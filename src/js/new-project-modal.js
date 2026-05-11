@@ -48,7 +48,7 @@ const NewProjectModal = {
 
     // Footer
     contentHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid var(--lex-border-subtle,rgba(0,0,0,0.06))">';
-    contentHtml += '<p style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);line-height:1.5">';
+    contentHtml += '<p class="npm-footer-hint" style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);line-height:1.5">';
     contentHtml += 'Select a matter to start a new conversation.';
     contentHtml += '</p>';
     contentHtml += '<lex-btn id="newProjectCreateBtn" variant="primary" size="sm">+ Create Matter</lex-btn>';
@@ -93,10 +93,73 @@ const NewProjectModal = {
     return true;
   },
 
+  /**
+   * @type {Function|null}
+   * Optional callback invoked when the user picks a matter. When set,
+   * supersedes the default "navigate to chat" behavior — the modal stays
+   * a generic matter picker. Reset on every open() call.
+   */
+  _onSelect: null,
+
+  /**
+   * @type {{ heading?: string, footerHint?: string, hideCreateBtn?: boolean }|null}
+   * Per-open UI tweaks. Applied on open(), reset on close().
+   */
+  _renderOverrides: null,
+
   // ── Open / Close ────────────────────────────────────────────────────────
 
-  async open() {
+  /**
+   * Open the matter picker.
+   *
+   * @param {Object} [options]
+   * @param {Function} [options.onSelect] - Callback(matterId, matterName, matterRow).
+   *   When provided, the picker invokes this instead of navigating to chat.
+   * @param {string}  [options.heading] - Custom modal heading.
+   * @param {string}  [options.footerHint] - Custom footer hint text.
+   * @param {boolean} [options.hideCreateBtn] - Hide "+ Create Matter" button.
+   */
+  async open(options) {
     await this.init();
+
+    var opts = options || {};
+    this._onSelect = typeof opts.onSelect === 'function' ? opts.onSelect : null;
+    this._renderOverrides = {
+      heading:       opts.heading || null,
+      footerHint:    opts.footerHint || null,
+      hideCreateBtn: opts.hideCreateBtn === true,
+    };
+
+    // Apply UI overrides without rebuilding the DOM
+    if (this._renderOverrides.heading) {
+      this.modal.heading = this._renderOverrides.heading;
+    } else {
+      this.modal.heading = 'Start New Chat';
+    }
+    var footer = this.modal.querySelector('.npm-footer-hint');
+    if (footer) {
+      footer.textContent = this._renderOverrides.footerHint
+        || 'Select a matter to start a new conversation.';
+    }
+    var createBtn = this.modal.querySelector('#newProjectCreateBtn');
+    if (createBtn) {
+      createBtn.style.display = this._renderOverrides.hideCreateBtn ? 'none' : '';
+    }
+
+    // Picker-mode chrome: when the modal is reused as a generic matter
+    // picker (onSelect callback), the user is in a sub-flow under another
+    // modal. Surface that with a back-chevron leading the title, hide the
+    // default X close button, and tag the modal so CSS can adjust. Default
+    // "Start New Chat" flow keeps the standard chrome.
+    var isPickerMode = !!this._onSelect;
+    this.modal.classList.toggle('npm-picker-mode', isPickerMode);
+    // Inject the back-chevron once; reuse on subsequent opens.
+    if (isPickerMode) {
+      // lex-modal's header isn't rendered until the modal opens for the
+      // first time. Defer injection until after .open=true triggers render.
+      // (init() guarantees this.modal exists but not its shadow children.)
+      setTimeout(this._ensurePickerChrome.bind(this), 0);
+    }
 
     this.modal.open = true;
     this.isOpen = true;
@@ -113,6 +176,10 @@ const NewProjectModal = {
         this.searchInput.value = '';
       }
     }
+    // Always clear per-open state so a stale onSelect from a prior caller
+    // can't fire on the next open.
+    this._onSelect = null;
+    this._renderOverrides = null;
   },
 
   // ── Data loading ────────────────────────────────────────────────────────
@@ -268,8 +335,6 @@ const NewProjectModal = {
 
   async selectMatter(matterId, matterName) {
     try {
-      this.close();
-
       if (!this.validateMatterId(matterId)) {
         console.error('[NewProjectModal] Invalid matter_id format:', matterId);
         if (window.Lex && window.Lex.Toast) {
@@ -279,10 +344,28 @@ const NewProjectModal = {
       }
 
       var matterIdString = String(matterId);
+      var matterRow = (this.allMatters || []).find(function (m) {
+        return String(m.matter_id || m.id || '') === matterIdString;
+      }) || null;
+
+      // Callback mode — the picker is reused by another flow (Create Task,
+      // task plan, etc). Hand off the selection and let the caller decide
+      // what to do; do NOT navigate.
+      if (typeof this._onSelect === 'function') {
+        var cb = this._onSelect;
+        this.close();
+        try {
+          cb(matterIdString, matterName, matterRow);
+        } catch (cbErr) {
+          console.error('[NewProjectModal] onSelect callback threw:', cbErr);
+        }
+        return;
+      }
+
+      // Default mode — open a chat for the selected matter
+      this.close();
       console.log('[NewProjectModal] Matter selected:', { matterId: matterIdString, matterName: matterName });
-
       var isOnChatPage = NavigationHelpers.isOnChatPage();
-
       if (isOnChatPage && typeof window.createProjectChat === 'function') {
         await window.createProjectChat(matterIdString, matterName);
       } else {
@@ -294,7 +377,7 @@ const NewProjectModal = {
     } catch (error) {
       console.error('[NewProjectModal] Failed to select matter:', error);
       if (window.Lex && window.Lex.Toast) {
-        window.Lex.Toast.show('Failed to start chat. Please try again.', 'error');
+        window.Lex.Toast.show('Failed to select matter. Please try again.', 'error');
       }
     }
   },
@@ -304,6 +387,86 @@ const NewProjectModal = {
   createNewMatter() {
     this.close();
     window.location.href = NavigationHelpers.resolvePath('matters.html') + '?action=create';
+  },
+
+  // ── Picker-mode chrome (back chevron, no X) ─────────────────────────────
+
+  /**
+   * In picker mode, inject a back-chevron button into the modal header and
+   * hide the default X close button. Idempotent — safe to call multiple
+   * times on the same modal instance.
+   *
+   * lex-modal renders its header lazily on first open, so this is called
+   * from a `setTimeout(0)` after toggling `.open = true`.
+   */
+  _ensurePickerChrome() {
+    if (!this.modal) return;
+    // lex-modal renders its content inside its own shadow / light DOM. The
+    // header is a direct child once rendered.
+    var header = this.modal.querySelector('.lex-modal-header');
+    if (!header) return;
+
+    // Hide the default close button via CSS (the `npm-picker-mode` class
+    // on the modal element gates the rule injected in _injectPickerStyles).
+    NewProjectModal._injectPickerStyles();
+
+    // Already injected? Just make sure it's visible.
+    var existing = header.querySelector('.npm-back-btn');
+    if (existing) return;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'npm-back-btn';
+    btn.setAttribute('aria-label', 'Go back');
+    btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+    btn.addEventListener('click', function () {
+      NewProjectModal.close();
+    });
+    // Insert as the FIRST child of the header so it leads the title.
+    header.insertBefore(btn, header.firstChild);
+  },
+
+  _stylesInjected: false,
+
+  _injectPickerStyles() {
+    if (NewProjectModal._stylesInjected) return;
+    NewProjectModal._stylesInjected = true;
+    var style = document.createElement('style');
+    style.setAttribute('data-source', 'new-project-modal');
+    style.textContent = [
+      // Hide the default X close button in picker mode — the chevron is the
+      // only dismissal affordance.
+      'lex-modal.npm-picker-mode .lex-modal-close { display: none !important; }',
+      // lex-modal's default header is flex with justify-content:space-between
+      // so the X-close sits on the right edge. With the X hidden, that
+      // pushes the title away from our injected back-chevron. Group them
+      // tight on the left in picker mode.
+      'lex-modal.npm-picker-mode .lex-modal-header {',
+      '  justify-content: flex-start !important;',
+      '  gap: 8px;',
+      '}',
+      'lex-modal.npm-picker-mode .lex-modal-title {',
+      '  flex: 0 1 auto;',
+      '  margin-right: auto;',
+      '}',
+      '.npm-back-btn {',
+      '  display: inline-flex; align-items: center; justify-content: center;',
+      '  width: 32px; height: 32px;',
+      '  background: transparent; border: none; padding: 0;',
+      '  margin: 0 4px 0 -6px;',  // pull slightly left to align with the modal edge
+      '  color: var(--lex-text-secondary, #555);',
+      '  border-radius: var(--lex-radius-md, 8px);',
+      '  cursor: pointer;',
+      '  transition: background 0.15s, color 0.15s;',
+      '  flex-shrink: 0;',
+      '}',
+      '.npm-back-btn:hover, .npm-back-btn:focus-visible {',
+      '  background: var(--lex-bg-secondary, rgba(0,0,0,0.05));',
+      '  color: var(--lex-text-primary);',
+      '  outline: none;',
+      '}',
+    ].join('\n');
+    document.head.appendChild(style);
   },
 
   // ── Component lazy-loading ───────────────────────────────────────────────

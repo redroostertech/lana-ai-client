@@ -11,9 +11,9 @@
     users: [],
     selectedId: null,
     matterId: null,
+    matterName: null,
     editingPlanId: null,
     editingItemIndex: null,
-    matterSearchTimer: null,
     unavailable: false,
     loading: false
   };
@@ -215,32 +215,6 @@
     return 'Unassigned / organization-level';
   }
 
-  function renderMatterResults(matters) {
-    var container = el('taskPlanMatterResults');
-    if (!container) return;
-    if (!matters.length) {
-      container.innerHTML = '<div class="task-plan-matter-result is-empty">No matching matters</div>';
-      container.classList.remove('hidden');
-      return;
-    }
-
-    container.innerHTML = matters.map(function (matter) {
-      var id = matterIdValue(matter);
-      return [
-        '<button class="task-plan-matter-result" type="button" data-matter-id="' + esc(id) + '">',
-        '  <span class="task-plan-matter-result__name">' + esc(matterLabel(matter)) + '</span>',
-        '  <span class="task-plan-matter-result__id">' + esc(id) + '</span>',
-        '</button>'
-      ].join('');
-    }).join('');
-    container.classList.remove('hidden');
-  }
-
-  function hideMatterResults() {
-    var container = el('taskPlanMatterResults');
-    if (container) container.classList.add('hidden');
-  }
-
   function setLexButtonText(button, label) {
     if (!button) return;
     button._originalChildren = [document.createTextNode(label)];
@@ -252,33 +226,41 @@
     }
   }
 
-  async function searchMatterScope() {
-    var input = el('taskPlanMatterId');
-    var query = input ? String(input.value || '').trim() : '';
-    if (query.length < 2) {
-      hideMatterResults();
+  // --- Matter picker (Create/Edit Task Plan modal) ----------------------
+  // Reuses NewProjectModal as a generic matter picker, giving the user the
+  // same recent-matters + search experience as the New Chat picker instead
+  // of a bare typeahead where they wouldn't know what to type.
+
+  function setPlanMatterScope(matterId, matterName) {
+    state.matterId = matterId || null;
+    state.matterName = matterName || null;
+    var hidden = el('taskPlanMatterId');
+    if (hidden) hidden.value = matterId || '';
+    var label = el('taskPlanMatterPickLabel');
+    if (label) {
+      if (matterId) {
+        label.textContent = matterName ? (matterName + '  ·  ' + matterId) : matterId;
+        label.classList.remove('is-placeholder');
+      } else {
+        label.textContent = 'None — applies to your organization';
+        label.classList.add('is-placeholder');
+      }
+    }
+  }
+
+  function openPlanMatterPicker() {
+    if (typeof NewProjectModal === 'undefined' || !NewProjectModal.open) {
+      Lex.Toast.error('Matter picker is unavailable on this page.');
       return;
     }
-
-    try {
-      var response = await api.searchMatters(query, 1, 8);
-      renderMatterResults(normalizeMatters(response));
-    } catch (error) {
-      console.warn('[TaskPlans] Matter search unavailable:', error && error.message);
-      hideMatterResults();
-    }
-  }
-
-  function queueMatterSearch() {
-    clearTimeout(state.matterSearchTimer);
-    state.matterSearchTimer = setTimeout(searchMatterScope, 250);
-  }
-
-  function selectMatterScope(matterId) {
-    var input = el('taskPlanMatterId');
-    state.matterId = matterId || '';
-    if (input) input.value = state.matterId;
-    hideMatterResults();
+    NewProjectModal.open({
+      heading: 'Pick a matter for this plan',
+      footerHint: 'Optional — leave unselected for organization-level work.',
+      hideCreateBtn: true,
+      onSelect: function (matterId, matterName) {
+        setPlanMatterScope(matterId, matterName);
+      }
+    });
   }
 
   function setUnavailable(error) {
@@ -466,7 +448,6 @@
     var type = el('taskPlanType');
     var description = el('taskPlanDescription');
     var instructions = el('taskPlanInstructions');
-    var matterId = el('taskPlanMatterId');
     var targetType = el('taskPlanTargetType');
     var targetUser = el('taskPlanTargetUserId');
     state.editingPlanId = null;
@@ -478,7 +459,10 @@
     if (type) type.value = 'manual';
     if (description) description.value = '';
     if (instructions) instructions.value = '';
-    if (matterId) matterId.value = state.matterId || '';
+    // Carry forward state.matterId (set from URL ?matter_id=... or prior
+    // selection) so a plan started from a matter context pre-populates the
+    // picker; otherwise default to "no matter".
+    setPlanMatterScope(state.matterId || null, state.matterName || null);
     if (targetType) targetType.value = 'unassigned';
     if (targetUser) targetUser.value = '';
     syncTargetUserVisibility();
@@ -495,7 +479,6 @@
     var type = el('taskPlanType');
     var description = el('taskPlanDescription');
     var instructions = el('taskPlanInstructions');
-    var matterId = el('taskPlanMatterId');
     var targetType = el('taskPlanTargetType');
     var targetUser = el('taskPlanTargetUserId');
     var target = planTarget(plan);
@@ -509,7 +492,11 @@
     if (type) type.value = plan.source_type || plan.metadata?.plan_type || 'manual';
     if (description) description.value = plan.description || '';
     if (instructions) instructions.value = plan.metadata?.draft_instructions || '';
-    if (matterId) matterId.value = plan.matter_id || plan.metadata?.source_matter_id || state.matterId || '';
+    var planMatterId = plan.matter_id || plan.metadata?.source_matter_id || state.matterId || null;
+    setPlanMatterScope(
+      planMatterId,
+      planMatterId === state.matterId ? state.matterName : null
+    );
     if (targetType) targetType.value = target.type || 'unassigned';
     if (targetUser) targetUser.value = target.user_id || '';
     syncTargetUserVisibility();
@@ -791,8 +778,7 @@
     var targetType = el('taskPlanTargetType');
     var list = el('taskPlansList');
     var detail = el('taskPlanDetail');
-    var matterInput = el('taskPlanMatterId');
-    var matterResults = el('taskPlanMatterResults');
+    var matterPickBtn = el('taskPlanMatterPickBtn');
 
     if (createBtn) createBtn.addEventListener('click', openCreateModal);
     if (cancelBtn) cancelBtn.addEventListener('click', closeCreateModal);
@@ -813,23 +799,7 @@
       targetType.addEventListener('change', syncTargetUserVisibility);
       targetType.addEventListener('lex-change', syncTargetUserVisibility);
     }
-    if (matterInput) {
-      matterInput.addEventListener('input', function () {
-        state.matterId = String(matterInput.value || '').trim() || null;
-        queueMatterSearch();
-      });
-      matterInput.addEventListener('focus', queueMatterSearch);
-      matterInput.addEventListener('blur', function () {
-        setTimeout(hideMatterResults, 150);
-      });
-    }
-
-    if (matterResults) {
-      matterResults.addEventListener('click', function (event) {
-        var result = event.target.closest('[data-matter-id]');
-        if (result) selectMatterScope(result.getAttribute('data-matter-id'));
-      });
-    }
+    if (matterPickBtn) matterPickBtn.addEventListener('click', openPlanMatterPicker);
 
     if (list) {
       list.addEventListener('click', function (event) {

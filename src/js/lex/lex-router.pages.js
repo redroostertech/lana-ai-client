@@ -39,9 +39,92 @@
       stylesheets: []
     },
 
+    'chat-v2.html': {
+      title: 'New Conversation',
+      activeNav: 'chat',
+      scripts: [
+        'js/utils/document-lifecycle.js',
+        'js/lex/components/foundation/lex-drawer.js',
+        'js/lex/components/foundation/lex-text.js',
+        'js/lex/components/foundation/lex-action-card.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-divider.js',
+        'js/vendor/mermaid.min.js',
+        'js/services/document-processing.service.js',
+        'js/lex/chat/lex-chat.format.js',
+        'js/lex/chat/lex-chat.source.js',
+        'js/lex/chat/lex-chat.source-llama.js',
+        'js/lex/chat/lex-chat.message.js',
+        'js/lex/chat/lex-chat.activity.js',
+        'js/lex/chat/lex-chat.documents.js',
+        'js/lex/chat/lex-chat.composer-mentions.js',
+        'js/lex/chat/lex-chat.composer.js',
+        'js/lex/chat/lex-chat.thread.js',
+        'js/lex/chat/lex-chat.js',
+        'js/lex/chat/lex-dynamic-card.renderer.js',
+        'js/lex/chat/lex-agentic-plan-card.js',
+        'js/lex/chat/lex-chat.index.js',
+        'js/chat-demo-responses.js',
+        'js/chat_v2.file-drawer.js',
+        'js/chat_v2.js'
+      ],
+      stylesheets: [
+        'css/lex-chat.css',
+        'css/chat-v2.css'
+      ]
+    },
+
     // ── Workspaces ── (standalone page — no descriptor needed)
 
-    // workspace-details.html — standalone page (not routed)
+    'workspace-details.html': {
+      title: 'Matter Details',
+      activeNav: 'workspaces',
+      scripts: [
+        'js/lex/components/foundation/lex-breadcrumb.js',
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-metric.js',
+        'js/lex/components/foundation/lex-detail-panel.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-card.js',
+        'js/lex/components/foundation/lex-drawer.js',
+        'js/lex/components/foundation/lex-tabs.js',
+        'js/lex/components/foundation/lex-accordion.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-checkbox.js',
+        'js/lex/components/form/lex-textarea.js',
+        'js/lex/components/data/lex-table.js',
+        'js/lex/components/data/lex-pagination.js',
+        'js/services/feature-tracker.js',
+        'js/vendor/mammoth.min.js',
+        'js/conflict-detection.js',
+        'js/similar-matters-widget.js',
+        'js/utils/document-lifecycle.js',
+        'js/utils/metadata-formatter.js',
+        'js/services/metadata-service.js',
+        'js/vendor/marked.min.js',
+        'js/components/document-metadata-viewer.js',
+        'js/tiptap-bundle-built.js',
+        'js/api/matter-notes-api.client.js',
+        'js/components/note-list.component.js',
+        'js/components/note-editor.component.js',
+        'js/matter-notes.js',
+        'js/shared/event-catalog.js',
+        'js/shared/event-browser.js',
+        'js/matter-skills.js',
+        'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.js',
+        'js/workflow-builder.js',
+        'js/vendor/pdf.min.js',
+        'js/services/docx-template-modal.js',
+        'js/workspace-billable-hours.js',
+        'js/workspace-details.js'
+      ],
+      stylesheets: [
+        'css/components/document-metadata.css',
+        'css/matter-notes.css',
+        'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css',
+        'css/lana-ask-btn.css'
+      ]
+    },
 
     'matters/timeline.html': {
       title: 'Matter Timeline',

@@ -12,8 +12,17 @@
     limit: 20,
     total: 0,
     newMenuOpen: false,
-    matterSearchTimer: null,
-    selectedMatterId: null
+    // Create/Edit Task modal selections
+    editingTaskId: null,           // null when creating, set when editing
+    viewingTask: null,             // currently open in the details modal
+    selectedMatterId: null,
+    selectedMatterName: null,
+    selectedTargetType: 'unassigned',  // unassigned | user | organization
+    selectedAssigneeId: null,
+    selectedAssigneeLabel: null,
+    // Create Task Plan modal selection
+    planSelectedMatterId: null,
+    planSelectedMatterName: null
   };
 
   var TASK_PLAN_ROLES = ['system_admin', 'org_admin', 'admin', 'upper_leader', 'senior_leader', 'senior_user'];
@@ -121,11 +130,24 @@
     var content = el('myTaskDetailsContent');
     if (!modal || !content || !task) return;
 
+    // Cache the task being viewed so action handlers (edit/complete/delete)
+    // can read its id without re-querying the row list.
+    state.viewingTask = task;
+
     var checklist = taskChecklistItems(task);
     var planLabel = taskPlanLabel(task);
-    var matterAction = task.matter_id
-      ? '<lex-btn variant="secondary" size="sm" data-matter-id="' + esc(task.matter_id) + '">Open Matter</lex-btn>'
-      : '';
+    var isComplete = String(task.status || '').toLowerCase() === 'complete';
+    var completeLabel = isComplete ? 'Reopen' : 'Mark Complete';
+    var completeAction = isComplete ? 'reopen' : 'complete';
+
+    var actionButtons = [
+      '<lex-btn variant="primary" size="sm" data-task-action="edit">Edit</lex-btn>',
+      '<lex-btn variant="secondary" size="sm" data-task-action="' + completeAction + '">' + completeLabel + '</lex-btn>',
+      task.matter_id
+        ? '<lex-btn variant="secondary" size="sm" data-matter-id="' + esc(task.matter_id) + '">Open Matter</lex-btn>'
+        : '',
+      '<lex-btn variant="danger" size="sm" data-task-action="delete">Delete</lex-btn>'
+    ].filter(Boolean).join(' ');
 
     modal.heading = task.title || 'Task Details';
     content.innerHTML = [
@@ -149,10 +171,16 @@
         return '<li>' + esc(label) + '</li>';
       }).join('') + '</ul>' : '    <p class="my-task-detail__muted">No checklist items attached.</p>',
       '  </section>',
-      matterAction ? '  <div class="my-task-detail__actions">' + matterAction + '</div>' : '',
+      '  <div class="my-task-detail__actions">' + actionButtons + '</div>',
       '</div>'
     ].join('');
     modal.open = true;
+  }
+
+  function closeTaskDetails() {
+    var modal = el('myTaskDetailsModal');
+    if (modal) modal.open = false;
+    state.viewingTask = null;
   }
 
   function updatePagination() {
@@ -322,90 +350,238 @@
     }
   }
 
-  function renderMatterResults(matters) {
-    var container = el('myTaskMatterResults');
-    if (!container) return;
-    if (!matters.length) {
-      container.innerHTML = '<div class="my-task-matter-result is-empty">No matching matters</div>';
-      container.classList.remove('hidden');
-      return;
-    }
-    container.innerHTML = matters.map(function (matter) {
-      var id = matter.matter_id || matter.id || '';
-      var name = matter.matter_name || matter.name || matter.title || id || 'Untitled matter';
-      return [
-        '<button type="button" class="my-task-matter-result" data-matter-id="' + esc(id) + '" data-matter-name="' + esc(name) + '">',
-        '  <span class="my-task-matter-result__name">' + esc(name) + '</span>',
-        '  <span class="my-task-matter-result__id">' + esc(id) + '</span>',
-        '</button>'
-      ].join('');
-    }).join('');
-    container.classList.remove('hidden');
-  }
+  // --- Matter picker (Create Task modal) ----------------------------------
+  // Reuses the NewProjectModal "Start New Chat" picker as a generic matter
+  // browser. The user sees recent + pinned matters by default, can search,
+  // and clicks a card to select. No more bare typeahead where the user
+  // doesn't know what to type.
 
-  function hideMatterResults() {
-    var container = el('myTaskMatterResults');
-    if (container) container.classList.add('hidden');
-  }
-
-  function normalizeMatters(response) {
-    if (!response) return [];
-    if (response.data) return normalizeMatters(response.data);
-    if (Array.isArray(response)) return response;
-    if (Array.isArray(response.matters)) return response.matters;
-    if (Array.isArray(response.items)) return response.items;
-    if (Array.isArray(response.results)) return response.results;
-    return [];
-  }
-
-  async function searchMatterScope() {
-    var input = el('myTaskMatterId');
-    var query = input ? String(input.value || '').trim() : '';
-    if (query.length < 2) {
-      hideMatterResults();
-      return;
-    }
-    try {
-      var response = await api.searchMatters(query, 1, 8);
-      renderMatterResults(normalizeMatters(response));
-    } catch (error) {
-      hideMatterResults();
-    }
-  }
-
-  function queueMatterSearch() {
-    clearTimeout(state.matterSearchTimer);
-    state.matterSearchTimer = setTimeout(searchMatterScope, 250);
-  }
-
-  function selectMatterScope(matterId, matterName) {
-    var input = el('myTaskMatterId');
+  function setSelectedMatter(matterId, matterName) {
     state.selectedMatterId = matterId || null;
-    if (input) input.value = matterName || matterId || '';
-    hideMatterResults();
+    state.selectedMatterName = matterName || null;
+    var hidden = el('myTaskMatterId');
+    if (hidden) hidden.value = matterId || '';
+    var label = el('myTaskMatterPickLabel');
+    if (label) {
+      if (matterId) {
+        label.textContent = matterName ? (matterName + '  ·  ' + matterId) : matterId;
+        label.classList.remove('is-placeholder');
+      } else {
+        label.textContent = 'Select a matter — or leave blank for a workspace task';
+        label.classList.add('is-placeholder');
+      }
+    }
+    // Show the clear (×) button only when something is selected.
+    var clearBtn = el('myTaskMatterClearBtn');
+    if (clearBtn) clearBtn.classList.toggle('hidden', !matterId);
+    // The available "Assign to" options depend on whether the task is
+    // scoped to a matter: matter-scoped tasks can only target users who
+    // have access to that matter, plus a "everyone with matter access"
+    // broadcast option. Workspace-only tasks target the org instead.
+    applyTargetTypeOptions();
+    // Selecting a new matter invalidates the prior assignee scope
+    setSelectedAssignee(null, null);
+  }
+
+  // Two option sets for the "Assign to" select, swapped based on whether
+  // a matter is currently selected. The lex-select component re-renders
+  // on `options` attribute change.
+  var WORKSPACE_TARGET_OPTIONS = [
+    { value: 'unassigned',   label: 'Unassigned / Org-level' },
+    { value: 'user',         label: 'Individual User' },
+    { value: 'organization', label: 'Entire Organization' }
+  ];
+  var MATTER_TARGET_OPTIONS = [
+    { value: 'unassigned',         label: 'Unassigned (matter ACL applies)' },
+    { value: 'user',               label: 'A user with matter access' },
+    { value: 'matter_organization', label: 'Everyone with matter access' }
+  ];
+
+  function applyTargetTypeOptions() {
+    var select = el('myTaskTargetType');
+    if (!select) return;
+    var nextOptions = state.selectedMatterId ? MATTER_TARGET_OPTIONS : WORKSPACE_TARGET_OPTIONS;
+    select.setAttribute('options', JSON.stringify(nextOptions));
+    // Preserve current selection where the value still exists in the new
+    // option set; otherwise fall back to 'unassigned'. Both option sets
+    // share 'unassigned' and 'user' values, so the matter-toggle only
+    // forces a fallback if the user had picked 'organization' /
+    // 'matter_organization' (those don't translate cleanly across modes).
+    var current = String(select.value || 'unassigned');
+    var validValues = nextOptions.map(function (o) { return o.value; });
+    if (validValues.indexOf(current) === -1) {
+      select.value = 'unassigned';
+    }
+    // Re-run visibility sync since the value may have just been reset.
+    syncTargetTypeVisibility();
+  }
+
+  function openMatterPicker() {
+    if (typeof NewProjectModal === 'undefined' || !NewProjectModal.open) {
+      Lex.Toast.error('Matter picker is unavailable on this page.');
+      return;
+    }
+    NewProjectModal.open({
+      heading: 'Pick a matter for this task',
+      footerHint: 'Select a matter — the task will be created under it.',
+      hideCreateBtn: true,
+      onSelect: function (matterId, matterName) {
+        setSelectedMatter(matterId, matterName);
+      }
+    });
+  }
+
+  // --- Matter picker (Create Task Plan modal) -----------------------------
+
+  function setPlanSelectedMatter(matterId, matterName) {
+    state.planSelectedMatterId = matterId || null;
+    state.planSelectedMatterName = matterName || null;
+    var hidden = el('myTaskPlanMatterId');
+    if (hidden) hidden.value = matterId || '';
+    var label = el('myTaskPlanMatterPickLabel');
+    if (label) {
+      if (matterId) {
+        label.textContent = matterName ? (matterName + '  ·  ' + matterId) : matterId;
+        label.classList.remove('is-placeholder');
+      } else {
+        label.textContent = 'None — applies to your workspace';
+        label.classList.add('is-placeholder');
+      }
+    }
+  }
+
+  function openPlanMatterPicker() {
+    if (typeof NewProjectModal === 'undefined' || !NewProjectModal.open) {
+      Lex.Toast.error('Matter picker is unavailable on this page.');
+      return;
+    }
+    NewProjectModal.open({
+      heading: 'Pick a matter for this plan',
+      footerHint: 'Optional — leave unselected to scope the plan to your workspace.',
+      hideCreateBtn: true,
+      onSelect: function (matterId, matterName) {
+        setPlanSelectedMatter(matterId, matterName);
+      }
+    });
+  }
+
+  // --- User picker (Create Task modal, target_type='user') ----------------
+  // Opens UserPickerModal — a sibling of NewProjectModal that shows the
+  // same Browse-trigger + modal flow for picking a user. Scoped to the
+  // currently selected matter when set, so the picker shows shared
+  // matter users first and "rest of org" after.
+
+  function setSelectedAssignee(userId, label) {
+    state.selectedAssigneeId = userId || null;
+    state.selectedAssigneeLabel = label || null;
+    var hidden = el('myTaskAssignee');
+    if (hidden) hidden.value = userId || '';
+    var pickLabel = el('myTaskUserPickLabel');
+    if (pickLabel) {
+      if (userId) {
+        pickLabel.textContent = label || userId;
+        pickLabel.classList.remove('is-placeholder');
+      } else {
+        pickLabel.textContent = 'Select a user…';
+        pickLabel.classList.add('is-placeholder');
+      }
+    }
+  }
+
+  function openUserPicker() {
+    if (typeof UserPickerModal === 'undefined' || !UserPickerModal.open) {
+      Lex.Toast.error('User picker is unavailable on this page.');
+      return;
+    }
+    UserPickerModal.open({
+      heading: 'Pick a user to assign',
+      footerHint: state.selectedMatterId
+        ? 'Pick someone who has access to this matter.'
+        : 'Pick a user in your organization.',
+      matterId: state.selectedMatterId || null,
+      onSelect: function (userId, label) {
+        setSelectedAssignee(userId, label);
+      }
+    });
+  }
+
+  // Show/hide the per-user search field depending on the "Assign to"
+  // selection. unassigned + organization both hide the user picker (they
+  // don't target a specific user); only `user` mode reveals it.
+  function syncTargetTypeVisibility() {
+    var select = el('myTaskTargetType');
+    var field = el('myTaskTargetUserField');
+    var value = select ? String(select.value || 'unassigned') : 'unassigned';
+    state.selectedTargetType = value;
+    if (field) {
+      field.classList.toggle('hidden', value !== 'user');
+    }
+    // Leaving "Individual User" mode clears any previously selected user
+    // so a stale assignee can't sneak into the payload.
+    if (value !== 'user') {
+      setSelectedAssignee(null, null);
+    }
   }
 
   function openNewTaskModal() {
+    state.editingTaskId = null;
+    fillTaskModal(null);
     var modal = el('myTaskCreateModal');
+    if (modal) modal.heading = 'Create Task';
+    // Use Lex.Utils.setLexButtonText — assigning textContent directly to a
+    // <lex-btn> wipes its styled inner DOM (see lex.utils.js for details).
+    Lex.Utils.setLexButtonText(el('myTaskSaveBtn'), 'Create Task');
+    if (modal) modal.open = true;
+  }
+
+  function openEditTaskModal(task) {
+    if (!task || !task.id) {
+      Lex.Toast.error('Task missing — try refreshing the list.');
+      return;
+    }
+    state.editingTaskId = task.id;
+    fillTaskModal(task);
+    var modal = el('myTaskCreateModal');
+    if (modal) modal.heading = 'Edit Task';
+    Lex.Utils.setLexButtonText(el('myTaskSaveBtn'), 'Save Changes');
+    if (modal) modal.open = true;
+  }
+
+  function fillTaskModal(task) {
     var title = el('myTaskTitle');
     var priority = el('myTaskPriority');
-    var matterInput = el('myTaskMatterId');
     var description = el('myTaskDescription');
     var dueDate = el('myTaskDueDate');
+    var targetType = el('myTaskTargetType');
 
-    state.selectedMatterId = null;
-    if (title) title.value = '';
-    if (priority) priority.value = 'medium';
-    if (matterInput) matterInput.value = '';
-    if (description) description.value = '';
-    if (dueDate) dueDate.value = '';
-    hideMatterResults();
-    if (modal) modal.open = true;
+    if (task) {
+      if (title) title.value = task.title || '';
+      if (priority) priority.value = task.priority || 'medium';
+      if (description) description.value = task.description || '';
+      if (dueDate) dueDate.value = task.due_date ? task.due_date.substring(0, 10) : '';
+      if (targetType) targetType.value = task.target_type || 'unassigned';
+      // Pre-fill matter selection from task.matter_id / matter name.
+      setSelectedMatter(task.matter_id || null, task.matter_name || task.matter_id || null);
+      // Pre-fill assignee if this is a user-targeted task.
+      setSelectedAssignee(
+        task.assigned_to_user_id || null,
+        task.assigned_to_name || null
+      );
+    } else {
+      if (title) title.value = '';
+      if (priority) priority.value = 'medium';
+      if (description) description.value = '';
+      if (dueDate) dueDate.value = '';
+      if (targetType) targetType.value = 'unassigned';
+      setSelectedMatter(null, null);
+      setSelectedAssignee(null, null);
+    }
   }
 
   function closeNewTaskModal() {
     var modal = el('myTaskCreateModal');
     if (modal) modal.open = false;
+    state.editingTaskId = null;
   }
 
   async function submitNewTask(event) {
@@ -417,23 +593,17 @@
     var saveBtn = el('myTaskSaveBtn');
     var titleInput = el('myTaskTitle');
     var priorityInput = el('myTaskPriority');
-    var matterInput = el('myTaskMatterId');
     var descriptionInput = el('myTaskDescription');
     var dueDateInput = el('myTaskDueDate');
 
     var title = titleInput ? String(titleInput.value || '').trim() : '';
-    // Only accept a matter that the user explicitly picked from the
-    // search results — never fall back to the typed input text, since
-    // that could send a matter NAME to a route that expects an ID.
-    var matterId = state.selectedMatterId;
+    // Matter is optional. When unset, the API call routes through a
+    // workspace-scoped sentinel ('_workspace') so the backend treats the
+    // task as org-level instead of matter-pinned.
+    var matterId = state.selectedMatterId || '_workspace';
 
     if (!title) {
       Lex.Toast.error('Title is required');
-      return;
-    }
-    if (!matterId) {
-      Lex.Toast.error('Pick a matter from the search results before saving.');
-      if (matterInput && typeof matterInput.focus === 'function') matterInput.focus();
       return;
     }
 
@@ -442,17 +612,169 @@
       description: descriptionInput && descriptionInput.value ? String(descriptionInput.value).trim() : null,
       priority: priorityInput && priorityInput.value ? priorityInput.value : 'medium',
       due_date: dueDateInput && dueDateInput.value ? new Date(dueDateInput.value + 'T12:00:00').toISOString() : null,
-      status: 'pending'
+      status: 'pending',
+      // Assignment semantics:
+      //   unassigned   -> no assignee; matter-level ACL grants access to everyone in the org
+      //   user         -> single assignee; assigned_to_user_id set below
+      //   organization -> broadcast to the org; no specific assignee
+      target_type: state.selectedTargetType || 'unassigned'
+    };
+    if (state.selectedTargetType === 'user') {
+      if (!state.selectedAssigneeId) {
+        Lex.Toast.error('Pick a user from the search results, or change "Assign to" to Unassigned.');
+        var assigneeInput = el('myTaskAssignee');
+        if (assigneeInput && typeof assigneeInput.focus === 'function') assigneeInput.focus();
+        return;
+      }
+      payload.assigned_to_user_id = state.selectedAssigneeId;
+    }
+
+    if (saveBtn) saveBtn.loading = true;
+    try {
+      if (state.editingTaskId) {
+        // PATCH /api/v1/matters/tasks/:task_id — the update route is task-
+        // scoped (no matter_id in URL). We don't pass `status` here; the
+        // Mark Complete / Reopen action owns status transitions so the
+        // edit modal can't accidentally flip-flop completed-ness.
+        var updatePayload = {
+          title: payload.title,
+          description: payload.description,
+          priority: payload.priority,
+          due_date: payload.due_date,
+          assigned_to_user_id: payload.assigned_to_user_id || null
+        };
+        await api.updateTask(state.editingTaskId, updatePayload);
+        Lex.Toast.success('Task updated');
+      } else {
+        await api.createTask(matterId, payload);
+        Lex.Toast.success(
+          state.selectedAssigneeId && state.selectedAssigneeLabel
+            ? ('Task created — assigned to ' + state.selectedAssigneeLabel)
+            : 'Task created'
+        );
+      }
+      closeNewTaskModal();
+      resetAndLoad();
+    } catch (error) {
+      Lex.Toast.error(error.message || (state.editingTaskId ? 'Unable to update task' : 'Unable to create task'));
+    } finally {
+      if (saveBtn) saveBtn.loading = false;
+    }
+  }
+
+  // --- Task actions (Edit / Complete / Reopen / Delete) -------------------
+
+  async function handleTaskAction(action) {
+    var task = state.viewingTask;
+    if (!task || !task.id) return;
+
+    if (action === 'edit') {
+      closeTaskDetails();
+      openEditTaskModal(task);
+      return;
+    }
+
+    if (action === 'complete') {
+      try {
+        await api.completeTask(task.id);
+        Lex.Toast.success('Task marked complete');
+        closeTaskDetails();
+        resetAndLoad();
+      } catch (error) {
+        Lex.Toast.error(error.message || 'Unable to mark task complete');
+      }
+      return;
+    }
+
+    if (action === 'reopen') {
+      try {
+        await api.updateTask(task.id, { status: 'pending' });
+        Lex.Toast.success('Task reopened');
+        closeTaskDetails();
+        resetAndLoad();
+      } catch (error) {
+        Lex.Toast.error(error.message || 'Unable to reopen task');
+      }
+      return;
+    }
+
+    if (action === 'delete') {
+      var confirmDelete = window.confirm('Delete this task? This cannot be undone.');
+      if (!confirmDelete) return;
+      try {
+        await api.deleteTask(task.id);
+        Lex.Toast.success('Task deleted');
+        closeTaskDetails();
+        resetAndLoad();
+      } catch (error) {
+        Lex.Toast.error(error.message || 'Unable to delete task');
+      }
+      return;
+    }
+  }
+
+  // --- Create Task Plan modal ---------------------------------------------
+
+  function openNewTaskPlanModal() {
+    var modal = el('myTaskPlanCreateModal');
+    var title = el('myTaskPlanTitle');
+    var description = el('myTaskPlanDescription');
+
+    if (title) title.value = '';
+    if (description) description.value = '';
+    setPlanSelectedMatter(null, null);
+    if (modal) modal.open = true;
+  }
+
+  function closeNewTaskPlanModal() {
+    var modal = el('myTaskPlanCreateModal');
+    if (modal) modal.open = false;
+  }
+
+  async function submitNewTaskPlan(event) {
+    if (event) event.preventDefault();
+    if (event && event.detail && event.detail.valid === false) {
+      Lex.Toast.error('Please fix the highlighted fields');
+      return;
+    }
+    var saveBtn = el('myTaskPlanSaveBtn');
+    var titleInput = el('myTaskPlanTitle');
+    var descriptionInput = el('myTaskPlanDescription');
+
+    var title = titleInput ? String(titleInput.value || '').trim() : '';
+    if (!title) {
+      Lex.Toast.error('Title is required');
+      if (titleInput && typeof titleInput.focus === 'function') titleInput.focus();
+      return;
+    }
+
+    // Backend validator (task-plans.validators.js line 52) requires
+    // `title` — historically the form labeled it "Name" which sent the
+    // wrong key and rejected at the API boundary.
+    var payload = {
+      title: title,
+      description: descriptionInput && descriptionInput.value
+        ? String(descriptionInput.value).trim() : null,
+      matter_id: state.planSelectedMatterId || null
     };
 
     if (saveBtn) saveBtn.loading = true;
     try {
-      await api.createTask(matterId, payload);
-      Lex.Toast.success('Task created');
-      closeNewTaskModal();
-      resetAndLoad();
+      var result = await api.createTaskPlan(payload);
+      var plan = (result && result.data) || result || {};
+      var planId = plan.id || plan.plan_id;
+      Lex.Toast.success('Plan created — opening editor');
+      closeNewTaskPlanModal();
+      // Hand off to the dedicated editor page for adding items + assignees.
+      // The plan id query param is what admin/task-plans.html uses to load
+      // the just-created plan into its editor view.
+      if (planId) {
+        Lex.Nav.go('admin/task-plans.html', { params: { id: planId } });
+      } else {
+        Lex.Nav.go('admin/task-plans.html');
+      }
     } catch (error) {
-      Lex.Toast.error(error.message || 'Unable to create task');
+      Lex.Toast.error(error.message || 'Unable to create task plan');
     } finally {
       if (saveBtn) saveBtn.loading = false;
     }
@@ -469,7 +791,7 @@
         Lex.Toast.error('You do not have permission to create task plans.');
         return;
       }
-      Lex.Nav.go('admin/task-plans.html', { params: { action: 'create' } });
+      openNewTaskPlanModal();
     }
   }
 
@@ -533,6 +855,16 @@
     var modalContent = el('myTaskDetailsContent');
     if (modalContent) {
       modalContent.addEventListener('click', function (event) {
+        // Action buttons (edit / complete / reopen / delete) take
+        // precedence — they share the same DOM region as the "Open
+        // Matter" button and we don't want the matter-id click leak
+        // when clicking, e.g., "Edit" on a matter-scoped task.
+        var actionButton = event.target.closest('[data-task-action]');
+        if (actionButton) {
+          event.stopPropagation();
+          handleTaskAction(actionButton.getAttribute('data-task-action'));
+          return;
+        }
         var matterButton = event.target.closest('[data-matter-id]');
         if (!matterButton) return;
         Lex.Nav.go('workspace-details.html', {
@@ -566,32 +898,48 @@
       if (event.key === 'Escape') hideNewMenu();
     });
 
+    // --- Create Task modal ----
     var createForm = el('myTaskCreateForm');
     var cancelBtn = el('myTaskCancelBtn');
-    var matterInput = el('myTaskMatterId');
-    var matterResults = el('myTaskMatterResults');
+    var matterPickBtn = el('myTaskMatterPickBtn');
+    var userPickBtn = el('myTaskUserPickBtn');
+
     if (createForm) {
       createForm.addEventListener('submit', submitNewTask);
       createForm.addEventListener('lex-submit', submitNewTask);
     }
     if (cancelBtn) cancelBtn.addEventListener('click', closeNewTaskModal);
-    if (matterInput) {
-      matterInput.addEventListener('input', function () {
-        state.selectedMatterId = null;
-        queueMatterSearch();
-      });
-      matterInput.addEventListener('focus', queueMatterSearch);
-      matterInput.addEventListener('blur', function () {
-        setTimeout(hideMatterResults, 150);
-      });
-    }
-    if (matterResults) {
-      matterResults.addEventListener('click', function (event) {
-        var result = event.target.closest('[data-matter-id]');
-        if (!result) return;
-        selectMatterScope(result.getAttribute('data-matter-id'), result.getAttribute('data-matter-name'));
+    if (matterPickBtn) matterPickBtn.addEventListener('click', openMatterPicker);
+    if (userPickBtn) userPickBtn.addEventListener('click', openUserPicker);
+
+    // The clear (×) button is a child of the matter picker-trigger button.
+    // Catch it here BEFORE the click bubbles to the trigger and re-opens
+    // the picker; stopPropagation is essential.
+    var matterClearBtn = el('myTaskMatterClearBtn');
+    if (matterClearBtn) {
+      matterClearBtn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        event.preventDefault();
+        setSelectedMatter(null, null);
       });
     }
+
+    var targetType = el('myTaskTargetType');
+    if (targetType) {
+      targetType.addEventListener('change', syncTargetTypeVisibility);
+      targetType.addEventListener('lex-change', syncTargetTypeVisibility);
+    }
+
+    // --- Create Task Plan modal ----
+    var planForm = el('myTaskPlanCreateForm');
+    var planCancelBtn = el('myTaskPlanCancelBtn');
+    var planMatterPickBtn = el('myTaskPlanMatterPickBtn');
+    if (planForm) {
+      planForm.addEventListener('submit', submitNewTaskPlan);
+      planForm.addEventListener('lex-submit', submitNewTaskPlan);
+    }
+    if (planCancelBtn) planCancelBtn.addEventListener('click', closeNewTaskPlanModal);
+    if (planMatterPickBtn) planMatterPickBtn.addEventListener('click', openPlanMatterPicker);
   }
 
   function init() {

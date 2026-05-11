@@ -49,6 +49,14 @@
   // lex-chat event listener refs for cleanup
   var _chatEventListeners = [];
 
+  // Window-level event listener refs for cleanup (page-scoped events such as
+  // `conversation:renamed` dispatched by the rename helper / kebab modal).
+  var _windowEventListeners = [];
+
+  // Handler kept on module scope so it can be referenced before `init` runs
+  // (and so cleanup detaches the exact instance that was attached).
+  var _onConversationRenamed = null;
+
   // Intent definitions (hardcoded for V1; V2 will pull from org config)
   var INTENTS = [
     { id: 'summarise',   label: 'Summarise'    },
@@ -93,17 +101,51 @@
   }
 
   // =========================================================================
-  // Page title + workspace details button
+  // Page title + workspace navigation buttons
   // =========================================================================
 
   /**
    * Update the topbar page title.
    * Shows "New Conversation" when no conversation is active.
+   *
+   * Calling lex-app.setPage({title}) also updates document.title via the
+   * <lex-app> reactive prop, so the macOS window title bar stays in sync.
    */
   function setPageTitle(title) {
     if (dom.app && typeof dom.app.setPage === 'function') {
       dom.app.setPage({ title: title || 'New Conversation' });
     }
+  }
+
+  /**
+   * Listen for `conversation:renamed` dispatched by the rename helper
+   * (utils/rename-conversation.js) and any modal that defers to it.
+   *
+   * When the renamed conversation matches the one currently loaded on this
+   * page, we update local cached state and refresh the topbar heading. The
+   * <lex-app> updated() hook then writes `document.title` automatically so
+   * the macOS window title bar refreshes alongside the in-page heading.
+   *
+   * Listener is tracked in `_windowEventListeners` and removed in onLeave().
+   */
+  function attachConversationRenamedListener() {
+    if (_onConversationRenamed) return; // idempotent — never double-bind
+    _onConversationRenamed = function (e) {
+      try {
+        var detail = (e && e.detail) || {};
+        if (!detail.threadId || !detail.title) return;
+        if (!_conversationId || detail.threadId !== _conversationId) return;
+        _sessionTitle = detail.title;
+        setPageTitle(detail.title);
+      } catch (err) {
+        console.error('[chat_v2] conversation:renamed handler error:', err);
+      }
+    };
+    window.addEventListener('conversation:renamed', _onConversationRenamed);
+    _windowEventListeners.push({
+      event: 'conversation:renamed',
+      handler: _onConversationRenamed
+    });
   }
 
   /**
@@ -122,19 +164,41 @@
     center.style.alignItems = 'center';
     center.style.gap = '12px';
 
-    var existing = center.querySelector('[data-action="workspace-details"]');
+    var existingBack = center.querySelector('[data-action="workspace-back"]');
+    var existingDetails = center.querySelector('[data-action="workspace-details"]');
 
     if (!_matter || !_matter.id) {
-      // No matter — remove button if present
-      if (existing) existing.remove();
+      if (existingBack) existingBack.remove();
+      if (existingDetails) existingDetails.remove();
       return;
+    }
+
+    if (!existingBack) {
+      var backBtn = document.createElement('button');
+      backBtn.setAttribute('data-action', 'workspace-back');
+      backBtn.title = 'Back to workspace';
+      backBtn.setAttribute('aria-label', 'Back to workspace');
+      backBtn.style.cssText = 'flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:5px 10px;font-size:12px;font-weight:600;color:var(--lex-text-primary);background:var(--lex-bg-primary);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-sm);cursor:pointer;white-space:nowrap;transition:background var(--lex-transition-fast),border-color var(--lex-transition-fast);';
+      backBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg><span>Back</span>';
+      backBtn.addEventListener('mouseenter', function () {
+        backBtn.style.background = 'var(--lex-bg-secondary)';
+        backBtn.style.borderColor = 'var(--lex-border-strong)';
+      });
+      backBtn.addEventListener('mouseleave', function () {
+        backBtn.style.background = 'var(--lex-bg-primary)';
+        backBtn.style.borderColor = 'var(--lex-border-default)';
+      });
+      backBtn.addEventListener('click', function () {
+        openWorkspaceDetails('conversations');
+      });
+      center.insertBefore(backBtn, center.firstChild);
     }
 
     var label = _matter.name ? 'View ' + _matter.name : 'View Workspace Details';
 
-    if (existing) {
+    if (existingDetails) {
       // Update label
-      var span = existing.querySelector('span');
+      var span = existingDetails.querySelector('span');
       if (span) span.textContent = label;
     } else {
       // Create button
@@ -155,16 +219,17 @@
   /**
    * Open workspace details page for the current matter.
    */
-  function openWorkspaceDetails() {
+  function openWorkspaceDetails(tab) {
     if (!_matter || !_matter.id) return;
     var matterId = _matter.matter_id || _matter.id;
+    var targetTab = tab || 'activity';
     if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
       Lex.Nav.go('workspace-details.html', {
-        params: { id: matterId, tab: 'activity' },
-        context: { matterId: matterId, tab: 'activity', source: 'chat', conversationId: _conversationId, conversationTitle: _sessionTitle }
+        params: { id: matterId, tab: targetTab },
+        context: { matterId: matterId, tab: targetTab, source: 'chat', conversationId: _conversationId, conversationTitle: _sessionTitle }
       });
     } else {
-      window.location.href = 'workspace-details.html?id=' + encodeURIComponent(matterId);
+      window.location.href = 'workspace-details.html?id=' + encodeURIComponent(matterId) + '&tab=' + encodeURIComponent(targetTab);
     }
   }
 
@@ -174,6 +239,8 @@
   function removeWorkspaceDetailsButton() {
     var topbar = dom.app ? dom.app.querySelector('lex-topbar') : null;
     if (!topbar) return;
+    var backBtn = topbar.querySelector('[data-action="workspace-back"]');
+    if (backBtn) backBtn.remove();
     var btn = topbar.querySelector('[data-action="workspace-details"]');
     if (btn) btn.remove();
   }
@@ -636,6 +703,7 @@
       if (title) {
         _sessionTitle = title;
         setPageTitle(title);
+        updateWorkspaceDetailsButton();
         if (convId && window.ConversationMenu) {
           window.ConversationMenu.updateConversation(convId, { title: title });
         }
@@ -1375,18 +1443,23 @@
         });
     };
 
+    // Subscribe to window-level rename events so the topbar / document.title
+    // refresh instantly when a rename happens on any surface (kebab modal,
+    // workspace Conversations tab, future inline-edit, etc.). The
+    // RenameConversation helper dispatches `conversation:renamed` on window
+    // after the PUT resolves.
+    attachConversationRenamedListener();
+
     // Activate skeleton shimmer for the cards area
     if (window.Lex && window.Lex.Redact) {
       window.Lex.Redact.on(dom.cardsWrapper);
     }
 
-    // Clear stale history.state.path from previous visits.
-    // chat-v2.html is a standalone page (not SPA-routed), so
-    // updateParams() writes session/matter into history.state.path.
-    // On a fresh navigation (e.g. sidebar "+ New Chat"), the browser
-    // may preserve the old state, causing init() to read a stale
-    // session ID and 404. Use location.search as the canonical source.
-    var params = new URLSearchParams(window.location.search);
+    // Read from Lex.Nav when SPA-routed and from location.search when loaded
+    // as a standalone page.
+    var params = (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.getParams === 'function')
+      ? window.Lex.Nav.getParams()
+      : new URLSearchParams(window.location.search);
     var deepLinkSessionId = params.get('session') || null;
     var deepLinkMatterId = params.get('matter') || null;
 
@@ -1469,6 +1542,12 @@
     hideGenerationBanner();
     // Clean up ACTIVE stage (lex-chat, event listeners)
     cleanupActiveStage();
+    // Detach window-level listeners (conversation:renamed, etc.)
+    _windowEventListeners.forEach(function (entry) {
+      window.removeEventListener(entry.event, entry.handler);
+    });
+    _windowEventListeners = [];
+    _onConversationRenamed = null;
     // Remove workspace details button
     removeWorkspaceDetailsButton();
     // Remove document click handler
@@ -1499,9 +1578,18 @@
   }
 
   // =========================================================================
-  // Page lifecycle — standalone page, called directly
+  // Page lifecycle
   // =========================================================================
 
-  init();
+  if (window.LexRouter && typeof window.LexRouter.registerPageInit === 'function') {
+    window.LexRouter.registerPageInit('chat-v2.html', function () {
+      if (window.LexRouter && typeof window.LexRouter.registerView === 'function') {
+        window.LexRouter.registerView({ onLeave: onLeave });
+      }
+      init();
+    });
+  } else {
+    init();
+  }
 
 })();

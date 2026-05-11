@@ -120,15 +120,31 @@
             value="medium"
             options='[{"value":"low","label":"Low"},{"value":"normal","label":"Normal"},{"value":"medium","label":"Medium"},{"value":"high","label":"High"}]'
           ></lex-select>
-          <div class="my-task-scope-field">
-            <lex-input
-              id="myTaskMatterId"
-              name="matter_id"
-              label="Matter / Workspace"
-              placeholder="Search matters by name or ID"
-              required
-            ></lex-input>
-            <div id="myTaskMatterResults" class="my-task-matter-results hidden" aria-live="polite"></div>
+          <div class="my-task-scope-field my-task-picker-field">
+            <label class="my-task-picker-label" for="myTaskMatterPickBtn">
+              Matter / Workspace <span class="my-task-picker-optional">(optional)</span>
+            </label>
+            <div class="my-task-picker-frame">
+              <button
+                type="button"
+                id="myTaskMatterPickBtn"
+                class="my-task-picker-trigger"
+                aria-haspopup="dialog"
+              >
+                <span id="myTaskMatterPickLabel" class="my-task-picker-trigger__label is-placeholder">
+                  Select a matter — or leave blank for a workspace task
+                </span>
+              </button>
+              <button
+                type="button"
+                id="myTaskMatterClearBtn"
+                class="my-task-picker-trigger__clear hidden"
+                aria-label="Clear matter selection"
+                title="Clear matter selection"
+              >&times;</button>
+              <span class="my-task-picker-trigger__hint" aria-hidden="true">Browse</span>
+            </div>
+            <input type="hidden" id="myTaskMatterId" name="matter_id" />
           </div>
           <lex-input
             id="myTaskDueDate"
@@ -136,6 +152,28 @@
             label="Due Date"
             type="date"
           ></lex-input>
+          <lex-select
+            id="myTaskTargetType"
+            name="target_type"
+            label="Assign to"
+            value="unassigned"
+            options='[{"value":"unassigned","label":"Unassigned / Org-level"},{"value":"user","label":"Individual User"},{"value":"organization","label":"Entire Organization"}]'
+          ></lex-select>
+          <div id="myTaskTargetUserField" class="my-task-scope-field my-task-picker-field hidden">
+            <label class="my-task-picker-label" for="myTaskUserPickBtn">User</label>
+            <button
+              type="button"
+              id="myTaskUserPickBtn"
+              class="my-task-picker-trigger"
+              aria-haspopup="dialog"
+            >
+              <span id="myTaskUserPickLabel" class="my-task-picker-trigger__label is-placeholder">
+                Select a user…
+              </span>
+              <span class="my-task-picker-trigger__hint" aria-hidden="true">Browse</span>
+            </button>
+            <input type="hidden" id="myTaskAssignee" name="assignee" />
+          </div>
         </div>
 
         <lex-textarea
@@ -153,6 +191,62 @@
         </div>
       </lex-form>
     </lex-modal>
+
+    <lex-modal
+      id="myTaskPlanCreateModal"
+      heading="Create Task Plan"
+      size="lg"
+      hide-actions
+      data-hoist
+    >
+      <lex-form id="myTaskPlanCreateForm">
+        <div class="my-task-form-grid">
+          <lex-input
+            id="myTaskPlanTitle"
+            name="title"
+            label="Title"
+            placeholder="Q3 onboarding checklist"
+            required
+          ></lex-input>
+          <div class="my-task-scope-field my-task-picker-field">
+            <label class="my-task-picker-label" for="myTaskPlanMatterPickBtn">
+              Matter / Workspace <span class="my-task-picker-optional">(optional)</span>
+            </label>
+            <button
+              type="button"
+              id="myTaskPlanMatterPickBtn"
+              class="my-task-picker-trigger"
+              aria-haspopup="dialog"
+            >
+              <span id="myTaskPlanMatterPickLabel" class="my-task-picker-trigger__label is-placeholder">
+                None — applies to your workspace
+              </span>
+              <span class="my-task-picker-trigger__hint" aria-hidden="true">Browse</span>
+            </button>
+            <input type="hidden" id="myTaskPlanMatterId" name="matter_id" />
+          </div>
+        </div>
+
+        <lex-textarea
+          id="myTaskPlanDescription"
+          name="description"
+          label="Description"
+          placeholder="What this plan covers. You can add items on the next screen."
+          rows="3"
+          auto-resize
+        ></lex-textarea>
+
+        <p class="my-task-plan-hint">
+          After creating the plan, you'll be taken to the editor to add items
+          and assignees.
+        </p>
+
+        <div class="my-task-modal-actions">
+          <lex-btn id="myTaskPlanCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
+          <lex-btn id="myTaskPlanSaveBtn" variant="primary" size="md" type="submit">Create &amp; Edit Items</lex-btn>
+        </div>
+      </lex-form>
+    </lex-modal>
   </template>
 
   <noscript>
@@ -164,11 +258,13 @@
   <script src="js/mock-data.js"></script>
   <script src="js/api.js"></script>
   <script src="js/utils.js"></script>
+  <script src="js/utils/rename-conversation.js"></script>
   <script src="js/components.js"></script>
   <script src="js/version.js"></script>
   <script src="js/menu.js"></script>
   <script src="js/navigation-helpers.js"></script>
   <script src="js/new-project-modal.js"></script>
+  <script src="js/user-picker-modal.js"></script>
   <script src="js/conversation-menu.js"></script>
   <script src="js/conversation-search-modal.js"></script>
   <script src="js/contact-search-modal.js"></script>

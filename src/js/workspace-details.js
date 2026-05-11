@@ -720,11 +720,15 @@
     // render it as a stacked block at the bottom of this card so the meta
     // rows above stay aligned in the label/value columns.
     var descriptionText = (matter && matter.description) ? String(matter.description).trim() : '';
-    var descriptionBlock = descriptionText
-      ? '<div class="pb-2.5 mb-2.5 border-b border-gray-100">' +
-          '<p class="text-gray-900" style="white-space:pre-wrap;line-height:1.5;margin:0;">' + escapeHtml(descriptionText) + '</p>' +
-        '</div>'
-      : '';
+    var descriptionBlock = '<div class="pb-2.5 mb-2.5 border-b border-gray-100">' +
+        '<div class="flex items-center justify-between gap-3 mb-1.5">' +
+          '<span class="text-gray-500">Description</span>' +
+          '<button type="button" onclick="openMatterDescriptionEditor()" class="text-xs font-medium lex-text-accent hover:underline">Edit</button>' +
+        '</div>' +
+        (descriptionText
+          ? '<p class="text-gray-900" style="white-space:pre-wrap;line-height:1.5;margin:0;">' + escapeHtml(descriptionText) + '</p>'
+          : '<p class="text-gray-500" style="margin:0;">No description yet</p>') +
+      '</div>';
 
     // Created-by name from the API's denormalized fields. Fall back to
     // email when neither name field is present, then to "—" so we never
@@ -7404,6 +7408,18 @@
     modal.open = true;
   }
 
+  function openMatterDescriptionEditor() {
+    if (!currentMatterData || !currentMatterData.matter) {
+      Lex.Toast.error('No matter loaded');
+      return;
+    }
+    openEditMatterModal(currentMatterData.matter);
+    trackTimeout(setTimeout(function () {
+      var descEl = document.getElementById('detailMatterDescription');
+      if (descEl && typeof descEl.focus === 'function') descEl.focus();
+    }, 50));
+  }
+
   /**
    * Handle the edit matter form submit.
    * Reads values from the detailMatterModal form, calls api.updateMatter,
@@ -7443,13 +7459,20 @@
     if (practiceEl) practiceArea = practiceEl.value || '';
 
     try {
-      await api.updateMatter(matterId, {
-        matter_name: matterName,
+      var payload = {
+        name: matterName,
         client_name: clientName,
-        description: description,
-        status: status,
-        practice_area: practiceArea
-      });
+        description: description
+      };
+      var currentStatus = currentMatterData && currentMatterData.matter && currentMatterData.matter.status;
+      if (status && status !== currentStatus && ['active', 'inactive', 'closed'].indexOf(status) !== -1) {
+        payload.status = status;
+      }
+      if (practiceArea) {
+        payload.metadata = { practice_area: practiceArea };
+      }
+
+      await api.updateMatter(matterId, payload);
 
       Lex.Toast.success('Matter updated successfully');
 
@@ -7464,23 +7487,26 @@
   }
 
   // Wire up form submit and cancel button once DOM is ready
-  (function wireEditMatterModal() {
+  function wireEditMatterModal() {
     var form = document.getElementById('detailMatterForm');
     if (form) {
+      form.removeEventListener('submit', saveEditMatter);
       form.addEventListener('submit', saveEditMatter);
     }
     var cancelBtn = document.getElementById('cancelDetailMatterBtn');
     if (cancelBtn) {
-      cancelBtn.addEventListener('click', function () {
+      cancelBtn.onclick = function () {
         var modal = document.getElementById('detailMatterModal');
         if (modal) modal.open = false;
-      });
+      };
     }
-  }());
+  }
+  wireEditMatterModal();
 
   window.openEditMatterModal = openEditMatterModal;
+  window.openMatterDescriptionEditor = openMatterDescriptionEditor;
   window.saveEditMatter = saveEditMatter;
-  ['openEditMatterModal', 'saveEditMatter'].forEach(_trackGlobal);
+  ['openEditMatterModal', 'openMatterDescriptionEditor', 'saveEditMatter'].forEach(_trackGlobal);
 
   // =========================================================================
   // Status Change Modal (NEW — specific to workspace_details.html)
@@ -9076,6 +9102,10 @@
   }
 
   async function onEnter() {
+    if (window.LexRouter && typeof window.LexRouter.registerView === 'function') {
+      window.LexRouter.registerView({ onLeave: onLeave });
+    }
+
     _preInitKeys = new Set(Object.keys(window));
 
     // Use the global API client (set by api.js as window.api)
@@ -9146,6 +9176,7 @@
     renderBanner(currentMatterData.matter);
     renderDescription(currentMatterData.matter);
     setupHeaderActions(currentMatterData.matter);
+    wireEditMatterModal();
 
     // Render dock panels
     renderDockDetailsPanel(currentMatterData.matter, currentMatterData.permissions);
@@ -9211,16 +9242,23 @@
     // Refresh the Conversations tab after archive / hard-delete / pin
     // operations originating from the kebab actions modal. We re-fetch the
     // current page so ordering and pinned state reflect server truth.
-    function _refreshConvosIfMounted() {
+    function _refreshConvosIfMounted(e) {
       if (!currentMatterData || !currentMatterData.matter) return;
       var mId = currentMatterData.matter.matter_id;
       if (!mId) return;
-      // Only refresh when the conversations tab is the active one — otherwise
-      // the cached data will reload on the next tab switch anyway.
       var tabContent = document.getElementById('tabContentConversations');
       if (!tabContent) return;
-      var isVisible = tabContent.offsetParent !== null;
-      if (!isVisible) return;
+
+      var detail = (e && e.detail) || {};
+      var isHardDelete = detail.permanent === true;
+      var isVisible = !tabContent.classList.contains('hidden');
+      if (!isVisible && !isHardDelete) return;
+
+      if (detail.threadId) {
+        var row = tabContent.querySelector('[data-thread-id="' + detail.threadId.split('"').join('') + '"]');
+        if (row) row.remove();
+      }
+
       var currentOffset = (currentMatterData.chatPagination && currentMatterData.chatPagination.offset) || 0;
       loadConversationsPage(mId, currentOffset);
     }
@@ -9277,8 +9315,11 @@
       _preInitKeys = null;
     }
 
-    // 7. Clean tracked globals
-    _windowKeys.forEach(function (name) { delete window[name]; });
+    // 7. Clean tracked globals only outside the SPA router. Routed page
+    // scripts stay cached, so deleting onclick globals would break re-entry.
+    if (!window.LexRouter) {
+      _windowKeys.forEach(function (name) { delete window[name]; });
+    }
     _windowKeys = [];
 
     // 8. Destroy external module instances
@@ -9319,7 +9360,11 @@
     api = null;
   }
 
-  // ── Init — standalone page, called directly ────────────────────────
-  onEnter();
+  // ── Init / SPA page registration ────────────────────────
+  if (window.LexRouter && typeof window.LexRouter.registerPageInit === 'function') {
+    window.LexRouter.registerPageInit('workspace-details.html', onEnter);
+  } else {
+    onEnter();
+  }
 
 })();

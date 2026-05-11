@@ -75,6 +75,23 @@ const ConversationMenu = {
       }, 150); // Throttle to 150ms
     });
 
+    // Self-sync on `conversation:renamed` window events. The rename helper
+    // (utils/rename-conversation.js) dispatches this on every rename, from
+    // any surface (kebab modal, workspace Conversations tab, future inline
+    // edit). Updating the cached row + re-rendering avoids a full
+    // /api/v1/conversation-threads list refetch for the common case.
+    //
+    // Bind once per ConversationMenu lifetime — `init` is idempotent (called
+    // from sidebar mount), so we guard against double-binding.
+    if (!this._renameListenerBound) {
+      this._renameListenerBound = true;
+      window.addEventListener('conversation:renamed', (e) => {
+        const detail = (e && e.detail) || {};
+        if (!detail.threadId || !detail.title) return;
+        this.updateConversation(detail.threadId, { title: detail.title });
+      });
+    }
+
     return true;
   },
 

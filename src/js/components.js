@@ -406,7 +406,11 @@ const ConversationActionsModal = {
   selectedConversationMatterId: null,
   selectedConversationIsProject: false,
   _boundActionsModal: null,
-  _boundRenameModal: null,
+  // The Rename modal is a <lex-modal> built programmatically on first use.
+  // See _ensureRenameModal(). Tracked separately from the actions modal so
+  // we don't rebuild it on SPA re-init.
+  _renameModal: null,
+  _renameInput: null,
 
   // Wire up modal elements (re-binds on every call to handle SPA navigation
   // where the DOM elements are replaced by the router).
@@ -414,19 +418,17 @@ const ConversationActionsModal = {
   // on any page, not just search-conversations.html).
   init() {
     var actionsModal = document.getElementById('conversationActionsModal');
-    var renameModal = document.getElementById('renameConversationModal');
 
     // Inject modal DOM if not present on the current page
-    if (!actionsModal || !renameModal) {
+    if (!actionsModal) {
       this._injectModalHtml();
       actionsModal = document.getElementById('conversationActionsModal');
-      renameModal = document.getElementById('renameConversationModal');
     }
 
-    if (!actionsModal || !renameModal) return;
+    if (!actionsModal) return;
 
-    // Skip if already bound to THESE exact elements
-    if (this._boundActionsModal === actionsModal && this._boundRenameModal === renameModal) return;
+    // Skip if already bound to THIS exact element
+    if (this._boundActionsModal === actionsModal) return;
 
     // Close on background click
     actionsModal.onclick = (e) => {
@@ -435,14 +437,7 @@ const ConversationActionsModal = {
       }
     };
 
-    renameModal.onclick = (e) => {
-      if (e.target === renameModal) {
-        this.closeRename();
-      }
-    };
-
     this._boundActionsModal = actionsModal;
-    this._boundRenameModal = renameModal;
   },
 
   // Inject the conversation actions + rename modal HTML into document.body.
@@ -495,26 +490,169 @@ const ConversationActionsModal = {
             '</div>' +
           '</div>' +
         '</div>' +
-      '</div>' +
-      '<div id="renameConversationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10000;">' +
-        '<div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">' +
-          '<div class="flex items-center justify-between p-6 border-b border-gray-200">' +
-            '<h2 class="text-xl font-semibold text-gray-900">Rename Conversation</h2>' +
-            '<button onclick="ConversationActionsModal.closeRename()" class="text-gray-400 hover:text-gray-600 transition-colors">' +
-              '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
-            '</button>' +
-          '</div>' +
-          '<div class="p-6">' +
-            '<label class="block text-sm font-medium text-gray-700 mb-2">New Conversation Name</label>' +
-            '<input type="text" id="renameInput" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="Enter new name">' +
-          '</div>' +
-          '<div class="flex justify-end gap-3 p-6 border-t border-gray-200">' +
-            '<button onclick="ConversationActionsModal.closeRename()" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>' +
-            '<button onclick="ConversationActionsModal.confirmRename()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Rename</button>' +
-          '</div>' +
-        '</div>' +
       '</div>';
+    // NOTE: The Rename modal is no longer injected here. It's built lazily
+    // as a <lex-modal> (Lex-styled chrome + buttons) via _ensureRenameModal().
     document.body.appendChild(container);
+  },
+
+  // Ensure lex-modal, lex-input, and lex-btn custom elements are defined.
+  // On standalone pages (not app.html), they may not be loaded yet — inject
+  // <script> tags and wait for them to register. Mirrors NewProjectModal._ensureComponents().
+  async _ensureLexComponents() {
+    var needed = [];
+
+    if (typeof customElements === 'undefined') return;
+
+    if (!customElements.get('lex-modal')) {
+      needed.push('js/lex/components/foundation/lex-modal.js');
+    }
+    if (!customElements.get('lex-input')) {
+      needed.push('js/lex/components/form/lex-input.js');
+    }
+    if (!customElements.get('lex-btn')) {
+      needed.push('js/lex/components/foundation/lex-btn.js');
+    }
+
+    if (needed.length === 0) return;
+
+    // Resolve paths relative to the current page (handles admin/ subfolders).
+    var prefix = '';
+    if (typeof NavigationHelpers !== 'undefined' && NavigationHelpers.resolvePath) {
+      var sample = NavigationHelpers.resolvePath('_');
+      if (sample.indexOf('../') === 0) {
+        prefix = sample.substring(0, sample.lastIndexOf('/') + 1);
+        if (prefix.length > 0 && prefix.charAt(prefix.length - 1) !== '/') {
+          prefix += '/';
+        }
+      }
+    }
+
+    await Promise.all(needed.map(function (src) {
+      return new Promise(function (resolve) {
+        var script = document.createElement('script');
+        script.src = prefix + src;
+        script.onload = resolve;
+        script.onerror = function () {
+          console.warn('[ConversationActionsModal] Failed to load:', src);
+          resolve(); // don't block the modal
+        };
+        document.head.appendChild(script);
+      });
+    }));
+  },
+
+  // Build the rename <lex-modal> once and cache it. Subsequent opens reuse
+  // the same element. Wires lex-confirm/lex-cancel/lex-close + enter-key
+  // commit + escape-to-cancel (lex-modal handles Escape natively).
+  async _ensureRenameModal() {
+    if (this._renameModal) return this._renameModal;
+
+    await this._ensureLexComponents();
+
+    var modal = document.createElement('lex-modal');
+    modal.heading = 'Rename Conversation';
+    modal.size = 'md';
+    modal.hideActions = true; // we render a custom footer with <lex-btn>s
+    modal.id = 'renameConversationModal'; // preserved for legacy querySelector calls
+    modal.innerHTML =
+      '<form id="renameConversationForm" class="rename-conversation-form" novalidate>' +
+        '<lex-input ' +
+          'id="renameInput" ' +
+          'name="title" ' +
+          'label="New Conversation Name" ' +
+          'placeholder="Enter new name" ' +
+          'maxlength="200" ' +
+          'required="true"' +
+        '></lex-input>' +
+      '</form>' +
+      '<div class="rename-conversation-footer">' +
+        '<lex-btn id="renameCancelBtn" variant="secondary" type="button">Cancel</lex-btn>' +
+        '<lex-btn id="renameConfirmBtn" variant="primary" type="button">Rename</lex-btn>' +
+      '</div>';
+
+    document.body.appendChild(modal);
+
+    this._renameModal = modal;
+    this._renameInput = modal.querySelector('#renameInput');
+
+    var self = this;
+
+    // Footer button wiring.
+    var cancelBtn = modal.querySelector('#renameCancelBtn');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () { self.closeRename(); });
+    }
+    var confirmBtn = modal.querySelector('#renameConfirmBtn');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', function () { self.confirmRename(); });
+    }
+
+    // Enter key submits, Escape cancels (Escape is also handled by lex-modal natively).
+    var form = modal.querySelector('#renameConversationForm');
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        self.confirmRename();
+      });
+    }
+    // lex-input emits keydown via its inner <input>; listen on the modal so it
+    // catches both Enter (commit) and any stray keys without coupling to internals.
+    modal.addEventListener('keydown', function (e) {
+      if (!self._renameModal || self._renameModal.open !== true) return;
+      if (e.key === 'Enter' && !e.shiftKey) {
+        // Only intercept when focus is inside the input — otherwise let
+        // lex-modal's own handlers (focus trap) run.
+        var active = document.activeElement;
+        if (active && self._renameModal.contains(active) && active.tagName === 'INPUT') {
+          e.preventDefault();
+          self.confirmRename();
+        }
+      }
+    });
+
+    // Treat the modal's own close/cancel events as a cancel — keeps state tidy.
+    modal.addEventListener('lex-close', function () { self._onRenameDismissed(); });
+    modal.addEventListener('lex-cancel', function () { self._onRenameDismissed(); });
+
+    // Inject minimal styling for the form + footer layout (no inline styles
+    // per the client's page-hygiene rule). One-time per page load.
+    this._injectRenameStyles();
+
+    return modal;
+  },
+
+  _renameStylesInjected: false,
+
+  _injectRenameStyles() {
+    if (this._renameStylesInjected) return;
+    if (typeof document === 'undefined') return;
+    this._renameStylesInjected = true;
+    var style = document.createElement('style');
+    style.id = 'rename-conversation-modal-styles';
+    style.setAttribute('data-source', 'components.js:ConversationActionsModal');
+    style.textContent = [
+      '.rename-conversation-form { display: block; margin-bottom: 16px; }',
+      '.rename-conversation-footer {',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: flex-end;',
+      '  gap: 8px;',
+      '  margin-top: 8px;',
+      '  padding-top: 16px;',
+      '  border-top: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));',
+      '}'
+    ].join('\n');
+    document.head.appendChild(style);
+  },
+
+  // No-op hook called when lex-modal emits lex-close / lex-cancel. We don't
+  // need to do anything beyond letting the modal hide — but we keep this
+  // explicit in case future callers want to listen.
+  _onRenameDismissed() {
+    // Intentionally empty: the modal's `open` is set to false by lex-modal
+    // itself when the user clicks the X / overlay / presses Escape, and
+    // confirmRename() handles the success path explicitly.
   },
 
   // Open conversation actions modal
@@ -579,8 +717,9 @@ const ConversationActionsModal = {
     this.selectedConversationMatterId = null;
   },
 
-  // Edit conversation (open rename modal)
-  editConversation() {
+  // Edit conversation (open rename modal). Returns a Promise so callers/tests
+  // can await modal-ready, but legacy call sites continue to work without await.
+  async editConversation() {
     if (!this.selectedConversationId || !this.selectedConversationTitle) {
       Toast.error('No conversation selected');
       this.close();
@@ -589,12 +728,13 @@ const ConversationActionsModal = {
 
     // Hide actions modal
     const actionsModal = document.getElementById('conversationActionsModal');
-    actionsModal.classList.remove('flex');
-    actionsModal.classList.add('hidden');
+    if (actionsModal) {
+      actionsModal.classList.remove('flex');
+      actionsModal.classList.add('hidden');
+    }
 
-    // Show rename modal
-    const renameModal = document.getElementById('renameConversationModal');
-    const renameInput = document.getElementById('renameInput');
+    // Lazy-build the lex-modal on first use (loads lex components if needed).
+    await this._ensureRenameModal();
 
     const decodedTitle = this.selectedConversationTitle
       .split('&apos;').join("'")
@@ -602,22 +742,31 @@ const ConversationActionsModal = {
       .split('&#96;').join('`')
       .split('&amp;').join('&');
 
-    renameInput.value = decodedTitle;
-    renameModal.classList.remove('hidden');
-    renameModal.classList.add('flex');
+    // Seed the lex-input with the current title. lex-input mirrors `.value`
+    // onto its internal <input> on render; setting it before opening is fine.
+    if (this._renameInput) {
+      this._renameInput.value = decodedTitle;
+    }
 
+    // Open the lex-modal — lex-modal handles overlay click, Escape, focus trap.
+    this._renameModal.open = true;
+
+    // Focus + select the inner <input> after the modal renders. lex-modal moves
+    // initial focus on next microtask; we run after so our select() wins.
     setTimeout(() => {
-      renameInput.focus();
-      renameInput.select();
-    }, 100);
+      if (!this._renameInput) return;
+      const innerInput = this._renameInput.querySelector('input');
+      if (innerInput) {
+        innerInput.focus();
+        try { innerInput.select(); } catch (e) { /* noop */ }
+      }
+    }, 50);
   },
 
   // Close rename modal
   closeRename() {
-    const modal = document.getElementById('renameConversationModal');
-    if (modal) {
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
+    if (this._renameModal) {
+      this._renameModal.open = false;
     }
   },
 
@@ -629,8 +778,19 @@ const ConversationActionsModal = {
       return;
     }
 
-    const renameInput = document.getElementById('renameInput');
-    const rawTitle = renameInput ? renameInput.value : '';
+    // Read from the lex-input (preferred) or its inner <input> as a fallback.
+    let rawTitle = '';
+    if (this._renameInput) {
+      rawTitle = this._renameInput.value || '';
+      if (!rawTitle) {
+        const inner = this._renameInput.querySelector('input');
+        if (inner) rawTitle = inner.value || '';
+      }
+    } else {
+      // Legacy DOM fallback (in case the lex-modal hasn't been built yet).
+      const legacy = document.getElementById('renameInput');
+      rawTitle = legacy ? legacy.value : '';
+    }
     const threadId = this.selectedConversationId;
 
     // Delegate to the shared rename helper. It:

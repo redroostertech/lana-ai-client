@@ -76,6 +76,139 @@
   grid-column: 1 / -1;
 }
 
+/* Matter/workspace picker — opens a rich modal instead of bare typeahead. */
+.my-task-picker-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-spacing-xs, 0.25rem);
+}
+
+.my-task-picker-label {
+  font-size: var(--lex-body-sm-size, 0.8125rem);
+  font-weight: 500;
+  color: var(--lex-text-primary);
+}
+
+.my-task-required {
+  color: var(--lex-color-danger-500, #dc2626);
+  margin-left: 2px;
+}
+
+.my-task-picker-optional {
+  font-weight: 400;
+  color: var(--lex-text-tertiary);
+  margin-left: 4px;
+}
+
+/* Frame wraps the trigger button + overlayed clear (×) + Browse hint so
+   they can sit visually inside the same "input" surface even though
+   they're separate elements (an inner <button> can't legally contain
+   another <button>, so we layer them with absolute positioning). */
+.my-task-picker-frame {
+  position: relative;
+}
+
+.my-task-picker-trigger {
+  display: block;
+  width: 100%;
+  /* Right padding leaves room for the absolutely-positioned X (when
+     visible) and the Browse hint on the right edge. */
+  padding: 10px 88px 10px 14px;
+  border: 1px solid var(--lex-border-default, rgba(0, 0, 0, 0.12));
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-input, var(--lex-bg-primary));
+  font: inherit;
+  text-align: left;
+  color: var(--lex-text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.my-task-picker-trigger:hover,
+.my-task-picker-trigger:focus-visible {
+  border-color: var(--lex-border-accent, #6366f1);
+  background: var(--lex-bg-secondary);
+  outline: none;
+}
+
+.my-task-picker-trigger__label {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.my-task-picker-trigger__label.is-placeholder {
+  color: var(--lex-text-tertiary);
+}
+
+.my-task-picker-trigger__hint {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  color: var(--lex-text-tertiary);
+  font-weight: 500;
+  /* The hint is decorative — clicks pass through to the trigger button
+     beneath it so the user can click anywhere in the row. */
+  pointer-events: none;
+}
+
+/* Clear (×) button overlays the trigger at its right edge, just left of
+   the Browse hint. Click clears the selection (stopPropagation prevents
+   the picker from opening). Hidden when no matter is selected. */
+.my-task-picker-trigger__clear {
+  position: absolute;
+  /* Sit just left of the "Browse" text (~50-55px wide). */
+  right: 64px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--lex-text-tertiary);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.12s, color 0.12s;
+}
+
+.my-task-picker-trigger__clear:hover,
+.my-task-picker-trigger__clear:focus-visible {
+  background: var(--lex-bg-secondary, rgba(0, 0, 0, 0.08));
+  color: var(--lex-text-primary);
+  outline: none;
+}
+
+.my-task-picker-trigger__clear.hidden {
+  display: none;
+}
+
+/* Hint text under the plan-create modal (above buttons) */
+.my-task-plan-hint {
+  margin: 4px 0 0;
+  font-size: var(--lex-body-sm-size, 0.8125rem);
+  color: var(--lex-text-tertiary);
+  line-height: 1.5;
+}
+
+/* Assignee dropdown sectioned labels (shared / org groups from /mentions). */
+.my-task-assignee-group__label {
+  padding: 8px 12px 4px;
+  font-size: var(--lex-body-xs-size, 0.6875rem);
+  font-weight: 600;
+  color: var(--lex-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .my-task-matter-results {
   position: absolute;
   z-index: calc(var(--lex-z-modal, 40) + 1);

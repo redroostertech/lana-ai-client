@@ -261,6 +261,37 @@
     return formatDate(dateString);
   }
 
+  // ── lex-btn label update ──────────────────────────────────────────────
+  // Correctly updates the visible label of a <lex-btn> element.
+  //
+  // Why this helper exists:
+  //   lex-btn renders its label inside a <slot-content> child node (see
+  //   lex-btn.js and lex.core.js _captureContent/_restoreContent). Setting
+  //   `.textContent` directly on the <lex-btn> wipes the styled inner DOM
+  //   (the .lex-btn-inner button, ripple container, etc.), leaving raw text.
+  //   It also fails to update on next property change because LexElement's
+  //   re-render path restores from `_originalChildren`, not from the DOM.
+  //
+  // This helper:
+  //   1. Updates the live <slot-content> textContent so the label changes
+  //      immediately without disturbing the rendered button shell.
+  //   2. Re-seeds `_originalChildren` so any future re-render (triggered by
+  //      e.g. `loading`, `disabled`, `variant` changes) restores the NEW
+  //      label, not the stale captured one.
+  //
+  // Falls back to plain textContent only if the slot is missing — covers
+  // raw <button> and other non-lex elements.
+  function setLexButtonText(button, label) {
+    if (!button) return;
+    button._originalChildren = [document.createTextNode(label)];
+    var slot = button.querySelector('slot-content');
+    if (slot) {
+      slot.textContent = label;
+    } else {
+      button.textContent = label;
+    }
+  }
+
   // ── File type label ─────────────────────────────────────────────────
   // Maps a File object (MIME type + extension) to a human-readable label.
 
@@ -376,7 +407,8 @@
     truncateText:       truncateText,
     formatPercentage:   formatPercentage,
     statusBadge:        statusBadge,
-    getFileType:        getFileType
+    getFileType:        getFileType,
+    setLexButtonText:   setLexButtonText
   };
 
   // ── Backward-compat globals ───────────────────────────────────────────

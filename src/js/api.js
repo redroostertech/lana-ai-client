@@ -1847,6 +1847,26 @@ class ApiClient {
   }
 
   /**
+   * Search org users + agents for @-mention / assignee typeahead.
+   * Backed by /api/v1/mentions/search; when matterId is supplied, results
+   * are split into "shared with matter" / "rest of org" sections.
+   *
+   * @param {string} query - Prefix string to match
+   * @param {Object} [options]
+   * @param {string} [options.matterId] - Matter scope (UUID or matter_id)
+   * @param {number} [options.limit=20] - 1..50
+   * @returns {Promise<{matches: Array, groups?: Array}>}
+   */
+  async searchMentions(query, options) {
+    var opts = options || {};
+    var params = new URLSearchParams();
+    if (query) params.set('q', query);
+    if (opts.matterId) params.set('matter_id', opts.matterId);
+    params.set('limit', String(opts.limit || 20));
+    return this.get('/api/v1/mentions/search?' + params.toString());
+  }
+
+  /**
    * Update a LANA-native task
    * @param {string} taskId - The task ID
    * @param {Object} updates - Task updates (title, description, notes, status, priority, due_date, assigned_to_user_id)

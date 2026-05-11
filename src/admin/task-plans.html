@@ -85,14 +85,22 @@
             placeholder="Select type"
             options='[{"value":"manual","label":"Manual Draft"},{"value":"lana_draft","label":"Lana Draft"}]'
           ></lex-select>
-          <div class="task-plan-scope-field">
-            <lex-input
-              id="taskPlanMatterId"
-              name="matter_id"
-              label="Matter / Workspace Scope"
-              placeholder="Search matters, or leave blank for organization-level work"
-            ></lex-input>
-            <div id="taskPlanMatterResults" class="task-plan-matter-results hidden" aria-live="polite"></div>
+          <div class="task-plan-scope-field task-plan-picker-field">
+            <label class="task-plan-picker-label" for="taskPlanMatterPickBtn">
+              Matter / Workspace Scope <span class="task-plan-picker-optional">(optional)</span>
+            </label>
+            <button
+              type="button"
+              id="taskPlanMatterPickBtn"
+              class="task-plan-picker-trigger"
+              aria-haspopup="dialog"
+            >
+              <span id="taskPlanMatterPickLabel" class="task-plan-picker-trigger__label is-placeholder">
+                None — applies to your organization
+              </span>
+              <span class="task-plan-picker-trigger__hint" aria-hidden="true">Browse</span>
+            </button>
+            <input type="hidden" id="taskPlanMatterId" name="matter_id" />
           </div>
           <lex-select
             id="taskPlanTargetType"

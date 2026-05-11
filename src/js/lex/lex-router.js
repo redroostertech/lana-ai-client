@@ -162,6 +162,12 @@
     var parser = new DOMParser();
     var doc = parser.parseFromString(htmlText, 'text/html');
 
+    // Strategy 0 (standalone Lex pages): inert page template.
+    // Standalone pages inject this template via lex-page-init.js during full
+    // loads. SPA routing must extract the same content directly.
+    var template = doc.getElementById('page-content');
+    if (template && template.content) return template.innerHTML;
+
     // Strategy 1 (migrated pages): #lex-page-content
     var content = doc.getElementById('lex-page-content');
     if (content) return content.innerHTML;
@@ -241,6 +247,16 @@
 
       // Already loaded globally (CDN or re-visited page)
       if (_loadedScripts.has(fullSrc)) {
+        resolve();
+        return;
+      }
+
+      var existing = Array.prototype.some.call(
+        document.querySelectorAll('script[src]'),
+        function (s) { return s.src === fullSrc; }
+      );
+      if (existing) {
+        _loadedScripts.add(fullSrc);
         resolve();
         return;
       }

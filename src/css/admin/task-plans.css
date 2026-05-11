@@ -159,6 +159,67 @@
   grid-column: 1 / -1;
 }
 
+/* Matter/workspace picker — opens NewProjectModal as a rich picker
+   instead of a bare typeahead the user wouldn't know how to fill out. */
+.task-plan-picker-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lex-spacing-xs, 0.25rem);
+}
+
+.task-plan-picker-label {
+  font-size: var(--lex-body-sm-size, 0.8125rem);
+  font-weight: 500;
+  color: var(--lex-text-primary);
+}
+
+.task-plan-picker-optional {
+  font-weight: 400;
+  color: var(--lex-text-tertiary);
+  margin-left: 4px;
+}
+
+.task-plan-picker-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  padding: 10px 14px;
+  border: 1px solid var(--lex-border-default, rgba(0, 0, 0, 0.12));
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-input, var(--lex-bg-primary));
+  font: inherit;
+  text-align: left;
+  color: var(--lex-text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.task-plan-picker-trigger:hover,
+.task-plan-picker-trigger:focus-visible {
+  border-color: var(--lex-border-accent, #6366f1);
+  background: var(--lex-bg-secondary);
+  outline: none;
+}
+
+.task-plan-picker-trigger__label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-plan-picker-trigger__label.is-placeholder {
+  color: var(--lex-text-tertiary);
+}
+
+.task-plan-picker-trigger__hint {
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  color: var(--lex-text-tertiary);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
 .task-plan-matter-results {
   position: absolute;
   z-index: calc(var(--lex-z-modal, 40) + 1);
