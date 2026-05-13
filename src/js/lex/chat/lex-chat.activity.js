@@ -22,17 +22,32 @@
     style.textContent = `
       lex-chat-activity {
         display: block;
-        padding-bottom: var(--lex-space-md);
+        padding: 0 0 6px;
       }
       lex-chat-activity[hidden] {
         display: none !important;
       }
 
       .lex-chat-activity-wrapper {
-        display: flex;
-        gap: 12px;
+        display: inline-flex;
+        max-width: min(720px, 100%);
+        gap: 8px;
         align-items: flex-start;
+        padding: 6px 10px;
+        border: 1px solid var(--lex-chat-border-soft, rgba(0,0,0,0.08));
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--lex-chat-bg-surface, #fff) 82%, transparent);
+        opacity: 0.82;
         animation: lex-chat-fade-in 0.3s ease both;
+      }
+
+      .lex-chat-activity-wrapper .lex-chat-indicator {
+        width: 20px;
+        height: 20px;
+        margin-top: 1px;
+        opacity: 0.58;
+        transform: scale(0.72);
+        transform-origin: top left;
       }
 
       .lex-chat-activity-body {
@@ -40,18 +55,19 @@
         min-width: 0;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 2px;
       }
 
       .lex-chat-activity-message {
-        font-size: var(--lex-body-sm-size, 0.875rem);
+        font-size: 0.75rem;
         color: var(--lex-chat-text-muted);
         font-weight: 500;
+        line-height: 1.25;
       }
 
       .lex-chat-activity-phase {
         font-family: var(--lex-font-mono);
-        font-size: 10px;
+        font-size: 9px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.1em;
@@ -60,9 +76,9 @@
 
       /* Reasoning drawer */
       .lex-chat-reasoning-drawer {
-        margin-top: 6px;
+        margin-top: 3px;
         border-left: 2px solid var(--lex-chat-accent);
-        padding-left: 12px;
+        padding-left: 8px;
       }
 
       .lex-chat-reasoning-toggle {
@@ -160,7 +176,7 @@
         <div class="lex-chat-activity-wrapper">
           ${BREATHING_LOGO}
           <div class="lex-chat-activity-body">
-            <div class="lex-chat-activity-primary" data-primary style="display:none;font-size:0.8125rem;color:var(--lex-text-secondary,#6b7280);margin-bottom:2px;"></div>
+            <div class="lex-chat-activity-primary" data-primary style="display:none;font-size:0.72rem;color:var(--lex-chat-text-dim,#8a8177);line-height:1.25;"></div>
             <div class="lex-chat-activity-message" data-msg></div>
             <div class="lex-chat-activity-phase" data-phase></div>
             <div class="lex-chat-reasoning-drawer" data-drawer style="display:none">
