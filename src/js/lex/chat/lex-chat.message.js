@@ -15,10 +15,24 @@
   // Timestamp formatting — smart relative dates
   // ---------------------------------------------------------------------------
 
+  function parseTimestampAsUtc(iso) {
+    if (global.Lex && global.Lex.Utils && typeof global.Lex.Utils.parseApiUtcDate === 'function') {
+      return global.Lex.Utils.parseApiUtcDate(iso);
+    }
+    if (iso instanceof Date) return iso;
+    if (typeof iso === 'string' && iso.indexOf('T') !== -1) {
+      const timePart = iso.substring(iso.indexOf('T') + 1);
+      const last = timePart.charAt(timePart.length - 1);
+      const hasExplicitZone = last === 'Z' || last === 'z' || timePart.indexOf('+') !== -1 || timePart.indexOf('-') !== -1;
+      return new Date(hasExplicitZone ? iso : iso + 'Z');
+    }
+    return new Date(iso);
+  }
+
   function formatTimestamp(iso) {
     if (!iso) return '';
-    const date = (iso instanceof Date) ? iso : new Date(iso);
-    if (isNaN(date.getTime())) return '';
+    const date = parseTimestampAsUtc(iso);
+    if (!date || isNaN(date.getTime())) return '';
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -26,8 +40,12 @@
     yesterday.setDate(yesterday.getDate() - 1);
     const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-    // Format time portion: "4:24 PM"
-    const timeStr = global.formatTime(iso);
+    // Format UTC timestamps in the client's local timezone.
+    const timeStr = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).format(date);
 
     if (msgDay.getTime() === today.getTime()) {
       return `Today ${timeStr}`;
@@ -37,7 +55,11 @@
     }
 
     // Older: "Feb 12, 2025 3:30 AM"
-    const dateStr = global.formatDateLong(iso, { month: 'short' });
+    const dateStr = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    }).format(date);
     return `${dateStr} ${timeStr}`;
   }
 

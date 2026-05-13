@@ -3284,20 +3284,56 @@
       }
     }
 
-    // Format timestamp for display
+    function getChatDisplayTimeZone() {
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } catch (err) {
+        return undefined;
+      }
+    }
+
+    function getDatePartsInTimeZone(date, timeZone) {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      return Object.fromEntries(formatter.formatToParts(date).map(part => [part.type, part.value]));
+    }
+
+    function parseApiUtcTimestamp(timestamp) {
+      if (timestamp instanceof Date) return timestamp;
+      if (typeof timestamp === 'string' && timestamp.includes('T')) {
+        const timePart = timestamp.slice(timestamp.indexOf('T') + 1);
+        const hasExplicitZone = timePart.endsWith('Z') || timePart.endsWith('z') || timePart.includes('+') || timePart.includes('-');
+        return new Date(hasExplicitZone ? timestamp : `${timestamp}Z`);
+      }
+      return new Date(timestamp);
+    }
+
+    // Format UTC timestamps for display in the client's local timezone.
     function formatTimestamp(timestamp) {
       if (!timestamp) return '';
 
-      const date = new Date(timestamp);
+      const date = parseApiUtcTimestamp(timestamp);
+      if (!Number.isFinite(date.getTime())) return '';
       const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const timeZone = getChatDisplayTimeZone();
+      const dateParts = getDatePartsInTimeZone(date, timeZone);
+      const nowParts = getDatePartsInTimeZone(now, timeZone);
+
+      const today = new Date(Number(nowParts.year), Number(nowParts.month) - 1, Number(nowParts.day));
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const messageDate = new Date(Number(dateParts.year), Number(dateParts.month) - 1, Number(dateParts.day));
 
       // Format time as "h:mm AM/PM"
-      const hours = date.getHours();
-      const minutes = date.getMinutes();
+      const hours = dateParts.hour === '24' ? 0 : Number(dateParts.hour);
+      const minutes = Number(dateParts.minute);
       const ampm = hours >= 12 ? 'PM' : 'AM';
       const displayHours = hours % 12 || 12;
       const displayMinutes = minutes < 10 ? '0' + minutes : minutes;
@@ -3311,8 +3347,8 @@
       } else {
         // Format as "MMM DD at h:mm AM/PM"
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const monthStr = months[date.getMonth()];
-        const dayStr = date.getDate();
+        const monthStr = months[Number(dateParts.month) - 1];
+        const dayStr = Number(dateParts.day);
         return `${monthStr} ${dayStr} at ${timeStr}`;
       }
     }
@@ -3428,8 +3464,8 @@
               ${preview ? `<p class="text-xs text-gray-500 truncate mt-0.5">${safePreview}</p>` : ''}
               ${time ? `<p class="text-xs text-gray-400 mt-0.5">${time}</p>` : ''}
             </div>
-            <div class="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" onclick="event.stopPropagation(); openConversationActionsModal('${escapeJsString(conv.thread_id)}', '${safeTitleForJs}', ${conv.matter_id ? `'${escapeJsString(conv.matter_id)}'` : 'null'}, ${isPinned ? 'true' : 'false'})">
-              <button class="p-1 hover:bg-gray-200 rounded">
+            <div class="opacity-100 transition-opacity flex-shrink-0" onclick="event.stopPropagation(); openConversationActionsModal('${escapeJsString(conv.thread_id)}', '${safeTitleForJs}', ${conv.matter_id ? `'${escapeJsString(conv.matter_id)}'` : 'null'}, ${isPinned ? 'true' : 'false'})">
+              <button type="button" class="p-1 hover:bg-gray-200 focus:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded" aria-label="Conversation actions" title="Conversation actions">
                 <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
                 </svg>

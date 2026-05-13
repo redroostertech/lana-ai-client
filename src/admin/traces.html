@@ -67,7 +67,7 @@
         subtitle="Debug and observability for AI chat interactions"
       ></lex-banner>
 
-      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Chat Traces"}]'></lex-breadcrumb>
+      <lex-breadcrumb id="traceBreadcrumb" items='[{"label":"Administration","href":"admin/index.html"},{"label":"Chat Traces"}]'></lex-breadcrumb>
 
       <!-- ══════════════════════════════════════════════════════════════
            Trace List View
@@ -81,8 +81,8 @@
             <div class="flex-1 min-w-[200px]">
               <lex-input
                 id="filterConversation"
-                label="Conversation ID"
-                placeholder="CONV-..."
+                label="Conversation, Session, or Trace ID"
+                placeholder="Optional identifier"
               ></lex-input>
             </div>
             <div class="flex-1 min-w-[140px]">
@@ -96,9 +96,9 @@
             <div class="flex-1 min-w-[140px]">
               <lex-select
                 id="filterMode"
-                label="Chat Mode"
-                placeholder="All Modes"
-                options='[{"value":"rag","label":"RAG"},{"value":"simple","label":"Simple"},{"value":"agentic","label":"Agentic"}]'
+                label="Route"
+                placeholder="All Routes"
+                options='[{"value":"unified","label":"Unified"},{"value":"workspace","label":"Workspace"},{"value":"document","label":"Document"},{"value":"agentic","label":"Agentic"},{"value":"rag","label":"RAG"},{"value":"general","label":"General"},{"value":"data","label":"Data"},{"value":"insights","label":"Insights"},{"value":"automations","label":"Automations"},{"value":"text_transform","label":"Text transform"},{"value":"pending_detection","label":"Pending route"}]'
               ></lex-select>
             </div>
             <div class="flex-1 min-w-[140px]">
@@ -120,8 +120,8 @@
           <lex-table
             id="tracesTable"
             columns="timestamp,user_message,chat_mode,status,duration,llm_calls"
-            labels="Timestamp,User Message,Mode,Status,Duration,LLM Calls"
-            empty-text="Enter a Conversation ID above to search traces"
+            labels="Timestamp,User Message,Route,Status,Duration,LLM Calls"
+            empty-text="No traces found"
           ></lex-table>
 
           <!-- Pagination -->
@@ -140,11 +140,6 @@
            Trace Detail View (hidden by default)
            ══════════════════════════════════════════════════════════════ -->
       <div id="traceDetailView" class="hidden">
-
-        <!-- Back button -->
-        <div style="margin-bottom:1rem;">
-          <lex-btn id="backToListBtn" variant="secondary" size="sm">Back to List</lex-btn>
-        </div>
 
         <!-- Overview Card -->
         <lex-card style="margin-bottom:1.5rem;">
@@ -170,7 +165,7 @@
               <p id="detailRagCount" class="text-lg font-semibold lex-text-primary">--</p>
             </div>
             <div>
-              <p class="text-xs lex-text-tertiary">Chat Mode</p>
+              <p class="text-xs lex-text-tertiary">Route</p>
               <p id="detailChatMode" class="text-lg font-semibold lex-text-primary">--</p>
             </div>
           </div>

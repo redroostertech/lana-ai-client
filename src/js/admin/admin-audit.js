@@ -259,6 +259,7 @@
         _categoryFilter = null;
         _clearCardHighlights();
         _currentPage = 1;
+        loadStatistics();
         loadLogs();
       });
     }
@@ -275,6 +276,7 @@
         _categoryFilter = null;
         _clearCardHighlights();
         _currentPage = 1;
+        loadStatistics();
         loadLogs();
       });
     }
@@ -298,6 +300,23 @@
       if (dd.length < 2) dd = '0' + dd;
       toDate.value = yyyy + '-' + mm + '-' + dd;
     }
+  }
+
+  function _getDateFilters() {
+    var fromDateEl = el('fromDate');
+    var toDateEl   = el('toDate');
+    return {
+      fromDate: fromDateEl ? (fromDateEl.value || '') : '',
+      toDate:   toDateEl   ? (toDateEl.value   || '') : ''
+    };
+  }
+
+  function _dateStartIso(dateValue) {
+    return dateValue ? new Date(dateValue + 'T00:00:00.000').toISOString() : '';
+  }
+
+  function _dateEndIso(dateValue) {
+    return dateValue ? new Date(dateValue + 'T23:59:59.999').toISOString() : '';
   }
 
   // =========================================================================
@@ -374,10 +393,11 @@
   // =========================================================================
 
   function loadStatistics() {
-    var thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    var dates = _getDateFilters();
+    var startDate = _dateStartIso(dates.fromDate);
+    var endDate   = _dateEndIso(dates.toDate);
 
-    api.getAuditStatistics(thirtyDaysAgo.toISOString(), new Date().toISOString())
+    api.getAuditStatistics(startDate, endDate)
       .then(function (result) {
         var totalEl = el('statTotal');
         if (totalEl) totalEl.textContent = result.total_events || 0;
@@ -430,12 +450,10 @@
     if (table) Lex.Redact.on(table);
 
     var eventSelect = el('eventTypeFilter');
-    var fromDateEl  = el('fromDate');
-    var toDateEl    = el('toDate');
-
-    var eventType = eventSelect ? (eventSelect.value || '') : '';
-    var fromDate  = fromDateEl  ? (fromDateEl.value  || '') : '';
-    var toDate    = toDateEl    ? (toDateEl.value    || '') : '';
+    var dates       = _getDateFilters();
+    var eventType   = eventSelect ? (eventSelect.value || '') : '';
+    var fromDate    = dates.fromDate;
+    var toDate      = dates.toDate;
 
     var promise;
 
@@ -479,8 +497,8 @@
           offset: (_currentPage - 1) * _pageSize,
           event_types: getCategoryEventTypes(_categoryFilter)
         };
-        if (fromDate) queryBody.start_date = new Date(fromDate).toISOString();
-        if (toDate)   queryBody.end_date   = new Date(toDate).toISOString();
+        if (fromDate) queryBody.start_date = _dateStartIso(fromDate);
+        if (toDate)   queryBody.end_date   = _dateEndIso(toDate);
 
         promise = api.queryAuditLogs(queryBody).then(function (result) {
           _logs = result.logs || [];

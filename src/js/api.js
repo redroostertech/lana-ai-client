@@ -2293,6 +2293,17 @@ class ApiClient {
     return this.get(`/api/v1/traces/${traceId}`);
   }
 
+  async getTraces(options = {}) {
+    const params = new URLSearchParams();
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.set(key, value);
+      }
+    });
+    const query = params.toString();
+    return this.get(`/api/v1/traces${query ? '?' + query : ''}`);
+  }
+
   async getConversationTraces(conversationId, limit = 50, offset = 0) {
     const params = new URLSearchParams({ limit, offset });
     return this.get(`/api/v1/conversations/${conversationId}/traces?${params}`);

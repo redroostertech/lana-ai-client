@@ -4,7 +4,7 @@
  * Handles trace listing, filtering by conversation/status/mode/date,
  * trace detail view with timeline, LLM calls, RAG retrievals, SSE events.
  *
- * @requires api.js       - window.api — getTraceById, getConversationTraces
+ * @requires api.js       - window.api — getTraceById, getTraces
  * @requires lex.utils.js - Lex.Utils.escapeHtml, Lex.Utils.formatDateTime
  * @requires lex-toast.js - Lex.Toast.error
  * @requires lex-table.js - table.setData()
@@ -56,6 +56,7 @@
   function init() {
     els.listView            = document.getElementById('traceListView');
     els.detailView          = document.getElementById('traceDetailView');
+    els.breadcrumb          = document.getElementById('traceBreadcrumb');
     els.tracesTable         = document.getElementById('tracesTable');
     els.filterConversation  = document.getElementById('filterConversation');
     els.filterStatus        = document.getElementById('filterStatus');
@@ -66,7 +67,6 @@
     els.prevBtn             = document.getElementById('prevPageBtn');
     els.nextBtn             = document.getElementById('nextPageBtn');
     els.paginationInfo      = document.getElementById('paginationInfo');
-    els.backBtn             = document.getElementById('backToListBtn');
 
     // Detail view elements
     els.traceId             = document.getElementById('traceIdDisplay');
@@ -92,10 +92,7 @@
     if (els.clearBtn) els.clearBtn.addEventListener('click', clearFilters);
     if (els.prevBtn)  els.prevBtn.addEventListener('click', previousPage);
     if (els.nextBtn)  els.nextBtn.addEventListener('click', nextPage);
-    if (els.backBtn)  els.backBtn.addEventListener('click', showListView);
-
-    // Show empty state
-    showEmptyState();
+    loadTraces();
   }
 
   // =========================================================================
@@ -109,12 +106,7 @@
     state.filters.date           = getValue(els.filterDate);
     state.pagination.offset      = 0;
 
-    if (!state.filters.conversationId) {
-      Lex.Toast.error('Please enter a Conversation ID to search traces');
-      return;
-    }
-
-    loadConversationTraces(state.filters.conversationId);
+    loadTraces();
   }
 
   function clearFilters() {
@@ -126,45 +118,32 @@
     state.filters = { conversationId: '', status: '', mode: '', date: '' };
     state.pagination.offset = 0;
 
-    showEmptyState();
+    loadTraces();
   }
 
   // =========================================================================
   // Data Loading
   // =========================================================================
 
-  async function loadConversationTraces(conversationId) {
+  async function loadTraces() {
     try {
       setTableLoading(true);
 
-      var resp = await window.api.getConversationTraces(
-        conversationId,
-        state.pagination.limit,
-        state.pagination.offset
-      );
+      var resp = await window.api.getTraces({
+        limit: state.pagination.limit,
+        offset: state.pagination.offset,
+        conversationId: state.filters.conversationId,
+        status: state.filters.status,
+        chatMode: state.filters.mode,
+        requestDate: state.filters.date
+      });
 
       var data = resp.data || resp;
       state.traces = data.traces || [];
       state.pagination.total   = data.total || 0;
       state.pagination.hasMore = (state.pagination.offset + state.pagination.limit) < state.pagination.total;
 
-      // Client-side sub-filters
-      var filtered = state.traces;
-
-      if (state.filters.status) {
-        filtered = filtered.filter(function (t) { return t.status === state.filters.status; });
-      }
-      if (state.filters.mode) {
-        filtered = filtered.filter(function (t) { return t.chat_mode === state.filters.mode; });
-      }
-      if (state.filters.date) {
-        var filterDate = new Date(state.filters.date).toDateString();
-        filtered = filtered.filter(function (t) {
-          return new Date(t.request_timestamp).toDateString() === filterDate;
-        });
-      }
-
-      renderTraceList(filtered);
+      renderTraceList(state.traces);
       setTableLoading(false);
       updatePagination();
 
@@ -173,6 +152,11 @@
       Lex.Toast.error('Failed to load traces: ' + (err.message || err));
       setTableLoading(false);
     }
+  }
+
+  async function loadConversationTraces(conversationId) {
+    state.filters.conversationId = conversationId || '';
+    return loadTraces();
   }
 
   // =========================================================================
@@ -205,7 +189,7 @@
         _chatMode: t.chat_mode,
         timestamp: fmtDateTime ? fmtDateTime(t.request_timestamp) : formatDateTime(t.request_timestamp),
         user_message: truncate(t.user_message || 'N/A', 80),
-        chat_mode: t.chat_mode || 'N/A',
+        chat_mode: formatTraceRoute(t.chat_mode),
         status: (t.status || 'unknown').toUpperCase(),
         duration: formatDuration(t.total_duration_ms),
         llm_calls: String(t.llm_call_count || 0)
@@ -217,6 +201,34 @@
     if (els.tracesTable.setData) {
       els.tracesTable.setData(rows);
     }
+  }
+
+  function formatTraceRoute(route) {
+    var value = String(route || '').trim();
+    if (!value) return 'N/A';
+
+    var labels = {
+      unified: 'Unified',
+      workspace: 'Workspace',
+      document: 'Document',
+      data: 'Data',
+      insights: 'Insights',
+      automations: 'Automations',
+      text_transform: 'Text transform',
+      pending_detection: 'Pending route',
+      workspace_chat: 'Workspace chat',
+      matter_chat: 'Matter chat',
+      document_chat: 'Document chat',
+      full_chat: 'Full chat',
+      agentic_mode: 'Agentic mode',
+      unified_chat: 'Unified chat',
+      unified_handler: 'Unified handler',
+      rag: 'RAG',
+      agentic: 'Agentic',
+      general: 'General'
+    };
+
+    return labels[value] || value.replace(/_/g, ' ');
   }
 
   /**
@@ -261,7 +273,7 @@
 
       // chat_mode cell (index 2): info badge
       if (tds[2]) {
-        tds[2].innerHTML = '<lex-badge variant="info">' + escHtml(row._chatMode || row.chat_mode || 'N/A') + '</lex-badge>';
+        tds[2].innerHTML = '<lex-badge variant="info">' + escHtml(formatTraceRoute(row._chatMode || row.chat_mode)) + '</lex-badge>';
       }
 
       // status cell (index 3): colored badge
@@ -306,7 +318,7 @@
     els.duration.textContent   = formatDuration(trace.total_duration_ms);
     els.llmCount.textContent   = String(trace.llm_call_count || 0);
     els.ragCount.textContent   = String(trace.rag_retrieval_count || 0);
-    els.chatMode.textContent   = trace.chat_mode || 'N/A';
+    els.chatMode.textContent   = formatTraceRoute(trace.chat_mode);
     els.userMessage.textContent = trace.user_message || 'N/A';
 
     // Status badge
@@ -358,7 +370,7 @@
     events.push({ time: 0, label: 'Trace Started', color: 'var(--lex-color-info-500, #3B82F6)' });
 
     if (trace.chat_mode) {
-      events.push({ time: 50, label: 'Classification: ' + trace.chat_mode, color: 'var(--lex-color-primary-500, #8B5CF6)' });
+      events.push({ time: 50, label: 'Classification: ' + formatTraceRoute(trace.chat_mode), color: 'var(--lex-color-primary-500, #8B5CF6)' });
     }
 
     if (ragRetrievals && ragRetrievals.length > 0) {
@@ -629,13 +641,13 @@
   function previousPage() {
     if (state.pagination.offset > 0) {
       state.pagination.offset -= state.pagination.limit;
-      if (state.filters.conversationId) loadConversationTraces(state.filters.conversationId);
+      loadTraces();
     }
   }
 
   function nextPage() {
     state.pagination.offset += state.pagination.limit;
-    if (state.filters.conversationId) loadConversationTraces(state.filters.conversationId);
+    loadTraces();
   }
 
   // =========================================================================
@@ -645,11 +657,20 @@
   function showListView() {
     els.listView.classList.remove('hidden');
     els.detailView.classList.add('hidden');
+    setBreadcrumbItems([
+      { label: 'Administration', href: 'admin/index.html' },
+      { label: 'Chat Traces' }
+    ]);
   }
 
   function showDetailView() {
     els.listView.classList.add('hidden');
     els.detailView.classList.remove('hidden');
+    setBreadcrumbItems([
+      { label: 'Administration', href: 'admin/index.html' },
+      { label: 'Chat Traces', href: 'admin/traces.html' },
+      { label: 'Trace Details' }
+    ]);
   }
 
   // =========================================================================
@@ -711,6 +732,11 @@
   function setValue(el, val) {
     if (!el) return;
     el.value = val;
+  }
+
+  function setBreadcrumbItems(items) {
+    if (!els.breadcrumb) return;
+    els.breadcrumb.items = items;
   }
 
 })();

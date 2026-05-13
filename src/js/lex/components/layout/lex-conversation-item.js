@@ -152,17 +152,19 @@
         background: transparent;
         color: var(--lex-sidebar-text-muted, #7A756D);
         cursor: pointer;
-        opacity: 0;
-        transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
-      }
-
-      .lex-conv-item:hover .lex-conv-item-menu {
         opacity: 1;
+        transition: background 0.15s ease, color 0.15s ease;
       }
 
-      .lex-conv-item-menu:hover {
+      .lex-conv-item-menu:hover,
+      .lex-conv-item-menu:focus-visible {
         background: var(--lex-sidebar-border, #2D2B27);
         color: var(--lex-sidebar-text-active, #FFFFFF);
+      }
+
+      .lex-conv-item-menu:focus-visible {
+        outline: 2px solid var(--lex-bg-accent, #736B5C);
+        outline-offset: 2px;
       }
 
       /* Unread dot */
@@ -212,7 +214,7 @@
           </div>
           <div class="lex-conv-item-meta">
             ${timeHtml}
-            <button class="lex-conv-item-menu" data-menu type="button">${ICON_KEBAB}</button>
+            <button class="lex-conv-item-menu" data-menu type="button" aria-label="Conversation actions" title="Conversation actions">${ICON_KEBAB}</button>
           </div>
         </div>`;
     }

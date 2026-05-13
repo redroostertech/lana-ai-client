@@ -413,8 +413,8 @@ const ConversationMenu = {
           </div>
           <div class="flex items-center gap-1 flex-shrink-0">
             <span class="text-xs text-gray-500">${timestamp}</span>
-            <div class="opacity-0 group-hover:opacity-100 transition-opacity" onclick="event.stopPropagation(); if (typeof window.openConversationActionsModal === 'function') { window.openConversationActionsModal('${threadId}', '${safeTitleForJs}', ${matterId ? `'${matterId}'` : 'null'}, ${isPinned ? 'true' : 'false'}); }">
-              <button class="p-1 hover:bg-gray-700 rounded transition-colors">
+            <div class="opacity-100 transition-opacity" onclick="event.stopPropagation(); if (typeof window.openConversationActionsModal === 'function') { window.openConversationActionsModal('${threadId}', '${safeTitleForJs}', ${matterId ? `'${matterId}'` : 'null'}, ${isPinned ? 'true' : 'false'}); }">
+              <button type="button" class="p-1 hover:bg-gray-700 focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded transition-colors" aria-label="Conversation actions" title="Conversation actions">
                 <svg class="w-4 h-4 text-gray-400 hover:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
                 </svg>
@@ -517,7 +517,10 @@ const ConversationMenu = {
   formatTimestamp(dateString) {
     if (!dateString) return '';
 
-    const date = new Date(dateString);
+    const date = window.Lex?.Utils?.parseApiUtcDate
+      ? window.Lex.Utils.parseApiUtcDate(dateString)
+      : new Date(dateString);
+    if (!date || !Number.isFinite(date.getTime())) return '';
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);

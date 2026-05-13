@@ -110,9 +110,23 @@
 
   function formatDate(dateStr) {
     if (!dateStr) return 'N/A';
-    var date = new Date(dateStr);
-    if (isNaN(date.getTime())) return 'N/A';
+    var date = parseApiUtcDate(dateStr);
+    if (!date || isNaN(date.getTime())) return 'N/A';
     return formatDateTime(dateStr);
+  }
+
+  function parseApiUtcDate(value) {
+    if (window.Lex && window.Lex.Utils && typeof window.Lex.Utils.parseApiUtcDate === 'function') {
+      return window.Lex.Utils.parseApiUtcDate(value);
+    }
+    if (value instanceof Date) return value;
+    if (typeof value === 'string' && value.indexOf('T') !== -1) {
+      var timePart = value.substring(value.indexOf('T') + 1);
+      var last = timePart.charAt(timePart.length - 1);
+      var hasExplicitZone = last === 'Z' || last === 'z' || timePart.indexOf('+') !== -1 || timePart.indexOf('-') !== -1;
+      return new Date(hasExplicitZone ? value : value + 'Z');
+    }
+    return new Date(value);
   }
 
   // NO-REGEX version of formatFieldName
@@ -154,7 +168,8 @@
 
   function timeAgo(dateStr) {
     if (!dateStr) return '';
-    var date = new Date(dateStr);
+    var date = parseApiUtcDate(dateStr);
+    if (!date || isNaN(date.getTime())) return '';
     var now = new Date();
     var seconds = Math.floor((now - date) / 1000);
     if (seconds < 60) return 'just now';
@@ -2360,7 +2375,7 @@
         '<button type="button" onclick="event.stopPropagation(); toggleConversationPin(\'' + matterId + '\', \'' + conversationId + '\', ' + (isPinned ? 'true' : 'false') + ')" class="' + pinColor + ' transition-colors flex-shrink-0 p-1" title="' + pinTitle + '" aria-label="' + pinTitle + '">' +
           pinSvg +
         '</button>' +
-        '<button type="button" onclick="' + kebabOnClick + '" class="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0 p-1 rounded hover:bg-gray-100 opacity-0 group-hover:opacity-100 focus:opacity-100" title="More actions — rename, archive, delete" aria-label="Conversation actions">' +
+        '<button type="button" onclick="' + kebabOnClick + '" class="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0 p-1 rounded hover:bg-gray-100" title="More actions — rename, archive, delete" aria-label="Conversation actions">' +
           '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>' +
           '</svg>' +

@@ -96,9 +96,32 @@
     ) || browserTimezone();
   }
 
+  function timestampHasExplicitTimezone(value) {
+    if (!value || typeof value !== 'string') return false;
+    var timeIndex = value.indexOf('T');
+    if (timeIndex === -1) return true;
+    var timePart = value.substring(timeIndex + 1);
+    if (!timePart) return true;
+    var last = timePart.charAt(timePart.length - 1);
+    if (last === 'Z' || last === 'z') return true;
+    return timePart.indexOf('+') !== -1 || timePart.indexOf('-') !== -1;
+  }
+
+  function normalizeApiUtcTimestamp(value) {
+    if (!value || typeof value !== 'string') return value;
+    if (value.indexOf('T') === -1 || timestampHasExplicitTimezone(value)) return value;
+    return value + 'Z';
+  }
+
+  function parseApiUtcDate(value) {
+    if (value instanceof Date) return new Date(value.getTime());
+    var date = new Date(normalizeApiUtcTimestamp(value));
+    return Number.isFinite(date.getTime()) ? date : null;
+  }
+
   function dateParts(dateString, options) {
-    var date = new Date(dateString);
-    if (!Number.isFinite(date.getTime())) return null;
+    var date = parseApiUtcDate(dateString);
+    if (!date) return null;
     var formatterOptions = {
       timeZone: getOrganizationTimezone(options),
       year: 'numeric',
@@ -136,8 +159,8 @@
   // Always honors org timezone via getOrganizationTimezone().
   function formatDateLong(dateString, options) {
     if (!dateString) return 'Never';
-    var date = new Date(dateString);
-    if (!Number.isFinite(date.getTime())) return 'Never';
+    var date = parseApiUtcDate(dateString);
+    if (!date) return 'Never';
     options = options || {};
     var fmt = {
       timeZone: getOrganizationTimezone(options),
@@ -157,8 +180,8 @@
   // Time-only: "10:29 PM" (12-hour, org timezone). Pass { hour12: false } for 24-hour.
   function formatTime(dateString, options) {
     if (!dateString) return '';
-    var date = new Date(dateString);
-    if (!Number.isFinite(date.getTime())) return '';
+    var date = parseApiUtcDate(dateString);
+    if (!date) return '';
     options = options || {};
     return new Intl.DateTimeFormat('en-US', {
       timeZone: getOrganizationTimezone(options),
@@ -180,7 +203,9 @@
 
   function timeAgo(dateString) {
     if (!dateString) return '-';
-    var seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
+    var date = parseApiUtcDate(dateString);
+    if (!date) return '-';
+    var seconds = Math.floor((new Date() - date) / 1000);
     for (var i = 0; i < TIME_INTERVALS.length; i++) {
       var count = Math.floor(seconds / TIME_INTERVALS[i].seconds);
       if (count >= 1) {
@@ -251,7 +276,8 @@
 
   function formatRelativeDate(dateString) {
     if (!dateString) return '\u2014';
-    var date = new Date(dateString);
+    var date = parseApiUtcDate(dateString);
+    if (!date) return '\u2014';
     var now = new Date();
     var diffMs = now - date;
     var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -402,6 +428,8 @@
     formatDateWeekday:  formatDateWeekday,
     formatTime:         formatTime,
     formatRelativeDate: formatRelativeDate,
+    normalizeApiUtcTimestamp: normalizeApiUtcTimestamp,
+    parseApiUtcDate:    parseApiUtcDate,
     timeAgo:            timeAgo,
     debounce:           debounce,
     truncateText:       truncateText,
@@ -421,6 +449,8 @@
   global.formatDateWeekday  = formatDateWeekday;
   global.formatTime         = formatTime;
   global.formatRelativeDate = formatRelativeDate;
+  global.normalizeApiUtcTimestamp = normalizeApiUtcTimestamp;
+  global.parseApiUtcDate    = parseApiUtcDate;
   global.timeAgo            = timeAgo;
   global.debounce           = debounce;
   global.formatFileSize     = formatFileSize;
