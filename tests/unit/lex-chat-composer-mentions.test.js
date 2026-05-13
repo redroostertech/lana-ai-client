@@ -159,6 +159,50 @@ describe('reduce', () => {
     expect(s.activeIndex).toBe(0);
   });
 
+  test('RESULTS_RECEIVED uses grouped result order for selection indexes', () => {
+    let s = helpers.reduce(undefined, { type: 'TRIGGER_OPENED', atIndex: 0, prefix: '' });
+    s = helpers.reduce(s, {
+      type: 'RESULTS_RECEIVED',
+      prefix: '',
+      // Deliberately different from the grouped render order. The reducer
+      // should normalize to the grouped order because the DOM rows are
+      // rendered from groups when groups are present.
+      results: [
+        { id: 'michael', label: 'Michael Westbrooks' },
+        { id: 'ron', label: 'Ron VanPelt' },
+        { id: 'iziah', label: 'Iziah Reid' },
+        { id: 'joe', label: 'Joe Calderon' }
+      ],
+      groups: [
+        {
+          label: 'Shared With This Matter',
+          matches: [
+            { id: 'michael', label: 'Michael Westbrooks' },
+            { id: 'ron', label: 'Ron VanPelt' }
+          ]
+        },
+        {
+          label: 'Users In Your Organization',
+          matches: [
+            { id: 'iziah', label: 'Iziah Reid' },
+            { id: 'joe', label: 'Joe Calderon' }
+          ]
+        }
+      ]
+    });
+
+    expect(s.results.map((item) => item.id)).toEqual(['michael', 'ron', 'iziah', 'joe']);
+    expect(s.results[3].label).toBe('Joe Calderon');
+  });
+
+  test('flattenMentionGroups ignores malformed groups', () => {
+    expect(helpers.flattenMentionGroups([
+      null,
+      { label: 'Empty' },
+      { label: 'Users', matches: [{ id: 'u1' }, null, { id: 'u2' }] }
+    ])).toEqual([{ id: 'u1' }, { id: 'u2' }]);
+  });
+
   test('MOVE_DOWN cycles activeIndex', () => {
     let s = helpers.reduce(undefined, { type: 'TRIGGER_OPENED', atIndex: 0, prefix: '' });
     s = helpers.reduce(s, {

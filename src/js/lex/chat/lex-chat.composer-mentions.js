@@ -151,6 +151,18 @@
     };
   }
 
+  function flattenMentionGroups(groups) {
+    if (!Array.isArray(groups)) return [];
+    const flat = [];
+    groups.forEach(function (group) {
+      const matches = group && Array.isArray(group.matches) ? group.matches : [];
+      matches.forEach(function (match) {
+        if (match && typeof match === 'object') flat.push(match);
+      });
+    });
+    return flat;
+  }
+
   function reduce(state, action) {
     if (!state) state = initialState();
     if (!action || !action.type) return state;
@@ -178,8 +190,11 @@
         if (action.prefix !== undefined && action.prefix !== state.prefix) {
           return state;
         }
-        const results = Array.isArray(action.results) ? action.results : [];
         const groups = Array.isArray(action.groups) ? action.groups : [];
+        const groupedResults = flattenMentionGroups(groups);
+        const results = groupedResults.length > 0
+          ? groupedResults
+          : (Array.isArray(action.results) ? action.results : []);
         return Object.assign({}, state, {
           results,
           groups,
@@ -241,6 +256,7 @@
     buildMentionToken: buildMentionToken,
     applyMentionToValue: applyMentionToValue,
     initialState: initialState,
+    flattenMentionGroups: flattenMentionGroups,
     reduce: reduce,
     debounce: debounce,
   };
