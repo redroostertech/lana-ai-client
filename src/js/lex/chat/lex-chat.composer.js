@@ -637,6 +637,7 @@
         : null;
       this._mentionAbortCtrl = null;
       this._mentionFetchSeq = 0;
+      this._selectedMentions = [];
     }
 
     connected() {
@@ -1304,6 +1305,22 @@
       );
       this._textarea.value = patched.value;
       this._textarea.selectionStart = this._textarea.selectionEnd = patched.caret;
+      const token = this._mentionHelpers.buildMentionToken(match);
+      if (token) {
+        const mention = {
+          id: match.id || null,
+          kind: match.kind || 'user',
+          label: match.label || '',
+          username: match.username || '',
+          email: match.email || '',
+          token: token,
+          share_eligible: match.share_eligible !== false
+        };
+        this._selectedMentions = this._selectedMentions.filter(function (m) {
+          return !(m && m.token === mention.token && m.id === mention.id);
+        });
+        this._selectedMentions.push(mention);
+      }
       this._autoResize();
       this._mentionDispatch({ type: 'CLOSED' });
       this._refreshMentionPopover();
@@ -1407,6 +1424,24 @@
       if (docs.length > 0) {
         detail.attachments = { files: docs.map(d => ({ file_id: d.id, name: d.filename })) };
       }
+      const people = (this._selectedMentions || [])
+        .filter(function (m) { return m && m.token && value.indexOf(m.token) !== -1; })
+        .map(function (m) {
+          return {
+            user_id: m.kind === 'user' ? m.id : null,
+            id: m.id,
+            kind: m.kind,
+            label: m.label,
+            username: m.username,
+            email: m.email,
+            token: m.token,
+            share_eligible: m.share_eligible !== false
+          };
+        });
+      if (people.length > 0) {
+        detail.attachments = detail.attachments || {};
+        detail.attachments.people = people;
+      }
       this.emit('lex-composer-send', detail);
     }
 
@@ -1422,6 +1457,7 @@
         this._textarea.style.height = 'auto';
       }
       this._attachedDocs = [];
+      this._selectedMentions = [];
       this._renderDocBadges();
     }
 
