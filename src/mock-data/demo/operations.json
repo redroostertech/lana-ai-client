@@ -1,0 +1,104 @@
+{
+  "approvals": [
+    {
+      "id": "apr-001",
+      "title": "Approve MSA redline package",
+      "status": "pending",
+      "priority": "high",
+      "source_type": "workflow",
+      "created_at": "2026-04-30T11:55:00Z",
+      "expires_at": "2026-04-30T18:00:00Z",
+      "matter_id": "m-001",
+      "matter_name": "Smith v. Johnson Contract Dispute",
+      "details": {
+        "message": "Counterparty redline package is ready for attorney sign-off."
+      }
+    },
+    {
+      "id": "apr-002",
+      "title": "Approve diligence summary for client send",
+      "status": "pending",
+      "priority": "normal",
+      "source_type": "manual",
+      "created_at": "2026-04-30T10:25:00Z",
+      "expires_at": "2026-05-01T15:00:00Z",
+      "matter_id": "m-002",
+      "matter_name": "Acme Corp Merger Review",
+      "details": {
+        "message": "Ready to release the diligence summary to the client team."
+      }
+    }
+  ],
+  "actionQueue": [
+    {
+      "id": "aq-001",
+      "title": "Review new indemnity markup",
+      "severity": "high",
+      "created_at": "2026-04-30T12:10:00Z",
+      "matter_id": "m-001",
+      "matter_name": "Smith v. Johnson Contract Dispute"
+    },
+    {
+      "id": "aq-002",
+      "title": "Follow up on outstanding diligence request",
+      "severity": "medium",
+      "created_at": "2026-04-30T11:25:00Z",
+      "matter_id": "m-002",
+      "matter_name": "Acme Corp Merger Review"
+    },
+    {
+      "id": "aq-003",
+      "title": "Draft privacy remediation plan",
+      "severity": "high",
+      "created_at": "2026-04-30T09:40:00Z",
+      "matter_id": "m-005",
+      "matter_name": "Data Privacy Compliance Audit"
+    }
+  ],
+  "agenticTasks": [
+    {
+      "id": "agt-001",
+      "name": "Summarize MSA changes",
+      "execution_status": "running",
+      "created_at": "2026-04-30T12:58:00Z"
+    },
+    {
+      "id": "agt-002",
+      "name": "Compile diligence issues",
+      "execution_status": "awaiting_approval",
+      "created_at": "2026-04-30T11:45:00Z"
+    },
+    {
+      "id": "agt-003",
+      "name": "Generate privacy gap checklist",
+      "execution_status": "completed",
+      "created_at": "2026-04-29T16:30:00Z"
+    }
+  ],
+  "dashboardWidgets": [
+    {
+      "id": "wid-001",
+      "widget_type": "metric_card",
+      "title": "Active Matters",
+      "config": { "value": 5 }
+    },
+    {
+      "id": "wid-002",
+      "widget_type": "activity_feed",
+      "title": "Recent Activity",
+      "config": {}
+    }
+  ],
+  "dashboardWidgetTypes": [
+    {
+      "id": "metric_card",
+      "name": "Metric Card",
+      "description": "Single KPI value card"
+    },
+    {
+      "id": "activity_feed",
+      "name": "Activity Feed",
+      "description": "Recent cross-system activity"
+    }
+  ]
+}

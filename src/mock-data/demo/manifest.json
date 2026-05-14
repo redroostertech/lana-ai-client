@@ -1,0 +1,11 @@
+{
+  "version": "2026-04-30",
+  "files": {
+    "users": "users.json",
+    "organizations": "organizations.json",
+    "matters": "matters.json",
+    "documents": "documents.json",
+    "system": "system.json",
+    "operations": "operations.json"
+  }
+}

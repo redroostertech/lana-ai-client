@@ -1,0 +1,49 @@
+{
+  "organizations": [
+    {
+      "id": "demo-org-001",
+      "name": "Acme Legal Group",
+      "slug": "acme-legal-group",
+      "status": "active",
+      "tier": "professional",
+      "user_count": 5,
+      "matter_count": 6,
+      "storage_used": 56264071577,
+      "storage_limit": 107374182400,
+      "settings": {
+        "features": {
+          "chat": true,
+          "documents": true,
+          "canvas": true,
+          "plugins": true,
+          "api": true
+        }
+      },
+      "created_at": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "demo-org-002",
+      "name": "Summit Advisory",
+      "slug": "summit-advisory",
+      "status": "trial",
+      "tier": "starter",
+      "user_count": 12,
+      "matter_count": 18,
+      "storage_used": 21474836480,
+      "storage_limit": 53687091200,
+      "created_at": "2026-02-01T00:00:00Z"
+    },
+    {
+      "id": "demo-org-003",
+      "name": "Northwind Counsel",
+      "slug": "northwind-counsel",
+      "status": "active",
+      "tier": "enterprise",
+      "user_count": 34,
+      "matter_count": 122,
+      "storage_used": 145170728960,
+      "storage_limit": 536870912000,
+      "created_at": "2025-10-15T00:00:00Z"
+    }
+  ]
+}

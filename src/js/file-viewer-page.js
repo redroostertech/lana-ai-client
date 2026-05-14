@@ -199,6 +199,52 @@
     return map[type] || type;
   }
 
+  function isDemoMode() {
+    return !!(window.api && typeof window.api.isDemoMode === 'function' && window.api.isDemoMode());
+  }
+
+  function buildDemoDocumentText(file) {
+    var lines = [
+      'LANA AI Demo Document',
+      '',
+      'Filename: ' + (file.filename || 'Untitled'),
+      'Matter: ' + (file.matter_name || file.client_matter || file.matter_id || 'Unassigned'),
+      'Type: ' + formatMimeType(file.content_type),
+      'Status: ' + (file.status || 'processed'),
+      'Created By: ' + (file.created_by || 'Demo User'),
+      '',
+      'This is a seeded demo document preview generated locally.',
+      'In live mode this page would stream the real file contents from storage.',
+      '',
+      'Suggested walkthrough:',
+      '- Open the metadata panel to show document details',
+      '- Use Ask LANA to discuss the document context',
+      '- Download the demo artifact to show an end-to-end flow'
+    ];
+
+    if (Array.isArray(file.tags) && file.tags.length > 0) {
+      lines.splice(6, 0, 'Tags: ' + file.tags.join(', '));
+    }
+
+    return lines.join('\n');
+  }
+
+  function buildDemoDocxHtml(file) {
+    return [
+      '<article class="prose max-w-none">',
+      '<h1>' + escapeHtml(file.filename || 'Demo Document') + '</h1>',
+      '<p>This preview is rendered from local demo fixtures.</p>',
+      '<p><strong>Matter:</strong> ' + escapeHtml(file.matter_name || file.client_matter || file.matter_id || 'Unassigned') + '</p>',
+      '<p><strong>Summary:</strong> This document is part of the seeded walkthrough data and demonstrates the document viewer without a live storage service.</p>',
+      '<ul>',
+      '<li>Metadata and tags are populated from fixture JSON.</li>',
+      '<li>Chat can still reference the document context.</li>',
+      '<li>Download produces a local demo artifact.</li>',
+      '</ul>',
+      '</article>'
+    ].join('');
+  }
+
   // =========================================================================
   // Navigation
   // =========================================================================
@@ -420,6 +466,18 @@
   }
 
   async function loadPDF(file) {
+    if (isDemoMode()) {
+      var demoIframe = document.getElementById('viewerIframe');
+      demoIframe.srcdoc = '<html><body style="font-family:system-ui,sans-serif;padding:32px;background:#f8fafc;color:#0f172a;"><h1 style="margin-top:0;">' +
+        escapeHtml(file.filename || 'Demo PDF') +
+        '</h1><p>This is a demo-mode PDF placeholder rendered from local fixture data.</p><pre style="white-space:pre-wrap;background:white;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">' +
+        escapeHtml(buildDemoDocumentText(file)) +
+        '</pre></body></html>';
+      demoIframe.classList.remove('hidden');
+      hideLoading();
+      return;
+    }
+
     var response = await fetch(getFileDownloadUrl(file), {
       headers: getAuthHeaders()
     });
@@ -433,6 +491,23 @@
   }
 
   async function loadImage(file) {
+    if (isDemoMode()) {
+      var demoSvg = [
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800">',
+        '<rect width="1200" height="800" fill="#e2e8f0"/>',
+        '<rect x="80" y="80" width="1040" height="640" rx="24" fill="#ffffff" stroke="#cbd5e1"/>',
+        '<text x="120" y="180" font-family="Arial, sans-serif" font-size="42" fill="#0f172a">Demo Image Preview</text>',
+        '<text x="120" y="250" font-family="Arial, sans-serif" font-size="28" fill="#334155">' + escapeHtml(file.filename || 'Image') + '</text>',
+        '<text x="120" y="320" font-family="Arial, sans-serif" font-size="24" fill="#64748b">Rendered locally from seeded JSON metadata.</text>',
+        '</svg>'
+      ].join('');
+      var demoImg = document.getElementById('viewerImage');
+      demoImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(demoSvg);
+      demoImg.classList.remove('hidden');
+      hideLoading();
+      return;
+    }
+
     var response = await fetch(getFileDownloadUrl(file), {
       headers: getAuthHeaders()
     });
@@ -451,6 +526,14 @@
   }
 
   async function loadText(file) {
+    if (isDemoMode()) {
+      var demoText = document.getElementById('viewerText');
+      demoText.textContent = buildDemoDocumentText(file);
+      demoText.classList.remove('hidden');
+      hideLoading();
+      return;
+    }
+
     var response = await fetch(getFileDownloadUrl(file), {
       headers: getAuthHeaders()
     });
@@ -463,6 +546,14 @@
   }
 
   async function loadDOCX(file) {
+    if (isDemoMode()) {
+      var demoContainer = document.getElementById('viewerDocx');
+      demoContainer.innerHTML = buildDemoDocxHtml(file);
+      demoContainer.classList.remove('hidden');
+      hideLoading();
+      return;
+    }
+
     if (typeof mammoth === 'undefined') {
       throw new Error('Mammoth library not loaded');
     }
@@ -500,6 +591,20 @@
 
   async function downloadFile(fileId, filename) {
     try {
+      if (isDemoMode()) {
+        var demoBlob = new Blob([buildDemoDocumentText(state.currentFile || { id: fileId, filename: filename })], { type: 'text/plain;charset=utf-8' });
+        var demoUrl = URL.createObjectURL(demoBlob);
+        var demoLink = document.createElement('a');
+        demoLink.href = demoUrl;
+        demoLink.download = filename || 'lana-demo-document.txt';
+        document.body.appendChild(demoLink);
+        demoLink.click();
+        document.body.removeChild(demoLink);
+        URL.revokeObjectURL(demoUrl);
+        notify('Demo document downloaded', 'success');
+        return;
+      }
+
       var response = await fetch(getFileDownloadUrl(fileId), {
         headers: getAuthHeaders()
       });

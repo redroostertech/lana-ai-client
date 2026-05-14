@@ -1,0 +1,213 @@
+{
+  "matters": [
+    {
+      "id": "m-001",
+      "matter_id": "MAT-2026-001",
+      "matter_number": "MAT-2026-001",
+      "name": "Smith v. Johnson Contract Dispute",
+      "description": "Commercial contract breach case involving a SaaS licensing agreement.",
+      "status": "active",
+      "organization_id": "demo-org-001",
+      "organization_name": "Acme Legal Group",
+      "client_name": "Smith Industries",
+      "practice_area": "Commercial Litigation",
+      "created_at": "2026-01-09T09:00:00Z",
+      "updated_at": "2026-04-30T13:40:00Z",
+      "document_count": 12,
+      "folder_count": 3,
+      "is_pinned": true,
+      "pinned_at": "2026-04-30T12:05:00Z",
+      "source": "client_matters",
+      "owner": { "id": "u-001", "name": "John Doe" }
+    },
+    {
+      "id": "m-002",
+      "matter_id": "MAT-2026-002",
+      "matter_number": "MAT-2026-002",
+      "name": "Acme Corp Merger Review",
+      "description": "Due diligence and integration planning for a proposed merger.",
+      "status": "active",
+      "organization_id": "demo-org-001",
+      "organization_name": "Acme Legal Group",
+      "client_name": "Acme Corporation",
+      "practice_area": "Mergers & Acquisitions",
+      "created_at": "2026-01-20T10:30:00Z",
+      "updated_at": "2026-04-30T12:15:00Z",
+      "document_count": 18,
+      "folder_count": 2,
+      "is_pinned": true,
+      "pinned_at": "2026-04-29T18:20:00Z",
+      "source": "client_matters",
+      "owner": { "id": "u-002", "name": "Jane Smith" }
+    },
+    {
+      "id": "m-003",
+      "matter_id": "MAT-2026-003",
+      "matter_number": "MAT-2026-003",
+      "name": "Employee Handbook Refresh",
+      "description": "Annual review and redline of employment policy materials.",
+      "status": "active",
+      "organization_id": "demo-org-001",
+      "organization_name": "Acme Legal Group",
+      "client_name": "Internal",
+      "practice_area": "Employment Law",
+      "created_at": "2026-02-05T08:00:00Z",
+      "updated_at": "2026-04-29T17:15:00Z",
+      "document_count": 7,
+      "folder_count": 1,
+      "source": "client_matters",
+      "owner": { "id": "u-005", "name": "Sarah Williams" }
+    },
+    {
+      "id": "m-004",
+      "matter_id": "MAT-2026-004",
+      "matter_number": "MAT-2026-004",
+      "name": "Patent Portfolio Analysis",
+      "description": "Review of pending patent applications and licensing exposure.",
+      "status": "active",
+      "organization_id": "demo-org-001",
+      "organization_name": "Acme Legal Group",
+      "client_name": "Innovation Labs LLC",
+      "practice_area": "Intellectual Property",
+      "created_at": "2026-02-18T14:00:00Z",
+      "updated_at": "2026-04-30T09:30:00Z",
+      "document_count": 15,
+      "folder_count": 4,
+      "source": "connector",
+      "connector_id": "case-actionstep",
+      "owner": { "id": "u-003", "name": "Emily Davis" }
+    },
+    {
+      "id": "m-005",
+      "matter_id": "MAT-2026-005",
+      "matter_number": "MAT-2026-005",
+      "name": "Data Privacy Compliance Audit",
+      "description": "Multi-state privacy compliance review and remediation plan.",
+      "status": "on_hold",
+      "organization_id": "demo-org-001",
+      "organization_name": "Acme Legal Group",
+      "client_name": "Global Tech Solutions",
+      "practice_area": "Data Privacy",
+      "created_at": "2026-03-01T11:00:00Z",
+      "updated_at": "2026-04-28T14:45:00Z",
+      "document_count": 10,
+      "folder_count": 2,
+      "source": "client_matters",
+      "owner": { "id": "u-003", "name": "Emily Davis" }
+    },
+    {
+      "id": "m-006",
+      "matter_id": "MAT-2026-006",
+      "matter_number": "MAT-2026-006",
+      "name": "Securities Offering Review",
+      "description": "Prospectus review and closing checklist for a public offering.",
+      "status": "completed",
+      "organization_id": "demo-org-001",
+      "organization_name": "Acme Legal Group",
+      "client_name": "FinTech Ventures",
+      "practice_area": "Securities",
+      "created_at": "2026-03-14T09:30:00Z",
+      "updated_at": "2026-04-21T16:00:00Z",
+      "document_count": 9,
+      "folder_count": 2,
+      "source": "client_matters",
+      "owner": { "id": "u-002", "name": "Jane Smith" }
+    }
+  ],
+  "folders": [
+    {
+      "id": "fld-001",
+      "matter_id": "m-001",
+      "name": "Agreements",
+      "parent_folder_id": null,
+      "document_count": 4,
+      "created_at": "2026-01-10T09:00:00Z"
+    },
+    {
+      "id": "fld-002",
+      "matter_id": "m-001",
+      "name": "Discovery",
+      "parent_folder_id": null,
+      "document_count": 5,
+      "created_at": "2026-01-12T09:00:00Z"
+    },
+    {
+      "id": "fld-003",
+      "matter_id": "m-002",
+      "name": "Diligence",
+      "parent_folder_id": null,
+      "document_count": 8,
+      "created_at": "2026-01-21T10:00:00Z"
+    },
+    {
+      "id": "fld-004",
+      "matter_id": "m-004",
+      "name": "Patent Filings",
+      "parent_folder_id": null,
+      "document_count": 6,
+      "created_at": "2026-02-19T10:30:00Z"
+    }
+  ],
+  "conversations": [
+    {
+      "id": "conv-001",
+      "title": "Contract Analysis MSA Review",
+      "matter_id": "m-001",
+      "matter_name": "Smith v. Johnson Contract Dispute",
+      "updated_at": "2026-04-30T13:00:00Z",
+      "message_count": 8,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can you summarize the termination clause in the MSA?",
+          "timestamp": "2026-04-30T12:52:00Z"
+        },
+        {
+          "role": "assistant",
+          "content": "The agreement permits termination for cause on 30 days' written notice and for convenience at renewal boundaries with 90 days' notice.",
+          "timestamp": "2026-04-30T12:53:00Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-002",
+      "title": "Due Diligence Questions",
+      "matter_id": "m-002",
+      "matter_name": "Acme Corp Merger Review",
+      "updated_at": "2026-04-30T11:20:00Z",
+      "message_count": 5,
+      "messages": [
+        {
+          "role": "user",
+          "content": "What risks stand out from the diligence memo?",
+          "timestamp": "2026-04-30T11:05:00Z"
+        },
+        {
+          "role": "assistant",
+          "content": "The main risks are customer concentration, a pending tax exposure, and a short runway for the integration timeline.",
+          "timestamp": "2026-04-30T11:06:00Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-003",
+      "title": "Patent Validity Research",
+      "matter_id": "m-004",
+      "matter_name": "Patent Portfolio Analysis",
+      "updated_at": "2026-04-30T09:12:00Z",
+      "message_count": 6,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Search for prior art related to the sensor calibration claim.",
+          "timestamp": "2026-04-30T09:00:00Z"
+        },
+        {
+          "role": "assistant",
+          "content": "I found two prior art references with overlapping calibration steps and one academic paper that may affect novelty analysis.",
+          "timestamp": "2026-04-30T09:02:00Z"
+        }
+      ]
+    }
+  ]
+}

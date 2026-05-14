@@ -78,6 +78,14 @@ window.LanaConfig = {
   DEMO_MODE: false,
 
   /**
+   * Demo fixture manifest
+   *
+   * Only used when DEMO_MODE is true. Paths are resolved relative to
+   * js/mock-data.js so subdirectory pages keep working.
+   */
+  DEMO_DATA_MANIFEST: '../mock-data/demo/manifest.json',
+
+  /**
    * Enable Multi-Factor Authentication (MFA)
    *
    * When false:
@@ -156,14 +164,14 @@ window.LanaConfig = {
    * Used when DEMO_MODE is true for simulating authentication
    */
   DEMO_USER: {
-    id: 'demo-user-001',
-    email: 'demo@lana.ai',
-    username: 'demo_user',
-    first_name: 'Demo',
-    last_name: 'User',
+    id: 'u-001',
+    email: 'john.doe@acmecorp.com',
+    username: 'john_doe',
+    first_name: 'John',
+    last_name: 'Doe',
     roles: ['admin', 'user'],
     organization_id: 'demo-org-001',
-    organization_name: 'Demo Organization',
+    organization_name: 'Acme Legal Group',
     permissions: [
       'admin:access',
       'users:read',
@@ -176,7 +184,7 @@ window.LanaConfig = {
       'settings:read',
       'settings:write'
     ],
-    created_at: '2024-01-15T10:00:00Z',
+    created_at: '2026-01-15T10:00:00Z',
     last_login: new Date().toISOString()
   },
 
@@ -186,8 +194,8 @@ window.LanaConfig = {
    */
   DEMO_ORGANIZATION: {
     id: 'demo-org-001',
-    name: 'Demo Organization',
-    slug: 'demo-org',
+    name: 'Acme Legal Group',
+    slug: 'acme-legal-group',
     status: 'active',
     tier: 'professional',
     settings: {

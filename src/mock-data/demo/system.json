@@ -1,0 +1,278 @@
+{
+  "auditLogs": [
+    {
+      "id": "a-001",
+      "action": "user.login",
+      "user_email": "john.doe@acmecorp.com",
+      "user_name": "John Doe",
+      "created_at": "2026-04-30T13:30:00Z",
+      "ip_address": "192.168.1.50",
+      "details": "Successful login"
+    },
+    {
+      "id": "a-002",
+      "action": "document.upload",
+      "user_email": "jane.smith@acmecorp.com",
+      "user_name": "Jane Smith",
+      "created_at": "2026-04-30T12:45:00Z",
+      "ip_address": "192.168.1.51",
+      "details": "Uploaded Integration_Risk_Memo.pdf"
+    },
+    {
+      "id": "a-003",
+      "action": "matter.update",
+      "user_email": "emily.davis@acmecorp.com",
+      "user_name": "Emily Davis",
+      "created_at": "2026-04-30T11:40:00Z",
+      "ip_address": "192.168.1.54",
+      "details": "Updated Acme Corp Merger Review"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "s-001",
+      "user_id": "u-001",
+      "user_email": "john.doe@acmecorp.com",
+      "user_name": "John Doe",
+      "ip_address": "192.168.1.50",
+      "browser": "Chrome 135",
+      "os": "macOS",
+      "device": "Desktop",
+      "location": "New York, NY",
+      "created_at": "2026-04-30T08:00:00Z",
+      "last_activity": "2026-04-30T13:45:00Z",
+      "is_current": true
+    },
+    {
+      "id": "s-002",
+      "user_id": "u-002",
+      "user_email": "jane.smith@acmecorp.com",
+      "user_name": "Jane Smith",
+      "ip_address": "192.168.1.51",
+      "browser": "Safari 18",
+      "os": "macOS",
+      "device": "Desktop",
+      "location": "San Francisco, CA",
+      "created_at": "2026-04-30T09:15:00Z",
+      "last_activity": "2026-04-30T13:15:00Z",
+      "is_current": false
+    }
+  ],
+  "health": {
+    "status": "healthy",
+    "timestamp": "2026-04-30T13:45:00Z",
+    "version": "4.0.0-demo",
+    "services": {
+      "database": { "status": "healthy", "latency_ms": 5, "message": "Demo fixture mode active" },
+      "storage": { "status": "healthy", "latency_ms": 2, "message": "Local fixture storage ready" },
+      "queue": { "status": "healthy", "latency_ms": 1, "message": "Synthetic job queue online" }
+    },
+    "memory": {
+      "heapUsed": 150000000,
+      "heapTotal": 256000000,
+      "rss": 300000000,
+      "external": 15000000
+    },
+    "uptime": 864000,
+    "cpu": {
+      "usage": 11.5,
+      "cores": 8
+    },
+    "connections": {
+      "database": { "active": 0, "idle": 0, "max": 0 },
+      "http": { "active": 3, "max": 1000 }
+    }
+  },
+  "plugins": {
+    "installed": [
+      {
+        "id": "p-001",
+        "name": "Document OCR",
+        "version": "1.2.0",
+        "status": "running",
+        "description": "Extract text from scanned PDFs and images.",
+        "author": "Lana AI",
+        "enabled": true,
+        "settings": { "language": "eng", "quality": "high" }
+      },
+      {
+        "id": "p-002",
+        "name": "Contract Analyzer",
+        "version": "1.5.0",
+        "status": "running",
+        "description": "AI-powered contract analysis and issue spotting.",
+        "author": "Lana AI",
+        "enabled": true,
+        "settings": { "auto_analyze": true }
+      }
+    ],
+    "marketplace": [
+      {
+        "id": "mp-001",
+        "name": "E-Signature Integration",
+        "version": "2.0.0",
+        "description": "DocuSign and Adobe Sign integration.",
+        "author": "Lana AI",
+        "downloads": 1500,
+        "rating": 4.8
+      }
+    ]
+  },
+  "integrations": {
+    "ollama": {
+      "status": "connected",
+      "endpoint": "http://localhost:11434",
+      "models": ["gpt-4.1-mini", "mistral-small"],
+      "default_model": "gpt-4.1-mini",
+      "last_checked": "2026-04-30T13:30:00Z"
+    },
+    "storage": {
+      "status": "connected",
+      "endpoint": "local-fixtures",
+      "last_checked": "2026-04-30T13:30:00Z"
+    }
+  },
+  "connectors": [
+    {
+      "id": "case-actionstep",
+      "name": "Actionstep",
+      "category": "case",
+      "status": "connected",
+      "records": 1523,
+      "lastSync": "2026-04-30T12:30:00Z"
+    },
+    {
+      "id": "crm-hubspot",
+      "name": "HubSpot",
+      "category": "crm",
+      "status": "connected",
+      "records": 2847,
+      "lastSync": "2026-04-30T12:50:00Z"
+    },
+    {
+      "id": "doc-gdrive",
+      "name": "Google Drive",
+      "category": "documents",
+      "status": "connected",
+      "records": 3456,
+      "lastSync": "2026-04-30T13:05:00Z"
+    }
+  ],
+  "reporting": {
+    "summary": {
+      "activeUsers": 5,
+      "totalUsers": 5,
+      "docsProcessed": 71,
+      "docsThisMonth": 22,
+      "aiQueries": 436,
+      "queriesThisMonth": 127,
+      "storageUsed": "52 GB",
+      "storageLimit": "100 GB"
+    }
+  },
+  "settings": {
+    "general": {
+      "app_name": "Lana AI",
+      "support_email": "support@lana.ai",
+      "timezone": "America/New_York",
+      "language": "en"
+    },
+    "features": {
+      "chat": true,
+      "documents": true,
+      "canvas": true,
+      "plugins": true,
+      "api": true
+    },
+    "notifications": {
+      "email_enabled": true,
+      "in_app_enabled": true,
+      "digest_frequency": "daily"
+    }
+  },
+  "onboarding": {
+    "steps": [
+      { "id": "welcome", "name": "Welcome", "description": "Introduction to Lana AI", "required": true, "order": 1 },
+      { "id": "profile", "name": "Profile Setup", "description": "Complete your profile", "required": true, "order": 2 },
+      { "id": "tour", "name": "Product Tour", "description": "Tour the main workspace", "required": false, "order": 3 }
+    ],
+    "settings": {
+      "enabled": true,
+      "allow_skip": true,
+      "show_progress": true
+    }
+  },
+  "dashboardStats": {
+    "matters": { "total": 6, "active": 5, "recent": 2 },
+    "documents": { "total": 8, "this_week": 4, "processing": 1 },
+    "users": { "total": 5, "active_today": 4 },
+    "storage": { "used_gb": 52.4, "limit_gb": 100, "percentage": 52 },
+    "ai_queries": { "today": 27, "this_week": 114, "trend": "+12%" }
+  },
+  "notifications": [
+    {
+      "id": "n-001",
+      "title": "Document processed",
+      "body": "Master_Service_Agreement_v3.pdf has been indexed.",
+      "type": "success",
+      "read": false,
+      "created_at": "2026-04-30T13:20:00Z"
+    },
+    {
+      "id": "n-002",
+      "title": "Approval needed",
+      "body": "A redline package is waiting for review.",
+      "type": "warning",
+      "read": false,
+      "created_at": "2026-04-30T12:40:00Z"
+    },
+    {
+      "id": "n-003",
+      "title": "Matter updated",
+      "body": "Acme Corp Merger Review was updated by Emily Davis.",
+      "type": "info",
+      "read": true,
+      "created_at": "2026-04-30T11:35:00Z"
+    }
+  ],
+  "recentActivity": [
+    {
+      "type": "document_upload",
+      "user": "Jane Smith",
+      "action": "uploaded",
+      "target": "Integration_Risk_Memo.pdf",
+      "matter": "Acme Corp Merger Review",
+      "timestamp": "2026-04-30T12:45:00Z"
+    },
+    {
+      "type": "chat_stream",
+      "user": "John Doe",
+      "action": "started a chat about",
+      "target": "termination rights",
+      "matter": "Smith v. Johnson Contract Dispute",
+      "timestamp": "2026-04-30T12:52:00Z"
+    },
+    {
+      "type": "matter_update",
+      "user": "Emily Davis",
+      "action": "updated",
+      "target": "Acme Corp Merger Review",
+      "matter": null,
+      "timestamp": "2026-04-30T11:40:00Z"
+    }
+  ],
+  "preferences": {
+    "theme": "light",
+    "notifications": true,
+    "language": "en"
+  },
+  "profile": {
+    "bio": "Demo workspace profile for product walkthroughs."
+  },
+  "chatResponses": {
+    "default": "I found the relevant materials in the demo workspace and summarized the main points for you. Ask a follow-up if you want a narrower readout.",
+    "contract": "The contract review surfaces a broad liability cap, an aggressive indemnity clause, and a renewal section that should be tightened before signature.",
+    "search": "I found several relevant demo documents, led by the master service agreement, the diligence checklist, and the integration risk memo.",
+    "legal": "The legal summary suggests documenting notice, preserving communications, and comparing the operative clause language against standard commercial practice."
+  }
+}

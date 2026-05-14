@@ -605,10 +605,43 @@ class ApiClient {
   // DEMO MODE: Mock Response Handler
   // ============================================================
   async getMockResponse(method, endpoint, data) {
-    const mock = window.MockData || {};
+    const mockLoader = window.MockData || {};
+    const mock = typeof mockLoader.load === 'function'
+      ? await mockLoader.load()
+      : mockLoader;
+    const queryParams = new URLSearchParams(endpoint.split('?')[1] || '');
+    const users = Array.isArray(mock.users) ? mock.users : [];
+    const matters = Array.isArray(mock.matters) ? mock.matters : [];
+    const documents = Array.isArray(mock.documents) ? mock.documents : [];
+    const folders = Array.isArray(mock.folders) ? mock.folders : [];
+    const approvals = Array.isArray(mock.approvals) ? mock.approvals : [];
+    const actionQueue = Array.isArray(mock.actionQueue) ? mock.actionQueue : [];
+    const agenticTasks = Array.isArray(mock.agenticTasks) ? mock.agenticTasks : [];
+    const page = Number(queryParams.get('page') || 1);
+    const pageSize = Number(queryParams.get('page_size') || queryParams.get('limit') || 100);
+    const offset = Number(queryParams.get('offset') || 0);
+    const currentUser = this.user || this.config.DEMO_USER || users[0] || {};
+
+    const paginate = (items) => {
+      const collection = Array.isArray(items) ? items : [];
+      const startIndex = offset || Math.max(0, (page - 1) * pageSize);
+      const pagedItems = collection.slice(startIndex, startIndex + pageSize);
+      return {
+        items: pagedItems,
+        pagination: {
+          page,
+          page_size: pageSize,
+          total: collection.length,
+          total_pages: Math.max(1, Math.ceil(collection.length / pageSize))
+        }
+      };
+    };
+
+    const findMatter = (matterId) => matters.find(m => m.id === matterId || m.matter_id === matterId || m.matter_number === matterId);
+    const findDocument = (documentId) => documents.find(doc => doc.id === documentId);
 
     // Simulate network delay
-    await (mock.delay ? mock.delay(300) : new Promise(r => setTimeout(r, 300)));
+    await (mockLoader.delay ? mockLoader.delay(300) : new Promise(r => setTimeout(r, 300)));
 
     this.log(`[DEMO] ${method} ${endpoint}`, data);
 
@@ -649,24 +682,28 @@ class ApiClient {
     }
 
     // -------------------- USERS --------------------
+    if (path === '/api/v1/users' && method === 'GET') {
+      return { users, total: users.length };
+    }
+
     if (path === '/api/v1/admin/users' && method === 'GET') {
-      return { users: mock.users || [], total: (mock.users || []).length };
+      return { users, total: users.length };
     }
 
     if (path.match(/\/api\/v1\/admin\/users\/[^/]+$/) && method === 'GET') {
       const userId = path.split('/').pop();
-      const user = mock.users?.find(u => u.id === userId) || mock.users?.[0] || {};
+      const user = users.find(u => u.id === userId) || users[0] || {};
       return { user };
     }
 
     if (path === '/api/v1/admin/users' && method === 'POST') {
-      const newUser = { id: mock.generateId?.('u') || 'u-new', ...data, created_at: new Date().toISOString() };
+      const newUser = { id: mockLoader.generateId?.('u') || 'u-new', ...data, created_at: new Date().toISOString() };
       return { user: newUser, message: 'User created (demo mode)' };
     }
 
     if (path.match(/\/api\/v1\/admin\/users\/[^/]+$/) && method === 'PUT') {
       const userId = path.split('/').pop();
-      const user = mock.users?.find(u => u.id === userId) || mock.users?.[0] || {};
+      const user = users.find(u => u.id === userId) || users[0] || {};
       return { user: { ...user, ...data }, message: 'User updated (demo mode)' };
     }
 
@@ -684,7 +721,7 @@ class ApiClient {
 
     if (path.includes('/roles') && path.includes('/admin/users/')) {
       const userId = path.split('/')[4];
-      const user = mock.users?.find(u => u.id === userId);
+      const user = users.find(u => u.id === userId);
       if (method === 'GET') {
         return { roles: user?.roles?.map(r => mock.roles?.find(role => role.name === r)) || [] };
       }
@@ -740,18 +777,32 @@ class ApiClient {
 
     // -------------------- MATTERS --------------------
     if (path === '/api/v1/matters' && method === 'GET') {
-      return { matters: mock.matters || [], total: (mock.matters || []).length };
+      let filteredMatters = matters.slice();
+      const search = (queryParams.get('q') || queryParams.get('search') || '').toLowerCase();
+      const status = (queryParams.get('status') || '').toLowerCase();
+      if (search) {
+        filteredMatters = filteredMatters.filter(m =>
+          (m.name || '').toLowerCase().includes(search) ||
+          (m.description || '').toLowerCase().includes(search) ||
+          (m.client_name || '').toLowerCase().includes(search)
+        );
+      }
+      if (status) {
+        filteredMatters = filteredMatters.filter(m => (m.status || '').toLowerCase() === status);
+      }
+      const result = paginate(filteredMatters);
+      return { matters: result.items, total: filteredMatters.length, pagination: result.pagination };
     }
 
     if (path.match(/\/api\/v1\/matters\/[^/]+$/) && method === 'GET') {
       const matterId = path.split('/').pop();
-      const matter = mock.matters?.find(m => m.id === matterId) || mock.matters?.[0] || {};
+      const matter = findMatter(matterId) || matters[0] || {};
       return { matter };
     }
 
     if (path === '/api/v1/matters' && method === 'POST') {
       const newMatter = {
-        id: mock.generateId?.('m') || 'm-new',
+        id: mockLoader.generateId?.('m') || 'm-new',
         ...data,
         created_at: new Date().toISOString(),
         document_count: 0,
@@ -935,6 +986,19 @@ class ApiClient {
     }
 
     // -------------------- HEALTH --------------------
+    if (path === '/api/v1/admin/health/storage') {
+      const storage = mock.dashboardStats?.storage || {};
+      const usedBytes = Math.round((storage.used_gb || 0) * 1024 * 1024 * 1024);
+      const limitBytes = Math.round((storage.limit_gb || 100) * 1024 * 1024 * 1024);
+      return {
+        storage: {
+          used_bytes: usedBytes,
+          total_bytes: limitBytes,
+          usage_percent: storage.percentage || Math.round((usedBytes / limitBytes) * 100)
+        }
+      };
+    }
+
     if (path.includes('/health')) {
       return mock.health || { status: 'healthy', services: {} };
     }
@@ -967,6 +1031,10 @@ class ApiClient {
     }
 
     // -------------------- INTEGRATIONS --------------------
+    if (path === '/api/v1/integrations/connectors' && method === 'GET') {
+      return { connectors: mock.connectors || [] };
+    }
+
     if (path.includes('/integrations')) {
       return mock.integrations || {};
     }
@@ -990,16 +1058,36 @@ class ApiClient {
     }
 
     // -------------------- PROFILE --------------------
+    if (path === '/api/v1/users/me/profile' && method === 'GET') {
+      return {
+        profile: {
+          user_id: currentUser.id,
+          email: currentUser.email,
+          username: currentUser.username,
+          first_name: currentUser.first_name || currentUser.firstName || 'Demo',
+          last_name: currentUser.last_name || currentUser.lastName || 'User',
+          org_id: currentUser.organization_id || currentUser.organizationId || this.config.DEMO_ORGANIZATION?.id,
+          organization_name: currentUser.organization_name || this.config.DEMO_ORGANIZATION?.name,
+          roles: currentUser.roles || [],
+          status: currentUser.is_active === false ? 'inactive' : 'active',
+          is_active: currentUser.is_active !== false,
+          last_login: currentUser.last_login || new Date().toISOString(),
+          created_at: currentUser.created_at || new Date().toISOString(),
+          bio: mock.profile?.bio || 'Demo workspace profile'
+        }
+      };
+    }
+
     if (path.includes('/profile')) {
       if (method === 'GET') {
-        return { ...this.user, bio: 'Legal professional with 10+ years experience' };
+        return { ...currentUser, bio: mock.profile?.bio || 'Demo workspace profile' };
       }
       return { success: true, message: 'Profile updated (demo mode)' };
     }
 
     if (path.includes('/preferences')) {
       if (method === 'GET') {
-        return { theme: 'light', notifications: true, language: 'en' };
+        return mock.preferences || { theme: 'light', notifications: true, language: 'en' };
       }
       return { success: true, message: 'Preferences saved (demo mode)' };
     }
@@ -1017,6 +1105,23 @@ class ApiClient {
 
     // -------------------- ACTIVITY --------------------
     if (path.includes('/activity')) {
+      if (path === '/api/v1/activity/stats') {
+        return {
+          total_events: (mock.recentActivity || []).length,
+          active_users: users.length,
+          documents_viewed: documents.length
+        };
+      }
+
+      if (path.includes('/productivity')) {
+        return {
+          user_id: currentUser.id,
+          documents_processed: documents.length,
+          matters_updated: matters.length,
+          ai_queries: mock.dashboardStats?.ai_queries?.today || 0
+        };
+      }
+
       // Transform mock data to match API format
       const rawActivities = mock.recentActivity || [];
       const activities = rawActivities.map((a, i) => ({
@@ -1038,6 +1143,10 @@ class ApiClient {
     }
 
     // -------------------- NOTIFICATIONS --------------------
+    if (path === '/api/v1/notifications/count' || path === '/api/v1/notifications/unread-count') {
+      return { unread_count: (mock.notifications || []).filter(n => !n.read).length };
+    }
+
     if (path === '/api/v1/notifications' && method === 'GET') {
       return { notifications: mock.notifications || [], unread_count: (mock.notifications || []).filter(n => !n.read).length };
     }
@@ -1061,13 +1170,127 @@ class ApiClient {
     }
 
     if (path === '/api/v1/groups' && method === 'POST') {
-      return { group: { id: mock.generateId?.('g') || 'g-new', ...data }, message: 'Group created (demo mode)' };
+      return { group: { id: mockLoader.generateId?.('g') || 'g-new', ...data }, message: 'Group created (demo mode)' };
+    }
+
+    // -------------------- APPROVALS --------------------
+    if (path === '/api/v1/approvals/stats' && method === 'GET') {
+      const byStatus = approvals.reduce((acc, approval) => {
+        const status = approval.status || 'pending';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {});
+      return { data: { total: approvals.length, by_status: byStatus } };
+    }
+
+    if (path === '/api/v1/approvals/inbox/count' && method === 'GET') {
+      const pending = approvals.filter(approval => approval.status === 'pending').length;
+      return { count: pending, pending };
+    }
+
+    if ((path === '/api/v1/approvals' || path === '/api/v1/approvals/inbox') && method === 'GET') {
+      let filteredApprovals = approvals.slice();
+      const status = queryParams.get('status');
+      const priority = queryParams.get('priority');
+      const sourceType = queryParams.get('source_type');
+      const search = (queryParams.get('search') || '').toLowerCase();
+
+      if (status) filteredApprovals = filteredApprovals.filter(item => item.status === status);
+      if (priority) filteredApprovals = filteredApprovals.filter(item => item.priority === priority);
+      if (sourceType) filteredApprovals = filteredApprovals.filter(item => item.source_type === sourceType);
+      if (search) filteredApprovals = filteredApprovals.filter(item => (item.title || '').toLowerCase().includes(search));
+
+      const result = paginate(filteredApprovals);
+      return { data: result.items, approvals: result.items, pagination: result.pagination };
+    }
+
+    if (path.match(/\/api\/v1\/approvals\/[^/]+\/history$/) && method === 'GET') {
+      return { data: [] };
+    }
+
+    if (path.match(/\/api\/v1\/approvals\/[^/]+$/) && method === 'GET') {
+      const approvalId = path.split('/').pop();
+      const approval = approvals.find(item => item.id === approvalId) || approvals[0] || {};
+      return { data: approval, approval };
+    }
+
+    if (path.includes('/api/v1/approvals/') && (path.endsWith('/approve') || path.endsWith('/reject') || path.endsWith('/cancel') || path.endsWith('/reassign'))) {
+      return { success: true, message: 'Approval updated (demo mode)' };
+    }
+
+    // -------------------- ACTION QUEUE / AGENTIC TASKS --------------------
+    if (path === '/api/v1/action-queue' && method === 'GET') {
+      const result = paginate(actionQueue);
+      return { items: result.items, actions: result.items, pagination: result.pagination };
+    }
+
+    if (path === '/api/v1/agentic-tasks' && method === 'GET') {
+      const result = paginate(agenticTasks);
+      return { data: result.items, pagination: result.pagination };
+    }
+
+    if (path.match(/\/api\/v1\/agentic-tasks\/[^/]+$/) && method === 'GET') {
+      const taskId = path.split('/').pop();
+      const task = agenticTasks.find(item => item.id === taskId) || agenticTasks[0] || {};
+      return { data: task, task };
+    }
+
+    // -------------------- STORAGE --------------------
+    if (path === '/api/v1/storage/root' && method === 'GET') {
+      const result = paginate(matters);
+      return { success: true, matters: result.items, pagination: result.pagination };
+    }
+
+    if (path === '/api/v1/storage/folders' && method === 'GET') {
+      const matterId = queryParams.get('matter_id');
+      const matter = matterId ? findMatter(matterId) : null;
+      const aliases = [matterId, matter?.id, matter?.matter_id, matter?.matter_number].filter(Boolean);
+      const items = matterId
+        ? folders.filter(folder => aliases.includes(folder.matter_id))
+        : folders;
+      return { status: 'success', folders: items, data: { folders: items } };
+    }
+
+    if (path === '/api/v1/storage/recent' && method === 'GET') {
+      const result = paginate(documents.slice().sort((a, b) => new Date(b.last_accessed_at || b.updated_at || 0) - new Date(a.last_accessed_at || a.updated_at || 0)));
+      return { files: result.items, pagination: result.pagination };
+    }
+
+    if (path === '/api/v1/storage/stats' && method === 'GET') {
+      return {
+        total_files: documents.length,
+        processing_files: documents.filter(doc => doc.status === 'processing').length,
+        processed_files: documents.filter(doc => doc.status === 'processed').length
+      };
+    }
+
+    if (path === '/api/v1/storage/files' && method === 'GET') {
+      let files = documents.slice();
+      const matterId = queryParams.get('matter_id');
+      const folderId = queryParams.get('folder_id');
+      const search = (queryParams.get('search') || '').toLowerCase();
+      if (matterId) {
+        files = files.filter(file => file.matter_id === matterId || file.client_matter === matterId);
+      }
+      if (folderId) {
+        files = files.filter(file => file.folder_id === folderId);
+      }
+      if (search) {
+        files = files.filter(file => (file.filename || '').toLowerCase().includes(search));
+      }
+      return { files, total: files.length, data: { files } };
+    }
+
+    if (path.match(/\/api\/v1\/storage\/files\/[^/]+$/) && method === 'GET') {
+      const fileId = path.split('/').pop();
+      const file = findDocument(fileId) || documents[0] || {};
+      return file;
     }
 
     // -------------------- DOCUMENTS --------------------
     if (path.includes('/documents') || path.includes('/storage') || path.includes('/files')) {
       if (method === 'GET') {
-        return { documents: mock.documents || [], files: mock.documents || [], total: (mock.documents || []).length };
+        return { documents, files: documents, total: documents.length };
       }
       return { success: true, message: 'Document action completed (demo mode)' };
     }
@@ -1094,8 +1317,8 @@ class ApiClient {
 
         return {
           response: response,
-          sources: mock.documents?.slice(0, 3) || [],
-          conversation_id: mock.generateId?.('conv') || 'conv-new'
+          sources: documents.slice(0, 3) || [],
+          conversation_id: mockLoader.generateId?.('conv') || 'conv-new'
         };
       }
 
@@ -1105,9 +1328,90 @@ class ApiClient {
     // -------------------- SEARCH --------------------
     if (path.includes('/search')) {
       return {
-        results: mock.documents?.slice(0, 5) || [],
-        total: 5,
+        results: documents.slice(0, 5) || [],
+        total: Math.min(5, documents.length),
         query: data?.query || ''
+      };
+    }
+
+    // -------------------- BILLABLE HOURS --------------------
+    if (path === '/api/v1/billable-hours/current' && method === 'GET') {
+      return {
+        data: {
+          billable_hours: 6.4,
+          matters: [
+            { matter_id: 'MAT-2026-001', hours: 2.1 },
+            { matter_id: 'MAT-2026-002', hours: 1.8 },
+            { matter_id: 'MAT-2026-004', hours: 2.5 }
+          ]
+        }
+      };
+    }
+
+    if (path === '/api/v1/billable-hours/drafts' && method === 'GET') {
+      return {
+        data: [
+          {
+            id: 'bhd-001',
+            matter_id: 'm-001',
+            matter_number: 'MAT-2026-001',
+            duration_minutes: 72,
+            description: 'Reviewed revised indemnity language and updated risk notes.'
+          },
+          {
+            id: 'bhd-002',
+            matter_id: 'm-002',
+            matter_number: 'MAT-2026-002',
+            duration_minutes: 48,
+            description: 'Prepared diligence summary for client review.'
+          }
+        ],
+        pagination: { total: 2 }
+      };
+    }
+
+    // -------------------- DASHBOARD WIDGETS --------------------
+    if (path === '/api/v1/dashboard-widgets' && method === 'GET') {
+      return { data: mock.dashboardWidgets || [] };
+    }
+
+    if (path === '/api/v1/dashboard-widgets/types' && method === 'GET') {
+      return { data: mock.dashboardWidgetTypes || [] };
+    }
+
+    if (path.includes('/api/v1/dashboard-widgets/') && path.endsWith('/data') && method === 'POST') {
+      return { data: mock.dashboardStats || {} };
+    }
+
+    // -------------------- COMMAND CENTER --------------------
+    if (path === '/api/v1/command-center/summary' && method === 'GET') {
+      return {
+        matter_pulse: {
+          total: matters.length,
+          active: matters.filter(m => m.status === 'active').length,
+          stale: matters.filter(m => m.status === 'on_hold').length
+        },
+        today_activity: {
+          documents: documents.filter(doc => (doc.updated_at || '').startsWith(new Date().toISOString().slice(0, 10))).length,
+          conversations: (mock.conversations || []).length
+        },
+        focus_items: actionQueue.slice(0, 4),
+        connector_health: {
+          connected: (mock.connectors || []).filter(item => item.status === 'connected').length,
+          total: (mock.connectors || []).length
+        }
+      };
+    }
+
+    if (path === '/api/v1/command-center/critical-items' && method === 'GET') {
+      return { items: actionQueue.slice(0, 5), total: actionQueue.length };
+    }
+
+    if (path === '/api/v1/command-center/pipeline-metrics' && method === 'GET') {
+      return {
+        active_matters: matters.filter(m => m.status === 'active').length,
+        total_documents: documents.length,
+        team_members: users.length
       };
     }
 
