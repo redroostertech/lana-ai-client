@@ -5367,6 +5367,10 @@
                     panelId: responseStarted ? 'streaming-reasoning-panel' : 'activity-reasoning-panel'
                   });
 
+                  if (data && data.message) {
+                    updateThinkingMessage(data.message, data.stage || data.category || 'thinking');
+                  }
+
                   // Pass unified progress event to showReasoning
                   showReasoning(data, responseStarted);
 

@@ -830,6 +830,12 @@ class LanaChat {
               } else if (currentEvent === 'reasoning') {
                 console.log('[SSE] Reasoning:', data);
                 this.showReasoning(data);
+              } else if (currentEvent === 'progress') {
+                console.log('[SSE] Progress:', data);
+                if (data && data.message) {
+                  this.updateTypingIndicator(data.message);
+                }
+                this.showReasoning(data);
               } else if (currentEvent === 'iteration_summary') {
                 console.log('[SSE] Iteration Summary:', data);
                 this.showIterationSummary(data);
