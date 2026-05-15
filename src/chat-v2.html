@@ -12,6 +12,7 @@
   <script src="js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="css/lex-chat.css">
   <link rel="stylesheet" href="css/chat-v2.css">
+  <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <style>
     @keyframes cv2-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
     @keyframes cv2-spin  { to{transform:rotate(360deg)} }
@@ -221,6 +222,9 @@
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/chat_v2.js"></script>
+
+  <!-- Lana Companion bridge consent handler (Lex modal for token requests) -->
+  <script src="js/companion-bridge-consent.js"></script>
 
   <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="js/auth-guard.js"></script>

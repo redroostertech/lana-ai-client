@@ -1,0 +1,58 @@
+/* Lana Companion Bridge — consent modal body styling.
+   Most styling comes from the Lex modal foundation
+   (see src/js/lex/components/foundation/lex-modal.js); this stylesheet
+   only adds layout polish for the body content (lede + detail + checkbox).
+   All values use Lex tokens — no hard-coded colors or spacing.
+
+   Pairing files:
+     - src/js/companion-bridge-consent.js   renderer-side handler
+     - electron-bridge.js                   main-process bridge + native fallback
+*/
+
+.lana-bridge-consent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lana-bridge-consent__lede {
+  margin: 0;
+  font-size: var(--lex-body-base-size, 0.9375rem);
+  color: var(--lex-text-primary);
+  line-height: 1.5;
+}
+
+.lana-bridge-consent__lede strong {
+  font-weight: var(--lex-weight-semibold, 600);
+  color: var(--lex-text-primary);
+}
+
+.lana-bridge-consent__detail {
+  margin: 0;
+  font-size: var(--lex-body-sm-size, 0.8125rem);
+  color: var(--lex-text-secondary);
+  line-height: 1.5;
+}
+
+.lana-bridge-consent__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: var(--lex-body-sm-size, 0.8125rem);
+  color: var(--lex-text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.lana-bridge-consent__checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--lex-bg-accent, var(--lex-color-brand-700));
+  cursor: pointer;
+}
+
+.lana-bridge-consent__checkbox:hover {
+  color: var(--lex-text-primary);
+}

@@ -204,3 +204,35 @@
   padding-top: 16px;
   border-top: 1px solid var(--lex-border-subtle);
 }
+
+
+/* ── Connected Apps (Bridge Consents) ─────────────────────────────── */
+
+.sv2-connected-app-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-connected-app-row:last-child {
+  border-bottom: none;
+}
+
+.sv2-connected-app-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sv2-connected-app-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--lex-body-xs-size);
+  color: var(--lex-text-tertiary);
+}

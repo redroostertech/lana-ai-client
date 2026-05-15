@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/approvals.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <script src="js/tailwind-loader.js"></script>
 
 </head>
@@ -171,6 +172,7 @@
   <script src="js/lex/components/foundation/lex-action-card.js"></script>
   <script src="js/lex/components/foundation/lex-badge.js"></script>
   <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
 
   <!-- Inject page content -->
@@ -178,6 +180,9 @@
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/approvals.js"></script>
+
+  <!-- Lana Companion bridge consent handler (Lex modal for token requests) -->
+  <script src="js/companion-bridge-consent.js"></script>
 
   <!-- Auth guard + loader dismiss -->
   <script src="js/auth-guard.js"></script>

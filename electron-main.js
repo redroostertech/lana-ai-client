@@ -23,6 +23,76 @@ const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerifi
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 const SessionTracker = require('./js/session/session-tracker');
+const companionBridge = require('./electron-bridge');
+
+/**
+ * Companion Bridge — in-app consent prompts
+ *
+ * The bridge (electron-bridge.js) calls `requestConsentFromRenderer({ app })`
+ * when it needs the user to approve a token request. We forward that to the
+ * renderer over IPC, where `src/js/companion-bridge-consent.js` shows a Lex
+ * modal and posts the answer back via `companion-bridge:respond-consent`.
+ *
+ * One pending Promise per requestId. The bridge applies its own timeout, so
+ * we don't bound this map on time — but we do clean up on respond + on
+ * destroyed window.
+ */
+const pendingCompanionConsents = new Map();
+
+function generateConsentRequestId() {
+  return `cb-${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}`;
+}
+
+function requestCompanionConsentFromRenderer({ app }) {
+  return new Promise((resolve) => {
+    if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents) {
+      resolve({ allow: false, alwaysAllow: false });
+      return;
+    }
+
+    const requestId = generateConsentRequestId();
+    pendingCompanionConsents.set(requestId, resolve);
+
+    // If the window goes away while we wait, resolve as denied so callers
+    // don't hang forever (the bridge has its own timeout too).
+    const cleanupOnClose = () => {
+      const pending = pendingCompanionConsents.get(requestId);
+      if (pending) {
+        pendingCompanionConsents.delete(requestId);
+        pending({ allow: false, alwaysAllow: false });
+      }
+    };
+
+    try {
+      mainWindow.once('closed', cleanupOnClose);
+      mainWindow.webContents.send('companion-bridge:request-consent', {
+        requestId,
+        app,
+        originHint: 'lana-companion'
+      });
+    } catch (error) {
+      pendingCompanionConsents.delete(requestId);
+      try { mainWindow.removeListener('closed', cleanupOnClose); } catch (_) { /* noop */ }
+      logError('[electron-main] Failed to forward companion consent request to renderer', error);
+      resolve({ allow: false, alwaysAllow: false });
+    }
+  });
+}
+
+ipcMain.handle('companion-bridge:respond-consent', async (_event, payload) => {
+  const requestId = payload && typeof payload.requestId === 'string' ? payload.requestId : null;
+  if (!requestId) return { ok: false, reason: 'missing_request_id' };
+
+  const resolve = pendingCompanionConsents.get(requestId);
+  if (!resolve) return { ok: false, reason: 'unknown_request_id' };
+
+  pendingCompanionConsents.delete(requestId);
+  resolve({
+    allow: Boolean(payload && payload.allow),
+    alwaysAllow: Boolean(payload && payload.alwaysAllow)
+  });
+  return { ok: true };
+});
 
 function isBrokenPipeError(error) {
   return error && (error.code === 'EPIPE' || /write EPIPE/i.test(String(error.message || '')));
@@ -893,6 +963,54 @@ ipcMain.handle('vpn-get-device-id', async () => {
 });
 
 /**
+ * Connected Apps (Companion Bridge consents) IPC Handlers
+ *
+ * These read/write the same `bridge-consents` electron-store file that
+ * `electron-bridge.js` consults on every incoming token request. Revocation
+ * here takes effect on the very next bridge request — the bridge re-reads
+ * the file each time and does not keep an in-memory cache.
+ *
+ * Shape stored under the top-level `consents` key:
+ *   { '<app-name>': { mode, granted_at, granted_user_id } }
+ *
+ * Note: granted_user_id is treated as semi-sensitive — never log it.
+ */
+const bridgeConsentsStore = new Store({
+  name: 'bridge-consents',
+  defaults: { consents: {} }
+});
+
+ipcMain.handle('settings:list-bridge-consents', async () => {
+  try {
+    const consents = bridgeConsentsStore.get('consents', {}) || {};
+    return consents;
+  } catch (error) {
+    logError('[settings] Failed to list bridge consents', error);
+    return {};
+  }
+});
+
+ipcMain.handle('settings:revoke-bridge-consent', async (_event, payload) => {
+  const app = payload && typeof payload.app === 'string' ? payload.app.trim() : '';
+  if (!app) {
+    return { ok: false, message: 'app name is required' };
+  }
+  try {
+    const all = bridgeConsentsStore.get('consents', {}) || {};
+    const removed = Object.prototype.hasOwnProperty.call(all, app);
+    if (removed) {
+      delete all[app];
+      bridgeConsentsStore.set('consents', all);
+      logInfo(`[settings] Revoked bridge consent for ${app}`);
+    }
+    return { ok: true, removed };
+  } catch (error) {
+    logError('[settings] Failed to revoke bridge consent', error);
+    return { ok: false, message: error.message || 'Failed to revoke consent' };
+  }
+});
+
+/**
  * Handle deep links (lana-ai://...)
  * Routes incoming URLs to the appropriate handler based on path.
  *
@@ -1092,6 +1210,46 @@ app.whenReady().then(async () => {
   });
   logInfo('Session tracker initialized');
 
+  // Start the Lana Companion bridge (loopback HTTP server on 127.0.0.1:7890).
+  // The bridge reads the renderer's localStorage for the bearer token and
+  // user id on demand — it never caches the token and never logs it.
+  try {
+    companionBridge.start({
+      getToken: async () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return null;
+        try {
+          // executeJavaScript returns a Promise resolving to the evaluated value.
+          const value = await mainWindow.webContents.executeJavaScript(
+            "(() => { try { return window.localStorage.getItem('token'); } catch (_) { return null; } })()",
+            true
+          );
+          return value || null;
+        } catch (_err) {
+          return null;
+        }
+      },
+      getCurrentUserId: async () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return null;
+        try {
+          const value = await mainWindow.webContents.executeJavaScript(
+            "(() => { try { const raw = window.localStorage.getItem('user'); if (!raw) return null; const u = JSON.parse(raw); return (u && (u.id || u.userId || u.user_id)) || null; } catch (_) { return null; } })()",
+            true
+          );
+          return value || null;
+        } catch (_err) {
+          return null;
+        }
+      },
+      getSavedServer: () => getSavedServer(),
+      // Renderer-driven Lex modal. The bridge calls this first; if there's
+      // no window or the renderer fails, the bridge falls back to the
+      // native dialog.showMessageBox flow inside electron-bridge.js.
+      requestConsentFromRenderer: requestCompanionConsentFromRenderer
+    });
+  } catch (error) {
+    logError('[electron-main] Failed to start companion bridge', error);
+  }
+
   // HOSTED DISCOVERY INITIALIZATION FLOW
   // With hosted discovery, we always start at login page
   // The login page handles org resolution via lanaai.io endpoint
@@ -1145,6 +1303,13 @@ app.on('window-all-closed', () => {
 app.on('before-quit', async () => {
   // Cleanup operations before quitting
   console.log('[electron-main] Application is quitting...');
+
+  // Stop the Lana Companion bridge HTTP server
+  try {
+    companionBridge.stop();
+  } catch (error) {
+    logError('[electron-main] Failed to stop companion bridge', error);
+  }
 
   // End session tracking
   if (sessionTracker) {

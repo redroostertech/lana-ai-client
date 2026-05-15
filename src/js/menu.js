@@ -55,6 +55,7 @@ const MenuIcons = {
   label: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>',
   folder: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>',
   plus: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>',
+  mic: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-14 0m7 7v3m-4 0h8m-4-6a3 3 0 01-3-3V5a3 3 0 016 0v7a3 3 0 01-3 3z"></path></svg>',
 };
 
 // ============================================================
@@ -118,6 +119,7 @@ const MenuConfig = {
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'my-tasks', label: 'My Tasks', href: '/my-tasks.html', icon: 'tasks' },
+          { id: 'recordings', label: 'Recordings', href: '/recordings.html', icon: 'mic' },
         ]
       },
       // Section 2: Infinite scrolling – Your Chats, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)

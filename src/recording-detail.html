@@ -3,75 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Notifications - LANA AI</title>
+  <title>Recording - LANA AI</title>
 
   <link rel="stylesheet" href="css/lex-tokens.css">
   <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/notifications-page.css">
+  <link rel="stylesheet" href="css/recordings.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <script src="js/tailwind-loader.js"></script>
 </head>
 <body>
+
   <lex-loader theme="light"></lex-loader>
 
   <lex-app
     logo-src="img/logo-light.png"
     logo-alt="LANA AI"
     logo-href="dashboard.html"
-    active-nav-id="dashboard"
-    page-title="Notifications"
+    active-nav-id="recordings"
+    page-title="Recording"
   ></lex-app>
 
   <template id="page-content">
-    <main class="notifications-page">
-      <header class="notifications-page__header">
-        <div>
-          <h1 class="notifications-page__title">Notifications</h1>
-          <div id="notificationsUnreadMeta" class="notifications-page__meta">0 unread notifications</div>
-        </div>
-        <div class="notifications-page__actions">
-          <lex-btn id="notificationsMarkAll" variant="ghost" size="sm" hidden>Mark all read</lex-btn>
-          <lex-btn id="notificationsRefresh" variant="ghost" size="sm" icon="true" title="Refresh" aria-label="Refresh notifications">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </lex-btn>
-        </div>
-      </header>
+    <main class="recording-detail">
+      <button type="button" id="recordingBackBtn" class="recording-detail__back" aria-label="Back to recordings">
+        &larr; Back to recordings
+      </button>
 
-      <div class="notifications-page__toolbar">
-        <div class="notifications-page__filters">
-          <lex-segmented
-            id="notificationsFilter"
-            value="all"
-            size="sm"
-            options='[{"value":"all","label":"All"},{"value":"unread","label":"Unread"}]'
-          ></lex-segmented>
-          <lex-select
-            id="notificationsTypeFilter"
-            value=""
-            size="sm"
-            searchable="true"
-            placeholder="All types"
-            options='[{"value":"","label":"All types"}]'
-          ></lex-select>
-        </div>
-        <div id="notificationsCount" class="notifications-page__count">0 notifications shown</div>
-      </div>
-
-      <div id="notificationsState" class="notifications-page__state"></div>
-      <div id="notificationsList" class="notifications-list"></div>
-      <div class="notifications-page__footer">
-        <lex-btn id="notificationsLoadMore" variant="ghost" size="sm" hidden>Load more</lex-btn>
+      <div id="recordingDetailContainer" aria-live="polite">
+        <lex-spinner size="md" label="Loading recording"></lex-spinner>
       </div>
     </main>
   </template>
 
   <noscript>
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
-      Please enable JavaScript to use LANA AI.
-    </div>
+    <div class="recordings-noscript">Please enable JavaScript to use LANA AI.</div>
   </noscript>
 
   <script src="js/error-reporter.js"></script>
@@ -104,9 +70,8 @@
   <script src="js/lex/components/foundation/lex-spinner.js"></script>
   <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
-  <script src="js/lex/components/form/lex-segmented.js"></script>
-  <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
   <script src="js/lex/components/layout/lex-conversation-item.js"></script>
@@ -114,7 +79,7 @@
   <script src="js/lex/components/layout/lex-app.js"></script>
 
   <script src="js/lex/lex-page-init.js"></script>
-  <script src="js/pages/notifications-page.js"></script>
+  <script src="js/recording-detail.js"></script>
   <script src="js/companion-bridge-consent.js"></script>
   <script src="js/auth-guard.js"></script>
 </body>

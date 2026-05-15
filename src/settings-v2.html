@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/settings-v2.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <script src="js/tailwind-loader.js"></script>
 
 </head>
@@ -202,6 +203,17 @@
       </section>
 
 
+      <!-- Connected Apps (Electron only — bridge consents)
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-connected-apps" class="sv2-hidden" style="margin-bottom:0.5rem">
+        <lex-card heading="Connected Apps" subtitle="Sibling Lana apps you have allowed to use this device's signed-in session">
+          <div id="sv2-connected-apps-content">
+            <!-- Loading / list / empty rendered by JS -->
+          </div>
+        </lex-card>
+      </section>
+
+
       <!-- VPN (conditionally shown by JS — Electron only)
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-vpn" class="sv2-hidden">
@@ -287,6 +299,9 @@
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/settings-v2.js"></script>
+
+  <!-- Lana Companion bridge consent handler (Lex modal for token requests) -->
+  <script src="js/companion-bridge-consent.js"></script>
 
   <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="js/auth-guard.js"></script>

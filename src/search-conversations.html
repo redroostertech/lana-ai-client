@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/lex-tokens.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <script src="js/tailwind-loader.js"></script>
 
 </head>
@@ -154,6 +155,7 @@
        parents capture un-rendered children (no double-rendering). -->
   <script src="js/lex/components/foundation/lex-banner.js"></script>
   <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
 
   <!-- Inject page content + hoist modals -->
@@ -161,6 +163,9 @@
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/search-conversations.js"></script>
+
+  <!-- Lana Companion bridge consent handler (Lex modal for token requests) -->
+  <script src="js/companion-bridge-consent.js"></script>
 
   <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="js/auth-guard.js"></script>

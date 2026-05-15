@@ -91,6 +91,10 @@
 
     // VPN
     dom.vpnContent = document.getElementById('sv2-vpn-content');
+
+    // Connected Apps (bridge consents)
+    dom.connectedAppsSection = document.getElementById('sv2-section-connected-apps');
+    dom.connectedAppsContent = document.getElementById('sv2-connected-apps-content');
   }
 
 
@@ -881,6 +885,250 @@
 
 
   // =========================================================================
+  // Connected Apps (Companion Bridge consents)
+  //
+  // The bridge stores per-app consents in an electron-store named
+  // `bridge-consents`. The renderer reads/writes that file via two IPC
+  // handlers exposed on window.electronAPI:
+  //   - listBridgeConsents()           → { [app]: { mode, granted_at, granted_user_id } }
+  //   - revokeBridgeConsent(appName)   → { ok, removed?, message? }
+  // The bridge re-checks consent on every request, so revocation here
+  // takes effect on the next companion request without restart.
+  //
+  // granted_user_id is treated as semi-sensitive — never logged to console.
+  // =========================================================================
+
+  // Human-friendly labels for known sibling Lana apps.
+  var CONNECTED_APP_LABELS = {
+    'lana-companion': 'Lana Companion'
+  };
+
+  function isConnectedAppsAvailable() {
+    return Boolean(
+      window.electronAPI &&
+      typeof window.electronAPI.listBridgeConsents === 'function' &&
+      typeof window.electronAPI.revokeBridgeConsent === 'function'
+    );
+  }
+
+  function humanizeConnectedApp(key) {
+    if (!key) return 'Unknown app';
+    if (CONNECTED_APP_LABELS[key]) return CONNECTED_APP_LABELS[key];
+    // Fallback: turn 'some-app-name' → 'Some App Name'
+    var parts = String(key).split('-');
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i].length > 0) {
+        parts[i] = parts[i].charAt(0).toUpperCase() + parts[i].slice(1);
+      }
+    }
+    return parts.join(' ');
+  }
+
+  // Compact relative time: "just now", "5m ago", "3h ago", "2d ago", "3w ago".
+  // Anything older than ~6 weeks falls back to absolute date only (rendered
+  // alongside via toLocaleString).
+  function formatRelativeTime(iso) {
+    if (!iso) return '';
+    var then = new Date(iso).getTime();
+    if (!then || isNaN(then)) return '';
+    var diff = Date.now() - then;
+    if (diff < 0) diff = 0;
+
+    var sec = Math.floor(diff / 1000);
+    if (sec < 45) return 'just now';
+    var min = Math.floor(sec / 60);
+    if (min < 60) return min + 'm ago';
+    var hr = Math.floor(min / 60);
+    if (hr < 24) return hr + 'h ago';
+    var day = Math.floor(hr / 24);
+    if (day < 7) return day + 'd ago';
+    var wk = Math.floor(day / 7);
+    if (wk < 6) return wk + 'w ago';
+    return '';
+  }
+
+  function formatGrantedAt(iso) {
+    if (!iso) return { absolute: '', relative: '' };
+    var d = new Date(iso);
+    var absolute = '';
+    try { absolute = d.toLocaleString(); } catch (e) { absolute = String(iso); }
+    return {
+      absolute: absolute,
+      relative: formatRelativeTime(iso)
+    };
+  }
+
+  function renderConnectedAppsLoading() {
+    if (!dom.connectedAppsContent) return;
+    dom.connectedAppsContent.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;padding:16px 0;">' +
+        '<lex-spinner size="sm" label="Loading connected apps..."></lex-spinner>' +
+      '</div>';
+  }
+
+  function renderConnectedAppsEmpty() {
+    if (!dom.connectedAppsContent) return;
+    dom.connectedAppsContent.innerHTML =
+      '<lex-empty ' +
+        'icon="inbox" ' +
+        'message="No connected apps yet." ' +
+        'description="When another Lana app asks to use this device\'s session and you choose &quot;Always allow&quot;, it will appear here.">' +
+      '</lex-empty>';
+  }
+
+  function renderConnectedAppsError() {
+    if (!dom.connectedAppsContent) return;
+    dom.connectedAppsContent.innerHTML =
+      '<lex-empty ' +
+        'icon="inbox" ' +
+        'message="Couldn\'t load connected apps." ' +
+        'description="Try refreshing this page. If the problem persists, restart the app.">' +
+      '</lex-empty>';
+  }
+
+  function renderConnectedApps(consents) {
+    if (!dom.connectedAppsContent) return;
+
+    var entries = [];
+    if (consents && typeof consents === 'object') {
+      var keys = Object.keys(consents);
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        var rec = consents[key] || {};
+        entries.push({
+          key: key,
+          label: humanizeConnectedApp(key),
+          mode: rec.mode || 'always-allow',
+          granted_at: rec.granted_at || ''
+        });
+      }
+    }
+
+    if (entries.length === 0) {
+      renderConnectedAppsEmpty();
+      return;
+    }
+
+    // Sort newest-granted first.
+    entries.sort(function (a, b) {
+      var ta = a.granted_at ? new Date(a.granted_at).getTime() : 0;
+      var tb = b.granted_at ? new Date(b.granted_at).getTime() : 0;
+      return tb - ta;
+    });
+
+    var html = '';
+    for (var j = 0; j < entries.length; j++) {
+      var entry = entries[j];
+      var times = formatGrantedAt(entry.granted_at);
+      var metaText = '';
+      if (times.relative && times.absolute) {
+        metaText = 'Granted ' + esc(times.relative) + ' • ' + esc(times.absolute);
+      } else if (times.absolute) {
+        metaText = 'Granted ' + esc(times.absolute);
+      } else if (times.relative) {
+        metaText = 'Granted ' + esc(times.relative);
+      } else {
+        metaText = 'Granted';
+      }
+
+      html +=
+        '<div class="sv2-connected-app-row" data-app="' + esc(entry.key) + '">' +
+          '<div class="sv2-connected-app-info">' +
+            '<lex-text variant="primary" size="body" weight="medium">' + esc(entry.label) + '</lex-text>' +
+            '<span class="sv2-connected-app-meta">' + metaText + '</span>' +
+          '</div>' +
+          '<lex-btn ' +
+            'class="sv2-connected-app-revoke-btn" ' +
+            'variant="danger" ' +
+            'size="sm" ' +
+            'icon="trash" ' +
+            'data-app="' + esc(entry.key) + '" ' +
+            'data-label="' + esc(entry.label) + '">' +
+            'Revoke' +
+          '</lex-btn>' +
+        '</div>';
+    }
+
+    dom.connectedAppsContent.innerHTML = html;
+    wireConnectedAppsButtons();
+  }
+
+  function wireConnectedAppsButtons() {
+    if (!dom.connectedAppsContent) return;
+    var buttons = dom.connectedAppsContent.querySelectorAll('.sv2-connected-app-revoke-btn');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].addEventListener('click', handleConnectedAppRevokeClick);
+    }
+  }
+
+  function handleConnectedAppRevokeClick(e) {
+    var btn = e.currentTarget;
+    if (!btn) return;
+    var appKey = btn.getAttribute('data-app') || '';
+    var appLabel = btn.getAttribute('data-label') || humanizeConnectedApp(appKey);
+    if (!appKey) return;
+
+    Lex.Modal.confirm({
+      heading: 'Revoke access for ' + appLabel + '?',
+      body: appLabel + ' will need to ask for permission again the next time it tries to use this device\'s Lana session.',
+      variant: 'danger',
+      confirmText: 'Revoke'
+    }).then(function (confirmed) {
+      if (!confirmed) return;
+      revokeConnectedApp(btn, appKey, appLabel);
+    });
+  }
+
+  function revokeConnectedApp(btn, appKey, appLabel) {
+    if (!isConnectedAppsAvailable()) {
+      Lex.Toast.error('Revoke is only available in the desktop app.');
+      return;
+    }
+
+    // Avoid double-revoke races: lock the row's button while in-flight.
+    if (btn) btn.loading = true;
+
+    window.electronAPI.revokeBridgeConsent(appKey).then(function (result) {
+      if (!result || result.ok !== true) {
+        var msg = (result && result.message) || 'Failed to revoke access';
+        Lex.Toast.error(msg);
+        if (btn) btn.loading = false;
+        return;
+      }
+
+      if (result.removed) {
+        Lex.Toast.success('Revoked access for ' + appLabel);
+      } else {
+        // Already gone — still treat as success from the user's POV.
+        Lex.Toast.info('Access for ' + appLabel + ' was already revoked');
+      }
+      loadConnectedApps();
+    }).catch(function (error) {
+      Lex.Toast.error((error && error.message) || 'Failed to revoke access');
+      if (btn) btn.loading = false;
+    });
+  }
+
+  function loadConnectedApps() {
+    if (!dom.connectedAppsSection || !dom.connectedAppsContent) return;
+    if (!isConnectedAppsAvailable()) {
+      // Web build / no Electron bridge — keep the section hidden.
+      dom.connectedAppsSection.classList.add('sv2-hidden');
+      return;
+    }
+
+    dom.connectedAppsSection.classList.remove('sv2-hidden');
+    renderConnectedAppsLoading();
+
+    window.electronAPI.listBridgeConsents().then(function (consents) {
+      renderConnectedApps(consents || {});
+    }).catch(function () {
+      renderConnectedAppsError();
+    });
+  }
+
+
+  // =========================================================================
   // Page Lifecycle
   // =========================================================================
 
@@ -953,6 +1201,7 @@
       loadProfile();
       loadMfaStatus();
       loadSessions();
+      loadConnectedApps();
     });
 
     // ── Load all data ──
@@ -960,6 +1209,7 @@
     loadTimezone();
     loadMfaStatus();
     loadSessions();
+    loadConnectedApps();
     showConditionalSections();
   }
 

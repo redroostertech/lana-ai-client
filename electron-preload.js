@@ -135,7 +135,49 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * Exchanges authorization code for tokens via backend
    */
   exchangeOAuthCode: (code, state, provider, connectorId, redirectUri, realmId) =>
-    ipcRenderer.invoke('exchange-oauth-code', { code, state, provider, connectorId, redirectUri, realmId })
+    ipcRenderer.invoke('exchange-oauth-code', { code, state, provider, connectorId, redirectUri, realmId }),
+
+  /**
+   * Lana Companion Bridge — in-app consent prompt
+   *
+   * The main process forwards bridge consent requests over the
+   * `companion-bridge:request-consent` channel. The renderer (see
+   * src/js/companion-bridge-consent.js) shows a Lex modal and calls
+   * `respondCompanionBridgeConsent({ requestId, allow, alwaysAllow })` to
+   * answer.
+   *
+   * `onCompanionBridgeRequestConsent(callback)` returns an unsubscribe
+   * function; call it to detach the listener (the consent handler does
+   * this on page unload).
+   */
+  onCompanionBridgeRequestConsent: (callback) => {
+    const handler = (_event, payload) => {
+      try { callback(payload); } catch (_) { /* swallow renderer errors */ }
+    };
+    ipcRenderer.on('companion-bridge:request-consent', handler);
+    return () => {
+      ipcRenderer.removeListener('companion-bridge:request-consent', handler);
+    };
+  },
+
+  respondCompanionBridgeConsent: (payload) =>
+    ipcRenderer.invoke('companion-bridge:respond-consent', payload),
+
+  /**
+   * Connected Apps — manage bridge consents granted to sibling Lana apps.
+   *
+   * Reads/writes the same `bridge-consents` electron-store file that the
+   * companion bridge consults on every incoming request. Revocation takes
+   * effect on the very next bridge request (no restart required).
+   *
+   * `listBridgeConsents()` resolves with the consents map keyed by app name:
+   *   { 'lana-companion': { mode, granted_at, granted_user_id } }
+   *
+   * `revokeBridgeConsent(app)` resolves with `{ ok, removed?, message? }`.
+   */
+  listBridgeConsents: () => ipcRenderer.invoke('settings:list-bridge-consents'),
+  revokeBridgeConsent: (app) =>
+    ipcRenderer.invoke('settings:revoke-bridge-consent', { app })
 });
 
 /**
