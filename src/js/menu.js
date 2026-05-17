@@ -119,7 +119,6 @@ const MenuConfig = {
           },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'my-tasks', label: 'My Tasks', href: '/my-tasks.html', icon: 'tasks' },
-          { id: 'recordings', label: 'Recordings', href: '/recordings.html', icon: 'mic' },
         ]
       },
       // Section 2: Infinite scrolling – Your Chats, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)
@@ -1201,7 +1200,8 @@ function renderMenu(containerSelector = '#sidebar nav', options = {}) {
     ...options,
     containerSelector
   });
-  return menuSystem.inject();
+  const result = menuSystem.inject();
+  return result;
 }
 
 /**

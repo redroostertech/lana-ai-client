@@ -1210,9 +1210,10 @@ app.whenReady().then(async () => {
   });
   logInfo('Session tracker initialized');
 
-  // Start the Lana Companion bridge (loopback HTTP server on 127.0.0.1:7890).
-  // The bridge reads the renderer's localStorage for the bearer token and
-  // user id on demand — it never caches the token and never logs it.
+  // Start the PAC bridge (loopback HTTP server on 127.0.0.1:7890). Wire
+  // identifier is still `lana-companion` for compat with already-granted
+  // consents. The bridge reads the renderer's localStorage for the bearer
+  // token and user id on demand — it never caches the token and never logs it.
   try {
     companionBridge.start({
       getToken: async () => {
@@ -1304,7 +1305,7 @@ app.on('before-quit', async () => {
   // Cleanup operations before quitting
   console.log('[electron-main] Application is quitting...');
 
-  // Stop the Lana Companion bridge HTTP server
+  // Stop the PAC bridge HTTP server
   try {
     companionBridge.stop();
   } catch (error) {

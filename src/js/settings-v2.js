@@ -898,9 +898,11 @@
   // granted_user_id is treated as semi-sensitive — never logged to console.
   // =========================================================================
 
-  // Human-friendly labels for known sibling Lana apps.
+  // Human-friendly labels for known sibling Lana apps. Keys are the wire
+  // identifiers used by the loopback bridge (kept as `lana-companion` for
+  // compat with already-granted device consents); values are user-visible.
   var CONNECTED_APP_LABELS = {
-    'lana-companion': 'Lana Companion'
+    'lana-companion': 'PAC'
   };
 
   function isConnectedAppsAvailable() {

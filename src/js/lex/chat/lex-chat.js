@@ -449,10 +449,12 @@
           };
         }
       } else if (this.chatMode === 'insights') {
-        sendOpts.contextType = 'insights_chat';
+        sendOpts.contextType = sendOpts.attachments && sendOpts.attachments.module_context
+          ? 'insights_chat'
+          : 'data_chat';
       }
       // Explicit contextType prop takes precedence
-      if (this.contextType) sendOpts.contextType = this.contextType;
+      if (this.contextType && !sendOpts.contextType) sendOpts.contextType = this.contextType;
       if (this.matterId) sendOpts.matterId = this.matterId;
 
       // Fire-and-forget JIT processing for any #filename mentions

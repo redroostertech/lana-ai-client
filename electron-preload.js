@@ -88,6 +88,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
 
   /**
+   * Open a URL in the user's system browser via shell.openExternal.
+   *
+   * Used by the Apps section pages (knowledge-base.html, etc.) to launch
+   * external apps' local web UIs (e.g. http://127.0.0.1:7891 for lana-brain)
+   * outside the Electron app. The renderer cannot import 'electron' directly,
+   * so we route through the existing 'open-external-url' main-process handler.
+   */
+  openExternal: (url) => ipcRenderer.invoke('open-external-url', url),
+
+  /**
    * Generic IPC send (fire-and-forget, for one-way messages to main process)
    */
   send: (channel, ...args) => ipcRenderer.send(channel, ...args),
@@ -138,7 +148,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('exchange-oauth-code', { code, state, provider, connectorId, redirectUri, realmId }),
 
   /**
-   * Lana Companion Bridge — in-app consent prompt
+   * PAC bridge (companion bridge) — in-app consent prompt
    *
    * The main process forwards bridge consent requests over the
    * `companion-bridge:request-consent` channel. The renderer (see

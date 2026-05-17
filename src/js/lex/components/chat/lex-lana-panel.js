@@ -381,6 +381,29 @@
       tryAttach(5);
     }
 
+    attachModuleContext(moduleContext) {
+      var self = this;
+      function tryAttach(attempts) {
+        if (!self._chatEl) return;
+        var composer = self._chatEl.querySelector('lex-chat-composer');
+        if (composer && typeof composer.attachModuleContext === 'function') {
+          composer.attachModuleContext(moduleContext);
+        } else if (attempts > 0) {
+          setTimeout(function () { tryAttach(attempts - 1); }, 100);
+        }
+      }
+      tryAttach(5);
+    }
+
+    clearModuleContext() {
+      if (!this._chatEl) return null;
+      var composer = this._chatEl.querySelector('lex-chat-composer');
+      if (composer && typeof composer.clearModuleContext === 'function') {
+        return composer.clearModuleContext();
+      }
+      return null;
+    }
+
     /**
      * Get reference to internal lex-chat (escape hatch for advanced use).
      */
@@ -570,11 +593,24 @@
         }
       });
 
-      // New thread creation
-      container.addEventListener('lex-thread-create', function () {
+      // New thread creation — eager. We POST a fresh thread row now so
+      // the backend allocates a brand-new thread_id; createThread() then
+      // rebinds the chat element (clearConversation + loadConversation)
+      // so the SSE source connects to the new conversation. Without
+      // this, the source would still be connected to the previously
+      // selected thread and the next message would silently append to
+      // it (see _wrapSend + lex-chat.source.js).
+      container.addEventListener('lex-thread-create', function (e) {
         if (!self._chatEl) return;
-        self._chatEl.clearConversation();
-        if (self._threadsEl) self._threadsEl.setActiveThread(null);
+        var threadType = (e.detail && e.detail.threadType) || 'ad_hoc';
+        self.createThread({
+          title: threadType === 'page_general' ? self.threadTitle : 'New Thread',
+          thread_type: threadType,
+          context_type: self.contextType,
+          page_scope: self.pageScope
+        }).catch(function (err) {
+          console.warn('[lex-lana-panel] Failed to create new thread:', err);
+        });
       });
 
       // Register thread on first conversation
@@ -590,6 +626,20 @@
             matter_id: self.matterId || undefined,
             updated_at: new Date().toISOString()
           });
+        }
+
+        // If a thread row already tracks this conversation (e.g. the
+        // user just clicked "+ New" and createThread() pre-allocated
+        // it), there's nothing to register. Avoids a duplicate POST
+        // with an already-taken thread_id, which the backend rejects
+        // with a 500.
+        if (self._threadsEl && self._threadsEl._threads) {
+          for (var k = 0; k < self._threadsEl._threads.length; k++) {
+            if (self._threadsEl._threads[k].thread_id === conversationId) {
+              self._threadsEl.setActiveThread(self._threadsEl._threads[k].id);
+              return;
+            }
+          }
         }
 
         // Check if page_general thread already exists
@@ -630,12 +680,36 @@
         });
       });
 
+      // Auto-title arrives over SSE as a 'title' event, which lex-chat
+      // re-emits as lex-chat-title-generated. The backend mirrors the
+      // generated title into conversation_threads.title at the same time
+      // (see conversation.service.updateConversationTitle), so this
+      // handler just refreshes the visible row.
+      container.addEventListener('lex-chat-title-generated', function (e) {
+        var detail = e.detail || {};
+        var newTitle = detail.title;
+        var conversationId = detail.conversationId;
+        if (!newTitle || !conversationId || !self._threadsEl) return;
+        var list = self._threadsEl._threads || [];
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].thread_id === conversationId) {
+            list[i].title = newTitle;
+            self._threadsEl._scheduleUpdate();
+            self.emit('lex-lana-thread-renamed', { thread: list[i] });
+            break;
+          }
+        }
+      });
+
       // Re-emit composer tool events
       container.addEventListener('lex-composer-tool-select', function (e) {
         self.emit('lex-lana-tool-select', { toolId: e.detail && e.detail.toolId });
       });
       container.addEventListener('lex-composer-tool-dismiss', function (e) {
         self.emit('lex-lana-tool-dismiss', { toolId: e.detail && e.detail.toolId });
+      });
+      container.addEventListener('lex-composer-module-context-remove', function (e) {
+        self.emit('lex-lana-module-context-remove', e.detail || {});
       });
     }
 

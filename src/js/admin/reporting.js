@@ -27,6 +27,7 @@
   var trendsChart = null;
   var statusChart = null;
   var timeSeriesChart = null;
+  var reportingModuleContextDismissed = false;
 
   // ==========================================================================
   // Helpers
@@ -495,6 +496,7 @@
 
       // Store full module configuration
       currentModuleConfig = data;
+      reportingModuleContextDismissed = false;
 
       // Update module header
       var moduleTitleEl = document.getElementById('moduleTitle');
@@ -537,6 +539,7 @@
       setTopbarLanaVisible(false);
 
       showInfo('Module executed successfully in ' + executionTimeMs + 'ms. ' + (data.metrics ? data.metrics.length : 0) + ' metrics calculated.');
+      attachCurrentModuleContextToComposer();
 
     } catch (error) {
       console.error('[Reporting] Execution failed:', error);
@@ -3923,6 +3926,14 @@
     };
   }
 
+  function attachCurrentModuleContextToComposer() {
+    if (reportingModuleContextDismissed) return;
+    var panel = document.getElementById('reportingLana');
+    if (!panel || typeof panel.attachModuleContext !== 'function') return;
+    var ctx = buildModuleContextAttachment();
+    if (ctx) panel.attachModuleContext(ctx);
+  }
+
   // Guard against double-binding when init() runs twice (page-init may
   // both auto-call init() and re-fire it via LexRouter.registerPageInit).
   // Two listeners would each set module_context idempotently — harmless —
@@ -3935,20 +3946,34 @@
     if (!panel) return;
     _reportingLanaContextWired = true;
 
+    panel.addEventListener('lex-lana-module-context-remove', function () {
+      reportingModuleContextDismissed = true;
+    });
+
     panel.addEventListener('lex-lana-before-send', function (e) {
       // Defensive: any throw from this listener must NOT bubble up and break
       // the chat send pipeline. If anything goes wrong building the context,
       // fall back to sending without it.
       try {
-        var ctx = buildModuleContextAttachment();
-        if (!ctx) return; // No module run yet — let the send pass through.
-
         var opts = e.detail && e.detail.opts;
         if (!opts) return;
+
+        if (reportingModuleContextDismissed) {
+          opts.contextType = 'data_chat';
+          if (opts.attachments) delete opts.attachments.module_context;
+          return;
+        }
+
+        var ctx = buildModuleContextAttachment();
+        if (!ctx) {
+          opts.contextType = 'data_chat';
+          return;
+        }
 
         opts.attachments = opts.attachments || {};
         opts.attachments.module_context = ctx;
         opts.contextType = 'insights_chat';
+        attachCurrentModuleContextToComposer();
       } catch (err) {
         console.warn('[Reporting] Failed to attach module_context to chat send:', err);
       }

@@ -1,4 +1,4 @@
-// recordings.js - List page for meeting recordings captured by Lana Companion.
+// recordings.js - List page for meeting recordings captured by PAC.
 //
 // View-only: this page browses recordings owned by the current organization
 // and links into a per-recording detail page. No capture/upload UI.
@@ -243,7 +243,7 @@
     if (state.recordings.length === 0) {
       els.list.innerHTML = '';
       els.state.hidden = false;
-      els.state.innerHTML = '<lex-empty icon="inbox" message="No recordings yet" description="Capture a meeting in Lana Companion to see it here."></lex-empty>';
+      els.state.innerHTML = '<lex-empty icon="inbox" message="No recordings yet" description="Capture a meeting in PAC to see it here."></lex-empty>';
       els.count.textContent = '';
       if (els.prev) els.prev.hidden = true;
       if (els.next) els.next.hidden = true;

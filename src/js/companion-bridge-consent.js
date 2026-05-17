@@ -1,10 +1,13 @@
 /**
- * Lana Companion Bridge — renderer-side consent handler.
+ * PAC bridge (formerly "Lana Companion Bridge") — renderer-side consent
+ * handler.
  *
  * Listens for `companion-bridge:request-consent` from the main process and
  * shows an in-app Lex modal asking the user to approve or deny a token
- * request from the sibling Lana Companion app. The decision is sent back
- * over IPC via `respondCompanionBridgeConsent`.
+ * request from the sibling PAC app. The decision is sent back over IPC via
+ * `respondCompanionBridgeConsent`. The IPC channel name and the wire
+ * identifier `lana-companion` are preserved for backwards compatibility
+ * with already-granted device consents.
  *
  * Pairing files:
  *   - electron-main.js                 forwards bridge → renderer requests
@@ -92,10 +95,10 @@
     return [
       '<div class="lana-bridge-consent">',
       '  <p class="lana-bridge-consent__lede">',
-      '    Allow <strong>Lana Companion</strong> to use your current Lana session for this device?',
+      '    Allow <strong>PAC</strong> to use your current Lana session for this device?',
       '  </p>',
       '  <p class="lana-bridge-consent__detail">',
-      '    Companion will receive a short-lived token tied to your signed-in user. ',
+      '    PAC will receive a short-lived token tied to your signed-in user. ',
       '    You can revoke access from Settings later.',
       '  </p>',
       '  <label class="lana-bridge-consent__checkbox">',
@@ -133,7 +136,7 @@
     };
 
     const modal = window.Lex.Modal.open({
-      heading: 'Lana Companion is requesting access',
+      heading: 'PAC is requesting access',
       content: buildBodyHTML(),
       size: 'sm',
       confirmText: 'Allow',

@@ -619,6 +619,7 @@
       this._docResults = [];
       this._hashTriggerPos = -1; // caret position of the # character
       this._attachedDocs = []; // { id, filename } — documents attached via # picker
+      this._moduleContext = null; // selected reporting module attachment
       this._boundOutsideClick = null;
 
       // ── @-mention picker state (independent from doc picker) ──
@@ -877,6 +878,17 @@
           return;
         }
 
+        // Reporting module badge dismiss
+        const dismissModuleEl = e.target.closest('[data-dismiss-module-context]');
+        if (dismissModuleEl) {
+          const previous = this._moduleContext;
+          this._moduleContext = null;
+          this._renderDocBadges();
+          this.emit('lex-composer-module-context-remove', { moduleContext: previous });
+          this.emit('lex-composer-tool-dismiss', { toolId: 'insights_chat' });
+          return;
+        }
+
         // Document picker selection
         const docEl = e.target.closest('[data-doc-select]');
         if (docEl) {
@@ -1043,18 +1055,25 @@
     _renderDocBadges() {
       const container = this.querySelector('[data-doc-badges]');
       if (!container) return;
-      if (this._attachedDocs.length === 0) {
+      if (this._attachedDocs.length === 0 && !this._moduleContext) {
         container.innerHTML = '';
         return;
       }
-      container.innerHTML = this._attachedDocs.map(doc => {
+      const moduleBadges = this._moduleContext ? [`
+        <div class="lex-cmp-doc-badge lex-cmp-doc-badge--module">
+          ${ICON_EYE}
+          <span>${esc(this._moduleContext.module_name || this._moduleContext.module_key || 'Report')}</span>
+          <button class="lex-cmp-doc-badge-x" data-dismiss-module-context title="Remove report context">${ICON_CLOSE}</button>
+        </div>`] : [];
+      const docBadges = this._attachedDocs.map(doc => {
         return `
           <div class="lex-cmp-doc-badge">
             ${ICON_FILE}
             <span>${esc(doc.filename)}</span>
             <button class="lex-cmp-doc-badge-x" data-dismiss-doc="${esc(doc.id)}" title="Remove ${esc(doc.filename)}">${ICON_CLOSE}</button>
           </div>`;
-      }).join('');
+      });
+      container.innerHTML = moduleBadges.concat(docBadges).join('');
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1442,6 +1461,10 @@
         detail.attachments = detail.attachments || {};
         detail.attachments.people = people;
       }
+      if (this._moduleContext) {
+        detail.attachments = detail.attachments || {};
+        detail.attachments.module_context = this._moduleContext;
+      }
       this.emit('lex-composer-send', detail);
     }
 
@@ -1566,6 +1589,26 @@
      */
     getAttachedDocuments() {
       return this._attachedDocs.slice();
+    }
+
+    attachModuleContext(moduleContext) {
+      if (!moduleContext) return;
+      this._moduleContext = { ...moduleContext };
+      this._renderDocBadges();
+      const active = new Set(this.activeTools || []);
+      active.add('insights_chat');
+      this.setActiveTools(Array.from(active));
+    }
+
+    clearModuleContext() {
+      const previous = this._moduleContext;
+      this._moduleContext = null;
+      this._renderDocBadges();
+      return previous;
+    }
+
+    getModuleContext() {
+      return this._moduleContext ? { ...this._moduleContext } : null;
     }
   }
 

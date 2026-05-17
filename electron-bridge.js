@@ -1,9 +1,11 @@
 /**
- * Lana Companion Bridge
+ * PAC Bridge (formerly "Lana Companion Bridge")
  *
- * Localhost HTTP server that lets the sibling `lana-companion` Electron app
- * piggy-back on this client's signed-in session. The bridge exposes a single
- * endpoint:
+ * Localhost HTTP server that lets the sibling PAC Electron app (package name
+ * `pac`, was `lana-companion`) piggy-back on this client's signed-in session.
+ * The on-the-wire app identifier is still the literal string `lana-companion`
+ * for backwards compatibility with consent-store entries already on devices;
+ * see KNOWN_APPS below. The bridge exposes a single endpoint:
  *
  *   POST /lana-bridge/companion/request-token
  *
@@ -55,7 +57,7 @@ const BRIDGE_HOST = '127.0.0.1';
 const BRIDGE_PORT = 7890;
 const BRIDGE_PATH = '/lana-bridge/companion/request-token';
 const MAX_BODY_BYTES = 16 * 1024; // 16 KB is plenty for the request shape
-const KNOWN_APPS = new Set(['lana-companion']);
+const KNOWN_APPS = new Set(['lana-companion', 'lana-brain']);
 // Max time we'll wait for the renderer to answer the in-app consent modal
 // before treating the request as denied. The modal should give the user
 // enough time to read, but a forgotten/ignored prompt must not pin the HTTP
@@ -247,9 +249,9 @@ async function promptForConsentViaRenderer(appName) {
 async function promptForConsentViaNativeDialog(appName, parentWindow) {
   const dialogOptions = {
     type: 'question',
-    title: 'Lana Companion is requesting access',
-    message: 'Lana Companion is requesting access',
-    detail: 'Allow Lana Companion to use your current Lana session for this device?',
+    title: 'PAC is requesting access',
+    message: 'PAC is requesting access',
+    detail: 'Allow PAC (Personal AI Companion) to use your current Lana session for this device?',
     buttons: ['Allow', 'Deny'],
     defaultId: 0,
     cancelId: 1,

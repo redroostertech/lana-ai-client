@@ -503,16 +503,16 @@
         </div>
       </div>
 
-    <!-- Unified LANA Insights panel (drawer mode, destroy on close) -->
-    <!-- Shared page-scope across the LanaInsights app so threads from any
-         insights page (Dashboard / Firm Reporting / Billable Hours / Data
-         Visualization) show in one unified sidebar list. -->
+    <!-- Unified LANA Insights panel (drawer mode, destroy on close). -->
+    <!-- page-scope is the per-page thread bucket. Each Insights surface
+         keeps its own thread list so Firm Reporting / Billable Hours /
+         Data Visualization don't bleed into each other. -->
     <lex-lana-panel
       id="reportingLana"
       mode="drawer"
       drawer-heading="LANA Insights"
       drawer-width="lg"
-      page-scope="data_visualization"
+      page-scope="firm_reporting"
       context-type="insights_chat"
       placeholder="Ask about forecasts, trends, and insights..."
       tools-locked="true"

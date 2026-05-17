@@ -78,14 +78,14 @@
       <div id="bhAdminTabApprovals" class="hidden"></div>
 
     <!-- Unified LANA Insights panel (drawer mode, destroy on close).
-         Wired to #bhLanaBtn in the page banner. page-scope is shared across
-         the LanaInsights app so threads from any insights page appear here. -->
+         Wired to #bhLanaBtn in the page banner. Each Insights surface
+         keeps its own page-scope so threads stay scoped per page. -->
     <lex-lana-panel
       id="bhLana"
       mode="drawer"
       drawer-heading="LANA Insights"
       drawer-width="lg"
-      page-scope="data_visualization"
+      page-scope="billable_hours"
       context-type="insights_chat"
       placeholder="Ask about utilization, time entries, and approvals..."
       tools-locked="true"
