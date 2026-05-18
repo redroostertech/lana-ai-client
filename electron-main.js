@@ -7,11 +7,31 @@
  * This is the THIN CLIENT version - connects to a remote backend server.
  */
 
-const { app, BrowserWindow, ipcMain, dialog, Menu, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage } = require('electron');
 const path = require('path');
 const url = require('url');
 const crypto = require('crypto');
+const fs = require('fs');
 const Store = require('electron-store');
+
+/**
+ * Resolve the best on-disk path for the app icon. Used at runtime to call
+ * `app.dock.setIcon()` on macOS so the dock shows the Lana mark even in
+ * `npm run dev` (where the .app bundle's electron.icns would otherwise
+ * surface the generic Electron lava lamp). Ported from
+ * brainchild/electron/main.ts#appIconPath().
+ */
+function appIconPath() {
+  const candidates = [
+    path.join(__dirname, 'build', 'icons', 'icon-1024.png'),
+    path.join(__dirname, 'build', 'icons', 'icon-512.png'),
+    path.join(__dirname, 'build', 'icons', 'icon.png'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
 
 // Set app version from package.json (prevents app.getVersion() returning the Electron framework version)
 const packageJson = require('./package.json');
@@ -279,7 +299,7 @@ function createWindow(serverUrl = null) {
     minWidth: 1024,
     minHeight: 768,
     backgroundColor: '#1a1a1a',
-    icon: path.join(__dirname, 'build/icons/256x256.png'),
+    icon: path.join(__dirname, 'build/icons/icon-256.png'),
     webPreferences: {
       nodeIntegration: false, // Disable Node.js integration for security
       contextIsolation: true, // Enable context isolation for security
@@ -369,7 +389,7 @@ function createLoginWindow() {
     minWidth: 1024,
     minHeight: 768,
     backgroundColor: '#f3f4f6',
-    icon: path.join(__dirname, 'build/icons/256x256.png'),
+    icon: path.join(__dirname, 'build/icons/icon-256.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -1151,6 +1171,23 @@ if (!gotTheLock) {
 // This method will be called when Electron has finished initialization
 app.whenReady().then(async () => {
   logInfo('App ready, starting thin client initialization...');
+
+  // macOS dock icon. On packaged builds Electron reads from the .app bundle's
+  // Contents/Resources/electron.icns; in dev that path is Electron's default
+  // (the lava lamp), so we override at runtime. BrowserWindow.icon is
+  // ignored on macOS so this is the only path that works for dev runs.
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = appIconPath();
+    if (iconPath) {
+      try {
+        const img = nativeImage.createFromPath(iconPath);
+        if (!img.isEmpty()) app.dock.setIcon(img);
+      } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        logError(`[lana-ai-client] dock icon set failed: ${msg}`);
+      }
+    }
+  }
 
   // Version migration: Clear server config to ensure fresh discovery with correct static_ip
   // This fixes issues where old versions saved incorrect IPs (e.g., link-local addresses)

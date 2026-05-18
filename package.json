@@ -45,6 +45,7 @@
     "build:all": "electron-builder --mac --x64 --arm64 --win --linux -c electron-builder.client.json",
     "generate:icons": "node scripts/generate-icons.js",
     "generate:icons-all": "node scripts/generate-icons.js --all",
+    "generate:app-icons": "node scripts/generate-app-icons.js",
     "css:build": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css --env production",
     "css:watch": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css --watch",
     "css:dev": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css"
@@ -114,9 +115,11 @@
     "jest-junit": "^16.0.0",
     "lucide-static": "^0.574.0",
     "nodemon": "^3.0.0",
+    "png-to-ico": "^2.1.8",
     "postcss": "^8.5.6",
     "postcss-cli": "^11.0.1",
     "postcss-import": "^16.1.1",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.19"
   }
 }

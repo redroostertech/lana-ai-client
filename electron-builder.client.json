@@ -55,7 +55,7 @@
     "category": "public.app-category.business",
     "artifactName": "LanaAI--genesis--${version}-${arch}.${ext}",
     "target": ["dmg", "zip"],
-    "icon": "build/icon.icns",
+    "icon": "build/icons/icon.icns",
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
     "entitlements": "build/entitlements.mac.plist",
@@ -74,7 +74,7 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "build/icon.ico"
+    "icon": "build/icons/icon.ico"
   },
   "linux": {
     "artifactName": "LanaAI--genesis--${version}.${ext}",
