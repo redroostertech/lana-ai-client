@@ -150,8 +150,9 @@ const UserPickerModal = {
   async loadUsers(query) {
     if (!this.listContainer) return;
     try {
-      var response = await api.searchMentions(query || '', {
-        matterId: this.matterId || undefined,
+      var response = await api.searchMentions({
+        q: query || '',
+        matter_id: this.matterId || undefined,
         limit: 40
       });
       this.renderResults(response, query);

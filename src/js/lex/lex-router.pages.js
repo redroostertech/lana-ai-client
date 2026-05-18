@@ -339,7 +339,54 @@
         'js/admin/reporting.js'
       ],
       stylesheets: [
-        'insights/raw-data-viewer.css'
+        'insights/raw-data-viewer.css',
+        'css/admin/reporting.css'
+      ]
+    },
+
+    'admin/analytics.html': {
+      title: 'Dashboard',
+      activeNav: 'insights-dashboard',
+      scripts: [
+        'js/admin/dashboard-catalog.js',
+        'js/admin/analytics-index.js'
+      ],
+      stylesheets: [
+        'css/admin/insights-dashboard.css'
+      ]
+    },
+
+    'admin/dashboard-library.html': {
+      title: 'Library',
+      activeNav: 'insights-library',
+      scripts: [
+        'js/admin/dashboard-catalog.js',
+        'js/admin/dashboard-library.js'
+      ],
+      stylesheets: [
+        'css/admin/insights-dashboard.css'
+      ]
+    },
+
+    'admin/dashboard-detail.html': {
+      title: 'Dashboard',
+      activeNav: 'insights-dashboard',
+      scripts: [
+        'js/admin/dashboard-detail.js'
+      ],
+      stylesheets: [
+        'css/admin/insights-dashboard.css'
+      ]
+    },
+
+    'admin/dashboard-builder.html': {
+      title: 'Dashboard Builder',
+      activeNav: 'insights-library',
+      scripts: [
+        'js/admin/dashboard-builder.js'
+      ],
+      stylesheets: [
+        'css/admin/insights-dashboard.css'
       ]
     },
 

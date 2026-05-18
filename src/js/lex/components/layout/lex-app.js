@@ -706,12 +706,24 @@
     }
 
     _getAppContext() {
-      const path = window.location.pathname || '';
+      const path = (window.history && window.history.state && window.history.state.path)
+        || window.location.pathname
+        || '';
       if (
         path.indexOf('/admin/analytics.html') !== -1 ||
+        path.indexOf('admin/analytics.html') !== -1 ||
+        path.indexOf('/admin/dashboard-library.html') !== -1 ||
+        path.indexOf('admin/dashboard-library.html') !== -1 ||
+        path.indexOf('/admin/dashboard-detail.html') !== -1 ||
+        path.indexOf('admin/dashboard-detail.html') !== -1 ||
+        path.indexOf('/admin/dashboard-builder.html') !== -1 ||
+        path.indexOf('admin/dashboard-builder.html') !== -1 ||
         path.indexOf('/admin/reporting.html') !== -1 ||
+        path.indexOf('admin/reporting.html') !== -1 ||
         path.indexOf('/admin/billable-hours.html') !== -1 ||
+        path.indexOf('admin/billable-hours.html') !== -1 ||
         path.indexOf('/admin/data-visualization.html') !== -1 ||
+        path.indexOf('admin/data-visualization.html') !== -1 ||
         path.indexOf('/insights/') !== -1
       ) {
         return 'insights';
@@ -723,6 +735,8 @@
       const mainItems = appContext === 'insights'
         ? [
             { id: 'insights-dashboard', label: 'Dashboard', icon: 'home', href: 'admin/analytics.html' },
+            { id: 'insights-library', label: 'Library', icon: 'book-open', href: 'admin/dashboard-library.html' },
+            { id: 'insights-builder', label: 'Builder', icon: 'layout-dashboard', href: 'admin/dashboard-builder.html' },
             { id: 'firm-reporting', label: 'Firm Reporting', icon: 'bar-chart-2', href: 'admin/reporting.html' },
             { id: 'billable-hours', label: 'Billable Hours', icon: 'clock', href: 'admin/billable-hours.html' },
             { id: 'data-visualization', label: 'Data Visualization', icon: 'bar-chart-3', href: 'admin/data-visualization.html' }

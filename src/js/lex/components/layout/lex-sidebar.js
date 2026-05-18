@@ -1048,15 +1048,27 @@
     }
 
     _getCurrentApp() {
-      const path = window.location.pathname || '';
+      const path = (window.history && window.history.state && window.history.state.path)
+        || window.location.pathname
+        || '';
       const items = this._getAppItems();
       const byId = (id) => items.find((it) => it.id === id);
       if (path.indexOf('/automation/') !== -1) return byId('lana-automations') || items[0];
       if (
         path.indexOf('/admin/analytics.html') !== -1 ||
+        path.indexOf('admin/analytics.html') !== -1 ||
+        path.indexOf('/admin/dashboard-library.html') !== -1 ||
+        path.indexOf('admin/dashboard-library.html') !== -1 ||
+        path.indexOf('/admin/dashboard-detail.html') !== -1 ||
+        path.indexOf('admin/dashboard-detail.html') !== -1 ||
+        path.indexOf('/admin/dashboard-builder.html') !== -1 ||
+        path.indexOf('admin/dashboard-builder.html') !== -1 ||
         path.indexOf('/admin/reporting.html') !== -1 ||
+        path.indexOf('admin/reporting.html') !== -1 ||
         path.indexOf('/admin/billable-hours.html') !== -1 ||
+        path.indexOf('admin/billable-hours.html') !== -1 ||
         path.indexOf('/admin/data-visualization.html') !== -1 ||
+        path.indexOf('admin/data-visualization.html') !== -1 ||
         path.indexOf('/insights/') !== -1
       ) return byId('lana-insights') || items[0];
       if (path.indexOf('/voice/') !== -1) return byId('lana-voice') || items[0];

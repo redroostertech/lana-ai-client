@@ -9,8 +9,8 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
+  <link rel="stylesheet" href="../css/admin/insights-dashboard.css">
   <script src="../js/tailwind-loader.js"></script>
-
 </head>
 <body>
 
@@ -36,40 +36,89 @@
         variant="light"
         heading="Dashboard"
         subtitle="Reporting, workspace insights, data exploration, and predictions"
-      ></lex-banner>
+      >
+        <lex-btn id="createDashboardBtn" variant="primary" size="sm">Create Dashboard</lex-btn>
+      </lex-banner>
 
-      <!-- Analytics navigation cards grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style="margin-top:1.5rem;">
-
-        <lex-action-card
-          title="Firm Reporting"
-          description="Run firm-wide reports, view trends, and analyze performance metrics"
-          tag="Reports"
-          data-href="admin/reporting.html"
-        ></lex-action-card>
-
-        <lex-action-card
-          title="Billable Hours"
-          description="Firm-wide time tracking, attorney utilization, and approval management"
-          tag="Billing"
-          data-href="admin/billable-hours.html"
-        ></lex-action-card>
-
-        <lex-action-card
-          title="Data Visualization"
-          description="Browse database tables and query data with natural language"
-          tag="Explorer"
-          data-href="admin/data-visualization.html"
-        ></lex-action-card>
-
+      <div class="insights-stat-grid" aria-label="Metric catalog summary">
+        <div class="insights-stat">
+          <div class="insights-stat__label">Catalog Metrics</div>
+          <div class="insights-stat__value" id="metricCatalogTotal">-</div>
+        </div>
+        <div class="insights-stat">
+          <div class="insights-stat__label">Executable</div>
+          <div class="insights-stat__value" id="metricCatalogExecutable">-</div>
+        </div>
+        <div class="insights-stat">
+          <div class="insights-stat__label">Planned</div>
+          <div class="insights-stat__value" id="metricCatalogPlanned">-</div>
+        </div>
+        <div class="insights-stat">
+          <div class="insights-stat__label">Registry Keys</div>
+          <div class="insights-stat__value" id="metricRegistryKeys">-</div>
+        </div>
       </div>
+
+      <section class="insights-section" aria-labelledby="mostUsedDashboardsHeading">
+        <div class="insights-section-header">
+          <div>
+            <div class="insights-section-title" id="mostUsedDashboardsHeading">Most Used Dashboards</div>
+            <div class="insights-section-subtitle">Dashboard views opened most often by this user</div>
+          </div>
+        </div>
+        <div class="insights-dashboard-grid" id="mostUsedDashboards"></div>
+      </section>
+
+      <section class="insights-section" aria-labelledby="recentDashboardsHeading">
+        <div class="insights-section-header">
+          <div>
+            <div class="insights-section-title" id="recentDashboardsHeading">Recently Used Dashboards</div>
+            <div class="insights-section-subtitle">Dashboard views opened most recently by this user</div>
+          </div>
+        </div>
+        <div class="insights-dashboard-grid" id="recentDashboards"></div>
+      </section>
+
+      <section class="insights-section" aria-labelledby="reportingToolsHeading">
+        <div class="insights-section-header">
+          <div>
+            <div class="insights-section-title" id="reportingToolsHeading">Reporting Tools</div>
+            <div class="insights-section-subtitle">Drill into source reports, billing analytics, and database exploration</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+          <lex-action-card
+            title="Firm Reporting"
+            description="Run firm-wide reports, view trends, and analyze performance metrics"
+            tag="Reports"
+            data-href="admin/reporting.html"
+          ></lex-action-card>
+
+          <lex-action-card
+            title="Billable Hours"
+            description="Firm-wide time tracking, attorney utilization, and approval management"
+            tag="Billing"
+            data-href="admin/billable-hours.html"
+          ></lex-action-card>
+
+          <lex-action-card
+            title="Data Visualization"
+            description="Browse database tables and query data with natural language"
+            tag="Explorer"
+            data-href="admin/data-visualization.html"
+          ></lex-action-card>
+
+        </div>
+      </section>
 
     </main>
 
   </template>
 
   <noscript>
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+    <div class="lex-noscript-message">
       Please enable JavaScript to use LANA AI.
     </div>
   </noscript>
@@ -126,6 +175,7 @@
   <script src="../js/lex/lex-page-init.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/admin/dashboard-catalog.js"></script>
   <script src="../js/admin/analytics-index.js"></script>
 
   <!-- Auth guard + loader dismiss (MUST be last) -->

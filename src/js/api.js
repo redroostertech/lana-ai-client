@@ -1847,26 +1847,6 @@ class ApiClient {
   }
 
   /**
-   * Search org users + agents for @-mention / assignee typeahead.
-   * Backed by /api/v1/mentions/search; when matterId is supplied, results
-   * are split into "shared with matter" / "rest of org" sections.
-   *
-   * @param {string} query - Prefix string to match
-   * @param {Object} [options]
-   * @param {string} [options.matterId] - Matter scope (UUID or matter_id)
-   * @param {number} [options.limit=20] - 1..50
-   * @returns {Promise<{matches: Array, groups?: Array}>}
-   */
-  async searchMentions(query, options) {
-    var opts = options || {};
-    var params = new URLSearchParams();
-    if (query) params.set('q', query);
-    if (opts.matterId) params.set('matter_id', opts.matterId);
-    params.set('limit', String(opts.limit || 20));
-    return this.get('/api/v1/mentions/search?' + params.toString());
-  }
-
-  /**
    * Update a LANA-native task
    * @param {string} taskId - The task ID
    * @param {Object} updates - Task updates (title, description, notes, status, priority, due_date, assigned_to_user_id)
@@ -2767,6 +2747,99 @@ class ApiClient {
    */
   async getDashboardWidgetTypes() {
     return this.get('/api/v1/dashboard-widgets/types');
+  }
+
+  /**
+   * Get reusable metric catalog definitions for report/dashboard composition.
+   * @param {Object} params - Query parameters (namespace, domain, status, executable, limit, offset)
+   * @returns {Promise<Object>} Metric catalog payload
+   */
+  async getMetricCatalog(params = {}) {
+    let url = '/api/v1/modules/metric-catalog';
+    const queryParts = [];
+    if (params.namespace) queryParts.push('namespace=' + encodeURIComponent(params.namespace));
+    if (params.domain) queryParts.push('domain=' + encodeURIComponent(params.domain));
+    if (params.status) queryParts.push('status=' + encodeURIComponent(params.status));
+    if (params.executable !== undefined) queryParts.push('executable=' + encodeURIComponent(String(params.executable)));
+    if (params.primaryAudience) queryParts.push('primaryAudience=' + encodeURIComponent(params.primaryAudience));
+    if (params.primary_audience) queryParts.push('primary_audience=' + encodeURIComponent(params.primary_audience));
+    if (params.entity) queryParts.push('entity=' + encodeURIComponent(params.entity));
+    if (params.criteria) queryParts.push('criteria=' + encodeURIComponent(params.criteria));
+    if (params.limit) queryParts.push('limit=' + encodeURIComponent(String(params.limit)));
+    if (params.offset) queryParts.push('offset=' + encodeURIComponent(String(params.offset)));
+    if (params.q) queryParts.push('q=' + encodeURIComponent(params.q));
+    if (queryParts.length > 0) url += '?' + queryParts.join('&');
+    return this.get(url);
+  }
+
+  /**
+   * Get computed dashboard metric card data for a dashboard view.
+   * @param {Object} params - Query parameters (type, limit)
+   * @returns {Promise<Object>} Dashboard metric card payload
+   */
+  async getDashboardMetricCards(params = {}) {
+    let url = '/api/v1/modules/dashboard-metric-cards';
+    const queryParts = [];
+    if (params.type) queryParts.push('type=' + encodeURIComponent(params.type));
+    if (params.limit) queryParts.push('limit=' + encodeURIComponent(String(params.limit)));
+    if (queryParts.length > 0) url += '?' + queryParts.join('&');
+    return this.get(url);
+  }
+
+  async listBIDashboards(params = {}) {
+    let url = '/api/v1/business-intelligence/dashboards';
+    const queryParts = [];
+    if (params.search) queryParts.push('search=' + encodeURIComponent(params.search));
+    if (params.limit) queryParts.push('limit=' + encodeURIComponent(String(params.limit)));
+    if (params.offset !== undefined) queryParts.push('offset=' + encodeURIComponent(String(params.offset)));
+    if (params.sort) queryParts.push('sort=' + encodeURIComponent(params.sort));
+    if (params.order) queryParts.push('order=' + encodeURIComponent(params.order));
+    if (queryParts.length > 0) url += '?' + queryParts.join('&');
+    return this.get(url);
+  }
+
+  async getBIDashboard(id) {
+    return this.get('/api/v1/business-intelligence/dashboards/' + encodeURIComponent(id));
+  }
+
+  async createBIDashboard(data) {
+    return this.post('/api/v1/business-intelligence/dashboards', data);
+  }
+
+  async updateBIDashboard(id, data) {
+    return this.put('/api/v1/business-intelligence/dashboards/' + encodeURIComponent(id), data);
+  }
+
+  async deleteBIDashboard(id) {
+    return this.delete('/api/v1/business-intelligence/dashboards/' + encodeURIComponent(id));
+  }
+
+  async listResourceShares(resourceType, resourceId, params = {}) {
+    let url = '/api/v1/sharing/resources/' + encodeURIComponent(resourceType) + '/' + encodeURIComponent(resourceId);
+    const queryParts = [];
+    if (params.search) queryParts.push('search=' + encodeURIComponent(params.search));
+    if (params.limit) queryParts.push('limit=' + encodeURIComponent(String(params.limit)));
+    if (params.page) queryParts.push('page=' + encodeURIComponent(String(params.page)));
+    if (queryParts.length > 0) url += '?' + queryParts.join('&');
+    return this.get(url);
+  }
+
+  async grantResourceShare(data) {
+    return this.post('/api/v1/sharing/grant', data);
+  }
+
+  async revokeResourceShare(data) {
+    return this.post('/api/v1/sharing/revoke', data);
+  }
+
+  async searchMentions(params = {}) {
+    let url = '/api/v1/mentions/search';
+    const queryParts = [];
+    if (params.q) queryParts.push('q=' + encodeURIComponent(params.q));
+    if (params.limit) queryParts.push('limit=' + encodeURIComponent(String(params.limit)));
+    if (params.matter_id) queryParts.push('matter_id=' + encodeURIComponent(params.matter_id));
+    if (queryParts.length > 0) url += '?' + queryParts.join('&');
+    return this.get(url);
   }
 
   // ---------------------------------------------------------------------------
