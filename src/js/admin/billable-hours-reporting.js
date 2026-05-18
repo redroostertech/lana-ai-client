@@ -11,6 +11,7 @@
   var _dateTo = '';
   var _activeTab = 'attorneys';
   var _approvalSelectedIds = {};
+  var _approvalEntriesById = {};
 
   // ═══════════════════════════════════════════════════════════════
   // Init
@@ -321,13 +322,18 @@
         html += '<div style="border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.5rem;overflow:hidden;">';
 
         // Header
-        html += '<div style="display:grid;grid-template-columns:2rem 1.5fr 1.5fr 0.7fr 0.7fr 2fr 5rem;gap:0.5rem;padding:0.625rem 1rem;background:var(--lex-bg-muted,#f9fafb);font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;align-items:center;">';
+        var GRID = '2rem 1.4fr 1.4fr 0.7fr 0.7fr 1.7fr 12rem';
+        html += '<div style="display:grid;grid-template-columns:' + GRID + ';gap:0.5rem;padding:0.625rem 1rem;background:var(--lex-bg-muted,#f9fafb);font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;align-items:center;">';
         html += '<div><input type="checkbox" id="bhApprovalSelectAll" style="cursor:pointer;"></div>';
         html += '<div>Attorney</div><div>Matter</div><div style="text-align:right;">Hours</div><div>Type</div><div>Description</div><div></div>';
         html += '</div>';
 
+        // Store entries by id for the edit drawer (needs full row data).
+        _approvalEntriesById = {};
+
         for (var i = 0; i < entries.length; i++) {
           var e = entries[i];
+          _approvalEntriesById[e.id] = e;
           var hours = ((e.duration_minutes || 0) / 60).toFixed(1);
           var name = ((e.first_name || '') + ' ' + (e.last_name || '')).trim() || e.email || '';
           var bg = i % 2 === 1 ? 'background:var(--lex-bg-muted,#f9fafb);' : '';
@@ -335,14 +341,18 @@
           if (desc.length > 80) desc = desc.substring(0, 77) + '...';
 
           var safeId = _escapeHtml(e.id);
-          html += '<div class="bh-approval-row" data-id="' + safeId + '" style="display:grid;grid-template-columns:2rem 1.5fr 1.5fr 0.7fr 0.7fr 2fr 5rem;gap:0.5rem;padding:0.625rem 1rem;font-size:0.8125rem;align-items:center;' + bg + '">';
+          html += '<div class="bh-approval-row" data-id="' + safeId + '" style="display:grid;grid-template-columns:' + GRID + ';gap:0.5rem;padding:0.625rem 1rem;font-size:0.8125rem;align-items:center;' + bg + '">';
           html += '<div><input type="checkbox" class="bh-approval-cb" data-id="' + safeId + '" style="cursor:pointer;"></div>';
           html += '<div style="font-weight:600;">' + _escapeHtml(name) + '</div>';
           html += '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _escapeHtml(e.matter_name || e.matter_id) + '</div>';
           html += '<div style="text-align:right;font-weight:600;color:var(--lex-color-blue-700,#1d4ed8);">' + hours + 'h</div>';
           html += '<div style="color:var(--lex-text-muted);">' + _escapeHtml(e.activity_type || '-') + '</div>';
           html += '<div style="color:var(--lex-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _escapeHtml(desc) + '</div>';
-          html += '<div><button class="bh-approval-approve-btn" data-id="' + safeId + '" style="padding:0.25rem 0.625rem;font-size:0.75rem;font-weight:600;background:var(--lex-color-green-50,#f0fdf4);color:var(--lex-color-green-700,#15803d);border:1px solid var(--lex-color-green-200,#bbf7d0);border-radius:0.25rem;cursor:pointer;">Approve</button></div>';
+          html += '<div style="display:flex;gap:0.25rem;justify-content:flex-end;">';
+          html += '<button class="bh-approval-edit-btn" data-id="' + safeId + '" style="padding:0.25rem 0.5rem;font-size:0.75rem;font-weight:600;background:#fff;color:var(--lex-text-primary);border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.25rem;cursor:pointer;">Edit</button>';
+          html += '<button class="bh-approval-history-btn" data-id="' + safeId + '" style="padding:0.25rem 0.5rem;font-size:0.75rem;font-weight:600;background:#fff;color:var(--lex-text-primary);border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.25rem;cursor:pointer;">History</button>';
+          html += '<button class="bh-approval-approve-btn" data-id="' + safeId + '" style="padding:0.25rem 0.625rem;font-size:0.75rem;font-weight:600;background:var(--lex-color-green-50,#f0fdf4);color:var(--lex-color-green-700,#15803d);border:1px solid var(--lex-color-green-200,#bbf7d0);border-radius:0.25rem;cursor:pointer;">Approve</button>';
+          html += '</div>';
           html += '</div>';
         }
 
@@ -357,7 +367,7 @@
   }
 
   function _wireApprovalActions(container) {
-    // Individual approve buttons
+    // Individual action buttons
     container.addEventListener('click', function (e) {
       var approveBtn = e.target.closest('.bh-approval-approve-btn');
       if (approveBtn) {
@@ -375,6 +385,22 @@
             approveBtn.textContent = 'Approve';
             approveBtn.disabled = false;
           });
+        return;
+      }
+
+      var editBtn = e.target.closest('.bh-approval-edit-btn');
+      if (editBtn) {
+        var editId = editBtn.getAttribute('data-id');
+        var entry = _approvalEntriesById[editId];
+        if (entry) _openAdminEditDrawer(entry);
+        return;
+      }
+
+      var historyBtn = e.target.closest('.bh-approval-history-btn');
+      if (historyBtn) {
+        var histId = historyBtn.getAttribute('data-id');
+        _openAdminHistoryDrawer(histId);
+        return;
       }
     });
 
@@ -474,6 +500,151 @@
   function _formatMoney(amount) {
     if (typeof amount !== 'number') amount = parseFloat(amount) || 0;
     return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Admin Edit & History Drawers
+  // ═══════════════════════════════════════════════════════════════
+
+  function _openAdminEditDrawer(entry) {
+    var hours = ((entry.duration_minutes || 0) / 60).toFixed(2);
+    var rate = entry.hourly_rate != null ? String(entry.hourly_rate) : '';
+    var desc = entry.description || '';
+
+    var html = '<div style="display:flex;flex-direction:column;gap:1rem;">';
+    html += '<div style="font-size:0.75rem;color:var(--lex-text-muted);">Editing <strong>' + _escapeHtml(((entry.first_name || '') + ' ' + (entry.last_name || '')).trim() || entry.email || entry.user_id) + '</strong>’s entry on <strong>' + _escapeHtml(entry.matter_name || entry.matter_id) + '</strong>. This action is audited.</div>';
+
+    html += '<div><div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;margin-bottom:0.25rem;">Description</div>';
+    html += '<textarea id="bhAdminEditDescription" style="width:100%;min-height:4rem;padding:0.5rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.875rem;font-family:inherit;resize:vertical;">' + _escapeHtml(desc) + '</textarea></div>';
+
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">';
+    html += '<div><div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;margin-bottom:0.25rem;">Hours</div>';
+    html += '<input type="number" id="bhAdminEditHours" value="' + _escapeHtml(hours) + '" step="0.1" min="0.1" max="24" style="width:100%;padding:0.375rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.25rem;font-size:0.875rem;"></div>';
+    html += '<div><div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;margin-bottom:0.25rem;">Rate ($/hr)</div>';
+    html += '<input type="number" id="bhAdminEditRate" value="' + _escapeHtml(rate) + '" step="0.01" min="0" placeholder="0.00" style="width:100%;padding:0.375rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.25rem;font-size:0.875rem;"></div>';
+    html += '</div>';
+
+    if (entry.status === 'approved') {
+      html += '<div style="padding:0.5rem 0.75rem;background:var(--lex-color-amber-50,#fffbeb);color:var(--lex-color-amber-800,#92400e);border:1px solid var(--lex-color-amber-200,#fde68a);border-radius:0.375rem;font-size:0.75rem;">This entry is already approved. Changes will be logged as a post-approval correction for payroll and finance.</div>';
+    }
+
+    html += '</div>';
+
+    Lex.Drawer.open({
+      heading: 'Edit time entry',
+      content: html,
+      width: 'md',
+      buttons: [{ label: 'Save changes', variant: 'primary', id: 'bhAdminEditSaveBtn' }]
+    });
+
+    setTimeout(function () {
+      var saveBtn = document.getElementById('bhAdminEditSaveBtn');
+      if (!saveBtn) return;
+      saveBtn.addEventListener('click', function () {
+        var updates = {};
+        var descEl = document.getElementById('bhAdminEditDescription');
+        var hoursEl = document.getElementById('bhAdminEditHours');
+        var rateEl = document.getElementById('bhAdminEditRate');
+        if (descEl && descEl.value !== (entry.description || '')) updates.description = descEl.value;
+        if (hoursEl) {
+          var newMinutes = Math.round(parseFloat(hoursEl.value) * 60);
+          if (newMinutes > 0 && newMinutes !== entry.duration_minutes) {
+            updates.duration_minutes = newMinutes;
+          }
+        }
+        if (rateEl) {
+          var raw = rateEl.value;
+          if (raw === '' || raw === null) {
+            if (entry.hourly_rate != null) updates.hourly_rate = null;
+          } else {
+            var num = parseFloat(raw);
+            if (!isNaN(num) && num >= 0 && num !== parseFloat(entry.hourly_rate)) {
+              updates.hourly_rate = num;
+            }
+          }
+        }
+
+        if (Object.keys(updates).length === 0) {
+          if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.info('No changes to save');
+          return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        api.patch('/api/v1/billable-hours/admin/entries/' + entry.id, updates)
+          .then(function () {
+            if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Entry updated');
+            if (typeof Lex !== 'undefined' && Lex.Drawer) Lex.Drawer.close();
+            _loadApprovalQueue();
+            _loadSummary();
+            _loadAttorneys();
+            _loadMatters();
+          })
+          .catch(function (err) {
+            var msg = (err && err.message) || 'Failed to update entry';
+            if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error(msg);
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save changes';
+          });
+      });
+    }, 50);
+  }
+
+  function _openAdminHistoryDrawer(entryId) {
+    api.get('/api/v1/billable-hours/entries/' + entryId + '/history')
+      .then(function (resp) {
+        var rows = (resp && resp.data) || [];
+        var html = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
+        if (rows.length === 0) {
+          html += '<div style="font-size:0.875rem;color:var(--lex-text-muted);padding:1rem;text-align:center;">No edits recorded for this entry yet.</div>';
+        } else {
+          for (var i = 0; i < rows.length; i++) {
+            html += _renderAdminHistoryRow(rows[i]);
+          }
+        }
+        html += '</div>';
+        Lex.Drawer.open({ heading: 'Edit history', content: html, width: 'md', buttons: [] });
+      })
+      .catch(function () {
+        if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Failed to load edit history');
+      });
+  }
+
+  function _renderAdminHistoryRow(row) {
+    var details = row.details || {};
+    var diff = details.diff || {};
+    var when = row.created_at ? (typeof Lex !== 'undefined' && Lex.Utils ? Lex.Utils.formatDateTime(row.created_at) : row.created_at) : '-';
+    var actor = (row.first_name || row.last_name) ? ((row.first_name || '') + ' ' + (row.last_name || '')).trim() : (row.email || row.user_id || 'Unknown');
+    var roleLabel = details.actor_role === 'admin' ? 'Admin' : 'Owner';
+    var flag = details.post_approval_edit ? ' <span style="font-size:0.7rem;color:var(--lex-color-amber-700,#b45309);font-weight:600;">[post-approval]</span>' : '';
+
+    var html = '<div style="border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;padding:0.75rem;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.5rem;">';
+    html += '<div style="font-size:0.875rem;font-weight:600;color:var(--lex-text-primary);">' + _escapeHtml(actor) + ' <span style="font-size:0.7rem;color:var(--lex-text-muted);font-weight:400;">(' + roleLabel + ')</span>' + flag + '</div>';
+    html += '<div style="font-size:0.75rem;color:var(--lex-text-muted);">' + _escapeHtml(when) + '</div>';
+    html += '</div>';
+
+    var keys = Object.keys(diff);
+    if (keys.length === 0) {
+      html += '<div style="font-size:0.75rem;color:var(--lex-text-muted);">No field changes recorded.</div>';
+    } else {
+      html += '<div style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.75rem;">';
+      for (var k = 0; k < keys.length; k++) {
+        var key = keys[k];
+        var d = diff[key] || {};
+        var before = d.before === null || d.before === undefined ? '—' : String(d.before);
+        var after = d.after === null || d.after === undefined ? '—' : String(d.after);
+        html += '<div>';
+        html += '<span style="font-weight:600;color:var(--lex-text-primary);">' + _escapeHtml(key) + ':</span> ';
+        html += '<span style="color:var(--lex-text-muted);text-decoration:line-through;">' + _escapeHtml(before) + '</span> ';
+        html += '<span style="color:var(--lex-text-muted);">→</span> ';
+        html += '<span style="color:var(--lex-color-blue-700,#1d4ed8);">' + _escapeHtml(after) + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
   }
 
   // ═══════════════════════════════════════════════════════════════

@@ -776,12 +776,15 @@
     var hours = ((entry.duration_minutes || 0) / 60).toFixed(1);
     var date = entry.start_time ? Lex.Utils.formatDateTime(entry.start_time) : '-';
     var isDraft = entry.status === 'draft';
+    // Owners can edit drafts AND submitted entries. Approved entries are
+    // locked for owners; only admins can edit those (admin route).
+    var isOwnerEditable = entry.status === 'draft' || entry.status === 'submitted';
 
     var html = '<div style="display:flex;flex-direction:column;gap:1rem;">';
 
     // Hours + Activity type
     html += '<div style="display:flex;gap:1rem;align-items:center;">';
-    if (isDraft) {
+    if (isOwnerEditable) {
       html += '<div><input type="number" id="bhEditHours" value="' + hours + '" step="0.1" min="0.1" max="24" style="width:5rem;font-size:1.5rem;font-weight:700;color:var(--lex-color-blue-700,#1d4ed8);text-align:center;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;padding:0.25rem;">h</div>';
     } else {
       html += '<div style="font-size:2rem;font-weight:700;color:var(--lex-color-blue-700,#1d4ed8);">' + hours + 'h</div>';
@@ -795,24 +798,25 @@
     // Description
     html += '<div>';
     html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;margin-bottom:0.25rem;">Description</div>';
-    if (isDraft) {
+    if (isOwnerEditable) {
       html += '<textarea id="bhEditDescription" style="width:100%;min-height:4rem;padding:0.5rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.875rem;font-family:inherit;resize:vertical;">' + Lex.Utils.escapeHtml(entry.description || '') + '</textarea>';
-      html += '<div style="display:flex;gap:0.5rem;margin-top:0.25rem;">';
-      html += '<button id="bhRegenDescBtn" style="font-size:0.75rem;color:var(--lex-color-blue-600);cursor:pointer;background:none;border:none;padding:0;">Regenerate description with AI</button>';
-      html += '</div>';
+      if (isDraft) {
+        html += '<div style="display:flex;gap:0.5rem;margin-top:0.25rem;">';
+        html += '<button id="bhRegenDescBtn" style="font-size:0.75rem;color:var(--lex-color-blue-600);cursor:pointer;background:none;border:none;padding:0;">Regenerate description with AI</button>';
+        html += '</div>';
+      }
     } else {
       html += '<div style="font-size:0.875rem;color:var(--lex-text-primary);padding:0.5rem;background:var(--lex-bg-muted,#f9fafb);border-radius:0.375rem;">' + Lex.Utils.escapeHtml(entry.description || 'No description') + '</div>';
     }
     html += '</div>';
 
-    // Details grid
+    // Details grid — rate becomes editable when entry is owner-editable
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">';
     var fields = [
       { label: 'Status', value: entry.status },
       { label: 'Billing Code', value: entry.billing_code || '-' },
       { label: 'Duration', value: entry.duration_minutes + ' minutes (' + hours + 'h)' },
       { label: 'Billable', value: entry.is_billable ? 'Yes' : 'No' },
-      { label: 'Rate', value: entry.hourly_rate ? '$' + entry.hourly_rate + '/hr' : 'Not set' },
       { label: 'Source', value: entry.source || 'manual' }
     ];
     for (var fi = 0; fi < fields.length; fi++) {
@@ -822,6 +826,24 @@
       html += '<div style="font-size:0.875rem;color:var(--lex-text-primary);">' + Lex.Utils.escapeHtml(f.value) + '</div>';
       html += '</div>';
     }
+    // Rate cell
+    html += '<div>';
+    html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;">Rate</div>';
+    if (isOwnerEditable) {
+      var rateVal = entry.hourly_rate != null ? String(entry.hourly_rate) : '';
+      html += '<div style="display:flex;align-items:center;gap:0.25rem;font-size:0.875rem;">';
+      html += '$<input type="number" id="bhEditRate" value="' + Lex.Utils.escapeHtml(rateVal) + '" step="0.01" min="0" placeholder="0.00" style="width:6rem;padding:0.25rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.25rem;font-size:0.875rem;">/hr';
+      html += '</div>';
+    } else {
+      html += '<div style="font-size:0.875rem;color:var(--lex-text-primary);">' + (entry.hourly_rate ? '$' + entry.hourly_rate + '/hr' : 'Not set') + '</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    // Audit-history link — every entry can have history once it has been
+    // edited; we surface the link regardless and let the endpoint return [].
+    html += '<div style="padding-top:0.25rem;">';
+    html += '<button id="bhHistoryBtn" style="font-size:0.75rem;color:var(--lex-color-blue-600);cursor:pointer;background:none;border:none;padding:0;text-decoration:underline;">View edit history</button>';
     html += '</div>';
 
     // Split + Merge buttons for drafts
@@ -874,6 +896,10 @@
     if (isDraft) {
       buttons.push({ label: 'Approve', variant: 'primary', id: 'bhModalApproveBtn' });
       buttons.push({ label: 'Reject', variant: 'danger', id: 'bhModalRejectBtn' });
+    } else if (isOwnerEditable) {
+      // Submitted: owner can save edits without resubmitting; admin handles
+      // the approval transition from /admin/approve/:id.
+      buttons.push({ label: 'Save changes', variant: 'primary', id: 'bhModalSaveBtn' });
     }
 
     Lex.Drawer.open({
@@ -889,6 +915,20 @@
       if (approveBtn) {
         approveBtn.addEventListener('click', function () {
           _saveAndApprove(entry);
+        });
+      }
+
+      var saveBtn = document.getElementById('bhModalSaveBtn');
+      if (saveBtn) {
+        saveBtn.addEventListener('click', function () {
+          _saveOnly(entry);
+        });
+      }
+
+      var historyBtn = document.getElementById('bhHistoryBtn');
+      if (historyBtn) {
+        historyBtn.addEventListener('click', function () {
+          _openHistoryDrawer(entry.id);
         });
       }
 
@@ -955,9 +995,12 @@
     }, 100);
   }
 
-  function _saveAndApprove(entry) {
+  // Collect modal field values into a PATCH payload. Only changed fields
+  // are included so the audit diff stays meaningful.
+  function _collectModalUpdates(entry) {
     var textarea = document.getElementById('bhEditDescription');
     var hoursInput = document.getElementById('bhEditHours');
+    var rateInput = document.getElementById('bhEditRate');
     var updates = {};
 
     if (textarea && textarea.value !== entry.description) {
@@ -969,9 +1012,25 @@
         updates.duration_minutes = newMinutes;
       }
     }
+    if (rateInput) {
+      var raw = rateInput.value;
+      if (raw === '' || raw === null) {
+        if (entry.hourly_rate != null) updates.hourly_rate = null;
+      } else {
+        var num = parseFloat(raw);
+        if (!isNaN(num) && num >= 0 && num !== parseFloat(entry.hourly_rate)) {
+          updates.hourly_rate = num;
+        }
+      }
+    }
+    return updates;
+  }
+
+  function _saveAndApprove(entry) {
+    var updates = _collectModalUpdates(entry);
 
     if (Object.keys(updates).length > 0) {
-      api.patch('/api/v1/time-entries/' + entry.id, updates)
+      api.patch('/api/v1/billable-hours/drafts/' + entry.id, updates)
         .then(function () { _approveEntry(entry.id); })
         .catch(function () {
           if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Failed to save edits — entry not approved');
@@ -979,6 +1038,89 @@
     } else {
       _approveEntry(entry.id);
     }
+  }
+
+  function _saveOnly(entry) {
+    var updates = _collectModalUpdates(entry);
+    if (Object.keys(updates).length === 0) {
+      if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.info('No changes to save');
+      return;
+    }
+    api.patch('/api/v1/billable-hours/drafts/' + entry.id, updates)
+      .then(function () {
+        if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Changes saved');
+        if (typeof Lex !== 'undefined' && Lex.Drawer) Lex.Drawer.close();
+        _refresh();
+      })
+      .catch(function (err) {
+        var msg = (err && err.message) || 'Failed to save changes';
+        if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error(msg);
+      });
+  }
+
+  // Audit-history viewer. Renders a chronological list of edit events with
+  // before/after diffs so owners can see what their admins changed (and
+  // admins can see what they themselves changed).
+  function _openHistoryDrawer(entryId) {
+    api.get('/api/v1/billable-hours/entries/' + entryId + '/history')
+      .then(function (resp) {
+        var rows = (resp && resp.data) || [];
+        var html = '<div style="display:flex;flex-direction:column;gap:0.75rem;">';
+        if (rows.length === 0) {
+          html += '<div style="font-size:0.875rem;color:var(--lex-text-muted);padding:1rem;text-align:center;">No edits recorded for this entry yet.</div>';
+        } else {
+          for (var i = 0; i < rows.length; i++) {
+            html += _renderHistoryRow(rows[i]);
+          }
+        }
+        html += '</div>';
+        Lex.Drawer.open({
+          heading: 'Edit history',
+          content: html,
+          width: 'md',
+          buttons: []
+        });
+      })
+      .catch(function () {
+        if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.error('Failed to load edit history');
+      });
+  }
+
+  function _renderHistoryRow(row) {
+    var details = row.details || {};
+    var diff = details.diff || {};
+    var when = row.created_at ? Lex.Utils.formatDateTime(row.created_at) : '-';
+    var actor = (row.first_name || row.last_name) ? ((row.first_name || '') + ' ' + (row.last_name || '')).trim() : (row.email || row.user_id || 'Unknown');
+    var roleLabel = details.actor_role === 'admin' ? 'Admin' : 'Owner';
+    var flag = details.post_approval_edit ? ' <span style="font-size:0.7rem;color:var(--lex-color-amber-700,#b45309);font-weight:600;">[post-approval]</span>' : '';
+
+    var html = '<div style="border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;padding:0.75rem;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.5rem;">';
+    html += '<div style="font-size:0.875rem;font-weight:600;color:var(--lex-text-primary);">' + Lex.Utils.escapeHtml(actor) + ' <span style="font-size:0.7rem;color:var(--lex-text-muted);font-weight:400;">(' + roleLabel + ')</span>' + flag + '</div>';
+    html += '<div style="font-size:0.75rem;color:var(--lex-text-muted);">' + Lex.Utils.escapeHtml(when) + '</div>';
+    html += '</div>';
+
+    var keys = Object.keys(diff);
+    if (keys.length === 0) {
+      html += '<div style="font-size:0.75rem;color:var(--lex-text-muted);">No field changes recorded.</div>';
+    } else {
+      html += '<div style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.75rem;">';
+      for (var k = 0; k < keys.length; k++) {
+        var key = keys[k];
+        var d = diff[key] || {};
+        var before = d.before === null || d.before === undefined ? '—' : String(d.before);
+        var after = d.after === null || d.after === undefined ? '—' : String(d.after);
+        html += '<div>';
+        html += '<span style="font-weight:600;color:var(--lex-text-primary);">' + Lex.Utils.escapeHtml(key) + ':</span> ';
+        html += '<span style="color:var(--lex-text-muted);text-decoration:line-through;">' + Lex.Utils.escapeHtml(before) + '</span> ';
+        html += '<span style="color:var(--lex-text-muted);">→</span> ';
+        html += '<span style="color:var(--lex-color-blue-700,#1d4ed8);">' + Lex.Utils.escapeHtml(after) + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
   }
 
   // ═══════════════════════════════════════════════════════════════
