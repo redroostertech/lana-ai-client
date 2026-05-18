@@ -21,6 +21,19 @@
     if (node) node.textContent = value == null || value === '' ? '-' : String(value);
   }
 
+  // Snake/dot-case identifiers (`legal_operations`, `department_legal_estate_planning`,
+  // `legal_firm.estate_planning.upcoming_poa_deed_design_meetings`) must never
+  // appear as plain text to users. Apply this anywhere a registry key is
+  // rendered as a label, status, audience, or section.
+  function humanize(value) {
+    if (value == null) return '';
+    return String(value)
+      .replace(/[_.\-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, function (letter) { return letter.toUpperCase(); });
+  }
+
   function formatNumber(value) {
     var numeric = Number(value);
     if (!isFinite(numeric)) return '-';
@@ -90,10 +103,11 @@
   function renderBreadcrumb(metric) {
     var breadcrumb = el('metricDetailBreadcrumb');
     if (!breadcrumb) return;
+    var leaf = metric.title || metric.name || humanize(metric.key);
     breadcrumb.items = [
       { label: 'Dashboard', href: 'admin/analytics.html' },
       { label: 'Metric Detail' },
-      { label: metric.title || metric.name || metric.key },
+      { label: leaf },
     ];
   }
 
@@ -125,7 +139,11 @@
       var metric = payload.metric || {};
       var current = payload.current || {};
       var movement = payload.movement || null;
-      var title = current.title || metric.title || metric.name || metric.key || metricKey;
+      // Title falls through to humanized key so the page never shows
+      // `legal_firm.estate_planning.upcoming_poa_deed_design_meetings` as a heading.
+      var rawTitle = current.title || metric.title || metric.name || metric.key || metricKey;
+      var titleLooksLikeKey = rawTitle && rawTitle === (metric.key || metric.metric_key || metricKey);
+      var title = titleLooksLikeKey ? humanize(rawTitle) : rawTitle;
 
       var banner = el('metricDetailBanner');
       if (banner) {
@@ -135,8 +153,8 @@
 
       renderBreadcrumb({ ...metric, title: title });
       setText('metricTitle', title);
-      setText('metricDomain', metric.domain || current.domain || 'Metric');
-      setText('metricStatus', current.status || metric.status || '-');
+      setText('metricDomain', humanize(metric.domain || current.domain) || 'Metric');
+      setText('metricStatus', humanize(current.status || metric.status) || '-');
       setText('metricDescription', current.description || metric.description || '');
       setText('metricCalculation', metric.calculation || current.calculation || '-');
       setText('metricBusinessLogic', metric.businessLogic || current.businessLogic || '-');

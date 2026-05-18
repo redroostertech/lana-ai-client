@@ -636,7 +636,7 @@
   }
 
   function renderMetricCard(metric) {
-    var title = metric.title || metric.name || metric.metric_key || 'Metric';
+    var title = metric.title || metric.name || humanize(metric.metric_key) || 'Metric';
     var value = formatMetricCardValue(metric);
     var cardId = metric.metric_key || metric.key || title;
     var typeLabel = getGroupLabel(metric, currentDashboardType);
@@ -669,13 +669,17 @@
     var message = metric.message || (metric.executable ? '' : 'Calculation is planned but not executable yet');
     var periodLabel = metric.period || metric.period_label || currentPeriod.label || 'Current period';
 
+    // Humanize metadata fields. They arrive as snake_case identifiers from
+    // the registry (e.g. `legal_operations`, `department_legal_estate_planning`),
+    // and we never want raw keys in the UI. Metric Key is intentionally left
+    // raw because that field's purpose is to show the canonical identifier.
     return ''
       + '<div class="dash-metric-modal__value">' + escapeHtml(value) + '</div>'
       + '<div class="dash-metric-modal__grid">'
-      + detailRow('Status', status)
-      + detailRow('Audience', audience)
-      + detailRow('Section', section)
-      + detailRow('Domain', metric.domain || metric.domain_group)
+      + detailRow('Status', humanize(status))
+      + detailRow('Audience', humanize(audience))
+      + detailRow('Section', humanize(section))
+      + detailRow('Domain', humanize(metric.domain || metric.domain_group))
       + detailRow('Period', periodLabel)
       + detailRow('Metric Key', metric.metric_key)
       + '</div>'
@@ -702,7 +706,9 @@
 
     var domain = firstValue(getMetricMeta(metric, 'domain'), getMetricMeta(metric, 'category'), 'Metric');
     if (eyebrow) eyebrow.textContent = humanize(domain);
-    title.textContent = metric.title || metric.name || metric.metric_key || 'Metric';
+    // Title fallback humanizes the raw key so the modal heading never shows
+    // an identifier like `legal_firm.estate_planning.upcoming_poa_deed_design_meetings`.
+    title.textContent = metric.title || metric.name || humanize(metric.metric_key) || 'Metric';
     body.innerHTML = renderModalDetails(metric);
     modal.hidden = false;
     document.body.classList.add('dash-metric-modal-open');

@@ -140,7 +140,7 @@
         + '<div class="dash-metric-card__eyebrow">' + escapeHtml(humanize(metric.domain || 'Metric')) + '</div>'
         + '<input type="checkbox" ' + (checked ? 'checked' : '') + ' aria-label="Select metric">'
         + '</div>'
-        + '<div class="dash-metric-card__title">' + escapeHtml(metric.title || metric.name || key) + '</div>'
+        + '<div class="dash-metric-card__title">' + escapeHtml(metric.title || metric.name || humanize(key)) + '</div>'
         + '<p class="dash-builder-metric__desc">' + escapeHtml(metric.description || '') + '</p>'
         + '<div class="dash-builder-metric__meta">' + escapeHtml(metricGroupLabel(metric)) + '</div>'
         + '</article>';
