@@ -282,45 +282,69 @@
     }));
 
     // 1. Grant first so incoming recipients are live before any revoke.
-    var grantResults = await Promise.allSettled(desired
-      .filter(function (share) {
-        return !existingTokens.has(shareToken(share.shared_with_type, share.shared_with_id));
-      })
-      .map(function (share) {
-        return api.grantResourceShare(share);
-      }));
+    var grantInputs = desired.filter(function (share) {
+      return !existingTokens.has(shareToken(share.shared_with_type, share.shared_with_id));
+    });
+    var grantResults = await Promise.allSettled(grantInputs.map(function (share) {
+      return api.grantResourceShare(share);
+    }));
 
-    var grantFailures = grantResults.filter(function (r) { return r.status === 'rejected'; });
+    var grantApplied = [];
+    var grantFailed = [];
+    grantResults.forEach(function (r, i) {
+      var input = grantInputs[i];
+      if (r.status === 'fulfilled') grantApplied.push(input);
+      else grantFailed.push({ recipient: input, error: r.reason && r.reason.message });
+    });
 
     // 2. Revoke only after grants resolved. If any grant failed, skip
     //    revokes that would shrink access and surface the partial state.
+    var revokeInputs = [];
     var revokeResults = [];
-    if (grantFailures.length === 0) {
-      revokeResults = await Promise.allSettled(existingShares
-        .filter(function (existing) {
-          return !desiredTokens.has(shareToken(existing.shared_with_type, existing.shared_with_id));
-        })
-        .map(function (existing) {
-          return api.revokeResourceShare({
-            resource_type: 'dashboard',
-            resource_id: savedDashboardId,
-            shared_with_type: existing.shared_with_type,
-            shared_with_id: existing.shared_with_id,
-          });
-        }));
+    if (grantFailed.length === 0) {
+      revokeInputs = existingShares.filter(function (existing) {
+        return !desiredTokens.has(shareToken(existing.shared_with_type, existing.shared_with_id));
+      });
+      revokeResults = await Promise.allSettled(revokeInputs.map(function (existing) {
+        return api.revokeResourceShare({
+          resource_type: 'dashboard',
+          resource_id: savedDashboardId,
+          shared_with_type: existing.shared_with_type,
+          shared_with_id: existing.shared_with_id,
+        });
+      }));
     }
 
-    var revokeFailures = revokeResults.filter(function (r) { return r.status === 'rejected'; });
+    var revokeApplied = [];
+    var revokeFailed = [];
+    revokeResults.forEach(function (r, i) {
+      var input = revokeInputs[i];
+      if (r.status === 'fulfilled') revokeApplied.push(input);
+      else revokeFailed.push({ recipient: input, error: r.reason && r.reason.message });
+    });
 
-    if (grantFailures.length > 0 || revokeFailures.length > 0) {
-      var msg = 'Dashboard saved, but share sync partially failed: '
-        + grantFailures.length + ' grant(s), ' + revokeFailures.length + ' revoke(s). '
-        + 'Please review the visibility tab.';
-      if (grantFailures.length > 0) {
-        msg += ' Old access was preserved to avoid locking anyone out.';
+    function labelFor(share) {
+      return share && (share.shared_with_label || share.shared_with_email || share.shared_with_name || share.shared_with_id) || 'unknown recipient';
+    }
+
+    if (grantFailed.length > 0 || revokeFailed.length > 0) {
+      var lines = ['Dashboard saved, but share sync partially failed:'];
+      if (grantApplied.length > 0) {
+        lines.push('Granted: ' + grantApplied.map(labelFor).join(', '));
       }
-      var error = new Error(msg);
+      if (grantFailed.length > 0) {
+        lines.push('Grant failed: ' + grantFailed.map(function (f) { return labelFor(f.recipient); }).join(', '));
+        lines.push('Old access was preserved to avoid locking anyone out.');
+      }
+      if (revokeApplied.length > 0) {
+        lines.push('Revoked: ' + revokeApplied.map(labelFor).join(', '));
+      }
+      if (revokeFailed.length > 0) {
+        lines.push('Revoke failed: ' + revokeFailed.map(function (f) { return labelFor(f.recipient); }).join(', '));
+      }
+      var error = new Error(lines.join(' '));
       error.partialShareSync = true;
+      error.shareSyncDetail = { grantApplied: grantApplied, grantFailed: grantFailed, revokeApplied: revokeApplied, revokeFailed: revokeFailed };
       throw error;
     }
 
