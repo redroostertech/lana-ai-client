@@ -578,6 +578,19 @@
         color: var(--_sb-text-active);
       }
 
+      .lex-sidebar-nav-item[data-variant="create"] {
+        min-height: 2.75rem;
+        margin-bottom: 0.25rem;
+        border: 1px solid color-mix(in srgb, var(--_sb-text-active) 22%, transparent);
+        background: color-mix(in srgb, var(--_sb-text-active) 34%, var(--_sb-bg));
+        color: var(--_sb-text-active);
+        font-weight: var(--lex-weight-semibold, 600);
+      }
+
+      .lex-sidebar-nav-item[data-variant="create"]:hover {
+        background: color-mix(in srgb, var(--_sb-text-active) 42%, var(--_sb-bg));
+      }
+
       .lex-sidebar-nav-item svg {
         flex-shrink: 0;
       }
@@ -1164,12 +1177,14 @@
       const hrefAttr = item.isButton ? '' : ` href="${this.escapeHtml(item.href || '#')}"`;
       const typeAttr = item.isButton ? ' type="button"' : '';
       const onClickAttr = item.onClick ? ` data-onclick="${this.escapeHtml(item.onClick)}"` : '';
+      const hrefDataAttr = item.isButton && item.href ? ` data-href="${this.escapeHtml(item.href)}"` : '';
+      const variantAttr = item.variant ? ` data-variant="${this.escapeHtml(item.variant)}"` : '';
       const iconHtml = item.icon ? icon(item.icon, 'normal') : '';
       const badgeHtml = item.badge
         ? `<span class="lex-sidebar-nav-badge">${this.escapeHtml(item.badge)}</span>`
         : '';
 
-      return `<${tag} class="lex-sidebar-nav-item"${hrefAttr}${typeAttr} data-active="${isActive}" data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}"${onClickAttr}>
+      return `<${tag} class="lex-sidebar-nav-item"${hrefAttr}${typeAttr} data-active="${isActive}" data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}"${onClickAttr}${hrefDataAttr}${variantAttr}>
         ${iconHtml}
         <span class="lex-sidebar-nav-label">${this.escapeHtml(item.label || '')}</span>
         ${badgeHtml}
@@ -1308,7 +1323,7 @@
         const id = target.dataset.id;
         const isButton = target.tagName === 'BUTTON';
         const label = target.querySelector('.lex-sidebar-nav-label');
-        const href = target.getAttribute('href') || '';
+        const href = target.getAttribute('href') || target.dataset.href || '';
         const onClickFn = target.dataset.onclick;
 
         // Prevent browser from following <a> tags — the router handles navigation
@@ -1326,6 +1341,14 @@
         // Call global onClick function if specified
         if (isButton && onClickFn && typeof window[onClickFn] === 'function') {
           window[onClickFn]();
+        } else if (isButton && href) {
+          this.open = false;
+          this.emit('sidebar-close');
+          if (window.Lex && window.Lex.Nav && window.Lex.Nav.go) {
+            window.Lex.Nav.go(href);
+          } else {
+            window.location.href = href;
+          }
         }
 
         // Close sidebar on mobile after navigation

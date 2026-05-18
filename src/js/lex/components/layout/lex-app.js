@@ -225,6 +225,8 @@
       this._notificationInterval = null;
       this._lastShowAdmin = undefined;
       this._lastShellKey = undefined;
+      this._topMoverItems = [];
+      this._topMoversLoaded = false;
     }
 
     // -----------------------------------------------------------------------
@@ -684,6 +686,9 @@
         this._lastShellKey = shellKey;
 
         this.setSections(this._buildSidebarSections(appContext));
+        if (appContext === 'insights') {
+          this._loadTopMoversForSidebar();
+        }
 
         // User menu items (role-gated)
         const menuItems = [];
@@ -718,6 +723,8 @@
         path.indexOf('admin/dashboard-detail.html') !== -1 ||
         path.indexOf('/admin/dashboard-builder.html') !== -1 ||
         path.indexOf('admin/dashboard-builder.html') !== -1 ||
+        path.indexOf('/admin/metric_detail.html') !== -1 ||
+        path.indexOf('admin/metric_detail.html') !== -1 ||
         path.indexOf('/admin/reporting.html') !== -1 ||
         path.indexOf('admin/reporting.html') !== -1 ||
         path.indexOf('/admin/billable-hours.html') !== -1 ||
@@ -734,9 +741,9 @@
     _buildSidebarSections(appContext) {
       const mainItems = appContext === 'insights'
         ? [
+            { id: 'insights-create', label: 'Create', icon: 'plus', href: 'admin/dashboard-builder.html', isButton: true, variant: 'create' },
             { id: 'insights-dashboard', label: 'Dashboard', icon: 'home', href: 'admin/analytics.html' },
             { id: 'insights-library', label: 'Library', icon: 'book-open', href: 'admin/dashboard-library.html' },
-            { id: 'insights-builder', label: 'Builder', icon: 'layout-dashboard', href: 'admin/dashboard-builder.html' },
             { id: 'firm-reporting', label: 'Firm Reporting', icon: 'bar-chart-2', href: 'admin/reporting.html' },
             { id: 'billable-hours', label: 'Billable Hours', icon: 'clock', href: 'admin/billable-hours.html' },
             { id: 'data-visualization', label: 'Data Visualization', icon: 'bar-chart-3', href: 'admin/data-visualization.html' }
@@ -756,7 +763,15 @@
         }
       ];
 
-      if (appContext !== 'insights') {
+      if (appContext === 'insights') {
+        sections.push({
+          id: 'top-movers',
+          title: 'Top Movers',
+          items: this._topMoverItems.length > 0
+            ? this._topMoverItems
+            : [{ id: 'top-movers-empty', label: 'No movement yet', icon: 'bar-chart-2', href: '#', badge: '24h' }]
+        });
+      } else {
         sections.push({
           id: 'chats',
           title: 'Your Chats',
@@ -769,6 +784,36 @@
       }
 
       return sections;
+    }
+
+    _formatMoverBadge(metric) {
+      if (metric.percent_change === null || metric.percent_change === undefined || !isFinite(Number(metric.percent_change))) {
+        return metric.direction === 'down' ? 'Down' : 'Up';
+      }
+      const sign = metric.direction === 'down' ? '-' : '+';
+      return sign + Math.abs(Number(metric.percent_change)).toFixed(1) + '%';
+    }
+
+    async _loadTopMoversForSidebar() {
+      if (this._topMoversLoaded || !window.api || typeof window.api.getTopMovingMetrics !== 'function') return;
+      this._topMoversLoaded = true;
+
+      try {
+        const response = await window.api.getTopMovingMetrics({ window: '24h', limit: 8 });
+        const rows = response && Array.isArray(response.data) ? response.data : [];
+        this._topMoverItems = rows.slice(0, 8).map((metric) => ({
+          id: 'top-mover-' + metric.metric_key,
+          label: metric.title || metric.metric_key,
+          icon: metric.direction === 'down' ? 'trending-down' : 'trending-up',
+          badge: this._formatMoverBadge(metric),
+          href: 'admin/metric_detail.html?metric_key=' + encodeURIComponent(metric.metric_key)
+        }));
+        if (this._getAppContext() === 'insights') {
+          this.setSections(this._buildSidebarSections('insights'));
+        }
+      } catch (_) {
+        this._topMoverItems = [];
+      }
     }
 
     // -----------------------------------------------------------------------

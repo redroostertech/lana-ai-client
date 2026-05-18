@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Library - LANA AI</title>
+  <title>Metric Detail - LANA AI</title>
 
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
@@ -18,44 +18,69 @@
     logo-src="../img/logo-light.png"
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
-    active-nav-id="insights-library"
-    page-title="Library"
+    active-nav-id="insights-dashboard"
+    page-title="Metric Detail"
   ></lex-app>
 
   <template id="page-content">
     <main>
       <lex-banner
+        id="metricDetailBanner"
         variant="light"
-        heading="Library"
-        subtitle="Search and open completed dashboards"
-      >
-        <lex-btn id="createDashboardBtn" variant="primary" size="sm">Create Dashboard</lex-btn>
-      </lex-banner>
+        heading="Metric Detail"
+        subtitle="Canonical metric calculation, movement, and raw data drilldown"
+      ></lex-banner>
 
-      <section class="insights-section" aria-labelledby="dashboardLibraryHeading">
-        <div class="insights-section-header">
-          <div>
-            <div class="insights-section-title" id="dashboardLibraryHeading">Dashboard Library</div>
-            <div class="insights-section-subtitle">Role-aware dashboard groups backed by report modules and metric catalog entries</div>
+      <lex-breadcrumb id="metricDetailBreadcrumb"></lex-breadcrumb>
+
+      <section class="metric-detail-layout">
+        <div class="dash-summary-grid">
+          <div class="dash-stat"><div class="dash-stat__label">Current Value</div><div class="dash-stat__value" id="metricCurrentValue">-</div></div>
+          <div class="dash-stat"><div class="dash-stat__label">Prior Value</div><div class="dash-stat__value" id="metricPriorValue">-</div></div>
+          <div class="dash-stat"><div class="dash-stat__label">Movement</div><div class="dash-stat__value" id="metricMovement">-</div></div>
+          <div class="dash-stat"><div class="dash-stat__label">Direction</div><div class="dash-stat__value" id="metricDirection">-</div></div>
+        </div>
+
+        <section class="metric-detail-card">
+          <div class="metric-detail-card__header">
+            <div>
+              <div class="metric-detail-card__eyebrow" id="metricDomain">Metric</div>
+              <h2 id="metricTitle">Metric Detail</h2>
+            </div>
+            <div id="metricStatus" class="metric-detail-chip">-</div>
           </div>
-        </div>
+          <p id="metricDescription" class="metric-detail-description"></p>
+          <div class="metric-detail-definition">
+            <div>
+              <div class="metric-detail-label">Calculation</div>
+              <p id="metricCalculation">-</p>
+            </div>
+            <div>
+              <div class="metric-detail-label">Business Logic</div>
+              <p id="metricBusinessLogic">-</p>
+            </div>
+          </div>
+        </section>
 
-        <div class="insights-library-card">
-          <lex-table
-            id="dashboardLibraryTable"
-            searchable
-            filterable
-            column-filters
-            compact
-            limit="10"
-            columns="name,audience,category,scope,visibility,state,actions"
-            labels="Name,Audience,Category,Scope,Visibility,State,Actions"
-            sort-by="name"
-            sort-dir="asc"
-            empty-text="No dashboards found"
-            aria-label="Dashboard library"
-          ></lex-table>
-        </div>
+        <section class="metric-detail-card">
+          <div class="metric-detail-card__header">
+            <div>
+              <div class="metric-detail-card__eyebrow">Snapshots</div>
+              <h2>Recent Values</h2>
+            </div>
+          </div>
+          <lex-table id="metricSnapshotsTable" searchable sortable paginated page-size="10"></lex-table>
+        </section>
+
+        <section class="metric-detail-card">
+          <div class="metric-detail-card__header">
+            <div>
+              <div class="metric-detail-card__eyebrow">Raw Data</div>
+              <h2>Source Rows</h2>
+            </div>
+          </div>
+          <lex-table id="metricRawDataTable" searchable sortable paginated page-size="10"></lex-table>
+        </section>
       </section>
     </main>
   </template>
@@ -89,18 +114,16 @@
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
-  <script src="../js/lex/components/data/lex-filter-bar.js"></script>
-  <script src="../js/lex/components/data/lex-table.js"></script>
-  <script src="../js/lex/components/form/lex-segmented.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
   <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
   <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
   <script src="../js/lex/components/layout/lex-app.js"></script>
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/lex-page-init.js"></script>
-  <script src="../js/admin/dashboard-catalog.js"></script>
-  <script src="../js/admin/dashboard-library.js"></script>
+  <script src="../js/admin/metric-detail.js"></script>
   <script src="../js/auth-guard.js"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@
   var metrics = [];
   var selected = new Set();
   var shares = [];
+  var existingShares = [];
   var activeType = 'all';
   var dashboardId = null;
   var loadedDashboard = null;
@@ -154,6 +155,52 @@
     selected = new Set(Array.isArray(layout.metric_keys) ? layout.metric_keys : []);
   }
 
+  function normalizeShareRows(response) {
+    if (response && Array.isArray(response.shares)) return response.shares;
+    if (response && response.data && Array.isArray(response.data.shares)) return response.data.shares;
+    if (response && Array.isArray(response.data)) return response.data;
+    return [];
+  }
+
+  function shareLabel(row) {
+    return row.shared_with_name ||
+      row.shared_with_email ||
+      row.shared_with_role_display_name ||
+      row.shared_with_role_name ||
+      row.shared_with_id;
+  }
+
+  function shareToken(type, id) {
+    return String(type || '') + ':' + String(id || '');
+  }
+
+  function desiredSharesForVisibility(savedDashboardId) {
+    var visibility = el('dashboardBuilderVisibility').value || 'private';
+    var user = window.api && window.api.user || {};
+    var organizationId = user.organization_id || user.organizationId;
+    if (visibility === 'organization' && organizationId) {
+      return [{
+        resource_type: 'dashboard',
+        resource_id: savedDashboardId,
+        shared_with_type: 'organization',
+        shared_with_id: organizationId,
+        permissions: ['read'],
+      }];
+    }
+    if (visibility === 'custom') {
+      return shares.map(function (share) {
+        return {
+          resource_type: 'dashboard',
+          resource_id: savedDashboardId,
+          shared_with_type: share.type,
+          shared_with_id: share.id,
+          permissions: ['read'],
+        };
+      });
+    }
+    return [];
+  }
+
   function selectedMetricKeys() {
     return Array.from(selected.values());
   }
@@ -219,33 +266,71 @@
     };
   }
 
+  // Client-side mitigation for non-atomic share sync. Grants are issued
+  // BEFORE revokes so a switch from organization → custom can't strand
+  // recipients with no access if a grant fails. Partial failures are
+  // surfaced to the user instead of silently committing a half-synced
+  // state. The proper fix is a server-side atomic replace endpoint;
+  // until then this narrows the window where users get locked out.
   async function syncVisibility(savedDashboardId) {
-    var visibility = el('dashboardBuilderVisibility').value || 'private';
-    if (visibility === 'organization') {
-      var user = window.api && window.api.user || {};
-      var organizationId = user.organization_id || user.organizationId;
-      if (organizationId) {
-        await api.grantResourceShare({
-          resource_type: 'dashboard',
-          resource_id: savedDashboardId,
-          shared_with_type: 'organization',
-          shared_with_id: organizationId,
-          permissions: ['read'],
-        });
-      }
+    var desired = desiredSharesForVisibility(savedDashboardId);
+    var desiredTokens = new Set(desired.map(function (share) {
+      return shareToken(share.shared_with_type, share.shared_with_id);
+    }));
+    var existingTokens = new Set(existingShares.map(function (share) {
+      return shareToken(share.shared_with_type, share.shared_with_id);
+    }));
+
+    // 1. Grant first so incoming recipients are live before any revoke.
+    var grantResults = await Promise.allSettled(desired
+      .filter(function (share) {
+        return !existingTokens.has(shareToken(share.shared_with_type, share.shared_with_id));
+      })
+      .map(function (share) {
+        return api.grantResourceShare(share);
+      }));
+
+    var grantFailures = grantResults.filter(function (r) { return r.status === 'rejected'; });
+
+    // 2. Revoke only after grants resolved. If any grant failed, skip
+    //    revokes that would shrink access and surface the partial state.
+    var revokeResults = [];
+    if (grantFailures.length === 0) {
+      revokeResults = await Promise.allSettled(existingShares
+        .filter(function (existing) {
+          return !desiredTokens.has(shareToken(existing.shared_with_type, existing.shared_with_id));
+        })
+        .map(function (existing) {
+          return api.revokeResourceShare({
+            resource_type: 'dashboard',
+            resource_id: savedDashboardId,
+            shared_with_type: existing.shared_with_type,
+            shared_with_id: existing.shared_with_id,
+          });
+        }));
     }
 
-    if (visibility === 'custom') {
-      for (var i = 0; i < shares.length; i += 1) {
-        await api.grantResourceShare({
-          resource_type: 'dashboard',
-          resource_id: savedDashboardId,
-          shared_with_type: shares[i].type,
-          shared_with_id: shares[i].id,
-          permissions: ['read'],
-        });
+    var revokeFailures = revokeResults.filter(function (r) { return r.status === 'rejected'; });
+
+    if (grantFailures.length > 0 || revokeFailures.length > 0) {
+      var msg = 'Dashboard saved, but share sync partially failed: '
+        + grantFailures.length + ' grant(s), ' + revokeFailures.length + ' revoke(s). '
+        + 'Please review the visibility tab.';
+      if (grantFailures.length > 0) {
+        msg += ' Old access was preserved to avoid locking anyone out.';
       }
+      var error = new Error(msg);
+      error.partialShareSync = true;
+      throw error;
     }
+
+    existingShares = desired.map(function (share) {
+      return {
+        shared_with_type: share.shared_with_type,
+        shared_with_id: share.shared_with_id,
+        permissions: share.permissions,
+      };
+    });
   }
 
   async function saveDashboard() {
@@ -312,6 +397,26 @@
     var response = await api.getBIDashboard(id);
     loadedDashboard = response && response.data ? response.data : response;
     setFormFromDashboard(loadedDashboard);
+    var sharesResponse = await api.listResourceShares('dashboard', id, { limit: 100 });
+    existingShares = normalizeShareRows(sharesResponse);
+    var orgShare = existingShares.find(function (share) { return share.shared_with_type === 'organization'; });
+    var customShares = existingShares.filter(function (share) { return share.shared_with_type !== 'organization'; });
+    if (orgShare) {
+      el('dashboardBuilderVisibility').value = 'organization';
+      shares = [];
+    } else if (customShares.length) {
+      el('dashboardBuilderVisibility').value = 'custom';
+      shares = customShares.map(function (share) {
+        return {
+          type: share.shared_with_type,
+          id: share.shared_with_id,
+          label: shareLabel(share),
+        };
+      });
+    } else {
+      el('dashboardBuilderVisibility').value = 'private';
+      shares = [];
+    }
   }
 
   async function loadMetrics() {
@@ -324,6 +429,10 @@
   async function init() {
     var content = el('lex-main-content');
     if (!content) return;
+
+    // Admin gate: dashboard builder creates/updates/deletes shared dashboards
+    // and is admin-only. Backend should also reject, but defense-in-depth on
+    // the renderer matches the rest of the admin pages.
     if (Lex.Auth && !Lex.Auth.isAdmin()) {
       Lex.Nav.go('dashboard.html', { replace: true });
       return;

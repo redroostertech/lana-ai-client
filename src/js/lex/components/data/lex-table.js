@@ -412,9 +412,15 @@
       this._searchHadFocus = false;
       this._selectedIds = new Set();
       this._colFilterOpen = null;  // Which column's filter dropdown is open
+      this._cellRenderers = {};
       // Column-type detection cache — invalidated when the raw data reference changes
       this._filterCacheDataRef = null;
       this._cachedFilterColumns = null;
+    }
+
+    setCellRenderers(renderers) {
+      this._cellRenderers = renderers && typeof renderers === 'object' ? renderers : {};
+      this._scheduleUpdate();
     }
 
     connected() {
@@ -821,6 +827,12 @@
         }
 
         columns.forEach(col => {
+          const renderer = this._cellRenderers && this._cellRenderers[col];
+          if (typeof renderer === 'function') {
+            html += `<td class="${cellPad} lex-text-primary">${renderer(row[col], row, col)}</td>`;
+            return;
+          }
+
           const val = this._formatCellValue(col, row[col]);
           if (this._isStatusValue(val)) {
             const label = this._humanizeStatus(val);

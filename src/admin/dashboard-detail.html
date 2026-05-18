@@ -51,6 +51,32 @@
         </div>
 
         <div id="dashboardViewContext" class="dash-view-context"></div>
+        <section class="dash-period-card" aria-labelledby="dashboardPeriodHeading">
+          <div class="dash-period-card__presets">
+            <p class="dash-period-card__label" id="dashboardPeriodHeading">Quick Select Period</p>
+            <div id="dashboardPeriodPresets" class="dash-period-card__buttons">
+              <lex-btn data-dashboard-preset="last7days" variant="secondary" size="sm">Last 7 Days</lex-btn>
+              <lex-btn data-dashboard-preset="last30days" variant="secondary" size="sm">Last 30 Days</lex-btn>
+              <lex-btn data-dashboard-preset="thisMonth" variant="secondary" size="sm">This Month</lex-btn>
+              <lex-btn data-dashboard-preset="lastMonth" variant="secondary" size="sm">Last Month</lex-btn>
+              <lex-btn data-dashboard-preset="thisQuarter" variant="secondary" size="sm">This Quarter</lex-btn>
+              <lex-btn data-dashboard-preset="thisYear" variant="secondary" size="sm">This Year</lex-btn>
+              <lex-btn data-dashboard-preset="lastYear" variant="secondary" size="sm">Last Year</lex-btn>
+            </div>
+          </div>
+
+          <div class="dash-period-card__fields">
+            <lex-input id="dashboardPeriodStart" label="Start Date" type="date" name="dashboardPeriodStart"></lex-input>
+            <lex-input id="dashboardPeriodEnd" label="End Date" type="date" name="dashboardPeriodEnd"></lex-input>
+            <lex-select
+              id="dashboardPeriodType"
+              label="Compare By"
+              name="dashboardPeriodType"
+              value="monthly"
+              options='[{"value":"daily","label":"Daily"},{"value":"weekly","label":"Weekly"},{"value":"monthly","label":"Monthly"},{"value":"quarterly","label":"Quarterly"},{"value":"yearly","label":"Yearly"}]'
+            ></lex-select>
+          </div>
+        </section>
         <div class="dash-browser">
           <aside class="dash-browser__rail" aria-label="Dashboard metric filters">
             <div class="dash-browser__rail-title">Types</div>
@@ -117,6 +143,8 @@
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-segmented.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>

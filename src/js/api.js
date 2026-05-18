@@ -2782,6 +2782,32 @@ class ApiClient {
     const queryParts = [];
     if (params.type) queryParts.push('type=' + encodeURIComponent(params.type));
     if (params.limit) queryParts.push('limit=' + encodeURIComponent(String(params.limit)));
+    if (params.periodStart) queryParts.push('periodStart=' + encodeURIComponent(params.periodStart));
+    if (params.periodEnd) queryParts.push('periodEnd=' + encodeURIComponent(params.periodEnd));
+    if (params.compareBy) queryParts.push('compareBy=' + encodeURIComponent(params.compareBy));
+    if (queryParts.length > 0) url += '?' + queryParts.join('&');
+    return this.get(url);
+  }
+
+  async getTopMovingMetrics(params = {}) {
+    let url = '/api/v1/modules/top-moving-metrics';
+    const queryParts = [];
+    if (params.window) queryParts.push('window=' + encodeURIComponent(params.window));
+    if (params.limit) queryParts.push('limit=' + encodeURIComponent(String(params.limit)));
+    if (queryParts.length > 0) url += '?' + queryParts.join('&');
+    return this.get(url);
+  }
+
+  async captureMetricSnapshots(data = {}) {
+    return this.post('/api/v1/modules/metric-snapshots/capture', data);
+  }
+
+  async getMetricDetail(metricKey, params = {}) {
+    let url = '/api/v1/modules/metric-detail/' + encodeURIComponent(metricKey);
+    const queryParts = [];
+    if (params.periodStart) queryParts.push('periodStart=' + encodeURIComponent(params.periodStart));
+    if (params.periodEnd) queryParts.push('periodEnd=' + encodeURIComponent(params.periodEnd));
+    if (params.compareBy) queryParts.push('compareBy=' + encodeURIComponent(params.compareBy));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
     return this.get(url);
   }
@@ -2794,6 +2820,7 @@ class ApiClient {
     if (params.offset !== undefined) queryParts.push('offset=' + encodeURIComponent(String(params.offset)));
     if (params.sort) queryParts.push('sort=' + encodeURIComponent(params.sort));
     if (params.order) queryParts.push('order=' + encodeURIComponent(params.order));
+    if (params.sharedWithMe !== undefined) queryParts.push('sharedWithMe=' + encodeURIComponent(String(params.sharedWithMe)));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
     return this.get(url);
   }

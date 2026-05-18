@@ -31,6 +31,7 @@
       scope: record.scope || 'Organization-wide',
       visibility: layout.visibility_label || record.visibility || 'Resource shares',
       state: record.state || 'Active',
+      actions: record.id ? 'Actions' : '',
       tags: record.tags || layout.category || '',
       href: record.id ? 'admin/dashboard-detail.html?id=' + encodeURIComponent(record.id) : (record.href || 'admin/dashboard-detail.html?type=' + encodeURIComponent(type)),
       usageRank: record.usageRank || index + 1,
@@ -54,37 +55,8 @@
     }
   }
 
-  function matchesDashboardQuery(item, query) {
-    if (!query) return true;
-    var haystack = [
-      item.name,
-      item.description,
-      item.audience,
-      item.category,
-      item.scope,
-      item.visibility,
-      item.state,
-      item.tags,
-    ].join(' ').toLowerCase();
-    return haystack.indexOf(query) !== -1;
-  }
-
-  function renderDashboardLibrary(query, sourceDashboards) {
-    var rows = el('dashboardLibraryRows');
-    var count = el('dashboardLibraryCount');
-    if (!rows) return;
-
-    var normalizedQuery = String(query || '').trim().toLowerCase();
-    var filtered = sourceDashboards.filter(function (item) {
-      return matchesDashboardQuery(item, normalizedQuery);
-    });
-
-    if (count) {
-      count.textContent = filtered.length + (filtered.length === 1 ? ' dashboard' : ' dashboards');
-    }
-
-    rows.innerHTML = filtered.map(function (item) {
-      var actions = item.id
+  function renderActions(item) {
+    return item && item.id
         ? '<div class="insights-action-menu">'
           + '<button class="insights-action-menu__trigger" type="button" aria-label="Dashboard actions" data-dashboard-actions="' + escapeHtml(item.id) + '">&hellip;</button>'
           + '<div class="insights-action-menu__panel" data-dashboard-actions-panel="' + escapeHtml(item.id) + '" hidden>'
@@ -93,18 +65,29 @@
           + '</div>'
           + '</div>'
         : '';
-      return ''
-        + '<tr data-dashboard-href="' + escapeHtml(item.href) + '">'
-        + '<td><div class="insights-library-name">' + escapeHtml(item.name) + '</div>'
-        + '<div class="insights-library-description">' + escapeHtml(item.description) + '</div></td>'
-        + '<td>' + escapeHtml(item.audience) + '</td>'
-        + '<td>' + escapeHtml(item.category) + '</td>'
-        + '<td>' + escapeHtml(item.scope) + '</td>'
-        + '<td>' + escapeHtml(item.visibility) + '</td>'
-        + '<td><span class="insights-library-pill insights-library-pill--active">' + escapeHtml(item.state) + '</span></td>'
-        + '<td class="insights-library-actions">' + actions + '</td>'
-        + '</tr>';
-    }).join('');
+  }
+
+  function renderDashboardLibrary(sourceDashboards) {
+    var table = el('dashboardLibraryTable');
+    if (!table) return;
+
+    if (typeof table.setCellRenderers === 'function') {
+      table.setCellRenderers({
+        name: function (value, row) {
+          return '<div class="insights-library-name">' + escapeHtml(value) + '</div>';
+        },
+        state: function (value) {
+          return '<span class="insights-library-pill insights-library-pill--active">' + escapeHtml(value || 'Active') + '</span>';
+        },
+        actions: function (value, row) {
+          return '<div class="insights-library-actions">' + renderActions(row) + '</div>';
+        },
+      });
+    }
+
+    if (typeof table.setData === 'function') {
+      table.setData(sourceDashboards);
+    }
   }
 
   function closeActionMenus() {
@@ -113,7 +96,7 @@
     });
   }
 
-  async function deleteDashboard(id, name, sourceDashboards, search) {
+  async function deleteDashboard(id, name, sourceDashboards) {
     if (!id) return sourceDashboards;
     var confirmed = window.confirm('Delete "' + (name || 'this dashboard') + '"?');
     if (!confirmed) return sourceDashboards;
@@ -155,47 +138,46 @@
       deleteDashboard(
         remove.getAttribute('data-dashboard-delete'),
         remove.getAttribute('data-dashboard-name'),
-        state.sourceDashboards,
-        state.search
+        state.sourceDashboards
       ).then(function (nextDashboards) {
         state.sourceDashboards = nextDashboards;
-        renderDashboardLibrary(state.search ? state.search.value : '', state.sourceDashboards);
+        renderDashboardLibrary(state.sourceDashboards);
       });
       return;
     }
 
     var row = event.target.closest('[data-dashboard-href]');
     var href = row && row.dataset && row.dataset.dashboardHref;
-    if (href) {
-      Lex.Nav.go(href);
-    }
+    if (href) Lex.Nav.go(href);
   }
 
   function init() {
     var content = el('lex-main-content');
     if (!content) return;
 
+    // Admin gate: dashboard library exposes share/delete actions, admin-only.
     if (Lex.Auth && !Lex.Auth.isAdmin()) {
       Lex.Nav.go('dashboard.html', { replace: true });
       return;
     }
 
-    var search = el('dashboardLibrarySearch');
-    var state = { search: search, sourceDashboards: dashboards() };
-    if (search) {
-      search.addEventListener('input', function () {
-        renderDashboardLibrary(search.value, state.sourceDashboards);
-      });
-    }
+    var table = el('dashboardLibraryTable');
+    var state = { sourceDashboards: dashboards() };
 
     content.addEventListener('click', function (event) { onDashboardLibraryClick(event, state); });
+    if (table) {
+      table.addEventListener('row-click', function (event) {
+        var row = event.detail && event.detail.row;
+        if (row && row.href) Lex.Nav.go(row.href);
+      });
+    }
     document.addEventListener('click', function (event) {
       if (!event.target.closest('.insights-action-menu')) closeActionMenus();
     });
-    renderDashboardLibrary('', state.sourceDashboards);
+    renderDashboardLibrary(state.sourceDashboards);
     loadDashboards().then(function (loadedDashboards) {
       state.sourceDashboards = loadedDashboards;
-      renderDashboardLibrary(search ? search.value : '', state.sourceDashboards);
+      renderDashboardLibrary(state.sourceDashboards);
     });
   }
 

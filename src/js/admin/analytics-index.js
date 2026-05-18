@@ -67,6 +67,26 @@
     }
   }
 
+  async function loadSharedDashboards() {
+    if (!window.api || typeof window.api.listBIDashboards !== 'function') {
+      return [];
+    }
+
+    try {
+      var response = await window.api.listBIDashboards({
+        sharedWithMe: true,
+        limit: 6,
+        sort: 'updated_at',
+        order: 'desc',
+      });
+      var rows = response && Array.isArray(response.data) ? response.data : [];
+      return rows.map(normalizeDashboardRecord);
+    } catch (err) {
+      console.warn('[AnalyticsIndex] Could not load shared BI dashboards:', err.message);
+      return [];
+    }
+  }
+
   function onActionClick(e) {
     var card = e.target.closest('lex-action-card');
     var href = card && card.dataset && card.dataset.href;
@@ -114,6 +134,11 @@
       })
       .slice(0, limit);
 
+    if (!cards.length) {
+      container.innerHTML = '<div class="insights-empty-row">No dashboards to show.</div>';
+      return;
+    }
+
     container.innerHTML = cards.map(function (item) {
       return renderDashboardCard(item, metaPrefix);
     }).join('');
@@ -121,8 +146,10 @@
 
   async function renderDashboardShortcuts() {
     var sourceDashboards = await loadDashboards();
+    var sharedDashboards = await loadSharedDashboards();
     renderDashboardCollection('mostUsedDashboards', 'usageRank', 3, 'Most used', sourceDashboards);
     renderDashboardCollection('recentDashboards', 'recentRank', 3, 'Recently used', sourceDashboards);
+    renderDashboardCollection('sharedDashboards', 'recentRank', 6, 'Shared with me', sharedDashboards);
   }
 
   function normalizeCatalogResponse(response) {
@@ -160,7 +187,8 @@
     var content = el('lex-main-content');
     if (!content) return;
 
-    // Gate: non-admins should not see the analytics hub.
+    // Admin gate: matches admin-index / workspace-analytics. Non-admins should
+    // never boot the analytics hub or trigger its dashboard API calls.
     if (Lex.Auth && !Lex.Auth.isAdmin()) {
       Lex.Nav.go('dashboard.html', { replace: true });
       return;
