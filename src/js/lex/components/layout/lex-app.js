@@ -794,6 +794,15 @@
       return sign + Math.abs(Number(metric.percent_change)).toFixed(1) + '%';
     }
 
+    _humanizeMetricKey(key) {
+      if (!key) return '';
+      return String(key)
+        .split(/[_.]+/)
+        .filter(Boolean)
+        .map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); })
+        .join(' ');
+    }
+
     async _loadTopMoversForSidebar() {
       if (this._topMoversLoaded || !window.api || typeof window.api.getTopMovingMetrics !== 'function') return;
       this._topMoversLoaded = true;
@@ -801,13 +810,22 @@
       try {
         const response = await window.api.getTopMovingMetrics({ window: '24h', limit: 8 });
         const rows = response && Array.isArray(response.data) ? response.data : [];
-        this._topMoverItems = rows.slice(0, 8).map((metric) => ({
-          id: 'top-mover-' + metric.metric_key,
-          label: metric.title || metric.metric_key,
-          icon: metric.direction === 'down' ? 'trending-down' : 'trending-up',
-          badge: this._formatMoverBadge(metric),
-          href: 'admin/metric_detail.html?metric_key=' + encodeURIComponent(metric.metric_key)
-        }));
+        const self = this;
+        this._topMoverItems = rows.slice(0, 8).map((metric) => {
+          // Backend now humanizes title server-side, but old data and any
+          // edge case where title equals the raw key still falls back here.
+          const titleLooksLikeKey = metric.title && metric.title === metric.metric_key;
+          const label = (!metric.title || titleLooksLikeKey)
+            ? self._humanizeMetricKey(metric.metric_key)
+            : metric.title;
+          return {
+            id: 'top-mover-' + metric.metric_key,
+            label,
+            icon: metric.direction === 'down' ? 'trending-down' : 'trending-up',
+            badge: this._formatMoverBadge(metric),
+            href: 'admin/metric_detail.html?metric_key=' + encodeURIComponent(metric.metric_key)
+          };
+        });
         if (this._getAppContext() === 'insights') {
           this.setSections(this._buildSidebarSections('insights'));
         }
