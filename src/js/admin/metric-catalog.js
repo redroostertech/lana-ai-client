@@ -144,14 +144,44 @@
     return '<span class="' + cls + '">' + escapeHtml(status || '-') + '</span>';
   }
 
+  // Compact summary for the Last Run cell. Arrays-of-rows and large
+  // objects collapse to a row count or "(object)" tag so the table row
+  // stays single-line. The drawer renders the full payload.
+  function summarizeRunValue(value) {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'number') return displayText(value);
+    if (typeof value === 'boolean') return String(value);
+    if (typeof value === 'string') {
+      var asNum = Number(value);
+      if (value.trim() !== '' && isFinite(asNum)) return displayText(asNum);
+      return value.length > 80 ? value.slice(0, 77) + '...' : value;
+    }
+    if (Array.isArray(value)) {
+      return displayText(value.length) + (value.length === 1 ? ' row' : ' rows');
+    }
+    if (typeof value === 'object') {
+      // Look for a numeric-ish leaf the backend commonly nests (total,
+      // value, count). Falls back to "(object)" so we never spill
+      // "[object Object]" into the cell.
+      var candidates = ['value', 'total', 'count', 'amount', 'rate', 'percentage', 'percent'];
+      for (var i = 0; i < candidates.length; i++) {
+        if (Object.prototype.hasOwnProperty.call(value, candidates[i])) {
+          return summarizeRunValue(value[candidates[i]]);
+        }
+      }
+      return '(object)';
+    }
+    return String(value);
+  }
+
   function lastRunCell(metric) {
     var run = lastRunByKey[metric.key];
     if (!run) return '<span class="metric-catalog-muted">never</span>';
     if (run.status === 'pending') return '<span class="metric-catalog-muted">running...</span>';
     if (run.status === 'pass') {
-      var v = run.value === null || run.value === undefined ? '-' : displayText(run.value);
+      var summary = summarizeRunValue(run.value);
       return '<span class="metric-catalog-pill metric-catalog-pill--ok">pass</span>'
-        + '<span class="metric-catalog-muted metric-catalog-runcell-value">' + escapeHtml(v) + '</span>';
+        + '<span class="metric-catalog-muted metric-catalog-runcell-value">' + escapeHtml(summary) + '</span>';
     }
     return '<span class="metric-catalog-pill metric-catalog-pill--fail" title="' + escapeHtml(run.error || '') + '">fail</span>';
   }
@@ -310,7 +340,7 @@
       html += '<div class="metric-catalog-muted">Running...</div>';
     } else if (run.status === 'pass') {
       html += '<div class="metric-catalog-drawer__run">';
-      html += '<div><strong>Value:</strong> ' + escapeHtml(displayText(run.value)) + '</div>';
+      html += '<div><strong>Value:</strong> ' + escapeHtml(summarizeRunValue(run.value)) + '</div>';
       html += '<div><strong>Elapsed:</strong> ' + escapeHtml(displayText(run.elapsed_ms)) + ' ms</div>';
       html += '</div>';
       if (run.payload) {
