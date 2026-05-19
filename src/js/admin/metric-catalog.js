@@ -14,8 +14,32 @@
       .replace(/'/g, '&#39;');
   }
 
+  // All numeric values rendered by this page are capped at 2 decimal
+  // places. Operators are inspecting "did this metric run", not consuming
+  // the precision, so the noise of long fractional tails (e.g.
+  // 0.3333333333333) is removed here in one place.
+  function formatNumeric(value) {
+    var num = Number(value);
+    if (!isFinite(num)) return null;
+    return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+
   function displayText(value) {
     if (value == null || value === '') return '-';
+    if (typeof value === 'number') {
+      var formatted = formatNumeric(value);
+      return formatted == null ? String(value) : formatted;
+    }
+    if (typeof value === 'string') {
+      // Some metric values come back as numeric strings ("123.456789").
+      // Format them too so the cap is consistent across types.
+      var asNum = Number(value);
+      if (value.trim() !== '' && isFinite(asNum)) {
+        var formattedStr = formatNumeric(asNum);
+        return formattedStr == null ? value : formattedStr;
+      }
+      return value;
+    }
     if (typeof value === 'object') {
       try { return JSON.stringify(value, null, 2); } catch (_) { return String(value); }
     }
@@ -115,7 +139,7 @@
     if (!run) return '<span class="metric-catalog-muted">never</span>';
     if (run.status === 'pending') return '<span class="metric-catalog-muted">running...</span>';
     if (run.status === 'pass') {
-      var v = run.value === null || run.value === undefined ? '-' : String(run.value);
+      var v = run.value === null || run.value === undefined ? '-' : displayText(run.value);
       return '<span class="metric-catalog-pill metric-catalog-pill--ok">pass</span>'
         + '<span class="metric-catalog-muted metric-catalog-runcell-value">' + escapeHtml(v) + '</span>';
     }
@@ -135,9 +159,9 @@
 
     if (typeof table.setCellRenderers === 'function') {
       table.setCellRenderers({
-        display_name: function (value, row) {
-          return '<div class="metric-catalog-name"><strong>' + escapeHtml(value || '-') + '</strong>'
-            + '<div class="metric-catalog-name__desc">' + escapeHtml((row && row.description) || '') + '</div></div>';
+        display_name: function (value) {
+          // Description lives in the side panel — keep the table row clean.
+          return '<strong>' + escapeHtml(value || '-') + '</strong>';
         },
         key: function (value) {
           return '<code class="metric-catalog-key">' + escapeHtml(value || '-') + '</code>';
