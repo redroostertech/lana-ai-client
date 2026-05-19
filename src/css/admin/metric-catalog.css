@@ -1,0 +1,255 @@
+/* Metric Catalog Inspector
+   Admin-only page that lists every metric in the registry and lets the
+   operator execute each one to verify its SQL/calculation works. */
+
+.metric-catalog-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.metric-catalog-summary__stat {
+  background: #fff;
+  border: 1px solid var(--lex-border-subtle, #e5e7eb);
+  border-radius: 0.5rem;
+  padding: 0.875rem 1rem;
+}
+
+.metric-catalog-summary__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lex-text-tertiary, #9ca3af);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric-catalog-summary__value {
+  margin-top: 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--lex-text-primary, #111827);
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+}
+
+.metric-catalog-summary__pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+}
+
+.metric-catalog-summary__pill--pass {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.metric-catalog-summary__pill--fail {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.metric-catalog-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 1rem 0 0.75rem;
+  flex-wrap: wrap;
+}
+
+.metric-catalog-toolbar__search {
+  flex: 1 1 280px;
+  min-width: 240px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  background: #fff;
+}
+
+.metric-catalog-toolbar__select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  background: #fff;
+  min-width: 140px;
+}
+
+.metric-catalog-card {
+  background: #fff;
+  border: 1px solid var(--lex-border-subtle, #e5e7eb);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+}
+
+.metric-catalog-name {
+  max-width: 26rem;
+}
+
+.metric-catalog-name__desc {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary, #9ca3af);
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.metric-catalog-key {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.75rem;
+  background: var(--lex-bg-muted, #f3f4f6);
+  color: var(--lex-text-secondary, #4b5563);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+}
+
+.metric-catalog-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.metric-catalog-pill--ok {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.metric-catalog-pill--warn {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.metric-catalog-pill--fail {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.metric-catalog-pill--muted {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.metric-catalog-muted {
+  color: var(--lex-text-tertiary, #9ca3af);
+  font-size: 0.75rem;
+}
+
+.metric-catalog-runcell-value {
+  margin-left: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.metric-catalog-actions {
+  display: inline-flex;
+  gap: 0.375rem;
+}
+
+.metric-catalog-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: 0.25rem;
+  background: #fff;
+  cursor: pointer;
+  color: var(--lex-text-primary, #111827);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.metric-catalog-btn:hover {
+  background: var(--lex-bg-muted, #f3f4f6);
+}
+
+.metric-catalog-btn--run {
+  background: #1d4ed8;
+  color: #fff;
+  border-color: #1d4ed8;
+}
+
+.metric-catalog-btn--run:hover {
+  background: #1e40af;
+}
+
+/* Drawer body */
+.metric-catalog-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.metric-catalog-drawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.metric-catalog-drawer__label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--lex-text-tertiary, #9ca3af);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.metric-catalog-drawer__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.metric-catalog-drawer__code {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.metric-catalog-drawer__run {
+  padding: 0.75rem;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  color: #065f46;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.metric-catalog-drawer__run--fail {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.metric-catalog-drawer__payload {
+  margin-top: 0.5rem;
+}
+
+.metric-catalog-drawer__payload pre {
+  background: #f9fafb;
+  border: 1px solid var(--lex-border-subtle, #e5e7eb);
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  max-height: 14rem;
+  overflow: auto;
+}
