@@ -180,6 +180,35 @@
     }
   }
 
+  // Configure the History/Source tabs and wire the panel show/hide. Two
+  // tables answer different questions (time series vs. current-period rows)
+  // so they live behind tabs instead of stacking, which previously made the
+  // page look like it had two redundant empty states.
+  function initDetailTabs() {
+    var tabs = el('metricDetailTabs');
+    var historyPanel = el('metricHistoryPanel');
+    var sourcePanel = el('metricSourcePanel');
+    if (!tabs || !historyPanel || !sourcePanel) return;
+
+    if (typeof tabs.setAttribute === 'function') {
+      tabs.setAttribute('tabs', JSON.stringify([
+        { id: 'history', label: 'History', icon: 'activity' },
+        { id: 'source', label: 'Source Records', icon: 'table' },
+      ]));
+    }
+
+    function showPanel(tabId) {
+      historyPanel.hidden = tabId !== 'history';
+      sourcePanel.hidden = tabId !== 'source';
+    }
+    showPanel('history');
+
+    tabs.addEventListener('tab-change', function (event) {
+      var next = event.detail && event.detail.tab;
+      if (next) showPanel(next);
+    });
+  }
+
   function init() {
     // Admin gate: matches the other admin analytics pages. Backend is still
     // authoritative on /api/v1/modules/metric-detail/:key; this is renderer-
@@ -188,6 +217,7 @@
       Lex.Nav.go('dashboard.html', { replace: true });
       return;
     }
+    initDetailTabs();
     loadMetricDetail();
   }
 

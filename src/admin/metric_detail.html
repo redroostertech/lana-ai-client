@@ -63,23 +63,29 @@
         </section>
 
         <section class="metric-detail-card">
-          <div class="metric-detail-card__header">
-            <div>
-              <div class="metric-detail-card__eyebrow">Snapshots</div>
-              <h2>Recent Values</h2>
-            </div>
-          </div>
-          <lex-table id="metricSnapshotsTable" searchable sortable paginated page-size="10"></lex-table>
-        </section>
+          <lex-tabs id="metricDetailTabs" active="history"></lex-tabs>
 
-        <section class="metric-detail-card">
-          <div class="metric-detail-card__header">
-            <div>
-              <div class="metric-detail-card__eyebrow">Raw Data</div>
-              <h2>Source Rows</h2>
+          <div id="metricHistoryPanel" class="metric-detail-tab-panel">
+            <div class="metric-detail-card__header">
+              <div>
+                <div class="metric-detail-card__eyebrow">History</div>
+                <h2>Recent Values</h2>
+                <p class="metric-detail-tab-help">How this metric has changed over time. Each row is one captured snapshot.</p>
+              </div>
             </div>
+            <lex-table id="metricSnapshotsTable" searchable sortable paginated page-size="10"></lex-table>
           </div>
-          <lex-table id="metricRawDataTable" searchable sortable paginated page-size="10"></lex-table>
+
+          <div id="metricSourcePanel" class="metric-detail-tab-panel" hidden>
+            <div class="metric-detail-card__header">
+              <div>
+                <div class="metric-detail-card__eyebrow">Source Records</div>
+                <h2>Underlying Rows</h2>
+                <p class="metric-detail-tab-help">The records that produced the current value. One row per source record.</p>
+              </div>
+            </div>
+            <lex-table id="metricRawDataTable" searchable sortable paginated page-size="10"></lex-table>
+          </div>
         </section>
       </section>
     </main>
@@ -121,6 +127,7 @@
   <script src="../js/lex/components/layout/lex-app.js"></script>
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-tabs.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/lex-page-init.js"></script>
   <script src="../js/admin/metric-detail.js"></script>
