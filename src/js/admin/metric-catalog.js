@@ -291,19 +291,41 @@
     if (btn) { btn.disabled = false; btn.textContent = 'Run visible'; }
   }
 
+  // Resolve the display name out of an entity entry. The registry uses
+  // several shapes depending on the metric:
+  //   - "matter" (plain string)
+  //   - { name: "matter" } or { entity: "matter" } or { key: "matter" }
+  //   - { "Entity Type": "Feedback", "Fields": [...], "Description": "..." }
+  //     (full canonical entity spec from the catalog group)
+  // We pull the most descriptive name field we can find and ignore the
+  // rest so the pill stays compact.
+  function entityName(value) {
+    if (value == null) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      var keys = ['Entity Type', 'entityType', 'entity_type', 'name', 'entity', 'key', 'id', 'type', 'label'];
+      for (var i = 0; i < keys.length; i++) {
+        if (Object.prototype.hasOwnProperty.call(value, keys[i]) && value[keys[i]]) {
+          return String(value[keys[i]]);
+        }
+      }
+    }
+    return String(value);
+  }
+
+  function humanize(value) {
+    return String(value).replace(/[_.\-]+/g, ' ').replace(/\s+/g, ' ').trim()
+      .replace(/\b\w/g, function (l) { return l.toUpperCase(); });
+  }
+
   function renderPillSection(label, values) {
     if (!Array.isArray(values) || values.length === 0) return '';
     var pills = values.map(function (v) {
-      // Strings come from the registry (e.g. "matter", "invoice"); objects
-      // may carry a name field, otherwise fall back to JSON for visibility.
-      var text = typeof v === 'string'
-        ? v
-        : (v && (v.name || v.entity || v.key)) || displayText(v);
-      // Humanize snake_case so "calendar_event" reads "Calendar Event".
-      var humanized = String(text).replace(/[_.\-]+/g, ' ').replace(/\s+/g, ' ').trim()
-        .replace(/\b\w/g, function (l) { return l.toUpperCase(); });
-      return '<span class="metric-catalog-entity-pill">' + escapeHtml(humanized) + '</span>';
-    }).join('');
+      var name = entityName(v);
+      if (!name) return '';
+      return '<span class="metric-catalog-entity-pill">' + escapeHtml(humanize(name)) + '</span>';
+    }).filter(Boolean).join('');
+    if (!pills) return '';
     return '<div class="metric-catalog-drawer__section">'
       + '<div class="metric-catalog-drawer__label">' + escapeHtml(label) + '</div>'
       + '<div class="metric-catalog-entity-pills">' + pills + '</div>'
