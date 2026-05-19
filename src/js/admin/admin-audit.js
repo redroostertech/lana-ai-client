@@ -388,6 +388,30 @@
       });
   }
 
+  function formatStatNumber(value) {
+    var number = Number(value) || 0;
+    var abs = Math.abs(number);
+
+    if (abs >= 1000000000) {
+      return (number / 1000000000).toFixed(abs >= 10000000000 ? 0 : 1).replace(/\.0$/, '') + 'B';
+    }
+    if (abs >= 1000000) {
+      return (number / 1000000).toFixed(abs >= 10000000 ? 0 : 1).replace(/\.0$/, '') + 'M';
+    }
+    if (abs >= 100000) {
+      return Math.round(number / 1000) + 'k';
+    }
+
+    return new Intl.NumberFormat('en-US').format(number);
+  }
+
+  function setStatNumber(id, value) {
+    var node = el(id);
+    if (!node) return;
+    node.textContent = formatStatNumber(value);
+    node.title = new Intl.NumberFormat('en-US').format(Number(value) || 0);
+  }
+
   // =========================================================================
   // Load Statistics
   // =========================================================================
@@ -399,8 +423,7 @@
 
     api.getAuditStatistics(startDate, endDate)
       .then(function (result) {
-        var totalEl = el('statTotal');
-        if (totalEl) totalEl.textContent = result.total_events || 0;
+        setStatNumber('statTotal', result.total_events || 0);
 
         // Classify events from by_event_type
         var byType = result.by_event_type || [];
@@ -426,15 +449,10 @@
           }
         }
 
-        var secEl = el('statSecurity');
-        var usrEl = el('statUser');
-        var sysEl = el('statSystem');
-        var othEl = el('statOther');
-
-        if (secEl) secEl.textContent = securityEvents;
-        if (usrEl) usrEl.textContent = userEvents;
-        if (sysEl) sysEl.textContent = systemEvents;
-        if (othEl) othEl.textContent = otherEvents;
+        setStatNumber('statSecurity', securityEvents);
+        setStatNumber('statUser', userEvents);
+        setStatNumber('statSystem', systemEvents);
+        setStatNumber('statOther', otherEvents);
       })
       .catch(function (err) {
         console.error('[admin-audit] loadStatistics error:', err);

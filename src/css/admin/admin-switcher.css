@@ -1,0 +1,19 @@
+.admin-flow-switcher {
+  flex: 1 1 auto;
+  max-width: min(620px, calc(100vw - 640px));
+}
+
+.admin-flow-switcher lex-select {
+  width: 100%;
+}
+
+.admin-flow-switcher .lex-select-trigger {
+  min-height: 46px;
+}
+
+@media (max-width: 1100px) {
+  .admin-flow-switcher {
+    max-width: 420px;
+  }
+}
+
