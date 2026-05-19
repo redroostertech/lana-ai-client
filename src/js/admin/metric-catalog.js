@@ -291,6 +291,25 @@
     if (btn) { btn.disabled = false; btn.textContent = 'Run visible'; }
   }
 
+  function renderPillSection(label, values) {
+    if (!Array.isArray(values) || values.length === 0) return '';
+    var pills = values.map(function (v) {
+      // Strings come from the registry (e.g. "matter", "invoice"); objects
+      // may carry a name field, otherwise fall back to JSON for visibility.
+      var text = typeof v === 'string'
+        ? v
+        : (v && (v.name || v.entity || v.key)) || displayText(v);
+      // Humanize snake_case so "calendar_event" reads "Calendar Event".
+      var humanized = String(text).replace(/[_.\-]+/g, ' ').replace(/\s+/g, ' ').trim()
+        .replace(/\b\w/g, function (l) { return l.toUpperCase(); });
+      return '<span class="metric-catalog-entity-pill">' + escapeHtml(humanized) + '</span>';
+    }).join('');
+    return '<div class="metric-catalog-drawer__section">'
+      + '<div class="metric-catalog-drawer__label">' + escapeHtml(label) + '</div>'
+      + '<div class="metric-catalog-entity-pills">' + pills + '</div>'
+      + '</div>';
+  }
+
   function renderDrawerBody(metric) {
     var run = lastRunByKey[metric.key] || {};
     var calculation = metric.calculation == null ? '(no calculation defined)' : metric.calculation;
@@ -316,6 +335,14 @@
       html += '<p>' + escapeHtml(metric.description) + '</p>';
       html += '</div>';
     }
+
+    // Entities / criteria / dimensions come straight from the registry
+    // catalog group. Render each as a pill list so the data dependencies
+    // are obvious at a glance — useful when an operator is checking
+    // whether a metric's source tables are populated yet.
+    html += renderPillSection('Required Entities', metric.entities);
+    html += renderPillSection('Criteria', metric.criteria);
+    html += renderPillSection('Dimensions', metric.dimensions);
 
     html += '<div class="metric-catalog-drawer__section">';
     html += '<div class="metric-catalog-drawer__label">Calculation</div>';
