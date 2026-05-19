@@ -85,16 +85,43 @@
     });
   }
 
+  // Normalize an entity name to snake_case so the filter option value is
+  // stable regardless of whether the registry shipped "Calendar Event",
+  // "calendar event", or "calendar_event". The display label is still
+  // produced via humanize() so the dropdown reads naturally.
+  function normalizeEntityKey(name) {
+    return String(name == null ? '' : name)
+      .trim()
+      .toLowerCase()
+      .replace(/[\s.\-]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+  }
+
   function buildFilters() {
     var domainSel = el('metricCatalogDomainFilter');
     var audienceSel = el('metricCatalogAudienceFilter');
+    var entitySel = el('metricCatalogEntityFilter');
     if (!domainSel || !audienceSel) return;
 
     var domains = new Set();
     var audiences = new Set();
+    // Track entity options as normalized key -> humanized display label so
+    // duplicates collapse (e.g. "Calendar Event" + "calendar_event" become
+    // one option) while the label stays human-readable.
+    var entityLabels = {};
     allMetrics.forEach(function (m) {
       if (m.domain) domains.add(m.domain);
       if (m.primaryAudience) audiences.add(m.primaryAudience);
+      if (Array.isArray(m.entities)) {
+        m.entities.forEach(function (raw) {
+          var name = entityName(raw);
+          if (!name) return;
+          var key = normalizeEntityKey(name);
+          if (!key) return;
+          if (!entityLabels[key]) entityLabels[key] = humanize(name);
+        });
+      }
     });
 
     function fill(select, set) {
@@ -110,6 +137,16 @@
     }
     fill(domainSel, domains);
     fill(audienceSel, audiences);
+
+    if (entitySel) {
+      while (entitySel.options.length > 1) entitySel.remove(1);
+      Object.keys(entityLabels).sort().forEach(function (key) {
+        var opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = entityLabels[key];
+        entitySel.appendChild(opt);
+      });
+    }
   }
 
   function applyFilters() {
@@ -117,6 +154,7 @@
     var executable = (el('metricCatalogExecutableFilter') || {}).value || '';
     var domain = (el('metricCatalogDomainFilter') || {}).value || '';
     var audience = (el('metricCatalogAudienceFilter') || {}).value || '';
+    var entity = (el('metricCatalogEntityFilter') || {}).value || '';
 
     var q = search.trim().toLowerCase();
 
@@ -125,6 +163,13 @@
       if (executable === 'false' && m.executable === true) return false;
       if (domain && m.domain !== domain) return false;
       if (audience && m.primaryAudience !== audience) return false;
+      if (entity) {
+        if (!Array.isArray(m.entities)) return false;
+        var hasEntity = m.entities.some(function (raw) {
+          return normalizeEntityKey(entityName(raw)) === entity;
+        });
+        if (!hasEntity) return false;
+      }
       if (q) {
         var hay = [m.key, m.name, m.title, m.description, m.domain, m.primaryAudience]
           .filter(Boolean).join(' ').toLowerCase();
@@ -453,7 +498,7 @@
         t = setTimeout(applyFilters, 150);
       });
     }
-    ['metricCatalogExecutableFilter', 'metricCatalogDomainFilter', 'metricCatalogAudienceFilter'].forEach(function (id) {
+    ['metricCatalogExecutableFilter', 'metricCatalogDomainFilter', 'metricCatalogEntityFilter', 'metricCatalogAudienceFilter'].forEach(function (id) {
       var node = el(id);
       if (node) node.addEventListener('change', applyFilters);
     });
