@@ -203,9 +203,6 @@
           // Description lives in the side panel — keep the table row clean.
           return '<strong>' + escapeHtml(value || '-') + '</strong>';
         },
-        key: function (value) {
-          return '<code class="metric-catalog-key">' + escapeHtml(value || '-') + '</code>';
-        },
         display_status: function (value) { return statusPill(value); },
         executable_label: function (value) {
           var ok = value === 'Yes';
