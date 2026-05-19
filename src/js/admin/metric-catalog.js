@@ -80,9 +80,58 @@
       display_domain: metric.display_domain || '-',
       display_primary_audience: metric.display_primary_audience || '-',
       display_status: statusLabel,
-      last_run: 'last_run_placeholder',
+      // Sortable underlying values for the Last Run / Value columns.
+      // Filled in just before render from lastRunByKey so the table can
+      // sort numerically (value) or alphabetically (status) without
+      // re-parsing the rendered HTML.
+      last_run_status: 'never',
+      last_run_value: null,
       actions: 'actions_placeholder',
     });
+  }
+
+  // Produce a sortable numeric (or null) for the Value column from a metric
+  // run result. Mirrors the categorical logic in summarizeRunValue but
+  // returns the raw underlying number / array-length / null so lex-table
+  // can sort it correctly.
+  function sortableRunValue(value) {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number') return isFinite(value) ? value : null;
+    if (typeof value === 'boolean') return value ? 1 : 0;
+    if (typeof value === 'string') {
+      var asNum = Number(value);
+      return value.trim() !== '' && isFinite(asNum) ? asNum : null;
+    }
+    if (Array.isArray(value)) return value.length;
+    if (typeof value === 'object') {
+      var candidates = ['value', 'total', 'count', 'amount', 'rate', 'percentage', 'percent'];
+      for (var i = 0; i < candidates.length; i++) {
+        if (Object.prototype.hasOwnProperty.call(value, candidates[i])) {
+          return sortableRunValue(value[candidates[i]]);
+        }
+      }
+    }
+    return null;
+  }
+
+  // Stamp each visible metric with the latest run status + sortable value
+  // pulled from lastRunByKey. Called every render so a fresh run shows up
+  // in the table immediately and the sort indicator stays consistent.
+  function applyRunStateToRows() {
+    for (var i = 0; i < visibleMetrics.length; i++) {
+      var m = visibleMetrics[i];
+      var run = lastRunByKey[m.key];
+      if (!run) {
+        m.last_run_status = 'never';
+        m.last_run_value = null;
+      } else if (run.status === 'pending') {
+        m.last_run_status = 'pending';
+        m.last_run_value = null;
+      } else {
+        m.last_run_status = run.status;
+        m.last_run_value = run.status === 'pass' ? sortableRunValue(run.value) : null;
+      }
+    }
   }
 
   // Normalize an entity name to snake_case so the filter option value is
@@ -219,16 +268,21 @@
     return String(value);
   }
 
-  function lastRunCell(metric) {
+  // Status-only cell — pill for pass/fail/pending/never. The Value column
+  // is rendered separately so it can be sorted on the raw numeric.
+  function lastRunStatusCell(metric) {
     var run = lastRunByKey[metric.key];
     if (!run) return '<span class="metric-catalog-muted">never</span>';
     if (run.status === 'pending') return '<span class="metric-catalog-muted">running...</span>';
-    if (run.status === 'pass') {
-      var summary = summarizeRunValue(run.value);
-      return '<span class="metric-catalog-pill metric-catalog-pill--ok">pass</span>'
-        + '<span class="metric-catalog-muted metric-catalog-runcell-value">' + escapeHtml(summary) + '</span>';
-    }
+    if (run.status === 'pass') return '<span class="metric-catalog-pill metric-catalog-pill--ok">pass</span>';
     return '<span class="metric-catalog-pill metric-catalog-pill--fail" title="' + escapeHtml(run.error || '') + '">fail</span>';
+  }
+
+  function lastRunValueCell(metric) {
+    var run = lastRunByKey[metric.key];
+    if (!run || run.status !== 'pass') return '<span class="metric-catalog-muted">-</span>';
+    var summary = summarizeRunValue(run.value);
+    return '<span class="metric-catalog-runcell-value">' + escapeHtml(summary) + '</span>';
   }
 
   function actionsCell(metric) {
@@ -253,12 +307,17 @@
           var ok = value === 'Yes';
           return '<span class="metric-catalog-pill ' + (ok ? 'metric-catalog-pill--ok' : 'metric-catalog-pill--muted') + '">' + escapeHtml(value) + '</span>';
         },
-        last_run: function (_value, row) { return lastRunCell(row); },
+        last_run_status: function (_value, row) { return lastRunStatusCell(row); },
+        last_run_value: function (_value, row) { return lastRunValueCell(row); },
         actions: function (_value, row) { return actionsCell(row); },
       });
     }
 
     if (typeof table.setData === 'function') {
+      // Stamp the current run state onto each row first so the table's
+      // built-in sort works on real underlying values (numeric for the
+      // Value column, status string for the Last Run column).
+      applyRunStateToRows();
       table.setData(visibleMetrics);
     }
   }
