@@ -321,6 +321,122 @@
   color: #047857;
 }
 
+/* ── Pinned strip + per-row pin toggle ────────────────────────────────
+   Mirrors the matter-pin strip on workspace.html so the Dashboard Library
+   page surfaces the user's pinned dashboards above the table. */
+.insights-pinned-section {
+  margin: 1rem 0 1.25rem;
+  padding: 1rem 1.25rem;
+  background: var(--lex-bg-secondary, #f5f5f0);
+  border: 1px solid var(--lex-border-subtle, #e5e7eb);
+  border-radius: 0.5rem;
+}
+
+.insights-pinned-section[hidden] {
+  display: none;
+}
+
+.insights-pinned-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  color: var(--lex-text-secondary, #6b7280);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.insights-pinned-header__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.insights-pinned-header__icon {
+  color: #d97706;
+}
+
+.insights-pinned-header__count {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary, #9ca3af);
+  font-weight: 500;
+}
+
+.insights-pinned-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.insights-pinned-card {
+  position: relative;
+  display: block;
+  padding: 0.875rem 1rem;
+  background: #fff;
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: 0.5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.insights-pinned-card:hover {
+  border-color: var(--lex-color-blue-300, #93c5fd);
+  transform: translateY(-1px);
+}
+
+.insights-pinned-card__pin {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: none;
+  border: 0;
+  font-size: 1rem;
+  color: #d97706;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+}
+
+.insights-pinned-card__name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--lex-text-primary, #111827);
+  padding-right: 1.5rem;
+}
+
+.insights-pinned-card__meta {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary, #9ca3af);
+  text-transform: capitalize;
+}
+
+.insights-pin-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  background: none;
+  border: 0;
+  border-radius: 0.25rem;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--lex-text-tertiary, #9ca3af);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.insights-pin-toggle:hover {
+  background: var(--lex-bg-muted, #f3f4f6);
+  color: var(--lex-text-secondary, #6b7280);
+}
+
+.insights-pin-toggle.is-pinned {
+  color: #d97706;
+}
+
 .insights-action-menu {
   position: relative;
   display: inline-flex;

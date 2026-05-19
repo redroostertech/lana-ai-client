@@ -32,6 +32,17 @@
         <lex-btn id="createDashboardBtn" variant="primary" size="sm">Create Dashboard</lex-btn>
       </lex-banner>
 
+      <section id="dashboardLibraryPinnedSection" class="insights-pinned-section" aria-label="Pinned dashboards" hidden>
+        <div class="insights-pinned-header">
+          <div class="insights-pinned-header__title">
+            <span class="insights-pinned-header__icon" aria-hidden="true">📌</span>
+            <span>Pinned</span>
+          </div>
+          <div class="insights-pinned-header__count" id="dashboardLibraryPinnedCount">0 items</div>
+        </div>
+        <div id="dashboardLibraryPinnedGrid" class="insights-pinned-grid"></div>
+      </section>
+
       <section class="insights-section" aria-labelledby="dashboardLibraryHeading">
         <div class="insights-section-header">
           <div>
@@ -48,8 +59,8 @@
             column-filters
             compact
             limit="10"
-            columns="name,audience,category,scope,visibility,state,actions"
-            labels="Name,Audience,Category,Scope,Visibility,State,Actions"
+            columns="pin,name,audience,category,scope,visibility,state,actions"
+            labels=" ,Name,Audience,Category,Scope,Visibility,State,Actions"
             sort-by="name"
             sort-dir="asc"
             empty-text="No dashboards found"

@@ -2841,6 +2841,20 @@ class ApiClient {
     return this.delete('/api/v1/business-intelligence/dashboards/' + encodeURIComponent(id));
   }
 
+  // Dashboard pinning — mirrors pinMatter/unpinMatter/getPinnedMatters.
+  // User-specific pins stored server-side in bi_dashboard_pins.
+  async listPinnedBIDashboards() {
+    return this.get('/api/v1/business-intelligence/dashboards/pinned');
+  }
+
+  async pinBIDashboard(id) {
+    return this.post('/api/v1/business-intelligence/dashboards/' + encodeURIComponent(id) + '/pin', {});
+  }
+
+  async unpinBIDashboard(id) {
+    return this.delete('/api/v1/business-intelligence/dashboards/' + encodeURIComponent(id) + '/pin');
+  }
+
   async listResourceShares(resourceType, resourceId, params = {}) {
     let url = '/api/v1/sharing/resources/' + encodeURIComponent(resourceType) + '/' + encodeURIComponent(resourceId);
     const queryParts = [];

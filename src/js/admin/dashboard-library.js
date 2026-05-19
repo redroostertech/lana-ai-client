@@ -18,6 +18,12 @@
     return Array.isArray(window.LanaInsightsDashboards) ? window.LanaInsightsDashboards : [];
   }
 
+  // Tracks dashboards the current user has pinned. Hydrated by
+  // loadPinnedDashboards() on init and kept in sync as the user toggles
+  // pins so the table and the Pinned strip stay consistent without a
+  // server round-trip per render.
+  var pinnedIds = new Set();
+
   function normalizeDashboardRecord(record, index) {
     var layout = record.layout || {};
     var type = layout.dashboard_type || record.key || 'owner';
@@ -32,6 +38,7 @@
       visibility: layout.visibility_label || record.visibility || 'Resource shares',
       state: record.state || 'Active',
       actions: record.id ? 'Actions' : '',
+      pin: record.id ? 'pin' : '',
       tags: record.tags || layout.category || '',
       href: record.id ? 'admin/dashboard-detail.html?id=' + encodeURIComponent(record.id) : (record.href || 'admin/dashboard-detail.html?type=' + encodeURIComponent(type)),
       usageRank: record.usageRank || index + 1,
@@ -67,12 +74,86 @@
         : '';
   }
 
+  function renderPinCell(item) {
+    if (!item || !item.id) return '';
+    var pinned = pinnedIds.has(item.id);
+    var label = pinned ? 'Unpin dashboard' : 'Pin dashboard';
+    var cls = 'insights-pin-toggle' + (pinned ? ' is-pinned' : '');
+    // Outline + filled bookmark glyph mirrors the matters list. The button
+    // stops propagation so a row-click handler doesn't navigate when the
+    // user is toggling the pin.
+    var icon = pinned ? '★' : '☆';
+    return '<button type="button" class="' + cls + '" data-dashboard-pin-toggle="' + escapeHtml(item.id) + '" aria-pressed="' + pinned + '" title="' + escapeHtml(label) + '" aria-label="' + escapeHtml(label) + '">' + icon + '</button>';
+  }
+
+  function renderPinnedStrip(sourceDashboards) {
+    var section = el('dashboardLibraryPinnedSection');
+    var grid = el('dashboardLibraryPinnedGrid');
+    var count = el('dashboardLibraryPinnedCount');
+    if (!section || !grid) return;
+
+    var pinned = sourceDashboards.filter(function (item) { return item.id && pinnedIds.has(item.id); });
+    if (pinned.length === 0) {
+      section.hidden = true;
+      grid.innerHTML = '';
+      if (count) count.textContent = '0 items';
+      return;
+    }
+
+    section.hidden = false;
+    if (count) count.textContent = pinned.length + (pinned.length === 1 ? ' item' : ' items');
+    grid.innerHTML = pinned.map(function (item) {
+      return '<a class="insights-pinned-card" href="' + escapeHtml(item.href) + '" data-dashboard-pinned-card="' + escapeHtml(item.id) + '">'
+        + '<button type="button" class="insights-pinned-card__pin" data-dashboard-pin-toggle="' + escapeHtml(item.id) + '" aria-label="Unpin dashboard" title="Unpin dashboard">★</button>'
+        + '<div class="insights-pinned-card__name">' + escapeHtml(item.name || 'Untitled dashboard') + '</div>'
+        + '<div class="insights-pinned-card__meta">' + escapeHtml(item.audience || '-') + '</div>'
+        + '</a>';
+    }).join('');
+  }
+
+  async function loadPinnedDashboards() {
+    if (!window.api || typeof window.api.listPinnedBIDashboards !== 'function') return;
+    try {
+      var response = await api.listPinnedBIDashboards();
+      var rows = response && Array.isArray(response.data) ? response.data : [];
+      pinnedIds = new Set(rows.map(function (row) { return row.id; }).filter(Boolean));
+    } catch (err) {
+      console.warn('[DashboardLibrary] Could not load pinned dashboards:', err.message);
+    }
+  }
+
+  async function togglePin(dashboardId, sourceDashboards) {
+    if (!dashboardId || !window.api) return sourceDashboards;
+    var wasPinned = pinnedIds.has(dashboardId);
+    // Optimistic update so the pin UI feels instant; rolled back on error.
+    if (wasPinned) pinnedIds.delete(dashboardId);
+    else pinnedIds.add(dashboardId);
+    renderPinnedStrip(sourceDashboards);
+    renderDashboardLibrary(sourceDashboards);
+
+    try {
+      if (wasPinned) await api.unpinBIDashboard(dashboardId);
+      else await api.pinBIDashboard(dashboardId);
+    } catch (err) {
+      // Rollback
+      if (wasPinned) pinnedIds.add(dashboardId);
+      else pinnedIds.delete(dashboardId);
+      renderPinnedStrip(sourceDashboards);
+      renderDashboardLibrary(sourceDashboards);
+      if (window.Lex && Lex.Toast) Lex.Toast.error(err.message || 'Could not update pin');
+    }
+    return sourceDashboards;
+  }
+
   function renderDashboardLibrary(sourceDashboards) {
     var table = el('dashboardLibraryTable');
     if (!table) return;
 
     if (typeof table.setCellRenderers === 'function') {
       table.setCellRenderers({
+        pin: function (value, row) {
+          return renderPinCell(row);
+        },
         name: function (value, row) {
           return '<div class="insights-library-name">' + escapeHtml(value) + '</div>';
         },
@@ -115,6 +196,15 @@
   function onDashboardLibraryClick(event, state) {
     if (event.target.closest('#createDashboardBtn')) {
       Lex.Nav.go('admin/dashboard-builder.html');
+      return;
+    }
+
+    var pinToggle = event.target.closest('[data-dashboard-pin-toggle]');
+    if (pinToggle) {
+      // Stop the row-click / card-click navigation when toggling a pin.
+      event.preventDefault();
+      event.stopPropagation();
+      togglePin(pinToggle.getAttribute('data-dashboard-pin-toggle'), state.sourceDashboards);
       return;
     }
 
@@ -175,9 +265,14 @@
       if (!event.target.closest('.insights-action-menu')) closeActionMenus();
     });
     renderDashboardLibrary(state.sourceDashboards);
-    loadDashboards().then(function (loadedDashboards) {
-      state.sourceDashboards = loadedDashboards;
+    renderPinnedStrip(state.sourceDashboards);
+
+    // Load pins and dashboards in parallel; render the strip when both are
+    // available so the pinned cards carry full dashboard metadata.
+    Promise.all([loadDashboards(), loadPinnedDashboards()]).then(function (results) {
+      state.sourceDashboards = results[0];
       renderDashboardLibrary(state.sourceDashboards);
+      renderPinnedStrip(state.sourceDashboards);
     });
   }
 
