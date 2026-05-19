@@ -181,7 +181,13 @@
     }
 
     if (typeof table.setData === 'function') {
-      table.setData(sourceDashboards);
+      // Filter pinned dashboards out of the main table — they live in the
+      // strip above and shouldn't be duplicated below. Mirrors the matters
+      // list behavior in workspace.js (currentMatters minus pinned ids).
+      var unpinned = sourceDashboards.filter(function (item) {
+        return !(item && item.id && pinnedIds.has(item.id));
+      });
+      table.setData(unpinned);
     }
   }
 
