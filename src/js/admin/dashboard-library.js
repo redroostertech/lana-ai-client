@@ -74,16 +74,29 @@
         : '';
   }
 
+  // SVG icons lifted from the workspaces matters table so the dashboard
+  // pin toggle matches it pixel-for-pixel. Filled thumbtack = pinned,
+  // outline bookmark = not pinned.
+  var PIN_ICON_FILLED = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>';
+  var PIN_ICON_OUTLINE = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>';
+
   function renderPinCell(item) {
     if (!item || !item.id) return '';
     var pinned = pinnedIds.has(item.id);
     var label = pinned ? 'Unpin dashboard' : 'Pin dashboard';
     var cls = 'insights-pin-toggle' + (pinned ? ' is-pinned' : '');
-    // Outline + filled bookmark glyph mirrors the matters list. The button
-    // stops propagation so a row-click handler doesn't navigate when the
-    // user is toggling the pin.
-    var icon = pinned ? '★' : '☆';
+    var icon = pinned ? PIN_ICON_FILLED : PIN_ICON_OUTLINE;
     return '<button type="button" class="' + cls + '" data-dashboard-pin-toggle="' + escapeHtml(item.id) + '" aria-pressed="' + pinned + '" title="' + escapeHtml(label) + '" aria-label="' + escapeHtml(label) + '">' + icon + '</button>';
+  }
+
+  function statePill(state) {
+    var label = (state || 'Active');
+    return '<span class="insights-pinned-card__pill insights-pinned-card__pill--active">' + escapeHtml(String(label).toLowerCase()) + '</span>';
+  }
+
+  function audiencePill(audience) {
+    if (!audience) return '';
+    return '<span class="insights-pinned-card__pill">' + escapeHtml(String(audience)) + '</span>';
   }
 
   function renderPinnedStrip(sourceDashboards) {
@@ -104,9 +117,10 @@
     if (count) count.textContent = pinned.length + (pinned.length === 1 ? ' item' : ' items');
     grid.innerHTML = pinned.map(function (item) {
       return '<a class="insights-pinned-card" href="' + escapeHtml(item.href) + '" data-dashboard-pinned-card="' + escapeHtml(item.id) + '">'
-        + '<button type="button" class="insights-pinned-card__pin" data-dashboard-pin-toggle="' + escapeHtml(item.id) + '" aria-label="Unpin dashboard" title="Unpin dashboard">★</button>'
+        + '<button type="button" class="insights-pinned-card__pin" data-dashboard-pin-toggle="' + escapeHtml(item.id) + '" aria-label="Unpin dashboard" title="Unpin dashboard">' + PIN_ICON_FILLED + '</button>'
         + '<div class="insights-pinned-card__name">' + escapeHtml(item.name || 'Untitled dashboard') + '</div>'
-        + '<div class="insights-pinned-card__meta">' + escapeHtml(item.audience || '-') + '</div>'
+        + '<div class="insights-pinned-card__sub">' + escapeHtml(item.audience || item.category || '') + '</div>'
+        + '<div class="insights-pinned-card__pills">' + audiencePill(item.category) + statePill(item.state) + '</div>'
         + '</a>';
     }).join('');
   }
