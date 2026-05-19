@@ -197,7 +197,7 @@
     content.addEventListener('action-click', onActionClick);
     content.addEventListener('click', onDashboardCardClick);
     renderDashboardShortcuts();
-    loadMetricCatalogSummary();
+    // Catalog summary cards were removed from the page; skip the API call.
   }
 
   // ── Boot ───────────────────────────────────────────────────────────

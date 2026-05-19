@@ -34,15 +34,20 @@
       .replace(/\b\w/g, function (letter) { return letter.toUpperCase(); });
   }
 
+  // Zero is rendered as an em-dash everywhere a metric value, prior value,
+  // or movement is shown. Users want to read "—" as "no signal yet" for both
+  // missing data and the legitimately-zero case so an empty dashboard
+  // doesn't look populated by a wall of zeros.
   function formatNumber(value) {
     var numeric = Number(value);
-    if (!isFinite(numeric)) return '-';
+    if (!isFinite(numeric) || numeric === 0) return '-';
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(numeric);
   }
 
   function formatValue(value, format) {
     var numeric = Number(value);
     if (!isFinite(numeric)) return value == null ? '-' : String(value);
+    if (numeric === 0) return '-';
     if (format === 'currency') {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(numeric);
     }
@@ -54,8 +59,10 @@
 
   function formatMovement(movement) {
     if (!movement || movement.percent_change == null || !isFinite(Number(movement.percent_change))) return '-';
+    var pct = Number(movement.percent_change);
+    if (pct === 0) return '-';
     var sign = movement.direction === 'down' ? '-' : '+';
-    return sign + Math.abs(Number(movement.percent_change)).toFixed(1) + '%';
+    return sign + Math.abs(pct).toFixed(1) + '%';
   }
 
   function formatDate(value) {
@@ -161,7 +168,14 @@
       setText('metricCurrentValue', formatValue(current.value_numeric != null ? current.value_numeric : current.value, current.format));
       setText('metricPriorValue', movement ? formatValue(movement.prior_value, current.format) : '-');
       setText('metricMovement', formatMovement(movement));
-      setText('metricDirection', movement ? movement.direction : '-');
+      // When the period had no movement (flat / 0% change), direction is
+      // also not meaningful — render as dash for consistency with the
+      // value cards on either side.
+      var directionLabel = '-';
+      if (movement && movement.direction && movement.direction !== 'flat' && Number(movement.percent_change) !== 0) {
+        directionLabel = movement.direction;
+      }
+      setText('metricDirection', directionLabel);
 
       setTableData('metricSnapshotsTable', (payload.snapshots || []).map(function (snapshot) {
         return {

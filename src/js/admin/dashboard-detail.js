@@ -286,8 +286,11 @@
     var value = metric ? metric.value : null;
     var format = String((metric && metric.format) || 'number').toLowerCase();
     var metadata = (metric && metric.metadata) || {};
-    if (value === 0) return '0';
-    if (!hasValue(value)) return '--';
+    // Treat 0 and missing-value identically: a dashboard full of literal
+    // zeros looks populated when it's actually empty. Render an em-dash so
+    // "no signal yet" is unambiguous.
+    if (value === 0) return '-';
+    if (!hasValue(value)) return '-';
 
     if (Array.isArray(value)) {
       var metadataTotal = Number(metadata.total);

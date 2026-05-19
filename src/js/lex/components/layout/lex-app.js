@@ -769,7 +769,7 @@
           title: 'Top Movers',
           items: this._topMoverItems.length > 0
             ? this._topMoverItems
-            : [{ id: 'top-movers-empty', label: 'No movement yet', icon: 'bar-chart-2', href: '#', badge: '24h' }]
+            : [{ id: 'top-movers-empty', label: 'No movement yet', icon: 'bar-chart-2', href: '#' }]
         });
       } else {
         sections.push({
