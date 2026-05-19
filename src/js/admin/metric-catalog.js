@@ -49,7 +49,17 @@
   function setText(id, value) {
     var node = el(id);
     if (!node) return;
-    node.textContent = value == null ? '-' : String(value);
+    if (value == null) {
+      node.textContent = '-';
+      return;
+    }
+    // Pipe through displayText so numeric counts pick up the 2dp cap and
+    // the comma grouping (e.g. 1,234 instead of 1234).
+    if (typeof value === 'number') {
+      node.textContent = displayText(value);
+      return;
+    }
+    node.textContent = String(value);
   }
 
   // Last execution result per metric. Keyed by metric key so the table cell
@@ -301,7 +311,7 @@
     } else if (run.status === 'pass') {
       html += '<div class="metric-catalog-drawer__run">';
       html += '<div><strong>Value:</strong> ' + escapeHtml(displayText(run.value)) + '</div>';
-      html += '<div><strong>Elapsed:</strong> ' + escapeHtml(String(run.elapsed_ms)) + ' ms</div>';
+      html += '<div><strong>Elapsed:</strong> ' + escapeHtml(displayText(run.elapsed_ms)) + ' ms</div>';
       html += '</div>';
       if (run.payload) {
         html += '<details class="metric-catalog-drawer__payload"><summary>Full payload</summary>';
@@ -311,7 +321,7 @@
     } else {
       html += '<div class="metric-catalog-drawer__run metric-catalog-drawer__run--fail">';
       html += '<div><strong>Error:</strong> ' + escapeHtml(run.error || 'Unknown failure') + '</div>';
-      html += '<div><strong>Elapsed:</strong> ' + escapeHtml(String(run.elapsed_ms || 0)) + ' ms</div>';
+      html += '<div><strong>Elapsed:</strong> ' + escapeHtml(displayText(run.elapsed_ms || 0)) + ' ms</div>';
       html += '</div>';
     }
     html += '</div>';
