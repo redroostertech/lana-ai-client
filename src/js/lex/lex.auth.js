@@ -14,12 +14,13 @@
   function hasRole(roleName) {
     var user = getUser();
     if (!user) return false;
-    var roles = user.roles || [];
+    var roles = user.roles || user.role_names || [];
     for (var i = 0; i < roles.length; i++) {
       var r = roles[i];
       if (r === roleName) return true;
       if (r && r.name === roleName) return true;
     }
+    if (user.role_name === roleName || user.role === roleName) return true;
     return false;
   }
 
@@ -30,11 +31,11 @@
 
     isSystemAdmin: function () { return hasRole('system_admin'); },
 
-    isOrgAdmin: function () { return hasRole('org_admin'); },
+    isOrgAdmin: function () { return hasRole('org_admin') || hasRole('organization_admin'); },
 
-    isAdmin: function () { return hasRole('system_admin') || hasRole('org_admin') || hasRole('admin'); },
+    isAdmin: function () { return hasRole('system_admin') || hasRole('org_admin') || hasRole('organization_admin') || hasRole('admin'); },
 
-    canViewSystemStatus: function () { return hasRole('system_admin') || hasRole('org_admin'); }
+    canViewSystemStatus: function () { return hasRole('system_admin') || hasRole('org_admin') || hasRole('organization_admin'); }
   };
 
 })(window);

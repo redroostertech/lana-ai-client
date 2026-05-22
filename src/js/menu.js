@@ -64,6 +64,7 @@ const MenuIcons = {
 const UserRoles = {
   SYSTEM_ADMIN: 'system_admin',
   ORG_ADMIN: 'org_admin',
+  ORGANIZATION_ADMIN: 'organization_admin',
   ADMIN: 'admin',
   MANAGER: 'manager',
   USER: 'user',
@@ -159,7 +160,7 @@ const MenuConfig = {
             label: 'Administration',
             href: '/admin/index.html',
             icon: 'users',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ORGANIZATION_ADMIN, UserRoles.ADMIN]
           },
           { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
@@ -174,7 +175,7 @@ const MenuConfig = {
       {
         id: 'admin-main',
         title: null,
-        requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN],
+        requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ORGANIZATION_ADMIN, UserRoles.ADMIN],
         items: [
           { id: 'admin-dashboard', label: 'Dashboard', href: '/admin/dashboard.html', icon: 'dashboard' },
           { id: 'admin-users', label: 'Users', href: '/admin/users.html', icon: 'users' },
@@ -182,6 +183,14 @@ const MenuConfig = {
           { id: 'admin-organizations', label: 'Organizations', href: '/admin/organizations.html', icon: 'organizations' },
           { id: 'admin-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'admin-task-plans', label: 'Task Plans', href: '/admin/task-plans.html', icon: 'tasks' },
+          {
+            id: 'admin-communications',
+            label: 'Communications',
+            href: '/admin/communications.html',
+            icon: 'chat',
+            badge: { text: 'Coming soon', class: 'bg-amber-100 text-amber-800' },
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ORGANIZATION_ADMIN]
+          },
           { id: 'admin-sessions', label: 'Sessions', href: '/admin/sessions.html', icon: 'sessions' },
           { id: 'admin-audit', label: 'Audit Logs', href: '/admin/audit.html', icon: 'audit' },
           { id: 'admin-health', label: 'System Health', href: '/admin/health.html', icon: 'health' },
@@ -266,7 +275,7 @@ const MenuConfig = {
             label: 'Administration',
             href: '/admin/index.html',
             icon: 'users',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ORGANIZATION_ADMIN, UserRoles.ADMIN]
           },
           { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
@@ -331,7 +340,7 @@ const MenuConfig = {
             label: 'Administration',
             href: '/admin/index.html',
             icon: 'users',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ORGANIZATION_ADMIN, UserRoles.ADMIN]
           },
           { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
@@ -396,7 +405,7 @@ const MenuConfig = {
             label: 'Administration',
             href: '/admin/index.html',
             icon: 'users',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ORGANIZATION_ADMIN, UserRoles.ADMIN]
           },
           { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
@@ -466,7 +475,7 @@ const MenuConfig = {
             label: 'Administration',
             href: '/admin/index.html',
             icon: 'users',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]
+            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ORGANIZATION_ADMIN, UserRoles.ADMIN]
           },
           { id: 'chat-settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'chat-help', label: 'Help & Support', href: '/help.html', icon: 'help' },
@@ -933,7 +942,7 @@ class MenuSystem {
 
     let overlay = document.getElementById('sidebarUserMenuOverlay');
     if (!overlay) {
-      const showAdmin = this.hasRole([UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ADMIN]);
+      const showAdmin = this.hasRole([UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN, UserRoles.ORGANIZATION_ADMIN, UserRoles.ADMIN]);
       const isAdminPath = (this.currentPath || '').toLowerCase().includes('/admin/');
       const adminHref = this._resolveHref('/admin/index.html');
       const settingsHref = this._resolveHref('/settings.html');

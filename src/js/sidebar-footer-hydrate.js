@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  var ADMIN_ROLE_NAMES = ['system_admin', 'org_admin', 'admin'];
+  var ADMIN_ROLE_NAMES = ['system_admin', 'org_admin', 'organization_admin', 'admin'];
 
   function readUser() {
     if (window.Lex && window.Lex.state && window.Lex.state.user) {

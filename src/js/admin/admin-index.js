@@ -20,6 +20,25 @@
     }
   }
 
+  function hasRole(roleName) {
+    return !!(Lex.Auth && Lex.Auth.hasRole && Lex.Auth.hasRole(roleName));
+  }
+
+  function canViewRoleGatedCard(card) {
+    var roles = (card.dataset.adminRoles || '').split(',');
+    for (var i = 0; i < roles.length; i++) {
+      if (hasRole(roles[i].trim())) return true;
+    }
+    return false;
+  }
+
+  function applyRoleGates() {
+    var cards = document.querySelectorAll('lex-action-card[data-admin-roles]');
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].hidden = !canViewRoleGatedCard(cards[i]);
+    }
+  }
+
   // ── Lifecycle ──────────────────────────────────────────────────────
 
   function init() {
@@ -32,6 +51,7 @@
       return;
     }
 
+    applyRoleGates();
     content.addEventListener('action-click', onActionClick);
   }
 

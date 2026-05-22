@@ -30,6 +30,12 @@
       description: 'Create, review, and publish task/checklist plans'
     },
     {
+      value: 'admin/communications.html',
+      label: 'Communications',
+      description: 'Coming soon',
+      allowedRoles: ['system_admin', 'org_admin', 'organization_admin']
+    },
+    {
       value: 'admin/sessions.html',
       label: 'Active Sessions',
       description: 'Monitor active user sessions and connections'
@@ -65,6 +71,15 @@
     return ADMIN_PAGES.some(function (page) { return page.value === current; });
   }
 
+  function hasRole(roleName) {
+    return !!(window.Lex && Lex.Auth && Lex.Auth.hasRole && Lex.Auth.hasRole(roleName));
+  }
+
+  function canViewPage(page) {
+    if (!page.allowedRoles || page.allowedRoles.length === 0) return true;
+    return page.allowedRoles.some(hasRole);
+  }
+
   function navigate(value) {
     if (!value || value === currentAdminPath()) return;
     if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
@@ -93,7 +108,7 @@
     var select = wrapper.querySelector('lex-select');
     if (!select) return true;
 
-    select.options = ADMIN_PAGES;
+    select.options = ADMIN_PAGES.filter(canViewPage);
     select.value = currentAdminPath();
     select.addEventListener('lex-change', function (event) {
       var value = event.detail && event.detail.value;

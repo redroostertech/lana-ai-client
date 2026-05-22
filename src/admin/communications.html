@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Communications - LANA AI</title>
+
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="admin"
+    page-title="Communications"
+  ></lex-app>
+
+  <template id="page-content">
+    <main>
+      <lex-banner
+        variant="light"
+        heading="Communications"
+        subtitle="Readiness, provider, and route controls for the communications app"
+      >
+        <lex-badge label="Admin only" color="blue"></lex-badge>
+        <lex-badge label="Safe controls" color="green"></lex-badge>
+      </lex-banner>
+
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Communications"}]'></lex-breadcrumb>
+
+      <div id="communicationsAccessDenied" class="hidden">
+        <lex-card heading="Access restricted">
+          <p class="text-sm lex-text-secondary">
+            Communications administration is available to system and organization administrators.
+          </p>
+        </lex-card>
+      </div>
+
+      <div id="communicationsAdminSurface" class="space-y-6">
+        <lex-card heading="Production readiness" subtitle="Status reported by the communications app and runtime configuration.">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div id="readinessBadgeSlot" class="flex flex-wrap gap-2">
+                <lex-badge label="Loading" color="gray"></lex-badge>
+              </div>
+              <p id="readinessStatusText" class="mt-3 text-sm lex-text-secondary">Loading communications readiness...</p>
+              <p class="mt-1 text-xs lex-text-muted">Credential fields are only shown for communications-owned API key providers. Gmail and Microsoft 365 credentials stay in connector administration.</p>
+              <div class="mt-3">
+                <lex-btn id="refreshCommunicationsBtn" variant="secondary" leading-icon="refresh-cw">Refresh readiness</lex-btn>
+              </div>
+            </div>
+            <div id="readinessCounts" class="grid grid-cols-2 gap-3 text-sm min-w-64">
+              <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div class="text-xs font-semibold uppercase tracking-wide lex-text-muted">Providers</div>
+                <div id="providerCountText" class="mt-1 text-lg font-semibold lex-text-primary">--</div>
+              </div>
+              <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div class="text-xs font-semibold uppercase tracking-wide lex-text-muted">Routes</div>
+                <div id="routeCountText" class="mt-1 text-lg font-semibold lex-text-primary">--</div>
+              </div>
+            </div>
+          </div>
+          <div id="readinessChecks" class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3"></div>
+        </lex-card>
+
+        <lex-card heading="Configuration gates" subtitle="Production dispatch remains gated by server-side configuration.">
+          <div id="configStatusGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm lex-text-secondary">Loading configuration status...</div>
+          </div>
+        </lex-card>
+
+        <lex-card heading="Provider registry" subtitle="Registry-backed metadata for supported communications providers.">
+          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p id="registryStatusText" class="text-sm lex-text-secondary">Loading provider registry...</p>
+              <p class="mt-1 text-xs lex-text-muted">Connector-owned provider credentials are managed by their connectors, not this page.</p>
+            </div>
+            <lex-badge id="registryStatusBadge" label="Loading" color="gray"></lex-badge>
+          </div>
+        </lex-card>
+
+        <div id="providerCards" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4"></div>
+
+        <lex-card heading="Provider setup controls" subtitle="Create or edit non-destructive provider configuration.">
+          <form id="providerForm" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Edit existing</span>
+                <select id="providerEditSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                  <option value="">Create new provider</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Provider account</span>
+                <select id="providerKeySelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Channel</span>
+                <select id="providerChannelSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Status</span>
+                <select id="providerStatusSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+              </label>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label class="block md:col-span-2">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Display name</span>
+                <input id="providerDisplayNameInput" type="text" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Provider display name">
+              </label>
+              <div class="flex items-end gap-2">
+                <lex-btn id="saveProviderBtn" type="submit" variant="primary" leading-icon="save">Save provider</lex-btn>
+                <lex-btn id="providerReadinessBtn" type="button" variant="secondary" leading-icon="refresh-cw" disabled>Check</lex-btn>
+              </div>
+            </div>
+          </form>
+          <form id="providerCredentialForm" class="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="text-sm font-semibold lex-text-primary">Credential update</div>
+                <p id="credentialHelpText" class="mt-1 text-xs lex-text-muted">Select a communications-owned API key provider to update encrypted config.</p>
+              </div>
+              <lex-badge id="credentialModeBadge" label="Select provider" color="gray"></lex-badge>
+            </div>
+            <div id="credentialFields" class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <lex-btn id="saveCredentialsBtn" type="submit" variant="secondary" leading-icon="key" disabled>Update credentials</lex-btn>
+            </div>
+          </form>
+          <div id="providerActionStatus" class="mt-3 text-sm lex-text-secondary"></div>
+        </lex-card>
+
+        <lex-card heading="Provider instances" subtitle="Existing communications provider instances, if the endpoint is available.">
+          <div id="providerInstancesStatus" class="mb-3 text-sm lex-text-secondary">Loading provider instances...</div>
+          <div id="providerInstancesList" class="space-y-3"></div>
+        </lex-card>
+
+        <lex-card heading="Route setup controls" subtitle="Create or edit enabled outbound routes. No delete controls are exposed.">
+          <form id="routeForm" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Edit existing</span>
+                <select id="routeEditSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                  <option value="">Create new route</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Provider</span>
+                <select id="routeProviderSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Channel</span>
+                <select id="routeChannelSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                  <option value="voice">Voice</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Direction</span>
+                <select id="routeDirectionSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                  <option value="outbound">Outbound</option>
+                  <option value="bidirectional">Bidirectional</option>
+                  <option value="inbound">Inbound</option>
+                </select>
+              </label>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Route key</span>
+                <input id="routeKeyInput" type="text" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="primary-email">
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Display name</span>
+                <input id="routeDisplayNameInput" type="text" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Primary email">
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Priority</span>
+                <input id="routePriorityInput" type="number" min="0" max="10000" value="100" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+              </label>
+              <label class="flex items-end gap-2 text-sm lex-text-primary">
+                <input id="routeEnabledInput" type="checkbox" checked class="rounded border-gray-300">
+                Enabled
+              </label>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <lex-btn id="saveRouteBtn" type="submit" variant="primary" leading-icon="save">Save route</lex-btn>
+            </div>
+          </form>
+          <div id="routeActionStatus" class="mt-3 text-sm lex-text-secondary"></div>
+        </lex-card>
+
+        <lex-card heading="Routes" subtitle="Existing communications routes, if the endpoint is available.">
+          <div id="routesStatus" class="mb-3 text-sm lex-text-secondary">Loading routes...</div>
+          <div id="routesList" class="space-y-3"></div>
+        </lex-card>
+
+        <lex-card heading="Test-send preview">
+          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p class="text-sm lex-text-secondary">Preview validates route, readiness, and consent without recording an event or contacting providers.</p>
+              <p id="dispatchStatusText" class="mt-1 text-xs lex-text-muted">Live delivery and webhook replay are not exposed here.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <lex-badge label="Preview only" color="blue"></lex-badge>
+              <lex-badge label="No dispatch" color="green"></lex-badge>
+            </div>
+          </div>
+          <form id="testSendPreviewForm" class="mt-4 space-y-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Route</span>
+                <select id="testRouteSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Recipient</span>
+                <input id="testRecipientInput" type="text" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="person@example.com or +15555550100">
+              </label>
+              <label class="block">
+                <span class="block text-sm font-medium lex-text-primary mb-2">Subject</span>
+                <input id="testSubjectInput" type="text" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Email subject">
+              </label>
+            </div>
+            <label class="block">
+              <span class="block text-sm font-medium lex-text-primary mb-2">Body or message</span>
+              <textarea id="testBodyInput" rows="3" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Preview content"></textarea>
+            </label>
+            <div class="flex flex-wrap gap-2">
+              <lex-btn id="previewTestSendBtn" type="submit" variant="secondary" leading-icon="send">Preview test send</lex-btn>
+            </div>
+          </form>
+          <div id="testPreviewResult" class="mt-4"></div>
+        </lex-card>
+
+        <lex-card heading="Advanced controls">
+          <p class="text-sm lex-text-secondary">
+            Provider deletion, route deletion, identity assignment, policy rule editing, webhook replay, and live dispatch are intentionally unavailable from this page.
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <lex-btn variant="secondary" leading-icon="shield" disabled>Edit policy rules</lex-btn>
+          </div>
+        </lex-card>
+      </div>
+    </main>
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/new-project-modal.js"></script>
+  <script src="../js/conversation-menu.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+
+  <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/admin/admin-switcher.js"></script>
+  <script src="../js/admin/admin-communications.js"></script>
+  <script src="../js/auth-guard.js"></script>
+</body>
+</html>
