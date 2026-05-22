@@ -1016,16 +1016,8 @@
       .replace(/'/g, '&#39;');
   }
 
-  function hasMetricInfo(metric) {
-    if (!metric) return false;
-    if (metric.description && String(metric.description).trim().length > 0) return true;
-    if (metric.helpText && (metric.helpText.title ||
-      (Array.isArray(metric.helpText.paragraphs) && metric.helpText.paragraphs.length))) return true;
-    return false;
-  }
-
   function infoIconButtonHTML(metric) {
-    if (!hasMetricInfo(metric)) return '';
+    if (!metric || !metric.key) return '';
     _metricInfoRegistry[metric.key] = {
       name: metric.name || metric.key,
       description: metric.description || '',
@@ -1040,17 +1032,25 @@
       '</svg></button>';
   }
 
-  function openMetricInfo(metricKey) {
-    var entry = _metricInfoRegistry[metricKey];
-    if (!entry) return;
+  // Renders the four-section info modal: Description, Help, Data Sources, How
+  // It's Calculated. `entry` is the locally-cached basics (name + description +
+  // helpText). `detail` is the optional fully-resolved catalog entry from
+  // /api/v1/modules/metric-catalog/<key> with `entities`, `calculation`, and
+  // `businessLogic`. When `detail` is null we render a loading skeleton in the
+  // last two sections, then re-render once the fetch resolves.
+  function renderMetricInfoBody(entry, detail) {
     var parts = [];
+
+    // 1. Description.
     if (entry.description) {
       parts.push('<p style="margin:0 0 0.75rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">' +
         escapeHtml(entry.description) + '</p>');
     }
+
+    // 2. Help text (structured).
     if (entry.helpText && Array.isArray(entry.helpText.paragraphs) && entry.helpText.paragraphs.length) {
       if (entry.helpText.title) {
-        parts.push('<h4 style="margin:0.5rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">' +
+        parts.push('<h4 style="margin:0.75rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">' +
           escapeHtml(entry.helpText.title) + '</h4>');
       }
       for (var i = 0; i < entry.helpText.paragraphs.length; i++) {
@@ -1058,19 +1058,122 @@
           escapeHtml(entry.helpText.paragraphs[i]) + '</p>');
       }
     }
-    if (!parts.length) {
-      parts.push('<p style="margin:0;color:var(--lex-text-secondary,#475569);">No additional details for this metric.</p>');
+
+    // 3. Business logic prose (if present in the catalog entry).
+    var bizLogic = detail && detail.businessLogic;
+    if (bizLogic && String(bizLogic).trim().length > 0) {
+      parts.push('<h4 style="margin:1rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">Business logic</h4>');
+      parts.push('<p style="margin:0 0 0.6rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">' +
+        escapeHtml(bizLogic) + '</p>');
     }
-    if (window.Lex && window.Lex.Modal && typeof window.Lex.Modal.open === 'function') {
-      window.Lex.Modal.open({
-        heading: entry.name,
-        content: parts.join(''),
-        size: 'md',
-        hideActions: true
-      });
+
+    // 4. Data sources (entities + fields).
+    parts.push('<h4 style="margin:1rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">Data sources</h4>');
+    if (!detail) {
+      parts.push('<p style="margin:0 0 0.6rem 0;color:var(--lex-text-muted,#94a3b8);font-style:italic;">Loading…</p>');
+    } else if (Array.isArray(detail.entities) && detail.entities.length > 0) {
+      for (var j = 0; j < detail.entities.length; j++) {
+        var ent = detail.entities[j];
+        parts.push(
+          '<div style="margin:0 0 0.55rem 0;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;">' +
+            '<div style="font-size:0.8rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">' +
+              escapeHtml(ent.entity_type || '(unknown entity)') +
+            '</div>' +
+            (ent.description ? '<div style="font-size:0.75rem;color:var(--lex-text-secondary,#475569);margin-top:0.15rem;">' + escapeHtml(ent.description) + '</div>' : '') +
+            (Array.isArray(ent.fields) && ent.fields.length
+              ? '<div style="font-size:0.7rem;color:var(--lex-text-muted,#64748b);margin-top:0.3rem;font-family:var(--lex-font-mono,monospace);">' +
+                ent.fields.map(escapeHtml).join(', ') +
+                '</div>'
+              : '') +
+          '</div>'
+        );
+      }
+    } else {
+      parts.push('<p style="margin:0 0 0.6rem 0;color:var(--lex-text-muted,#94a3b8);">No data sources declared.</p>');
+    }
+
+    // 5. How it's calculated (calculation shape).
+    parts.push('<h4 style="margin:1rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">How it\'s calculated</h4>');
+    if (!detail) {
+      parts.push('<p style="margin:0;color:var(--lex-text-muted,#94a3b8);font-style:italic;">Loading…</p>');
+    } else {
+      var calc = detail.calculation || {};
+      if (typeof calc.ref === 'string' && calc.ref) {
+        parts.push(
+          '<p style="margin:0 0 0.4rem 0;color:var(--lex-text-secondary,#475569);">Resolves to the central registry executor:</p>' +
+          '<code style="display:block;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;font-size:0.78rem;color:var(--lex-text-primary,#0f172a);">' +
+            escapeHtml(calc.ref) +
+          '</code>'
+        );
+      } else if (calc.spec && typeof calc.spec === 'object') {
+        parts.push(
+          '<p style="margin:0 0 0.4rem 0;color:var(--lex-text-secondary,#475569);">Computed from an inline spec:</p>' +
+          '<pre style="margin:0;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;font-size:0.72rem;color:var(--lex-text-primary,#0f172a);white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto;">' +
+            escapeHtml(JSON.stringify(calc.spec, null, 2)) +
+          '</pre>'
+        );
+      } else if (typeof calc.query === 'string' && calc.query) {
+        parts.push(
+          '<p style="margin:0 0 0.4rem 0;color:var(--lex-text-secondary,#475569);">Inline SQL query (read-only):</p>' +
+          '<pre style="margin:0;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;font-size:0.72rem;color:var(--lex-text-primary,#0f172a);white-space:pre-wrap;word-break:break-word;max-height:240px;overflow:auto;">' +
+            escapeHtml(calc.query) +
+          '</pre>'
+        );
+      } else {
+        parts.push('<p style="margin:0;color:var(--lex-text-muted,#94a3b8);">Calculation details not declared.</p>');
+      }
+    }
+
+    return parts.join('');
+  }
+
+  function openMetricInfo(metricKey) {
+    var entry = _metricInfoRegistry[metricKey];
+    if (!entry) return;
+
+    if (!(window.Lex && window.Lex.Modal && typeof window.Lex.Modal.open === 'function')) {
+      window.alert(entry.name + '\n\n' + (entry.description || ''));
       return;
     }
-    window.alert(entry.name + '\n\n' + (entry.description || ''));
+
+    // Open the modal immediately with the loading skeleton so the UI feels
+    // responsive even if the catalog fetch takes a beat.
+    var modal = window.Lex.Modal.open({
+      heading: entry.name,
+      content: renderMetricInfoBody(entry, null),
+      size: 'md',
+      hideActions: true
+    });
+
+    // Fetch full catalog entry to populate entities + calculation. Cached on
+    // the registry entry so subsequent opens skip the network.
+    var finalize = function (detail) {
+      entry.detail = detail;
+      var body = renderMetricInfoBody(entry, detail);
+      if (modal && modal.innerHTML !== undefined) {
+        // lex-modal.open creates a real DOM element; replacing its slot innerHTML
+        // works because we passed `content` as a string on open.
+        modal.innerHTML = body;
+      }
+    };
+
+    if (entry.detail) {
+      finalize(entry.detail);
+      return;
+    }
+
+    if (window.api && typeof window.api.get === 'function') {
+      window.api.get('/api/v1/modules/metric-catalog/' + encodeURIComponent(metricKey))
+        .then(function (res) {
+          var detail = (res && (res.data || res)) || null;
+          finalize(detail || { entities: [], calculation: null, businessLogic: null });
+        })
+        .catch(function () {
+          finalize({ entities: [], calculation: null, businessLogic: null });
+        });
+    } else {
+      finalize({ entities: [], calculation: null, businessLogic: null });
+    }
   }
 
   function createDistributionMetricCard(metric) {
@@ -1170,21 +1273,21 @@
       '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Override</button>';
 
     return '<div data-metric-card class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' hover:shadow-md transition-shadow" style="position:relative;padding:24px 24px 56px 24px;">' +
-      // Header: title (auto-fit)
+      // Header: title (auto-fit, up to 2 lines, 14px -> 10px)
       '<div class="mb-4"><div class="flex items-start justify-between gap-2">' +
-      '<h3 data-metric-title class="font-medium text-gray-500 uppercase tracking-wide flex-1 min-w-0" style="font-size:0.875rem;line-height:1.2;">' + metric.name + '</h3>' +
+      '<h3 data-fit-text="14:10:2" class="font-medium text-gray-500 uppercase tracking-wide flex-1 min-w-0" style="font-size:14px;line-height:1.2;">' + metric.name + '</h3>' +
       '</div></div>' +
-      // Current period value
+      // Current period value (auto-fit, 1 line, 30px -> 14px)
       '<div class="mb-4"><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Current Period</p></div>' +
-      '<p class="text-3xl font-bold text-gray-900">' + currentValue + '</p></div>' +
+      '<p data-fit-text="30:14:1" class="font-bold text-gray-900" style="font-size:30px;line-height:1.1;white-space:nowrap;overflow:hidden;">' + currentValue + '</p></div>' +
       comparisonHTML +
       // Prior Period + Target side-by-side; Override sits next to the Target value.
       '<div class="grid grid-cols-2 gap-4 text-sm">' +
       '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p>' +
-      '<p class="font-semibold text-gray-700">' + priorValue + '</p></div>' +
+      '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + priorValue + '</p></div>' +
       '<div><p class="text-xs text-gray-500 mb-1">Target</p>' +
       '<div class="flex items-center gap-2 flex-wrap">' +
-      '<p class="font-semibold text-gray-700">' + targetValue + '</p>' + overrideBtn +
+      '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + targetValue + '</p>' + overrideBtn +
       '</div></div></div>' +
       // Footer: pinned to card bottom-left / bottom-right with 12px insets.
       '<div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">' +
@@ -1192,27 +1295,37 @@
       '<div>' + drilldownBtn + '</div></div></div>';
   }
 
-  // Shrink card titles in 1px steps until they fit in <= maxLines.
-  function fitMetricTitle(card, maxLines, minPx, maxPx) {
+  // Generic shrink-to-fit: walks every element with `data-fit-text="MAX:MIN:LINES"`
+  // and reduces its font-size 1px at a time until its scrollHeight fits within
+  // LINES * line-height, OR it hits the MIN floor. When LINES === 1 we also
+  // shrink as long as scrollWidth exceeds clientWidth (text was clipped by
+  // overflow:hidden on a single line).
+  function fitMetricCardText(card) {
     if (!card) return;
-    var el = card.querySelector('[data-metric-title]');
-    if (!el) return;
-    var lines = maxLines || 2;
-    var min = minPx || 10;
-    var max = maxPx || 14;
-    el.style.fontSize = max + 'px';
-    var lineHeight = parseFloat(getComputedStyle(el).lineHeight) || (max * 1.2);
-    var targetHeight = Math.ceil(lineHeight * lines) + 1;
-    var size = max;
-    while (el.scrollHeight > targetHeight && size > min) {
-      size -= 1;
-      el.style.fontSize = size + 'px';
+    var els = card.querySelectorAll('[data-fit-text]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var spec = (el.getAttribute('data-fit-text') || '').split(':');
+      var max = parseInt(spec[0], 10) || 14;
+      var min = parseInt(spec[1], 10) || 10;
+      var lines = parseInt(spec[2], 10) || 1;
+      el.style.fontSize = max + 'px';
+      var lineHeight = parseFloat(getComputedStyle(el).lineHeight) || (max * 1.2);
+      var targetHeight = Math.ceil(lineHeight * lines) + 1;
+      var size = max;
+      while (size > min) {
+        var heightOk = el.scrollHeight <= targetHeight;
+        var widthOk = (lines !== 1) || (el.scrollWidth <= el.clientWidth + 1);
+        if (heightOk && widthOk) break;
+        size -= 1;
+        el.style.fontSize = size + 'px';
+      }
     }
   }
 
-  function fitAllMetricTitles(grid) {
+  function fitAllMetricCardText(grid) {
     var cards = grid.querySelectorAll('[data-metric-card]');
-    for (var i = 0; i < cards.length; i++) fitMetricTitle(cards[i]);
+    for (var i = 0; i < cards.length; i++) fitMetricCardText(cards[i]);
   }
 
   function renderMetrics(metrics) {
@@ -1220,7 +1333,7 @@
     if (!grid) return;
     grid.innerHTML = metrics.map(function (metric) { return createMetricCard(metric); }).join('');
 
-    requestAnimationFrame(function () { fitAllMetricTitles(grid); });
+    requestAnimationFrame(function () { fitAllMetricCardText(grid); });
 
     setTimeout(function () {
       metrics.forEach(function (metric) {
@@ -1506,39 +1619,70 @@
     chartInstances = {};
     container.innerHTML = '';
 
-    var visualizationsBySection = { primary: [], secondary: [], trends: [] };
+    // Section order + titles come from the module's ui.sections[]. Falls back
+    // to legacy hardcoded keys for older modules that don't declare sections
+    // (primary/secondary/trends). Any visualization with an unknown section key
+    // is dropped into 'trends' for back-compat.
+    var declaredSections = (data.ui && Array.isArray(data.ui.sections))
+      ? data.ui.sections
+      : (data.config && data.config.ui && Array.isArray(data.config.ui.sections) ? data.config.ui.sections : []);
+
+    var orderedSectionKeys = declaredSections.length
+      ? declaredSections.map(function (s) { return s.key; })
+      : ['primary', 'secondary', 'trends'];
+
+    var sectionMeta = {};
+    declaredSections.forEach(function (s) { sectionMeta[s.key] = s; });
+
+    var visualizationsBySection = {};
+    orderedSectionKeys.forEach(function (k) { visualizationsBySection[k] = []; });
 
     (data.visualizations || []).forEach(function (viz) {
-      var section = viz.section || 'trends';
-      if (visualizationsBySection[section]) {
-        visualizationsBySection[section].push(viz);
-      }
+      var section = viz.section || orderedSectionKeys[orderedSectionKeys.length - 1] || 'trends';
+      if (!visualizationsBySection[section]) visualizationsBySection[section] = [];
+      visualizationsBySection[section].push(viz);
     });
 
-    ['primary', 'secondary', 'trends'].forEach(function (sectionName) {
+    orderedSectionKeys.forEach(function (sectionName) {
       var visualizations = visualizationsBySection[sectionName];
       if (visualizations && visualizations.length > 0) {
-        renderSection(sectionName, visualizations, data, container);
+        renderSection(sectionName, visualizations, data, container, sectionMeta[sectionName]);
       }
     });
   }
 
-  function renderSection(sectionName, visualizations, data, container) {
+  function renderSection(sectionName, visualizations, data, container, meta) {
     var sectionDiv = document.createElement('div');
     sectionDiv.className = 'mb-8';
     sectionDiv.id = 'section-' + sectionName;
 
-    if (sectionName === 'trends') {
+    // Title block — pulled from ui.sections[].title/description when declared.
+    // Falls back to a built-in "Trends & Comparisons" treatment for the legacy
+    // 'trends' key so older modules that don't declare sections still look the
+    // same. Other unnamed sections render with no title block.
+    if (meta && (meta.title || meta.description)) {
       var titleDiv = document.createElement('div');
-      titleDiv.className = 'mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6 border border-indigo-100';
-      titleDiv.innerHTML = '<h3 class="text-2xl font-bold text-gray-900 mb-3">Trends &amp; Comparisons</h3>' +
+      titleDiv.className = 'mb-6';
+      var titleHTML = '';
+      if (meta.title) {
+        titleHTML += '<h3 class="text-2xl font-bold text-gray-900">' + escapeHtml(meta.title) + '</h3>';
+      }
+      if (meta.description) {
+        titleHTML += '<p class="mt-1 text-sm text-gray-600">' + escapeHtml(meta.description) + '</p>';
+      }
+      titleDiv.innerHTML = titleHTML;
+      sectionDiv.appendChild(titleDiv);
+    } else if (sectionName === 'trends') {
+      var legacyDiv = document.createElement('div');
+      legacyDiv.className = 'mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6 border border-indigo-100';
+      legacyDiv.innerHTML = '<h3 class="text-2xl font-bold text-gray-900 mb-3">Trends &amp; Comparisons</h3>' +
         '<div class="space-y-3 text-sm text-gray-700">' +
         '<p class="leading-relaxed"><strong>What you are looking at:</strong> These charts compare your current period performance to the previous period.</p>' +
         '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">' +
         '<div class="bg-white rounded-lg p-4 shadow-sm"><div class="flex items-center gap-2 mb-2"><span class="w-4 h-4 rounded bg-blue-500"></span><strong class="text-blue-700">Blue bars = Current Period</strong></div><p class="text-xs text-gray-600">This is your performance RIGHT NOW.</p></div>' +
         '<div class="bg-white rounded-lg p-4 shadow-sm"><div class="flex items-center gap-2 mb-2"><span class="w-4 h-4 rounded bg-gray-400"></span><strong class="text-gray-700">Gray bars = Prior Period</strong></div><p class="text-xs text-gray-600">This is your performance BEFORE.</p></div>' +
         '</div></div>';
-      sectionDiv.appendChild(titleDiv);
+      sectionDiv.appendChild(legacyDiv);
     }
 
     visualizations.forEach(function (viz, index) {
@@ -1575,10 +1719,25 @@
     var div = document.createElement('div');
     div.className = 'mb-6';
     var grid = document.createElement('div');
-    grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+    // Container-aware auto-fit: cards adapt to actual grid width, not viewport
+    // width. Viewport breakpoints lied here because the left sidebar + the
+    // Report Modules panel eat ~500-560px of horizontal space, so a "wide"
+    // window still leaves a narrow content area.
+    //
+    // grid-template-columns: repeat(auto-fit, minmax(260px, 1fr))
+    //   - Each card is at least 260px wide and grows to fill the row
+    //   - Browser packs as many as fit, then wraps. Effectively:
+    //       ~830px+ container = 3 cols, ~525-829px = 2 cols, <525px = 1 col
+    //   - 260px floor chosen so 3 cards fit comfortably even with both the
+    //     LANA app sidebar (~280px) and Report Modules panel (~260px) open.
+    grid.className = 'gap-6';
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(260px, 1fr))';
     grid.id = 'grid-' + uniqueId;
     grid.innerHTML = viz.metrics.map(function (metric) { return createMetricCard(metric); }).join('');
     div.appendChild(grid);
+
+    requestAnimationFrame(function () { fitAllMetricCardText(grid); });
 
     setTimeout(function () {
       viz.metrics.forEach(function (metric) {

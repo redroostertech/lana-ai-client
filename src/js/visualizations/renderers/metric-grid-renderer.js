@@ -485,45 +485,137 @@ export class MetricGridRenderer {
   }
 
   /**
-   * Open a lex-modal with the metric's description and any structured helpText.
+   * Open a lex-modal with the metric's description, help, data sources, and
+   * calculation details. The first two sections render from `metric` directly;
+   * the last two are fetched on demand from /api/v1/modules/metric-catalog/<key>
+   * and cached on the renderer instance to avoid re-fetching on subsequent opens.
    * Falls back to a native alert if Lex.Modal is not loaded on this page.
    * @private
    */
   openMetricInfoModal(metric) {
-    const escape = (s) => String(s == null ? '' : s)
+    const heading = metric.name || metric.key || 'About this metric';
+
+    if (!(window.Lex && window.Lex.Modal && typeof window.Lex.Modal.open === 'function')) {
+      window.alert(`${heading}\n\n${metric.description || ''}`);
+      return;
+    }
+
+    if (!this._metricDetailCache) this._metricDetailCache = Object.create(null);
+    const cached = this._metricDetailCache[metric.key] || null;
+
+    const modal = window.Lex.Modal.open({
+      heading,
+      content: this._renderMetricInfoBody(metric, cached),
+      size: 'md',
+      hideActions: true,
+    });
+
+    if (cached) return;
+
+    const finalize = (detail) => {
+      if (!detail) detail = { entities: [], calculation: null, businessLogic: null };
+      this._metricDetailCache[metric.key] = detail;
+      const body = this._renderMetricInfoBody(metric, detail);
+      if (modal && modal.innerHTML !== undefined) modal.innerHTML = body;
+    };
+
+    if (window.api && typeof window.api.get === 'function' && metric.key) {
+      window.api.get('/api/v1/modules/metric-catalog/' + encodeURIComponent(metric.key))
+        .then((res) => finalize((res && (res.data || res)) || null))
+        .catch(() => finalize(null));
+    } else {
+      finalize(null);
+    }
+  }
+
+  /**
+   * Build the modal body HTML. When `detail` is null the last two sections
+   * (data sources + how it's calculated) render a loading skeleton; once the
+   * catalog fetch resolves we re-render the body in place.
+   * @private
+   */
+  _renderMetricInfoBody(metric, detail) {
+    const esc = (s) => String(s == null ? '' : s)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
 
     const parts = [];
+
+    // 1. Description
     if (metric.description) {
-      parts.push(`<p style="margin:0 0 0.75rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">${escape(metric.description)}</p>`);
+      parts.push(`<p style="margin:0 0 0.75rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">${esc(metric.description)}</p>`);
     }
+
+    // 2. Structured helpText
     const help = metric.helpText;
     if (help && Array.isArray(help.paragraphs) && help.paragraphs.length) {
       if (help.title) {
-        parts.push(`<h4 style="margin:0.5rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">${escape(help.title)}</h4>`);
+        parts.push(`<h4 style="margin:0.75rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">${esc(help.title)}</h4>`);
       }
       for (const p of help.paragraphs) {
-        parts.push(`<p style="margin:0 0 0.6rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">${escape(p)}</p>`);
+        parts.push(`<p style="margin:0 0 0.6rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">${esc(p)}</p>`);
       }
     }
-    if (parts.length === 0) {
-      parts.push('<p style="margin:0;color:var(--lex-text-secondary,#475569);">No additional details for this metric.</p>');
+
+    // 3. Business logic prose
+    const bizLogic = detail && detail.businessLogic;
+    if (bizLogic && String(bizLogic).trim().length > 0) {
+      parts.push('<h4 style="margin:1rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">Business logic</h4>');
+      parts.push(`<p style="margin:0 0 0.6rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">${esc(bizLogic)}</p>`);
     }
 
-    const heading = metric.name || metric.key || 'About this metric';
-    if (window.Lex && window.Lex.Modal && typeof window.Lex.Modal.open === 'function') {
-      window.Lex.Modal.open({
-        heading,
-        content: parts.join(''),
-        size: 'md',
-        hideActions: true,
-      });
-      return;
+    // 4. Data sources
+    parts.push('<h4 style="margin:1rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">Data sources</h4>');
+    if (!detail) {
+      parts.push('<p style="margin:0 0 0.6rem 0;color:var(--lex-text-muted,#94a3b8);font-style:italic;">Loading…</p>');
+    } else if (Array.isArray(detail.entities) && detail.entities.length > 0) {
+      for (const ent of detail.entities) {
+        const fieldsLine = Array.isArray(ent.fields) && ent.fields.length
+          ? `<div style="font-size:0.7rem;color:var(--lex-text-muted,#64748b);margin-top:0.3rem;font-family:var(--lex-font-mono,monospace);">${ent.fields.map(esc).join(', ')}</div>`
+          : '';
+        const descLine = ent.description
+          ? `<div style="font-size:0.75rem;color:var(--lex-text-secondary,#475569);margin-top:0.15rem;">${esc(ent.description)}</div>`
+          : '';
+        parts.push(
+          `<div style="margin:0 0 0.55rem 0;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;">` +
+            `<div style="font-size:0.8rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">${esc(ent.entity_type || '(unknown entity)')}</div>` +
+            descLine + fieldsLine +
+          `</div>`
+        );
+      }
+    } else {
+      parts.push('<p style="margin:0 0 0.6rem 0;color:var(--lex-text-muted,#94a3b8);">No data sources declared.</p>');
     }
-    window.alert(`${heading}\n\n${metric.description || ''}`);
+
+    // 5. How it's calculated
+    parts.push(`<h4 style="margin:1rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">How it's calculated</h4>`);
+    if (!detail) {
+      parts.push('<p style="margin:0;color:var(--lex-text-muted,#94a3b8);font-style:italic;">Loading…</p>');
+    } else {
+      const calc = detail.calculation || {};
+      if (typeof calc.ref === 'string' && calc.ref) {
+        parts.push(
+          `<p style="margin:0 0 0.4rem 0;color:var(--lex-text-secondary,#475569);">Resolves to the central registry executor:</p>` +
+          `<code style="display:block;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;font-size:0.78rem;color:var(--lex-text-primary,#0f172a);">${esc(calc.ref)}</code>`
+        );
+      } else if (calc.spec && typeof calc.spec === 'object') {
+        parts.push(
+          `<p style="margin:0 0 0.4rem 0;color:var(--lex-text-secondary,#475569);">Computed from an inline spec:</p>` +
+          `<pre style="margin:0;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;font-size:0.72rem;color:var(--lex-text-primary,#0f172a);white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto;">${esc(JSON.stringify(calc.spec, null, 2))}</pre>`
+        );
+      } else if (typeof calc.query === 'string' && calc.query) {
+        parts.push(
+          `<p style="margin:0 0 0.4rem 0;color:var(--lex-text-secondary,#475569);">Inline SQL query (read-only):</p>` +
+          `<pre style="margin:0;padding:0.5rem 0.75rem;background:var(--lex-bg-secondary,#f1f5f9);border-radius:6px;font-size:0.72rem;color:var(--lex-text-primary,#0f172a);white-space:pre-wrap;word-break:break-word;max-height:240px;overflow:auto;">${esc(calc.query)}</pre>`
+        );
+      } else {
+        parts.push('<p style="margin:0;color:var(--lex-text-muted,#94a3b8);">Calculation details not declared.</p>');
+      }
+    }
+
+    return parts.join('');
   }
 
   /**
@@ -641,9 +733,11 @@ export class MetricGridRenderer {
    * @private
    */
   getInfoButtonHTML(metric) {
-    const hasInfo = (metric.description && metric.description.trim().length > 0) ||
-      (metric.helpText && (metric.helpText.title || (metric.helpText.paragraphs && metric.helpText.paragraphs.length)));
-    if (!hasInfo) return '';
+    // Always show for any metric with a key. The modal fetches the full catalog
+    // entry on click (entities + calculation + helpText), so local description
+    // presence is not the right gate. /modules/<key>/execute does not include
+    // description per-metric, which is why the icon was previously suppressed.
+    if (!metric || !metric.key) return '';
     return `
       <button
         data-info-btn
