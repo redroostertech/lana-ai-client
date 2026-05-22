@@ -1003,6 +1003,76 @@
   // Metric Card Rendering
   // ==========================================================================
 
+  // Per-render registry of metrics so the inline onclick info handler can look
+  // up description/helpText without round-tripping through DOM attributes.
+  var _metricInfoRegistry = Object.create(null);
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function hasMetricInfo(metric) {
+    if (!metric) return false;
+    if (metric.description && String(metric.description).trim().length > 0) return true;
+    if (metric.helpText && (metric.helpText.title ||
+      (Array.isArray(metric.helpText.paragraphs) && metric.helpText.paragraphs.length))) return true;
+    return false;
+  }
+
+  function infoIconButtonHTML(metric) {
+    if (!hasMetricInfo(metric)) return '';
+    _metricInfoRegistry[metric.key] = {
+      name: metric.name || metric.key,
+      description: metric.description || '',
+      helpText: metric.helpText || null
+    };
+    var key = String(metric.key).split("'").join("\\'");
+    return '<button type="button" aria-label="About this metric" title="About this metric" ' +
+      'onclick="window._reporting.openMetricInfo(\'' + key + '\')" ' +
+      'class="text-gray-400 hover:text-indigo-600 transition-colors">' +
+      '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
+      '</svg></button>';
+  }
+
+  function openMetricInfo(metricKey) {
+    var entry = _metricInfoRegistry[metricKey];
+    if (!entry) return;
+    var parts = [];
+    if (entry.description) {
+      parts.push('<p style="margin:0 0 0.75rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">' +
+        escapeHtml(entry.description) + '</p>');
+    }
+    if (entry.helpText && Array.isArray(entry.helpText.paragraphs) && entry.helpText.paragraphs.length) {
+      if (entry.helpText.title) {
+        parts.push('<h4 style="margin:0.5rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">' +
+          escapeHtml(entry.helpText.title) + '</h4>');
+      }
+      for (var i = 0; i < entry.helpText.paragraphs.length; i++) {
+        parts.push('<p style="margin:0 0 0.6rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">' +
+          escapeHtml(entry.helpText.paragraphs[i]) + '</p>');
+      }
+    }
+    if (!parts.length) {
+      parts.push('<p style="margin:0;color:var(--lex-text-secondary,#475569);">No additional details for this metric.</p>');
+    }
+    if (window.Lex && window.Lex.Modal && typeof window.Lex.Modal.open === 'function') {
+      window.Lex.Modal.open({
+        heading: entry.name,
+        content: parts.join(''),
+        size: 'md',
+        hideActions: true
+      });
+      return;
+    }
+    window.alert(entry.name + '\n\n' + (entry.description || ''));
+  }
+
   function createDistributionMetricCard(metric) {
     var canvasId = 'chart-' + metric.key;
     var statusColor = metric.status === 'error' ? 'gray' : (metric.status || 'gray');
@@ -1015,8 +1085,8 @@
     return '<div class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' p-6 hover:shadow-md transition-shadow">' +
       '<div class="flex items-start justify-between mb-4"><div class="flex-1">' +
       '<h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">' + metric.name + '</h3>' +
-      '<p class="text-xs text-gray-400 mt-1">' + (metric.description || '') + '</p>' +
-      '<p class="text-xs text-indigo-600 mt-2 font-medium">Click any bar to see actual leads</p></div></div>' +
+      '<p class="text-xs text-indigo-600 mt-2 font-medium">Click any bar to see actual leads</p></div>' +
+      '<div class="flex items-center gap-2">' + infoIconButtonHTML(metric) + '</div></div>' +
       '<div class="mb-4"><p class="text-xs text-gray-500 mb-1">Total Leads</p>' +
       '<p class="text-2xl font-bold text-gray-900">' + formatNumber(totalCount, 0) + '</p></div>' +
       '<div class="mb-4"><canvas id="' + canvasId + '" style="max-height: 250px;"></canvas></div></div>';
@@ -1099,24 +1169,58 @@
     var overrideBtn = '<button onclick="window._reporting.openDataOverridePanel(\'' + metric.key + '\', \'' + metric.name + '\', \'' + (metric.description || '').split("'").join("\\'") + '\', ' + metric.target + ', \'target\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1" title="Override target value">' +
       '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Override</button>';
 
-    return '<div class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' p-6 hover:shadow-md transition-shadow">' +
-      '<div class="mb-4"><div class="flex items-center justify-between gap-2 mb-2"><div class="flex items-center gap-2">' +
-      '<h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">' + metric.name + '</h3></div>' +
-      '<div class="flex items-center gap-2">' + drilldownBtn + '</div></div>' +
-      '<p class="text-xs text-gray-400">' + (metric.description || '') + '</p></div>' +
+    return '<div data-metric-card class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' hover:shadow-md transition-shadow" style="position:relative;padding:24px 24px 56px 24px;">' +
+      // Header: title (auto-fit)
+      '<div class="mb-4"><div class="flex items-start justify-between gap-2">' +
+      '<h3 data-metric-title class="font-medium text-gray-500 uppercase tracking-wide flex-1 min-w-0" style="font-size:0.875rem;line-height:1.2;">' + metric.name + '</h3>' +
+      '</div></div>' +
+      // Current period value
       '<div class="mb-4"><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Current Period</p></div>' +
       '<p class="text-3xl font-bold text-gray-900">' + currentValue + '</p></div>' +
       comparisonHTML +
+      // Prior Period + Target side-by-side; Override sits next to the Target value.
       '<div class="grid grid-cols-2 gap-4 text-sm">' +
-      '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p><p class="font-semibold text-gray-700">' + priorValue + '</p></div>' +
-      '<div><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Target</p>' + overrideBtn + '</div>' +
-      '<p class="font-semibold text-gray-700">' + targetValue + '</p></div></div></div>';
+      '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p>' +
+      '<p class="font-semibold text-gray-700">' + priorValue + '</p></div>' +
+      '<div><p class="text-xs text-gray-500 mb-1">Target</p>' +
+      '<div class="flex items-center gap-2 flex-wrap">' +
+      '<p class="font-semibold text-gray-700">' + targetValue + '</p>' + overrideBtn +
+      '</div></div></div>' +
+      // Footer: pinned to card bottom-left / bottom-right with 12px insets.
+      '<div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">' +
+      '<div>' + infoIconButtonHTML(metric) + '</div>' +
+      '<div>' + drilldownBtn + '</div></div></div>';
+  }
+
+  // Shrink card titles in 1px steps until they fit in <= maxLines.
+  function fitMetricTitle(card, maxLines, minPx, maxPx) {
+    if (!card) return;
+    var el = card.querySelector('[data-metric-title]');
+    if (!el) return;
+    var lines = maxLines || 2;
+    var min = minPx || 10;
+    var max = maxPx || 14;
+    el.style.fontSize = max + 'px';
+    var lineHeight = parseFloat(getComputedStyle(el).lineHeight) || (max * 1.2);
+    var targetHeight = Math.ceil(lineHeight * lines) + 1;
+    var size = max;
+    while (el.scrollHeight > targetHeight && size > min) {
+      size -= 1;
+      el.style.fontSize = size + 'px';
+    }
+  }
+
+  function fitAllMetricTitles(grid) {
+    var cards = grid.querySelectorAll('[data-metric-card]');
+    for (var i = 0; i < cards.length; i++) fitMetricTitle(cards[i]);
   }
 
   function renderMetrics(metrics) {
     var grid = document.getElementById('metricsGrid');
     if (!grid) return;
     grid.innerHTML = metrics.map(function (metric) { return createMetricCard(metric); }).join('');
+
+    requestAnimationFrame(function () { fitAllMetricTitles(grid); });
 
     setTimeout(function () {
       metrics.forEach(function (metric) {
@@ -1448,6 +1552,7 @@
   function renderVisualization(viz, data, uniqueId) {
     switch (viz.type) {
       case 'metric_grid': return renderMetricGrid(viz, uniqueId);
+      case 'time_series':
       case 'trend_chart':
       case 'line_chart': return renderTrendChart(viz, data, uniqueId);
       case 'comparison_chart': return renderComparisonChart(viz, data, uniqueId);
@@ -3693,14 +3798,17 @@
     });
   }
 
-  // Show the customize button when a module is selected
+  // Show the customize button when a module is selected.
+  // Customize is hidden until the surface is ready to ship; keep the badge
+  // sync so any pending customization state stays consistent.
   function showCustomizeButton() {
     var btn = document.getElementById('customizeBtn');
-    if (btn) btn.style.display = selectedModuleKey ? '' : 'none';
+    if (btn) btn.style.display = 'none';
     updateCustomizationBadge();
   }
 
   window._reporting = {
+    openMetricInfo: openMetricInfo,
     showModuleInfo: showModuleInfo,
     closeModuleInfo: closeModuleInfo,
     exportToPDF: exportToPDF,

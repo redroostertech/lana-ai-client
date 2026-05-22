@@ -187,7 +187,8 @@ export class MetricGridRenderer {
    */
   createStandardMetricCard(metric) {
     const card = document.createElement('div');
-    card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow';
+    card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow';
+    card.setAttribute('style', 'position:relative;padding:24px 24px 56px 24px;');
 
     // Format values
     const isCurrency = metric.type === 'currency' || metric.unit === 'dollars';
@@ -210,16 +211,10 @@ export class MetricGridRenderer {
     card.innerHTML = `
       <!-- Metric Header -->
       <div class="mb-4">
-        <!-- Row 1: Metric Name, Status Badge, Details Button -->
-        <div class="flex items-center justify-between gap-2 mb-2">
-          <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">${metric.name}</h3>
-          <div class="flex items-center gap-2">
-            ${this.getStatusBadgeHTML(statusColor)}
-            ${this.getDetailsButtonHTML(metric)}
-          </div>
+        <div class="flex items-start justify-between gap-2">
+          <h3 data-metric-title class="font-medium text-gray-500 uppercase tracking-wide flex-1 min-w-0" style="font-size:0.875rem;line-height:1.2;">${metric.name}</h3>
+          <div class="flex-shrink-0">${this.getStatusBadgeHTML(statusColor)}</div>
         </div>
-        <!-- Row 2: Description -->
-        <p class="text-xs text-gray-400">${metric.description || ''}</p>
       </div>
 
       <!-- Current Value -->
@@ -240,26 +235,56 @@ export class MetricGridRenderer {
       </div>
       ` : ''}
 
-      <!-- Prior Period & Target -->
+      <!-- Prior Period + Target side-by-side; Override sits next to Target value -->
       <div class="grid grid-cols-2 gap-4 text-sm">
         <div>
           <p class="text-xs text-gray-500 mb-1">Prior Period</p>
           <p class="font-semibold text-gray-700">${priorValue}</p>
         </div>
         <div>
-          <div class="flex items-center justify-between mb-1">
-            <p class="text-xs text-gray-500">Target</p>
+          <p class="text-xs text-gray-500 mb-1">Target</p>
+          <div class="flex items-center gap-2 flex-wrap">
+            <p class="font-semibold text-gray-700">${targetValue}</p>
             ${this.getOverrideButtonHTML(metric)}
           </div>
-          <p class="font-semibold text-gray-700">${targetValue}</p>
         </div>
+      </div>
+
+      <!-- Footer pinned to card bottom-left / bottom-right with 12px insets -->
+      <div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+        <div>${this.getInfoButtonHTML(metric)}</div>
+        <div>${this.getDetailsButtonHTML(metric)}</div>
       </div>
     `;
 
     // Attach event listeners
     this.attachMetricCardListeners(card, metric);
 
+    // Defer to next frame so layout has settled before measuring.
+    requestAnimationFrame(() => this.fitTitle(card));
+
     return card;
+  }
+
+  /**
+   * Shrink the .data-metric-title font-size in 1px steps until the title
+   * fits within `maxLines` (default 2) lines or hits the minimum size.
+   * Idempotent: re-running on the same element only does extra work if width changed.
+   * @private
+   */
+  fitTitle(card, maxLines = 2, minPx = 10, maxPx = 14) {
+    if (!card) return;
+    const el = card.querySelector('[data-metric-title]');
+    if (!el) return;
+    // Reset to max to handle re-fit on resize.
+    el.style.fontSize = maxPx + 'px';
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || (maxPx * 1.2);
+    const targetHeight = Math.ceil(lineHeight * maxLines) + 1;
+    let size = maxPx;
+    while (el.scrollHeight > targetHeight && size > minPx) {
+      size -= 1;
+      el.style.fontSize = size + 'px';
+    }
   }
 
   /**
@@ -270,7 +295,8 @@ export class MetricGridRenderer {
    */
   createDistributionMetricCard(metric) {
     const card = document.createElement('div');
-    card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow';
+    card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow';
+    card.setAttribute('style', 'position:relative;padding:24px 24px 56px 24px;');
 
     const canvasId = `chart-${metric.key}-${this.config.uniqueId}`;
     const statusColor = metric.status === 'error' ? 'gray' : (metric.status || 'gray');
@@ -283,15 +309,12 @@ export class MetricGridRenderer {
 
     card.innerHTML = `
       <!-- Metric Header -->
-      <div class="flex items-start justify-between mb-4">
-        <div class="flex-1">
-          <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">${metric.name}</h3>
-          <p class="text-xs text-gray-400 mt-1">${metric.description || ''}</p>
+      <div class="flex items-start justify-between gap-2 mb-4">
+        <div class="flex-1 min-w-0">
+          <h3 data-metric-title class="font-medium text-gray-500 uppercase tracking-wide" style="font-size:0.875rem;line-height:1.2;">${metric.name}</h3>
           <p class="text-xs text-indigo-600 mt-2 font-medium">Click any bar to see actual leads</p>
         </div>
-        <div class="flex items-center gap-2">
-          ${this.getStatusBadgeHTML(statusColor)}
-        </div>
+        <div class="flex-shrink-0">${this.getStatusBadgeHTML(statusColor)}</div>
       </div>
 
       <!-- Total Count -->
@@ -301,10 +324,19 @@ export class MetricGridRenderer {
       </div>
 
       <!-- Pie Chart -->
-      <div class="mb-4">
+      <div>
         <canvas id="${canvasId}" style="max-height: 250px;"></canvas>
       </div>
+
+      <!-- Footer pinned to card bottom-left / bottom-right with 12px insets -->
+      <div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+        <div>${this.getInfoButtonHTML(metric)}</div>
+        <div>${this.getDetailsButtonHTML(metric)}</div>
+      </div>
     `;
+
+    this.attachMetricCardListeners(card, metric);
+    requestAnimationFrame(() => this.fitTitle(card));
 
     return card;
   }
@@ -441,6 +473,57 @@ export class MetricGridRenderer {
         }
       });
     }
+
+    // Info icon: open description modal
+    const infoBtn = card.querySelector('[data-info-btn]');
+    if (infoBtn) {
+      infoBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.openMetricInfoModal(metric);
+      });
+    }
+  }
+
+  /**
+   * Open a lex-modal with the metric's description and any structured helpText.
+   * Falls back to a native alert if Lex.Modal is not loaded on this page.
+   * @private
+   */
+  openMetricInfoModal(metric) {
+    const escape = (s) => String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const parts = [];
+    if (metric.description) {
+      parts.push(`<p style="margin:0 0 0.75rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">${escape(metric.description)}</p>`);
+    }
+    const help = metric.helpText;
+    if (help && Array.isArray(help.paragraphs) && help.paragraphs.length) {
+      if (help.title) {
+        parts.push(`<h4 style="margin:0.5rem 0 0.4rem 0;font-size:0.95rem;font-weight:600;color:var(--lex-text-primary,#0f172a);">${escape(help.title)}</h4>`);
+      }
+      for (const p of help.paragraphs) {
+        parts.push(`<p style="margin:0 0 0.6rem 0;color:var(--lex-text-secondary,#475569);line-height:1.55;">${escape(p)}</p>`);
+      }
+    }
+    if (parts.length === 0) {
+      parts.push('<p style="margin:0;color:var(--lex-text-secondary,#475569);">No additional details for this metric.</p>');
+    }
+
+    const heading = metric.name || metric.key || 'About this metric';
+    if (window.Lex && window.Lex.Modal && typeof window.Lex.Modal.open === 'function') {
+      window.Lex.Modal.open({
+        heading,
+        content: parts.join(''),
+        size: 'md',
+        hideActions: true,
+      });
+      return;
+    }
+    window.alert(`${heading}\n\n${metric.description || ''}`);
   }
 
   /**
@@ -549,6 +632,30 @@ export class MetricGridRenderer {
         </svg>
         <span class="text-xs font-medium uppercase">${color}</span>
       </div>
+    `;
+  }
+
+  /**
+   * Get info icon HTML — only rendered when the metric carries a description.
+   * Clicking opens a lex-modal with the metric description (and helpText if present).
+   * @private
+   */
+  getInfoButtonHTML(metric) {
+    const hasInfo = (metric.description && metric.description.trim().length > 0) ||
+      (metric.helpText && (metric.helpText.title || (metric.helpText.paragraphs && metric.helpText.paragraphs.length)));
+    if (!hasInfo) return '';
+    return `
+      <button
+        data-info-btn
+        type="button"
+        aria-label="About this metric"
+        class="text-gray-400 hover:text-indigo-600 transition-colors"
+        title="About this metric"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      </button>
     `;
   }
 
