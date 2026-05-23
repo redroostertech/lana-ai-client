@@ -459,6 +459,9 @@
 
       // Notification bell → open notification panel
       this.delegate('topbar-notification-click', 'lex-topbar', () => {
+        if (window.DesktopNotifications) {
+          window.DesktopNotifications.enableFromUserGesture();
+        }
         if (this._notificationPanel) this._notificationPanel.open();
       });
 
@@ -901,6 +904,9 @@
             const count = (result && result.unread_count) || 0;
             const topbar = this.$('lex-topbar');
             if (topbar) topbar.notificationCount = count;
+            if (window.DesktopNotifications) {
+              window.DesktopNotifications.handleUnreadCount(count);
+            }
           })
           .catch(() => {
             // Silently ignore notification fetch errors
@@ -915,6 +921,9 @@
             const count = (result && result.unread_count) || 0;
             const topbar = this.$('lex-topbar');
             if (topbar) topbar.notificationCount = count;
+            if (window.DesktopNotifications) {
+              window.DesktopNotifications.handleUnreadCount(count);
+            }
           })
           .catch(() => {
             // Silently ignore notification fetch errors

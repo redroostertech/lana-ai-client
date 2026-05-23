@@ -10,6 +10,222 @@
  *   3. Call NotificationPanel.init() after DOM is ready
  */
 
+window.DesktopNotifications = window.DesktopNotifications || (function() {
+  const ENABLED_KEY = 'lana.desktopNotifications.enabled';
+  const SEEN_KEY = 'lana.desktopNotifications.seenIds';
+  const MAX_NOTIFICATIONS_PER_POLL = 3;
+
+  let lastUnreadCount = null;
+  let isFetching = false;
+
+  function isSupported() {
+    return typeof window !== 'undefined' && 'Notification' in window;
+  }
+
+  function isEnabled() {
+    return isSupported() && localStorage.getItem(ENABLED_KEY) !== 'false';
+  }
+
+  function getSeenIds() {
+    try {
+      return new Set(JSON.parse(sessionStorage.getItem(SEEN_KEY) || '[]'));
+    } catch (_error) {
+      return new Set();
+    }
+  }
+
+  function rememberSeenId(id) {
+    if (!id) return;
+    const ids = getSeenIds();
+    ids.add(id);
+    const trimmed = Array.from(ids).slice(-100);
+    sessionStorage.setItem(SEEN_KEY, JSON.stringify(trimmed));
+  }
+
+  function enableFromUserGesture() {
+    if (!isSupported()) return Promise.resolve(false);
+
+    localStorage.setItem(ENABLED_KEY, 'true');
+
+    if (Notification.permission === 'granted') {
+      return Promise.resolve(true);
+    }
+
+    if (Notification.permission === 'denied') {
+      return Promise.resolve(false);
+    }
+
+    return Notification.requestPermission().then(function(permission) {
+      if (permission === 'denied') {
+        localStorage.setItem(ENABLED_KEY, 'false');
+      }
+      return permission === 'granted';
+    }).catch(function() {
+      return false;
+    });
+  }
+
+  function getPlatformName() {
+    if (window.electronAPI && window.electronAPI.platform) {
+      if (window.electronAPI.platform === 'darwin') return 'Mac';
+      if (window.electronAPI.platform === 'win32') return 'Windows';
+    }
+
+    const platform = (navigator.userAgentData && navigator.userAgentData.platform)
+      || navigator.platform
+      || '';
+    if (/mac/i.test(platform)) return 'Mac';
+    if (/win/i.test(platform)) return 'Windows';
+    return 'this device';
+  }
+
+  function getBlockedPermissionMessage() {
+    const platform = getPlatformName();
+    if (platform === 'Mac') {
+      return 'Notifications are blocked. Enable them in macOS System Settings > Notifications > LANA AI.';
+    }
+    if (platform === 'Windows') {
+      return 'Notifications are blocked. Enable them in Windows Settings > System > Notifications for LANA AI.';
+    }
+    return 'Notifications are blocked. Enable them in your system or browser notification settings.';
+  }
+
+  function showTestNotification() {
+    if (!isEnabled() || Notification.permission !== 'granted') return false;
+
+    const platform = getPlatformName();
+    const desktopNotification = new Notification('LANA AI notifications enabled', {
+      body: 'Test notification delivered for ' + platform + '.',
+      tag: 'lana-desktop-notification-test',
+      renotify: false
+    });
+
+    desktopNotification.onclick = function() {
+      desktopNotification.close();
+      window.focus();
+    };
+
+    return true;
+  }
+
+  async function requestPermissionAndTest() {
+    const granted = await enableFromUserGesture();
+    if (granted) {
+      showTestNotification();
+    }
+    return {
+      supported: isSupported(),
+      granted,
+      permission: isSupported() ? Notification.permission : 'unsupported',
+      platform: getPlatformName(),
+      blockedMessage: granted ? '' : getBlockedPermissionMessage()
+    };
+  }
+
+  function openNotificationTarget(notification) {
+    const actionUrl = notification && notification.action_url;
+    if (!actionUrl) return;
+    window.focus();
+    window.location.href = actionUrl;
+  }
+
+  function show(notification) {
+    if (!isEnabled() || Notification.permission !== 'granted' || !notification) return false;
+
+    const id = notification.id || '';
+    if (id && getSeenIds().has(id)) return false;
+
+    const title = notification.title || 'LANA AI notification';
+    const body = notification.body || notification.message || '';
+    const desktopNotification = new Notification(title, {
+      body,
+      tag: id || undefined,
+      renotify: false,
+      data: {
+        id,
+        action_url: notification.action_url || ''
+      }
+    });
+
+    desktopNotification.onclick = function() {
+      desktopNotification.close();
+      openNotificationTarget(notification);
+    };
+
+    if (id) rememberSeenId(id);
+    return true;
+  }
+
+  function showSummary(extraCount) {
+    if (!isEnabled() || Notification.permission !== 'granted' || extraCount <= 0) return;
+
+    const id = 'lana-notification-summary-' + Date.now();
+    const desktopNotification = new Notification('LANA AI notifications', {
+      body: extraCount === 1
+        ? 'You have 1 more unread notification.'
+        : 'You have ' + extraCount + ' more unread notifications.',
+      tag: id,
+      renotify: false
+    });
+
+    desktopNotification.onclick = function() {
+      desktopNotification.close();
+      window.focus();
+      if (window.Lex && window.Lex.Nav) {
+        window.Lex.Nav.go('notifications.html');
+      } else {
+        window.location.href = 'notifications.html';
+      }
+    };
+  }
+
+  async function notifyLatest(delta) {
+    if (!isEnabled() || Notification.permission !== 'granted' || isFetching || !window.api) return;
+
+    isFetching = true;
+    try {
+      const limit = Math.min(Math.max(delta || 1, 1), MAX_NOTIFICATIONS_PER_POLL);
+      const result = await window.api.getNotifications(true, limit, 0);
+      const notifications = result.notifications || [];
+
+      notifications.forEach(show);
+
+      if (delta > notifications.length) {
+        showSummary(delta - notifications.length);
+      }
+    } catch (error) {
+      console.warn('[DesktopNotifications] Failed to show local notification:', error);
+    } finally {
+      isFetching = false;
+    }
+  }
+
+  function handleUnreadCount(count) {
+    const unreadCount = Number(count) || 0;
+
+    if (lastUnreadCount === null) {
+      lastUnreadCount = unreadCount;
+      return;
+    }
+
+    const delta = unreadCount - lastUnreadCount;
+    lastUnreadCount = unreadCount;
+
+    if (delta > 0) {
+      notifyLatest(delta);
+    }
+  }
+
+  return {
+    enableFromUserGesture,
+    requestPermissionAndTest,
+    handleUnreadCount,
+    isEnabled,
+    isSupported,
+    showTestNotification
+  };
+})();
+
 window.NotificationPanel = (function() {
   // State
   let state = {
@@ -146,7 +362,12 @@ window.NotificationPanel = (function() {
    */
   function bindEvents() {
     // Open panel
-    elements.btn.addEventListener('click', open);
+    elements.btn.addEventListener('click', () => {
+      if (window.DesktopNotifications) {
+        window.DesktopNotifications.enableFromUserGesture();
+      }
+      open();
+    });
 
     // Close panel
     if (elements.closeBtn) {
@@ -615,6 +836,9 @@ window.NotificationPanel = (function() {
       const result = await api.getNotifications(false, 1, 0); // Just get count, limit to 1
       state.unreadCount = result.unread_count || 0;
       updateBadge(state.unreadCount);
+      if (window.DesktopNotifications) {
+        window.DesktopNotifications.handleUnreadCount(state.unreadCount);
+      }
       
       // Log for debugging
       if (state.unreadCount > 0) {

@@ -14,6 +14,7 @@
   <script src="js/version.js"></script>
   <script src="js/mock-data.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/notifications.js"></script>
   <script src="js/utils/rename-conversation.js"></script>
   <script src="js/components.js"></script>
 </head>
@@ -715,6 +716,21 @@
         }
 
         Toast.success('Login successful! Redirecting...');
+
+        if (window.DesktopNotifications && window.DesktopNotifications.isSupported()) {
+          try {
+            Toast.info('Checking desktop notification permission...');
+            const notificationResult = await window.DesktopNotifications.requestPermissionAndTest();
+            if (notificationResult.granted) {
+              Toast.success('Desktop notifications enabled.');
+            } else if (notificationResult.permission === 'denied') {
+              Toast.info(notificationResult.blockedMessage);
+            }
+          } catch (notificationError) {
+            console.warn('[Login] Desktop notification permission check failed:', notificationError);
+          }
+        }
+
         setTimeout(() => {
           window.location.href = 'dashboard.html';
         }, 500);
