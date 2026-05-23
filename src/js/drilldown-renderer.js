@@ -39,6 +39,10 @@ class DrilldownRenderer {
     this.initialized = false;
     this.currentTableView = null; // Stores current table view filter state
 
+    // Active breakdown card filter: { column: string, value: string, key: string } or null.
+    // Only one breakdown filter active at a time (v1 single-card filter rule).
+    this.activeBreakdownFilter = null;
+
     // Bind pagination methods to preserve 'this' context when called from onclick
     this.prevPage = this.prevPage.bind(this);
     this.nextPage = this.nextPage.bind(this);
@@ -365,6 +369,7 @@ class DrilldownRenderer {
     this.sortDirection = 'asc';
     this.filters = {};
     this.searchQuery = '';
+    this.activeBreakdownFilter = null;
 
     // Clear search input so previous drilldown's query is not persisted
     const searchInput = document.getElementById('drilldown-search');
@@ -465,6 +470,7 @@ class DrilldownRenderer {
     document.body.classList.remove('overflow-hidden');
     this.currentConfig = null;
     this.currentData = null;
+    this.activeBreakdownFilter = null;
 
     console.log('[DrilldownRenderer] Modal closed, state cleared');
   }
@@ -1188,9 +1194,11 @@ class DrilldownRenderer {
    * Rules:
    *   - Missing or empty array hides the section entirely.
    *   - Max 6 cards rendered (extras dropped with a console warning).
-   *   - Cards with non-null filter_column AND filter_value get the
-   *     "is-clickable" visual; cards with either null get "is-static".
-   *     (Click-to-filter behavior is wired in a follow-up commit.)
+   *   - Cards with non-null filter_column AND filter_value are clickable
+   *     and participate in the single-card filter toggle.
+   *   - Cards with either null render as "is-static" (no hover/cursor).
+   *   - The active card is highlighted via the "is-active" class and
+   *     reflects this.activeBreakdownFilter.
    *   - No emojis, no em or en dashes in card text per spec.
    */
   renderBreakdownCards() {
@@ -1222,18 +1230,29 @@ class DrilldownRenderer {
       visibleCards = cards.slice(0, MAX_VISIBLE_CARDS);
     }
 
+    const active = this.activeBreakdownFilter;
+
     const cardsHTML = visibleCards.map((card, idx) => {
       const filterColumn = card.filter_column != null ? String(card.filter_column) : null;
       const filterValue = card.filter_value != null ? String(card.filter_value) : null;
       const clickable = Boolean(filterColumn && filterValue);
 
+      const isActive = Boolean(
+        clickable && active && active.column === filterColumn && active.value === filterValue
+      );
+
       const formattedValue = this.formatBreakdownCardValue(card.value, card.title);
       const formattedCount = this.formatBreakdownCardCount(card.count);
 
-      const stateClass = clickable ? 'is-clickable' : 'is-static';
+      const stateClass = clickable
+        ? (isActive ? 'is-clickable is-active' : 'is-clickable')
+        : 'is-static';
 
-      // Persist filter data on the element so the click-handler commit can
-      // consume it without re-walking the card config.
+      const role = clickable ? 'button' : 'group';
+      const tabIndex = clickable ? '0' : '-1';
+      const ariaPressed = clickable ? `aria-pressed="${isActive ? 'true' : 'false'}"` : '';
+
+      // Persist filter data on the element for the click + keydown handlers
       const dataAttrs = clickable
         ? `data-clickable="true" data-filter-column="${this.escapeHtml(filterColumn)}" data-filter-value="${this.escapeHtml(filterValue)}" data-card-key="${this.escapeHtml(card.key != null ? String(card.key) : '')}"`
         : 'data-clickable="false"';
@@ -1248,6 +1267,9 @@ class DrilldownRenderer {
 
       return `
         <div class="drilldown-breakdown-card ${stateClass}"
+             role="${role}"
+             tabindex="${tabIndex}"
+             ${ariaPressed}
              ${dataAttrs}
              data-card-index="${idx}">
           <span class="drilldown-breakdown-card__active-badge">Active filter</span>
@@ -1261,6 +1283,70 @@ class DrilldownRenderer {
 
     grid.innerHTML = cardsHTML;
     container.classList.remove('hidden');
+
+    // Attach click + keyboard handlers to clickable cards only. The grid is
+    // re-rendered on every fetchData(), so wiring listeners per-render is
+    // intentional (innerHTML replacement discards previous listeners).
+    grid.querySelectorAll('.drilldown-breakdown-card.is-clickable').forEach(el => {
+      el.addEventListener('click', () => this.onBreakdownCardClick(el));
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.onBreakdownCardClick(el);
+        }
+      });
+    });
+  }
+
+  /**
+   * Handle a click (or Enter/Space) on a clickable breakdown card.
+   *
+   * Behavior:
+   *   - Clicking the currently-active card REMOVES that filter from
+   *     this.filters and clears this.activeBreakdownFilter.
+   *   - Clicking any other card SETS the filter (and clears the prior
+   *     breakdown filter, since only one can be active at a time).
+   *   - In both cases pagination resets to page 1 and fetchData() re-fires
+   *     the /drilldown/execute request with the merged filters payload.
+   */
+  onBreakdownCardClick(cardEl) {
+    if (!cardEl) return;
+
+    const column = cardEl.getAttribute('data-filter-column');
+    const value = cardEl.getAttribute('data-filter-value');
+    const key = cardEl.getAttribute('data-card-key') || '';
+
+    if (!column || !value) {
+      console.warn('[DrilldownRenderer] Breakdown card clicked without filter column/value');
+      return;
+    }
+
+    const active = this.activeBreakdownFilter;
+    const isAlreadyActive = active && active.column === column && active.value === value;
+
+    if (isAlreadyActive) {
+      // Toggle off: remove the filter entirely
+      delete this.filters[column];
+      this.activeBreakdownFilter = null;
+      console.log('[DrilldownRenderer] Breakdown filter cleared:', { column, value, key });
+    } else {
+      // Swap or set: only one breakdown filter active at a time.
+      // Clear any prior breakdown filter column first.
+      if (active && active.column && active.column !== column) {
+        delete this.filters[active.column];
+      }
+      // Drop any stale value on this column from a prior click.
+      delete this.filters[column];
+
+      this.filters[column] = value;
+      this.activeBreakdownFilter = { column, value, key };
+      console.log('[DrilldownRenderer] Breakdown filter applied:', this.activeBreakdownFilter);
+    }
+
+    // Reset to page 1 and re-fetch so both the table and the cards refresh
+    // against the new filter scope.
+    this.currentPage = 1;
+    this.fetchData();
   }
 
   /**
