@@ -122,6 +122,13 @@ class DrilldownRenderer {
               </div>
             </div>
 
+            <!-- Breakdown cards (data.breakdown_cards from v2 drilldown schema) -->
+            <div id="drilldown-breakdown-cards-container" class="drilldown-breakdown-cards-container hidden">
+              <div id="drilldown-breakdown-cards" class="drilldown-breakdown-cards-grid">
+                <!-- Breakdown cards rendered here by renderBreakdownCards() -->
+              </div>
+            </div>
+
             <!-- Search bar with sort dropdown (positioned after filters, before table) -->
             <div class="bg-white px-4 sm:px-6 pt-4">
               <div class="flex items-center gap-3">
@@ -662,6 +669,11 @@ class DrilldownRenderer {
       this.renderSummary();
     }
 
+    // Render v2 breakdown cards (between summary and table) when the
+    // executor includes data.breakdown_cards. Missing or empty array hides
+    // the section entirely per the drilldown v2 spec.
+    this.renderBreakdownCards();
+
     // Check if we have data rows
     console.log('[DrilldownRenderer] Checking for rows:', {
       hasRowsProperty: 'rows' in this.currentData,
@@ -1167,6 +1179,162 @@ class DrilldownRenderer {
   }
 
   /**
+   * Render the v2 breakdown_cards row between summary and table.
+   *
+   * Contract: response.data.breakdown_cards is an array of objects matching
+   * the drilldown v2 spec:
+   *   { key, title, value, count, description, filter_column, filter_value }
+   *
+   * Rules:
+   *   - Missing or empty array hides the section entirely.
+   *   - Max 6 cards rendered (extras dropped with a console warning).
+   *   - Cards with non-null filter_column AND filter_value get the
+   *     "is-clickable" visual; cards with either null get "is-static".
+   *     (Click-to-filter behavior is wired in a follow-up commit.)
+   *   - No emojis, no em or en dashes in card text per spec.
+   */
+  renderBreakdownCards() {
+    const container = document.getElementById('drilldown-breakdown-cards-container');
+    const grid = document.getElementById('drilldown-breakdown-cards');
+
+    if (!container || !grid) {
+      return;
+    }
+
+    const cards = this.currentData && Array.isArray(this.currentData.breakdown_cards)
+      ? this.currentData.breakdown_cards
+      : null;
+
+    // Spec: missing or empty -> do not render the section
+    if (!cards || cards.length === 0) {
+      container.classList.add('hidden');
+      grid.innerHTML = '';
+      return;
+    }
+
+    // Cap at 6 visible cards
+    const MAX_VISIBLE_CARDS = 6;
+    let visibleCards = cards;
+    if (cards.length > MAX_VISIBLE_CARDS) {
+      console.warn(
+        `[DrilldownRenderer] breakdown_cards returned ${cards.length} rows; capping display at ${MAX_VISIBLE_CARDS}`
+      );
+      visibleCards = cards.slice(0, MAX_VISIBLE_CARDS);
+    }
+
+    const cardsHTML = visibleCards.map((card, idx) => {
+      const filterColumn = card.filter_column != null ? String(card.filter_column) : null;
+      const filterValue = card.filter_value != null ? String(card.filter_value) : null;
+      const clickable = Boolean(filterColumn && filterValue);
+
+      const formattedValue = this.formatBreakdownCardValue(card.value, card.title);
+      const formattedCount = this.formatBreakdownCardCount(card.count);
+
+      const stateClass = clickable ? 'is-clickable' : 'is-static';
+
+      // Persist filter data on the element so the click-handler commit can
+      // consume it without re-walking the card config.
+      const dataAttrs = clickable
+        ? `data-clickable="true" data-filter-column="${this.escapeHtml(filterColumn)}" data-filter-value="${this.escapeHtml(filterValue)}" data-card-key="${this.escapeHtml(card.key != null ? String(card.key) : '')}"`
+        : 'data-clickable="false"';
+
+      const countHTML = card.count != null && Number.isFinite(Number(card.count)) && Number(card.count) !== 0
+        ? `<div class="drilldown-breakdown-card__count">${formattedCount}</div>`
+        : '';
+
+      const descriptionHTML = card.description
+        ? `<div class="drilldown-breakdown-card__description">${this.escapeHtml(String(card.description))}</div>`
+        : '';
+
+      return `
+        <div class="drilldown-breakdown-card ${stateClass}"
+             ${dataAttrs}
+             data-card-index="${idx}">
+          <span class="drilldown-breakdown-card__active-badge">Active filter</span>
+          <div class="drilldown-breakdown-card__title">${this.escapeHtml(String(card.title != null ? card.title : ''))}</div>
+          <div class="drilldown-breakdown-card__value">${formattedValue}</div>
+          ${countHTML}
+          ${descriptionHTML}
+        </div>
+      `;
+    }).join('');
+
+    grid.innerHTML = cardsHTML;
+    container.classList.remove('hidden');
+  }
+
+  /**
+   * Format the primary value on a breakdown card.
+   *
+   * Heuristic (since the v2 spec only ships a raw number):
+   *   - Drilldown title or metric key carries a money/percent hint (best signal)
+   *   - Card title contains "rate" or "%" -> percent
+   *   - Card title contains currency-shaped keywords -> currency
+   *   - Card title contains count-shaped keywords -> integer
+   *   - Otherwise: fall back to drilldown-level format if known, else default
+   *     to integer for whole numbers and 1 decimal for fractions.
+   */
+  formatBreakdownCardValue(value, title) {
+    if (value === null || value === undefined || value === '') {
+      return '<span class="text-gray-400">--</span>';
+    }
+
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return this.escapeHtml(String(value));
+    }
+
+    const titleLower = (title || '').toString().toLowerCase();
+
+    // Percent hints (card-level wins)
+    if (/(\brate\b|%|percent|percentage)/.test(titleLower)) {
+      return this.formatValue(num, { type: 'percent', decimals: 1 });
+    }
+
+    // Card-level currency hints
+    if (/(\$|amount|balance|revenue|invoice|invoiced|paid|outstanding|\bar\b|aging|owed|due|cost|expense|fees?)/.test(titleLower)) {
+      return this.formatValue(num, { type: 'currency', prefix: '$', decimals: 2 });
+    }
+
+    // Card-level count hints
+    if (/(\bcount\b|invoices|matters|leads|opportunities|contacts|cases|clients|records|rows|items|files|documents|users)/.test(titleLower)) {
+      return this.formatValue(num, { type: 'number', decimals: 0 });
+    }
+
+    // Drilldown-level fallback: inspect the parent metric's title or key for
+    // a money or percent signal. Many breakdown card titles are just bucket
+    // labels (eg "Current (0 to 30 days)") that don't reveal the unit on
+    // their own.
+    const drilldownTitle = (this.currentConfig?.title || '').toLowerCase();
+    const metricKey = (this.currentConfig?.metricKey || '').toLowerCase();
+    const drilldownContext = `${drilldownTitle} ${metricKey}`;
+
+    if (/(\brate\b|%|percent|percentage|conversion)/.test(drilldownContext)) {
+      return this.formatValue(num, { type: 'percent', decimals: 1 });
+    }
+    if (/(balance|revenue|invoice|invoiced|paid|outstanding|\bar\b|aging|owed|due|cost|expense|fees?|amount|\$)/.test(drilldownContext)) {
+      return this.formatValue(num, { type: 'currency', prefix: '$', decimals: 2 });
+    }
+
+    // Final default: integer for whole numbers, 1 decimal for fractions
+    const isWhole = Number.isInteger(num);
+    return this.formatValue(num, { type: 'number', decimals: isWhole ? 0 : 1 });
+  }
+
+  /**
+   * Format the secondary count line. Returns "N items" style text. The
+   * caller decides whether to render it at all.
+   */
+  formatBreakdownCardCount(count) {
+    const n = Number(count);
+    if (!Number.isFinite(n) || n === 0) {
+      return '';
+    }
+    const formatted = n.toLocaleString('en-US');
+    return n === 1 ? `${formatted} record` : `${formatted} records`;
+  }
+
+  /**
    * Render the data table
    */
   renderTable() {
@@ -1615,8 +1783,10 @@ class DrilldownRenderer {
     // Hide summary and insights containers during loading
     const summaryContainer = document.getElementById('drilldown-summary-container');
     const insightsContainer = document.getElementById('drilldown-insights');
+    const breakdownContainer = document.getElementById('drilldown-breakdown-cards-container');
     if (summaryContainer) summaryContainer.classList.add('hidden');
     if (insightsContainer) insightsContainer.classList.add('hidden');
+    if (breakdownContainer) breakdownContainer.classList.add('hidden');
   }
 
   /**
