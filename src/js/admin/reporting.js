@@ -1286,9 +1286,9 @@
       '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p>' +
       '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + priorValue + '</p></div>' +
       '<div><p class="text-xs text-gray-500 mb-1">Target</p>' +
-      '<div class="flex items-center gap-2 flex-wrap">' +
-      '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + targetValue + '</p>' + overrideBtn +
-      '</div></div></div>' +
+      '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + targetValue + '</p>' +
+      '<div class="mt-1">' + overrideBtn + '</div>' +
+      '</div></div>' +
       // Footer: pinned to card bottom-left / bottom-right with 12px insets.
       '<div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">' +
       '<div>' + infoIconButtonHTML(metric) + '</div>' +

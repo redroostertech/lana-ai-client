@@ -243,10 +243,8 @@ export class MetricGridRenderer {
         </div>
         <div>
           <p class="text-xs text-gray-500 mb-1">Target</p>
-          <div class="flex items-center gap-2 flex-wrap">
-            <p class="font-semibold text-gray-700">${targetValue}</p>
-            ${this.getOverrideButtonHTML(metric)}
-          </div>
+          <p class="font-semibold text-gray-700">${targetValue}</p>
+          <div class="mt-1">${this.getOverrideButtonHTML(metric)}</div>
         </div>
       </div>
 
