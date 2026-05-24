@@ -758,11 +758,17 @@ class DrilldownRenderer {
            </div>`
         : '';
 
+      // Map insight type to a default SVG icon when the JSON rule doesn't
+      // ship its own. Avoids rendering literal "undefined" in the badge slot.
+      const iconHTML = insight.icon
+        ? `<span class="text-2xl">${this.escapeHtml(insight.icon)}</span>`
+        : this._defaultInsightIcon(insight.type, colorClasses);
+
       return `
         <div class="rounded-md ${colorClasses.bg} p-4 border-l-4 ${colorClasses.border}">
           <div class="flex">
             <div class="flex-shrink-0">
-              <span class="text-2xl">${insight.icon}</span>
+              ${iconHTML}
             </div>
             <div class="ml-3">
               <h3 class="text-sm font-medium ${colorClasses.title}">${this.escapeHtml(insight.title)}</h3>
@@ -1421,6 +1427,71 @@ class DrilldownRenderer {
   }
 
   /**
+   * Default SVG icon for an insight when the JSON rule doesn't ship its
+   * own .icon string. Maps insight type to a neutral pictogram so the
+   * card never renders the literal text "undefined".
+   */
+  _defaultInsightIcon(type, colorClasses) {
+    const stroke = (colorClasses && colorClasses.title)
+      ? colorClasses.title.replace('text-', 'text-').replace('-800', '-600')
+      : 'text-gray-600';
+    let path;
+    switch (type) {
+      case 'success':
+        path = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />';
+        break;
+      case 'alert':
+      case 'error':
+        path = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />';
+        break;
+      case 'warning':
+        path = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />';
+        break;
+      case 'info':
+      default:
+        path = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />';
+    }
+    return `<svg class="h-6 w-6 ${stroke}" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">${path}</svg>`;
+  }
+
+  /**
+   * Clamp a fixed-positioned popover so it stays inside the viewport.
+   * Anchored to a header rect; prefers below + right-aligned, flips to
+   * above when there is no room below, and slides left when the right
+   * edge would clip.
+   */
+  _positionPopover(popEl, anchorRect) {
+    const margin = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // Measure after the element is in the DOM (caller has done appendChild)
+    const popRect = popEl.getBoundingClientRect();
+    const popW = popRect.width || 320;
+    const popH = popRect.height || 200;
+
+    // Default placement: just below the anchor, left-aligned with it
+    let top = anchorRect.bottom + 6;
+    let left = anchorRect.left;
+
+    // Clip right edge: shift left so the popover fits
+    if (left + popW > vw - margin) {
+      left = vw - popW - margin;
+    }
+    // Clip left edge
+    if (left < margin) left = margin;
+
+    // If popover would extend past the viewport bottom, flip above the anchor
+    if (top + popH > vh - margin && anchorRect.top - popH - 6 > margin) {
+      top = anchorRect.top - popH - 6;
+    }
+    // Final clamp
+    if (top < margin) top = margin;
+
+    popEl.style.top = top + 'px';
+    popEl.style.left = left + 'px';
+  }
+
+  /**
    * Open a small read-only popover that shows a column's description on
    * click. Hover still gets the native title= tooltip; this gives users
    * a substantive readable card they can leave open while reading.
@@ -1433,8 +1504,6 @@ class DrilldownRenderer {
     const pop = document.createElement('div');
     pop.id = 'drilldown-col-info-popover';
     pop.className = 'fixed z-[10000] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-80';
-    pop.style.top = (rect.bottom + 6) + 'px';
-    pop.style.left = Math.max(8, rect.left - 140) + 'px';
     pop.innerHTML = `
       <div class="flex items-start justify-between gap-2 mb-1">
         <div class="text-xs font-semibold text-gray-700">${this.escapeHtml(header)}</div>
@@ -1443,6 +1512,7 @@ class DrilldownRenderer {
       <div class="text-xs text-gray-600 whitespace-pre-line">${this.escapeHtml(text)}</div>
     `;
     document.body.appendChild(pop);
+    this._positionPopover(pop, rect);
 
     const close = () => {
       pop.remove();
@@ -1488,8 +1558,6 @@ class DrilldownRenderer {
     const pop = document.createElement('div');
     pop.id = 'drilldown-col-filter-popover';
     pop.className = 'fixed z-[10000] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-72';
-    pop.style.top = (rect.bottom + 6) + 'px';
-    pop.style.left = Math.max(8, rect.left - 120) + 'px';
     pop.innerHTML = `
       <div class="text-xs font-semibold text-gray-700 mb-2">Filter ${this.escapeHtml(header)}</div>
       <input type="text" id="drilldown-col-filter-input"
@@ -1504,6 +1572,7 @@ class DrilldownRenderer {
       </div>
     `;
     document.body.appendChild(pop);
+    this._positionPopover(pop, rect);
 
     const input = pop.querySelector('#drilldown-col-filter-input');
     input?.focus();
@@ -1571,8 +1640,6 @@ class DrilldownRenderer {
     const pop = document.createElement('div');
     pop.id = 'drilldown-col-filter-popover';
     pop.className = 'fixed z-[10000] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-72';
-    pop.style.top = (rect.bottom + 6) + 'px';
-    pop.style.left = Math.max(8, rect.left - 120) + 'px';
 
     const optionsHTML = options.map(opt => {
       const val = String(opt.value);
@@ -1600,6 +1667,7 @@ class DrilldownRenderer {
       </div>
     `;
     document.body.appendChild(pop);
+    this._positionPopover(pop, rect);
 
     const apply = () => {
       const checked = Array.from(pop.querySelectorAll('.drilldown-col-filter-option'))
