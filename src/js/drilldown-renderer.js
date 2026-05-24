@@ -1529,109 +1529,99 @@ class DrilldownRenderer {
   }
 
   /**
-   * Open a small inline popover next to the column's filter icon. Used
-   * because Electron disables window.prompt(). Single-instance: opening
-   * one closes any prior popover.
+   * Fetch DISTINCT values + counts for one column from the drilldown's
+   * current row set. Body filters out the column being filtered so the
+   * popover always shows the full option set for that column (not just
+   * the values currently passing its own active filter).
    *
-   * Dispatches by `col.filter?.type`:
-   *   - 'enum'  -> multi-checkbox popover; applies as an array of values.
-   *   - default -> single text input; applies as a string.
+   * Returns { values: [{value, count}], hasMore, error? }. Never throws;
+   * the caller renders an empty list with an error message on failure.
    */
-  openColumnFilterPopover(anchorEl, col) {
-    // Close any existing popover first
-    document.getElementById('drilldown-col-filter-popover')?.remove();
-
-    const field = col.field;
-    const header = col.header || field;
-    const filterType = col.filter?.type || 'text';
-
-    if (filterType === 'enum') {
-      this.openEnumFilterPopover(anchorEl, col);
-      return;
+  async fetchDistinctValues(columnField) {
+    if (!this.currentConfig) {
+      return { values: [], hasMore: false, error: 'No drilldown context' };
     }
 
-    const existing = this.filters[field];
-    const existingText = Array.isArray(existing)
-      ? existing.join(',')
-      : (existing != null ? String(existing) : '');
-    const rect = anchorEl.getBoundingClientRect();
-    const pop = document.createElement('div');
-    pop.id = 'drilldown-col-filter-popover';
-    pop.className = 'fixed z-[10000] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-72';
-    pop.innerHTML = `
-      <div class="text-xs font-semibold text-gray-700 mb-2">Filter ${this.escapeHtml(header)}</div>
-      <input type="text" id="drilldown-col-filter-input"
-             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
-             placeholder="Value (case sensitive)"
-             value="${this.escapeHtml(existingText)}" />
-      <div class="text-[11px] text-gray-500 mt-1">Press Enter to apply, Esc to cancel. Leave blank to clear.</div>
-      <div class="flex justify-end gap-2 mt-2">
-        <button type="button" data-action="cancel" class="px-2 py-1 text-xs text-gray-600 hover:text-gray-900">Cancel</button>
-        <button type="button" data-action="clear" class="px-2 py-1 text-xs text-gray-500 hover:text-red-600">Clear</button>
-        <button type="button" data-action="apply" class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded">Apply</button>
-      </div>
-    `;
-    document.body.appendChild(pop);
-    this._positionPopover(pop, rect);
+    // Exclude the column being filtered so the popover shows the full set.
+    const filtersCopy = {};
+    for (const [k, v] of Object.entries(this.filters || {})) {
+      if (k !== columnField) filtersCopy[k] = v;
+    }
 
-    const input = pop.querySelector('#drilldown-col-filter-input');
-    input?.focus();
-    input?.select();
+    const requestBody = {
+      periodStart: this.currentConfig.periodStart,
+      periodEnd: this.currentConfig.periodEnd,
+      filters: filtersCopy,
+      search: this.searchQuery || '',
+    };
+    if (this.currentConfig.extraFilters) {
+      Object.assign(requestBody, this.currentConfig.extraFilters);
+    }
+    if (this.currentViewFilter) requestBody.viewFilter = this.currentViewFilter;
+    if (this.currentViewType) requestBody.viewType = this.currentViewType;
 
-    const apply = () => {
-      const v = input.value.trim();
-      if (v === '') {
-        delete this.filters[field];
+    const endpoint = `/api/v1/modules/${this.currentConfig.moduleKey}/metrics/${this.currentConfig.metricKey}/drilldown/distinct/${encodeURIComponent(columnField)}`;
+
+    try {
+      const apiClient = window.api || (typeof api !== 'undefined' ? api : null);
+      let result;
+      if (apiClient) {
+        result = await apiClient.post(endpoint, requestBody);
       } else {
-        this.filters[field] = v;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.getAuthToken()}`,
+          },
+          body: JSON.stringify(requestBody),
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        result = await response.json();
       }
-      close();
-      this.currentPage = 1;
-      this.renderActiveFilters();
-      this.fetchData();
-    };
-    const clear = () => {
-      delete this.filters[field];
-      close();
-      this.currentPage = 1;
-      this.renderActiveFilters();
-      this.fetchData();
-    };
-    const close = () => {
-      pop.remove();
-      document.removeEventListener('mousedown', onOutside, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-    const onOutside = (e) => {
-      if (!pop.contains(e.target)) close();
-    };
-    const onKey = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); apply(); }
-      else if (e.key === 'Escape') { e.preventDefault(); close(); }
-    };
-    pop.querySelector('[data-action="apply"]').addEventListener('click', apply);
-    pop.querySelector('[data-action="clear"]').addEventListener('click', clear);
-    pop.querySelector('[data-action="cancel"]').addEventListener('click', close);
-    // Defer the outside-click listener so the initial click that opened
-    // the popover doesn't immediately close it.
-    setTimeout(() => {
-      document.addEventListener('mousedown', onOutside, true);
-      document.addEventListener('keydown', onKey, true);
-    }, 0);
+
+      const data = (result && result.data) ? result.data : result;
+      return {
+        values: Array.isArray(data?.values) ? data.values : [],
+        hasMore: !!data?.has_more,
+      };
+    } catch (error) {
+      console.error('[DrilldownRenderer] fetchDistinctValues failed:', error);
+      return { values: [], hasMore: false, error: error.message || 'Failed to load values' };
+    }
   }
 
   /**
-   * Multi-select checkbox popover for `filter.type === 'enum'` columns.
-   * Each option has { value, label }. Existing filter state may be a
-   * string (legacy single-value) or an array; both round-trip correctly.
+   * Open an Excel-style multi-select filter popover anchored to the funnel
+   * icon. Replaces the previous text-input / predeclared-enum dispatch with
+   * a single popover that loads the column's actual distinct values from
+   * the backend, so every column gets a smart filter list.
+   *
+   * Single-instance: opening one closes any prior info or filter popover.
    */
-  openEnumFilterPopover(anchorEl, col) {
+  openColumnFilterPopover(anchorEl, col) {
+    document.getElementById('drilldown-col-filter-popover')?.remove();
+    document.getElementById('drilldown-col-info-popover')?.remove();
+
     const field = col.field;
     const header = col.header || field;
-    const options = Array.isArray(col.filter?.options) ? col.filter.options : [];
+
+    // Build a label map for predeclared enum columns so the user sees
+    // "Wire Transfer" instead of "wire_transfer" while counts/ordering
+    // still come from the data response.
+    const labelByValue = {};
+    if (Array.isArray(col.filter?.options)) {
+      for (const opt of col.filter.options) {
+        if (opt == null) continue;
+        const v = String(opt.value);
+        labelByValue[v] = opt.label != null ? String(opt.label) : v;
+      }
+    }
 
     const existing = this.filters[field];
-    const checkedSet = new Set(
+    const initialChecked = new Set(
       Array.isArray(existing) ? existing.map(String)
         : (existing != null ? [String(existing)] : [])
     );
@@ -1640,27 +1630,14 @@ class DrilldownRenderer {
     const pop = document.createElement('div');
     pop.id = 'drilldown-col-filter-popover';
     pop.className = 'fixed z-[10000] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-72';
-
-    const optionsHTML = options.map(opt => {
-      const val = String(opt.value);
-      const label = opt.label != null ? String(opt.label) : val;
-      const isChecked = checkedSet.has(val) ? 'checked' : '';
-      return `
-        <label class="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 px-1 rounded">
-          <input type="checkbox" class="drilldown-col-filter-option h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-400"
-                 value="${this.escapeHtml(val)}" ${isChecked} />
-          <span>${this.escapeHtml(label)}</span>
-        </label>
-      `;
-    }).join('');
-
     pop.innerHTML = `
       <div class="text-xs font-semibold text-gray-700 mb-2">Filter ${this.escapeHtml(header)}</div>
-      <div class="max-h-64 overflow-y-auto -mx-1">
-        ${optionsHTML || '<div class="text-xs text-gray-500 px-1 py-2">No options configured.</div>'}
-      </div>
-      <div class="text-[11px] text-gray-500 mt-2">Select one or more. Apply with none checked to clear.</div>
-      <div class="flex justify-end gap-2 mt-2">
+      <input type="text" data-role="search"
+             class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2"
+             placeholder="Search values..." />
+      <div data-role="body" class="text-xs text-gray-500 px-1 py-3 text-center">Loading values...</div>
+      <div data-role="hint" class="hidden text-[11px] text-gray-500 mt-2"></div>
+      <div class="flex justify-end gap-2 mt-3">
         <button type="button" data-action="cancel" class="px-2 py-1 text-xs text-gray-600 hover:text-gray-900">Cancel</button>
         <button type="button" data-action="clear" class="px-2 py-1 text-xs text-gray-500 hover:text-red-600">Clear</button>
         <button type="button" data-action="apply" class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded">Apply</button>
@@ -1669,46 +1646,138 @@ class DrilldownRenderer {
     document.body.appendChild(pop);
     this._positionPopover(pop, rect);
 
+    const searchEl = pop.querySelector('[data-role="search"]');
+    const bodyEl = pop.querySelector('[data-role="body"]');
+    const hintEl = pop.querySelector('[data-role="hint"]');
+
+    const close = () => {
+      pop.remove();
+      document.removeEventListener('mousedown', onOutside, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+    const onOutside = (e) => { if (!pop.contains(e.target)) close(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+    };
+
+    // Live checkbox state lives outside the DOM so search keystrokes can
+    // re-render the visible list without losing what the user has checked.
+    const checkedState = new Set(initialChecked);
+    let loadedValues = [];
+
+    const renderList = () => {
+      const term = (searchEl.value || '').trim().toLowerCase();
+      const visible = term
+        ? loadedValues.filter(v => {
+            const raw = String(v.value);
+            const label = labelByValue[raw] || raw;
+            return raw.toLowerCase().includes(term) || label.toLowerCase().includes(term);
+          })
+        : loadedValues;
+
+      if (loadedValues.length === 0) {
+        bodyEl.innerHTML = '<div class="text-xs text-gray-500 px-1 py-3 text-center">No values found.</div>';
+        return;
+      }
+
+      const allVisibleChecked = visible.length > 0 && visible.every(v => checkedState.has(String(v.value)));
+
+      const rowsHtml = visible.map(v => {
+        const raw = String(v.value);
+        const label = labelByValue[raw] || raw;
+        const isChecked = checkedState.has(raw) ? 'checked' : '';
+        return `
+          <label class="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 px-1 rounded">
+            <input type="checkbox" data-role="opt" value="${this.escapeHtml(raw)}" ${isChecked}
+                   class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-400" />
+            <span class="flex-1 truncate">${this.escapeHtml(label)}</span>
+            <span class="text-xs text-gray-400">(${v.count})</span>
+          </label>
+        `;
+      }).join('') || '<div class="text-xs text-gray-500 px-1 py-2 text-center">No matches.</div>';
+
+      bodyEl.innerHTML = `
+        <label class="flex items-center gap-2 py-1 text-sm font-medium text-gray-800 cursor-pointer hover:bg-gray-50 px-1 rounded border-b border-gray-100 mb-1">
+          <input type="checkbox" data-role="select-all" ${allVisibleChecked ? 'checked' : ''}
+                 class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-400" />
+          <span>(Select All${term ? ' visible' : ''})</span>
+        </label>
+        <div class="max-h-[250px] overflow-y-auto -mx-1">${rowsHtml}</div>
+      `;
+
+      bodyEl.querySelectorAll('[data-role="opt"]').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const val = e.target.value;
+          if (e.target.checked) checkedState.add(val);
+          else checkedState.delete(val);
+          const selAll = bodyEl.querySelector('[data-role="select-all"]');
+          if (selAll) {
+            selAll.checked = visible.every(v => checkedState.has(String(v.value)));
+          }
+        });
+      });
+
+      const selAll = bodyEl.querySelector('[data-role="select-all"]');
+      if (selAll) {
+        selAll.addEventListener('change', (e) => {
+          const shouldCheck = e.target.checked;
+          for (const v of visible) {
+            const raw = String(v.value);
+            if (shouldCheck) checkedState.add(raw);
+            else checkedState.delete(raw);
+          }
+          renderList();
+        });
+      }
+    };
+
+    searchEl.addEventListener('input', renderList);
+    searchEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); apply(); }
+    });
+
     const apply = () => {
-      const checked = Array.from(pop.querySelectorAll('.drilldown-col-filter-option'))
-        .filter(cb => cb.checked)
-        .map(cb => cb.value);
-      if (checked.length === 0) {
+      const selected = Array.from(checkedState);
+      if (selected.length === 0) {
         delete this.filters[field];
       } else {
-        this.filters[field] = checked;
+        this.filters[field] = selected;
       }
       close();
       this.currentPage = 1;
       this.renderActiveFilters();
       this.fetchData();
     };
-    const clear = () => {
+    pop.querySelector('[data-action="cancel"]').addEventListener('click', close);
+    pop.querySelector('[data-action="clear"]').addEventListener('click', () => {
       delete this.filters[field];
       close();
       this.currentPage = 1;
       this.renderActiveFilters();
       this.fetchData();
-    };
-    const close = () => {
-      pop.remove();
-      document.removeEventListener('mousedown', onOutside, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-    const onOutside = (e) => {
-      if (!pop.contains(e.target)) close();
-    };
-    const onKey = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); apply(); }
-      else if (e.key === 'Escape') { e.preventDefault(); close(); }
-    };
+    });
     pop.querySelector('[data-action="apply"]').addEventListener('click', apply);
-    pop.querySelector('[data-action="clear"]').addEventListener('click', clear);
-    pop.querySelector('[data-action="cancel"]').addEventListener('click', close);
+
     setTimeout(() => {
       document.addEventListener('mousedown', onOutside, true);
       document.addEventListener('keydown', onKey, true);
     }, 0);
+
+    // Kick off the distinct fetch. If the user cancels before the response
+    // lands the popover is gone; we no-op via the document.body check.
+    this.fetchDistinctValues(field).then(({ values, hasMore, error }) => {
+      if (!document.body.contains(pop)) return;
+      loadedValues = values || [];
+      renderList();
+      if (error) {
+        hintEl.textContent = `Could not load values: ${error}`;
+        hintEl.classList.remove('hidden', 'text-gray-500');
+        hintEl.classList.add('text-red-600');
+      } else if (hasMore) {
+        hintEl.textContent = `Showing top 1,000 of ${loadedValues.length}+ values. Type in the search box to narrow.`;
+        hintEl.classList.remove('hidden');
+      }
+    });
   }
 
   /**
