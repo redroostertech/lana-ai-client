@@ -1462,12 +1462,28 @@ class DrilldownRenderer {
    * Open a small inline popover next to the column's filter icon. Used
    * because Electron disables window.prompt(). Single-instance: opening
    * one closes any prior popover.
+   *
+   * Dispatches by `col.filter?.type`:
+   *   - 'enum'  -> multi-checkbox popover; applies as an array of values.
+   *   - default -> single text input; applies as a string.
    */
-  openColumnFilterPopover(anchorEl, field, header) {
+  openColumnFilterPopover(anchorEl, col) {
     // Close any existing popover first
     document.getElementById('drilldown-col-filter-popover')?.remove();
 
+    const field = col.field;
+    const header = col.header || field;
+    const filterType = col.filter?.type || 'text';
+
+    if (filterType === 'enum') {
+      this.openEnumFilterPopover(anchorEl, col);
+      return;
+    }
+
     const existing = this.filters[field];
+    const existingText = Array.isArray(existing)
+      ? existing.join(',')
+      : (existing != null ? String(existing) : '');
     const rect = anchorEl.getBoundingClientRect();
     const pop = document.createElement('div');
     pop.id = 'drilldown-col-filter-popover';
@@ -1479,7 +1495,7 @@ class DrilldownRenderer {
       <input type="text" id="drilldown-col-filter-input"
              class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
              placeholder="Value (case sensitive)"
-             value="${this.escapeHtml(existing != null ? String(existing) : '')}" />
+             value="${this.escapeHtml(existingText)}" />
       <div class="text-[11px] text-gray-500 mt-1">Press Enter to apply, Esc to cancel. Leave blank to clear.</div>
       <div class="flex justify-end gap-2 mt-2">
         <button type="button" data-action="cancel" class="px-2 py-1 text-xs text-gray-600 hover:text-gray-900">Cancel</button>
@@ -1536,6 +1552,98 @@ class DrilldownRenderer {
   }
 
   /**
+   * Multi-select checkbox popover for `filter.type === 'enum'` columns.
+   * Each option has { value, label }. Existing filter state may be a
+   * string (legacy single-value) or an array; both round-trip correctly.
+   */
+  openEnumFilterPopover(anchorEl, col) {
+    const field = col.field;
+    const header = col.header || field;
+    const options = Array.isArray(col.filter?.options) ? col.filter.options : [];
+
+    const existing = this.filters[field];
+    const checkedSet = new Set(
+      Array.isArray(existing) ? existing.map(String)
+        : (existing != null ? [String(existing)] : [])
+    );
+
+    const rect = anchorEl.getBoundingClientRect();
+    const pop = document.createElement('div');
+    pop.id = 'drilldown-col-filter-popover';
+    pop.className = 'fixed z-[10000] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-72';
+    pop.style.top = (rect.bottom + 6) + 'px';
+    pop.style.left = Math.max(8, rect.left - 120) + 'px';
+
+    const optionsHTML = options.map(opt => {
+      const val = String(opt.value);
+      const label = opt.label != null ? String(opt.label) : val;
+      const isChecked = checkedSet.has(val) ? 'checked' : '';
+      return `
+        <label class="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 px-1 rounded">
+          <input type="checkbox" class="drilldown-col-filter-option h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-400"
+                 value="${this.escapeHtml(val)}" ${isChecked} />
+          <span>${this.escapeHtml(label)}</span>
+        </label>
+      `;
+    }).join('');
+
+    pop.innerHTML = `
+      <div class="text-xs font-semibold text-gray-700 mb-2">Filter ${this.escapeHtml(header)}</div>
+      <div class="max-h-64 overflow-y-auto -mx-1">
+        ${optionsHTML || '<div class="text-xs text-gray-500 px-1 py-2">No options configured.</div>'}
+      </div>
+      <div class="text-[11px] text-gray-500 mt-2">Select one or more. Apply with none checked to clear.</div>
+      <div class="flex justify-end gap-2 mt-2">
+        <button type="button" data-action="cancel" class="px-2 py-1 text-xs text-gray-600 hover:text-gray-900">Cancel</button>
+        <button type="button" data-action="clear" class="px-2 py-1 text-xs text-gray-500 hover:text-red-600">Clear</button>
+        <button type="button" data-action="apply" class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded">Apply</button>
+      </div>
+    `;
+    document.body.appendChild(pop);
+
+    const apply = () => {
+      const checked = Array.from(pop.querySelectorAll('.drilldown-col-filter-option'))
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+      if (checked.length === 0) {
+        delete this.filters[field];
+      } else {
+        this.filters[field] = checked;
+      }
+      close();
+      this.currentPage = 1;
+      this.renderActiveFilters();
+      this.fetchData();
+    };
+    const clear = () => {
+      delete this.filters[field];
+      close();
+      this.currentPage = 1;
+      this.renderActiveFilters();
+      this.fetchData();
+    };
+    const close = () => {
+      pop.remove();
+      document.removeEventListener('mousedown', onOutside, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+    const onOutside = (e) => {
+      if (!pop.contains(e.target)) close();
+    };
+    const onKey = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); apply(); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(); }
+    };
+    pop.querySelector('[data-action="apply"]').addEventListener('click', apply);
+    pop.querySelector('[data-action="clear"]').addEventListener('click', clear);
+    pop.querySelector('[data-action="cancel"]').addEventListener('click', close);
+    setTimeout(() => {
+      document.addEventListener('mousedown', onOutside, true);
+      document.addEventListener('keydown', onKey, true);
+    }, 0);
+  }
+
+  /**
    * Render active filter chips above the table. Each chip has an X button
    * to clear that one filter. Renders into #drilldown-active-filters if
    * that container exists; otherwise injects a transient div above the
@@ -1557,11 +1665,32 @@ class DrilldownRenderer {
       return;
     }
     const columnHeaders = {};
-    for (const c of (this.currentConfig.columns || [])) columnHeaders[c.field] = c.header;
+    const columnOptionLabels = {};
+    for (const c of (this.currentConfig.columns || [])) {
+      columnHeaders[c.field] = c.header;
+      if (Array.isArray(c.filter?.options)) {
+        const map = {};
+        for (const opt of c.filter.options) map[String(opt.value)] = opt.label != null ? String(opt.label) : String(opt.value);
+        columnOptionLabels[c.field] = map;
+      }
+    }
     const chips = entries.map(([field, value]) => {
       const label = columnHeaders[field] || field;
+      let display;
+      if (Array.isArray(value)) {
+        const labels = value.map(v => (columnOptionLabels[field] && columnOptionLabels[field][String(v)]) || String(v));
+        if (labels.length === 0) {
+          display = '';
+        } else if (labels.length <= 2) {
+          display = labels.join(', ');
+        } else {
+          display = `${labels.length} selected`;
+        }
+      } else {
+        display = String(value);
+      }
       return `<span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 border border-indigo-200">
-        <span>${this.escapeHtml(label)}: ${this.escapeHtml(String(value))}</span>
+        <span>${this.escapeHtml(label)}: ${this.escapeHtml(display)}</span>
         <button type="button" data-clear-filter="${this.escapeHtml(field)}" class="text-indigo-500 hover:text-indigo-800" aria-label="Clear filter">&times;</button>
       </span>`;
     }).join('');
@@ -1639,13 +1768,16 @@ class DrilldownRenderer {
 
     // Attach per-column filter handlers. Clicking the funnel icon opens
     // an inline popover (Electron blocks window.prompt) anchored to the
-    // icon. Enter applies, Escape cancels, blank value clears the filter.
+    // icon. The full column config is passed so the popover can dispatch
+    // on `col.filter?.type` (text vs enum vs future types).
+    const columnsByField = {};
+    for (const c of (this.currentConfig.columns || [])) columnsByField[c.field] = c;
     document.querySelectorAll('[data-col-filter]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const field = el.dataset.colFilter;
-        const header = el.dataset.colHeader || field;
-        this.openColumnFilterPopover(el, field, header);
+        const col = columnsByField[field] || { field, header: el.dataset.colHeader || field };
+        this.openColumnFilterPopover(el, col);
       });
     });
 
