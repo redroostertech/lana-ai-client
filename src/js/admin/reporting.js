@@ -2587,16 +2587,37 @@
     setTimeout(function () {
       var ctx = document.getElementById(canvasId);
       if (!ctx) return;
-      if (!viz.data || viz.data.length === 0) {
+
+      // Build chart rows. If viz.data is not pre-populated (the common case
+      // for Current vs. Prior visualizations declared with a metrics list)
+      // synthesize one row per listed metric from data.metrics current/prior.
+      var rows = viz.data;
+      if ((!rows || rows.length === 0) && Array.isArray(viz.metrics) && Array.isArray(data.metrics)) {
+        rows = viz.metrics.map(function (key) {
+          var m = data.metrics.find(function (x) { return x.key === key; });
+          if (!m) return null;
+          return {
+            source_name: m.name || m.key,
+            current: m.current,
+            prior: m.prior
+          };
+        }).filter(function (r) {
+          if (!r) return false;
+          var c = parseFloat(r.current); var p = parseFloat(r.prior);
+          return (Number.isFinite(c) && c !== 0) || (Number.isFinite(p) && p !== 0);
+        });
+      }
+
+      if (!rows || rows.length === 0) {
         ctx.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">No data available</div>';
         return;
       }
       var xField = (viz.xAxis && viz.xAxis.field) || 'source_name';
-      var labels = viz.data.map(function (row) { return row[xField] || 'Unknown'; });
+      var labels = rows.map(function (row) { return row[xField] || 'Unknown'; });
       var datasets = (viz.series || []).map(function (serie) {
         return {
           label: serie.label,
-          data: viz.data.map(function (row) { return parseFloat(row[serie.field]) || 0; }),
+          data: rows.map(function (row) { return parseFloat(row[serie.field]) || 0; }),
           backgroundColor: serie.color, borderColor: serie.color, borderWidth: 1
         };
       });
