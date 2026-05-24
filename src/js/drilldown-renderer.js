@@ -1421,6 +1421,44 @@ class DrilldownRenderer {
   }
 
   /**
+   * Open a small read-only popover that shows a column's description on
+   * click. Hover still gets the native title= tooltip; this gives users
+   * a substantive readable card they can leave open while reading.
+   */
+  openColumnInfoPopover(anchorEl, header, text) {
+    document.getElementById('drilldown-col-info-popover')?.remove();
+    document.getElementById('drilldown-col-filter-popover')?.remove();
+
+    const rect = anchorEl.getBoundingClientRect();
+    const pop = document.createElement('div');
+    pop.id = 'drilldown-col-info-popover';
+    pop.className = 'fixed z-[10000] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-80';
+    pop.style.top = (rect.bottom + 6) + 'px';
+    pop.style.left = Math.max(8, rect.left - 140) + 'px';
+    pop.innerHTML = `
+      <div class="flex items-start justify-between gap-2 mb-1">
+        <div class="text-xs font-semibold text-gray-700">${this.escapeHtml(header)}</div>
+        <button type="button" data-action="close" class="text-gray-400 hover:text-gray-700 leading-none" aria-label="Close">&times;</button>
+      </div>
+      <div class="text-xs text-gray-600 whitespace-pre-line">${this.escapeHtml(text)}</div>
+    `;
+    document.body.appendChild(pop);
+
+    const close = () => {
+      pop.remove();
+      document.removeEventListener('mousedown', onOutside, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+    const onOutside = (e) => { if (!pop.contains(e.target)) close(); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    pop.querySelector('[data-action="close"]').addEventListener('click', close);
+    setTimeout(() => {
+      document.addEventListener('mousedown', onOutside, true);
+      document.addEventListener('keydown', onKey, true);
+    }, 0);
+  }
+
+  /**
    * Open a small inline popover next to the column's filter icon. Used
    * because Electron disables window.prompt(). Single-instance: opening
    * one closes any prior popover.
@@ -1568,7 +1606,7 @@ class DrilldownRenderer {
             ${sortable ? `data-sort="${col.field}"` : ''}>
           <div class="flex items-center ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : ''}">
             <span>${col.header}</span>
-            ${col.description ? `<span class="ml-1 inline-flex" data-col-info="${this.escapeHtml(col.field)}" title="${this.escapeHtml(col.description)}" onclick="event.stopPropagation()" style="cursor: help;"><svg class="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></span>` : ''}
+            ${col.description ? `<span class="ml-1 inline-flex" data-col-info="${this.escapeHtml(col.field)}" data-col-info-text="${this.escapeHtml(col.description)}" data-col-info-header="${this.escapeHtml(col.header)}" title="${this.escapeHtml(col.description)}" onclick="event.stopPropagation()" style="cursor: help;"><svg class="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></span>` : ''}
             <span class="ml-1 inline-flex" data-col-filter="${this.escapeHtml(col.field)}" data-col-header="${this.escapeHtml(col.header)}" onclick="event.stopPropagation()" style="cursor: pointer;" title="Filter ${this.escapeHtml(col.header)}"><svg class="h-3.5 w-3.5 ${filterIconColor} hover:text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg></span>
             ${sortable ? `<span class="ml-1 text-gray-400">${sortIcon}</span>` : ''}
           </div>
@@ -1608,6 +1646,18 @@ class DrilldownRenderer {
         const field = el.dataset.colFilter;
         const header = el.dataset.colHeader || field;
         this.openColumnFilterPopover(el, field, header);
+      });
+    });
+
+    // Info-icon click: show the column's description in a popover. Hover
+    // still gets the native title= tooltip; click opens a more
+    // substantial readable card that doesn't auto-dismiss.
+    document.querySelectorAll('[data-col-info]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const text = el.dataset.colInfoText || '';
+        const header = el.dataset.colInfoHeader || el.dataset.colInfo || '';
+        this.openColumnInfoPopover(el, header, text);
       });
     });
 
