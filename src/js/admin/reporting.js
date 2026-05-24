@@ -1758,7 +1758,8 @@
     var canvasId = 'chart-' + uniqueId;
     var helpTextHTML = renderHelpTextModal(viz.helpText, uniqueId);
 
-    div.innerHTML = '<div class="flex items-center mb-4"><h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Metrics Over Time') + '</h3>' + helpTextHTML + '</div>' +
+    div.innerHTML = '<div class="flex items-center mb-2"><h3 class="text-lg font-semibold text-gray-900">' + (viz.title || 'Metrics Over Time') + '</h3>' + helpTextHTML + '</div>' +
+      (viz.description ? '<p class="text-sm text-gray-600 mb-4">' + viz.description + '</p>' : '') +
       '<div class="h-96"><canvas id="' + canvasId + '"></canvas></div>';
 
     setTimeout(function () {
