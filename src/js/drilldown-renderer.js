@@ -1421,6 +1421,83 @@ class DrilldownRenderer {
   }
 
   /**
+   * Open a small inline popover next to the column's filter icon. Used
+   * because Electron disables window.prompt(). Single-instance: opening
+   * one closes any prior popover.
+   */
+  openColumnFilterPopover(anchorEl, field, header) {
+    // Close any existing popover first
+    document.getElementById('drilldown-col-filter-popover')?.remove();
+
+    const existing = this.filters[field];
+    const rect = anchorEl.getBoundingClientRect();
+    const pop = document.createElement('div');
+    pop.id = 'drilldown-col-filter-popover';
+    pop.className = 'fixed z-[10000] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-72';
+    pop.style.top = (rect.bottom + 6) + 'px';
+    pop.style.left = Math.max(8, rect.left - 120) + 'px';
+    pop.innerHTML = `
+      <div class="text-xs font-semibold text-gray-700 mb-2">Filter ${this.escapeHtml(header)}</div>
+      <input type="text" id="drilldown-col-filter-input"
+             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+             placeholder="Value (case sensitive)"
+             value="${this.escapeHtml(existing != null ? String(existing) : '')}" />
+      <div class="text-[11px] text-gray-500 mt-1">Press Enter to apply, Esc to cancel. Leave blank to clear.</div>
+      <div class="flex justify-end gap-2 mt-2">
+        <button type="button" data-action="cancel" class="px-2 py-1 text-xs text-gray-600 hover:text-gray-900">Cancel</button>
+        <button type="button" data-action="clear" class="px-2 py-1 text-xs text-gray-500 hover:text-red-600">Clear</button>
+        <button type="button" data-action="apply" class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded">Apply</button>
+      </div>
+    `;
+    document.body.appendChild(pop);
+
+    const input = pop.querySelector('#drilldown-col-filter-input');
+    input?.focus();
+    input?.select();
+
+    const apply = () => {
+      const v = input.value.trim();
+      if (v === '') {
+        delete this.filters[field];
+      } else {
+        this.filters[field] = v;
+      }
+      close();
+      this.currentPage = 1;
+      this.renderActiveFilters();
+      this.fetchData();
+    };
+    const clear = () => {
+      delete this.filters[field];
+      close();
+      this.currentPage = 1;
+      this.renderActiveFilters();
+      this.fetchData();
+    };
+    const close = () => {
+      pop.remove();
+      document.removeEventListener('mousedown', onOutside, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+    const onOutside = (e) => {
+      if (!pop.contains(e.target)) close();
+    };
+    const onKey = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); apply(); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(); }
+    };
+    pop.querySelector('[data-action="apply"]').addEventListener('click', apply);
+    pop.querySelector('[data-action="clear"]').addEventListener('click', clear);
+    pop.querySelector('[data-action="cancel"]').addEventListener('click', close);
+    // Defer the outside-click listener so the initial click that opened
+    // the popover doesn't immediately close it.
+    setTimeout(() => {
+      document.addEventListener('mousedown', onOutside, true);
+      document.addEventListener('keydown', onKey, true);
+    }, 0);
+  }
+
+  /**
    * Render active filter chips above the table. Each chip has an X button
    * to clear that one filter. Renders into #drilldown-active-filters if
    * that container exists; otherwise injects a transient div above the
@@ -1522,30 +1599,15 @@ class DrilldownRenderer {
       });
     });
 
-    // Attach per-column filter handlers. Clicking the funnel icon opens a
-    // small inline prompt that captures a value and pushes it into
-    // this.filters[field], then re-fetches. Click again on an active filter
-    // to clear it.
+    // Attach per-column filter handlers. Clicking the funnel icon opens
+    // an inline popover (Electron blocks window.prompt) anchored to the
+    // icon. Enter applies, Escape cancels, blank value clears the filter.
     document.querySelectorAll('[data-col-filter]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const field = el.dataset.colFilter;
         const header = el.dataset.colHeader || field;
-        const existing = this.filters[field];
-        const next = window.prompt(
-          'Filter "' + header + '" by value (empty to clear):',
-          existing != null ? String(existing) : ''
-        );
-        if (next === null) return; // user hit Cancel
-        const trimmed = next.trim();
-        if (trimmed === '') {
-          delete this.filters[field];
-        } else {
-          this.filters[field] = trimmed;
-        }
-        this.currentPage = 1;
-        this.renderActiveFilters();
-        this.fetchData();
+        this.openColumnFilterPopover(el, field, header);
       });
     });
 
