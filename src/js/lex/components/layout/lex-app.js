@@ -714,7 +714,7 @@
       }
 
       // Build sidebar sections with role-gated admin link
-      const adminRoles = ['system_admin', 'org_admin', 'organization_admin', 'admin'];
+      const adminRoles = ['system_admin', 'org_admin'];
       const userRoles = user ? (user.roles || user.role_names || []) : [];
       const userRoleName = user ? (user.role_name || user.role || '') : '';
       const allRoles = new Set([
@@ -796,8 +796,7 @@
             { id: 'insights-dashboard', label: 'Dashboard', icon: 'home', href: 'admin/analytics.html' },
             { id: 'insights-library', label: 'Library', icon: 'book-open', href: 'admin/dashboard-library.html' },
             { id: 'firm-reporting', label: 'Firm Reporting', icon: 'bar-chart-2', href: 'admin/reporting.html' },
-            { id: 'billable-hours', label: 'Billable Hours', icon: 'clock', href: 'admin/billable-hours.html' },
-            { id: 'data-visualization', label: 'Data Visualization', icon: 'bar-chart-3', href: 'admin/data-visualization.html' }
+            { id: 'billable-hours', label: 'Billable Hours', icon: 'clock', href: 'admin/billable-hours.html' }
           ]
         : [
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
