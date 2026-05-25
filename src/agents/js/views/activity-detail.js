@@ -25,32 +25,38 @@
   var TEMPLATE = ''
     + '<main>'
 
-    + '<div class="atd-header">'
-    +   '<a href="#activity" class="atd-header-back" data-back-link>&larr; Back to Lana Tasks</a>'
-    +   '<div class="atd-title" id="atdTitle">Loading...</div>'
-    +   '<div class="atd-meta">'
-    +     '<span><span class="atd-meta-dot" id="atdStatusDot"></span> <span id="atdStatusLabel">Loading</span></span>'
-    +     '<span id="atdPriorityBadge"></span>'
-    +     '<span id="atdMatterLink"></span>'
-    +     '<span id="atdCreatedAt"></span>'
-    +   '</div>'
+    + '<lex-banner id="atdBanner" variant="light" heading="Loading..." subtitle="Loading run details">'
+    +   '<a id="atdMatterLink" class="atd-banner-action hidden" href="#">View Matter</a>'
+    + '</lex-banner>'
+    + '<lex-breadcrumb id="atdBreadcrumb" style="margin:12px 0 16px;" items=\'[{"label":"LanaAgents","href":"#catalog"},{"label":"Activity","href":"#activity"},{"label":"Run detail"}]\'></lex-breadcrumb>'
+
+    + '<div class="atd-tabs" role="tablist" aria-label="Run details">'
+    +   '<button id="atdExecutionTab" class="atd-tab active" type="button" role="tab" aria-selected="true" aria-controls="atdExecutionPane" data-atd-tab="execution">Execution log</button>'
+    +   '<button id="atdDeliverablesTab" class="atd-tab" type="button" role="tab" aria-selected="false" aria-controls="atdDeliverablesPane" data-atd-tab="deliverables">Deliverables <span id="atdDeliverablesCount" class="atd-tab-count hidden">0</span></button>'
     + '</div>'
 
-    + '<lex-card padding="none">'
-    +   '<div style="padding:12px 16px;border-bottom:1px solid var(--lex-border-subtle);font-size:0.75rem;font-weight:500;color:var(--lex-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;">'
-    +     'Execution Log'
-    +   '</div>'
-    +   '<div class="atd-log" id="atdLog">'
-    +     '<div style="text-align:center;padding:24px;color:var(--lex-text-tertiary);font-size:0.8125rem;">'
-    +       '<lex-spinner size="sm"></lex-spinner> Loading events...'
+    + '<section id="atdExecutionPane" class="atd-tab-pane" role="tabpanel" aria-labelledby="atdExecutionTab">'
+    +   '<lex-card padding="none">'
+    +     '<div style="padding:12px 16px;border-bottom:1px solid var(--lex-border-subtle);font-size:0.75rem;font-weight:500;color:var(--lex-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;">'
+    +       'Execution Log'
     +     '</div>'
-    +   '</div>'
-    + '</lex-card>'
+    +     '<div class="atd-log" id="atdLog">'
+    +       '<div style="text-align:center;padding:24px;color:var(--lex-text-tertiary);font-size:0.8125rem;">'
+    +         '<lex-spinner size="sm"></lex-spinner> Loading events...'
+    +       '</div>'
+    +     '</div>'
+    +   '</lex-card>'
+    + '</section>'
+
+    + '<section id="atdDeliverablesPane" class="atd-tab-pane hidden" role="tabpanel" aria-labelledby="atdDeliverablesTab">'
+    +   '<div id="atdDeliverables" class="atd-deliverables"></div>'
+    + '</section>'
 
     + '<div id="atdApprovalPanel" class="atd-approval hidden">'
     +   '<div class="atd-approval-title">Lana wants to make the following changes:</div>'
     +   '<div id="atdApprovalSummary" style="font-size:0.8125rem;color:var(--lex-text-secondary);margin-bottom:12px;"></div>'
-    +   '<div class="atd-approval-toggle" id="atdDiffToggle">View detailed changes</div>'
+    +   '<div id="atdApprovalDescription" class="atd-approval-description"></div>'
+    +   '<div class="atd-approval-toggle" id="atdDiffToggle">Show raw JSON</div>'
     +   '<div id="atdDiffContainer" class="atd-approval-diff hidden"></div>'
     +   '<div id="atdRejectReason" class="hidden" style="margin-top:12px;">'
     +     '<textarea id="atdRejectReasonInput" placeholder="Reason for rejection (optional)" style="width:100%;min-height:60px;border:1px solid var(--lex-border-default);border-radius:6px;padding:8px;font-size:0.8125rem;resize:vertical;font-family:inherit;"></textarea>'
@@ -92,6 +98,29 @@
   function show(id) { var e = el(id); if (e) e.classList.remove('hidden'); }
   function hide(id) { var e = el(id); if (e) e.classList.add('hidden'); }
 
+  function setBanner(task, status) {
+    var banner = el('atdBanner');
+    if (!banner) return;
+
+    var taskStatus = status || (task && task.execution_status) || 'pending';
+    var subtitleParts = [statusLabel(taskStatus)];
+    if (task && task.priority) subtitleParts.push(String(task.priority).toUpperCase());
+    if (task && task.created_at) subtitleParts.push(timeAgo(task.created_at));
+
+    banner.setAttribute('heading', (task && task.name) || 'Run detail');
+    banner.setAttribute('subtitle', subtitleParts.filter(Boolean).join(' · '));
+    banner.setAttribute('status', isTerminal(taskStatus) ? (taskStatus === 'completed' ? 'connected' : 'offline') : 'warning');
+
+    var breadcrumb = el('atdBreadcrumb');
+    if (breadcrumb) {
+      breadcrumb.setAttribute('items', JSON.stringify([
+        { label: 'LanaAgents', href: '#catalog' },
+        { label: 'Activity', href: '#activity' },
+        { label: (task && task.name) || 'Run detail' }
+      ]));
+    }
+  }
+
   function statusLabel(status) {
     if (!status) return 'Pending';
     if (status === 'compiling_context') return 'Compiling Context...';
@@ -130,6 +159,272 @@
            status === 'rejected'  || status === 'cancelled';
   }
 
+  function formatJson(value) {
+    if (value == null || value === '') return '';
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (_err) {
+      return String(value);
+    }
+  }
+
+  function compactObjectSummary(value) {
+    if (!value || typeof value !== 'object') return '';
+    var parts = [];
+    Object.keys(value).slice(0, 4).forEach(function (key) {
+      var item = value[key];
+      if (item == null || typeof item === 'object') return;
+      var rendered = renderSummaryValue(key, item);
+      if (rendered) parts.push(rendered);
+    });
+    return parts.join(' · ');
+  }
+
+  function durationLabel(ms) {
+    if (ms == null || ms === '') return '';
+    var n = Number(ms);
+    if (!Number.isFinite(n)) return '';
+    if (n < 1000) return String(Math.round(n)) + 'ms';
+    return String(Math.round(n / 100) / 10) + 's';
+  }
+
+  function humanizeToken(value) {
+    if (value == null || value === '') return '';
+    var words = String(value)
+      .split('_')
+      .join(' ')
+      .split('-')
+      .join(' ')
+      .split(' ')
+      .filter(Boolean);
+    var text = words.join(' ');
+    if (!text) return '';
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  function humanizeKey(value) {
+    return humanizeToken(value);
+  }
+
+  function humanizeValue(value) {
+    if (value == null || value === '') return '';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'number') return String(value);
+    if (typeof value !== 'string') return '';
+    return humanizeToken(value);
+  }
+
+  function compactText(value, fallback) {
+    if (value == null || value === '') return fallback || '';
+    if (typeof value === 'string') return decodeText(value);
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return fallback || '';
+  }
+
+  function firstValue(values) {
+    for (var i = 0; i < values.length; i++) {
+      if (values[i] != null && values[i] !== '') return values[i];
+    }
+    return '';
+  }
+
+  function summarizeValue(value) {
+    if (value == null || value === '') return '';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'string') return decodeText(value);
+    if (Array.isArray(value)) return String(value.length) + ' item' + (value.length === 1 ? '' : 's');
+    if (typeof value === 'object') return compactObjectSummary(value) || 'Structured data';
+    return String(value);
+  }
+
+  function renderFactGrid(facts) {
+    if (!Array.isArray(facts) || facts.length === 0) return '';
+    var rows = [];
+    for (var i = 0; i < facts.length; i++) {
+      var fact = facts[i] || {};
+      var value = summarizeValue(fact.value);
+      if (!fact.label || !value) continue;
+      rows.push('<div class="atd-step-fact">' +
+        '<span>' + escHtml(humanizeKey(fact.label)) + '</span>' +
+        '<strong>' + escHtml(value) + '</strong>' +
+      '</div>');
+    }
+    if (rows.length === 0) return '';
+    return '<div class="atd-step-facts">' + rows.join('') + '</div>';
+  }
+
+  function renderDetailsBlock(title, value) {
+    if (value == null || value === '') return '';
+    return '<details class="atd-step-details">' +
+      '<summary>' + escHtml(humanizeKey(title)) + '</summary>' +
+      '<pre>' + escHtml(formatJson(value)) + '</pre>' +
+    '</details>';
+  }
+
+  function setActiveTab(tabName) {
+    var executionTab = el('atdExecutionTab');
+    var deliverablesTab = el('atdDeliverablesTab');
+    var executionPane = el('atdExecutionPane');
+    var deliverablesPane = el('atdDeliverablesPane');
+    var showDeliverables = tabName === 'deliverables';
+
+    if (executionTab) {
+      executionTab.classList.toggle('active', !showDeliverables);
+      executionTab.setAttribute('aria-selected', showDeliverables ? 'false' : 'true');
+    }
+    if (deliverablesTab) {
+      deliverablesTab.classList.toggle('active', showDeliverables);
+      deliverablesTab.setAttribute('aria-selected', showDeliverables ? 'true' : 'false');
+    }
+    if (executionPane) executionPane.classList.toggle('hidden', showDeliverables);
+    if (deliverablesPane) deliverablesPane.classList.toggle('hidden', !showDeliverables);
+  }
+
+  function updateDeliverablesCount(count) {
+    var countEl = el('atdDeliverablesCount');
+    if (!countEl) return;
+    countEl.textContent = String(count || 0);
+    countEl.classList.toggle('hidden', !count);
+  }
+
+  function renderStepCard(options) {
+    var title = options.title || 'Step';
+    var subtitle = options.subtitle || '';
+    var status = options.status || '';
+    var source = options.source || '';
+    var body = options.body || '';
+    var details = options.details || [];
+    var facts = options.facts || [];
+    var tone = options.tone || '';
+    var classes = 'atd-step-card' + (tone ? ' atd-step-card--' + tone : '');
+    var html = '<div class="' + escHtml(classes) + '">';
+    html += '<div class="atd-step-head">';
+    html += '<div>';
+    html += '<div class="atd-step-title">' + escHtml(humanizeKey(title)) + '</div>';
+    if (subtitle) html += '<div class="atd-step-subtitle">' + escHtml(humanizeValue(subtitle)) + '</div>';
+    html += '</div>';
+    html += '<div class="atd-step-meta">';
+    if (source) html += '<span>' + escHtml(humanizeValue(source)) + '</span>';
+    if (status) html += '<span class="atd-step-status">' + escHtml(statusLabel(status) || humanizeValue(status)) + '</span>';
+    html += '</div>';
+    html += '</div>';
+    if (body) html += '<div class="atd-step-body">' + escHtml(body) + '</div>';
+    html += renderFactGrid(facts);
+    for (var i = 0; i < details.length; i++) html += details[i];
+    html += '</div>';
+    return html;
+  }
+
+  function renderSummaryValue(key, value) {
+    var rendered = humanizeValue(value);
+    if (!rendered) return '';
+    return humanizeKey(key) + ': ' + rendered;
+  }
+
+  function classifyEvent(evt) {
+    var type = evt && evt.event_type || '';
+    var content = evt && evt.content || {};
+    var data = content.data || {};
+    var family = String(content.family || data.family || '').toLowerCase();
+    var source = String(content.source || content.source_type || '').toLowerCase();
+    var sourceEventName = String(content.source_event_name || data.event || data.type || '').toLowerCase();
+    var phase = String(content.phase || data.phase || '').toLowerCase();
+    var runtimeType = String(content.runtime_type || data.runtime_type || '').toLowerCase();
+
+    if (type === 'approval_request' || type === 'approval_response' || content.approval) return 'approval';
+    if (type === 'artifact' || type === 'outcome' || content.artifact_ref) return 'deliverable';
+
+    if (family === 'context' || source === 'context' || phase === 'context' || phase === 'compile_context') return 'context';
+    if (sourceEventName === 'runtime_selection' || sourceEventName === 'runtime_selected' || sourceEventName === 'runtime_policy') return 'runtime';
+    if (family === 'tool' || family === 'tools' || source === 'tool' || source === 'tools' || content.tool_call || content.tool_name) return 'tools';
+    if (family === 'hermes' || source === 'hermes' || runtimeType === 'hermes') return 'hermes';
+    if (type === 'runtime_event') return 'trace';
+    if (type === 'progress') return 'hermes';
+    if (type === 'status_change') return 'runtime';
+    return 'trace';
+  }
+
+  function sectionLabel(section) {
+    if (section === 'context') return 'Context';
+    if (section === 'runtime') return 'Runtime Selection';
+    if (section === 'hermes') return 'Hermes Loop';
+    if (section === 'tools') return 'Lana Tool Calls';
+    if (section === 'approval') return 'Approval';
+    if (section === 'deliverable') return 'Deliverable';
+    return 'Raw Trace';
+  }
+
+  function renderSectionDivider(section) {
+    return '<div class="atd-log-section atd-log-section--' + escHtml(section) + '">' +
+      '<span>' + escHtml(sectionLabel(section)) + '</span>' +
+    '</div>';
+  }
+
+  function renderProgressEvent(content) {
+    var msg = content.message || content.phase || 'Processing...';
+    var pct = content.progress_pct ? ' (' + content.progress_pct + '%)' : '';
+    var stepTitle = content.title || msg;
+    var stepSubtitle = content.source_run_title || content.source_type || '';
+    var stepBody = compactObjectSummary(content.output || content.metadata || {}) || compactText(content.message, '');
+    var facts = [
+      { label: 'state', value: content.state || content.phase },
+      { label: 'tool', value: content.tool_name },
+      { label: 'duration', value: durationLabel(content.duration_ms) },
+      { label: 'source', value: content.source_type }
+    ];
+    return renderStepCard({
+      title: stepTitle + pct,
+      subtitle: stepSubtitle,
+      status: content.status || '',
+      source: content.source_type || '',
+      body: stepBody,
+      facts: facts,
+      tone: classifyEvent({ event_type: 'progress', content: content }),
+      details: [
+        renderDetailsBlock('Input', content.input),
+        renderDetailsBlock('Output', content.output),
+        renderDetailsBlock('Metadata', content.metadata)
+      ]
+    });
+  }
+
+  function renderRuntimeEvent(content) {
+    var runtimeTitle = content.source_event_name || content.type || 'Runtime event';
+    var runtimeBody = firstValue([
+      compactText(content.data && content.data.message, ''),
+      compactText(content.data && content.data.summary, ''),
+      compactText(content.error && content.error.message, ''),
+      compactObjectSummary(content.data || {})
+    ]);
+    var section = classifyEvent({ event_type: 'runtime_event', content: content });
+    var toolCall = content.tool_call || {};
+    var approval = content.approval || {};
+    var artifact = content.artifact_ref || {};
+    return renderStepCard({
+      title: runtimeTitle,
+      subtitle: content.source_run_title || content.runtime_type || '',
+      status: content.error ? 'failed' : 'completed',
+      source: content.family || content.source || '',
+      body: runtimeBody,
+      tone: section,
+      facts: [
+        { label: 'runtime', value: content.runtime_type },
+        { label: 'sequence', value: content.sequence },
+        { label: 'tool', value: toolCall.name || toolCall.tool_name || toolCall.toolName },
+        { label: 'approval', value: approval.status || approval.approval_state },
+        { label: 'artifact', value: artifact.title || artifact.kind || artifact.id }
+      ],
+      details: [
+        renderDetailsBlock('Data', content.data),
+        renderDetailsBlock('Tool call', content.tool_call),
+        renderDetailsBlock('Approval', content.approval),
+        renderDetailsBlock('Artifact', content.artifact_ref),
+        renderDetailsBlock('Raw trace', content.raw_json)
+      ]
+    });
+  }
+
   // =========================================================================
   // Per-render state
   // =========================================================================
@@ -142,6 +437,8 @@
       currentStatus: 'pending',
       reconnectTimer: null,
       destroyed: false,
+      seenEventIds: {},
+      lastLogSection: null,
       _unbindFns: []
     };
   }
@@ -156,12 +453,7 @@
     var html = '';
 
     if (type === 'progress') {
-      var msg = content.message || content.phase || 'Processing...';
-      var pct = content.progress_pct ? ' (' + content.progress_pct + '%)' : '';
-      html = '<div class="atd-log-entry atd-log-progress">' +
-        '<span style="color:var(--lex-color-primary-500);">&#9679;</span> ' +
-        escHtml(msg) + escHtml(pct) +
-      '</div>';
+      html = renderProgressEvent(content);
     } else if (type === 'agent_message') {
       html = '<div class="atd-log-entry atd-log-agent">' +
         '<strong style="color:var(--lex-color-primary-600);">Lana:</strong> ' +
@@ -173,30 +465,87 @@
         escHtml(content.message || '') +
       '</div>';
     } else if (type === 'status_change') {
-      html = '<div class="atd-log-entry atd-log-progress">' +
-        '<span style="color:var(--lex-text-tertiary);">Status:</span> ' +
-        escHtml(statusLabel(content.from_status || '')) + ' &rarr; ' +
-        escHtml(statusLabel(content.to_status || '')) +
-      '</div>';
+      html = renderStepCard({
+        title: 'Status change',
+        subtitle: 'Run lifecycle',
+        status: content.to_status || '',
+        source: 'runtime',
+        body: (statusLabel(content.from_status || '') || 'New run') + ' -> ' + statusLabel(content.to_status || ''),
+        tone: 'runtime'
+      });
     } else if (type === 'approval_request') {
-      html = '<div class="atd-log-entry atd-log-agent">' +
-        '<strong style="color:var(--lex-color-warning-500);">Lana:</strong> ' +
-        escHtml(content.summary || 'Requesting approval for proposed changes.') +
-      '</div>';
+      html = renderStepCard({
+        title: 'Approval requested',
+        subtitle: content.artifact_type || content.source_type || '',
+        status: content.status || 'awaiting_approval',
+        source: 'approval',
+        body: content.summary || 'Requesting approval for proposed changes.',
+        tone: 'approval',
+        facts: [
+          { label: 'artifact', value: content.title || content.artifact_type },
+          { label: 'changes', value: Array.isArray(content.proposed_changes) ? content.proposed_changes.length : '' },
+          { label: 'approval', value: content.approval_id }
+        ],
+        details: [
+          renderDetailsBlock('Proposed changes', content.proposed_changes),
+          renderDetailsBlock('Raw JSON', content.raw_json)
+        ]
+      });
     } else if (type === 'approval_response') {
       var approved = content.approved;
-      html = '<div class="atd-log-entry">' +
-        '<strong>' + (approved ? 'Approved' : 'Rejected') + '</strong>' +
-        (content.reason ? ': ' + escHtml(content.reason) : '') +
-      '</div>';
+      html = renderStepCard({
+        title: approved ? 'Approved' : 'Rejected',
+        subtitle: 'Human decision',
+        status: approved ? 'approved' : 'rejected',
+        source: 'approval',
+        body: content.reason || '',
+        tone: 'approval'
+      });
     } else if (type === 'error') {
       html = '<div class="atd-log-entry atd-log-error">' +
         '<strong>Error:</strong> ' + escHtml(content.message || 'Unknown error') +
       '</div>';
     } else if (type === 'completion') {
-      html = '<div class="atd-log-entry" style="color:var(--lex-color-success-500, #10b981);">' +
-        '<strong>Completed:</strong> ' + escHtml(content.summary || 'Task completed successfully.') +
-      '</div>';
+      html = renderStepCard({
+        title: 'Completed',
+        subtitle: 'Run complete',
+        status: 'completed',
+        source: 'runtime',
+        body: content.summary || 'Task completed successfully.',
+        tone: 'deliverable',
+        details: [renderDetailsBlock('Completion', content)]
+      });
+    } else if (type === 'runtime_event') {
+      html = renderRuntimeEvent(content);
+    } else if (type === 'artifact') {
+      var artifactStatus = content.status || '';
+      html = renderStepCard({
+        title: content.title || 'Artifact',
+        subtitle: content.artifact_type || '',
+        status: artifactStatus,
+        source: 'artifact',
+        body: content.summary || 'Artifact produced by this run.',
+        tone: 'deliverable',
+        facts: [
+          { label: 'artifact', value: content.artifact_type },
+          { label: 'target', value: content.apply_target_type },
+          { label: 'record', value: content.apply_target_id }
+        ],
+        details: [
+          renderDetailsBlock('Proposed changes', content.proposed_changes),
+          renderDetailsBlock('Raw JSON', content.raw_json)
+        ]
+      });
+    } else if (type === 'outcome') {
+      html = renderStepCard({
+        title: content.outcome || content.status || 'Outcome',
+        subtitle: 'Run outcome',
+        status: content.status || 'completed',
+        source: 'outcome',
+        body: content.summary || compactObjectSummary(content),
+        tone: 'deliverable',
+        details: [renderDetailsBlock('Outcome', content)]
+      });
     } else if (type === 'stream') {
       return '';
     }
@@ -212,12 +561,37 @@
     log.scrollTop = log.scrollHeight;
   }
 
+  function appendEvent(state, evt) {
+    if (!evt) return;
+    var eventId = evt.id || null;
+    if (eventId && state.seenEventIds[eventId]) return;
+    if (eventId) state.seenEventIds[eventId] = true;
+    var rendered = renderEvent(evt);
+    if (rendered) {
+      var section = classifyEvent(evt);
+      if (section !== state.lastLogSection) {
+        appendToLog(renderSectionDivider(section));
+        state.lastLogSection = section;
+      }
+      appendToLog(rendered);
+    }
+
+    if (evt.event_type === 'approval_request') {
+      showApproval(evt.content || {});
+    }
+
+    if (evt.event_type === 'status_change' && evt.content) {
+      updateUIForStatus(state, evt.content.to_status);
+    }
+  }
+
   // =========================================================================
   // UI state
   // =========================================================================
 
   function updateUIForStatus(state, status) {
     state.currentStatus = status;
+    setBanner(state.task, status);
 
     var dot = el('atdStatusDot');
     var label = el('atdStatusLabel');
@@ -237,23 +611,145 @@
     else hide('atdRetryArea');
   }
 
+  function decodeText(value) {
+    var text = value == null ? '' : String(value);
+    if (text.indexOf('&') === -1) return text;
+    var textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    return textarea.value;
+  }
+
+  function parseStructuredValue(value) {
+    if (value == null || value === '') return '';
+    if (typeof value === 'object') return value;
+
+    var text = decodeText(value).trim();
+    if (!text) return '';
+    if (text !== '(empty)' && (text.charAt(0) === '{' || text.charAt(0) === '[')) {
+      try {
+        return JSON.parse(text);
+      } catch (_err) {
+        return text;
+      }
+    }
+    return text;
+  }
+
+  function readableValue(value) {
+    var parsed = parseStructuredValue(value);
+    if (parsed == null || parsed === '') return '(empty)';
+    if (typeof parsed === 'object') return JSON.stringify(parsed, null, 2);
+    return String(parsed);
+  }
+
   function showApproval(content) {
     var summaryEl = el('atdApprovalSummary');
     if (summaryEl) summaryEl.textContent = content.summary || 'Review proposed changes';
 
-    var diffContainer = el('atdDiffContainer');
-    if (diffContainer && content.proposed_changes && content.proposed_changes.length > 0) {
-      var diffHtml = '';
-      for (var i = 0; i < content.proposed_changes.length; i++) {
-        var change = content.proposed_changes[i];
-        diffHtml += escHtml(change.entity || 'Entity') + '\n';
-        diffHtml += '  ' + escHtml(change.field || '') + ': ';
-        diffHtml += escHtml(change.old_value || '(empty)') + ' -> ' + escHtml(change.new_value || '(empty)') + '\n';
+    var descriptionEl = el('atdApprovalDescription');
+    if (descriptionEl) {
+      var descriptionHtml = '';
+      var proposed = content.proposed_changes || [];
+      if (proposed.length > 0) {
+        for (var i = 0; i < proposed.length; i++) {
+          var change = proposed[i] || {};
+          descriptionHtml += '<div class="atd-approval-item">';
+          descriptionHtml += '<div class="atd-approval-item-title">' + escHtml(decodeText(change.entity || 'Proposed change')) + '</div>';
+          if (change.field) {
+            descriptionHtml += '<div class="atd-approval-item-kind">' + escHtml(decodeText(change.field)) + '</div>';
+          }
+          descriptionHtml += '<div class="atd-approval-item-body">' + escHtml(readableValue(change.new_value || 'No description provided.')) + '</div>';
+          descriptionHtml += '</div>';
+        }
+      } else {
+        descriptionHtml = '<div class="atd-approval-item-body">No human-readable description was provided.</div>';
       }
-      diffContainer.textContent = diffHtml;
+      descriptionEl.innerHTML = descriptionHtml;
+    }
+
+    var diffContainer = el('atdDiffContainer');
+    if (diffContainer) {
+      var raw = content.raw_json || null;
+      if (!raw && content.proposed_changes && content.proposed_changes.length > 0) {
+        raw = content.proposed_changes.map(function (change) {
+          return {
+            entity: change.entity || null,
+            field: change.field || null,
+            raw_json: change.raw_json || null
+          };
+        });
+      }
+      var rawText = '';
+      try {
+        rawText = JSON.stringify(raw || {}, null, 2);
+      } catch (err) {
+        rawText = String(raw || '');
+      }
+      diffContainer.textContent = rawText;
     }
 
     show('atdApprovalPanel');
+  }
+
+  function renderDeliverables(task) {
+    var panel = el('atdDeliverables');
+    if (!panel) return;
+    var artifacts = (task && task.artifacts) || [];
+    var applied = artifacts.filter(function (artifact) {
+      return artifact && (artifact.status === 'applied' || artifact.status === 'approved');
+    });
+    updateDeliverablesCount(applied.length);
+    if (applied.length === 0) {
+      panel.innerHTML = '<lex-card padding="none">' +
+        '<div class="atd-deliverables-head">Deliverables</div>' +
+        '<div class="atd-deliverables-empty">No deliverables have been produced for this run yet.</div>' +
+      '</lex-card>';
+      return;
+    }
+
+    var html = '<lex-card padding="none">';
+    html += '<div class="atd-deliverables-head">Deliverables</div>';
+    html += '<div class="atd-deliverables-list">';
+    for (var i = 0; i < applied.length; i++) {
+      var artifact = applied[i] || {};
+      var changes = artifactToReadableItems(artifact);
+      html += '<div class="atd-deliverable">';
+      html += '<div class="atd-deliverable-title">' + escHtml(artifact.title || artifact.kind || 'Artifact') + '</div>';
+      html += '<div class="atd-deliverable-meta">' + escHtml((artifact.kind || 'artifact') + ' · ' + (artifact.status || '')) + '</div>';
+      if (artifact.apply_target_id) {
+        html += '<div class="atd-deliverable-meta">Created record: ' + escHtml(artifact.apply_target_id) + '</div>';
+      }
+      if (changes.length > 0) {
+        html += '<div class="atd-deliverable-items">';
+        for (var j = 0; j < changes.length; j++) html += changes[j];
+        html += '</div>';
+      }
+      html += renderDetailsBlock('Raw JSON', artifact.content_jsonb || artifact.payload || artifact.content);
+      html += '</div>';
+    }
+    html += '</div></lex-card>';
+    panel.innerHTML = html;
+  }
+
+  function artifactToReadableItems(artifact) {
+    var content = artifact && (artifact.content_jsonb || artifact.payload || artifact.content);
+    var items = [];
+    if (!content || typeof content !== 'object') return items;
+    if (Array.isArray(content.workstreams)) {
+      for (var i = 0; i < content.workstreams.length; i++) {
+        var workstream = content.workstreams[i] || {};
+        var text = workstream.scope || 'No scope provided.';
+        var meta = [];
+        if (workstream.owner_role) meta.push('Owner: ' + workstream.owner_role);
+        if (workstream.estimated_duration_days != null) meta.push('Duration: ' + workstream.estimated_duration_days + ' days');
+        items.push('<div class="atd-approval-item">' +
+          '<div class="atd-approval-item-title">' + escHtml(workstream.name || ('Workstream ' + String(i + 1))) + '</div>' +
+          '<div class="atd-approval-item-body">' + escHtml(text) + '</div>' +
+          (meta.length ? '<div class="atd-deliverable-meta">' + escHtml(meta.join(' · ')) + '</div>' : '') +
+        '</div>');
+      }
+    }
+    return items;
   }
 
   // =========================================================================
@@ -274,38 +770,24 @@
         state.task = resp.data || {};
         var events = state.task.events || [];
 
-        var titleEl = el('atdTitle');
-        if (titleEl) titleEl.textContent = state.task.name || 'Task Detail';
-
-        var priorityEl = el('atdPriorityBadge');
-        if (priorityEl && state.task.priority) {
-          priorityEl.innerHTML = '<span class="atd-priority-badge" style="background:' +
-            priorityColor(state.task.priority) + ';">' + escHtml(state.task.priority) + '</span>';
-        }
-
         var matterEl = el('atdMatterLink');
         if (matterEl && state.task.matter_id) {
-          matterEl.innerHTML = '<a href="../workspace-details.html?id=' + escHtml(state.task.matter_id) +
-            '" style="color:var(--lex-color-primary-600);font-size:0.75rem;text-decoration:none;">View Matter</a>';
-        }
-
-        var createdEl = el('atdCreatedAt');
-        if (createdEl && state.task.created_at) {
-          createdEl.textContent = timeAgo(state.task.created_at);
+          matterEl.href = '../workspace-details.html?id=' + encodeURIComponent(state.task.matter_id);
+          matterEl.classList.remove('hidden');
+        } else if (matterEl) {
+          matterEl.classList.add('hidden');
         }
 
         var log = el('atdLog');
         if (log) log.innerHTML = '';
+        state.seenEventIds = {};
+        state.lastLogSection = null;
 
         for (var i = 0; i < events.length; i++) {
-          var html = renderEvent(events[i]);
-          appendToLog(html);
-
-          if (events[i].event_type === 'approval_request') {
-            showApproval(events[i].content || {});
-          }
+          appendEvent(state, events[i]);
         }
 
+        renderDeliverables(state.task);
         updateUIForStatus(state, state.task.execution_status || 'pending');
 
         startSSE(state);
@@ -342,16 +824,7 @@
       if (state.destroyed) return;
       try {
         var evt = JSON.parse(e.data);
-        var html = renderEvent(evt);
-        appendToLog(html);
-
-        if (evt.event_type === 'approval_request') {
-          showApproval(evt.content || {});
-        }
-
-        if (evt.event_type === 'status_change' && evt.content) {
-          updateUIForStatus(state, evt.content.to_status);
-        }
+        appendEvent(state, evt);
       } catch (parseErr) {
         console.error('[AgenticTaskDetail] SSE parse error:', parseErr);
       }
@@ -367,8 +840,17 @@
       } catch (err) { /* ignore */ }
     });
 
-    state.eventSource.addEventListener('catchup', function () {
-      // Catchup events are sent as an array — we already loaded them via API.
+    state.eventSource.addEventListener('catchup', function (e) {
+      if (state.destroyed) return;
+      try {
+        var events = JSON.parse(e.data);
+        if (!Array.isArray(events)) return;
+        for (var i = 0; i < events.length; i++) {
+          appendEvent(state, events[i]);
+        }
+      } catch (err) {
+        console.error('[AgenticTaskDetail] SSE catchup parse error:', err);
+      }
     });
 
     state.eventSource.addEventListener('done', function (e) {
@@ -628,14 +1110,25 @@
         if (!container) return;
         if (container.classList.contains('hidden')) {
           show('atdDiffContainer');
-          diffToggle.textContent = 'Hide detailed changes';
+          diffToggle.textContent = 'Hide raw JSON';
         } else {
           hide('atdDiffContainer');
-          diffToggle.textContent = 'View detailed changes';
+          diffToggle.textContent = 'Show raw JSON';
         }
       };
       diffToggle.addEventListener('click', diffHandler);
       state._unbindFns.push(function () { diffToggle.removeEventListener('click', diffHandler); });
+    }
+
+    var tabButtons = rootEl.querySelectorAll('[data-atd-tab]');
+    for (var i = 0; i < tabButtons.length; i++) {
+      (function (button) {
+        var tabHandler = function () {
+          setActiveTab(button.getAttribute('data-atd-tab') || 'execution');
+        };
+        button.addEventListener('click', tabHandler);
+        state._unbindFns.push(function () { button.removeEventListener('click', tabHandler); });
+      })(tabButtons[i]);
     }
 
     loadTask(state);
