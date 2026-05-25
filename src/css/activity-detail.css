@@ -35,6 +35,89 @@
   background: var(--lex-bg-tertiary);
 }
 
+.atd-run-summary {
+  margin: 0 0 14px;
+}
+.atd-summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+.atd-summary-eyebrow {
+  color: var(--lex-text-tertiary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.atd-summary-title {
+  margin-top: 3px;
+  color: var(--lex-text-primary);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.atd-summary-status {
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 4px 8px;
+  text-transform: uppercase;
+}
+.atd-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(180px, 0.8fr) minmax(160px, 0.6fr);
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+.atd-summary-block {
+  min-width: 0;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 6px;
+  background: var(--lex-bg-secondary);
+  padding: 10px;
+}
+.atd-summary-block span,
+.atd-deliverable-target span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--lex-text-tertiary);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.atd-summary-block strong,
+.atd-deliverable-target strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--lex-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+.atd-muted {
+  color: var(--lex-text-tertiary);
+  font-weight: 400;
+}
+.atd-target-link {
+  color: var(--lex-color-primary-600);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.atd-target-link:hover {
+  text-decoration: underline;
+}
+.atd-target-id {
+  overflow-wrap: anywhere;
+}
+
 .atd-tabs {
   display: flex;
   align-items: center;
@@ -83,7 +166,60 @@
   display: none;
 }
 
+.atd-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--lex-border-subtle);
+  color: var(--lex-text-tertiary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.atd-pane-subtitle {
+  color: var(--lex-text-tertiary);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.atd-trace-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--lex-border-subtle);
+  background: var(--lex-bg-secondary);
+}
+.atd-trace-tab {
+  appearance: none;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 6px;
+  background: var(--lex-bg-primary);
+  color: var(--lex-text-secondary);
+  cursor: pointer;
+  min-height: 28px;
+  padding: 0 9px;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.atd-trace-tab:hover {
+  border-color: var(--lex-border-default);
+  color: var(--lex-text-primary);
+}
+.atd-trace-tab.active {
+  border-color: var(--lex-text-primary);
+  color: var(--lex-text-primary);
+  background: var(--lex-bg-primary);
+}
+
 .atd-log { max-height: 620px; overflow-y: auto; padding: 16px; }
+.atd-log-empty { padding: 24px; text-align: center; color: var(--lex-text-tertiary); font-size: 0.8125rem; }
 .atd-log-entry { padding: 8px 0; font-size: 0.8125rem; line-height: 1.5; }
 .atd-log-entry + .atd-log-entry { border-top: 1px solid var(--lex-border-subtle); }
 .atd-log-agent { color: var(--lex-text-primary); }
@@ -186,7 +322,84 @@
 .atd-deliverable { border: 1px solid var(--lex-border-subtle); border-radius: 6px; background: var(--lex-bg-primary); padding: 12px; }
 .atd-deliverable-title { font-size: 0.875rem; font-weight: 600; color: var(--lex-text-primary); }
 .atd-deliverable-meta { margin-top: 4px; font-size: 0.75rem; color: var(--lex-text-tertiary); }
+.atd-deliverable-target {
+  margin-top: 10px;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 6px;
+  background: var(--lex-bg-secondary);
+  padding: 8px;
+}
 .atd-deliverable-items { display: grid; gap: 8px; margin-top: 12px; }
+
+.atd-readable-payload {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.atd-readable-title {
+  color: var(--lex-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.atd-readable-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+.atd-readable-row {
+  min-width: 0;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 6px;
+  background: var(--lex-bg-secondary);
+  padding: 8px;
+}
+.atd-readable-row span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--lex-text-tertiary);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.atd-readable-row strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--lex-text-primary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.atd-readable-text {
+  white-space: pre-line;
+  color: var(--lex-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.atd-readable-list,
+.atd-readable-nested {
+  display: grid;
+  gap: 8px;
+}
+.atd-readable-card,
+.atd-readable-item {
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 6px;
+  background: var(--lex-bg-secondary);
+  padding: 10px;
+}
+.atd-readable-card-title {
+  color: var(--lex-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.atd-readable-card-body {
+  margin-top: 5px;
+  white-space: pre-line;
+  color: var(--lex-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
 
 .atd-approval { padding: 16px; margin-top: 16px; border-radius: 8px; border: 1px solid var(--lex-border-default); background: var(--lex-bg-secondary); }
 .atd-approval-title { font-size: 0.875rem; font-weight: 500; color: var(--lex-text-primary); margin-bottom: 12px; }
@@ -218,3 +431,14 @@
 .atd-input-area textarea:focus { outline: none; border-color: var(--lex-color-primary-500); }
 
 .atd-priority-badge { display: inline-block; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 6px; border-radius: 3px; color: #fff; font-weight: 600; }
+
+@media (max-width: 760px) {
+  .atd-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .atd-pane-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+}

@@ -30,15 +30,28 @@
     + '</lex-banner>'
     + '<lex-breadcrumb id="atdBreadcrumb" style="margin:12px 0 16px;" items=\'[{"label":"LanaAgents","href":"#catalog"},{"label":"Activity","href":"#activity"},{"label":"Run detail"}]\'></lex-breadcrumb>'
 
+    + '<div id="atdRunSummary" class="atd-run-summary hidden"></div>'
+
     + '<div class="atd-tabs" role="tablist" aria-label="Run details">'
-    +   '<button id="atdExecutionTab" class="atd-tab active" type="button" role="tab" aria-selected="true" aria-controls="atdExecutionPane" data-atd-tab="execution">Execution log</button>'
+    +   '<button id="atdExecutionTab" class="atd-tab active" type="button" role="tab" aria-selected="true" aria-controls="atdExecutionPane" data-atd-tab="execution">Trace</button>'
     +   '<button id="atdDeliverablesTab" class="atd-tab" type="button" role="tab" aria-selected="false" aria-controls="atdDeliverablesPane" data-atd-tab="deliverables">Deliverables <span id="atdDeliverablesCount" class="atd-tab-count hidden">0</span></button>'
     + '</div>'
 
     + '<section id="atdExecutionPane" class="atd-tab-pane" role="tabpanel" aria-labelledby="atdExecutionTab">'
     +   '<lex-card padding="none">'
-    +     '<div style="padding:12px 16px;border-bottom:1px solid var(--lex-border-subtle);font-size:0.75rem;font-weight:500;color:var(--lex-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;">'
-    +       'Execution Log'
+    +     '<div class="atd-pane-head">'
+    +       '<div>Step Trace</div>'
+    +       '<div class="atd-pane-subtitle">Grouped by run phase</div>'
+    +     '</div>'
+    +     '<div class="atd-trace-tabs" role="tablist" aria-label="Trace sections">'
+    +       '<button class="atd-trace-tab active" type="button" data-atd-trace="all">All</button>'
+    +       '<button class="atd-trace-tab" type="button" data-atd-trace="context">Context</button>'
+    +       '<button class="atd-trace-tab" type="button" data-atd-trace="runtime">Runtime</button>'
+    +       '<button class="atd-trace-tab" type="button" data-atd-trace="hermes">Hermes</button>'
+    +       '<button class="atd-trace-tab" type="button" data-atd-trace="tools">Tools</button>'
+    +       '<button class="atd-trace-tab" type="button" data-atd-trace="approval">Approval</button>'
+    +       '<button class="atd-trace-tab" type="button" data-atd-trace="deliverable">Deliverables</button>'
+    +       '<button class="atd-trace-tab" type="button" data-atd-trace="trace">Other</button>'
     +     '</div>'
     +     '<div class="atd-log" id="atdLog">'
     +       '<div style="text-align:center;padding:24px;color:var(--lex-text-tertiary);font-size:0.8125rem;">'
@@ -132,7 +145,7 @@
     if (status === 'failed')            return 'Failed';
     if (status === 'rejected')          return 'Rejected';
     if (status === 'cancelled')         return 'Cancelled';
-    return status;
+    return humanizeToken(status);
   }
 
   function statusColor(status) {
@@ -143,14 +156,6 @@
     if (status === 'failed')            return '#ef4444';
     if (status === 'rejected')          return '#ef4444';
     if (status === 'cancelled')         return '#6b7280';
-    return '#9ca3af';
-  }
-
-  function priorityColor(priority) {
-    if (priority === 'urgent')  return '#ef4444';
-    if (priority === 'high')    return '#f59e0b';
-    if (priority === 'medium')  return '#3b82f6';
-    if (priority === 'low')     return '#6b7280';
     return '#9ca3af';
   }
 
@@ -221,6 +226,13 @@
     return fallback || '';
   }
 
+  function compactLongText(value, limit) {
+    var text = compactText(value, '');
+    var max = limit || 220;
+    if (text.length <= max) return text;
+    return text.slice(0, max - 1) + '...';
+  }
+
   function firstValue(values) {
     for (var i = 0; i < values.length; i++) {
       if (values[i] != null && values[i] !== '') return values[i];
@@ -262,6 +274,187 @@
     '</details>';
   }
 
+  function objectHasValues(value) {
+    if (!value || typeof value !== 'object') return false;
+    var keys = Object.keys(value);
+    for (var i = 0; i < keys.length; i++) {
+      var item = value[keys[i]];
+      if (item != null && item !== '') return true;
+    }
+    return false;
+  }
+
+  function renderRawDetails(title, value) {
+    if (value == null || value === '') return '';
+    if (typeof value === 'object' && !objectHasValues(value)) return '';
+    return renderDetailsBlock(title || 'Raw details', value);
+  }
+
+  function renderTargetLink(target) {
+    if (!target || !target.id) return '';
+    var labelParts = [];
+    if (target.type) labelParts.push(humanizeValue(target.type));
+    labelParts.push(String(target.id));
+    var label = labelParts.join(' ');
+    if (target.url) {
+      return '<a class="atd-target-link" href="' + escHtml(target.url) + '">' + escHtml(label) + '</a>';
+    }
+    return '<span class="atd-target-id">' + escHtml(label) + '</span>';
+  }
+
+  function targetUrl(type, id) {
+    if (!id) return '';
+    var t = String(type || '').toLowerCase();
+    if (t === 'matter' || t === 'workspace') {
+      return '../workspace-details.html?id=' + encodeURIComponent(id);
+    }
+    return '';
+  }
+
+  function findAppliedTarget(task) {
+    var artifacts = (task && task.artifacts) || [];
+    for (var i = 0; i < artifacts.length; i++) {
+      var artifact = artifacts[i] || {};
+      var id = firstValue([
+        artifact.apply_target_id,
+        artifact.target_id,
+        artifact.entity_id,
+        artifact.record_id
+      ]);
+      if (!id) continue;
+      var type = firstValue([
+        artifact.apply_target_type,
+        artifact.target_type,
+        artifact.entity_type,
+        artifact.kind
+      ]);
+      var url = firstValue([
+        artifact.apply_target_url,
+        artifact.target_url,
+        artifact.url,
+        targetUrl(type, id)
+      ]);
+      return { id: id, type: type, url: url };
+    }
+    return null;
+  }
+
+  function approvalStatusForTask(task) {
+    var artifacts = (task && task.artifacts) || [];
+    var sawApproval = false;
+    for (var i = 0; i < artifacts.length; i++) {
+      var artifact = artifacts[i] || {};
+      var status = firstValue([
+        artifact.approval_status,
+        artifact.approval_state,
+        artifact.decision,
+        artifact.status
+      ]);
+      if (!status) continue;
+      var normalized = String(status).toLowerCase();
+      if (normalized === 'approved' || normalized === 'applied') sawApproval = true;
+      if (normalized === 'rejected' || normalized === 'denied') return 'Rejected';
+      if (normalized === 'awaiting_approval' || normalized === 'pending_approval' || normalized === 'pending') return 'Pending approval';
+    }
+
+    var events = (task && task.events) || [];
+    for (var j = events.length - 1; j >= 0; j--) {
+      var evt = events[j] || {};
+      var content = evt.content || {};
+      if (evt.event_type === 'approval_response') {
+        return content.approved === false ? 'Rejected' : 'Approved';
+      }
+      if (evt.event_type === 'approval_request') sawApproval = true;
+    }
+
+    if (task && task.execution_status === 'awaiting_approval') return 'Pending approval';
+    if (sawApproval) return 'Approved';
+    return 'No approval required';
+  }
+
+  function findFinalDeliverable(task) {
+    if (!task) return '';
+    var direct = firstValue([
+      task.final_deliverable,
+      task.final_delivery,
+      task.result_summary,
+      task.completion_summary,
+      task.summary,
+      task.output_summary
+    ]);
+    if (direct) return compactLongText(direct, 520);
+
+    var events = task.events || [];
+    for (var i = events.length - 1; i >= 0; i--) {
+      var evt = events[i] || {};
+      var content = evt.content || {};
+      if (evt.event_type === 'completion' || evt.event_type === 'outcome') {
+        var eventSummary = firstValue([content.summary, content.message, content.outcome]);
+        if (eventSummary) return compactLongText(eventSummary, 520);
+      }
+    }
+
+    var artifacts = collectDeliverables(task);
+    if (artifacts.length > 0) {
+      var artifact = artifacts[0] || {};
+      var payload = parseStructuredValue(artifact.content_jsonb || artifact.payload || artifact.content || {});
+      var payloadSummary = '';
+      if (payload && typeof payload === 'object') {
+        payloadSummary = firstValue([
+          payload.summary,
+          payload.description,
+          payload.final_deliverable,
+          payload.title
+        ]);
+      }
+      return compactLongText(payloadSummary || artifact.title || artifact.name || artifact.kind || 'Deliverable produced', 520);
+    }
+
+    if (task.execution_status === 'completed') return 'Run completed successfully.';
+    return '';
+  }
+
+  function renderRunSummary(task) {
+    var container = el('atdRunSummary');
+    if (!container) return;
+    if (!task || !isTerminal(task.execution_status || '') && task.execution_status !== 'awaiting_approval') {
+      container.classList.add('hidden');
+      container.innerHTML = '';
+      return;
+    }
+
+    var deliverable = findFinalDeliverable(task);
+    var target = findAppliedTarget(task);
+    var approval = approvalStatusForTask(task);
+    var status = task.execution_status || 'pending';
+    var targetHtml = target ? renderTargetLink(target) : '<span class="atd-muted">No applied target recorded</span>';
+
+    container.innerHTML = '<lex-card padding="none">' +
+      '<div class="atd-summary-head">' +
+        '<div>' +
+          '<div class="atd-summary-eyebrow">Run summary</div>' +
+          '<div class="atd-summary-title">' + escHtml(statusLabel(status)) + '</div>' +
+        '</div>' +
+        '<span class="atd-summary-status">' + escHtml(statusLabel(status)) + '</span>' +
+      '</div>' +
+      '<div class="atd-summary-grid">' +
+        '<div class="atd-summary-block atd-summary-block--wide">' +
+          '<span>Final deliverable</span>' +
+          '<strong>' + escHtml(deliverable || 'No final deliverable recorded yet.') + '</strong>' +
+        '</div>' +
+        '<div class="atd-summary-block">' +
+          '<span>Applied target</span>' +
+          '<strong>' + targetHtml + '</strong>' +
+        '</div>' +
+        '<div class="atd-summary-block">' +
+          '<span>Approval</span>' +
+          '<strong>' + escHtml(approval) + '</strong>' +
+        '</div>' +
+      '</div>' +
+    '</lex-card>';
+    container.classList.remove('hidden');
+  }
+
   function setActiveTab(tabName) {
     var executionTab = el('atdExecutionTab');
     var deliverablesTab = el('atdDeliverablesTab');
@@ -279,6 +472,16 @@
     }
     if (executionPane) executionPane.classList.toggle('hidden', showDeliverables);
     if (deliverablesPane) deliverablesPane.classList.toggle('hidden', !showDeliverables);
+  }
+
+  function setActiveTraceSection(state, sectionName) {
+    state.activeTraceSection = sectionName || 'all';
+    var buttons = document.querySelectorAll('[data-atd-trace]');
+    for (var i = 0; i < buttons.length; i++) {
+      var isActive = buttons[i].getAttribute('data-atd-trace') === state.activeTraceSection;
+      buttons[i].classList.toggle('active', isActive);
+    }
+    renderTrace(state);
   }
 
   function updateDeliverablesCount(count) {
@@ -314,6 +517,37 @@
     for (var i = 0; i < details.length; i++) html += details[i];
     html += '</div>';
     return html;
+  }
+
+  function renderTrace(state) {
+    var log = el('atdLog');
+    if (!log) return;
+    var events = state.events || [];
+    var sectionFilter = state.activeTraceSection || 'all';
+    var html = '';
+    var lastSection = null;
+    var visibleCount = 0;
+
+    for (var i = 0; i < events.length; i++) {
+      var evt = events[i];
+      var section = classifyEvent(evt);
+      if (sectionFilter !== 'all' && section !== sectionFilter) continue;
+      var rendered = renderEvent(evt);
+      if (!rendered) continue;
+      if (section !== lastSection) {
+        html += renderSectionDivider(section);
+        lastSection = section;
+      }
+      html += rendered;
+      visibleCount++;
+    }
+
+    if (visibleCount === 0) {
+      html = '<div class="atd-log-empty">No trace events in this section yet.</div>';
+    }
+
+    log.innerHTML = html;
+    log.scrollTop = log.scrollHeight;
   }
 
   function renderSummaryValue(key, value) {
@@ -382,9 +616,9 @@
       facts: facts,
       tone: classifyEvent({ event_type: 'progress', content: content }),
       details: [
-        renderDetailsBlock('Input', content.input),
-        renderDetailsBlock('Output', content.output),
-        renderDetailsBlock('Metadata', content.metadata)
+        renderRawDetails('Input details', content.input),
+        renderRawDetails('Output details', content.output),
+        renderRawDetails('Metadata', content.metadata)
       ]
     });
   }
@@ -416,11 +650,11 @@
         { label: 'artifact', value: artifact.title || artifact.kind || artifact.id }
       ],
       details: [
-        renderDetailsBlock('Data', content.data),
-        renderDetailsBlock('Tool call', content.tool_call),
-        renderDetailsBlock('Approval', content.approval),
-        renderDetailsBlock('Artifact', content.artifact_ref),
-        renderDetailsBlock('Raw trace', content.raw_json)
+        renderRawDetails('Data details', content.data),
+        renderRawDetails('Tool call details', content.tool_call),
+        renderRawDetails('Approval details', content.approval),
+        renderRawDetails('Artifact details', content.artifact_ref),
+        renderRawDetails('Raw trace', content.raw_json)
       ]
     });
   }
@@ -435,10 +669,11 @@
       task: null,
       eventSource: null,
       currentStatus: 'pending',
+      events: [],
+      activeTraceSection: 'all',
       reconnectTimer: null,
       destroyed: false,
       seenEventIds: {},
-      lastLogSection: null,
       _unbindFns: []
     };
   }
@@ -470,7 +705,7 @@
         subtitle: 'Run lifecycle',
         status: content.to_status || '',
         source: 'runtime',
-        body: (statusLabel(content.from_status || '') || 'New run') + ' -> ' + statusLabel(content.to_status || ''),
+        body: (statusLabel(content.from_status || '') || 'New run') + ' to ' + statusLabel(content.to_status || ''),
         tone: 'runtime'
       });
     } else if (type === 'approval_request') {
@@ -487,8 +722,8 @@
           { label: 'approval', value: content.approval_id }
         ],
         details: [
-          renderDetailsBlock('Proposed changes', content.proposed_changes),
-          renderDetailsBlock('Raw JSON', content.raw_json)
+          renderRawDetails('Proposed change details', content.proposed_changes),
+          renderRawDetails('Raw approval JSON', content.raw_json)
         ]
       });
     } else if (type === 'approval_response') {
@@ -513,7 +748,7 @@
         source: 'runtime',
         body: content.summary || 'Task completed successfully.',
         tone: 'deliverable',
-        details: [renderDetailsBlock('Completion', content)]
+        details: [renderRawDetails('Completion details', content)]
       });
     } else if (type === 'runtime_event') {
       html = renderRuntimeEvent(content);
@@ -532,8 +767,8 @@
           { label: 'record', value: content.apply_target_id }
         ],
         details: [
-          renderDetailsBlock('Proposed changes', content.proposed_changes),
-          renderDetailsBlock('Raw JSON', content.raw_json)
+          renderRawDetails('Proposed change details', content.proposed_changes),
+          renderRawDetails('Raw artifact JSON', content.raw_json)
         ]
       });
     } else if (type === 'outcome') {
@@ -544,7 +779,7 @@
         source: 'outcome',
         body: content.summary || compactObjectSummary(content),
         tone: 'deliverable',
-        details: [renderDetailsBlock('Outcome', content)]
+        details: [renderRawDetails('Outcome details', content)]
       });
     } else if (type === 'stream') {
       return '';
@@ -553,28 +788,13 @@
     return html;
   }
 
-  function appendToLog(html) {
-    if (!html) return;
-    var log = el('atdLog');
-    if (!log) return;
-    log.insertAdjacentHTML('beforeend', html);
-    log.scrollTop = log.scrollHeight;
-  }
-
   function appendEvent(state, evt) {
     if (!evt) return;
     var eventId = evt.id || null;
     if (eventId && state.seenEventIds[eventId]) return;
     if (eventId) state.seenEventIds[eventId] = true;
-    var rendered = renderEvent(evt);
-    if (rendered) {
-      var section = classifyEvent(evt);
-      if (section !== state.lastLogSection) {
-        appendToLog(renderSectionDivider(section));
-        state.lastLogSection = section;
-      }
-      appendToLog(rendered);
-    }
+    state.events.push(evt);
+    renderTrace(state);
 
     if (evt.event_type === 'approval_request') {
       showApproval(evt.content || {});
@@ -592,6 +812,10 @@
   function updateUIForStatus(state, status) {
     state.currentStatus = status;
     setBanner(state.task, status);
+    if (state.task) {
+      state.task.execution_status = status;
+      renderRunSummary(state.task);
+    }
 
     var dot = el('atdStatusDot');
     var label = el('atdStatusLabel');
@@ -638,8 +862,143 @@
   function readableValue(value) {
     var parsed = parseStructuredValue(value);
     if (parsed == null || parsed === '') return '(empty)';
-    if (typeof parsed === 'object') return JSON.stringify(parsed, null, 2);
+    if (typeof parsed === 'object') return compactObjectSummary(parsed) || 'Structured data';
     return String(parsed);
+  }
+
+  function renderPrimitivePayloadValue(label, value) {
+    var rendered = summarizeValue(value);
+    if (!rendered) return '';
+    return '<div class="atd-readable-row">' +
+      '<span>' + escHtml(humanizeKey(label)) + '</span>' +
+      '<strong>' + escHtml(rendered) + '</strong>' +
+    '</div>';
+  }
+
+  function renderReadableObject(value, depth) {
+    if (!value || typeof value !== 'object') return '';
+    var keys = Object.keys(value);
+    var rows = [];
+    var nested = [];
+    var currentDepth = depth || 0;
+
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var item = value[key];
+      if (item == null || item === '') continue;
+      if (typeof item === 'object') {
+        if (currentDepth < 1) {
+          var child = renderReadablePayload(item, humanizeKey(key), currentDepth + 1);
+          if (child) nested.push(child);
+        } else {
+          rows.push(renderPrimitivePayloadValue(key, summarizeValue(item)));
+        }
+      } else {
+        rows.push(renderPrimitivePayloadValue(key, item));
+      }
+    }
+
+    var html = '';
+    if (rows.length) html += '<div class="atd-readable-grid">' + rows.join('') + '</div>';
+    if (nested.length) html += '<div class="atd-readable-nested">' + nested.join('') + '</div>';
+    return html;
+  }
+
+  function renderReadablePayload(value, title, depth) {
+    var parsed = parseStructuredValue(value);
+    if (parsed == null || parsed === '') return '';
+    var heading = title ? '<div class="atd-readable-title">' + escHtml(humanizeKey(title)) + '</div>' : '';
+
+    if (typeof parsed !== 'object') {
+      return '<div class="atd-readable-payload">' +
+        heading +
+        '<div class="atd-readable-text">' + escHtml(String(parsed)) + '</div>' +
+      '</div>';
+    }
+
+    if (Array.isArray(parsed)) {
+      if (parsed.length === 0) return '';
+      var listHtml = '';
+      for (var i = 0; i < parsed.length; i++) {
+        var item = parsed[i];
+        var itemTitle = title ? title + ' ' + String(i + 1) : 'Item ' + String(i + 1);
+        if (item && typeof item === 'object') {
+          listHtml += '<div class="atd-readable-item">' + renderReadablePayload(item, itemTitle, (depth || 0) + 1) + '</div>';
+        } else {
+          listHtml += '<div class="atd-readable-item">' + escHtml(summarizeValue(item)) + '</div>';
+        }
+      }
+      return '<div class="atd-readable-payload">' + heading + listHtml + '</div>';
+    }
+
+    if (Array.isArray(parsed.workstreams)) {
+      return '<div class="atd-readable-payload">' +
+        heading +
+        renderWorkstreams(parsed.workstreams) +
+        renderReadableObject(withoutKeys(parsed, ['workstreams']), depth || 0) +
+      '</div>';
+    }
+
+    if (Array.isArray(parsed.proposed_changes)) {
+      return '<div class="atd-readable-payload">' +
+        heading +
+        renderProposedChanges(parsed.proposed_changes) +
+        renderReadableObject(withoutKeys(parsed, ['proposed_changes']), depth || 0) +
+      '</div>';
+    }
+
+    return '<div class="atd-readable-payload">' +
+      heading +
+      renderReadableObject(parsed, depth || 0) +
+    '</div>';
+  }
+
+  function withoutKeys(value, keysToDrop) {
+    var out = {};
+    if (!value || typeof value !== 'object') return out;
+    var keys = Object.keys(value);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var drop = false;
+      for (var j = 0; j < keysToDrop.length; j++) {
+        if (key === keysToDrop[j]) drop = true;
+      }
+      if (!drop) out[key] = value[key];
+    }
+    return out;
+  }
+
+  function renderWorkstreams(workstreams) {
+    if (!Array.isArray(workstreams) || workstreams.length === 0) return '';
+    var html = '<div class="atd-readable-list">';
+    for (var i = 0; i < workstreams.length; i++) {
+      var workstream = workstreams[i] || {};
+      var meta = [];
+      if (workstream.owner_role) meta.push('Owner: ' + humanizeValue(workstream.owner_role));
+      if (workstream.estimated_duration_days != null) meta.push('Duration: ' + workstream.estimated_duration_days + ' days');
+      html += '<div class="atd-readable-card">' +
+        '<div class="atd-readable-card-title">' + escHtml(workstream.name || ('Workstream ' + String(i + 1))) + '</div>' +
+        '<div class="atd-readable-card-body">' + escHtml(workstream.scope || workstream.description || 'No scope provided.') + '</div>' +
+        (meta.length ? '<div class="atd-deliverable-meta">' + escHtml(meta.join(' · ')) + '</div>' : '') +
+      '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderProposedChanges(changes) {
+    if (!Array.isArray(changes) || changes.length === 0) return '';
+    var html = '<div class="atd-readable-list">';
+    for (var i = 0; i < changes.length; i++) {
+      var change = changes[i] || {};
+      html += '<div class="atd-readable-card">' +
+        '<div class="atd-readable-card-title">' + escHtml(humanizeKey(change.entity || 'Proposed change')) + '</div>' +
+        (change.field ? '<div class="atd-approval-item-kind">' + escHtml(humanizeKey(change.field)) + '</div>' : '') +
+        '<div class="atd-readable-card-body">' + escHtml(readableValue(change.new_value || change.description || 'No description provided.')) + '</div>' +
+      '</div>';
+    }
+    html += '</div>';
+    return html;
   }
 
   function showApproval(content) {
@@ -654,9 +1013,9 @@
         for (var i = 0; i < proposed.length; i++) {
           var change = proposed[i] || {};
           descriptionHtml += '<div class="atd-approval-item">';
-          descriptionHtml += '<div class="atd-approval-item-title">' + escHtml(decodeText(change.entity || 'Proposed change')) + '</div>';
+          descriptionHtml += '<div class="atd-approval-item-title">' + escHtml(humanizeKey(decodeText(change.entity || 'Proposed change'))) + '</div>';
           if (change.field) {
-            descriptionHtml += '<div class="atd-approval-item-kind">' + escHtml(decodeText(change.field)) + '</div>';
+            descriptionHtml += '<div class="atd-approval-item-kind">' + escHtml(humanizeKey(decodeText(change.field))) + '</div>';
           }
           descriptionHtml += '<div class="atd-approval-item-body">' + escHtml(readableValue(change.new_value || 'No description provided.')) + '</div>';
           descriptionHtml += '</div>';
@@ -691,15 +1050,26 @@
     show('atdApprovalPanel');
   }
 
-  function renderDeliverables(task) {
-    var panel = el('atdDeliverables');
-    if (!panel) return;
+  function collectDeliverables(task) {
     var artifacts = (task && task.artifacts) || [];
     var applied = artifacts.filter(function (artifact) {
       return artifact && (artifact.status === 'applied' || artifact.status === 'approved');
     });
-    updateDeliverablesCount(applied.length);
-    if (applied.length === 0) {
+    if (applied.length > 0) return applied;
+    if (task && task.execution_status === 'completed') {
+      return artifacts.filter(function (artifact) {
+        return artifact && artifact.status !== 'rejected' && artifact.status !== 'failed';
+      });
+    }
+    return [];
+  }
+
+  function renderDeliverables(task) {
+    var panel = el('atdDeliverables');
+    if (!panel) return;
+    var deliverables = collectDeliverables(task);
+    updateDeliverablesCount(deliverables.length);
+    if (deliverables.length === 0) {
       panel.innerHTML = '<lex-card padding="none">' +
         '<div class="atd-deliverables-head">Deliverables</div>' +
         '<div class="atd-deliverables-empty">No deliverables have been produced for this run yet.</div>' +
@@ -710,44 +1080,67 @@
     var html = '<lex-card padding="none">';
     html += '<div class="atd-deliverables-head">Deliverables</div>';
     html += '<div class="atd-deliverables-list">';
-    for (var i = 0; i < applied.length; i++) {
-      var artifact = applied[i] || {};
+    for (var i = 0; i < deliverables.length; i++) {
+      var artifact = deliverables[i] || {};
       var changes = artifactToReadableItems(artifact);
+      var target = artifactTarget(artifact);
+      var payload = artifact.content_jsonb || artifact.payload || artifact.content;
       html += '<div class="atd-deliverable">';
       html += '<div class="atd-deliverable-title">' + escHtml(artifact.title || artifact.kind || 'Artifact') + '</div>';
-      html += '<div class="atd-deliverable-meta">' + escHtml((artifact.kind || 'artifact') + ' · ' + (artifact.status || '')) + '</div>';
-      if (artifact.apply_target_id) {
-        html += '<div class="atd-deliverable-meta">Created record: ' + escHtml(artifact.apply_target_id) + '</div>';
+      html += '<div class="atd-deliverable-meta">' + escHtml(humanizeValue(artifact.kind || 'artifact') + ' · ' + statusLabel(artifact.status || 'completed')) + '</div>';
+      if (target) {
+        html += '<div class="atd-deliverable-target"><span>Applied target</span>' + renderTargetLink(target) + '</div>';
+      }
+      if (artifact.approval_status || artifact.approval_state || artifact.decision) {
+        html += '<div class="atd-deliverable-target"><span>Approval</span><strong>' + escHtml(humanizeValue(artifact.approval_status || artifact.approval_state || artifact.decision)) + '</strong></div>';
       }
       if (changes.length > 0) {
         html += '<div class="atd-deliverable-items">';
         for (var j = 0; j < changes.length; j++) html += changes[j];
         html += '</div>';
+      } else {
+        html += renderReadablePayload(payload, 'Artifact payload', 0);
       }
-      html += renderDetailsBlock('Raw JSON', artifact.content_jsonb || artifact.payload || artifact.content);
+      html += renderRawDetails('Raw artifact JSON', artifact.content_jsonb || artifact.payload || artifact.content || artifact);
       html += '</div>';
     }
     html += '</div></lex-card>';
     panel.innerHTML = html;
   }
 
+  function artifactTarget(artifact) {
+    if (!artifact) return null;
+    var id = firstValue([
+      artifact.apply_target_id,
+      artifact.target_id,
+      artifact.entity_id,
+      artifact.record_id
+    ]);
+    if (!id) return null;
+    var type = firstValue([
+      artifact.apply_target_type,
+      artifact.target_type,
+      artifact.entity_type,
+      artifact.kind
+    ]);
+    var url = firstValue([
+      artifact.apply_target_url,
+      artifact.target_url,
+      artifact.url,
+      targetUrl(type, id)
+    ]);
+    return { id: id, type: type, url: url };
+  }
+
   function artifactToReadableItems(artifact) {
-    var content = artifact && (artifact.content_jsonb || artifact.payload || artifact.content);
+    var content = parseStructuredValue(artifact && (artifact.content_jsonb || artifact.payload || artifact.content));
     var items = [];
     if (!content || typeof content !== 'object') return items;
     if (Array.isArray(content.workstreams)) {
-      for (var i = 0; i < content.workstreams.length; i++) {
-        var workstream = content.workstreams[i] || {};
-        var text = workstream.scope || 'No scope provided.';
-        var meta = [];
-        if (workstream.owner_role) meta.push('Owner: ' + workstream.owner_role);
-        if (workstream.estimated_duration_days != null) meta.push('Duration: ' + workstream.estimated_duration_days + ' days');
-        items.push('<div class="atd-approval-item">' +
-          '<div class="atd-approval-item-title">' + escHtml(workstream.name || ('Workstream ' + String(i + 1))) + '</div>' +
-          '<div class="atd-approval-item-body">' + escHtml(text) + '</div>' +
-          (meta.length ? '<div class="atd-deliverable-meta">' + escHtml(meta.join(' · ')) + '</div>' : '') +
-        '</div>');
-      }
+      items.push(renderWorkstreams(content.workstreams));
+    }
+    if (Array.isArray(content.proposed_changes)) {
+      items.push(renderProposedChanges(content.proposed_changes));
     }
     return items;
   }
@@ -781,7 +1174,7 @@
         var log = el('atdLog');
         if (log) log.innerHTML = '';
         state.seenEventIds = {};
-        state.lastLogSection = null;
+        state.events = [];
 
         for (var i = 0; i < events.length; i++) {
           appendEvent(state, events[i]);
@@ -905,10 +1298,10 @@
         input.value = '';
         if (sendBtn) sendBtn.removeAttribute('disabled');
 
-        appendToLog(renderEvent({
+        appendEvent(state, {
           event_type: 'user_message',
           content: { message: message }
-        }));
+        });
 
         if (resp.data && resp.data.status) {
           updateUIForStatus(state, resp.data.status);
@@ -931,10 +1324,10 @@
       .then(function () {
         if (state.destroyed) return;
         hide('atdApprovalPanel');
-        appendToLog(renderEvent({
+        appendEvent(state, {
           event_type: 'approval_response',
           content: { approved: true }
-        }));
+        });
         if (approveBtn) approveBtn.removeAttribute('disabled');
       })
       .catch(function (err) {
@@ -957,10 +1350,10 @@
         if (state.destroyed) return;
         hide('atdApprovalPanel');
         updateUIForStatus(state, 'rejected');
-        appendToLog(renderEvent({
+        appendEvent(state, {
           event_type: 'approval_response',
           content: { approved: false, reason: reason }
-        }));
+        });
         if (rejectBtn) rejectBtn.removeAttribute('disabled');
       })
       .catch(function (err) {
@@ -1129,6 +1522,17 @@
         button.addEventListener('click', tabHandler);
         state._unbindFns.push(function () { button.removeEventListener('click', tabHandler); });
       })(tabButtons[i]);
+    }
+
+    var traceButtons = rootEl.querySelectorAll('[data-atd-trace]');
+    for (var k = 0; k < traceButtons.length; k++) {
+      (function (button) {
+        var traceHandler = function () {
+          setActiveTraceSection(state, button.getAttribute('data-atd-trace') || 'all');
+        };
+        button.addEventListener('click', traceHandler);
+        state._unbindFns.push(function () { button.removeEventListener('click', traceHandler); });
+      })(traceButtons[k]);
     }
 
     loadTask(state);
