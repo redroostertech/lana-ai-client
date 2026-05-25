@@ -111,7 +111,7 @@
         width: 100%;
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto auto;
-        align-items: start;
+        align-items: center;
         gap: 0.75rem;
         padding: 0.75rem;
         border: 1px solid transparent;
@@ -121,6 +121,30 @@
         cursor: pointer;
         text-align: left;
         outline: none;
+      }
+
+      /* Column 1 wrapper. min-width: 0 is required for the grid track's
+         minmax(0, 1fr) to actually constrain inner content; without it
+         the title's text-overflow: ellipsis never fires. */
+      .unified-search-result-main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        overflow: hidden;
+      }
+
+      .unified-search-result-submeta {
+        display: flex;
+        gap: 0.5rem;
+        align-items: baseline;
+        min-width: 0;
+      }
+      .unified-search-result-submeta > * {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .unified-search-result:hover,
@@ -140,6 +164,8 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        display: block;
+        min-width: 0;
       }
 
       .unified-search-result-meta,
@@ -731,12 +757,14 @@
 
     document.getElementById('unifiedSearchResults').innerHTML = results.map((result, index) => `
       <div role="button" tabindex="0" class="unified-search-result" data-result-index="${index}" data-active="${index === 0}">
-        <span>
+        <div class="unified-search-result-main">
           <span class="unified-search-result-title">${escapeHtml(result.title || 'Untitled')}</span>
-          <span class="unified-search-result-meta">${escapeHtml(result.subtitle || result.source_system || result.source_table || '')}</span>
+          <span class="unified-search-result-submeta">
+            <span class="unified-search-result-meta">${escapeHtml(result.subtitle || result.source_system || result.source_table || '')}</span>
+            <span class="unified-search-result-count">${Number(result.related_entity_count || 0)} related</span>
+          </span>
           ${result.snippet ? `<span class="unified-search-result-snippet">${escapeHtml(result.snippet)}</span>` : ''}
-          <span class="unified-search-result-count">${Number(result.related_entity_count || 0)} related</span>
-        </span>
+        </div>
         <button type="button" class="unified-search-result-open" data-open-result-index="${index}">Open details</button>
         <span class="unified-search-result-type">${escapeHtml(formatType(result.entity_type || result.source_type))}</span>
       </div>
