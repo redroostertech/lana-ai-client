@@ -5369,6 +5369,8 @@
               <div class="mt-4 max-h-[420px] overflow-auto rounded-xl bg-gray-950 p-3 text-xs">${renderInteractivePayload(record)}</div>
             </div>
 
+            ${renderSourceAttributionSection(record)}
+
             ${renderLinkedRecordsSection(record)}
 
             ${renderRecordAssignSection(record)}
@@ -5430,6 +5432,165 @@
           </div>
         </div>
       `;
+    }
+
+    function renderSourceAttributionSection(record) {
+      // Renders for ANY connector record that carries data.attributions[]
+      // (Leadly opportunities and contacts today; any future connector that
+      // emits attribution arrays gets the same panel for free). Attribution
+      // metadata is too dimensional for the Linked Records count-per-entity
+      // panel, so it gets its own table here. The optional top-level
+      // data.source label is rendered above the table when present.
+      const data = (record && record.data) || {};
+      const attributions = Array.isArray(data.attributions) ? data.attributions : [];
+      const sourceLabel = typeof data.source === 'string' ? data.source.trim() : '';
+      if (attributions.length === 0 && !sourceLabel) return '';
+
+      const positionFor = (attr, idx, total) => {
+        if (attr && attr.isFirst === true) return 'first';
+        if (attr && attr.isLast === true) return 'last';
+        if (total === 1) return 'only';
+        if (idx === 0) return 'first';
+        if (idx === total - 1) return 'last';
+        return 'middle';
+      };
+
+      const positionBadge = (pos) => {
+        const palette = {
+          first: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+          last: 'bg-blue-50 text-blue-700 border-blue-200',
+          only: 'bg-violet-50 text-violet-700 border-violet-200',
+          middle: 'bg-gray-50 text-gray-600 border-gray-200'
+        };
+        const cls = palette[pos] || palette.middle;
+        return `<span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${cls}">${escapeHtml(pos)}</span>`;
+      };
+
+      const truncate = (value, max) => {
+        if (typeof value !== 'string') return '';
+        if (value.length <= max) return value;
+        return value.slice(0, Math.max(0, max - 1)) + '…';
+      };
+
+      const mediumIdCell = (attr) => {
+        const id = attr && typeof attr.mediumId === 'string' ? attr.mediumId : '';
+        if (!id) return '<span class="text-gray-400">—</span>';
+        const medium = attr && typeof attr.medium === 'string' ? attr.medium.toLowerCase() : '';
+        // calendar -> existing calendar row; form/survey/quiz -> form row
+        // (new in leadly 2.4.7). Anything else stays as a plain id label.
+        let targetEntity = null;
+        if (medium === 'calendar') targetEntity = 'calendar';
+        else if (medium === 'form' || medium === 'survey' || medium === 'quiz') targetEntity = 'form';
+        if (targetEntity) {
+          return `<button type="button" class="connector-mono text-xs font-semibold text-blue-600 hover:underline" onclick="filterDataPreviewToRecord('${escapeHtml(targetEntity)}','${escapeHtml(id)}')" title="Open ${escapeHtml(targetEntity)} ${escapeHtml(id)}">${escapeHtml(id)}</button>`;
+        }
+        return `<span class="connector-mono text-xs text-gray-700">${escapeHtml(id)}</span>`;
+      };
+
+      const cellTextLink = (value, max) => {
+        if (typeof value !== 'string' || !value) return '<span class="text-gray-400">—</span>';
+        const display = escapeHtml(truncate(value, max));
+        if (/^https?:\/\//i.test(value)) {
+          return `<a href="${escapeHtml(value)}" target="_blank" rel="noopener" class="text-xs text-blue-600 hover:underline break-all" title="${escapeHtml(value)}">${display}</a>`;
+        }
+        return `<span class="text-xs text-gray-700 break-all" title="${escapeHtml(value)}">${display}</span>`;
+      };
+
+      const rowsHtml = attributions.map((attr, idx) => {
+        const pos = positionFor(attr, idx, attributions.length);
+        const medium = attr && typeof attr.medium === 'string' ? attr.medium : '';
+        const utm = attr && typeof attr.utmSessionSource === 'string' ? attr.utmSessionSource : '';
+        const pageUrl = attr && typeof attr.pageUrl === 'string' ? attr.pageUrl : (attr && typeof attr.url === 'string' ? attr.url : '');
+        const referrer = attr && typeof attr.referrer === 'string' ? attr.referrer : '';
+        return `
+          <tr class="border-t border-gray-100 align-top">
+            <td class="px-3 py-2">${positionBadge(pos)}</td>
+            <td class="px-3 py-2"><span class="text-xs font-medium text-gray-800">${escapeHtml(medium || '—')}</span></td>
+            <td class="px-3 py-2">${mediumIdCell(attr)}</td>
+            <td class="px-3 py-2"><span class="text-xs text-gray-700">${escapeHtml(utm || '—')}</span></td>
+            <td class="px-3 py-2">${cellTextLink(pageUrl, 80)}</td>
+            <td class="px-3 py-2">${cellTextLink(referrer, 60)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const tableHtml = attributions.length === 0
+        ? '<div class="mt-3 text-sm text-gray-500">No attribution events recorded on this record.</div>'
+        : `
+          <div class="mt-3 overflow-x-auto rounded-xl border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Position</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Medium</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Medium ID</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">UTM Source</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Page URL</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Referrer</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white">${rowsHtml}</tbody>
+            </table>
+          </div>
+        `;
+
+      const sourceRow = sourceLabel
+        ? `<div class="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+             <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Source</span>
+             <span class="text-sm font-medium text-gray-900">${escapeHtml(sourceLabel)}</span>
+           </div>`
+        : '';
+
+      return `
+        <div class="rounded-xl border border-gray-200 bg-white p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-semibold text-gray-900">Source / Attribution</div>
+              <div class="mt-1 text-xs text-gray-500">Marketing-attribution events recorded against this record (first-touch, last-touch, UTM, referrer, page).</div>
+            </div>
+            <span class="rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-semibold text-gray-600">${attributions.length}</span>
+          </div>
+          ${sourceRow}
+          ${tableHtml}
+        </div>
+      `;
+    }
+
+    function filterDataPreviewToRecord(entityType, externalId) {
+      // Best-effort jump from an attribution mediumId to the entity row it
+      // references. Switches the Data tab's entity filter and search query,
+      // then reloads. If the row exists, the user will see it; if it doesn't
+      // yet (e.g. a form id from before the `form` entity was synced in
+      // leadly 2.4.7), the preview will be empty and prompt re-sync. We
+      // intentionally do NOT auto-open record detail because the row may
+      // not be loaded yet.
+      try {
+        const entitySelect = document.getElementById('entityTypeFilter');
+        if (entitySelect) {
+          // Only set if the option exists — otherwise leave the current filter
+          // alone so we don't put the select into an invalid state.
+          const hasOption = Array.from(entitySelect.options).some((opt) => opt.value === entityType);
+          if (hasOption) {
+            entitySelect.value = entityType;
+          }
+        }
+        const searchInput = document.getElementById('dataSearchInput')
+          || document.getElementById('dataPreviewSearchInput');
+        if (searchInput) {
+          searchInput.value = externalId;
+        }
+        if (state) {
+          state.dataPreviewOffset = 0;
+          state.selectedRecordId = '';
+          state.selectedRecord = null;
+        }
+        if (typeof refreshDataPreview === 'function') {
+          refreshDataPreview();
+        }
+      } catch (err) {
+        // Non-fatal: panel still rendered, jump just failed silently.
+        console.warn('filterDataPreviewToRecord failed', err);
+      }
     }
 
     function renderLinkedRecordsSection(record) {
