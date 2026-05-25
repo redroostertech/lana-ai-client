@@ -238,10 +238,83 @@
         flex-shrink: 0;
       }
 
+      .lex-sidebar-global-search-wrap {
+        padding: 0.75rem 0.75rem 0;
+        flex-shrink: 0;
+      }
+
+      .lex-sidebar-global-search {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        width: 100%;
+        height: 2.5rem;
+        padding: 0 0.625rem;
+        border: 1px solid var(--_sb-border);
+        border-radius: var(--lex-radius-md, 6px);
+        background: color-mix(in srgb, var(--_sb-hover-bg) 72%, transparent);
+        color: var(--_sb-text);
+        cursor: pointer;
+        text-align: left;
+        transition: background var(--lex-transition-fast), border-color var(--lex-transition-fast), color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-global-search:hover {
+        background: var(--_sb-hover-bg);
+        border-color: color-mix(in srgb, var(--_sb-border) 70%, var(--_sb-text-muted));
+        color: var(--_sb-text-active);
+      }
+
+      .lex-sidebar-global-search svg {
+        flex-shrink: 0;
+        color: var(--_sb-text-muted);
+      }
+
+      .lex-sidebar-global-search-label {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: var(--lex-body-sm-size, 0.875rem);
+      }
+
+      .lex-sidebar-global-search-shortcut {
+        flex-shrink: 0;
+        padding: 0.125rem 0.375rem;
+        border: 1px solid var(--_sb-border);
+        border-radius: var(--lex-radius-sm, 4px);
+        color: var(--_sb-text-muted);
+        font-size: 0.6875rem;
+        line-height: 1;
+      }
+
       .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-app-switcher-wrap {
         display: flex;
         justify-content: center;
         padding: 0.5rem;
+      }
+
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-global-search-wrap {
+        display: flex;
+        justify-content: center;
+        padding: 0.5rem 0.5rem 0;
+      }
+
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-global-search {
+        width: 2.5rem;
+        justify-content: center;
+        padding: 0.5rem;
+        gap: 0;
+      }
+
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-global-search-label,
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-global-search-shortcut {
+        opacity: 0;
+        width: 0;
+        flex: 0 0 0px;
+        overflow: hidden;
+        pointer-events: none;
       }
 
       .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-app-switcher {
@@ -975,6 +1048,7 @@
       html += `<button class="lex-sidebar-close" data-action="close">${icon('x', 'normal')}</button>`;
       html += `</div>`;
 
+      html += `<div class="lex-sidebar-global-search-wrap">${this._renderUnifiedSearch()}</div>`;
       html += `<div class="lex-sidebar-app-switcher-wrap">${this._renderAppSwitcher()}</div>`;
 
       // ── Body ──
@@ -1107,6 +1181,15 @@
           <span class="lex-sidebar-app-name">${this.escapeHtml(current.label)}</span>
           <span class="lex-sidebar-app-chevron">${icon('chevrons-up-down', 'small') || icon('chevron-down', 'small')}</span>
         </button>`;
+    }
+
+    _renderUnifiedSearch() {
+      const shortcut = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '') ? '⌘K' : 'Ctrl K';
+      return `<button type="button" class="lex-sidebar-global-search" data-action="global-search" data-tooltip="Search all data">
+        ${icon('search', 'normal')}
+        <span class="lex-sidebar-global-search-label">Search all data</span>
+        <span class="lex-sidebar-global-search-shortcut">${this.escapeHtml(shortcut)}</span>
+      </button>`;
     }
 
     _renderAppMenu() {
@@ -1281,6 +1364,18 @@
 
       this.delegate('click', '[data-action="app-menu"]', () => {
         this.appMenuOpen = !this.appMenuOpen;
+      });
+
+      this.delegate('click', '[data-action="global-search"]', () => {
+        if (window.UnifiedSearchModal && typeof window.UnifiedSearchModal.open === 'function') {
+          window.UnifiedSearchModal.open();
+        } else if (window.Lex && window.Lex.Nav && window.Lex.Nav.go) {
+          try { sessionStorage.setItem('lana-open-global-search', '1'); } catch (_err) {}
+          window.Lex.Nav.go('search-results.html', { replace: true });
+        } else {
+          try { sessionStorage.setItem('lana-open-global-search', '1'); } catch (_err) {}
+          window.location.href = this._getAppPrefix() + 'app.html';
+        }
       });
 
       // Outside-click + Escape dismiss for the app-switcher menu. Bound once

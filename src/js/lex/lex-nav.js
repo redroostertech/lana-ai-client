@@ -97,9 +97,14 @@
       if (global.LexRouter && global.LexRouter._normalizePath) {
         return global.LexRouter._normalizePath(path);
       }
+      var protocolPath = stripToAppRoute(path);
+      if (protocolPath) return protocolPath;
       // Fallback: external URLs pass through as-is
       return null;
     }
+
+    var appRoute = stripToAppRoute(path);
+    if (appRoute) return appRoute;
 
     // Already root-relative
     if (path.indexOf('/') === 0) return path;
@@ -111,6 +116,34 @@
 
     // Prepend /
     return '/' + path;
+  }
+
+  function stripToAppRoute(path) {
+    if (!path) return null;
+    var clean = path;
+    var qIdx = clean.indexOf('?');
+    var search = qIdx === -1 ? '' : clean.substring(qIdx);
+    if (qIdx !== -1) clean = clean.substring(0, qIdx);
+
+    var publicIdx = clean.lastIndexOf('/public_html/');
+    if (publicIdx !== -1) {
+      return '/' + clean.substring(publicIdx + '/public_html/'.length) + search;
+    }
+
+    var srcIdx = clean.lastIndexOf('/src/');
+    if (srcIdx !== -1) {
+      return '/' + clean.substring(srcIdx + '/src/'.length) + search;
+    }
+
+    var repoIdx = clean.lastIndexOf('/lana-ai-client/');
+    if (repoIdx !== -1) {
+      var relative = clean.substring(repoIdx + '/lana-ai-client/'.length);
+      if (relative.indexOf('public_html/') === 0) relative = relative.substring('public_html/'.length);
+      if (relative.indexOf('src/') === 0) relative = relative.substring('src/'.length);
+      return '/' + relative + search;
+    }
+
+    return null;
   }
 
   /**
@@ -140,6 +173,30 @@
   function extractPageKey(pathname) {
     if (!pathname) return '';
     return pathname.indexOf('/') === 0 ? pathname.substring(1) : pathname;
+  }
+
+  function rootRelativeUrl(pathname) {
+    var appRoute = stripToAppRoute(pathname);
+    if (appRoute) pathname = appRoute;
+    var currentPath = global.location && global.location.pathname ? global.location.pathname : '';
+    var relativePath = '';
+    var publicIdx = currentPath.lastIndexOf('/public_html/');
+    var srcIdx = currentPath.lastIndexOf('/src/');
+    if (publicIdx !== -1) {
+      relativePath = currentPath.substring(publicIdx + '/public_html/'.length);
+    } else if (srcIdx !== -1) {
+      relativePath = currentPath.substring(srcIdx + '/src/'.length);
+    } else {
+      relativePath = currentPath.charAt(0) === '/' ? currentPath.substring(1) : currentPath;
+    }
+    var slashIdx = relativePath.lastIndexOf('/');
+    var directory = slashIdx === -1 ? '' : relativePath.substring(0, slashIdx);
+    var depth = directory ? directory.split('/').filter(Boolean).length : 0;
+    return '../'.repeat(depth) + pathname.replace(/^\//, '');
+  }
+
+  function hasSearchDetailParams(params) {
+    return !!(params.get('entity_id') || params.get('id') || params.get('external_id') || params.get('result_key'));
   }
 
   /**
@@ -270,6 +327,46 @@
     var pathname = parts.pathname;
     var inlineSearch = parts.search;
 
+    var pageKey = extractPageKey(pathname);
+    if (pageKey === 'search-results.html' || pageKey === 'global-search.html') {
+      var searchParams = new URLSearchParams(inlineSearch || '');
+      if (options.params) {
+        var optionKeys = Object.keys(options.params);
+        for (var oi = 0; oi < optionKeys.length; oi++) {
+          var optionKey = optionKeys[oi];
+          var optionValue = options.params[optionKey];
+          if (optionValue !== null && optionValue !== undefined && optionValue !== '') {
+            searchParams.set(optionKey, String(optionValue));
+          }
+        }
+      }
+      var searchQuery = searchParams.get('q') || searchParams.get('query') || '';
+      var isDetailRoute = pageKey === 'search-results.html' && hasSearchDetailParams(searchParams);
+      if (isDetailRoute) {
+        pathname = '/search-results.html';
+        inlineSearch = searchParams.toString() ? '?' + searchParams.toString() : '';
+      } else {
+        try {
+          sessionStorage.setItem('lana-open-global-search', '1');
+          if (searchQuery) {
+            sessionStorage.setItem('lana-pending-global-search', searchQuery);
+          }
+        } catch (e) {
+          window.name = searchQuery
+            ? 'lana-pending-global-search:' + searchQuery
+            : 'lana-open-global-search';
+        }
+
+        if (window.UnifiedSearchModal && typeof window.UnifiedSearchModal.openPending === 'function') {
+          window.UnifiedSearchModal.openPending({ openEmpty: true, force: true });
+          return;
+        }
+
+        window.location.href = rootRelativeUrl('app.html');
+        return;
+      }
+    }
+
     // 2. Build final URL with merged params (options.params override inline)
     var finalUrl = buildUrl(pathname, options.params || null, inlineSearch);
 
@@ -289,7 +386,12 @@
     }
 
     // 5. Fallback: no router available (pre-init or outside SPA shell)
-    window.location.href = finalUrl;
+    if (extractPageKey(pathname) === 'search-results.html') {
+      try { sessionStorage.setItem('_lex_last_path', finalUrl); } catch (e) {}
+      window.location.href = rootRelativeUrl('app.html');
+      return;
+    }
+    window.location.href = rootRelativeUrl(finalUrl);
   }
 
   /**

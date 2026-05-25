@@ -1401,6 +1401,25 @@ app.on('web-contents-created', (event, contents) => {
           }
         }
 
+        // If a file:// navigation resolved to the project root instead of
+        // public_html (for example /Users/.../lana-ai-client/admin/analytics.html),
+        // strip the project root before joining with public_html. Without this,
+        // the handler produces public_html/Users/.../lana-ai-client/... paths.
+        const projectRoot = path.resolve(__dirname);
+        const normalizedPathname = path.resolve(pathname);
+        if (normalizedPathname === projectRoot || normalizedPathname.startsWith(projectRoot + path.sep)) {
+          pagePath = normalizedPathname.substring(projectRoot.length);
+          if (pagePath.startsWith(path.sep + 'public_html' + path.sep)) {
+            pagePath = pagePath.substring(('/public_html').length);
+          } else if (pagePath.startsWith(path.sep + 'src' + path.sep)) {
+            pagePath = pagePath.substring(('/src').length);
+          }
+          if (!pagePath.startsWith(path.sep)) {
+            pagePath = path.sep + pagePath;
+          }
+          logInfo(`[electron-main] [Navigation] Project-root path stripped: ${pathname} -> ${pagePath}`);
+        }
+
         // Ensure pagePath starts with / for proper path.join behavior
         if (!pagePath.startsWith('/')) {
           pagePath = '/' + pagePath;

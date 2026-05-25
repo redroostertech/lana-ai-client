@@ -3,268 +3,214 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Search Results - LANA AI</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50">
-  <!-- Header -->
-  <header class="bg-white border-b border-gray-200 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
-        <div class="flex items-center">
-          <h1 class="text-2xl font-bold text-indigo-600">LANA AI</h1>
-        </div>
-        <nav class="flex space-x-6">
-          <a href="/index.html" class="text-gray-600 hover:text-gray-900">Dashboard</a>
-          <a href="/matters.html" class="text-gray-600 hover:text-gray-900">Matters</a>
-          <a href="/chat.html" class="text-gray-600 hover:text-gray-900">Chat</a>
-          <a href="/integrations/index.html" class="text-gray-600 hover:text-gray-900">Integrations</a>
-        </nav>
-        <div class="flex items-center space-x-4">
-          <button id="logoutBtn" class="text-gray-600 hover:text-gray-900 text-sm">
-            Logout
-          </button>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Content -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Search Bar -->
-    <div class="mb-8">
-      <div class="relative max-w-3xl mx-auto">
-        <input
-          type="text"
-          id="searchInput"
-          class="w-full px-6 py-4 text-lg border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-lg bg-white text-gray-900"
-          placeholder="Search across all your connected data sources..."
-          autocomplete="off"
-          onkeypress="if(event.key==='Enter'){const q=document.getElementById('searchInput').value; if(q.trim()) window.location.href='search-results.html?q='+encodeURIComponent(q);}"
-        />
-        <button
-          type="button"
-          class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 text-white px-6 py-2 rounded-full hover:bg-indigo-700 transition-colors"
-          onclick="const q=document.getElementById('searchInput').value; if(q.trim()) window.location.href='search-results.html?q='+encodeURIComponent(q);"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <!-- Search Metadata -->
-    <div id="searchMetadata" class="mb-6 hidden">
-      <div class="flex items-center justify-between text-sm text-gray-600">
-        <div>
-          <span id="resultCount">0</span> results found in <span id="searchTime">0</span>ms
-        </div>
-        <div id="connectorFilter" class="flex items-center space-x-2">
-          <!-- Connector filters will be added here -->
-        </div>
-      </div>
-    </div>
-
-    <!-- Loading State -->
-    <div id="loadingState" class="hidden">
-      <div class="flex items-center justify-center py-12">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    </div>
-
-    <!-- Error State -->
-    <div id="errorState" class="hidden">
-      <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-        <svg class="w-12 h-12 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-        </svg>
-        <h3 class="text-lg font-semibold text-red-900 mb-2">Search Failed</h3>
-        <p id="errorMessage" class="text-red-700"></p>
-      </div>
-    </div>
-
-    <!-- Empty State -->
-    <div id="emptyState" class="hidden">
-      <div class="bg-white rounded-lg shadow p-12 text-center">
-        <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-        </svg>
-        <h3 class="text-lg font-semibold text-gray-900 mb-2">No results found</h3>
-        <p class="text-gray-600">Try searching for something else or check your spelling.</p>
-      </div>
-    </div>
-
-    <!-- Search Results -->
-    <div id="searchResults" class="space-y-4">
-      <!-- Results will be dynamically inserted here -->
-    </div>
-  </main>
-
-  <script src="js/api.js"></script>
+  <title>Search Result - LANA AI</title>
   <script>
-    const API_BASE_URL = window.electronAPI?.getApiUrl
-      ? window.electronAPI.getApiUrl()
-      : 'http://localhost:8080';
-
-    // Check auth using same pattern as index.html
-    const token = localStorage.getItem('token');
-    if (token) {
-      api.token = token;
-      api.user = JSON.parse(localStorage.getItem('user') || 'null');
-    }
-
-    if (!api.isAuthenticated()) {
-      console.log('Not authenticated - redirecting to login');
-      window.location.href = 'login.html';
-    }
-
-    const authToken = token;
-
-    // Get query from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const query = urlParams.get('q');
-    console.log('[Search Results] Query from URL:', query);
-    console.log('[Search Results] Auth token:', authToken);
-
-    // Set search input value
-    if (query) {
-      document.getElementById('searchInput').value = query;
-      console.log('[Search Results] Performing search for:', query);
-      performSearch(query);
-    } else {
-      console.log('[Search Results] No query provided');
-    }
-
-    // Logout handler
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      sessionStorage.clear();
-      window.location.href = '/login.html';
-    });
-
-    // Perform search
-    async function performSearch(searchQuery) {
-      console.log('[Search] performSearch called with query:', searchQuery);
-
-      // Show loading state
-      document.getElementById('loadingState').classList.remove('hidden');
-      document.getElementById('searchResults').innerHTML = '';
-      document.getElementById('emptyState').classList.add('hidden');
-      document.getElementById('errorState').classList.add('hidden');
-      document.getElementById('searchMetadata').classList.add('hidden');
-
-      try {
-        const url = `${API_BASE_URL}/api/v1/search`;
-        console.log('[Search] Fetching:', url);
-        console.log('[Search] Request body:', { query: searchQuery, limit: 20 });
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            query: searchQuery,
-            limit: 20
-          })
-        });
-
-        console.log('[Search] Response status:', response.status);
-        const data = await response.json();
-        console.log('[Search] Response data:', data);
-
-        // Hide loading state
-        document.getElementById('loadingState').classList.add('hidden');
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Search failed');
+    (function () {
+      var params = new URLSearchParams(window.location.search || '');
+      var hasDetail = !!(params.get('entity_id') || params.get('id') || params.get('external_id') || params.get('result_key'));
+      if (!hasDetail) {
+        var query = params.get('q') || params.get('query') || '';
+        try {
+          sessionStorage.setItem('lana-open-global-search', '1');
+          if (query) sessionStorage.setItem('lana-pending-global-search', query);
+        } catch (_err) {
+          window.name = query ? 'lana-pending-global-search:' + query : 'lana-open-global-search';
         }
-
-        // Show metadata
-        document.getElementById('searchMetadata').classList.remove('hidden');
-        document.getElementById('resultCount').textContent = data.totalResults || 0;
-        document.getElementById('searchTime').textContent = data.searchTime || 0;
-
-        // Display results
-        if (data.results && data.results.length > 0) {
-          console.log('[Search] Displaying', data.results.length, 'results');
-          displayResults(data.results);
-        } else {
-          console.log('[Search] No results, showing empty state');
-          document.getElementById('emptyState').classList.remove('hidden');
-        }
-
-      } catch (error) {
-        console.error('[Search] Search error:', error);
-        document.getElementById('loadingState').classList.add('hidden');
-        document.getElementById('errorState').classList.remove('hidden');
-        document.getElementById('errorMessage').textContent = error.message;
+      } else {
+        try {
+          sessionStorage.setItem('_lex_last_path', '/search-results.html' + (window.location.search || ''));
+        } catch (_err) {}
       }
-    }
-
-    // Display search results
-    function displayResults(results) {
-      const container = document.getElementById('searchResults');
-      container.innerHTML = '';
-
-      results.forEach(result => {
-        const resultCard = document.createElement('div');
-        resultCard.className = 'bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer';
-
-        // Connector badge
-        const connectorBadge = result.connector_type
-          ? `<span class="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 mb-2">
-              ${result.connector_type}
-            </span>`
-          : '';
-
-        // Relevance score
-        const relevanceScore = result.relevance_score
-          ? `<span class="text-xs text-gray-500 ml-2">${(result.relevance_score * 100).toFixed(0)}% match</span>`
-          : '';
-
-        // Metadata
-        const metadata = [];
-        if (result.matter_name) metadata.push(`Matter: ${result.matter_name}`);
-        if (result.created_at) metadata.push(`Date: ${new Date(result.created_at).toLocaleDateString()}`);
-        const metadataHtml = metadata.length > 0
-          ? `<div class="text-sm text-gray-500 mb-2">${metadata.join(' • ')}</div>`
-          : '';
-
-        resultCard.innerHTML = `
-          ${connectorBadge}
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">
-            ${result.title || result.name || 'Untitled Document'}
-            ${relevanceScore}
-          </h3>
-          ${metadataHtml}
-          <p class="text-gray-700 mb-3">
-            ${result.snippet || result.description || 'No preview available'}
-          </p>
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-500">
-              ${result.source_type || 'Document'}
-            </span>
-            ${result.url
-              ? `<a href="${result.url}" target="_blank" class="text-indigo-600 hover:text-indigo-700 font-medium">
-                  View Original →
-                </a>`
-              : ''
-            }
-          </div>
-        `;
-
-        // Make entire card clickable if URL exists
-        if (result.url) {
-          resultCard.addEventListener('click', () => {
-            window.open(result.url, '_blank');
-          });
-        }
-
-        container.appendChild(resultCard);
-      });
-    }
+      if (!window.Lex) window.location.replace('app.html');
+    })();
   </script>
+</head>
+<body>
+  <main id="lex-page-content">
+    <section class="search-result-page">
+      <style>
+        .search-result-page {
+          max-width: 1180px;
+          margin: 0 auto;
+          padding: 1.5rem;
+          color: #111827;
+        }
+        .search-result-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 1rem;
+          margin-bottom: 1rem;
+        }
+        .search-result-kicker {
+          color: #64748b;
+          font-size: 0.8125rem;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .search-result-title {
+          margin: 0.25rem 0 0;
+          font-size: 1.5rem;
+          line-height: 1.25;
+          font-weight: 700;
+        }
+        .search-result-subtitle {
+          margin-top: 0.375rem;
+          color: #64748b;
+        }
+        .search-result-actions {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+        .search-result-action {
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          background: #fff;
+          color: #374151;
+          padding: 0.5rem 0.75rem;
+          cursor: pointer;
+        }
+        .search-result-action[data-primary="true"] {
+          border-color: #4f46e5;
+          background: #4f46e5;
+          color: #fff;
+        }
+        .search-result-tabs-shell {
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          margin-top: 1.5rem;
+        }
+        .search-result-tabs-shell lex-tabs {
+          padding: 0 1.5rem;
+        }
+        .search-result-tab-content {
+          padding: 1.5rem;
+        }
+        .search-result-tab-panel.hidden {
+          display: none;
+        }
+        .search-result-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(18rem, 28rem);
+          gap: 1rem;
+          margin-top: 1rem;
+        }
+        .search-result-card {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          background: #fff;
+          overflow: hidden;
+        }
+        .search-result-card h2 {
+          margin: 0;
+          padding: 0.75rem 1rem;
+          border-bottom: 1px solid #e5e7eb;
+          font-size: 0.875rem;
+          text-transform: uppercase;
+        }
+        .search-result-kv {
+          display: grid;
+          grid-template-columns: minmax(8rem, 32%) minmax(0, 1fr);
+          gap: 0.75rem;
+          padding: 0.625rem 1rem;
+          border-bottom: 1px solid #f1f5f9;
+          font-size: 0.875rem;
+        }
+        .search-result-kv:last-child { border-bottom: 0; }
+        .search-result-key { color: #64748b; }
+        .search-result-value { overflow-wrap: anywhere; }
+        .search-result-preview {
+          padding: 1rem;
+          white-space: pre-wrap;
+          line-height: 1.5;
+        }
+        .search-result-json {
+          margin: 0;
+          max-height: 28rem;
+          overflow: auto;
+          padding: 1rem;
+          background: #0f172a;
+          color: #dbeafe;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+          font-size: 0.8125rem;
+          line-height: 1.5;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+        }
+        .search-result-empty {
+          padding: 2rem;
+          color: #64748b;
+          text-align: center;
+        }
+        .search-result-editor-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 11000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem;
+          background: rgba(15, 23, 42, 0.48);
+        }
+        .search-result-editor {
+          width: min(920px, 100%);
+          max-height: min(820px, calc(100vh - 3rem));
+          display: flex;
+          flex-direction: column;
+          border: 1px solid #dbe3ef;
+          border-radius: 8px;
+          background: #fff;
+          overflow: hidden;
+        }
+        .search-result-editor-header,
+        .search-result-editor-footer {
+          padding: 1rem;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .search-result-editor-footer {
+          border-top: 1px solid #e5e7eb;
+          border-bottom: 0;
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.5rem;
+        }
+        .search-result-editor-title {
+          margin: 0;
+          font-size: 1rem;
+        }
+        .search-result-editor-body {
+          min-height: 0;
+          padding: 1rem;
+          overflow: auto;
+        }
+        .search-result-editor-textarea {
+          width: 100%;
+          min-height: 26rem;
+          resize: vertical;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          padding: 0.75rem;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+          font-size: 0.8125rem;
+          line-height: 1.5;
+        }
+        .search-result-editor-status {
+          margin-top: 0.75rem;
+          min-height: 1.25rem;
+          color: #64748b;
+          font-size: 0.875rem;
+        }
+        .search-result-editor-status[data-error="true"] {
+          color: #b91c1c;
+        }
+        @media (max-width: 900px) {
+          .search-result-grid { grid-template-columns: 1fr; }
+        }
+      </style>
+      <div id="searchResultDetailRoot" class="search-result-empty">Loading result details...</div>
+    </section>
+  </main>
 </body>
 </html>

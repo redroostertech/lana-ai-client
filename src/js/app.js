@@ -73,6 +73,18 @@
       // across refresh — under file:// protocol the URL bar always shows
       // app.html so window.location.pathname is useless for routing).
       // Fall back to sessionStorage when history.state is cleared on reload.
+      var hasPendingGlobalSearch = false;
+      try {
+        hasPendingGlobalSearch = !!sessionStorage.getItem('lana-open-global-search')
+          || !!sessionStorage.getItem('lana-pending-global-search');
+      } catch (e) {
+        hasPendingGlobalSearch = false;
+      }
+      if (!hasPendingGlobalSearch && window.name) {
+        hasPendingGlobalSearch = window.name === 'lana-open-global-search'
+          || window.name.indexOf('lana-pending-global-search:') === 0;
+      }
+
       var startPath = (history.state && history.state.path)
         || (function () {
             try {
@@ -81,11 +93,21 @@
           }())
         || window.location.pathname
         || '/dashboard.html';
-      if (startPath === '/' || startPath === '' || startPath.endsWith('/app.html')) {
+      if (startPath === '/'
+        || startPath === ''
+        || startPath.endsWith('/app.html')
+        || startPath.endsWith('/search-results.html')
+        || startPath.endsWith('/global-search.html')) {
         startPath = '/dashboard.html';
       }
 
       LexRouter.start(startPath);
+
+      if (hasPendingGlobalSearch && window.UnifiedSearchModal && typeof window.UnifiedSearchModal.openPending === 'function') {
+        setTimeout(function () {
+          window.UnifiedSearchModal.openPending({ openEmpty: true, force: true });
+        }, 100);
+      }
 
       // Hide the branded loader when lex-page-ready fires (content injected)
       // or after 2s timeout — whichever comes first.

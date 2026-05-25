@@ -112,6 +112,9 @@
         background: var(--lex-bg-secondary);
         transition: opacity var(--lex-transition-normal);
       }
+      lex-content:focus {
+        outline: none;
+      }
       lex-content[data-loading="true"] {
         opacity: 0.4;
         pointer-events: none;
@@ -327,6 +330,10 @@
       // Initialize backend reachability monitoring
       this._startReachabilityMonitor();
 
+      // Initialize app-level global search on every Lex shell page,
+      // including standalone admin/reporting pages that do not load app.html.
+      this._ensureGlobalSearchModal();
+
       // Subscribe to auth changes to refresh user display
       if (window.Lex && window.Lex.state) {
         this._authChangeHandler = () => {
@@ -350,6 +357,47 @@
 
       // Signal ready
       this.emit('lex-app-ready');
+    }
+
+    _sharedAssetUrl(path) {
+      const pathname = window.location.pathname || '';
+      let relativePath = '';
+      const publicIdx = pathname.lastIndexOf('/public_html/');
+      const srcIdx = pathname.lastIndexOf('/src/');
+      if (publicIdx !== -1) {
+        relativePath = pathname.substring(publicIdx + '/public_html/'.length);
+      } else if (srcIdx !== -1) {
+        relativePath = pathname.substring(srcIdx + '/src/'.length);
+      } else {
+        relativePath = pathname.charAt(0) === '/' ? pathname.substring(1) : pathname;
+      }
+      const directory = relativePath.indexOf('/') === -1
+        ? ''
+        : relativePath.substring(0, relativePath.lastIndexOf('/'));
+      const depth = directory ? directory.split('/').filter(Boolean).length : 0;
+      return '../'.repeat(depth) + path;
+    }
+
+    _ensureGlobalSearchModal() {
+      if (window.UnifiedSearchModal && typeof window.UnifiedSearchModal.init === 'function') {
+        window.UnifiedSearchModal.init();
+        return;
+      }
+      const existing = document.querySelector('script[data-lana-global-search="true"], script[src$="js/unified-search-modal.js"]');
+      if (existing) return;
+
+      const script = document.createElement('script');
+      script.src = this._sharedAssetUrl('js/unified-search-modal.js');
+      script.dataset.lanaGlobalSearch = 'true';
+      script.onload = () => {
+        if (window.UnifiedSearchModal && typeof window.UnifiedSearchModal.init === 'function') {
+          window.UnifiedSearchModal.init();
+        }
+        if (window.UnifiedSearchModal && typeof window.UnifiedSearchModal.openPending === 'function') {
+          window.UnifiedSearchModal.openPending();
+        }
+      };
+      document.head.appendChild(script);
     }
 
     // -----------------------------------------------------------------------

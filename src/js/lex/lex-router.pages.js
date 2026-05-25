@@ -253,9 +253,13 @@
     // search-conversations.html — standalone page (not routed)
 
     'search-results.html': {
-      title: 'Search Results',
+      title: 'Search Result',
       activeNav: '',
-      scripts: [],
+      scripts: [
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-tabs.js',
+        'js/search-result-detail.js'
+      ],
       stylesheets: []
     },
 
