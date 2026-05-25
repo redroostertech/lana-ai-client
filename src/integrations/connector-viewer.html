@@ -3957,6 +3957,38 @@
       return matches;
     }
 
+    // Fetch matched child rows for a relationship by pushing the FK filter to
+    // the server. Replaces the older "load entity pool client-side then filter"
+    // path which silently capped at 5000 rows per entity and under-reported
+    // matches for high-volume entity types (notes/tasks/matter_participants).
+    async function fetchMatchedChildrenForRel(childEntityType, viaPath, parentMatchValues) {
+      const valuesArray = Array.from(parentMatchValues);
+      if (!valuesArray.length) return [];
+      const matched = [];
+      const pageSize = 500;
+      let offset = 0;
+      let total = Infinity;
+      while (offset < total) {
+        const filters = JSON.stringify([{ field: viaPath, operator: 'in', value: valuesArray }]);
+        const params = new URLSearchParams({
+          entity_type: childEntityType,
+          limit: String(pageSize),
+          offset: String(offset),
+          filters
+        });
+        const response = await api.get(`${connectorApi('/data')}?${params.toString()}`);
+        const rows = Array.isArray(response.data) ? response.data : [];
+        matched.push(...rows);
+        const pagination = response.pagination || {};
+        total = typeof pagination.total === 'number' ? pagination.total : matched.length;
+        if (!rows.length) break;
+        offset += rows.length;
+        if (offset >= total) break;
+        if (matched.length >= 25000) break;
+      }
+      return matched;
+    }
+
     async function computeCascadeForRows(parentRows) {
       const result = {
         parents: Array.isArray(parentRows) ? parentRows.length : 0,
@@ -3984,15 +4016,14 @@
           const parentValues = getMatchValuesForRows(parentsOfType, rel.match);
           if (!parentValues.size) continue;
 
-          let childRows;
+          let matchedChildren;
           try {
-            childRows = await loadCascadeIndexForEntity(rel.entity_type);
+            matchedChildren = await fetchMatchedChildrenForRel(rel.entity_type, rel.via, parentValues);
           } catch (error) {
             result.warnings.push(`Failed to load ${rel.label}: ${error.message || error}`);
             continue;
           }
 
-          const matchedChildren = findChildRowsForParents(childRows, rel.via, parentValues);
           if (!matchedChildren.length) {
             result.breakdown.push({
               parent_entity_type: parentEntityType,
@@ -4023,15 +4054,14 @@
               const transParentValues = getMatchValuesForRows(matchedChildren, trans.match);
               if (!transParentValues.size) continue;
 
-              let transRows;
+              let matchedTrans;
               try {
-                transRows = await loadCascadeIndexForEntity(trans.entity_type);
+                matchedTrans = await fetchMatchedChildrenForRel(trans.entity_type, trans.via, transParentValues);
               } catch (error) {
                 result.warnings.push(`Failed to load ${trans.label}: ${error.message || error}`);
                 continue;
               }
 
-              const matchedTrans = findChildRowsForParents(transRows, trans.via, transParentValues);
               const transIds = matchedTrans.map((row) => row.id).filter(Boolean);
               for (const id of transIds) result.allChildIds.add(id);
               if (!result.idsByEntity[trans.entity_type]) result.idsByEntity[trans.entity_type] = new Set();
@@ -4875,6 +4905,65 @@
       }
     }
 
+    // Single-record Linked Records uses targeted server-side filters per
+    // relationship instead of the in-browser cascade index. The index caps
+    // at 5000 rows per entity type, so for high-volume entity types (notes,
+    // tasks, matter_participants) the open record's children almost never
+    // land in the first page and the panel under-reports to zero.
+    async function fetchLinkedRecordsForRow(parentRow) {
+      const result = { breakdown: [], warnings: [], totalChildren: 0 };
+      if (!parentRow || !parentRow.entity_type) return result;
+      const rels = getRelationshipsForEntity(parentRow.entity_type);
+      if (!rels.length) return result;
+
+      for (const rel of rels) {
+        if (state.cascadeDisabledRels[`${parentRow.entity_type}::${rel.entity_type}`]) continue;
+
+        let matchValue;
+        if (!rel.match || rel.match === 'external_id') {
+          matchValue = parentRow.external_id != null ? String(parentRow.external_id) : null;
+        } else if (rel.match === 'id') {
+          matchValue = parentRow.id != null ? String(parentRow.id) : null;
+        } else {
+          matchValue = readPathValue(parentRow, rel.match);
+        }
+
+        if (matchValue == null || matchValue === '') {
+          result.breakdown.push({
+            parent_entity_type: parentRow.entity_type,
+            entity_type: rel.entity_type,
+            label: rel.label,
+            count: 0,
+            ids: []
+          });
+          continue;
+        }
+
+        const filters = JSON.stringify([{ field: rel.via, operator: 'equals', value: matchValue }]);
+        const params = new URLSearchParams({
+          entity_type: rel.entity_type,
+          limit: '1',
+          offset: '0',
+          filters
+        });
+        try {
+          const response = await api.get(`${connectorApi('/data')}?${params.toString()}`);
+          const total = Number(response && response.pagination && response.pagination.total) || 0;
+          result.breakdown.push({
+            parent_entity_type: parentRow.entity_type,
+            entity_type: rel.entity_type,
+            label: rel.label,
+            count: total,
+            ids: []
+          });
+          result.totalChildren += total;
+        } catch (error) {
+          result.warnings.push(`Failed to load ${rel.label}: ${error.message || error}`);
+        }
+      }
+      return result;
+    }
+
     async function refreshLinkedRecordsForOpenRecord() {
       if (!state.selectedRecord) {
         state.cascadeLinkedPanel = null;
@@ -4890,7 +4979,7 @@
       state.cascadeLinkedPanel = { loading: true, breakdown: [], warnings: [], totalChildren: 0 };
       renderRecordDetail();
       try {
-        const preview = await previewCascadeForSelection([state.selectedRecord], { threshold: 100 });
+        const preview = await fetchLinkedRecordsForRow(state.selectedRecord);
         state.cascadeLinkedPanel = {
           loading: false,
           breakdown: preview.breakdown,
@@ -5166,15 +5255,15 @@
         .filter((a) => a && a.annotation_type === 'correction');
 
       const intro = `
-        <div class="text-sm font-semibold text-gray-900">Proposed Corrections</div>
-        <div class="mt-1 text-xs text-gray-500">Suggested edits collaborators have proposed for this record. The synced source data is unchanged until a correction is applied.</div>
+        <div class="text-sm font-semibold text-gray-900">Your Corrections</div>
+        <div class="mt-1 text-xs text-gray-500">Field-level edits applied as a read-time overlay. The synced raw value stays in the source payload; reads return your corrected value until you delete the correction.</div>
       `;
 
       if (!corrections.length) {
         return `
           <div class="rounded-xl border border-gray-200 bg-white p-4">
             ${intro}
-            <div class="mt-3 text-sm text-gray-500">No proposed corrections yet. Click a field in the Source Payload above to start one.</div>
+            <div class="mt-3 text-sm text-gray-500">No corrections yet. Click a field in the Source Payload above to start one.</div>
           </div>
         `;
       }
@@ -6744,11 +6833,11 @@
             proposed_value: proposedValue,
             notes,
             original_value: originalValue === undefined ? null : originalValue,
-            status: 'shortlisted'
+            status: 'approved'
           }
         });
 
-        showPageAlert('Correction shortlisted for review.', 'success');
+        showPageAlert('Correction applied. It will overlay on every read until removed.', 'success');
         await Promise.all([openRecordDetail(state.selectedRecordId), refreshDataPreview()]);
       } catch (error) {
         console.error('[Connector Viewer] Failed to shortlist correction', error);
