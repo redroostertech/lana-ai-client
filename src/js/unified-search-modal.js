@@ -161,11 +161,16 @@
         font-size: 0.9375rem;
         font-weight: 600;
         color: #111827;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: block;
         min-width: 0;
+        /* Allow up to 2 lines; anything beyond gets ellipsis. Standard
+           line-clamp pattern via -webkit-box; supported everywhere
+           Electron renders. */
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+        line-height: 1.3;
       }
 
       .unified-search-result-meta,
