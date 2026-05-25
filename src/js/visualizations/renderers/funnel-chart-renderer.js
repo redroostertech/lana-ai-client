@@ -355,6 +355,20 @@ export class FunnelChartRenderer {
    * The first stage in a group is the "entry" stage, subsequent ones are "outcome" branches.
    */
   _renderStagesWithBranching(stages, container) {
+    // Drop zero-value stages before any rendering. A stage with 0 leads
+    // (count or value) adds visual noise + produces nonsense connectors
+    // like "All 0 leads continue". Hide them entirely. If every stage is
+    // 0 we still need to emit something so the container isn't blank --
+    // keep the first stage as a marker in that case.
+    var nonZeroStages = stages.filter(function (s) {
+      var v = parseFloat(s && (s.value != null ? s.value : s.count)) || 0;
+      return v > 0;
+    });
+    if (nonZeroStages.length === 0 && stages.length > 0) {
+      nonZeroStages = [stages[0]];
+    }
+    stages = nonZeroStages;
+
     // Build branch group map: find consecutive stages sharing a stage_group
     var branchGroups = this._detectBranchGroups(stages);
     var renderedIndices = {};
