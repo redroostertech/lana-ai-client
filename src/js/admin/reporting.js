@@ -2588,39 +2588,77 @@
       var ctx = document.getElementById(canvasId);
       if (!ctx) return;
 
-      // Build chart rows. If viz.data is not pre-populated (the common case
-      // for Current vs. Prior visualizations declared with a metrics list)
-      // synthesize one row per listed metric from data.metrics current/prior.
+      // Build chart rows. Three cases:
+      //   1. viz.data pre-populated  -> use as-is
+      //   2. single metric whose .current is an array  -> distribution metric;
+      //      treat each array row as a bar so this renderer can display
+      //      Agent D-style breakdowns (medium, utm, referrer, touch_type)
+      //      without requiring per-viz series configs.
+      //   3. multiple metrics with scalar current/prior -> classic
+      //      current-vs-prior comparison (the original behavior)
       var rows = viz.data;
+      var distributionMode = false;
+      var distributionSeries = null;
       if ((!rows || rows.length === 0) && Array.isArray(viz.metrics) && Array.isArray(data.metrics)) {
-        rows = viz.metrics.map(function (key) {
-          var m = data.metrics.find(function (x) { return x.key === key; });
-          if (!m) return null;
-          return {
-            source_name: m.name || m.key,
-            current: m.current,
-            prior: m.prior
-          };
-        }).filter(function (r) {
-          if (!r) return false;
-          var c = parseFloat(r.current); var p = parseFloat(r.prior);
-          return (Number.isFinite(c) && c !== 0) || (Number.isFinite(p) && p !== 0);
-        });
+        if (viz.metrics.length === 1) {
+          var soleMetric = data.metrics.find(function (x) { return x.key === viz.metrics[0]; });
+          if (soleMetric && Array.isArray(soleMetric.current) && soleMetric.current.length > 0) {
+            distributionMode = true;
+            rows = soleMetric.current;
+            // Auto-pick the value series. If the distribution rows carry a
+            // touch_type / status / category column we can build a grouped
+            // axis off it; otherwise fall back to a single count series.
+            var hasTouchType = rows.some(function (r) { return r && r.touch_type; });
+            if (hasTouchType) {
+              var groups = Array.from(new Set(rows.map(function (r) { return r.touch_type || 'other'; })));
+              distributionSeries = groups.map(function (g, i) {
+                return {
+                  label: g,
+                  data: rows.map(function (r) { return (r.touch_type === g) ? (parseFloat(r.count) || parseFloat(r.value) || 0) : 0; }),
+                  backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444'][i % 4]
+                };
+              });
+            } else {
+              distributionSeries = [{
+                label: soleMetric.unit || 'count',
+                data: rows.map(function (r) { return parseFloat(r.count) || parseFloat(r.value) || 0; }),
+                backgroundColor: '#6366f1'
+              }];
+            }
+          }
+        }
+        if (!distributionMode) {
+          rows = viz.metrics.map(function (key) {
+            var m = data.metrics.find(function (x) { return x.key === key; });
+            if (!m) return null;
+            return {
+              source_name: m.name || m.key,
+              current: m.current,
+              prior: m.prior
+            };
+          }).filter(function (r) {
+            if (!r) return false;
+            var c = parseFloat(r.current); var p = parseFloat(r.prior);
+            return (Number.isFinite(c) && c !== 0) || (Number.isFinite(p) && p !== 0);
+          });
+        }
       }
 
       if (!rows || rows.length === 0) {
         ctx.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">No data available</div>';
         return;
       }
-      var xField = (viz.xAxis && viz.xAxis.field) || 'source_name';
+      var xField = (viz.xAxis && viz.xAxis.field) || (distributionMode ? 'label' : 'source_name');
       var labels = rows.map(function (row) { return row[xField] || 'Unknown'; });
-      var datasets = (viz.series || []).map(function (serie) {
-        return {
-          label: serie.label,
-          data: rows.map(function (row) { return parseFloat(row[serie.field]) || 0; }),
-          backgroundColor: serie.color, borderColor: serie.color, borderWidth: 1
-        };
-      });
+      var datasets = distributionMode
+        ? distributionSeries
+        : (viz.series || []).map(function (serie) {
+            return {
+              label: serie.label,
+              data: rows.map(function (row) { return parseFloat(row[serie.field]) || 0; }),
+              backgroundColor: serie.color, borderColor: serie.color, borderWidth: 1
+            };
+          });
 
       var chart = new Chart(ctx, {
         type: 'bar',
