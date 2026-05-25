@@ -614,6 +614,7 @@
       cascadeEnabled: false,
       cascadeDisabledRels: {},
       cascadeLinkedPanel: null,
+      parentRecordsPanel: null,
       cascadePanelPreview: null,
       cascadePanelLoading: false,
       cascadePanelDebounce: null,
@@ -4964,6 +4965,102 @@
       return result;
     }
 
+    // Parents panel: walks the connector's relationships graph in the
+    // reverse direction. For the open record, find every declared edge of
+    // the shape `X -> currentEntityType via data.<field>` (i.e. any
+    // entity that names this entity as a child). Each such edge tells us
+    // the current row's data.<field> holds X's external_id. Look up the
+    // parent rows by external_id and return them grouped by parent
+    // entity type. Lets the viewer surface "this opportunity belongs to
+    // THIS contact, THIS pipeline" even though the FK lives on the
+    // opportunity (so cascade-assign sees it as a leaf with no children).
+    function getParentRelationshipsForEntity(entityType) {
+      if (!entityType) return [];
+      const map = getDependentEntitiesMap();
+      const out = [];
+      for (const [parentEntity, rels] of Object.entries(map)) {
+        for (const rel of rels) {
+          if (rel && rel.entity_type === entityType && typeof rel.via === 'string' && rel.via.startsWith('data.')) {
+            out.push({
+              parent_entity_type: parentEntity,
+              label: titleCase(parentEntity),
+              via_field: rel.via.slice('data.'.length),
+              match: rel.match || 'external_id'
+            });
+          }
+        }
+      }
+      return out;
+    }
+
+    async function fetchParentRecordsForRow(parentRow) {
+      const result = { breakdown: [], warnings: [] };
+      if (!parentRow || !parentRow.entity_type) return result;
+      const inbound = getParentRelationshipsForEntity(parentRow.entity_type);
+      if (!inbound.length) return result;
+
+      const data = parentRow.data && typeof parentRow.data === 'object' ? parentRow.data : {};
+      // Group inbound edges by parent_entity_type so we only query each
+      // parent table once per (entity, via-field-value) combo.
+      for (const edge of inbound) {
+        const fkValue = data[edge.via_field];
+        if (fkValue == null || fkValue === '') {
+          continue;
+        }
+        const targetColumn = edge.match === 'external_id' ? 'external_id' : `data.${edge.match.startsWith('data.') ? edge.match.slice('data.'.length) : edge.match}`;
+        const filters = JSON.stringify([{ field: targetColumn, operator: 'equals', value: String(fkValue) }]);
+        const params = new URLSearchParams({
+          entity_type: edge.parent_entity_type,
+          limit: '1',
+          offset: '0',
+          filters
+        });
+        try {
+          const response = await api.get(`${connectorApi('/data')}?${params.toString()}`);
+          const rows = Array.isArray(response.data) ? response.data : [];
+          const total = Number(response && response.pagination && response.pagination.total) || 0;
+          result.breakdown.push({
+            parent_entity_type: edge.parent_entity_type,
+            label: edge.label,
+            via_field: edge.via_field,
+            fk_value: String(fkValue),
+            row: rows[0] || null,
+            count: total
+          });
+        } catch (error) {
+          result.warnings.push(`Failed to lookup ${edge.label}: ${error.message || error}`);
+        }
+      }
+      return result;
+    }
+
+    async function refreshParentRecordsForOpenRecord() {
+      if (!state.selectedRecord) {
+        state.parentRecordsPanel = null;
+        renderRecordDetail();
+        return;
+      }
+      const inbound = getParentRelationshipsForEntity(state.selectedRecord.entity_type);
+      if (!inbound.length) {
+        state.parentRecordsPanel = null;
+        renderRecordDetail();
+        return;
+      }
+      state.parentRecordsPanel = { loading: true, breakdown: [], warnings: [] };
+      renderRecordDetail();
+      try {
+        const preview = await fetchParentRecordsForRow(state.selectedRecord);
+        state.parentRecordsPanel = {
+          loading: false,
+          breakdown: preview.breakdown,
+          warnings: preview.warnings
+        };
+      } catch (error) {
+        state.parentRecordsPanel = { loading: false, breakdown: [], warnings: [error.message || String(error)] };
+      }
+      renderRecordDetail();
+    }
+
     async function refreshLinkedRecordsForOpenRecord() {
       if (!state.selectedRecord) {
         state.cascadeLinkedPanel = null;
@@ -5371,6 +5468,8 @@
 
             ${renderSourceAttributionSection(record)}
 
+            ${renderParentRecordsSection(record)}
+
             ${renderLinkedRecordsSection(record)}
 
             ${renderRecordAssignSection(record)}
@@ -5593,6 +5692,87 @@
       }
     }
 
+    // Switch the data grid to the parent entity, refresh, and open the
+    // parent row in the side drawer. Uses the same filter-then-open pattern
+    // as filterToLinkedRecords (which goes the child direction).
+    async function openParentRecord(parentEntityType, parentExternalId, parentRowId) {
+      if (!parentEntityType || !parentExternalId) return;
+      const entitySelect = document.getElementById('entityTypeFilter');
+      if (entitySelect) entitySelect.value = parentEntityType;
+      const searchInput = document.getElementById('dataSearchInput');
+      if (searchInput) searchInput.value = String(parentExternalId);
+      closeRecordDetail();
+      state.dataPreviewOffset = 0;
+      state.selectedDataIds = [];
+      state.selectedRowsById = {};
+      state.selectionMode = 'manual';
+      try {
+        await refreshDataPreview();
+        const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
+        const targetRow = (parentRowId && rows.find((r) => r.id === parentRowId))
+          || rows.find((r) => String(r.external_id) === String(parentExternalId));
+        if (targetRow) {
+          openRecordDetail(targetRow.id);
+        } else {
+          showPageAlert(`Filtered to ${parentEntityType} ${parentExternalId}, but the row was not in the page. Adjust the filter to find it.`, 'info');
+        }
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to open parent record', error);
+        showPageAlert(error.message || 'Failed to open parent record.', 'error');
+      }
+    }
+
+    function renderParentRecordsSection(record) {
+      const inbound = getParentRelationshipsForEntity(record && record.entity_type);
+      if (!inbound.length) return '';
+      const panel = state.parentRecordsPanel;
+      let bodyHtml;
+      if (!panel) {
+        bodyHtml = `
+          <div class="mt-3 text-sm text-gray-500">Look up the records this row points back at.</div>
+          <div class="mt-3"><button type="button" onclick="refreshParentRecordsForOpenRecord()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Load Parents</button></div>
+        `;
+      } else if (panel.loading) {
+        bodyHtml = '<div class="mt-3 text-sm text-gray-500">Loading parents...</div>';
+      } else if (!panel.breakdown.length) {
+        bodyHtml = '<div class="mt-3 text-sm text-gray-500">No parent references found on this row.</div>';
+      } else {
+        const rows = panel.breakdown.map((b) => {
+          const found = b.row && b.count > 0;
+          const name = found ? (b.row.data && (b.row.data.name || b.row.data.title || b.row.data.firstName + ' ' + (b.row.data.lastName || '') || b.row.external_id)) : '(not synced)';
+          const action = found
+            ? `<button type="button" onclick="openParentRecord('${escapeHtml(b.parent_entity_type)}','${escapeHtml(b.row.external_id || b.fk_value)}','${escapeHtml(b.row.id)}')" class="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Open</button>`
+            : `<span class="text-xs text-gray-500">id: ${escapeHtml(b.fk_value)}</span>`;
+          return `
+            <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+              <div>
+                <div class="font-medium text-gray-900">${escapeHtml(b.label)}</div>
+                <div class="text-xs text-gray-500">${escapeHtml(record.entity_type)} &rarr; ${escapeHtml(b.parent_entity_type)} via <code>data.${escapeHtml(b.via_field)}</code></div>
+                <div class="mt-1 text-xs text-gray-700">${escapeHtml(String(name).trim() || '(no name)')}</div>
+              </div>
+              <div>${action}</div>
+            </div>
+          `;
+        }).join('');
+        const warningsHtml = panel.warnings && panel.warnings.length
+          ? `<div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">${panel.warnings.map(escapeHtml).join('<br>')}</div>`
+          : '';
+        bodyHtml = `<div class="mt-3 space-y-2">${rows}</div>${warningsHtml}`;
+      }
+      return `
+        <div class="rounded-xl border border-gray-200 bg-white p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-semibold text-gray-900">Parents</div>
+              <div class="mt-1 text-xs text-gray-500">Records this row references via foreign keys on its own data.</div>
+            </div>
+            <button type="button" onclick="refreshParentRecordsForOpenRecord()" class="rounded-lg border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Refresh</button>
+          </div>
+          ${bodyHtml}
+        </div>
+      `;
+    }
+
     function renderLinkedRecordsSection(record) {
       const rels = getRelationshipsForEntity(record && record.entity_type);
       if (!rels.length) return '';
@@ -5662,6 +5842,7 @@
       state.selectedRecord = null;
       state.recordAnnotations = [];
       state.cascadeLinkedPanel = null;
+      state.parentRecordsPanel = null;
       renderDataPreview();
     }
 
@@ -6952,6 +7133,7 @@
       state.selectedRecord = rows.find((row) => row.id === recordId) || null;
       if (previousRecordId !== recordId) {
         state.cascadeLinkedPanel = null;
+        state.parentRecordsPanel = null;
       }
 
       try {
@@ -6966,6 +7148,9 @@
 
       if (state.selectedRecord && getRelationshipsForEntity(state.selectedRecord.entity_type).length) {
         refreshLinkedRecordsForOpenRecord();
+      }
+      if (state.selectedRecord && getParentRelationshipsForEntity(state.selectedRecord.entity_type).length) {
+        refreshParentRecordsForOpenRecord();
       }
     }
 
@@ -7629,6 +7814,8 @@
     window.clearAssignSelection = clearAssignSelection;
     window.onMatterDropdownChange = onMatterDropdownChange;
     window.openRecordDetail = openRecordDetail;
+    window.openParentRecord = openParentRecord;
+    window.refreshParentRecordsForOpenRecord = refreshParentRecordsForOpenRecord;
     window.submitRecordCorrection = submitRecordCorrection;
     window.onCorrectionFieldSelectChange = onCorrectionFieldSelectChange;
     window.updateCurrentValueDisplay = updateCurrentValueDisplay;
