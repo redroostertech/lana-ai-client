@@ -1096,18 +1096,85 @@
 
     _getAppPrefix() {
       const path = window.location.pathname || '';
-      const nestedDirs = ['/admin/', '/automation/', '/integrations/', '/insights/', '/matters/', '/voice/'];
+      const nestedDirs = ['/admin/', '/automation/', '/doc-studio/', '/deck-studio/', '/integrations/', '/insights/', '/matters/', '/voice/'];
       return nestedDirs.some((dir) => path.indexOf(dir) !== -1) ? '../' : '';
+    }
+
+    _getAppCatalog() {
+      if (window.LanaClientApps && window.LanaClientApps.catalog) {
+        return window.LanaClientApps.catalog;
+      }
+      return {
+        'lana-works': {
+          id: 'lana-works',
+          label: 'LanaWorks',
+          description: 'Manage matters, workspaces and client operations',
+          route: 'dashboard.html',
+          colors: ['#82d8ff', '#4267df', '#126f62', '#111827']
+        },
+        'lana-agents': {
+          id: 'lana-agents',
+          label: 'LanaAgents',
+          description: 'Browse and run AI agents',
+          route: 'agents/index.html',
+          colors: ['#a78bfa', '#7c3aed', '#5b21b6', '#1e1b4b']
+        },
+        'lana-insights': {
+          id: 'lana-insights',
+          label: 'LanaInsights',
+          description: 'Dashboards, reporting, and firm analytics',
+          route: 'admin/analytics.html',
+          colors: ['#60a5fa', '#2563eb', '#7c3aed', '#0f172a']
+        },
+        'doc-studio': {
+          id: 'doc-studio',
+          label: 'Doc Studio',
+          description: 'Generate decks, legal documents, PDFs, and pages',
+          route: 'doc-studio/index.html',
+          colors: ['#2f6f73', '#b56b45', '#17201f', '#f7f4ef']
+        }
+      };
     }
 
     _getDefaultAppItems() {
       // Safe fallback when discovery hasn't supplied enabled_apps yet
       // (e.g. first launch, missing field, parse error). LanaWorks is the
       // baseline app every org has; other sub-apps must be explicitly enabled.
-      return [
-        { id: 'lana-works',  label: 'LanaWorks',  description: 'Manage matters, workspaces and client operations', route: 'dashboard.html',    colors: ['#82d8ff', '#4267df', '#126f62', '#111827'] },
-        { id: 'lana-agents', label: 'LanaAgents', description: 'Browse and run AI agents',                          route: 'agents/index.html', colors: ['#a78bfa', '#7c3aed', '#5b21b6', '#1e1b4b'] }
-      ];
+      if (window.LanaClientApps && typeof window.LanaClientApps.defaultApps === 'function') {
+        return window.LanaClientApps.defaultApps();
+      }
+      const catalog = this._getAppCatalog();
+      return [catalog['lana-works'], catalog['lana-agents']];
+    }
+
+    _normalizeAppItem(item) {
+      if (window.LanaClientApps && typeof window.LanaClientApps.normalizeApp === 'function') {
+        return window.LanaClientApps.normalizeApp(item);
+      }
+      if (!item) return null;
+      const catalog = this._getAppCatalog();
+      const rawId = typeof item === 'string'
+        ? item
+        : (item.id || item.app_id || item.slug || item.key || '');
+      const aliases = {
+        works: 'lana-works',
+        'lana-works': 'lana-works',
+        agents: 'lana-agents',
+        'lana-agents': 'lana-agents',
+        insights: 'lana-insights',
+        'business-intelligence': 'lana-insights',
+        'lana-insights': 'lana-insights',
+        'doc-studio': 'doc-studio',
+        'deck-studio': 'doc-studio',
+        documents: 'doc-studio'
+      };
+      const id = aliases[String(rawId).trim()] || String(rawId).trim();
+      const base = catalog[id] || {};
+      const normalized = typeof item === 'string'
+        ? Object.assign({}, base, { id: id })
+        : Object.assign({}, base, item, { id: id });
+      if (!normalized.id || !normalized.label || !normalized.route) return null;
+      return normalized;
     }
 
     _getAppItems() {
@@ -1125,6 +1192,11 @@
         }
       } catch (_) { /* fall through to defaults */ }
       if (!items) items = this._getDefaultAppItems();
+      if (window.LanaClientApps && typeof window.LanaClientApps.normalizeAppList === 'function') {
+        items = window.LanaClientApps.normalizeAppList(items);
+      } else {
+        items = items.map((item) => this._normalizeAppItem(item)).filter(Boolean);
+      }
       return items.map((item) => ({
         id: item.id,
         label: item.label,
@@ -1160,6 +1232,7 @@
       ) return byId('lana-insights') || items[0];
       if (path.indexOf('/voice/') !== -1) return byId('lana-voice') || items[0];
       if (path.indexOf('/agents/') !== -1) return byId('lana-agents') || items[0];
+      if (path.indexOf('/doc-studio/') !== -1 || path.indexOf('/deck-studio/') !== -1) return byId('doc-studio') || items[0];
       return byId('lana-works') || items[0];
     }
 

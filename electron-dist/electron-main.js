@@ -53,6 +53,7 @@ var require_package = __commonJS({
         "build:all": "electron-builder --mac --x64 --arm64 --win --linux -c electron-builder.client.json",
         "generate:icons": "node scripts/generate-icons.js",
         "generate:icons-all": "node scripts/generate-icons.js --all",
+        "generate:app-icons": "node scripts/generate-app-icons.js",
         "css:build": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css --env production",
         "css:watch": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css --watch",
         "css:dev": "postcss src/css/tailwind-input.css -o src/css/tailwind-output.css"
@@ -122,9 +123,11 @@ var require_package = __commonJS({
         "jest-junit": "^16.0.0",
         "lucide-static": "^0.574.0",
         nodemon: "^3.0.0",
+        "png-to-ico": "^2.1.8",
         postcss: "^8.5.6",
         "postcss-cli": "^11.0.1",
         "postcss-import": "^16.1.1",
+        sharp: "^0.34.5",
         tailwindcss: "^3.4.19"
       }
     };
@@ -10091,7 +10094,7 @@ var require_form_data = __commonJS({
     var http = require("http");
     var https = require("https");
     var parseUrl = require("url").parse;
-    var fs = require("fs");
+    var fs2 = require("fs");
     var Stream = require("stream").Stream;
     var crypto2 = require("crypto");
     var mime = require_mime_types();
@@ -10158,7 +10161,7 @@ var require_form_data = __commonJS({
         if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
           callback(null, value.end + 1 - (value.start ? value.start : 0));
         } else {
-          fs.stat(value.path, function(err, stat) {
+          fs2.stat(value.path, function(err, stat) {
             if (err) {
               callback(err);
               return;
@@ -15232,7 +15235,7 @@ var require_axios = __commonJS({
 // electron-logger.js
 var require_electron_logger = __commonJS({
   "electron-logger.js"(exports2, module2) {
-    var fs = require("fs");
+    var fs2 = require("fs");
     var path2 = require("path");
     var { app: app2 } = require("electron");
     var LOG_LEVELS = {
@@ -15315,7 +15318,7 @@ var require_electron_logger = __commonJS({
         }
         logContent += "\n";
       }
-      fs.writeFileSync(logPath, logContent, "utf8");
+      fs2.writeFileSync(logPath, logContent, "utf8");
       return logPath;
     }
     function getLogsAsString() {
@@ -15434,12 +15437,12 @@ var require_electron_storage = __commonJS({
       } catch (error) {
         logError2("Config file corrupted, resetting to defaults", error);
         try {
-          const fs = require("fs");
+          const fs2 = require("fs");
           const path2 = require("path");
           const configDir = app2.getPath("userData");
           const configPath = path2.join(configDir, "server-config.json");
-          if (fs.existsSync(configPath)) {
-            fs.unlinkSync(configPath);
+          if (fs2.existsSync(configPath)) {
+            fs2.unlinkSync(configPath);
             logInfo2(`[electron-storage] Deleted corrupted config file: ${configPath}`);
           }
           store = new Store2(storeOptions);
@@ -15485,6 +15488,10 @@ var require_electron_storage = __commonJS({
           // Burst API configuration for direct calls to burst service
           burstApiKey: server.burstApiKey || null,
           burstUrl: server.burstUrl || null,
+          // Forge agents platform configuration (Phase 1) — mirrors burst pattern.
+          forgeApiKey: server.forgeApiKey || null,
+          forgeUrl: server.forgeUrl || null,
+          forgeSovereign: server.forgeSovereign || null,
           tier: server.tier || "standard",
           rateLimit: server.rateLimit || 100,
           // Sub-apps available to this organization (drives the client app switcher)
@@ -15682,54 +15689,54 @@ var require_polyfills = __commonJS({
     }
     var chdir;
     module2.exports = patch;
-    function patch(fs) {
+    function patch(fs2) {
       if (constants.hasOwnProperty("O_SYMLINK") && process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
-        patchLchmod(fs);
+        patchLchmod(fs2);
       }
-      if (!fs.lutimes) {
-        patchLutimes(fs);
+      if (!fs2.lutimes) {
+        patchLutimes(fs2);
       }
-      fs.chown = chownFix(fs.chown);
-      fs.fchown = chownFix(fs.fchown);
-      fs.lchown = chownFix(fs.lchown);
-      fs.chmod = chmodFix(fs.chmod);
-      fs.fchmod = chmodFix(fs.fchmod);
-      fs.lchmod = chmodFix(fs.lchmod);
-      fs.chownSync = chownFixSync(fs.chownSync);
-      fs.fchownSync = chownFixSync(fs.fchownSync);
-      fs.lchownSync = chownFixSync(fs.lchownSync);
-      fs.chmodSync = chmodFixSync(fs.chmodSync);
-      fs.fchmodSync = chmodFixSync(fs.fchmodSync);
-      fs.lchmodSync = chmodFixSync(fs.lchmodSync);
-      fs.stat = statFix(fs.stat);
-      fs.fstat = statFix(fs.fstat);
-      fs.lstat = statFix(fs.lstat);
-      fs.statSync = statFixSync(fs.statSync);
-      fs.fstatSync = statFixSync(fs.fstatSync);
-      fs.lstatSync = statFixSync(fs.lstatSync);
-      if (fs.chmod && !fs.lchmod) {
-        fs.lchmod = function(path2, mode, cb) {
+      fs2.chown = chownFix(fs2.chown);
+      fs2.fchown = chownFix(fs2.fchown);
+      fs2.lchown = chownFix(fs2.lchown);
+      fs2.chmod = chmodFix(fs2.chmod);
+      fs2.fchmod = chmodFix(fs2.fchmod);
+      fs2.lchmod = chmodFix(fs2.lchmod);
+      fs2.chownSync = chownFixSync(fs2.chownSync);
+      fs2.fchownSync = chownFixSync(fs2.fchownSync);
+      fs2.lchownSync = chownFixSync(fs2.lchownSync);
+      fs2.chmodSync = chmodFixSync(fs2.chmodSync);
+      fs2.fchmodSync = chmodFixSync(fs2.fchmodSync);
+      fs2.lchmodSync = chmodFixSync(fs2.lchmodSync);
+      fs2.stat = statFix(fs2.stat);
+      fs2.fstat = statFix(fs2.fstat);
+      fs2.lstat = statFix(fs2.lstat);
+      fs2.statSync = statFixSync(fs2.statSync);
+      fs2.fstatSync = statFixSync(fs2.fstatSync);
+      fs2.lstatSync = statFixSync(fs2.lstatSync);
+      if (fs2.chmod && !fs2.lchmod) {
+        fs2.lchmod = function(path2, mode, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs.lchmodSync = function() {
+        fs2.lchmodSync = function() {
         };
       }
-      if (fs.chown && !fs.lchown) {
-        fs.lchown = function(path2, uid, gid, cb) {
+      if (fs2.chown && !fs2.lchown) {
+        fs2.lchown = function(path2, uid, gid, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs.lchownSync = function() {
+        fs2.lchownSync = function() {
         };
       }
       if (platform === "win32") {
-        fs.rename = typeof fs.rename !== "function" ? fs.rename : (function(fs$rename) {
+        fs2.rename = typeof fs2.rename !== "function" ? fs2.rename : (function(fs$rename) {
           function rename(from, to, cb) {
             var start = Date.now();
             var backoff = 0;
             fs$rename(from, to, function CB(er) {
               if (er && (er.code === "EACCES" || er.code === "EPERM" || er.code === "EBUSY") && Date.now() - start < 6e4) {
                 setTimeout(function() {
-                  fs.stat(to, function(stater, st) {
+                  fs2.stat(to, function(stater, st) {
                     if (stater && stater.code === "ENOENT")
                       fs$rename(from, to, CB);
                     else
@@ -15745,9 +15752,9 @@ var require_polyfills = __commonJS({
           }
           if (Object.setPrototypeOf) Object.setPrototypeOf(rename, fs$rename);
           return rename;
-        })(fs.rename);
+        })(fs2.rename);
       }
-      fs.read = typeof fs.read !== "function" ? fs.read : (function(fs$read) {
+      fs2.read = typeof fs2.read !== "function" ? fs2.read : (function(fs$read) {
         function read(fd, buffer, offset, length, position, callback_) {
           var callback;
           if (callback_ && typeof callback_ === "function") {
@@ -15755,22 +15762,22 @@ var require_polyfills = __commonJS({
             callback = function(er, _, __) {
               if (er && er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
-                return fs$read.call(fs, fd, buffer, offset, length, position, callback);
+                return fs$read.call(fs2, fd, buffer, offset, length, position, callback);
               }
               callback_.apply(this, arguments);
             };
           }
-          return fs$read.call(fs, fd, buffer, offset, length, position, callback);
+          return fs$read.call(fs2, fd, buffer, offset, length, position, callback);
         }
         if (Object.setPrototypeOf) Object.setPrototypeOf(read, fs$read);
         return read;
-      })(fs.read);
-      fs.readSync = typeof fs.readSync !== "function" ? fs.readSync : /* @__PURE__ */ (function(fs$readSync) {
+      })(fs2.read);
+      fs2.readSync = typeof fs2.readSync !== "function" ? fs2.readSync : /* @__PURE__ */ (function(fs$readSync) {
         return function(fd, buffer, offset, length, position) {
           var eagCounter = 0;
           while (true) {
             try {
-              return fs$readSync.call(fs, fd, buffer, offset, length, position);
+              return fs$readSync.call(fs2, fd, buffer, offset, length, position);
             } catch (er) {
               if (er.code === "EAGAIN" && eagCounter < 10) {
                 eagCounter++;
@@ -15780,10 +15787,10 @@ var require_polyfills = __commonJS({
             }
           }
         };
-      })(fs.readSync);
-      function patchLchmod(fs2) {
-        fs2.lchmod = function(path2, mode, callback) {
-          fs2.open(
+      })(fs2.readSync);
+      function patchLchmod(fs3) {
+        fs3.lchmod = function(path2, mode, callback) {
+          fs3.open(
             path2,
             constants.O_WRONLY | constants.O_SYMLINK,
             mode,
@@ -15792,80 +15799,80 @@ var require_polyfills = __commonJS({
                 if (callback) callback(err);
                 return;
               }
-              fs2.fchmod(fd, mode, function(err2) {
-                fs2.close(fd, function(err22) {
+              fs3.fchmod(fd, mode, function(err2) {
+                fs3.close(fd, function(err22) {
                   if (callback) callback(err2 || err22);
                 });
               });
             }
           );
         };
-        fs2.lchmodSync = function(path2, mode) {
-          var fd = fs2.openSync(path2, constants.O_WRONLY | constants.O_SYMLINK, mode);
+        fs3.lchmodSync = function(path2, mode) {
+          var fd = fs3.openSync(path2, constants.O_WRONLY | constants.O_SYMLINK, mode);
           var threw = true;
           var ret;
           try {
-            ret = fs2.fchmodSync(fd, mode);
+            ret = fs3.fchmodSync(fd, mode);
             threw = false;
           } finally {
             if (threw) {
               try {
-                fs2.closeSync(fd);
+                fs3.closeSync(fd);
               } catch (er) {
               }
             } else {
-              fs2.closeSync(fd);
+              fs3.closeSync(fd);
             }
           }
           return ret;
         };
       }
-      function patchLutimes(fs2) {
-        if (constants.hasOwnProperty("O_SYMLINK") && fs2.futimes) {
-          fs2.lutimes = function(path2, at, mt, cb) {
-            fs2.open(path2, constants.O_SYMLINK, function(er, fd) {
+      function patchLutimes(fs3) {
+        if (constants.hasOwnProperty("O_SYMLINK") && fs3.futimes) {
+          fs3.lutimes = function(path2, at, mt, cb) {
+            fs3.open(path2, constants.O_SYMLINK, function(er, fd) {
               if (er) {
                 if (cb) cb(er);
                 return;
               }
-              fs2.futimes(fd, at, mt, function(er2) {
-                fs2.close(fd, function(er22) {
+              fs3.futimes(fd, at, mt, function(er2) {
+                fs3.close(fd, function(er22) {
                   if (cb) cb(er2 || er22);
                 });
               });
             });
           };
-          fs2.lutimesSync = function(path2, at, mt) {
-            var fd = fs2.openSync(path2, constants.O_SYMLINK);
+          fs3.lutimesSync = function(path2, at, mt) {
+            var fd = fs3.openSync(path2, constants.O_SYMLINK);
             var ret;
             var threw = true;
             try {
-              ret = fs2.futimesSync(fd, at, mt);
+              ret = fs3.futimesSync(fd, at, mt);
               threw = false;
             } finally {
               if (threw) {
                 try {
-                  fs2.closeSync(fd);
+                  fs3.closeSync(fd);
                 } catch (er) {
                 }
               } else {
-                fs2.closeSync(fd);
+                fs3.closeSync(fd);
               }
             }
             return ret;
           };
-        } else if (fs2.futimes) {
-          fs2.lutimes = function(_a, _b, _c, cb) {
+        } else if (fs3.futimes) {
+          fs3.lutimes = function(_a, _b, _c, cb) {
             if (cb) process.nextTick(cb);
           };
-          fs2.lutimesSync = function() {
+          fs3.lutimesSync = function() {
           };
         }
       }
       function chmodFix(orig) {
         if (!orig) return orig;
         return function(target, mode, cb) {
-          return orig.call(fs, target, mode, function(er) {
+          return orig.call(fs2, target, mode, function(er) {
             if (chownErOk(er)) er = null;
             if (cb) cb.apply(this, arguments);
           });
@@ -15875,7 +15882,7 @@ var require_polyfills = __commonJS({
         if (!orig) return orig;
         return function(target, mode) {
           try {
-            return orig.call(fs, target, mode);
+            return orig.call(fs2, target, mode);
           } catch (er) {
             if (!chownErOk(er)) throw er;
           }
@@ -15884,7 +15891,7 @@ var require_polyfills = __commonJS({
       function chownFix(orig) {
         if (!orig) return orig;
         return function(target, uid, gid, cb) {
-          return orig.call(fs, target, uid, gid, function(er) {
+          return orig.call(fs2, target, uid, gid, function(er) {
             if (chownErOk(er)) er = null;
             if (cb) cb.apply(this, arguments);
           });
@@ -15894,7 +15901,7 @@ var require_polyfills = __commonJS({
         if (!orig) return orig;
         return function(target, uid, gid) {
           try {
-            return orig.call(fs, target, uid, gid);
+            return orig.call(fs2, target, uid, gid);
           } catch (er) {
             if (!chownErOk(er)) throw er;
           }
@@ -15914,13 +15921,13 @@ var require_polyfills = __commonJS({
             }
             if (cb) cb.apply(this, arguments);
           }
-          return options ? orig.call(fs, target, options, callback) : orig.call(fs, target, callback);
+          return options ? orig.call(fs2, target, options, callback) : orig.call(fs2, target, callback);
         };
       }
       function statFixSync(orig) {
         if (!orig) return orig;
         return function(target, options) {
-          var stats = options ? orig.call(fs, target, options) : orig.call(fs, target);
+          var stats = options ? orig.call(fs2, target, options) : orig.call(fs2, target);
           if (stats) {
             if (stats.uid < 0) stats.uid += 4294967296;
             if (stats.gid < 0) stats.gid += 4294967296;
@@ -15949,7 +15956,7 @@ var require_legacy_streams = __commonJS({
   "node_modules/graceful-fs/legacy-streams.js"(exports2, module2) {
     var Stream = require("stream").Stream;
     module2.exports = legacy;
-    function legacy(fs) {
+    function legacy(fs2) {
       return {
         ReadStream,
         WriteStream
@@ -15992,7 +15999,7 @@ var require_legacy_streams = __commonJS({
           });
           return;
         }
-        fs.open(this.path, this.flags, this.mode, function(err, fd) {
+        fs2.open(this.path, this.flags, this.mode, function(err, fd) {
           if (err) {
             self2.emit("error", err);
             self2.readable = false;
@@ -16031,7 +16038,7 @@ var require_legacy_streams = __commonJS({
         this.busy = false;
         this._queue = [];
         if (this.fd === null) {
-          this._open = fs.open;
+          this._open = fs2.open;
           this._queue.push([this._open, this.path, this.flags, this.mode, void 0]);
           this.flush();
         }
@@ -16066,7 +16073,7 @@ var require_clone = __commonJS({
 // node_modules/graceful-fs/graceful-fs.js
 var require_graceful_fs = __commonJS({
   "node_modules/graceful-fs/graceful-fs.js"(exports2, module2) {
-    var fs = require("fs");
+    var fs2 = require("fs");
     var polyfills = require_polyfills();
     var legacy = require_legacy_streams();
     var clone = require_clone();
@@ -16098,12 +16105,12 @@ var require_graceful_fs = __commonJS({
         m = "GFS4: " + m.split(/\n/).join("\nGFS4: ");
         console.error(m);
       };
-    if (!fs[gracefulQueue]) {
+    if (!fs2[gracefulQueue]) {
       queue = global[gracefulQueue] || [];
-      publishQueue(fs, queue);
-      fs.close = (function(fs$close) {
+      publishQueue(fs2, queue);
+      fs2.close = (function(fs$close) {
         function close(fd, cb) {
-          return fs$close.call(fs, fd, function(err) {
+          return fs$close.call(fs2, fd, function(err) {
             if (!err) {
               resetQueue();
             }
@@ -16115,40 +16122,40 @@ var require_graceful_fs = __commonJS({
           value: fs$close
         });
         return close;
-      })(fs.close);
-      fs.closeSync = (function(fs$closeSync) {
+      })(fs2.close);
+      fs2.closeSync = (function(fs$closeSync) {
         function closeSync(fd) {
-          fs$closeSync.apply(fs, arguments);
+          fs$closeSync.apply(fs2, arguments);
           resetQueue();
         }
         Object.defineProperty(closeSync, previousSymbol, {
           value: fs$closeSync
         });
         return closeSync;
-      })(fs.closeSync);
+      })(fs2.closeSync);
       if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || "")) {
         process.on("exit", function() {
-          debug(fs[gracefulQueue]);
-          require("assert").equal(fs[gracefulQueue].length, 0);
+          debug(fs2[gracefulQueue]);
+          require("assert").equal(fs2[gracefulQueue].length, 0);
         });
       }
     }
     var queue;
     if (!global[gracefulQueue]) {
-      publishQueue(global, fs[gracefulQueue]);
+      publishQueue(global, fs2[gracefulQueue]);
     }
-    module2.exports = patch(clone(fs));
-    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs.__patched) {
-      module2.exports = patch(fs);
-      fs.__patched = true;
+    module2.exports = patch(clone(fs2));
+    if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs2.__patched) {
+      module2.exports = patch(fs2);
+      fs2.__patched = true;
     }
-    function patch(fs2) {
-      polyfills(fs2);
-      fs2.gracefulify = patch;
-      fs2.createReadStream = createReadStream;
-      fs2.createWriteStream = createWriteStream;
-      var fs$readFile = fs2.readFile;
-      fs2.readFile = readFile;
+    function patch(fs3) {
+      polyfills(fs3);
+      fs3.gracefulify = patch;
+      fs3.createReadStream = createReadStream;
+      fs3.createWriteStream = createWriteStream;
+      var fs$readFile = fs3.readFile;
+      fs3.readFile = readFile;
       function readFile(path2, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
@@ -16164,8 +16171,8 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$writeFile = fs2.writeFile;
-      fs2.writeFile = writeFile;
+      var fs$writeFile = fs3.writeFile;
+      fs3.writeFile = writeFile;
       function writeFile(path2, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
@@ -16181,9 +16188,9 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$appendFile = fs2.appendFile;
+      var fs$appendFile = fs3.appendFile;
       if (fs$appendFile)
-        fs2.appendFile = appendFile;
+        fs3.appendFile = appendFile;
       function appendFile(path2, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
@@ -16199,9 +16206,9 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$copyFile = fs2.copyFile;
+      var fs$copyFile = fs3.copyFile;
       if (fs$copyFile)
-        fs2.copyFile = copyFile;
+        fs3.copyFile = copyFile;
       function copyFile(src, dest, flags, cb) {
         if (typeof flags === "function") {
           cb = flags;
@@ -16219,8 +16226,8 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      var fs$readdir = fs2.readdir;
-      fs2.readdir = readdir;
+      var fs$readdir = fs3.readdir;
+      fs3.readdir = readdir;
       var noReaddirOptionVersions = /^v[0-5]\./;
       function readdir(path2, options, cb) {
         if (typeof options === "function")
@@ -16261,21 +16268,21 @@ var require_graceful_fs = __commonJS({
         }
       }
       if (process.version.substr(0, 4) === "v0.8") {
-        var legStreams = legacy(fs2);
+        var legStreams = legacy(fs3);
         ReadStream = legStreams.ReadStream;
         WriteStream = legStreams.WriteStream;
       }
-      var fs$ReadStream = fs2.ReadStream;
+      var fs$ReadStream = fs3.ReadStream;
       if (fs$ReadStream) {
         ReadStream.prototype = Object.create(fs$ReadStream.prototype);
         ReadStream.prototype.open = ReadStream$open;
       }
-      var fs$WriteStream = fs2.WriteStream;
+      var fs$WriteStream = fs3.WriteStream;
       if (fs$WriteStream) {
         WriteStream.prototype = Object.create(fs$WriteStream.prototype);
         WriteStream.prototype.open = WriteStream$open;
       }
-      Object.defineProperty(fs2, "ReadStream", {
+      Object.defineProperty(fs3, "ReadStream", {
         get: function() {
           return ReadStream;
         },
@@ -16285,7 +16292,7 @@ var require_graceful_fs = __commonJS({
         enumerable: true,
         configurable: true
       });
-      Object.defineProperty(fs2, "WriteStream", {
+      Object.defineProperty(fs3, "WriteStream", {
         get: function() {
           return WriteStream;
         },
@@ -16296,7 +16303,7 @@ var require_graceful_fs = __commonJS({
         configurable: true
       });
       var FileReadStream = ReadStream;
-      Object.defineProperty(fs2, "FileReadStream", {
+      Object.defineProperty(fs3, "FileReadStream", {
         get: function() {
           return FileReadStream;
         },
@@ -16307,7 +16314,7 @@ var require_graceful_fs = __commonJS({
         configurable: true
       });
       var FileWriteStream = WriteStream;
-      Object.defineProperty(fs2, "FileWriteStream", {
+      Object.defineProperty(fs3, "FileWriteStream", {
         get: function() {
           return FileWriteStream;
         },
@@ -16356,13 +16363,13 @@ var require_graceful_fs = __commonJS({
         });
       }
       function createReadStream(path2, options) {
-        return new fs2.ReadStream(path2, options);
+        return new fs3.ReadStream(path2, options);
       }
       function createWriteStream(path2, options) {
-        return new fs2.WriteStream(path2, options);
+        return new fs3.WriteStream(path2, options);
       }
-      var fs$open = fs2.open;
-      fs2.open = open;
+      var fs$open = fs3.open;
+      fs3.open = open;
       function open(path2, flags, mode, cb) {
         if (typeof mode === "function")
           cb = mode, mode = null;
@@ -16378,20 +16385,20 @@ var require_graceful_fs = __commonJS({
           });
         }
       }
-      return fs2;
+      return fs3;
     }
     function enqueue(elem) {
       debug("ENQUEUE", elem[0].name, elem[1]);
-      fs[gracefulQueue].push(elem);
+      fs2[gracefulQueue].push(elem);
       retry();
     }
     var retryTimer;
     function resetQueue() {
       var now = Date.now();
-      for (var i = 0; i < fs[gracefulQueue].length; ++i) {
-        if (fs[gracefulQueue][i].length > 2) {
-          fs[gracefulQueue][i][3] = now;
-          fs[gracefulQueue][i][4] = now;
+      for (var i = 0; i < fs2[gracefulQueue].length; ++i) {
+        if (fs2[gracefulQueue][i].length > 2) {
+          fs2[gracefulQueue][i][3] = now;
+          fs2[gracefulQueue][i][4] = now;
         }
       }
       retry();
@@ -16399,9 +16406,9 @@ var require_graceful_fs = __commonJS({
     function retry() {
       clearTimeout(retryTimer);
       retryTimer = void 0;
-      if (fs[gracefulQueue].length === 0)
+      if (fs2[gracefulQueue].length === 0)
         return;
-      var elem = fs[gracefulQueue].shift();
+      var elem = fs2[gracefulQueue].shift();
       var fn = elem[0];
       var args = elem[1];
       var err = elem[2];
@@ -16423,7 +16430,7 @@ var require_graceful_fs = __commonJS({
           debug("RETRY", fn.name, args);
           fn.apply(null, args.concat([startTime]));
         } else {
-          fs[gracefulQueue].push(elem);
+          fs2[gracefulQueue].push(elem);
         }
       }
       if (retryTimer === void 0) {
@@ -16438,7 +16445,7 @@ var require_fs = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/fs/index.js"(exports2) {
     "use strict";
     var u = require_universalify().fromCallback;
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var api = [
       "access",
       "appendFile",
@@ -16475,26 +16482,26 @@ var require_fs = __commonJS({
       "utimes",
       "writeFile"
     ].filter((key) => {
-      return typeof fs[key] === "function";
+      return typeof fs2[key] === "function";
     });
-    Object.assign(exports2, fs);
+    Object.assign(exports2, fs2);
     api.forEach((method) => {
-      exports2[method] = u(fs[method]);
+      exports2[method] = u(fs2[method]);
     });
     exports2.exists = function(filename, callback) {
       if (typeof callback === "function") {
-        return fs.exists(filename, callback);
+        return fs2.exists(filename, callback);
       }
       return new Promise((resolve) => {
-        return fs.exists(filename, resolve);
+        return fs2.exists(filename, resolve);
       });
     };
     exports2.read = function(fd, buffer, offset, length, position, callback) {
       if (typeof callback === "function") {
-        return fs.read(fd, buffer, offset, length, position, callback);
+        return fs2.read(fd, buffer, offset, length, position, callback);
       }
       return new Promise((resolve, reject) => {
-        fs.read(fd, buffer, offset, length, position, (err, bytesRead, buffer2) => {
+        fs2.read(fd, buffer, offset, length, position, (err, bytesRead, buffer2) => {
           if (err) return reject(err);
           resolve({ bytesRead, buffer: buffer2 });
         });
@@ -16502,30 +16509,30 @@ var require_fs = __commonJS({
     };
     exports2.write = function(fd, buffer, ...args) {
       if (typeof args[args.length - 1] === "function") {
-        return fs.write(fd, buffer, ...args);
+        return fs2.write(fd, buffer, ...args);
       }
       return new Promise((resolve, reject) => {
-        fs.write(fd, buffer, ...args, (err, bytesWritten, buffer2) => {
+        fs2.write(fd, buffer, ...args, (err, bytesWritten, buffer2) => {
           if (err) return reject(err);
           resolve({ bytesWritten, buffer: buffer2 });
         });
       });
     };
-    if (typeof fs.writev === "function") {
+    if (typeof fs2.writev === "function") {
       exports2.writev = function(fd, buffers, ...args) {
         if (typeof args[args.length - 1] === "function") {
-          return fs.writev(fd, buffers, ...args);
+          return fs2.writev(fd, buffers, ...args);
         }
         return new Promise((resolve, reject) => {
-          fs.writev(fd, buffers, ...args, (err, bytesWritten, buffers2) => {
+          fs2.writev(fd, buffers, ...args, (err, bytesWritten, buffers2) => {
             if (err) return reject(err);
             resolve({ bytesWritten, buffers: buffers2 });
           });
         });
       };
     }
-    if (typeof fs.realpath.native === "function") {
-      exports2.realpath.native = u(fs.realpath.native);
+    if (typeof fs2.realpath.native === "function") {
+      exports2.realpath.native = u(fs2.realpath.native);
     } else {
       process.emitWarning(
         "fs.realpath.native is not a function. Is fs being monkey-patched?",
@@ -16558,7 +16565,7 @@ var require_utils = __commonJS({
 var require_make_dir = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/mkdirs/make-dir.js"(exports2, module2) {
     "use strict";
-    var fs = require_fs();
+    var fs2 = require_fs();
     var { checkPath } = require_utils();
     var getMode = (options) => {
       const defaults = { mode: 511 };
@@ -16567,14 +16574,14 @@ var require_make_dir = __commonJS({
     };
     module2.exports.makeDir = async (dir, options) => {
       checkPath(dir);
-      return fs.mkdir(dir, {
+      return fs2.mkdir(dir, {
         mode: getMode(options),
         recursive: true
       });
     };
     module2.exports.makeDirSync = (dir, options) => {
       checkPath(dir);
-      return fs.mkdirSync(dir, {
+      return fs2.mkdirSync(dir, {
         mode: getMode(options),
         recursive: true
       });
@@ -16606,13 +16613,13 @@ var require_path_exists = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/path-exists/index.js"(exports2, module2) {
     "use strict";
     var u = require_universalify().fromPromise;
-    var fs = require_fs();
+    var fs2 = require_fs();
     function pathExists(path2) {
-      return fs.access(path2).then(() => true).catch(() => false);
+      return fs2.access(path2).then(() => true).catch(() => false);
     }
     module2.exports = {
       pathExists: u(pathExists),
-      pathExistsSync: fs.existsSync
+      pathExistsSync: fs2.existsSync
     };
   }
 });
@@ -16621,21 +16628,21 @@ var require_path_exists = __commonJS({
 var require_utimes = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/util/utimes.js"(exports2, module2) {
     "use strict";
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     function utimesMillis(path2, atime, mtime, callback) {
-      fs.open(path2, "r+", (err, fd) => {
+      fs2.open(path2, "r+", (err, fd) => {
         if (err) return callback(err);
-        fs.futimes(fd, atime, mtime, (futimesErr) => {
-          fs.close(fd, (closeErr) => {
+        fs2.futimes(fd, atime, mtime, (futimesErr) => {
+          fs2.close(fd, (closeErr) => {
             if (callback) callback(futimesErr || closeErr);
           });
         });
       });
     }
     function utimesMillisSync(path2, atime, mtime) {
-      const fd = fs.openSync(path2, "r+");
-      fs.futimesSync(fd, atime, mtime);
-      return fs.closeSync(fd);
+      const fd = fs2.openSync(path2, "r+");
+      fs2.futimesSync(fd, atime, mtime);
+      return fs2.closeSync(fd);
     }
     module2.exports = {
       utimesMillis,
@@ -16648,11 +16655,11 @@ var require_utimes = __commonJS({
 var require_stat = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/util/stat.js"(exports2, module2) {
     "use strict";
-    var fs = require_fs();
+    var fs2 = require_fs();
     var path2 = require("path");
     var util = require("util");
     function getStats(src, dest, opts) {
-      const statFunc = opts.dereference ? (file) => fs.stat(file, { bigint: true }) : (file) => fs.lstat(file, { bigint: true });
+      const statFunc = opts.dereference ? (file) => fs2.stat(file, { bigint: true }) : (file) => fs2.lstat(file, { bigint: true });
       return Promise.all([
         statFunc(src),
         statFunc(dest).catch((err) => {
@@ -16663,7 +16670,7 @@ var require_stat = __commonJS({
     }
     function getStatsSync(src, dest, opts) {
       let destStat;
-      const statFunc = opts.dereference ? (file) => fs.statSync(file, { bigint: true }) : (file) => fs.lstatSync(file, { bigint: true });
+      const statFunc = opts.dereference ? (file) => fs2.statSync(file, { bigint: true }) : (file) => fs2.lstatSync(file, { bigint: true });
       const srcStat = statFunc(src);
       try {
         destStat = statFunc(dest);
@@ -16726,7 +16733,7 @@ var require_stat = __commonJS({
       const srcParent = path2.resolve(path2.dirname(src));
       const destParent = path2.resolve(path2.dirname(dest));
       if (destParent === srcParent || destParent === path2.parse(destParent).root) return cb();
-      fs.stat(destParent, { bigint: true }, (err, destStat) => {
+      fs2.stat(destParent, { bigint: true }, (err, destStat) => {
         if (err) {
           if (err.code === "ENOENT") return cb();
           return cb(err);
@@ -16743,7 +16750,7 @@ var require_stat = __commonJS({
       if (destParent === srcParent || destParent === path2.parse(destParent).root) return;
       let destStat;
       try {
-        destStat = fs.statSync(destParent, { bigint: true });
+        destStat = fs2.statSync(destParent, { bigint: true });
       } catch (err) {
         if (err.code === "ENOENT") return;
         throw err;
@@ -16779,7 +16786,7 @@ var require_stat = __commonJS({
 var require_copy = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/copy/copy.js"(exports2, module2) {
     "use strict";
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var path2 = require("path");
     var mkdirs = require_mkdirs().mkdirs;
     var pathExists = require_path_exists().pathExists;
@@ -16836,7 +16843,7 @@ var require_copy = __commonJS({
       return getStats(destStat, src, dest, opts, cb);
     }
     function getStats(destStat, src, dest, opts, cb) {
-      const stat2 = opts.dereference ? fs.stat : fs.lstat;
+      const stat2 = opts.dereference ? fs2.stat : fs2.lstat;
       stat2(src, (err, srcStat) => {
         if (err) return cb(err);
         if (srcStat.isDirectory()) return onDir(srcStat, destStat, src, dest, opts, cb);
@@ -16853,7 +16860,7 @@ var require_copy = __commonJS({
     }
     function mayCopyFile(srcStat, src, dest, opts, cb) {
       if (opts.overwrite) {
-        fs.unlink(dest, (err) => {
+        fs2.unlink(dest, (err) => {
           if (err) return cb(err);
           return copyFile(srcStat, src, dest, opts, cb);
         });
@@ -16862,7 +16869,7 @@ var require_copy = __commonJS({
       } else return cb();
     }
     function copyFile(srcStat, src, dest, opts, cb) {
-      fs.copyFile(src, dest, (err) => {
+      fs2.copyFile(src, dest, (err) => {
         if (err) return cb(err);
         if (opts.preserveTimestamps) return handleTimestampsAndMode(srcStat.mode, src, dest, cb);
         return setDestMode(dest, srcStat.mode, cb);
@@ -16890,10 +16897,10 @@ var require_copy = __commonJS({
       });
     }
     function setDestMode(dest, srcMode, cb) {
-      return fs.chmod(dest, srcMode, cb);
+      return fs2.chmod(dest, srcMode, cb);
     }
     function setDestTimestamps(src, dest, cb) {
-      fs.stat(src, (err, updatedSrcStat) => {
+      fs2.stat(src, (err, updatedSrcStat) => {
         if (err) return cb(err);
         return utimesMillis(dest, updatedSrcStat.atime, updatedSrcStat.mtime, cb);
       });
@@ -16903,7 +16910,7 @@ var require_copy = __commonJS({
       return copyDir(src, dest, opts, cb);
     }
     function mkDirAndCopy(srcMode, src, dest, opts, cb) {
-      fs.mkdir(dest, (err) => {
+      fs2.mkdir(dest, (err) => {
         if (err) return cb(err);
         copyDir(src, dest, opts, (err2) => {
           if (err2) return cb(err2);
@@ -16912,7 +16919,7 @@ var require_copy = __commonJS({
       });
     }
     function copyDir(src, dest, opts, cb) {
-      fs.readdir(src, (err, items) => {
+      fs2.readdir(src, (err, items) => {
         if (err) return cb(err);
         return copyDirItems(items, src, dest, opts, cb);
       });
@@ -16935,17 +16942,17 @@ var require_copy = __commonJS({
       });
     }
     function onLink(destStat, src, dest, opts, cb) {
-      fs.readlink(src, (err, resolvedSrc) => {
+      fs2.readlink(src, (err, resolvedSrc) => {
         if (err) return cb(err);
         if (opts.dereference) {
           resolvedSrc = path2.resolve(process.cwd(), resolvedSrc);
         }
         if (!destStat) {
-          return fs.symlink(resolvedSrc, dest, cb);
+          return fs2.symlink(resolvedSrc, dest, cb);
         } else {
-          fs.readlink(dest, (err2, resolvedDest) => {
+          fs2.readlink(dest, (err2, resolvedDest) => {
             if (err2) {
-              if (err2.code === "EINVAL" || err2.code === "UNKNOWN") return fs.symlink(resolvedSrc, dest, cb);
+              if (err2.code === "EINVAL" || err2.code === "UNKNOWN") return fs2.symlink(resolvedSrc, dest, cb);
               return cb(err2);
             }
             if (opts.dereference) {
@@ -16963,9 +16970,9 @@ var require_copy = __commonJS({
       });
     }
     function copyLink(resolvedSrc, dest, cb) {
-      fs.unlink(dest, (err) => {
+      fs2.unlink(dest, (err) => {
         if (err) return cb(err);
-        return fs.symlink(resolvedSrc, dest, cb);
+        return fs2.symlink(resolvedSrc, dest, cb);
       });
     }
     module2.exports = copy;
@@ -16976,7 +16983,7 @@ var require_copy = __commonJS({
 var require_copy_sync = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/copy/copy-sync.js"(exports2, module2) {
     "use strict";
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var path2 = require("path");
     var mkdirsSync = require_mkdirs().mkdirsSync;
     var utimesMillisSync = require_utimes().utimesMillisSync;
@@ -17002,7 +17009,7 @@ var require_copy_sync = __commonJS({
     function handleFilterAndCopy(destStat, src, dest, opts) {
       if (opts.filter && !opts.filter(src, dest)) return;
       const destParent = path2.dirname(dest);
-      if (!fs.existsSync(destParent)) mkdirsSync(destParent);
+      if (!fs2.existsSync(destParent)) mkdirsSync(destParent);
       return getStats(destStat, src, dest, opts);
     }
     function startCopy(destStat, src, dest, opts) {
@@ -17010,7 +17017,7 @@ var require_copy_sync = __commonJS({
       return getStats(destStat, src, dest, opts);
     }
     function getStats(destStat, src, dest, opts) {
-      const statSync = opts.dereference ? fs.statSync : fs.lstatSync;
+      const statSync = opts.dereference ? fs2.statSync : fs2.lstatSync;
       const srcStat = statSync(src);
       if (srcStat.isDirectory()) return onDir(srcStat, destStat, src, dest, opts);
       else if (srcStat.isFile() || srcStat.isCharacterDevice() || srcStat.isBlockDevice()) return onFile(srcStat, destStat, src, dest, opts);
@@ -17025,14 +17032,14 @@ var require_copy_sync = __commonJS({
     }
     function mayCopyFile(srcStat, src, dest, opts) {
       if (opts.overwrite) {
-        fs.unlinkSync(dest);
+        fs2.unlinkSync(dest);
         return copyFile(srcStat, src, dest, opts);
       } else if (opts.errorOnExist) {
         throw new Error(`'${dest}' already exists`);
       }
     }
     function copyFile(srcStat, src, dest, opts) {
-      fs.copyFileSync(src, dest);
+      fs2.copyFileSync(src, dest);
       if (opts.preserveTimestamps) handleTimestamps(srcStat.mode, src, dest);
       return setDestMode(dest, srcStat.mode);
     }
@@ -17047,10 +17054,10 @@ var require_copy_sync = __commonJS({
       return setDestMode(dest, srcMode | 128);
     }
     function setDestMode(dest, srcMode) {
-      return fs.chmodSync(dest, srcMode);
+      return fs2.chmodSync(dest, srcMode);
     }
     function setDestTimestamps(src, dest) {
-      const updatedSrcStat = fs.statSync(src);
+      const updatedSrcStat = fs2.statSync(src);
       return utimesMillisSync(dest, updatedSrcStat.atime, updatedSrcStat.mtime);
     }
     function onDir(srcStat, destStat, src, dest, opts) {
@@ -17058,12 +17065,12 @@ var require_copy_sync = __commonJS({
       return copyDir(src, dest, opts);
     }
     function mkDirAndCopy(srcMode, src, dest, opts) {
-      fs.mkdirSync(dest);
+      fs2.mkdirSync(dest);
       copyDir(src, dest, opts);
       return setDestMode(dest, srcMode);
     }
     function copyDir(src, dest, opts) {
-      fs.readdirSync(src).forEach((item) => copyDirItem(item, src, dest, opts));
+      fs2.readdirSync(src).forEach((item) => copyDirItem(item, src, dest, opts));
     }
     function copyDirItem(item, src, dest, opts) {
       const srcItem = path2.join(src, item);
@@ -17072,18 +17079,18 @@ var require_copy_sync = __commonJS({
       return startCopy(destStat, srcItem, destItem, opts);
     }
     function onLink(destStat, src, dest, opts) {
-      let resolvedSrc = fs.readlinkSync(src);
+      let resolvedSrc = fs2.readlinkSync(src);
       if (opts.dereference) {
         resolvedSrc = path2.resolve(process.cwd(), resolvedSrc);
       }
       if (!destStat) {
-        return fs.symlinkSync(resolvedSrc, dest);
+        return fs2.symlinkSync(resolvedSrc, dest);
       } else {
         let resolvedDest;
         try {
-          resolvedDest = fs.readlinkSync(dest);
+          resolvedDest = fs2.readlinkSync(dest);
         } catch (err) {
-          if (err.code === "EINVAL" || err.code === "UNKNOWN") return fs.symlinkSync(resolvedSrc, dest);
+          if (err.code === "EINVAL" || err.code === "UNKNOWN") return fs2.symlinkSync(resolvedSrc, dest);
           throw err;
         }
         if (opts.dereference) {
@@ -17092,15 +17099,15 @@ var require_copy_sync = __commonJS({
         if (stat.isSrcSubdir(resolvedSrc, resolvedDest)) {
           throw new Error(`Cannot copy '${resolvedSrc}' to a subdirectory of itself, '${resolvedDest}'.`);
         }
-        if (fs.statSync(dest).isDirectory() && stat.isSrcSubdir(resolvedDest, resolvedSrc)) {
+        if (fs2.statSync(dest).isDirectory() && stat.isSrcSubdir(resolvedDest, resolvedSrc)) {
           throw new Error(`Cannot overwrite '${resolvedDest}' with '${resolvedSrc}'.`);
         }
         return copyLink(resolvedSrc, dest);
       }
     }
     function copyLink(resolvedSrc, dest) {
-      fs.unlinkSync(dest);
-      return fs.symlinkSync(resolvedSrc, dest);
+      fs2.unlinkSync(dest);
+      return fs2.symlinkSync(resolvedSrc, dest);
     }
     module2.exports = copySync;
   }
@@ -17122,7 +17129,7 @@ var require_copy2 = __commonJS({
 var require_rimraf = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/remove/rimraf.js"(exports2, module2) {
     "use strict";
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var path2 = require("path");
     var assert = require("assert");
     var isWindows = process.platform === "win32";
@@ -17136,9 +17143,9 @@ var require_rimraf = __commonJS({
         "readdir"
       ];
       methods.forEach((m) => {
-        options[m] = options[m] || fs[m];
+        options[m] = options[m] || fs2[m];
         m = m + "Sync";
-        options[m] = options[m] || fs[m];
+        options[m] = options[m] || fs2[m];
       });
       options.maxBusyTries = options.maxBusyTries || 3;
     }
@@ -17357,15 +17364,15 @@ var require_rimraf = __commonJS({
 var require_remove = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/remove/index.js"(exports2, module2) {
     "use strict";
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var u = require_universalify().fromCallback;
     var rimraf = require_rimraf();
     function remove(path2, callback) {
-      if (fs.rm) return fs.rm(path2, { recursive: true, force: true }, callback);
+      if (fs2.rm) return fs2.rm(path2, { recursive: true, force: true }, callback);
       rimraf(path2, callback);
     }
     function removeSync(path2) {
-      if (fs.rmSync) return fs.rmSync(path2, { recursive: true, force: true });
+      if (fs2.rmSync) return fs2.rmSync(path2, { recursive: true, force: true });
       rimraf.sync(path2);
     }
     module2.exports = {
@@ -17380,14 +17387,14 @@ var require_empty = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/empty/index.js"(exports2, module2) {
     "use strict";
     var u = require_universalify().fromPromise;
-    var fs = require_fs();
+    var fs2 = require_fs();
     var path2 = require("path");
     var mkdir = require_mkdirs();
     var remove = require_remove();
     var emptyDir = u(async function emptyDir2(dir) {
       let items;
       try {
-        items = await fs.readdir(dir);
+        items = await fs2.readdir(dir);
       } catch {
         return mkdir.mkdirs(dir);
       }
@@ -17396,7 +17403,7 @@ var require_empty = __commonJS({
     function emptyDirSync(dir) {
       let items;
       try {
-        items = fs.readdirSync(dir);
+        items = fs2.readdirSync(dir);
       } catch {
         return mkdir.mkdirsSync(dir);
       }
@@ -17420,19 +17427,19 @@ var require_file = __commonJS({
     "use strict";
     var u = require_universalify().fromCallback;
     var path2 = require("path");
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var mkdir = require_mkdirs();
     function createFile(file, callback) {
       function makeFile() {
-        fs.writeFile(file, "", (err) => {
+        fs2.writeFile(file, "", (err) => {
           if (err) return callback(err);
           callback();
         });
       }
-      fs.stat(file, (err, stats) => {
+      fs2.stat(file, (err, stats) => {
         if (!err && stats.isFile()) return callback();
         const dir = path2.dirname(file);
-        fs.stat(dir, (err2, stats2) => {
+        fs2.stat(dir, (err2, stats2) => {
           if (err2) {
             if (err2.code === "ENOENT") {
               return mkdir.mkdirs(dir, (err3) => {
@@ -17444,7 +17451,7 @@ var require_file = __commonJS({
           }
           if (stats2.isDirectory()) makeFile();
           else {
-            fs.readdir(dir, (err3) => {
+            fs2.readdir(dir, (err3) => {
               if (err3) return callback(err3);
             });
           }
@@ -17454,20 +17461,20 @@ var require_file = __commonJS({
     function createFileSync(file) {
       let stats;
       try {
-        stats = fs.statSync(file);
+        stats = fs2.statSync(file);
       } catch {
       }
       if (stats && stats.isFile()) return;
       const dir = path2.dirname(file);
       try {
-        if (!fs.statSync(dir).isDirectory()) {
-          fs.readdirSync(dir);
+        if (!fs2.statSync(dir).isDirectory()) {
+          fs2.readdirSync(dir);
         }
       } catch (err) {
         if (err && err.code === "ENOENT") mkdir.mkdirsSync(dir);
         else throw err;
       }
-      fs.writeFileSync(file, "");
+      fs2.writeFileSync(file, "");
     }
     module2.exports = {
       createFile: u(createFile),
@@ -17482,19 +17489,19 @@ var require_link = __commonJS({
     "use strict";
     var u = require_universalify().fromCallback;
     var path2 = require("path");
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var mkdir = require_mkdirs();
     var pathExists = require_path_exists().pathExists;
     var { areIdentical } = require_stat();
     function createLink(srcpath, dstpath, callback) {
       function makeLink(srcpath2, dstpath2) {
-        fs.link(srcpath2, dstpath2, (err) => {
+        fs2.link(srcpath2, dstpath2, (err) => {
           if (err) return callback(err);
           callback(null);
         });
       }
-      fs.lstat(dstpath, (_, dstStat) => {
-        fs.lstat(srcpath, (err, srcStat) => {
+      fs2.lstat(dstpath, (_, dstStat) => {
+        fs2.lstat(srcpath, (err, srcStat) => {
           if (err) {
             err.message = err.message.replace("lstat", "ensureLink");
             return callback(err);
@@ -17515,21 +17522,21 @@ var require_link = __commonJS({
     function createLinkSync(srcpath, dstpath) {
       let dstStat;
       try {
-        dstStat = fs.lstatSync(dstpath);
+        dstStat = fs2.lstatSync(dstpath);
       } catch {
       }
       try {
-        const srcStat = fs.lstatSync(srcpath);
+        const srcStat = fs2.lstatSync(srcpath);
         if (dstStat && areIdentical(srcStat, dstStat)) return;
       } catch (err) {
         err.message = err.message.replace("lstat", "ensureLink");
         throw err;
       }
       const dir = path2.dirname(dstpath);
-      const dirExists = fs.existsSync(dir);
-      if (dirExists) return fs.linkSync(srcpath, dstpath);
+      const dirExists = fs2.existsSync(dir);
+      if (dirExists) return fs2.linkSync(srcpath, dstpath);
       mkdir.mkdirsSync(dir);
-      return fs.linkSync(srcpath, dstpath);
+      return fs2.linkSync(srcpath, dstpath);
     }
     module2.exports = {
       createLink: u(createLink),
@@ -17543,11 +17550,11 @@ var require_symlink_paths = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/ensure/symlink-paths.js"(exports2, module2) {
     "use strict";
     var path2 = require("path");
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var pathExists = require_path_exists().pathExists;
     function symlinkPaths(srcpath, dstpath, callback) {
       if (path2.isAbsolute(srcpath)) {
-        return fs.lstat(srcpath, (err) => {
+        return fs2.lstat(srcpath, (err) => {
           if (err) {
             err.message = err.message.replace("lstat", "ensureSymlink");
             return callback(err);
@@ -17568,7 +17575,7 @@ var require_symlink_paths = __commonJS({
               toDst: srcpath
             });
           } else {
-            return fs.lstat(srcpath, (err2) => {
+            return fs2.lstat(srcpath, (err2) => {
               if (err2) {
                 err2.message = err2.message.replace("lstat", "ensureSymlink");
                 return callback(err2);
@@ -17585,7 +17592,7 @@ var require_symlink_paths = __commonJS({
     function symlinkPathsSync(srcpath, dstpath) {
       let exists;
       if (path2.isAbsolute(srcpath)) {
-        exists = fs.existsSync(srcpath);
+        exists = fs2.existsSync(srcpath);
         if (!exists) throw new Error("absolute srcpath does not exist");
         return {
           toCwd: srcpath,
@@ -17594,14 +17601,14 @@ var require_symlink_paths = __commonJS({
       } else {
         const dstdir = path2.dirname(dstpath);
         const relativeToDst = path2.join(dstdir, srcpath);
-        exists = fs.existsSync(relativeToDst);
+        exists = fs2.existsSync(relativeToDst);
         if (exists) {
           return {
             toCwd: relativeToDst,
             toDst: srcpath
           };
         } else {
-          exists = fs.existsSync(srcpath);
+          exists = fs2.existsSync(srcpath);
           if (!exists) throw new Error("relative srcpath does not exist");
           return {
             toCwd: srcpath,
@@ -17621,12 +17628,12 @@ var require_symlink_paths = __commonJS({
 var require_symlink_type = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/ensure/symlink-type.js"(exports2, module2) {
     "use strict";
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     function symlinkType(srcpath, type, callback) {
       callback = typeof type === "function" ? type : callback;
       type = typeof type === "function" ? false : type;
       if (type) return callback(null, type);
-      fs.lstat(srcpath, (err, stats) => {
+      fs2.lstat(srcpath, (err, stats) => {
         if (err) return callback(null, "file");
         type = stats && stats.isDirectory() ? "dir" : "file";
         callback(null, type);
@@ -17636,7 +17643,7 @@ var require_symlink_type = __commonJS({
       let stats;
       if (type) return type;
       try {
-        stats = fs.lstatSync(srcpath);
+        stats = fs2.lstatSync(srcpath);
       } catch {
         return "file";
       }
@@ -17655,7 +17662,7 @@ var require_symlink = __commonJS({
     "use strict";
     var u = require_universalify().fromCallback;
     var path2 = require("path");
-    var fs = require_fs();
+    var fs2 = require_fs();
     var _mkdirs = require_mkdirs();
     var mkdirs = _mkdirs.mkdirs;
     var mkdirsSync = _mkdirs.mkdirsSync;
@@ -17670,11 +17677,11 @@ var require_symlink = __commonJS({
     function createSymlink(srcpath, dstpath, type, callback) {
       callback = typeof type === "function" ? type : callback;
       type = typeof type === "function" ? false : type;
-      fs.lstat(dstpath, (err, stats) => {
+      fs2.lstat(dstpath, (err, stats) => {
         if (!err && stats.isSymbolicLink()) {
           Promise.all([
-            fs.stat(srcpath),
-            fs.stat(dstpath)
+            fs2.stat(srcpath),
+            fs2.stat(dstpath)
           ]).then(([srcStat, dstStat]) => {
             if (areIdentical(srcStat, dstStat)) return callback(null);
             _createSymlink(srcpath, dstpath, type, callback);
@@ -17691,10 +17698,10 @@ var require_symlink = __commonJS({
           const dir = path2.dirname(dstpath);
           pathExists(dir, (err3, dirExists) => {
             if (err3) return callback(err3);
-            if (dirExists) return fs.symlink(srcpath, dstpath, type2, callback);
+            if (dirExists) return fs2.symlink(srcpath, dstpath, type2, callback);
             mkdirs(dir, (err4) => {
               if (err4) return callback(err4);
-              fs.symlink(srcpath, dstpath, type2, callback);
+              fs2.symlink(srcpath, dstpath, type2, callback);
             });
           });
         });
@@ -17703,22 +17710,22 @@ var require_symlink = __commonJS({
     function createSymlinkSync(srcpath, dstpath, type) {
       let stats;
       try {
-        stats = fs.lstatSync(dstpath);
+        stats = fs2.lstatSync(dstpath);
       } catch {
       }
       if (stats && stats.isSymbolicLink()) {
-        const srcStat = fs.statSync(srcpath);
-        const dstStat = fs.statSync(dstpath);
+        const srcStat = fs2.statSync(srcpath);
+        const dstStat = fs2.statSync(dstpath);
         if (areIdentical(srcStat, dstStat)) return;
       }
       const relative = symlinkPathsSync(srcpath, dstpath);
       srcpath = relative.toDst;
       type = symlinkTypeSync(relative.toCwd, type);
       const dir = path2.dirname(dstpath);
-      const exists = fs.existsSync(dir);
-      if (exists) return fs.symlinkSync(srcpath, dstpath, type);
+      const exists = fs2.existsSync(dir);
+      if (exists) return fs2.symlinkSync(srcpath, dstpath, type);
       mkdirsSync(dir);
-      return fs.symlinkSync(srcpath, dstpath, type);
+      return fs2.symlinkSync(srcpath, dstpath, type);
     }
     module2.exports = {
       createSymlink: u(createSymlink),
@@ -17785,9 +17792,9 @@ var require_jsonfile = __commonJS({
       if (typeof options === "string") {
         options = { encoding: options };
       }
-      const fs = options.fs || _fs;
+      const fs2 = options.fs || _fs;
       const shouldThrow = "throws" in options ? options.throws : true;
-      let data = await universalify.fromCallback(fs.readFile)(file, options);
+      let data = await universalify.fromCallback(fs2.readFile)(file, options);
       data = stripBom(data);
       let obj;
       try {
@@ -17807,10 +17814,10 @@ var require_jsonfile = __commonJS({
       if (typeof options === "string") {
         options = { encoding: options };
       }
-      const fs = options.fs || _fs;
+      const fs2 = options.fs || _fs;
       const shouldThrow = "throws" in options ? options.throws : true;
       try {
-        let content = fs.readFileSync(file, options);
+        let content = fs2.readFileSync(file, options);
         content = stripBom(content);
         return JSON.parse(content, options.reviver);
       } catch (err) {
@@ -17823,15 +17830,15 @@ var require_jsonfile = __commonJS({
       }
     }
     async function _writeFile(file, obj, options = {}) {
-      const fs = options.fs || _fs;
+      const fs2 = options.fs || _fs;
       const str = stringify(obj, options);
-      await universalify.fromCallback(fs.writeFile)(file, str, options);
+      await universalify.fromCallback(fs2.writeFile)(file, str, options);
     }
     var writeFile = universalify.fromPromise(_writeFile);
     function writeFileSync(file, obj, options = {}) {
-      const fs = options.fs || _fs;
+      const fs2 = options.fs || _fs;
       const str = stringify(obj, options);
-      return fs.writeFileSync(file, str, options);
+      return fs2.writeFileSync(file, str, options);
     }
     module2.exports = {
       readFile,
@@ -17862,7 +17869,7 @@ var require_output_file = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/output-file/index.js"(exports2, module2) {
     "use strict";
     var u = require_universalify().fromCallback;
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var path2 = require("path");
     var mkdir = require_mkdirs();
     var pathExists = require_path_exists().pathExists;
@@ -17874,20 +17881,20 @@ var require_output_file = __commonJS({
       const dir = path2.dirname(file);
       pathExists(dir, (err, itDoes) => {
         if (err) return callback(err);
-        if (itDoes) return fs.writeFile(file, data, encoding, callback);
+        if (itDoes) return fs2.writeFile(file, data, encoding, callback);
         mkdir.mkdirs(dir, (err2) => {
           if (err2) return callback(err2);
-          fs.writeFile(file, data, encoding, callback);
+          fs2.writeFile(file, data, encoding, callback);
         });
       });
     }
     function outputFileSync(file, ...args) {
       const dir = path2.dirname(file);
-      if (fs.existsSync(dir)) {
-        return fs.writeFileSync(file, ...args);
+      if (fs2.existsSync(dir)) {
+        return fs2.writeFileSync(file, ...args);
       }
       mkdir.mkdirsSync(dir);
-      fs.writeFileSync(file, ...args);
+      fs2.writeFileSync(file, ...args);
     }
     module2.exports = {
       outputFile: u(outputFile),
@@ -17946,7 +17953,7 @@ var require_json = __commonJS({
 var require_move = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/move/move.js"(exports2, module2) {
     "use strict";
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var path2 = require("path");
     var copy = require_copy2().copy;
     var remove = require_remove().remove;
@@ -17993,7 +18000,7 @@ var require_move = __commonJS({
       });
     }
     function rename(src, dest, overwrite, cb) {
-      fs.rename(src, dest, (err) => {
+      fs2.rename(src, dest, (err) => {
         if (!err) return cb();
         if (err.code !== "EXDEV") return cb(err);
         return moveAcrossDevice(src, dest, overwrite, cb);
@@ -18017,7 +18024,7 @@ var require_move = __commonJS({
 var require_move_sync = __commonJS({
   "node_modules/electron-updater/node_modules/fs-extra/lib/move/move-sync.js"(exports2, module2) {
     "use strict";
-    var fs = require_graceful_fs();
+    var fs2 = require_graceful_fs();
     var path2 = require("path");
     var copySync = require_copy2().copySync;
     var removeSync = require_remove().removeSync;
@@ -18042,12 +18049,12 @@ var require_move_sync = __commonJS({
         removeSync(dest);
         return rename(src, dest, overwrite);
       }
-      if (fs.existsSync(dest)) throw new Error("dest already exists.");
+      if (fs2.existsSync(dest)) throw new Error("dest already exists.");
       return rename(src, dest, overwrite);
     }
     function rename(src, dest, overwrite) {
       try {
-        fs.renameSync(src, dest);
+        fs2.renameSync(src, dest);
       } catch (err) {
         if (err.code !== "EXDEV") throw err;
         return moveAcrossDevice(src, dest, overwrite);
@@ -30328,6 +30335,409 @@ var require_session_tracker = __commonJS({
   }
 });
 
+// electron-bridge.js
+var require_electron_bridge = __commonJS({
+  "electron-bridge.js"(exports2, module2) {
+    var http = require("node:http");
+    var Store2 = require("electron-store");
+    var { dialog: dialog2, BrowserWindow: BrowserWindow2 } = require("electron");
+    var { logInfo: logInfo2, logError: logError2 } = require_electron_logger();
+    var BRIDGE_HOST = "127.0.0.1";
+    var BRIDGE_PORT = 7890;
+    var BRIDGE_PATH = "/lana-bridge/companion/request-token";
+    var MAX_BODY_BYTES = 16 * 1024;
+    var KNOWN_APPS = /* @__PURE__ */ new Set(["lana-companion", "lana-brain"]);
+    var RENDERER_CONSENT_TIMEOUT_MS = 90 * 1e3;
+    var LOOPBACK_HOSTNAMES = /* @__PURE__ */ new Set(["127.0.0.1", "::1", "localhost", "[::1]"]);
+    var server = null;
+    var consentStore = null;
+    var deps = null;
+    var pendingPrompts = /* @__PURE__ */ new Map();
+    function initConsentStore() {
+      if (consentStore) return consentStore;
+      consentStore = new Store2({
+        name: "bridge-consents",
+        defaults: {
+          // settings UI for revocation can read/write under this key
+          consents: {}
+        }
+      });
+      return consentStore;
+    }
+    function getConsent(appName) {
+      try {
+        const all = initConsentStore().get("consents", {});
+        return all && all[appName] ? all[appName] : null;
+      } catch (error) {
+        logError2("[electron-bridge] Failed to read consent store", error);
+        return null;
+      }
+    }
+    function setConsent(appName, record) {
+      try {
+        const store = initConsentStore();
+        const all = store.get("consents", {}) || {};
+        all[appName] = record;
+        store.set("consents", all);
+        return true;
+      } catch (error) {
+        logError2("[electron-bridge] Failed to write consent store", error);
+        return false;
+      }
+    }
+    function isLoopbackRemote(remoteAddress) {
+      if (!remoteAddress) return false;
+      if (remoteAddress === "127.0.0.1" || remoteAddress === "::1") return true;
+      if (remoteAddress.startsWith("::ffff:127.")) return true;
+      return false;
+    }
+    function isLoopbackHostHeader(hostHeader) {
+      if (!hostHeader) return false;
+      let host = String(hostHeader).trim();
+      if (host.startsWith("[")) {
+        const end = host.indexOf("]");
+        if (end === -1) return false;
+        host = host.slice(0, end + 1);
+      } else {
+        const colon = host.indexOf(":");
+        if (colon !== -1) host = host.slice(0, colon);
+      }
+      return LOOPBACK_HOSTNAMES.has(host.toLowerCase());
+    }
+    function writeJson(res, status, body) {
+      const payload = JSON.stringify(body);
+      res.writeHead(status, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": Buffer.byteLength(payload),
+        "Cache-Control": "no-store",
+        // Loopback-only API; explicitly deny browser cross-origin use.
+        "Access-Control-Allow-Origin": "null"
+      });
+      res.end(payload);
+    }
+    function readJsonBody(req) {
+      return new Promise((resolve, reject) => {
+        let received = 0;
+        const chunks = [];
+        let aborted = false;
+        req.on("data", (chunk) => {
+          if (aborted) return;
+          received += chunk.length;
+          if (received > MAX_BODY_BYTES) {
+            aborted = true;
+            const err = new Error("payload_too_large");
+            err.code = "PAYLOAD_TOO_LARGE";
+            reject(err);
+            try {
+              req.destroy();
+            } catch (_) {
+            }
+            return;
+          }
+          chunks.push(chunk);
+        });
+        req.on("end", () => {
+          if (aborted) return;
+          const raw = Buffer.concat(chunks).toString("utf8");
+          if (!raw) return resolve({});
+          try {
+            resolve(JSON.parse(raw));
+          } catch (_err) {
+            const err = new Error("invalid_json");
+            err.code = "INVALID_JSON";
+            reject(err);
+          }
+        });
+        req.on("error", (err) => reject(err));
+      });
+    }
+    function pickRendererWindow() {
+      const focused = BrowserWindow2.getFocusedWindow();
+      if (focused && !focused.isDestroyed()) return focused;
+      const all = BrowserWindow2.getAllWindows();
+      for (const win of all) {
+        if (win && !win.isDestroyed() && win.isVisible()) return win;
+      }
+      for (const win of all) {
+        if (win && !win.isDestroyed()) return win;
+      }
+      return null;
+    }
+    async function promptForConsentViaRenderer(appName) {
+      if (!deps || typeof deps.requestConsentFromRenderer !== "function") {
+        const err = new Error("renderer_consent_unavailable");
+        err.code = "RENDERER_CONSENT_UNAVAILABLE";
+        throw err;
+      }
+      let timeoutHandle = null;
+      const timeoutPromise = new Promise((resolve) => {
+        timeoutHandle = setTimeout(() => {
+          logInfo2(`[electron-bridge] Renderer consent prompt for ${appName} timed out; treating as denied`);
+          resolve({ allow: false, alwaysAllow: false, timedOut: true });
+        }, RENDERER_CONSENT_TIMEOUT_MS);
+      });
+      try {
+        const decision = await Promise.race([
+          Promise.resolve(deps.requestConsentFromRenderer({ app: appName })),
+          timeoutPromise
+        ]);
+        return {
+          allow: Boolean(decision && decision.allow),
+          alwaysAllow: Boolean(decision && decision.alwaysAllow)
+        };
+      } finally {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+      }
+    }
+    async function promptForConsentViaNativeDialog(appName, parentWindow) {
+      const dialogOptions = {
+        type: "question",
+        title: "PAC is requesting access",
+        message: "PAC is requesting access",
+        detail: "Allow PAC (Personal AI Companion) to use your current Lana session for this device?",
+        buttons: ["Allow", "Deny"],
+        defaultId: 0,
+        cancelId: 1,
+        checkboxLabel: "Always allow on this device",
+        checkboxChecked: false,
+        noLink: true
+      };
+      let result;
+      try {
+        if (parentWindow) {
+          result = await dialog2.showMessageBox(parentWindow, dialogOptions);
+        } else {
+          result = await dialog2.showMessageBox(dialogOptions);
+        }
+      } catch (error) {
+        logError2("[electron-bridge] Native consent dialog failed", error);
+        return { allow: false, alwaysAllow: false };
+      }
+      return {
+        allow: result.response === 0,
+        alwaysAllow: Boolean(result.checkboxChecked)
+      };
+    }
+    async function promptForConsent(appName) {
+      if (pendingPrompts.has(appName)) {
+        return pendingPrompts.get(appName);
+      }
+      const promise = (async () => {
+        const rendererWindow = pickRendererWindow();
+        const canUseRenderer = Boolean(rendererWindow) && deps && typeof deps.requestConsentFromRenderer === "function";
+        if (canUseRenderer) {
+          try {
+            return await promptForConsentViaRenderer(appName);
+          } catch (error) {
+            logError2("[electron-bridge] Renderer consent prompt failed; falling back to native dialog", error);
+          }
+        } else {
+          logInfo2("[electron-bridge] No renderer window available; using native consent dialog fallback");
+        }
+        return promptForConsentViaNativeDialog(appName, rendererWindow);
+      })();
+      pendingPrompts.set(appName, promise);
+      try {
+        return await promise;
+      } finally {
+        pendingPrompts.delete(appName);
+      }
+    }
+    function buildServerPayload(savedServer) {
+      if (!savedServer) return null;
+      return {
+        url: savedServer.url || null,
+        orgId: savedServer.orgId || null,
+        orgName: savedServer.orgName || null,
+        version: savedServer.version || null,
+        apiVersion: savedServer.apiVersion || null
+      };
+    }
+    async function handleRequestToken(req, res) {
+      const remote = req.socket && req.socket.remoteAddress;
+      if (!isLoopbackRemote(remote)) {
+        res.writeHead(403, { "Content-Type": "text/plain" });
+        res.end("forbidden");
+        return;
+      }
+      if (!isLoopbackHostHeader(req.headers && req.headers.host)) {
+        res.writeHead(400, { "Content-Type": "text/plain" });
+        res.end("bad host");
+        return;
+      }
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch (err) {
+        if (err && err.code === "PAYLOAD_TOO_LARGE") {
+          writeJson(res, 413, { error: "payload_too_large" });
+        } else {
+          writeJson(res, 400, { error: "invalid_body" });
+        }
+        return;
+      }
+      const appName = body && typeof body.app === "string" ? body.app : null;
+      if (!appName || !KNOWN_APPS.has(appName)) {
+        writeJson(res, 400, { error: "unknown_app" });
+        return;
+      }
+      let token = null;
+      let currentUserId = null;
+      try {
+        token = await deps.getToken();
+      } catch (error) {
+        logError2("[electron-bridge] getToken failed", error);
+        token = null;
+      }
+      try {
+        currentUserId = await deps.getCurrentUserId();
+      } catch (error) {
+        logError2("[electron-bridge] getCurrentUserId failed", error);
+        currentUserId = null;
+      }
+      if (!token) {
+        writeJson(res, 401, { error: "not_signed_in" });
+        return;
+      }
+      let savedConsent = getConsent(appName);
+      let alreadyAllowed = false;
+      if (savedConsent && savedConsent.mode === "always-allow" && savedConsent.granted_user_id && currentUserId && String(savedConsent.granted_user_id) === String(currentUserId)) {
+        alreadyAllowed = true;
+      } else if (savedConsent) {
+        logInfo2(`[electron-bridge] Discarding stale consent for ${appName} (user changed)`);
+      }
+      if (!alreadyAllowed) {
+        const decision = await promptForConsent(appName);
+        if (!decision.allow) {
+          writeJson(res, 403, { error: "denied" });
+          return;
+        }
+        if (decision.alwaysAllow && currentUserId) {
+          setConsent(appName, {
+            mode: "always-allow",
+            granted_at: (/* @__PURE__ */ new Date()).toISOString(),
+            granted_user_id: currentUserId
+          });
+          logInfo2(`[electron-bridge] Stored always-allow consent for ${appName}`);
+        }
+      }
+      let savedServer = null;
+      try {
+        savedServer = await deps.getSavedServer();
+      } catch (error) {
+        logError2("[electron-bridge] getSavedServer failed", error);
+      }
+      const serverPayload = buildServerPayload(savedServer);
+      if (!serverPayload || !serverPayload.url) {
+        writeJson(res, 401, { error: "not_signed_in" });
+        return;
+      }
+      writeJson(res, 200, {
+        token,
+        server: serverPayload
+      });
+    }
+    function createRequestHandler() {
+      return async (req, res) => {
+        try {
+          if (req.method === "GET" && (req.url === "/lana-bridge/health" || req.url === "/lana-bridge/health/")) {
+            const remote = req.socket && req.socket.remoteAddress;
+            if (!isLoopbackRemote(remote)) {
+              res.writeHead(403);
+              res.end();
+              return;
+            }
+            if (!isLoopbackHostHeader(req.headers && req.headers.host)) {
+              res.writeHead(400);
+              res.end();
+              return;
+            }
+            res.writeHead(204);
+            res.end();
+            return;
+          }
+          if (req.method !== "POST" || req.url !== BRIDGE_PATH) {
+            writeJson(res, 404, { error: "not_found" });
+            return;
+          }
+          await handleRequestToken(req, res);
+        } catch (error) {
+          logError2("[electron-bridge] Unhandled request error", error);
+          try {
+            writeJson(res, 500, { error: "internal_error" });
+          } catch (_) {
+          }
+        }
+      };
+    }
+    function start(dependencies) {
+      if (server) {
+        logInfo2("[electron-bridge] start() called but server is already running");
+        return;
+      }
+      if (!dependencies || typeof dependencies.getToken !== "function" || typeof dependencies.getSavedServer !== "function" || typeof dependencies.getCurrentUserId !== "function") {
+        logError2("[electron-bridge] start() missing required dependencies; bridge will not start");
+        return;
+      }
+      deps = dependencies;
+      initConsentStore();
+      const handler = createRequestHandler();
+      server = http.createServer(handler);
+      server.on("error", (error) => {
+        if (error && error.code === "EADDRINUSE") {
+          logInfo2(`[electron-bridge] Port ${BRIDGE_PORT} already in use, skipping bridge startup`);
+          try {
+            server.close();
+          } catch (_) {
+          }
+          server = null;
+          return;
+        }
+        logError2("[electron-bridge] HTTP server error", error);
+      });
+      server.on("clientError", (err, socket) => {
+        try {
+          socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
+        } catch (_) {
+        }
+      });
+      try {
+        server.listen(BRIDGE_PORT, BRIDGE_HOST, () => {
+          logInfo2(`[electron-bridge] Listening on http://${BRIDGE_HOST}:${BRIDGE_PORT}${BRIDGE_PATH}`);
+        });
+      } catch (error) {
+        logError2("[electron-bridge] Failed to start listening", error);
+        server = null;
+      }
+    }
+    function stop() {
+      if (!server) return;
+      const closing = server;
+      server = null;
+      try {
+        closing.close((err) => {
+          if (err) logError2("[electron-bridge] Error closing server", err);
+          else logInfo2("[electron-bridge] Server stopped");
+        });
+      } catch (error) {
+        logError2("[electron-bridge] stop() threw", error);
+      }
+    }
+    module2.exports = {
+      start,
+      stop,
+      // Exported for tests / debug only — not for normal callers.
+      _internals: {
+        isLoopbackRemote,
+        isLoopbackHostHeader,
+        BRIDGE_HOST,
+        BRIDGE_PORT,
+        BRIDGE_PATH
+      }
+    };
+  }
+});
+
 // src/version.js
 var require_version = __commonJS({
   "src/version.js"(exports2, module2) {
@@ -30364,11 +30774,23 @@ var require_version = __commonJS({
 });
 
 // electron-main.js
-var { app, BrowserWindow, ipcMain, dialog, Menu, session } = require("electron");
+var { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage } = require("electron");
 var path = require("path");
 var url = require("url");
 var crypto = require("crypto");
+var fs = require("fs");
 var Store = require("electron-store");
+function appIconPath() {
+  const candidates = [
+    path.join(__dirname, "build", "icons", "icon-1024.png"),
+    path.join(__dirname, "build", "icons", "icon-512.png"),
+    path.join(__dirname, "build", "icons", "icon.png")
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
 var packageJson = require_package();
 app.setVersion(packageJson.version);
 var { verifyServer } = require_electron_discovery();
@@ -30376,6 +30798,56 @@ var { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified
 var { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require_electron_updater_custom();
 var { logInfo, logError, exportLogs, getLogFilePath } = require_electron_logger();
 var SessionTracker = require_session_tracker();
+var companionBridge = require_electron_bridge();
+var pendingCompanionConsents = /* @__PURE__ */ new Map();
+function generateConsentRequestId() {
+  return `cb-${Date.now().toString(36)}-${crypto.randomBytes(6).toString("hex")}`;
+}
+function requestCompanionConsentFromRenderer({ app: app2 }) {
+  return new Promise((resolve) => {
+    if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents) {
+      resolve({ allow: false, alwaysAllow: false });
+      return;
+    }
+    const requestId = generateConsentRequestId();
+    pendingCompanionConsents.set(requestId, resolve);
+    const cleanupOnClose = () => {
+      const pending = pendingCompanionConsents.get(requestId);
+      if (pending) {
+        pendingCompanionConsents.delete(requestId);
+        pending({ allow: false, alwaysAllow: false });
+      }
+    };
+    try {
+      mainWindow.once("closed", cleanupOnClose);
+      mainWindow.webContents.send("companion-bridge:request-consent", {
+        requestId,
+        app: app2,
+        originHint: "lana-companion"
+      });
+    } catch (error) {
+      pendingCompanionConsents.delete(requestId);
+      try {
+        mainWindow.removeListener("closed", cleanupOnClose);
+      } catch (_) {
+      }
+      logError("[electron-main] Failed to forward companion consent request to renderer", error);
+      resolve({ allow: false, alwaysAllow: false });
+    }
+  });
+}
+ipcMain.handle("companion-bridge:respond-consent", async (_event, payload) => {
+  const requestId = payload && typeof payload.requestId === "string" ? payload.requestId : null;
+  if (!requestId) return { ok: false, reason: "missing_request_id" };
+  const resolve = pendingCompanionConsents.get(requestId);
+  if (!resolve) return { ok: false, reason: "unknown_request_id" };
+  pendingCompanionConsents.delete(requestId);
+  resolve({
+    allow: Boolean(payload && payload.allow),
+    alwaysAllow: Boolean(payload && payload.alwaysAllow)
+  });
+  return { ok: true };
+});
 function isBrokenPipeError(error) {
   return error && (error.code === "EPIPE" || /write EPIPE/i.test(String(error.message || "")));
 }
@@ -30437,6 +30909,12 @@ if (process.env.NODE_ENV === "development") {
 }
 function registerDeepLinkProtocol() {
   const protocol = "lana-ai";
+  if (process.platform === "darwin" && process.defaultApp) {
+    logInfo(
+      `[DeepLink] Skipping ${protocol}:// registration on macOS dev \u2014 routing is owned by LanaAIDevHelper.app (installed by install.sh)`
+    );
+    return;
+  }
   if (process.defaultApp) {
     const appEntry = path.resolve(__dirname, "electron-main.js");
     try {
@@ -30488,7 +30966,7 @@ function createWindow(serverUrl = null) {
     minWidth: 1024,
     minHeight: 768,
     backgroundColor: "#1a1a1a",
-    icon: path.join(__dirname, "build/icons/256x256.png"),
+    icon: path.join(__dirname, "build/icons/icon-256.png"),
     webPreferences: {
       nodeIntegration: false,
       // Disable Node.js integration for security
@@ -30554,7 +31032,7 @@ function createLoginWindow() {
     minWidth: 1024,
     minHeight: 768,
     backgroundColor: "#f3f4f6",
-    icon: path.join(__dirname, "build/icons/256x256.png"),
+    icon: path.join(__dirname, "build/icons/icon-256.png"),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -31021,6 +31499,38 @@ ipcMain.handle("vpn-get-device-id", async () => {
     return crypto.randomUUID();
   }
 });
+var bridgeConsentsStore = new Store({
+  name: "bridge-consents",
+  defaults: { consents: {} }
+});
+ipcMain.handle("settings:list-bridge-consents", async () => {
+  try {
+    const consents = bridgeConsentsStore.get("consents", {}) || {};
+    return consents;
+  } catch (error) {
+    logError("[settings] Failed to list bridge consents", error);
+    return {};
+  }
+});
+ipcMain.handle("settings:revoke-bridge-consent", async (_event, payload) => {
+  const app2 = payload && typeof payload.app === "string" ? payload.app.trim() : "";
+  if (!app2) {
+    return { ok: false, message: "app name is required" };
+  }
+  try {
+    const all = bridgeConsentsStore.get("consents", {}) || {};
+    const removed = Object.prototype.hasOwnProperty.call(all, app2);
+    if (removed) {
+      delete all[app2];
+      bridgeConsentsStore.set("consents", all);
+      logInfo(`[settings] Revoked bridge consent for ${app2}`);
+    }
+    return { ok: true, removed };
+  } catch (error) {
+    logError("[settings] Failed to revoke bridge consent", error);
+    return { ok: false, message: error.message || "Failed to revoke consent" };
+  }
+});
 var handleDeepLink = async (deepLinkUrl) => {
   logInfo(`Deep link received: ${deepLinkUrl}`);
   try {
@@ -31119,6 +31629,18 @@ if (!gotTheLock) {
 }
 app.whenReady().then(async () => {
   logInfo("App ready, starting thin client initialization...");
+  if (process.platform === "darwin" && app.dock) {
+    const iconPath = appIconPath();
+    if (iconPath) {
+      try {
+        const img = nativeImage.createFromPath(iconPath);
+        if (!img.isEmpty()) app.dock.setIcon(img);
+      } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        logError(`[lana-ai-client] dock icon set failed: ${msg}`);
+      }
+    }
+  }
   const { getAllData, clearSavedServer: clearServerConfig } = require_electron_storage();
   const Store2 = require("electron-store");
   const migrationStore = new Store2({ name: "migration-state" });
@@ -31162,6 +31684,41 @@ app.whenReady().then(async () => {
     // 1 minute
   });
   logInfo("Session tracker initialized");
+  try {
+    companionBridge.start({
+      getToken: async () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return null;
+        try {
+          const value = await mainWindow.webContents.executeJavaScript(
+            "(() => { try { return window.localStorage.getItem('token'); } catch (_) { return null; } })()",
+            true
+          );
+          return value || null;
+        } catch (_err) {
+          return null;
+        }
+      },
+      getCurrentUserId: async () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return null;
+        try {
+          const value = await mainWindow.webContents.executeJavaScript(
+            "(() => { try { const raw = window.localStorage.getItem('user'); if (!raw) return null; const u = JSON.parse(raw); return (u && (u.id || u.userId || u.user_id)) || null; } catch (_) { return null; } })()",
+            true
+          );
+          return value || null;
+        } catch (_err) {
+          return null;
+        }
+      },
+      getSavedServer: () => getSavedServer(),
+      // Renderer-driven Lex modal. The bridge calls this first; if there's
+      // no window or the renderer fails, the bridge falls back to the
+      // native dialog.showMessageBox flow inside electron-bridge.js.
+      requestConsentFromRenderer: requestCompanionConsentFromRenderer
+    });
+  } catch (error) {
+    logError("[electron-main] Failed to start companion bridge", error);
+  }
   const savedServer = getSavedServer();
   if (savedServer) {
     logInfo(`Found saved server: ${savedServer.orgName || savedServer.orgId}`);
@@ -31197,6 +31754,11 @@ app.on("window-all-closed", () => {
 });
 app.on("before-quit", async () => {
   console.log("[electron-main] Application is quitting...");
+  try {
+    companionBridge.stop();
+  } catch (error) {
+    logError("[electron-main] Failed to stop companion bridge", error);
+  }
   if (sessionTracker) {
     await sessionTracker.shutdown();
     logInfo("[electron-main] Session tracker shut down");
@@ -31226,6 +31788,20 @@ app.on("web-contents-created", (event, contents) => {
             pagePath = windowsDriveMatch[1];
             logInfo(`[electron-main] [Navigation] Windows drive letter stripped: ${pathname} -> ${pagePath}`);
           }
+        }
+        const projectRoot = path.resolve(__dirname);
+        const normalizedPathname = path.resolve(pathname);
+        if (normalizedPathname === projectRoot || normalizedPathname.startsWith(projectRoot + path.sep)) {
+          pagePath = normalizedPathname.substring(projectRoot.length);
+          if (pagePath.startsWith(path.sep + "public_html" + path.sep)) {
+            pagePath = pagePath.substring("/public_html".length);
+          } else if (pagePath.startsWith(path.sep + "src" + path.sep)) {
+            pagePath = pagePath.substring("/src".length);
+          }
+          if (!pagePath.startsWith(path.sep)) {
+            pagePath = path.sep + pagePath;
+          }
+          logInfo(`[electron-main] [Navigation] Project-root path stripped: ${pathname} -> ${pagePath}`);
         }
         if (!pagePath.startsWith("/")) {
           pagePath = "/" + pagePath;

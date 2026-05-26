@@ -11,6 +11,7 @@
   <script src="js/tailwind-loader.js"></script>
   <script src="js/error-reporter.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/app-catalog.js"></script>
   <script src="js/version.js"></script>
   <script src="js/mock-data.js"></script>
   <script src="js/api.js"></script>
@@ -163,6 +164,13 @@
 
     // Hosted discovery endpoint
     const HOSTED_DISCOVERY_URL = 'https://www.redroostertec.com/lana-ai/v1/discovery';
+
+    function normalizeEnabledApps(enabledApps) {
+      if (window.LanaClientApps && typeof window.LanaClientApps.normalizeAppList === 'function') {
+        return window.LanaClientApps.normalizeAppList(enabledApps || []);
+      }
+      return Array.isArray(enabledApps) ? enabledApps : [];
+    }
 
     // Check if development mode is enabled (Electron or config.js)
     let isDevelopmentMode = window.LanaConfig?.DEVELOPMENT_MODE || false;
@@ -352,6 +360,8 @@
       try {
         const savedServer = JSON.parse(savedServerJson);
         if (savedServer && savedServer.url && savedServer.orgId) {
+          savedServer.enabledApps = normalizeEnabledApps(savedServer.enabledApps);
+          localStorage.setItem('lana_saved_server', JSON.stringify(savedServer));
           console.log('[Login] Found saved server, skipping to Step 2:', savedServer.orgName || savedServer.orgId);
           // Set the API base URL
           api.baseUrl = savedServer.url;
@@ -457,7 +467,7 @@
           tier: data.tier || 'standard',
           rateLimit: data.rate_limit || 100,
           // Sub-apps available to this organization (drives the client app switcher)
-          enabledApps: Array.isArray(data.enabled_apps) ? data.enabled_apps : []
+          enabledApps: normalizeEnabledApps(data.enabled_apps)
         };
       } catch (error) {
         if (error.message === 'Failed to fetch') {
@@ -501,7 +511,7 @@
           rateLimit: data.rate_limit || 100,
           burstApiKey: data.burst_api_key || null,
           burstUrl: data.burst_url || null,
-          enabledApps: Array.isArray(data.enabled_apps) ? data.enabled_apps : []
+          enabledApps: normalizeEnabledApps(data.enabled_apps)
         };
 
         localStorage.setItem('lana_saved_server', JSON.stringify(merged));

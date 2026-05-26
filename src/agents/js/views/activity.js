@@ -21,10 +21,8 @@
   var TEMPLATE = ''
     + '<main>'
 
-    + '<div style="padding:24px 0 16px;">'
-    +   '<div style="font-size:1.125rem;font-weight:600;color:var(--lex-text-primary);">Lana Tasks</div>'
-    +   '<div style="font-size:0.8125rem;color:var(--lex-text-tertiary);margin-top:4px;">Interactive tasks assigned to Lana</div>'
-    + '</div>'
+    + '<lex-banner variant="light" heading="Lana Tasks" subtitle="Interactive tasks assigned to Lana"></lex-banner>'
+    + '<lex-breadcrumb style="margin:12px 0 16px;" items=\'[{"label":"LanaAgents","href":"#catalog"},{"label":"Activity"}]\'></lex-breadcrumb>'
 
     + '<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">'
     +   '<lex-segmented'

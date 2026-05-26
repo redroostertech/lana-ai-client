@@ -1378,6 +1378,17 @@
   // =========================================================================
 
   function render(rootEl, ctx) {
+    var activityDetail = global.LanaAgentsApp
+      && global.LanaAgentsApp.Views
+      && global.LanaAgentsApp.Views.activityDetail;
+    if (activityDetail && typeof activityDetail.render === 'function') {
+      rootEl._agentRunDelegatedToActivityDetail = true;
+      activityDetail.render(rootEl, Object.assign({}, ctx || {}, {
+        id: ctx && (ctx.runId || ctx.id)
+      }));
+      return;
+    }
+
     rootEl.innerHTML = TEMPLATE;
 
     var runId = ctx && ctx.runId;
@@ -1398,6 +1409,17 @@
   }
 
   function destroy(rootEl) {
+    if (rootEl && rootEl._agentRunDelegatedToActivityDetail) {
+      var activityDetail = global.LanaAgentsApp
+        && global.LanaAgentsApp.Views
+        && global.LanaAgentsApp.Views.activityDetail;
+      if (activityDetail && typeof activityDetail.destroy === 'function') {
+        activityDetail.destroy(rootEl);
+      }
+      rootEl._agentRunDelegatedToActivityDetail = false;
+      return;
+    }
+
     var state = rootEl && rootEl._agentRunState;
     if (!state) return;
     state.destroyed = true;

@@ -13,6 +13,36 @@
     return (typeof getLoginPath === 'function') ? getLoginPath() : 'login.html';
   }
 
+  function accessDeniedPath() {
+    if (typeof getPagePath === 'function') return getPagePath('auth_error.html');
+    var path = (window.location.pathname || '').toLowerCase();
+    return path.indexOf('/admin/') !== -1 ? '../auth_error.html' : 'auth_error.html';
+  }
+
+  function getRoleName(role) {
+    if (typeof role === 'string') return role.toLowerCase();
+    if (role && typeof role === 'object' && role.name) return String(role.name).toLowerCase();
+    return '';
+  }
+
+  function hasAdminPageRole(user) {
+    if (!user) return false;
+
+    var roles = user.roles || user.role_names || [];
+    for (var i = 0; i < roles.length; i++) {
+      var roleName = getRoleName(roles[i]);
+      if (roleName === 'system_admin' || roleName === 'org_admin') return true;
+    }
+
+    var directRole = getRoleName(user.role_name || user.role);
+    return directRole === 'system_admin' || directRole === 'org_admin';
+  }
+
+  function isRestrictedPath() {
+    var path = (window.location.pathname || '').toLowerCase();
+    return path.indexOf('/admin/') !== -1;
+  }
+
   function checkAuth(retries) {
     var token = localStorage.getItem('token');
     if (!token) {
@@ -31,7 +61,16 @@
           return;
         }
       }
-    } catch (e) { /* ignore parse errors */ }
+
+      if (isRestrictedPath() && !hasAdminPageRole(user)) {
+        window.location.href = accessDeniedPath();
+        return;
+      }
+    } catch (e) {
+      if (isRestrictedPath()) {
+        window.location.href = accessDeniedPath();
+      }
+    }
   }
   checkAuth(3);
 

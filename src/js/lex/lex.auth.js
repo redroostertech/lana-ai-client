@@ -24,6 +24,10 @@
     return false;
   }
 
+  function canAccessAdminPages() {
+    return hasRole('system_admin') || hasRole('org_admin');
+  }
+
   global.Lex.Auth = {
     get user() { return getUser(); },
 
@@ -34,6 +38,8 @@
     isOrgAdmin: function () { return hasRole('org_admin') || hasRole('organization_admin'); },
 
     isAdmin: function () { return hasRole('system_admin') || hasRole('org_admin') || hasRole('organization_admin') || hasRole('admin'); },
+
+    canAccessAdminPages: canAccessAdminPages,
 
     canViewSystemStatus: function () { return hasRole('system_admin') || hasRole('org_admin') || hasRole('organization_admin'); }
   };

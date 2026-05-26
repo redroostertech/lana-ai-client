@@ -153,6 +153,45 @@
     return DEFAULT_DESCRIPTOR;
   }
 
+  function getRoleName(role) {
+    if (typeof role === 'string') return role.toLowerCase();
+    if (role && typeof role === 'object' && role.name) return String(role.name).toLowerCase();
+    return '';
+  }
+
+  function canAccessRestrictedPages() {
+    if (global.Lex && global.Lex.Auth && typeof global.Lex.Auth.canAccessAdminPages === 'function') {
+      return global.Lex.Auth.canAccessAdminPages();
+    }
+
+    var user = (window.api && window.api.user) || null;
+    if (!user && global.Lex && global.Lex.state && global.Lex.state.user) {
+      user = global.Lex.state.user;
+    }
+    if (!user) return false;
+
+    var roles = user.roles || user.role_names || [];
+    for (var i = 0; i < roles.length; i++) {
+      var roleName = getRoleName(roles[i]);
+      if (roleName === 'system_admin' || roleName === 'org_admin') return true;
+    }
+
+    var directRole = getRoleName(user.role_name || user.role);
+    return directRole === 'system_admin' || directRole === 'org_admin';
+  }
+
+  function isRestrictedPath(path) {
+    var key = pathKey(path).toLowerCase();
+    return key.indexOf('admin/') === 0;
+  }
+
+  function redirectAccessDenied() {
+    if (window.Lex && window.Lex.Toast) {
+      window.Lex.Toast.show('You do not have permission to view that page.', 'error');
+    }
+    navigate('/dashboard.html', { pushState: true, force: true });
+  }
+
 
   // ---------------------------------------------------------------------------
   // Content extraction from fetched HTML
@@ -485,6 +524,15 @@
         _navigating = false;
         return _attemptRefreshThenNavigate(path, options);
       }
+    }
+
+    // Step 1.6: Role guard for admin surfaces.
+    // Admin pages are restricted to system_admin and org_admin only.
+    if (isRestrictedPath(path) && !canAccessRestrictedPages()) {
+      _navigating = false;
+      console.warn('[LexRouter] Navigation blocked: admin role required');
+      redirectAccessDenied();
+      return Promise.resolve();
     }
 
     // Step 2: Tear down previous view

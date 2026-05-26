@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Console - LANA AI</title>
+
+  <!-- CSS + Tailwind in head — behavioral scripts at end of body -->
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/admin/admin-console.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
+
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="admin"
+    page-title="Admin Console"
+  ></lex-app>
+
+  <template id="page-content">
+
+    <main class="admin-console-page">
+
+      <lex-banner
+        variant="light"
+        heading="Admin Console"
+        subtitle="Run scoped administrative commands and review session output"
+      >
+        <div class="admin-console-banner-actions">
+          <lex-badge id="consoleRoleBadge" label="Loading" color="gray"></lex-badge>
+          <lex-badge id="consoleModeBadge" label="Guided" color="gray"></lex-badge>
+        </div>
+      </lex-banner>
+
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Admin Console"}]'></lex-breadcrumb>
+
+      <section class="admin-console-layout" aria-label="Admin console workspace">
+        <aside class="admin-console-sidebar" aria-label="Command rail and session context">
+          <lex-card heading="Session">
+            <div class="admin-console-kv-list">
+              <div>
+                <span>Operator</span>
+                <strong id="consoleUserLabel">Current user</strong>
+              </div>
+              <div>
+                <span>Scope</span>
+                <strong id="consoleScopeLabel">Organization</strong>
+              </div>
+              <div>
+                <span>Runtime</span>
+                <strong id="consoleRuntimeLabel">Local preview</strong>
+              </div>
+            </div>
+          </lex-card>
+
+          <lex-card heading="Commands">
+            <div id="consoleCommandList" class="admin-console-command-list">
+              <lex-btn variant="ghost" size="sm" leading-icon="circle-help" data-command="help">help</lex-btn>
+              <lex-btn variant="ghost" size="sm" leading-icon="activity" data-command="lana status">lana status</lex-btn>
+              <lex-btn variant="ghost" size="sm" leading-icon="building-2" data-command="lana org current">lana org current</lex-btn>
+              <lex-btn variant="ghost" size="sm" leading-icon="plug" data-command="lana connectors status">lana connectors status</lex-btn>
+              <lex-btn variant="ghost" size="sm" leading-icon="scroll-text" data-command="lana logs api --since 15m">lana logs api --since 15m</lex-btn>
+              <lex-btn variant="ghost" size="sm" leading-icon="bot" data-command='lana agent run "audit this org"'>lana agent run "audit this org"</lex-btn>
+            </div>
+          </lex-card>
+
+          <lex-card heading="Tasks">
+            <div id="consoleTaskList" class="admin-console-task-list">
+              <div class="admin-console-task">
+                <strong>Console session</strong>
+                <span>ready</span>
+              </div>
+            </div>
+          </lex-card>
+        </aside>
+
+        <section class="admin-console-main" aria-label="Terminal output">
+          <div class="admin-console-toolbar">
+            <div>
+              <p class="admin-console-eyebrow">Scoped command stream</p>
+              <h2>Admin terminal</h2>
+            </div>
+            <div class="admin-console-toolbar-actions">
+              <lex-btn id="consoleClearBtn" variant="ghost" size="sm" leading-icon="trash">Clear</lex-btn>
+              <lex-btn id="consoleCopyBtn" variant="secondary" size="sm" leading-icon="copy">Copy</lex-btn>
+            </div>
+          </div>
+
+          <div id="consoleOutput" class="admin-console-output" role="log" aria-live="polite"></div>
+
+          <form id="consoleForm" class="admin-console-form" autocomplete="off">
+            <label for="consoleInput">Command</label>
+            <div class="admin-console-prompt-row">
+              <span id="consolePromptLabel">lana $</span>
+              <input id="consoleInput" type="text" value="lana status" aria-label="Console command">
+              <lex-btn id="consoleRunBtn" type="submit" variant="primary" size="md" leading-icon="play">Run</lex-btn>
+            </div>
+          </form>
+        </section>
+      </section>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div class="admin-console-noscript">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- Universal shell scripts -->
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/new-project-modal.js"></script>
+  <script src="../js/conversation-menu.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation + layout -->
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components (BEFORE inject) -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/admin/admin-switcher.js"></script>
+
+  <!-- Page controller -->
+  <script src="../js/admin/admin-console.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="../js/auth-guard.js"></script>
+</body>
+</html>

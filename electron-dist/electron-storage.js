@@ -206,6 +206,10 @@ function saveServerConnection(server) {
       // Burst API configuration for direct calls to burst service
       burstApiKey: server.burstApiKey || null,
       burstUrl: server.burstUrl || null,
+      // Forge agents platform configuration (Phase 1) — mirrors burst pattern.
+      forgeApiKey: server.forgeApiKey || null,
+      forgeUrl: server.forgeUrl || null,
+      forgeSovereign: server.forgeSovereign || null,
       tier: server.tier || "standard",
       rateLimit: server.rateLimit || 100,
       // Sub-apps available to this organization (drives the client app switcher)

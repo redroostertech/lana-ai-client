@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Doc Studio</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317201f'/%3E%3Cpath d='M22 16h8v25h15v7H22z' fill='white'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/tailwind-output.css">
+    <script src="../js/tailwind-loader.js"></script>
+    <link rel="stylesheet" href="../css/lex-tokens.css">
+    <script src="../js/config.js"></script>
+    <script src="../js/app-catalog.js"></script>
+    <script>
+      if (window.location.protocol !== 'file:' && window.LanaConfig) {
+        window.LanaConfig.API_BASE_URL = '';
+      }
+    </script>
+    <link rel="stylesheet" href="./styles.css?v=20260525-client-feature">
+  </head>
+  <body>
+    <lex-app
+      id="doc-studio-shell"
+      logo-src="../img/logo-light.png"
+      logo-alt="LANA AI"
+      logo-href="../dashboard.html"
+      active-nav-id="doc-studio"
+      page-title="Doc Studio"
+    ></lex-app>
+
+    <template id="docStudioTemplate">
+    <main class="app-shell">
+      <aside class="control-panel">
+        <div class="brand-block">
+          <span class="product-mark">L</span>
+          <div>
+            <h1>Doc Studio</h1>
+            <p>Local AI documents, presentations, and pages</p>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Format</span>
+          <select id="mode">
+            <option value="presentation">Presentation</option>
+            <option value="document">Document</option>
+            <option value="webpage">Webpage</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Document type</span>
+          <select id="documentType">
+            <option value="nda">NDA</option>
+            <option value="mutual_nda">Mutual NDA</option>
+            <option value="unilateral_nda">Unilateral NDA</option>
+            <option value="msa">Master Services Agreement</option>
+            <option value="sow">Statement of Work</option>
+            <option value="settlement_agreement">Settlement Agreement</option>
+            <option value="contract_summary">Contract Summary</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Audience</span>
+          <input id="audience" value="executive stakeholders">
+        </label>
+
+        <label class="field">
+          <span>Tone</span>
+          <input id="tone" value="clear, concise, polished">
+        </label>
+
+        <label class="field">
+          <span>Style</span>
+          <select id="style">
+            <option value="editorial">Editorial</option>
+            <option value="executive">Executive</option>
+            <option value="noir">Noir</option>
+            <option value="atelier">Atelier</option>
+            <option value="modern">Modern</option>
+            <option value="signal">Signal</option>
+            <option value="luxe">Luxe</option>
+            <option value="blueprint">Blueprint</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Title</span>
+          <input id="metadataTitle" value="Untitled file">
+        </label>
+
+        <label class="field">
+          <span>Subtitle</span>
+          <input id="metadataSubtitle" value="Generate a file to begin">
+        </label>
+
+        <label class="field">
+          <span>Accent</span>
+          <input id="themeAccent" type="color" value="#2f6f73">
+        </label>
+
+        <label class="field">
+          <span>Background</span>
+          <input id="themeBackground" type="color" value="#f7f4ef">
+        </label>
+
+        <label class="field">
+          <span>Text</span>
+          <input id="themeForeground" type="color" value="#17201f">
+        </label>
+
+        <section class="brand-kit-panel" aria-label="Brand kits">
+          <div class="panel-heading">
+            <strong>Brand kits</strong>
+            <button id="saveBrandKitBtn" type="button">Save kit</button>
+          </div>
+          <label class="field">
+            <span>Saved kit</span>
+            <select id="brandKitSelect"></select>
+          </label>
+          <label class="field">
+            <span>Kit name</span>
+            <input id="brandKitName" value="Current file">
+          </label>
+          <label class="field">
+            <span>Logo URL</span>
+            <input id="brandLogoUrl" type="url" placeholder="https://example.com/logo.svg">
+          </label>
+          <label class="field">
+            <span>Text mark</span>
+            <input id="brandTextMark" maxlength="24" placeholder="Lana">
+          </label>
+          <label class="field">
+            <span>Font</span>
+            <select id="brandFontFamily">
+              <option value="inter">Inter / system</option>
+              <option value="aptos">Aptos / UI sans</option>
+              <option value="serif">Editorial serif</option>
+              <option value="mono">Technical mono</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Icons</span>
+            <select id="brandIconMode">
+              <option value="restrained">Restrained</option>
+              <option value="balanced">Balanced</option>
+              <option value="minimal">Minimal</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Images</span>
+            <select id="brandImageStyle">
+              <option value="editorial">Editorial</option>
+              <option value="product">Product</option>
+              <option value="abstract">Abstract</option>
+              <option value="documentary">Documentary</option>
+              <option value="diagrammatic">Diagrammatic</option>
+              <option value="illustration">Illustration</option>
+              <option value="data">Data-informed</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Density</span>
+            <select id="brandDensity">
+              <option value="standard">Standard</option>
+              <option value="dense">Dense</option>
+              <option value="spacious">Spacious</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Composition</span>
+            <select id="brandComposition">
+              <option value="magazine">Magazine</option>
+              <option value="boardroom">Boardroom</option>
+              <option value="cinematic">Cinematic</option>
+              <option value="gallery">Gallery</option>
+              <option value="product">Product</option>
+              <option value="briefing">Briefing</option>
+              <option value="luxury">Luxury</option>
+              <option value="systems">Systems</option>
+            </select>
+          </label>
+        </section>
+
+        <label class="field">
+          <span>Sections</span>
+          <input id="cardCount" type="number" min="3" max="24" value="8">
+        </label>
+
+        <label class="check-field">
+          <input id="generateImages" type="checkbox">
+          <span>Generate images with OpenAI</span>
+        </label>
+
+        <label class="field prompt-field">
+          <span>Source</span>
+          <textarea id="prompt" placeholder="Paste notes, an outline, a proposal, or describe what to create."></textarea>
+        </label>
+
+        <section class="quick-starts" aria-label="Doc Studio prompt starters">
+          <div class="panel-heading">
+            <strong>Quick starts</strong>
+          </div>
+          <div class="quick-start-grid">
+            <button type="button" data-quick-start="mutual_nda">Mutual NDA</button>
+            <button type="button" data-quick-start="settlement">Settlement</button>
+            <button type="button" data-quick-start="sow">SOW</button>
+            <button type="button" data-quick-start="pitch">Pitch deck</button>
+          </div>
+        </section>
+
+        <div class="source-tools" aria-label="Source ingestion">
+          <label class="field">
+            <span>Source URL</span>
+            <input id="sourceUrl" type="url" placeholder="https://example.com/brief.md">
+          </label>
+          <label class="file-field">
+            <span>Source files</span>
+            <input id="sourceFiles" type="file" multiple accept=".txt,.text,.md,.markdown,.mdown,text/plain,text/markdown">
+          </label>
+          <button id="importSourceBtn" type="button">Import source</button>
+        </div>
+
+        <div class="actions">
+          <button id="generateBtn" class="primary">Generate</button>
+          <button id="outlineBtn" type="button">Outline</button>
+          <button id="sampleBtn" type="button">Sample</button>
+        </div>
+
+        <div class="export-actions">
+          <button id="printBtn" type="button">PDF</button>
+          <button id="pptxBtn" type="button">PPTX</button>
+          <button id="htmlBtn" type="button">HTML</button>
+        </div>
+
+        <p id="status" class="status">Ready. Uses your configured llama.cpp server.</p>
+      </aside>
+
+      <section class="workspace">
+        <div class="toolbar">
+          <div>
+            <strong id="deckTitle">Untitled file</strong>
+            <span id="deckSubtitle">Generate a file to begin</span>
+          </div>
+          <div class="view-tabs" role="tablist">
+            <button class="active" data-view="slides">Slides</button>
+            <button data-view="present">Present</button>
+            <button data-view="doc">Doc</button>
+            <button data-view="library">Library</button>
+          </div>
+        </div>
+
+        <div id="editorTools" class="editor-tools">
+          <div class="slide-browser">
+            <button id="prevSlideBtn" type="button" aria-label="Previous slide">‹</button>
+            <label class="mini-field">
+              <span>Slide</span>
+              <select id="slidePicker"></select>
+            </label>
+            <button id="nextSlideBtn" type="button" aria-label="Next slide">›</button>
+          </div>
+          <div class="slide-browser">
+            <label class="mini-field">
+              <span>Layout</span>
+              <select id="slideLayout"></select>
+            </label>
+            <label class="mini-field">
+              <span>Slide style</span>
+              <select id="slideStyle"></select>
+            </label>
+          </div>
+          <div class="slide-browser">
+            <button id="addSlideBtn" type="button">Add</button>
+            <button id="duplicateSlideBtn" type="button">Duplicate</button>
+            <button id="removeSlideBtn" type="button">Remove</button>
+            <button id="moveSlideUpBtn" type="button">Up</button>
+            <button id="moveSlideDownBtn" type="button">Down</button>
+            <button id="rewriteSlideBtn" type="button">Rewrite</button>
+            <button id="regenerateSlideBtn" type="button">Regenerate</button>
+            <button id="generateSlideImageBtn" type="button">Image</button>
+            <button id="removeSlideImageBtn" type="button">No image</button>
+            <button id="toggleTemplatesBtn" type="button" aria-expanded="false">Templates</button>
+            <button id="sharePresentationBtn" type="button">Share</button>
+            <button id="saveMetadataBtn" type="button">Save</button>
+          </div>
+          <div class="style-compare" id="styleCompare"></div>
+          <section class="critic-panel" id="criticPanel" aria-label="Doc Studio critic"></section>
+          <div class="visual-editor" id="visualEditor"></div>
+          <section class="template-gallery" id="templateGallery" aria-label="Template gallery"></section>
+        </div>
+
+        <div id="slidesView" class="slides-view"></div>
+        <section id="presentView" class="present-view hidden" aria-label="Presentation view"></section>
+        <article id="docView" class="doc-view hidden"></article>
+        <section id="libraryView" class="library-view hidden">
+          <div class="library-header">
+            <div>
+              <h2>Doc Studio Library</h2>
+              <p>Generated and saved Doc Studio files.</p>
+            </div>
+            <div class="library-toolbar">
+              <label class="mini-field">
+                <span>Search</span>
+                <input id="librarySearch" type="search" placeholder="Title or subtitle">
+              </label>
+              <label class="mini-field">
+                <span>Style</span>
+                <select id="libraryStyleFilter">
+                  <option value="all">All styles</option>
+                </select>
+              </label>
+              <label class="mini-field">
+                <span>Sort</span>
+                <select id="librarySort">
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                  <option value="title">Title</option>
+                  <option value="cards">Section count</option>
+                </select>
+              </label>
+              <button id="refreshLibraryBtn" type="button">Refresh</button>
+            </div>
+          </div>
+          <div id="libraryList" class="library-list"></div>
+        </section>
+      </section>
+    </main>
+    </template>
+
+    <script src="../js/version.js"></script>
+    <script src="../js/lex/lex.core.js"></script>
+    <script src="../js/lex/lex.icons.js"></script>
+    <script src="../js/lex/lex.utils.js"></script>
+    <script src="../js/lex/lex.data.js"></script>
+    <script src="../js/lex/lex.forms.js"></script>
+    <script src="../js/lex/lex.state.js"></script>
+    <script src="../js/lex/lex-nav.js"></script>
+    <script src="../js/lex/components/foundation/lex-btn.js"></script>
+    <script src="../js/lex/components/foundation/lex-card.js"></script>
+    <script src="../js/lex/components/foundation/lex-action-card.js"></script>
+    <script src="../js/lex/components/foundation/lex-badge.js"></script>
+    <script src="../js/lex/components/foundation/lex-empty.js"></script>
+    <script src="../js/lex/components/foundation/lex-banner.js"></script>
+    <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+    <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+    <script src="../js/lex/components/foundation/lex-modal.js"></script>
+    <script src="../js/lex/components/foundation/lex-tabs.js"></script>
+    <script src="../js/lex/components/foundation/lex-kv.js"></script>
+    <script src="../js/lex/components/foundation/lex-metric.js"></script>
+    <script src="../js/lex/components/form/lex-segmented.js"></script>
+    <script src="../js/lex/components/form/lex-select.js"></script>
+    <script src="../js/lex/components/form/lex-input.js"></script>
+    <script src="../js/lex/components/form/lex-textarea.js"></script>
+    <script src="../js/lex/components/form/lex-toggle.js"></script>
+    <script src="../js/lex/components/form/lex-checkbox.js"></script>
+    <script src="../js/lex/components/data/lex-pagination.js"></script>
+    <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+    <script src="../js/lex/components/layout/lex-topbar.js"></script>
+    <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+    <script src="../js/lex/components/layout/lex-app.js"></script>
+    <script src="../js/lex/index.js"></script>
+    <script src="../js/sidebar-footer-hydrate.js"></script>
+    <script>
+      (function () {
+        function mountDocStudio() {
+          var shell = document.getElementById('doc-studio-shell');
+          var template = document.getElementById('docStudioTemplate');
+          if (!shell || !template || shell.dataset.docStudioMounted === 'true') return;
+          var content = typeof shell.getContentEl === 'function' ? shell.getContentEl() : document.getElementById('lex-main-content');
+          if (!content) return;
+          shell.dataset.docStudioMounted = 'true';
+          if (typeof shell.setSections === 'function') {
+            shell.setSections([
+              {
+                id: 'doc-studio',
+                isStaticTop: true,
+                items: [
+            { id: 'doc-studio', label: 'Studio', icon: 'file-text', href: 'index.html' }
+                ]
+              }
+            ]);
+          }
+          content.appendChild(template.content.cloneNode(true));
+          var script = document.createElement('script');
+          script.src = './app.js?v=20260525-client-feature';
+          document.body.appendChild(script);
+        }
+
+        var shell = document.getElementById('doc-studio-shell');
+        if (shell) {
+          shell.addEventListener('lex-app-ready', mountDocStudio, { once: true });
+          requestAnimationFrame(mountDocStudio);
+        }
+      })();
+    </script>
+  </body>
+</html>

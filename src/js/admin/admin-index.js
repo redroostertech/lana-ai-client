@@ -46,7 +46,7 @@
     if (!content) return;
 
     // Gate: non-admins should not see the admin index.
-    if (Lex.Auth && !Lex.Auth.isAdmin()) {
+    if (Lex.Auth && Lex.Auth.canAccessAdminPages && !Lex.Auth.canAccessAdminPages()) {
       Lex.Nav.go('dashboard.html', { replace: true });
       return;
     }

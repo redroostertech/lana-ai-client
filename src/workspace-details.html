@@ -438,6 +438,56 @@
     </div>
   </lex-modal>
 
+  <!-- Doc Studio Document Creation Modal -->
+  <lex-modal id="createDocStudioDocumentModal" heading="Create with Doc Studio" subtitle="Generate a matter-specific file from selected or all matter documents" size="lg" hide-actions close-on-overlay>
+    <form id="createDocStudioDocumentForm" class="p-6 space-y-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <lex-select id="docStudioOutputFormat" label="Format"
+          options='[{"value":"document","label":"Legal Document"},{"value":"presentation","label":"Presentation"},{"value":"webpage","label":"Webpage"}]'>
+        </lex-select>
+        <lex-select id="docStudioDocumentStyle" label="Style"
+          options='[{"value":"executive","label":"Executive"},{"value":"editorial","label":"Editorial"},{"value":"modern","label":"Modern"},{"value":"blueprint","label":"Blueprint"},{"value":"luxe","label":"Luxe"}]'>
+        </lex-select>
+      </div>
+      <lex-input id="docStudioDocumentTitle" label="Working title" placeholder="e.g., Mutual NDA for Acme diligence"></lex-input>
+      <lex-textarea id="docStudioDocumentPrompt" label="Prompt" rows="8" placeholder="Describe the document you need, parties, business context, key terms, jurisdiction, signature requirements, and any special clauses."></lex-textarea>
+      <div id="docStudioDocumentProgress" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div id="docStudioProgressTitle" class="text-sm font-semibold text-gray-900">Generating with Doc Studio</div>
+            <div id="docStudioProgressSubtitle" class="text-xs text-gray-500">Preparing request...</div>
+          </div>
+          <div id="docStudioProgressElapsed" class="text-xs font-medium text-gray-500">0s</div>
+        </div>
+        <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-200">
+          <div id="docStudioProgressBar" class="h-full rounded-full transition-all" style="width: 0%; background: var(--lex-bg-accent)"></div>
+        </div>
+        <ol id="docStudioProgressSteps" class="mt-3 space-y-2 text-sm"></ol>
+      </div>
+      <div id="docStudioDocumentStatus" class="hidden rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600"></div>
+      <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+        <lex-btn type="button" id="cancelDocStudioDocumentBtn" variant="secondary">Cancel</lex-btn>
+        <lex-btn type="submit" id="generateDocStudioDocumentBtn" variant="primary">Generate</lex-btn>
+      </div>
+    </form>
+  </lex-modal>
+
+  <lex-modal id="docStudioDocumentViewerModal" heading="Doc Studio Document" size="full" hide-actions>
+    <div class="flex flex-col h-full min-h-[76vh]">
+      <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
+        <div>
+          <div id="docStudioViewerTitle" class="text-sm font-semibold text-gray-900">Generated document</div>
+          <div id="docStudioViewerMeta" class="text-xs text-gray-500">Doc Studio</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <lex-btn type="button" id="openDocStudioDocumentTabBtn" variant="secondary" size="sm">Open in Doc Studio</lex-btn>
+          <lex-btn type="button" id="closeDocStudioDocumentViewerBtn" variant="ghost" size="sm">Close</lex-btn>
+        </div>
+      </div>
+      <iframe id="docStudioDocumentViewerFrame" title="Doc Studio document viewer" class="flex-1 w-full border-0 bg-white"></iframe>
+    </div>
+  </lex-modal>
+
   <!-- Document Metadata Modal -->
   <lex-modal id="documentMetadataModal" heading="Document Details" subtitle="Add optional metadata to help organize and find this document" size="md" hide-actions>
       <div class="p-6 space-y-4">
