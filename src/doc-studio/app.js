@@ -8,6 +8,7 @@ const state = {
   view: 'slides',
   presentationId: null,
   presentations: [],
+  libraryDocuments: [],
   selectedSlideIndex: 0,
   templateGalleryOpen: false,
   templates: [],
@@ -15,7 +16,7 @@ const state = {
   critique: null,
   libraryQuery: '',
   libraryStyle: 'all',
-  librarySort: 'newest',
+  librarySort: 'updated',
   libraryCapabilities: {
     duplicate: true,
     rename: true,
@@ -30,16 +31,45 @@ const state = {
     share: true,
     imageAvailable: false
   },
-  activeSignaturePad: null
+  activeSignaturePad: null,
+  documentDirty: false,
+  documentComments: [],
+  documentPermissions: [],
+  documentCollaborators: [],
+  documentCollaborationLoaded: false,
+  documentPanelTab: 'comments',
+  documentVersions: [],
+  selectedDocumentVersion: null,
+  documentHistory: [],
+  documentHistoryIndex: -1,
+  historyTimer: null,
+  autosaveTimer: null,
+  autosaving: false,
+  documentLastSavedAt: null
 };
 
 const initialParams = new URLSearchParams(window.location.search);
 state.embedded = initialParams.get('embed') === '1' || initialParams.get('embedded') === '1';
+state.documentEditor = initialParams.get('editor') === '1' ||
+  initialParams.get('docEditor') === '1' ||
+  (initialParams.has('id') && initialParams.get('view') === 'doc');
 if (state.embedded) {
   document.body.dataset.embedded = 'true';
   const shell = document.getElementById('doc-studio-shell');
   if (shell) {
     shell.setAttribute('chrome', 'embedded');
+  }
+}
+if (state.documentEditor) {
+  document.body.dataset.documentEditor = 'true';
+}
+
+function setDocumentEditorMode(enabled) {
+  state.documentEditor = !!enabled;
+  if (state.documentEditor) {
+    document.body.dataset.documentEditor = 'true';
+  } else {
+    delete document.body.dataset.documentEditor;
   }
 }
 
@@ -98,6 +128,34 @@ function replaceClientUrl(path) {
   window.history.replaceState({}, '', clientDeckUrl(path));
 }
 
+async function openDocStudioLibrary() {
+  if (state.view !== 'library' && !confirmUnsavedDocumentChanges()) {
+    return;
+  }
+  setDocumentEditorMode(false);
+  state.view = 'library';
+  replaceClientUrl('/doc-studio/?view=library');
+  await loadLibrary();
+  render();
+}
+
+window.openDocStudioLibrary = openDocStudioLibrary;
+
+function currentDocumentFileId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('file_id') || params.get('document_id') || '';
+}
+
+function currentMatterId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('matter_id') || '';
+}
+
+function currentDocumentFileName() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('file_name') || params.get('filename') || `${slug(state.deck?.title || 'document')}.pdf`;
+}
+
 const elements = {
   mode: document.getElementById('mode'),
   documentType: document.getElementById('documentType'),
@@ -132,6 +190,12 @@ const elements = {
   pptxBtn: document.getElementById('pptxBtn'),
   htmlBtn: document.getElementById('htmlBtn'),
   status: document.getElementById('status'),
+  standardHeader: document.getElementById('standardHeader'),
+  docHeaderChrome: document.getElementById('docHeaderChrome'),
+  docHeaderBanner: document.getElementById('docHeaderBanner'),
+  docHeaderBreadcrumbs: document.getElementById('docHeaderBreadcrumbs'),
+  docEditorLayout: document.getElementById('docEditorLayout'),
+  docSidePanel: document.getElementById('docSidePanel'),
   deckTitle: document.getElementById('deckTitle'),
   deckSubtitle: document.getElementById('deckSubtitle'),
   editorTools: document.getElementById('editorTools'),
@@ -256,6 +320,119 @@ function escapeHtml(value) {
 
 function setStatus(message) {
   elements.status.textContent = message;
+}
+
+function markDocumentDirty(message = 'Unsaved document changes.') {
+  state.documentDirty = true;
+  setStatus(message);
+  const dirtyState = document.querySelector('[data-doc-dirty-state]');
+  if (dirtyState) {
+    dirtyState.setAttribute('label', 'Unsaved changes');
+    dirtyState.setAttribute('color', 'yellow');
+    dirtyState.classList.add('is-dirty');
+  }
+  scheduleDocumentHistorySnapshot();
+  scheduleDocumentAutosave();
+}
+
+function clearDocumentDirty() {
+  state.documentDirty = false;
+  updateDocumentHistoryControls();
+}
+
+function formatLastSaved(value) {
+  if (!value) {
+    return 'Last saved not yet';
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'Last saved recently';
+  }
+  return `Last saved ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+}
+
+function confirmUnsavedDocumentChanges() {
+  if (!state.documentDirty) {
+    return true;
+  }
+  return window.confirm('Continue with unsaved document changes? Save first if you want them persisted.');
+}
+
+function cloneDocumentModel() {
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  return documentModel ? JSON.parse(JSON.stringify(documentModel)) : null;
+}
+
+function documentSnapshotKey(snapshot) {
+  return JSON.stringify(snapshot || null);
+}
+
+function resetDocumentHistory() {
+  const snapshot = cloneDocumentModel();
+  state.documentHistory = snapshot ? [snapshot] : [];
+  state.documentHistoryIndex = snapshot ? 0 : -1;
+  updateDocumentHistoryControls();
+}
+
+function pushDocumentHistorySnapshot() {
+  const snapshot = cloneDocumentModel();
+  if (!snapshot) {
+    return;
+  }
+  const current = state.documentHistory[state.documentHistoryIndex];
+  if (documentSnapshotKey(current) === documentSnapshotKey(snapshot)) {
+    updateDocumentHistoryControls();
+    return;
+  }
+  state.documentHistory = state.documentHistory.slice(0, state.documentHistoryIndex + 1);
+  state.documentHistory.push(snapshot);
+  if (state.documentHistory.length > 60) {
+    state.documentHistory.shift();
+  }
+  state.documentHistoryIndex = state.documentHistory.length - 1;
+  updateDocumentHistoryControls();
+}
+
+function scheduleDocumentHistorySnapshot() {
+  if (!state.deck.document) {
+    return;
+  }
+  window.clearTimeout(state.historyTimer);
+  state.historyTimer = window.setTimeout(pushDocumentHistorySnapshot, 550);
+}
+
+function updateDocumentHistoryControls() {
+  document.querySelectorAll('[data-doc-undo]').forEach(button => {
+    button.disabled = state.documentHistoryIndex <= 0;
+  });
+  document.querySelectorAll('[data-doc-redo]').forEach(button => {
+    button.disabled = state.documentHistoryIndex < 0 || state.documentHistoryIndex >= state.documentHistory.length - 1;
+  });
+}
+
+function restoreDocumentHistory(index) {
+  if (index < 0 || index >= state.documentHistory.length) {
+    return;
+  }
+  state.documentHistoryIndex = index;
+  state.deck.document = JSON.parse(JSON.stringify(state.documentHistory[index]));
+  state.deck.title = state.deck.document.title || state.deck.title;
+  state.deck.subtitle = state.deck.document.subtitle || state.deck.subtitle;
+  state.documentDirty = true;
+  render();
+  markDocumentDirty('Document history restored. Save document to persist.');
+}
+
+function scheduleDocumentAutosave() {
+  if (!state.presentationId || !state.deck.document || state.autosaving) {
+    return;
+  }
+  window.clearTimeout(state.autosaveTimer);
+  state.autosaveTimer = window.setTimeout(() => {
+    saveDocumentEdits({ autosave: true, silent: true }).catch(error => {
+      setStatus(`Autosave failed: ${error.message}`);
+    });
+  }, 1800);
 }
 
 function setInputValue(input, value) {
@@ -868,6 +1045,46 @@ function ensureDocumentSignatureBlocks(documentModel) {
   return documentModel.signature_blocks;
 }
 
+function ensureDocumentParties(documentModel) {
+  if (!documentModel || typeof documentModel !== 'object') {
+    return [];
+  }
+  documentModel.parties = Array.isArray(documentModel.parties) ? documentModel.parties : [];
+  return documentModel.parties;
+}
+
+function ensureDocumentSections(documentModel) {
+  if (!documentModel || typeof documentModel !== 'object') {
+    return [];
+  }
+  documentModel.sections = Array.isArray(documentModel.sections) ? documentModel.sections : [];
+  return documentModel.sections;
+}
+
+function ensureDocumentReviewNotes(documentModel) {
+  if (!documentModel || typeof documentModel !== 'object') {
+    return [];
+  }
+  documentModel.review_notes = Array.isArray(documentModel.review_notes) ? documentModel.review_notes : [];
+  return documentModel.review_notes;
+}
+
+function ensureDocumentComments(documentModel) {
+  if (!documentModel || typeof documentModel !== 'object') {
+    return [];
+  }
+  documentModel.comments = Array.isArray(documentModel.comments) ? documentModel.comments : [];
+  return documentModel.comments;
+}
+
+function ensureDocumentSharedWith(documentModel) {
+  if (!documentModel || typeof documentModel !== 'object') {
+    return [];
+  }
+  documentModel.shared_with = Array.isArray(documentModel.shared_with) ? documentModel.shared_with : [];
+  return documentModel.shared_with;
+}
+
 function signedDateForInput(block) {
   const value = block?.signed_date || block?.signed_at || '';
   if (!value) {
@@ -881,37 +1098,412 @@ function signatureImage(block) {
   return /^data:image\/png;base64,/i.test(value) ? value : '';
 }
 
+function editableDocAttrs(attrs = '') {
+  return `contenteditable="true" data-doc-edit="true" ${attrs} spellcheck="true"`;
+}
+
+function hiddenDocumentFields(documentModel) {
+  if (!documentModel || typeof documentModel !== 'object') {
+    return [];
+  }
+  documentModel.hidden_fields = Array.isArray(documentModel.hidden_fields) ? documentModel.hidden_fields : [];
+  return documentModel.hidden_fields;
+}
+
+function documentFieldVisible(documentModel, field) {
+  return hiddenDocumentFields(documentModel).indexOf(field) === -1;
+}
+
+function renderDocumentBreadcrumbs(deck, documentModel) {
+  if (!state.documentEditor) {
+    return '';
+  }
+  const matterId = currentMatterId();
+  const params = new URLSearchParams(window.location.search);
+  const matterName = params.get('matter_name') || params.get('workspace_name') || matterId || 'Workspace';
+  const documentsLabel = matterId ? `${matterName} Documents` : 'Documents';
+  const items = [{ label: documentsLabel, href: matterId ? `workspace-details.html?id=${encodeURIComponent(matterId)}&tab=documents` : 'workspaces.html' }];
+  const fileId = currentDocumentFileId();
+  if (fileId) {
+    const fileName = params.get('file_name') || 'File Viewer';
+    items.push({ label: fileName, href: `file-viewer.html?id=${encodeURIComponent(fileId)}` });
+  }
+  items.push({ label: documentModel.title || deck.title || 'Doc Studio' });
+  return `<lex-breadcrumb class="doc-editor-breadcrumb" items="${escapeHtml(JSON.stringify(items))}"></lex-breadcrumb>`;
+}
+
+function renderDocumentHeaderChrome(deck) {
+  const documentModel = deck.document && typeof deck.document === 'object' ? deck.document : null;
+  const showDocChrome = state.view === 'doc' && state.documentEditor && documentModel;
+  if (elements.standardHeader) {
+    elements.standardHeader.classList.toggle('hidden', !!showDocChrome);
+  }
+  if (elements.docHeaderChrome) {
+    elements.docHeaderChrome.classList.toggle('hidden', !showDocChrome);
+  }
+  if (!showDocChrome) {
+    if (elements.docHeaderBreadcrumbs) {
+      elements.docHeaderBreadcrumbs.innerHTML = '';
+    }
+    return;
+  }
+  if (elements.docHeaderBanner) {
+    elements.docHeaderBanner.setAttribute('heading', documentModel.title || deck.title || 'Untitled file');
+    const saveState = state.documentDirty ? 'Unsaved changes' : 'Saved';
+    elements.docHeaderBanner.setAttribute('subtitle', `${saveState} · ${formatLastSaved(state.documentLastSavedAt)}`);
+    const saveButton = elements.docHeaderChrome.querySelector('[data-save-document]');
+    if (saveButton) {
+      saveButton.textContent = state.presentationId ? 'Save document' : 'Save document copy';
+    }
+  }
+  updateDocumentHistoryControls();
+  if (elements.docHeaderBreadcrumbs) {
+    elements.docHeaderBreadcrumbs.innerHTML = renderDocumentBreadcrumbs(deck, documentModel);
+  }
+}
+
+function renderDocumentMeta(documentModel) {
+  const fields = [
+    { key: 'effective_date', label: 'Effective date', fallback: '[Effective Date]' },
+    { key: 'jurisdiction', label: 'Governing law', fallback: '[Jurisdiction]' }
+  ].filter(field => documentFieldVisible(documentModel, field.key));
+  if (!fields.length) {
+    return '';
+  }
+  return `
+    <dl class="legal-doc-meta">
+      ${fields.map(field => `
+        <div class="legal-doc-meta-card">
+          <button type="button" class="doc-meta-delete" data-doc-delete-meta="${escapeHtml(field.key)}" aria-label="Remove ${escapeHtml(field.label)}">Delete</button>
+          <dt>${escapeHtml(field.label)}</dt>
+          <dd ${editableDocAttrs(`data-doc-field="${field.key}"`)}>${escapeHtml(documentModel[field.key] || field.fallback)}</dd>
+        </div>
+      `).join('')}
+    </dl>
+  `;
+}
+
+function currentUserLabel() {
+  try {
+    const profile = JSON.parse(localStorage.getItem('user') || localStorage.getItem('lana_user') || 'null');
+    return profile?.name || profile?.email || profile?.username || 'You';
+  } catch (_error) {
+    return 'You';
+  }
+}
+
+function currentUserInitials() {
+  const label = currentUserLabel();
+  const parts = String(label || 'U').trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return String(label || 'U').slice(0, 2).toUpperCase();
+}
+
+function renderDocPanelEmpty(message, description, icon = 'document') {
+  return `
+    <lex-empty
+      class="doc-panel-empty"
+      size="compact"
+      icon="${escapeHtml(icon)}"
+      message="${escapeHtml(message)}"
+      description="${escapeHtml(description)}"
+    ></lex-empty>
+  `;
+}
+
+function renderDocumentComments(documentModel) {
+  const fileId = currentDocumentFileId();
+  const comments = fileId ? state.documentComments : ensureDocumentComments(documentModel);
+  return `
+    <section class="legal-doc-section doc-collaboration">
+      <div class="section-heading-row">
+        <h2>Comments</h2>
+        ${fileId && !state.documentCollaborationLoaded ? '<small>Loading document comments...</small>' : ''}
+      </div>
+      <lex-document-comment-composer
+        initials="${escapeHtml(currentUserInitials())}"
+        placeholder="Add a comment... (type @ to mention teammates, # to reference documents)"
+        submit-label="Post Comment"
+      ></lex-document-comment-composer>
+      <ul class="doc-comment-list">
+        ${comments.length ? comments.map((comment, index) => `
+          <li class="doc-comment">
+            <div>
+              <strong>${escapeHtml(comment.author || comment.user_name || comment.user_email || 'Comment')}</strong>
+              <small>${escapeHtml(formatDate(comment.created_at))}</small>
+            </div>
+            <small>Location: ${escapeHtml(comment.location || comment.anchor_text || comment.metadata?.location || comment.metadata?.section || 'Document')}</small>
+            <p>${escapeHtml(comment.body || comment.content || '')}</p>
+            <lex-btn type="button" size="sm" variant="ghost" data-doc-delete-comment="${escapeHtml(comment.id || String(index))}">Delete</lex-btn>
+          </li>
+        `).join('') : ''}
+      </ul>
+      ${comments.length ? '' : renderDocPanelEmpty('No comments yet', 'Use comments to ask questions, tag teammates, or capture review notes for this document.', 'inbox')}
+    </section>
+  `;
+}
+
+function renderDocumentCollaboration(documentModel) {
+  const fileId = currentDocumentFileId();
+  const matterId = currentMatterId();
+  const draftSharedWith = ensureDocumentSharedWith(documentModel);
+  const collaboratorOptions = state.documentCollaborators
+    .filter(user => !state.documentPermissions.some(permission => permission.user_id === user.id))
+    .map(user => ({
+      value: user.id,
+      label: user.name || user.email || 'Matter coworker',
+      description: user.email || ''
+    }));
+  return `
+    <section class="legal-doc-section doc-share">
+      <div class="section-heading-row">
+        <h2>Collaborate</h2>
+      </div>
+      <div class="doc-share-composer">
+        ${fileId && matterId ? `
+          <lex-select
+            data-doc-share-input
+            placeholder="${collaboratorOptions.length ? 'Search matter coworkers' : 'No additional matter coworkers found'}"
+            searchable
+            clearable
+            ${collaboratorOptions.length ? '' : 'disabled'}
+            options="${escapeHtml(JSON.stringify(collaboratorOptions))}"
+          ></lex-select>
+        ` : '<input data-doc-share-input placeholder="Coworker name or email">'}
+        <lex-btn type="button" variant="secondary" data-doc-add-share>${fileId ? 'Grant access' : 'Add coworker'}</lex-btn>
+      </div>
+      <div class="doc-share-list">
+        ${fileId
+          ? (state.documentPermissions.length ? state.documentPermissions.map(permission => {
+            const label = permission.user_email || permission.username || permission.role_name || permission.permission || 'Access grant';
+            const removableId = permission.user_id || '';
+            return `
+              <span class="doc-share-chip">
+                ${escapeHtml(label)}
+                ${removableId ? `<button type="button" data-doc-remove-share="${escapeHtml(removableId)}" aria-label="Remove ${escapeHtml(label)}">×</button>` : ''}
+              </span>
+            `;
+          }).join('') : '')
+          : (draftSharedWith.length ? draftSharedWith.map((recipient, index) => `
+            <span class="doc-share-chip">
+              ${escapeHtml(recipient)}
+              <button type="button" data-doc-remove-share="${index}" aria-label="Remove ${escapeHtml(recipient)}">×</button>
+            </span>
+          `).join('') : '')}
+      </div>
+      ${(fileId ? state.documentPermissions.length : draftSharedWith.length) ? '' : renderDocPanelEmpty('No collaborators yet', 'Grant access to matter coworkers when this draft is ready for review or signature prep.', 'folder')}
+    </section>
+  `;
+}
+
+function ensureDocumentActivity(documentModel) {
+  if (!documentModel || typeof documentModel !== 'object') {
+    return [];
+  }
+  if (!Array.isArray(documentModel.activity_history)) {
+    documentModel.activity_history = [];
+  }
+  return documentModel.activity_history;
+}
+
+function ensureDocumentVersions(documentModel) {
+  if (!documentModel || typeof documentModel !== 'object') {
+    return [];
+  }
+  if (!Array.isArray(documentModel.versions)) {
+    documentModel.versions = [{
+      version: 1,
+      label: 'Initial draft',
+      created_at: state.documentLastSavedAt || new Date().toISOString(),
+      summary: 'Generated document draft',
+      document: JSON.parse(JSON.stringify(documentModel))
+    }];
+  }
+  return documentModel.versions;
+}
+
+function documentTextForDiff(documentModel) {
+  if (!documentModel) {
+    return '';
+  }
+  const lines = [
+    documentModel.title || '',
+    documentModel.subtitle || '',
+    documentModel.effective_date ? `Effective date: ${documentModel.effective_date}` : '',
+    documentModel.jurisdiction ? `Governing law: ${documentModel.jurisdiction}` : '',
+    ...(Array.isArray(documentModel.parties) ? documentModel.parties.map(party => `${party.role || 'Party'}: ${party.name || ''} ${party.address || ''}`) : []),
+    ...(Array.isArray(documentModel.sections) ? documentModel.sections.flatMap(section => [section.heading || '', section.body || '']) : []),
+    ...(Array.isArray(documentModel.review_notes) ? documentModel.review_notes.map(note => `Review note: ${note}`) : [])
+  ];
+  return lines.map(line => String(line || '').trim()).filter(Boolean).join('\n');
+}
+
+function documentVersionSnapshot(documentModel) {
+  const snapshot = JSON.parse(JSON.stringify(documentModel || {}));
+  delete snapshot.versions;
+  delete snapshot.activity_history;
+  delete snapshot.comments;
+  delete snapshot.shared_with;
+  return snapshot;
+}
+
+function recordDocumentSaveActivity(kind = 'save') {
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  if (!documentModel) {
+    return;
+  }
+  const versions = ensureDocumentVersions(documentModel);
+  const nextVersion = versions.length
+    ? Math.max(...versions.map(version => Number(version.version) || 0)) + 1
+    : 1;
+  const createdAt = new Date().toISOString();
+  const summary = kind === 'autosave' ? 'Autosaved document edits' : 'Saved document edits';
+  versions.push({
+    version: nextVersion,
+    label: summary,
+    created_at: createdAt,
+    summary,
+    document: documentVersionSnapshot(documentModel)
+  });
+  if (versions.length > 30) {
+    versions.splice(0, versions.length - 30);
+  }
+  ensureDocumentActivity(documentModel).push({
+    action: kind === 'autosave' ? 'Autosaved document' : 'Saved document',
+    summary,
+    version: nextVersion,
+    created_at: createdAt
+  });
+  if (documentModel.activity_history.length > 100) {
+    documentModel.activity_history.splice(0, documentModel.activity_history.length - 100);
+  }
+  state.documentLastSavedAt = createdAt;
+}
+
+function renderSimpleDiff(fromText, toText) {
+  const before = String(fromText || '').split('\n').filter(Boolean);
+  const after = String(toText || '').split('\n').filter(Boolean);
+  const beforeSet = new Set(before);
+  const afterSet = new Set(after);
+  const removed = before.filter(line => !afterSet.has(line));
+  const added = after.filter(line => !beforeSet.has(line));
+  if (!removed.length && !added.length) {
+    return '<p class="doc-empty-row">No text differences from the current document.</p>';
+  }
+  return `
+    <div class="doc-diff">
+      ${removed.map(line => `<div class="diff-line removed">- ${escapeHtml(line)}</div>`).join('')}
+      ${added.map(line => `<div class="diff-line added">+ ${escapeHtml(line)}</div>`).join('')}
+    </div>
+  `;
+}
+
+function renderDocumentSidePanel(deck) {
+  if (!elements.docSidePanel) {
+    return;
+  }
+  const documentModel = deck.document && typeof deck.document === 'object' ? deck.document : null;
+  if (!documentModel) {
+    elements.docSidePanel.innerHTML = '';
+    return;
+  }
+  const activeTab = state.documentPanelTab || 'comments';
+  const tabs = ['history', 'versions', 'comments', 'collaborate'];
+  const activity = ensureDocumentActivity(documentModel).slice().reverse();
+  const versions = ensureDocumentVersions(documentModel)
+    .slice()
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    .slice(0, 25);
+  const selectedVersion = versions.find(version => String(version.version) === String(state.selectedDocumentVersion)) || versions[0];
+  const commentsMarkup = renderDocumentComments(documentModel);
+  const collaborateMarkup = renderDocumentCollaboration(documentModel);
+  const historyMarkup = activity.length ? `
+    <ol class="doc-history-list">
+      ${activity.map(item => `
+        <li>
+          <strong>${escapeHtml(item.action || 'Document updated')}</strong>
+          <span>${escapeHtml(item.summary || '')}</span>
+          <small>${escapeHtml(formatDate(item.created_at))}${item.version ? ` · v${escapeHtml(item.version)}` : ''}</small>
+        </li>
+      `).join('')}
+    </ol>
+  ` : renderDocPanelEmpty('No history yet', 'Document edits, saves, exports, and collaboration activity will appear here.', 'document');
+  const versionsMarkup = versions.length ? `
+    <div class="doc-version-list">
+      ${versions.map(version => `
+        <button type="button" class="${selectedVersion?.version === version.version ? 'active' : ''}" data-doc-version="${escapeHtml(version.version)}">
+          <strong>${escapeHtml(version.summary || version.label || 'Saved document version')}</strong>
+          <span>Version ${escapeHtml(version.version)}</span>
+          <small>${escapeHtml(formatDate(version.created_at))}</small>
+        </button>
+      `).join('')}
+    </div>
+    <div class="doc-version-diff">
+      <h3>Changes from selected version</h3>
+      ${renderSimpleDiff(documentTextForDiff(selectedVersion?.document), documentTextForDiff(documentModel))}
+    </div>
+  ` : renderDocPanelEmpty('No versions yet', 'Saved versions will appear here after the document is created or edited.', 'document');
+  const panelBody = activeTab === 'history'
+    ? historyMarkup
+    : activeTab === 'versions'
+      ? versionsMarkup
+      : activeTab === 'collaborate'
+        ? collaborateMarkup
+        : commentsMarkup;
+  elements.docSidePanel.innerHTML = `
+    <lex-segmented class="doc-side-tabs" size="sm" value="${escapeHtml(activeTab)}" options='${escapeHtml(JSON.stringify(tabs.map(tab => ({ value: tab, label: tab === 'collaborate' ? 'Collaborate' : `${tab[0].toUpperCase()}${tab.slice(1)}` }))))}'></lex-segmented>
+    <div class="doc-side-body">${panelBody}</div>
+  `;
+}
+
 function renderDocumentView(deck) {
   const documentModel = deck.document && typeof deck.document === 'object' ? deck.document : null;
   if (documentModel) {
-    const parties = Array.isArray(documentModel.parties) ? documentModel.parties : [];
-    const sections = Array.isArray(documentModel.sections) ? documentModel.sections : [];
+    const parties = ensureDocumentParties(documentModel);
+    const sections = ensureDocumentSections(documentModel);
     const signatures = ensureDocumentSignatureBlocks(documentModel);
-    const notes = Array.isArray(documentModel.review_notes) ? documentModel.review_notes : [];
+    const notes = ensureDocumentReviewNotes(documentModel);
     return `
-      <header class="legal-doc-header">
-        <p>${escapeHtml((documentModel.document_type || 'legal document').replace(/_/g, ' '))}</p>
-        <h1>${escapeHtml(documentModel.title || deck.title)}</h1>
-        <span>${escapeHtml(documentModel.subtitle || deck.subtitle || '')}</span>
+      <header class="legal-doc-title-block">
+        <p>${escapeHtml(String(documentModel.document_type || 'legal document').replace(/_/g, ' '))}</p>
+        <h1 ${editableDocAttrs('data-doc-field="title"')}>${escapeHtml(documentModel.title || deck.title || 'Legal Document')}</h1>
+        <span ${editableDocAttrs('data-doc-field="subtitle"')}>${escapeHtml(documentModel.subtitle || deck.subtitle || 'Generated working draft')}</span>
       </header>
-      <dl class="legal-doc-meta">
-        <div><dt>Effective date</dt><dd>${escapeHtml(documentModel.effective_date || '[Effective Date]')}</dd></div>
-        <div><dt>Governing law</dt><dd>${escapeHtml(documentModel.jurisdiction || '[Jurisdiction]')}</dd></div>
-      </dl>
+      ${renderDocumentMeta(documentModel)}
       <section class="legal-doc-section">
-        <h2>Parties</h2>
-        <ul>${parties.map(party => `<li><strong>${escapeHtml(party.role || 'Party')}:</strong> ${escapeHtml(party.name || '')}${party.address ? `, ${escapeHtml(party.address)}` : ''}</li>`).join('')}</ul>
+        <div class="section-heading-row">
+          <h2>Parties</h2>
+          <button type="button" data-doc-add-party>Add party</button>
+        </div>
+        <ul>${parties.map((party, index) => `
+          <li class="doc-list-row" data-doc-party="${index}">
+            <span>
+              <strong ${editableDocAttrs(`data-doc-field="party_role" data-doc-index="${index}"`)}>${escapeHtml(party.role || 'Party')}</strong>:
+              <span ${editableDocAttrs(`data-doc-field="party_name" data-doc-index="${index}"`)}>${escapeHtml(party.name || '')}</span>
+              <span class="party-address" ${editableDocAttrs(`data-doc-field="party_address" data-doc-index="${index}" data-placeholder=", address"`)}>${escapeHtml(party.address || '')}</span>
+            </span>
+            <button type="button" data-doc-delete-party="${index}" aria-label="Delete party ${escapeHtml(String(index + 1))}">Delete</button>
+          </li>
+        `).join('')}</ul>
       </section>
-      ${sections.map(section => `
+      ${sections.map((section, index) => `
         <section class="legal-doc-section">
-          <h2>${escapeHtml(section.heading || '')}</h2>
-          <p>${escapeHtml(section.body || '')}</p>
+          <div class="section-heading-row">
+            <h2 ${editableDocAttrs(`data-doc-field="section_heading" data-doc-index="${index}"`)}>${escapeHtml(section.heading || '')}</h2>
+            <button type="button" data-doc-delete-section="${index}">Delete section</button>
+          </div>
+          <p ${editableDocAttrs(`data-doc-field="section_body" data-doc-index="${index}"`)}>${escapeHtml(section.body || '')}</p>
         </section>
       `).join('')}
+      <section class="legal-doc-section doc-add-section-row">
+        <button type="button" data-doc-add-section>Add section</button>
+      </section>
       <section class="legal-doc-section signature-section">
         <div class="section-heading-row">
           <h2>Signatures</h2>
-          <button type="button" data-save-signatures ${state.presentationId ? '' : 'disabled'}>${state.presentationId ? 'Save signatures' : 'Save doc first'}</button>
+          <button type="button" data-save-signatures>${state.presentationId ? 'Save signatures' : 'Save document copy'}</button>
         </div>
         <div class="signature-grid">
           ${signatures.map((block, index) => {
@@ -934,7 +1526,7 @@ function renderDocumentView(deck) {
               </div>
               <label>
                 <span>Signature</span>
-                <input data-signature-field="signature_text" data-signature-index="${index}" value="${escapeHtml(signatureText)}" placeholder="Type legal signature">
+                <textarea data-signature-field="signature_text" data-signature-index="${index}" rows="3" placeholder="Type legal signature">${escapeHtml(signatureText)}</textarea>
               </label>
               <label>
                 <span>Name</span>
@@ -959,8 +1551,16 @@ function renderDocumentView(deck) {
         </div>
       </section>
       <section class="legal-doc-section review-notes">
-        <h2>Review Notes</h2>
-        <ul>${notes.map(note => `<li>${escapeHtml(note)}</li>`).join('')}</ul>
+        <div class="section-heading-row">
+          <h2>Review Notes</h2>
+          <button type="button" data-doc-add-review-note>Add note</button>
+        </div>
+        <ul>${notes.map((note, index) => `
+          <li class="doc-list-row">
+            <span ${editableDocAttrs(`data-doc-field="review_note" data-doc-index="${index}"`)}>${escapeHtml(note)}</span>
+            <button type="button" data-doc-delete-review-note="${index}">Delete</button>
+          </li>
+        `).join('')}</ul>
       </section>
     `;
   }
@@ -994,6 +1594,7 @@ function render() {
   document.documentElement.style.setProperty('--deck-font-family', deckFontFamilies[brand.typography.fontFamily] || deckFontFamilies.inter);
   document.body.dataset.deckStyle = activeDeckStyle();
   document.body.dataset.embedded = state.embedded ? 'true' : 'false';
+  document.body.dataset.docStudioView = state.view || 'slides';
   document.body.dataset.composition = brand.preferences.composition;
   document.body.dataset.typeScale = deck.designSystem?.typeScale || deck.designSystem?.stylePreset?.typeScale || 'editorial';
   document.body.dataset.imageStyle = brand.preferences.imageStyle;
@@ -1005,6 +1606,7 @@ function render() {
   setInputValue(elements.themeBackground, normalizeColor(deck.theme?.background, '#f7f4ef'));
   setInputValue(elements.themeForeground, normalizeColor(deck.theme?.foreground, '#17201f'));
   setInputValue(elements.style, activeDeckStyle());
+  renderDocumentHeaderChrome(deck);
   updateBrandKitControls();
   renderBrandKitControls();
   renderEditorTools();
@@ -1014,16 +1616,21 @@ function render() {
   renderPresentView();
 
   elements.docView.innerHTML = renderDocumentView(deck);
+  renderDocumentSidePanel(deck);
 
   elements.slidesView.classList.toggle('hidden', state.view !== 'slides');
   elements.presentView.classList.toggle('hidden', state.view !== 'present');
-  elements.docView.classList.toggle('hidden', state.view !== 'doc');
+  elements.docEditorLayout.classList.toggle('hidden', state.view !== 'doc');
   elements.libraryView.classList.toggle('hidden', state.view !== 'library');
   elements.editorTools.classList.toggle('hidden', state.view !== 'slides');
   if (state.embedded) {
     elements.editorTools.classList.add('hidden');
   }
   elements.tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.view === state.view));
+  const shell = document.getElementById('doc-studio-shell');
+  if (shell) {
+    shell.setAttribute('page-title', state.view === 'library' ? 'Doc Studio Library' : 'Doc Studio');
+  }
   renderLibrary();
 }
 
@@ -1227,6 +1834,14 @@ async function loadPresentationFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id');
   if (!id) {
+    const requestedView = params.get('view');
+    if (['slides', 'present', 'doc', 'library'].includes(requestedView)) {
+      state.view = requestedView;
+      if (state.view === 'library') {
+        await loadLibrary();
+      }
+      render();
+    }
     return;
   }
 
@@ -1237,20 +1852,68 @@ async function loadPresentationFromUrl() {
       throw new Error(`Request failed with ${response.status}`);
     }
     const payload = await response.json();
+    clearDocumentDirty();
     state.deck = payload.deck;
     state.presentationId = payload.id || id;
+    state.documentLastSavedAt = payload.updated_at || payload.created_at || new Date().toISOString();
     state.critique = null;
     state.selectedSlideIndex = 0;
+    resetDocumentHistory();
     const requestedView = params.get('view');
     if (['slides', 'present', 'doc', 'library'].includes(requestedView)) {
       state.view = requestedView;
     } else if (state.deck.document && typeof state.deck.document === 'object') {
       state.view = 'doc';
     }
+    setDocumentEditorMode(state.view === 'doc' && state.presentationId && state.deck.document && typeof state.deck.document === 'object');
     setStatus('File loaded.');
     render();
+    if (state.view === 'doc' && currentDocumentFileId()) {
+      await loadDocumentCollaboration();
+      render();
+    }
   } catch (error) {
     setStatus(`Load failed: ${error.message}`);
+  }
+}
+
+async function loadDocumentCollaboration() {
+  const fileId = currentDocumentFileId();
+  if (!fileId) {
+    return;
+  }
+  state.documentCollaborationLoaded = false;
+  const matterId = currentMatterId();
+  try {
+    const params = new URLSearchParams({
+      resource_type: 'document',
+      resource_id: fileId,
+      limit: '50',
+      include_replies: 'true'
+    });
+    const commentsResponse = await apiFetch(`/api/v1/comments?${params.toString()}`);
+    if (commentsResponse.ok) {
+      const payload = await commentsResponse.json();
+      state.documentComments = Array.isArray(payload?.data?.comments) ? payload.data.comments : [];
+    }
+
+    if (matterId) {
+      const permissionsResponse = await apiFetch(`/api/v1/files/${encodeURIComponent(fileId)}/permissions?matter_id=${encodeURIComponent(matterId)}`);
+      if (permissionsResponse.ok) {
+        const payload = await permissionsResponse.json();
+        state.documentPermissions = Array.isArray(payload.permissions) ? payload.permissions : [];
+      }
+
+      const usersResponse = await apiFetch(`/api/v1/matters/${encodeURIComponent(matterId)}/mentionable-users?limit=100`);
+      if (usersResponse.ok) {
+        const payload = await usersResponse.json();
+        state.documentCollaborators = Array.isArray(payload.data) ? payload.data : [];
+      }
+    }
+  } catch (error) {
+    setStatus(`Document collaboration unavailable: ${error.message}`);
+  } finally {
+    state.documentCollaborationLoaded = true;
   }
 }
 
@@ -1271,28 +1934,111 @@ function formatDate(value) {
   }
 }
 
-function filteredPresentations() {
+function fileExtension(filename) {
+  const clean = String(filename || '').split('?')[0];
+  const index = clean.lastIndexOf('.');
+  return index > -1 && index < clean.length - 1 ? clean.slice(index + 1).toUpperCase() : '';
+}
+
+function humanFileType(item) {
+  const raw = item?.file_type || item?.content_type || item?.document_type || item?.format || '';
+  if (raw) {
+    const value = String(raw);
+    if (value.includes('/')) {
+      if (value.includes('pdf')) return 'PDF';
+      if (value.includes('wordprocessingml') || value.includes('msword')) return 'DOCX';
+      if (value.includes('presentation')) return 'PPTX';
+      if (value.includes('html')) return 'HTML';
+      return value.split('/').pop().toUpperCase();
+    }
+    return value.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+  }
+  return fileExtension(item?.filename || item?.title) || 'Document';
+}
+
+function docStudioFilename(presentation) {
+  const documentModel = presentation?.deck?.document;
+  if (presentation?.filename) return presentation.filename;
+  if (documentModel?.file_name) return documentModel.file_name;
+  if (documentModel?.metadata?.filename) return documentModel.metadata.filename;
+  const title = presentation?.title || 'Untitled file';
+  const normalized = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'doc-studio-file';
+  return `${normalized}.${documentModel ? 'pdf' : 'html'}`;
+}
+
+function libraryItems() {
+  const storageRows = Array.isArray(state.libraryDocuments) ? state.libraryDocuments : [];
+  const storageItems = storageRows.map(document => ({
+    id: `storage:${document.id}`,
+    filename: document.filename || document.original_filename || document.name || 'Untitled document',
+    file_type: humanFileType(document),
+    matter: document.matter_name || document.client_matter || document.matter_id || 'Unassigned',
+    is_template: document.is_template ? 'Yes' : 'No',
+    created_at: document.created_at || '',
+    updated_at: document.updated_at || document.created_at || '',
+    _kind: 'storage',
+    _fileId: document.id,
+    _matterId: document.client_matter || document.matter_id || '',
+    _source: document
+  }));
+
+  const seenFileIds = new Set(storageItems.map(item => String(item._fileId)));
+  const presentationItems = state.presentations
+    .filter(presentation => {
+      const fileId = presentation.deck?.document?.metadata?.file_id || presentation.file_id;
+      return !fileId || !seenFileIds.has(String(fileId));
+    })
+    .map(presentation => {
+      const documentModel = presentation.deck?.document;
+      return {
+        id: `deck:${presentation.id}`,
+        filename: docStudioFilename(presentation),
+        file_type: documentModel ? 'Doc Studio Draft' : 'Presentation',
+        matter: documentModel?.metadata?.matter_name || documentModel?.metadata?.matter_id || presentation.matter_name || presentation.matter_id || 'Doc Studio',
+        is_template: presentation.is_template || documentModel?.is_template ? 'Yes' : 'No',
+        created_at: presentation.created_at || '',
+        updated_at: presentation.updated_at || presentation.created_at || '',
+        _kind: 'deck',
+        _presentationId: presentation.id,
+        _source: presentation
+      };
+    });
+
+  return storageItems.concat(presentationItems);
+}
+
+function filteredLibraryItems() {
   const query = state.libraryQuery.trim().toLowerCase();
-  const style = state.libraryStyle;
-  const sorted = state.presentations.filter(presentation => {
+  const fileType = state.libraryStyle;
+  const sorted = libraryItems().filter(item => {
     const matchesQuery = !query || [
-      presentation.title,
-      presentation.subtitle,
-      presentation.style
+      item.filename,
+      item.file_type,
+      item.matter,
+      item.is_template
     ].some(value => String(value || '').toLowerCase().includes(query));
-    const matchesStyle = style === 'all' || (presentation.style || 'editorial') === style;
-    return matchesQuery && matchesStyle;
+    const matchesType = fileType === 'all' || item.file_type === fileType;
+    return matchesQuery && matchesType;
   });
 
   sorted.sort((a, b) => {
+    if (state.librarySort === 'updated') {
+      return String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || ''));
+    }
     if (state.librarySort === 'oldest') {
       return String(a.created_at || '').localeCompare(String(b.created_at || ''));
     }
-    if (state.librarySort === 'title') {
-      return String(a.title || '').localeCompare(String(b.title || ''));
+    if (state.librarySort === 'filename') {
+      return String(a.filename || '').localeCompare(String(b.filename || ''));
     }
-    if (state.librarySort === 'cards') {
-      return Number(b.card_count || 0) - Number(a.card_count || 0);
+    if (state.librarySort === 'type') {
+      return String(a.file_type || '').localeCompare(String(b.file_type || ''));
+    }
+    if (state.librarySort === 'matter') {
+      return String(a.matter || '').localeCompare(String(b.matter || ''));
     }
     return String(b.created_at || '').localeCompare(String(a.created_at || ''));
   });
@@ -1301,9 +2047,9 @@ function filteredPresentations() {
 }
 
 function renderLibraryStyleFilter() {
-  const styles = Array.from(new Set(state.presentations.map(p => p.style || 'editorial'))).sort();
-  const options = ['<option value="all">All styles</option>']
-    .concat(styles.map(style => `<option value="${escapeHtml(style)}" ${state.libraryStyle === style ? 'selected' : ''}>${escapeHtml(style)}</option>`));
+  const types = Array.from(new Set(libraryItems().map(item => item.file_type || 'Document'))).sort();
+  const options = ['<option value="all">All file types</option>']
+    .concat(types.map(type => `<option value="${escapeHtml(type)}" ${state.libraryStyle === type ? 'selected' : ''}>${escapeHtml(type)}</option>`));
   elements.libraryStyleFilter.innerHTML = options.join('');
 }
 
@@ -1329,33 +2075,55 @@ function renderLibrary() {
   }
 
   renderLibraryStyleFilter();
-  const presentations = filteredPresentations();
-  if (!presentations.length) {
-    elements.libraryList.innerHTML = `<p class="empty-state">${state.presentations.length ? 'No files match the current filters.' : 'No saved files yet.'}</p>`;
+  const items = filteredLibraryItems();
+  if (!items.length) {
+    elements.libraryList.innerHTML = `
+      <lex-empty
+        icon="document"
+        message="${libraryItems().length ? 'No documents match these filters' : 'No documents yet'}"
+        description="${libraryItems().length ? 'Adjust search, file type, or sort to find a saved document.' : 'Generated Doc Studio files and uploaded matter documents will appear here.'}"
+      ></lex-empty>
+    `;
     return;
   }
 
-  elements.libraryList.innerHTML = presentations.map(presentation => `
-    <article class="library-item">
-      ${presentationPreview(presentation)}
-      <div class="library-meta">
-        <strong>${escapeHtml(presentation.title || 'Untitled file')}</strong>
-        <span>${escapeHtml(presentation.subtitle || '')}</span>
-        <small>${escapeHtml(formatDate(presentation.created_at))} · ${Number(presentation.card_count || 0)} sections · ${escapeHtml(presentation.style || 'editorial')}</small>
-      </div>
-      <div class="library-actions">
-        <button type="button" data-open-presentation="${escapeHtml(presentation.id)}">Open</button>
-        ${state.libraryCapabilities.duplicate ? `<button type="button" data-duplicate-presentation="${escapeHtml(presentation.id)}">Duplicate</button>` : ''}
-        ${state.libraryCapabilities.rename ? `<button type="button" data-rename-presentation="${escapeHtml(presentation.id)}">Rename</button>` : ''}
-        ${state.libraryCapabilities.delete ? `<button type="button" data-delete-presentation="${escapeHtml(presentation.id)}">Delete</button>` : ''}
-        ${state.libraryCapabilities.share ? `<a href="${escapeHtml(viewerPathForPresentation(presentation.id))}" target="_blank" rel="noreferrer">Viewer</a>` : ''}
-        <a href="${escapeHtml(clientDeckUrl(presentation.edit_path || `/doc-studio/?id=${presentation.id}`))}" target="_blank" rel="noreferrer">New tab</a>
-      </div>
-    </article>
-  `).join('');
+  elements.libraryList.innerHTML = `
+    <lex-table
+      id="docStudioLibraryTable"
+      columns="filename,file_type,matter,is_template,created_at,updated_at"
+      labels="Filename,File Type,Matter,Template,Created,Edited"
+      searchable
+      filterable
+      column-filters
+      compact
+      limit="25"
+      sort-by="updated_at"
+      sort-dir="desc"
+      empty-text="No saved documents"
+    ></lex-table>
+  `;
+  const table = elements.libraryList.querySelector('#docStudioLibraryTable');
+  if (!table || typeof table.setData !== 'function') {
+    return;
+  }
+  table.setData(items);
+  table.setCellRenderers({
+    filename: (value, row) => {
+      const subtitle = row._source?.subtitle || row._source?.document_type || row.file_type || '';
+      return `
+        <button type="button" class="library-table-title" data-open-library-item="${escapeHtml(row.id)}">
+          <strong>${escapeHtml(value)}</strong>
+          ${subtitle ? `<span>${escapeHtml(subtitle)}</span>` : ''}
+        </button>
+      `;
+    },
+    file_type: value => `<span class="doc-library-badge">${escapeHtml(value || 'Document')}</span>`,
+    is_template: value => `<span class="doc-library-badge ${String(value).toLowerCase() === 'yes' ? 'is-template' : ''}">${escapeHtml(value || 'No')}</span>`
+  });
 }
 
 async function loadLibrary() {
+  const errors = [];
   try {
     const response = await apiFetch('/api/v1/deck-studio/presentations?limit=100');
     if (!response.ok) {
@@ -1364,9 +2132,30 @@ async function loadLibrary() {
 
     const payload = await response.json();
     state.presentations = Array.isArray(payload.presentations) ? payload.presentations : [];
-    renderLibrary();
   } catch (error) {
-    setStatus(`Library failed: ${error.message}`);
+    errors.push(`Doc Studio files: ${error.message}`);
+  }
+
+  try {
+    const response = await apiFetch('/api/v1/storage/documents?page_size=200&sort_by=updated_at&sort_order=desc');
+    if (!response.ok) {
+      throw new Error(`Request failed with ${response.status}`);
+    }
+
+    const payload = await response.json();
+    state.libraryDocuments = Array.isArray(payload.documents)
+      ? payload.documents
+      : Array.isArray(payload.files)
+        ? payload.files
+        : [];
+  } catch (error) {
+    state.libraryDocuments = [];
+    errors.push(`stored documents: ${error.message}`);
+  }
+
+  renderLibrary();
+  if (errors.length) {
+    setStatus(`Library loaded with limited sources (${errors.join('; ')}).`);
   }
 }
 
@@ -1996,6 +2785,12 @@ function signatureBlockAt(index) {
   return blocks[index] || null;
 }
 
+function capturePendingSignatureDrawings() {
+  elements.docView.querySelectorAll('[data-signature-pad][data-has-drawing="true"]').forEach(canvas => {
+    captureSignaturePad(Number(canvas.dataset.signaturePad));
+  });
+}
+
 async function saveDocumentSignatures() {
   if (!state.deck.document) {
     setStatus('Open a generated document before saving signatures.');
@@ -2007,14 +2802,341 @@ async function saveDocumentSignatures() {
     replaceClientUrl(`${saved.edit_path}&view=doc`);
   }
 
+  capturePendingSignatureDrawings();
   setStatus('Saving document signatures...');
   const updated = await persistDeckPatch();
   if (updated?.deck) {
     state.deck = updated.deck;
   }
   await loadLibrary();
+  clearDocumentDirty();
   render();
   setStatus('Document signatures saved.');
+}
+
+async function saveDocumentEdits(options = {}) {
+  if (!state.deck.document) {
+    setStatus('Open a generated document before saving edits.');
+    return;
+  }
+  if (!state.presentationId) {
+    const saved = await saveCurrentPresentation('pdf');
+    state.presentationId = saved.presentation_id;
+    replaceClientUrl(`${saved.edit_path}&view=doc`);
+  }
+
+  window.clearTimeout(state.autosaveTimer);
+  state.autosaving = true;
+  if (!options.silent) {
+    setStatus(options.autosave ? 'Autosaving document...' : 'Saving document edits...');
+  }
+  capturePendingSignatureDrawings();
+  try {
+    recordDocumentSaveActivity(options.autosave ? 'autosave' : 'save');
+    const updated = await persistDeckPatch();
+    if (updated?.deck) {
+      state.deck = updated.deck;
+    }
+    await loadLibrary();
+    clearDocumentDirty();
+    pushDocumentHistorySnapshot();
+    if (!options.silent) {
+      render();
+    } else {
+      renderDocumentHeaderChrome(state.deck);
+    }
+    setStatus(options.autosave ? 'Document autosaved.' : 'Document edits saved.');
+  } finally {
+    state.autosaving = false;
+  }
+}
+
+function addDocumentParty() {
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  if (!documentModel) {
+    return;
+  }
+  const parties = ensureDocumentParties(documentModel);
+  const signatures = ensureDocumentSignatureBlocks(documentModel);
+  parties.push({ role: 'Party', name: '[Party Name]', address: '' });
+  signatures.push({ party: '[Party Name]', signatory_title: '[Authorized Signatory]' });
+  markDocumentDirty('Party added. Save document to persist.');
+  render();
+}
+
+function deleteDocumentParty(index) {
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  const parties = documentModel ? ensureDocumentParties(documentModel) : [];
+  if (!documentModel || !parties[index]) {
+    return;
+  }
+  const label = parties[index].name || parties[index].role || `party ${index + 1}`;
+  if (!window.confirm(`Delete ${label}? This also removes the matching signature block.`)) {
+    return;
+  }
+  parties.splice(index, 1);
+  const signatures = ensureDocumentSignatureBlocks(documentModel);
+  signatures.splice(index, 1);
+  markDocumentDirty('Party deleted. Save document to persist.');
+  render();
+}
+
+function addDocumentSection() {
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  if (!documentModel) {
+    return;
+  }
+  ensureDocumentSections(documentModel).push({
+    heading: 'New Section',
+    body: 'Add section text.'
+  });
+  markDocumentDirty('Section added. Save document to persist.');
+  render();
+}
+
+function deleteDocumentSection(index) {
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  const sections = documentModel ? ensureDocumentSections(documentModel) : [];
+  if (!documentModel || !sections[index]) {
+    return;
+  }
+  if (!window.confirm(`Delete section "${sections[index].heading || index + 1}"?`)) {
+    return;
+  }
+  sections.splice(index, 1);
+  markDocumentDirty('Section deleted. Save document to persist.');
+  render();
+}
+
+function deleteDocumentMetaField(field) {
+  const labels = {
+    effective_date: 'Effective date',
+    jurisdiction: 'Governing law'
+  };
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  if (!documentModel || !labels[field]) {
+    return;
+  }
+  if (!window.confirm(`Remove ${labels[field]} from this document layout?`)) {
+    return;
+  }
+  const hidden = hiddenDocumentFields(documentModel);
+  if (!hidden.includes(field)) {
+    hidden.push(field);
+  }
+  markDocumentDirty(`${labels[field]} removed. Save document to persist.`);
+  render();
+}
+
+function addDocumentReviewNote() {
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  if (!documentModel) {
+    return;
+  }
+  ensureDocumentReviewNotes(documentModel).push('New review note');
+  markDocumentDirty('Review note added. Save document to persist.');
+  render();
+}
+
+function deleteDocumentReviewNote(index) {
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  const notes = documentModel ? ensureDocumentReviewNotes(documentModel) : [];
+  if (!documentModel || index < 0 || index >= notes.length) {
+    return;
+  }
+  if (!window.confirm('Delete this review note?')) {
+    return;
+  }
+  notes.splice(index, 1);
+  markDocumentDirty('Review note deleted. Save document to persist.');
+  render();
+}
+
+async function addDocumentComment(bodyOverride = '') {
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  const composer = (elements.docSidePanel || elements.docView).querySelector('lex-document-comment-composer');
+  const input = (elements.docSidePanel || elements.docView).querySelector('[data-doc-comment-input]');
+  const body = String(bodyOverride || composer?.value || input?.value || '').trim();
+  if (!documentModel || !body) {
+    return;
+  }
+  const fileId = currentDocumentFileId();
+  if (fileId) {
+    const response = await apiFetch('/api/v1/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resource_type: 'document',
+        resource_id: fileId,
+        content: body,
+        mentions: []
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Comment failed with ${response.status}`);
+    }
+    composer?.clear?.();
+    await loadDocumentCollaboration();
+    render();
+    setStatus('Comment added.');
+    return;
+  }
+  ensureDocumentComments(documentModel).push({
+    author: currentUserLabel(),
+    body,
+    created_at: new Date().toISOString()
+  });
+  composer?.clear?.();
+  markDocumentDirty('Comment added. Save document to persist.');
+  render();
+}
+
+async function deleteDocumentComment(commentIdOrIndex) {
+  const fileId = currentDocumentFileId();
+  if (fileId) {
+    const response = await apiFetch(`/api/v1/comments/${encodeURIComponent(commentIdOrIndex)}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      throw new Error(`Delete comment failed with ${response.status}`);
+    }
+    await loadDocumentCollaboration();
+    render();
+    setStatus('Comment deleted.');
+    return;
+  }
+  const index = Number(commentIdOrIndex);
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  const comments = documentModel ? ensureDocumentComments(documentModel) : [];
+  if (!documentModel || index < 0 || index >= comments.length) {
+    return;
+  }
+  if (!window.confirm('Delete this comment?')) {
+    return;
+  }
+  comments.splice(index, 1);
+  markDocumentDirty('Comment deleted. Save document to persist.');
+  render();
+}
+
+async function addDocumentShareRecipient() {
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  const input = (elements.docSidePanel || elements.docView).querySelector('[data-doc-share-input]');
+  const value = input ? input.value.trim() : '';
+  const fileId = currentDocumentFileId();
+  const matterId = currentMatterId();
+  if (fileId && matterId && value) {
+    const response = await apiFetch(`/api/v1/files/${encodeURIComponent(fileId)}/permissions?matter_id=${encodeURIComponent(matterId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: value,
+        permission: 'read'
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Share failed with ${response.status}`);
+    }
+    await loadDocumentCollaboration();
+    render();
+    setStatus('Document access granted.');
+    return;
+  }
+  if (!documentModel || !value) {
+    return;
+  }
+  const sharedWith = ensureDocumentSharedWith(documentModel);
+  if (!sharedWith.some(item => item.toLowerCase() === value.toLowerCase())) {
+    sharedWith.push(value);
+  }
+  markDocumentDirty('Share list updated. Save document to persist.');
+  render();
+}
+
+async function removeDocumentShareRecipient(userIdOrIndex) {
+  const fileId = currentDocumentFileId();
+  const matterId = currentMatterId();
+  if (fileId && matterId) {
+    const response = await apiFetch(`/api/v1/files/${encodeURIComponent(fileId)}/permissions?matter_id=${encodeURIComponent(matterId)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userIdOrIndex,
+        permission: 'read'
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Remove access failed with ${response.status}`);
+    }
+    await loadDocumentCollaboration();
+    render();
+    setStatus('Document access removed.');
+    return;
+  }
+  const index = Number(userIdOrIndex);
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  const sharedWith = documentModel ? ensureDocumentSharedWith(documentModel) : [];
+  if (!documentModel || index < 0 || index >= sharedWith.length) {
+    return;
+  }
+  sharedWith.splice(index, 1);
+  markDocumentDirty('Share recipient removed. Save document to persist.');
+  render();
+}
+
+function syncDocumentEdits(event) {
+  const editable = event.target.closest('[data-doc-edit="true"]');
+  const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
+  if (!editable || !documentModel) {
+    return;
+  }
+
+  const value = editable.textContent.trim();
+  const field = editable.dataset.docField;
+  const index = Number(editable.dataset.docIndex);
+
+  if (field === 'title' || field === 'subtitle' || field === 'effective_date' || field === 'jurisdiction') {
+    documentModel[field] = value;
+    if (field === 'title') {
+      state.deck.title = value || state.deck.title;
+      elements.deckTitle.textContent = state.deck.title || 'Untitled file';
+    }
+    if (field === 'subtitle') {
+      state.deck.subtitle = value;
+      elements.deckSubtitle.textContent = state.deck.subtitle || '';
+    }
+    markDocumentDirty();
+    return;
+  }
+
+  if (field === 'party_name' || field === 'party_role' || field === 'party_address') {
+    documentModel.parties = Array.isArray(documentModel.parties) ? documentModel.parties : [];
+    documentModel.parties[index] = documentModel.parties[index] || { name: '', role: 'Party', address: '' };
+    const partyField = field.replace('party_', '');
+    documentModel.parties[index][partyField] = value;
+    if (partyField === 'name') {
+      const signatures = ensureDocumentSignatureBlocks(documentModel);
+      if (signatures[index] && !signatures[index].signed_by) {
+        signatures[index].party = value || documentModel.parties[index].role || 'Party';
+      }
+    }
+    markDocumentDirty();
+    return;
+  }
+
+  if (field === 'section_heading' || field === 'section_body') {
+    documentModel.sections = Array.isArray(documentModel.sections) ? documentModel.sections : [];
+    documentModel.sections[index] = documentModel.sections[index] || { heading: '', body: '' };
+    documentModel.sections[index][field === 'section_heading' ? 'heading' : 'body'] = value;
+    markDocumentDirty();
+    return;
+  }
+
+  if (field === 'review_note') {
+    documentModel.review_notes = Array.isArray(documentModel.review_notes) ? documentModel.review_notes : [];
+    documentModel.review_notes[index] = value;
+    markDocumentDirty();
+  }
 }
 
 function prepareSignaturePad(canvas) {
@@ -2065,6 +3187,7 @@ function drawSignatureStroke(event) {
   session.x = point.x;
   session.y = point.y;
   session.dirty = true;
+  session.canvas.dataset.hasDrawing = 'true';
 }
 
 function finishSignatureStroke(event) {
@@ -2075,6 +3198,9 @@ function finishSignatureStroke(event) {
     state.activeSignaturePad.canvas.releasePointerCapture(event.pointerId);
   } catch (error) {
     // Pointer capture may already be released by the browser.
+  }
+  if (state.activeSignaturePad.dirty) {
+    markDocumentDirty('Signature drawing captured locally. Save signatures to persist.');
   }
   state.activeSignaturePad = null;
 }
@@ -2090,6 +3216,7 @@ function captureSignaturePad(index) {
   block.signature_image = block.signature_data_url;
   block.signed_date = block.signed_date || new Date().toISOString().slice(0, 10);
   block.signed_at = new Date().toISOString();
+  delete canvas.dataset.hasDrawing;
   return true;
 }
 
@@ -2105,6 +3232,7 @@ function clearSignaturePad(index) {
   context.fillRect(0, 0, Number(canvas.dataset.logicalWidth || 720), Number(canvas.dataset.logicalHeight || 220));
   delete block.signature_data_url;
   delete block.signature_image;
+  delete canvas.dataset.hasDrawing;
 }
 
 async function critiqueCurrentDeck({ polish = false } = {}) {
@@ -2152,6 +3280,9 @@ async function critiqueCurrentDeck({ polish = false } = {}) {
 }
 
 async function generateDeck() {
+  if (!confirmUnsavedDocumentChanges()) {
+    return;
+  }
   const prompt = elements.prompt.value.trim();
   if (!prompt) {
     setStatus('Add source material first.');
@@ -2189,6 +3320,7 @@ async function generateDeck() {
     }
 
     const payload = await response.json();
+    clearDocumentDirty();
     state.deck = payload.deck;
     state.critique = null;
     applyBrandControlsToDeck();
@@ -2262,6 +3394,26 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+async function downloadCurrentStoredFile() {
+  const fileId = currentDocumentFileId();
+  if (!fileId) {
+    setStatus('No stored matter file is attached to this document.');
+    return;
+  }
+  const params = new URLSearchParams();
+  const matterId = currentMatterId();
+  if (matterId) {
+    params.set('matter_id', matterId);
+  }
+  const response = await apiFetch(`/api/v1/storage/files/${encodeURIComponent(fileId)}/download${params.toString() ? `?${params}` : ''}`);
+  if (!response.ok) {
+    setStatus('File download failed.');
+    return;
+  }
+  downloadBlob(await response.blob(), currentDocumentFileName());
+  setStatus('File download started.');
+}
+
 function slug(value) {
   return String(value || 'deck').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'deck';
 }
@@ -2297,7 +3449,7 @@ async function exportPptx() {
 }
 
 async function exportPdf() {
-  if (!state.deck.cards.length) {
+  if (!state.deck.cards.length && !state.deck.document) {
     setStatus('Generate a file before exporting.');
     return;
   }
@@ -2306,7 +3458,7 @@ async function exportPdf() {
   const response = await apiFetch('/api/v1/deck-studio/export/pdf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ deck: state.deck })
+    body: JSON.stringify(state.presentationId ? { presentation_id: state.presentationId } : { deck: state.deck })
   });
 
   if (!response.ok) {
@@ -2316,6 +3468,41 @@ async function exportPdf() {
 
   downloadBlob(await response.blob(), `${slug(state.deck.title)}.pdf`);
   setStatus('PDF exported.');
+}
+
+function documentHtmlForExport() {
+  const docClone = elements.docView.cloneNode(true);
+  docClone.querySelectorAll('button, canvas, .signature-actions').forEach(node => node.remove());
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(state.deck.title || 'Document')}</title><style>
+    body{font-family:Georgia,"Times New Roman",serif;color:#161b1a;margin:48px;line-height:1.55}
+    h1{font-size:28px;margin:0 0 8px} h2{font-size:18px;margin:28px 0 10px}
+    .legal-doc-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}
+    .legal-doc-meta-card{border:1px solid #d8d2c8;border-radius:6px;padding:12px}
+    dt{font:700 11px Arial,sans-serif;text-transform:uppercase;color:#66706c} dd{margin:4px 0 0;font-weight:700}
+    .legal-doc-title-block{border-bottom:2px solid #161b1a;padding-bottom:18px;margin-bottom:24px}
+    .legal-doc-title-block p{font:700 12px Arial,sans-serif;text-transform:uppercase;color:#2f6f73;margin:0 0 8px}
+  </style></head><body>${docClone.innerHTML}</body></html>`;
+}
+
+async function exportDocumentDocx() {
+  if (!state.deck.document) {
+    setStatus('Open a document before exporting DOCX.');
+    return;
+  }
+  setStatus('Preparing DOCX...');
+  const response = await apiFetch('/api/v1/deck-studio/export/docx', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(state.presentationId ? { presentation_id: state.presentationId } : { deck: state.deck })
+  });
+
+  if (!response.ok) {
+    setStatus('DOCX export failed.');
+    return;
+  }
+
+  downloadBlob(await response.blob(), `${slug(state.deck.title)}.docx`);
+  setStatus('DOCX exported.');
 }
 
 function exportHtml() {
@@ -2599,15 +3786,39 @@ elements.librarySort.addEventListener('change', () => {
   renderLibrary();
 });
 elements.libraryList.addEventListener('click', async event => {
+  const libraryItemButton = event.target.closest('[data-open-library-item]');
   const openButton = event.target.closest('[data-open-presentation]');
   const duplicateButton = event.target.closest('[data-duplicate-presentation]');
   const renameButton = event.target.closest('[data-rename-presentation]');
   const deleteButton = event.target.closest('[data-delete-presentation]');
-  if (!openButton && !duplicateButton && !renameButton && !deleteButton) {
+  if (!libraryItemButton && !openButton && !duplicateButton && !renameButton && !deleteButton) {
     return;
   }
 
   try {
+    if (libraryItemButton) {
+      const item = libraryItems().find(entry => entry.id === libraryItemButton.dataset.openLibraryItem);
+      if (!item) return;
+      if (item._kind === 'storage') {
+        const params = new URLSearchParams({ id: item._fileId });
+        if (item._matterId) {
+          params.set('matter_id', item._matterId);
+        }
+        window.location.href = `../file-viewer.html?${params.toString()}`;
+        return;
+      }
+      if (!confirmUnsavedDocumentChanges()) {
+        return;
+      }
+      replaceClientUrl(`/doc-studio/?id=${encodeURIComponent(item._presentationId)}`);
+      state.presentationId = item._presentationId;
+      await loadPresentationFromUrl();
+      render();
+      return;
+    }
+    if (openButton && !confirmUnsavedDocumentChanges()) {
+      return;
+    }
     if (duplicateButton) {
       await duplicatePresentation(duplicateButton.dataset.duplicatePresentation);
       return;
@@ -2625,13 +3836,89 @@ elements.libraryList.addEventListener('click', async event => {
     replaceClientUrl(`/doc-studio/?id=${encodeURIComponent(id)}`);
     state.presentationId = id;
     await loadPresentationFromUrl();
-    state.view = 'slides';
     render();
   } catch (error) {
     setStatus(error.message);
   }
 });
+if (elements.docSidePanel) {
+  elements.docSidePanel.addEventListener('lex-change', event => {
+    state.documentPanelTab = event.detail?.value || 'comments';
+    renderDocumentSidePanel(state.deck);
+  });
+  elements.docSidePanel.addEventListener('comment-submit', async event => {
+    try {
+      await addDocumentComment(event.detail?.content || '');
+    } catch (error) {
+      setStatus(error.message);
+    }
+  });
+  elements.docSidePanel.addEventListener('click', async event => {
+    const versionButton = event.target.closest('[data-doc-version]');
+    const addCommentButton = event.target.closest('[data-doc-add-comment]');
+    const deleteCommentButton = event.target.closest('[data-doc-delete-comment]');
+    const addShareButton = event.target.closest('[data-doc-add-share]');
+    const removeShareButton = event.target.closest('[data-doc-remove-share]');
+    if (versionButton) {
+      state.selectedDocumentVersion = versionButton.dataset.docVersion;
+      renderDocumentSidePanel(state.deck);
+      return;
+    }
+    try {
+      if (addCommentButton) {
+        await addDocumentComment();
+        return;
+      }
+      if (deleteCommentButton) {
+        await deleteDocumentComment(deleteCommentButton.dataset.docDeleteComment);
+        return;
+      }
+      if (addShareButton) {
+        await addDocumentShareRecipient();
+        return;
+      }
+      if (removeShareButton) {
+        await removeDocumentShareRecipient(removeShareButton.dataset.docRemoveShare);
+      }
+    } catch (error) {
+      setStatus(error.message);
+    }
+  });
+}
+if (elements.docHeaderChrome) {
+  elements.docHeaderChrome.addEventListener('click', async event => {
+    const undoButton = event.target.closest('[data-doc-undo]');
+    const redoButton = event.target.closest('[data-doc-redo]');
+    const exportButton = event.target.closest('[data-doc-export]');
+    const saveDocumentButton = event.target.closest('[data-save-document]');
+    if (!undoButton && !redoButton && !exportButton && !saveDocumentButton) {
+      return;
+    }
+    try {
+      if (undoButton) {
+        restoreDocumentHistory(state.documentHistoryIndex - 1);
+        return;
+      }
+      if (redoButton) {
+        restoreDocumentHistory(state.documentHistoryIndex + 1);
+        return;
+      }
+      if (exportButton?.dataset.docExport === 'pdf') {
+        await exportPdf();
+        return;
+      }
+      if (exportButton?.dataset.docExport === 'docx') {
+        await exportDocumentDocx();
+        return;
+      }
+      await saveDocumentEdits();
+    } catch (error) {
+      setStatus(error.message);
+    }
+  });
+}
 elements.docView.addEventListener('input', event => {
+  syncDocumentEdits(event);
   const input = event.target.closest('[data-signature-field]');
   if (!input) {
     return;
@@ -2641,6 +3928,7 @@ elements.docView.addEventListener('input', event => {
     return;
   }
   block[input.dataset.signatureField] = input.value.trim();
+  markDocumentDirty('Signature details changed. Save signatures to persist.');
 });
 elements.docView.addEventListener('pointerdown', event => {
   const canvas = event.target.closest('[data-signature-pad]');
@@ -2669,16 +3957,88 @@ elements.docView.addEventListener('pointermove', event => {
 elements.docView.addEventListener('pointerup', finishSignatureStroke);
 elements.docView.addEventListener('pointercancel', finishSignatureStroke);
 elements.docView.addEventListener('click', async event => {
+  const saveDocumentButton = event.target.closest('[data-save-document]');
   const saveButton = event.target.closest('[data-save-signatures]');
+  const addPartyButton = event.target.closest('[data-doc-add-party]');
+  const deletePartyButton = event.target.closest('[data-doc-delete-party]');
+  const addSectionButton = event.target.closest('[data-doc-add-section]');
+  const deleteSectionButton = event.target.closest('[data-doc-delete-section]');
+  const deleteMetaButton = event.target.closest('[data-doc-delete-meta]');
+  const addReviewNoteButton = event.target.closest('[data-doc-add-review-note]');
+  const deleteReviewNoteButton = event.target.closest('[data-doc-delete-review-note]');
+  const addCommentButton = event.target.closest('[data-doc-add-comment]');
+  const deleteCommentButton = event.target.closest('[data-doc-delete-comment]');
+  const addShareButton = event.target.closest('[data-doc-add-share]');
+  const removeShareButton = event.target.closest('[data-doc-remove-share]');
   const signButton = event.target.closest('[data-signature-sign]');
   const clearButton = event.target.closest('[data-signature-clear]');
   const useDrawingButton = event.target.closest('[data-signature-pad-use]');
   const eraseDrawingButton = event.target.closest('[data-signature-pad-erase]');
-  if (!saveButton && !signButton && !clearButton && !useDrawingButton && !eraseDrawingButton) {
+  if (!saveDocumentButton && !saveButton && !addPartyButton && !deletePartyButton && !addSectionButton && !deleteSectionButton && !deleteMetaButton && !addReviewNoteButton && !deleteReviewNoteButton && !addCommentButton && !deleteCommentButton && !addShareButton && !removeShareButton && !signButton && !clearButton && !useDrawingButton && !eraseDrawingButton) {
     return;
   }
 
   try {
+    if (addPartyButton) {
+      addDocumentParty();
+      return;
+    }
+
+    if (deletePartyButton) {
+      deleteDocumentParty(Number(deletePartyButton.dataset.docDeleteParty));
+      return;
+    }
+
+    if (addSectionButton) {
+      addDocumentSection();
+      return;
+    }
+
+    if (deleteSectionButton) {
+      deleteDocumentSection(Number(deleteSectionButton.dataset.docDeleteSection));
+      return;
+    }
+
+    if (deleteMetaButton) {
+      deleteDocumentMetaField(deleteMetaButton.dataset.docDeleteMeta);
+      return;
+    }
+
+    if (addReviewNoteButton) {
+      addDocumentReviewNote();
+      return;
+    }
+
+    if (deleteReviewNoteButton) {
+      deleteDocumentReviewNote(Number(deleteReviewNoteButton.dataset.docDeleteReviewNote));
+      return;
+    }
+
+    if (addCommentButton) {
+      await addDocumentComment();
+      return;
+    }
+
+    if (deleteCommentButton) {
+      await deleteDocumentComment(deleteCommentButton.dataset.docDeleteComment);
+      return;
+    }
+
+    if (addShareButton) {
+      await addDocumentShareRecipient();
+      return;
+    }
+
+    if (removeShareButton) {
+      await removeDocumentShareRecipient(removeShareButton.dataset.docRemoveShare);
+      return;
+    }
+
+    if (saveDocumentButton) {
+      await saveDocumentEdits();
+      return;
+    }
+
     if (saveButton) {
       await saveDocumentSignatures();
       return;
@@ -2697,6 +4057,7 @@ elements.docView.addEventListener('click', async event => {
 
     if (useDrawingButton) {
       if (captureSignaturePad(index)) {
+        markDocumentDirty('Drawn signature captured. Save signatures to persist.');
         render();
         setStatus('Drawn signature captured. Save signatures to persist.');
       }
@@ -2705,6 +4066,7 @@ elements.docView.addEventListener('click', async event => {
 
     if (eraseDrawingButton) {
       clearSignaturePad(index);
+      markDocumentDirty('Drawn signature erased. Save signatures to persist.');
       render();
       setStatus('Drawn signature erased. Save signatures to persist.');
       return;
@@ -2719,17 +4081,22 @@ elements.docView.addEventListener('click', async event => {
       delete block.signed_at;
       delete block.signature_data_url;
       delete block.signature_image;
+      markDocumentDirty('Signature cleared. Save signatures to persist.');
       render();
       setStatus('Signature cleared. Save signatures to persist.');
       return;
     }
 
-    captureSignaturePad(index);
+    const signatureCanvas = elements.docView.querySelector(`[data-signature-pad="${index}"]`);
+    if (signatureCanvas?.dataset.hasDrawing === 'true') {
+      captureSignaturePad(index);
+    }
     block.signature_text = block.signature_text || block.signed_by || block.party || 'Authorized Signature';
     block.signed_by = block.signed_by || block.signature_text;
     block.signed_title = block.signed_title || block.signatory_title || '[Authorized Signatory]';
     block.signed_date = block.signed_date || new Date().toISOString().slice(0, 10);
     block.signed_at = new Date().toISOString();
+    markDocumentDirty('Signature captured. Save signatures to persist.');
     render();
     setStatus('Signature captured. Save signatures to persist.');
   } catch (error) {
@@ -2738,6 +4105,9 @@ elements.docView.addEventListener('click', async event => {
 });
 elements.tabs.forEach(tab => {
   tab.addEventListener('click', () => {
+    if (tab.dataset.view !== state.view && !confirmUnsavedDocumentChanges()) {
+      return;
+    }
     state.view = tab.dataset.view;
     if (state.view === 'library') {
       loadLibrary();
@@ -2761,6 +4131,13 @@ document.addEventListener('keydown', event => {
     event.preventDefault();
     exitPresentation();
   }
+});
+window.addEventListener('beforeunload', event => {
+  if (!state.documentDirty) {
+    return;
+  }
+  event.preventDefault();
+  event.returnValue = '';
 });
 
 loadBrandKits();

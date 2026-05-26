@@ -14,7 +14,8 @@
   --deck-media: #efe7db;
   --deck-radius: 6px;
   --deck-shadow: 0 18px 44px rgba(23, 32, 31, 0.12);
-  --deck-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ui-font: var(--lex-font-sans);
+  --deck-font-family: var(--lex-font-sans);
   --shadow: 0 18px 44px rgba(23, 32, 31, 0.12);
 }
 
@@ -28,7 +29,7 @@ body {
   overflow-x: clip;
   color: var(--ink);
   background: var(--deck-bg);
-  font-family: var(--deck-font-family);
+  font-family: var(--lex-font-sans);
 }
 
 button,
@@ -85,6 +86,30 @@ body[data-embedded="true"] .control-panel,
 body[data-embedded="true"] .toolbar .view-tabs,
 body[data-embedded="true"] .toolbar {
   display: none;
+}
+
+body[data-document-editor="true"] lex-content .app-shell,
+body[data-document-editor="true"] .app-shell {
+  display: block;
+}
+
+body[data-document-editor="true"] .control-panel,
+body[data-document-editor="true"] .toolbar .view-tabs {
+  display: none;
+}
+
+body[data-doc-studio-view="library"] lex-content .app-shell,
+body[data-doc-studio-view="library"] .app-shell {
+  display: block;
+}
+
+body[data-doc-studio-view="library"] .control-panel,
+body[data-doc-studio-view="library"] .toolbar {
+  display: none;
+}
+
+body[data-doc-studio-view="library"] .workspace {
+  padding: 40px 56px;
 }
 
 body[data-embedded="true"] .workspace {
@@ -301,9 +326,19 @@ textarea:focus {
   margin-bottom: 20px;
 }
 
-.toolbar > div:first-child {
+.toolbar > div:first-child,
+#standardHeader {
   display: grid;
   gap: 4px;
+}
+
+#standardHeader.hidden {
+  display: none;
+}
+
+.workspace-heading {
+  flex: 1;
+  min-width: 0;
 }
 
 #deckTitle {
@@ -2206,7 +2241,8 @@ body[data-composition="briefing"] .role-badge {
   margin-top: 0;
 }
 
-.legal-doc-header {
+.legal-doc-header,
+.legal-doc-title-block {
   display: grid;
   gap: 8px;
   border-bottom: 2px solid var(--ink);
@@ -2214,7 +2250,8 @@ body[data-composition="briefing"] .role-badge {
   padding-bottom: 18px;
 }
 
-.legal-doc-header p {
+.legal-doc-header p,
+.legal-doc-title-block p {
   margin: 0;
   color: var(--accent);
   font-size: 12px;
@@ -2223,15 +2260,65 @@ body[data-composition="briefing"] .role-badge {
   text-transform: uppercase;
 }
 
-.legal-doc-header h1 {
+.legal-doc-header h1,
+.legal-doc-title-block h1 {
   margin: 0;
   color: var(--ink);
   font-size: 34px;
   letter-spacing: 0;
 }
 
-.legal-doc-header span {
+.legal-doc-header span,
+.legal-doc-title-block span {
   color: var(--muted);
+}
+
+.doc-header-chrome {
+  display: grid;
+  gap: 14px;
+  max-width: 1320px;
+}
+
+.doc-header-chrome.hidden {
+  display: none;
+}
+
+.doc-header-chrome lex-banner {
+  margin: 0;
+}
+
+.doc-editor-breadcrumb {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.doc-editor-layout {
+  align-items: start;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 920px) minmax(300px, 360px);
+  max-width: 1320px;
+}
+
+.doc-editor-layout.hidden {
+  display: none;
+}
+
+.doc-side-panel {
+  align-self: start;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+  padding: 14px;
+  position: sticky;
+  top: 18px;
+}
+
+.doc-side-panel:has(.lex-select-dropdown--open) {
+  overflow: visible;
 }
 
 .legal-doc-meta {
@@ -2245,6 +2332,7 @@ body[data-composition="briefing"] .role-badge {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 12px;
+  position: relative;
 }
 
 .legal-doc-meta dt {
@@ -2260,6 +2348,24 @@ body[data-composition="briefing"] .role-badge {
   font-weight: 760;
 }
 
+.doc-meta-delete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 760;
+  padding: 4px 8px;
+}
+
+.doc-meta-delete:hover {
+  color: #b33535;
+  border-color: rgba(179, 53, 53, 0.35);
+}
+
 .legal-doc-section {
   margin-top: 24px;
 }
@@ -2270,12 +2376,246 @@ body[data-composition="briefing"] .role-badge {
   font-size: 18px;
 }
 
-.legal-doc-section p,
-.legal-doc-section li {
+.doc-view .legal-doc-section p,
+.doc-view .legal-doc-section li {
   color: #2c3331;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 15px;
   line-height: 1.65;
+}
+
+.doc-side-panel,
+.doc-side-panel *,
+.doc-toolbar,
+.doc-toolbar *,
+.doc-editor-shell lex-empty,
+.doc-editor-shell lex-empty * {
+  font-family: var(--lex-font-sans);
+}
+
+.doc-view [data-doc-edit="true"] {
+  border-radius: 4px;
+  outline: 1px solid transparent;
+  transition: background 120ms ease, outline-color 120ms ease, box-shadow 120ms ease;
+}
+
+.doc-view [data-doc-edit="true"]:hover {
+  background: rgba(47, 111, 115, 0.06);
+}
+
+.doc-view [data-doc-edit="true"]:focus {
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(47, 111, 115, 0.14);
+  outline-color: rgba(47, 111, 115, 0.45);
+}
+
+.doc-collaboration,
+.doc-share {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
+.doc-comment-composer,
+.doc-share-composer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.doc-share-composer lex-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-comment-composer textarea,
+.doc-share-composer input,
+.doc-share-composer select {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  font: inherit;
+  min-height: 40px;
+  padding: 10px 12px;
+}
+
+.doc-comment-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.doc-comment {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.doc-comment div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.doc-comment small,
+.doc-empty-row {
+  color: var(--muted);
+}
+
+.doc-share-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.doc-share-chip {
+  align-items: center;
+  background: rgba(47, 111, 115, 0.08);
+  border: 1px solid rgba(47, 111, 115, 0.22);
+  border-radius: 999px;
+  color: var(--ink);
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px 10px;
+}
+
+.doc-share-chip button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+
+.doc-side-tabs {
+  margin-bottom: 14px;
+}
+
+.doc-side-body {
+  display: grid;
+  gap: 14px;
+}
+
+.doc-side-body .doc-collaboration,
+.doc-side-body .doc-share {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.doc-history-list,
+.doc-version-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.doc-history-list li,
+.doc-version-list button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: left;
+}
+
+.doc-version-list strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.doc-version-list button.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47, 111, 115, 0.1);
+}
+
+.doc-history-list span,
+.doc-version-list span,
+.doc-history-list small,
+.doc-version-list small {
+  color: var(--muted);
+}
+
+.doc-version-diff {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.doc-version-diff h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.doc-diff {
+  display: grid;
+  gap: 4px;
+}
+
+.diff-line {
+  border-radius: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 6px 8px;
+  white-space: pre-wrap;
+}
+
+.diff-line.added {
+  background: #e8f6ed;
+  color: #176b33;
+}
+
+.diff-line.removed {
+  background: #fdebea;
+  color: #9a2c27;
+}
+
+.library-table-title {
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  text-align: left;
+}
+
+.library-table-title span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.doc-library-badge {
+  background: rgba(47, 111, 115, 0.08);
+  border-radius: 999px;
+  color: #2f6f73;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 760;
+  padding: 4px 8px;
+}
+
+.doc-library-badge.is-template {
+  background: color-mix(in srgb, #1f8a4c 12%, #fff);
+  color: #1f6f3d;
+}
+
+.party-address:empty::before {
+  color: var(--muted);
+  content: attr(data-placeholder);
 }
 
 .legal-doc-section ul {
@@ -2297,8 +2637,59 @@ body[data-composition="briefing"] .role-badge {
   margin: 0;
 }
 
+.doc-banner-actions,
+.doc-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.doc-edit-actions {
+  justify-content: flex-start;
+}
+
+.doc-banner-actions button,
+.doc-edit-actions button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  padding: 8px 11px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.doc-banner-actions button:hover:not(:disabled),
+.doc-edit-actions button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+}
+
+.doc-banner-actions button:disabled,
+.doc-edit-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.doc-last-saved {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.doc-dirty-state {
+  display: inline-flex;
+}
+
+.doc-dirty-state.is-dirty {
+  display: inline-flex;
+}
+
 .section-heading-row button,
-.signature-actions button {
+.signature-actions button,
+.doc-list-row button,
+.doc-add-section-row button {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
@@ -2312,6 +2703,25 @@ body[data-composition="briefing"] .role-badge {
 .section-heading-row button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.doc-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.doc-list-row button {
+  padding: 6px 9px;
+  font-family: var(--ui-font, Inter, system-ui, sans-serif);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.doc-add-section-row {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .signature-grid {
@@ -2380,19 +2790,26 @@ body[data-composition="briefing"] .role-badge {
   text-transform: uppercase;
 }
 
-.signature-card input {
+.signature-card input,
+.signature-card textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 5px;
   padding: 9px 10px;
   color: var(--ink);
   font: inherit;
+  box-sizing: border-box;
 }
 
-.signature-card input[data-signature-field="signature_text"] {
+.signature-card textarea[data-signature-field="signature_text"] {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 18px;
   font-style: italic;
+  min-height: 3.5rem;
+  max-height: 24rem;
+  resize: vertical;
+  line-height: 1.4;
+  white-space: pre-wrap;
 }
 
 .signature-actions {
@@ -2420,7 +2837,12 @@ body[data-composition="briefing"] .role-badge {
 .library-view {
   display: grid;
   gap: 18px;
+  width: 100%;
   min-width: 0;
+}
+
+body[data-doc-studio-view="library"] .library-view {
+  max-width: none;
 }
 
 .library-view.hidden {
@@ -2456,10 +2878,17 @@ body[data-composition="briefing"] .role-badge {
 }
 
 .library-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-  gap: 14px;
+  display: block;
+  width: 100%;
   min-width: 0;
+}
+
+.library-list lex-table {
+  width: 100%;
+}
+
+.library-list .lex-table-search {
+  max-width: 420px;
 }
 
 .library-item {
