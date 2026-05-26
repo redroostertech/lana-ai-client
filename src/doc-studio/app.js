@@ -2120,6 +2120,38 @@ function renderLibrary() {
     file_type: value => `<span class="doc-library-badge">${escapeHtml(value || 'Document')}</span>`,
     is_template: value => `<span class="doc-library-badge ${String(value).toLowerCase() === 'yes' ? 'is-template' : ''}">${escapeHtml(value || 'No')}</span>`
   });
+
+  // Make the entire row clickable, not just the filename button. lex-table
+  // emits row-click for any non-control click in the row; route through the
+  // shared openLibraryItem dispatcher so storage files open the file viewer
+  // and presentations open in-place in Doc Studio.
+  if (!table.__rowClickWired) {
+    table.addEventListener('row-click', (event) => {
+      const rowId = event.detail && event.detail.id;
+      if (rowId) openLibraryItem(rowId);
+    });
+    table.__rowClickWired = true;
+  }
+}
+
+async function openLibraryItem(itemId) {
+  const item = libraryItems().find(entry => entry.id === itemId);
+  if (!item) return;
+  if (item._kind === 'storage') {
+    const params = new URLSearchParams({ id: item._fileId });
+    if (item._matterId) {
+      params.set('matter_id', item._matterId);
+    }
+    window.location.href = `../file-viewer.html?${params.toString()}`;
+    return;
+  }
+  if (!confirmUnsavedDocumentChanges()) {
+    return;
+  }
+  replaceClientUrl(`/doc-studio/?id=${encodeURIComponent(item._presentationId)}`);
+  state.presentationId = item._presentationId;
+  await loadPresentationFromUrl();
+  render();
 }
 
 async function loadLibrary() {
@@ -3797,23 +3829,7 @@ elements.libraryList.addEventListener('click', async event => {
 
   try {
     if (libraryItemButton) {
-      const item = libraryItems().find(entry => entry.id === libraryItemButton.dataset.openLibraryItem);
-      if (!item) return;
-      if (item._kind === 'storage') {
-        const params = new URLSearchParams({ id: item._fileId });
-        if (item._matterId) {
-          params.set('matter_id', item._matterId);
-        }
-        window.location.href = `../file-viewer.html?${params.toString()}`;
-        return;
-      }
-      if (!confirmUnsavedDocumentChanges()) {
-        return;
-      }
-      replaceClientUrl(`/doc-studio/?id=${encodeURIComponent(item._presentationId)}`);
-      state.presentationId = item._presentationId;
-      await loadPresentationFromUrl();
-      render();
+      await openLibraryItem(libraryItemButton.dataset.openLibraryItem);
       return;
     }
     if (openButton && !confirmUnsavedDocumentChanges()) {
