@@ -766,8 +766,8 @@
     dashboardLoadToken += 1;
     var myToken = dashboardLoadToken;
     var config = VIEW_CONFIG[type];
-    var actions = el('dashboardDetailActions');
-    if (actions) actions.hidden = true;
+    var banner = el('dashboardDetailBanner');
+    if (banner) banner.classList.add('dashboard-detail-banner--no-actions');
     currentDashboardId = null;
     currentDashboardName = '';
     currentDashboardMetricKeys = null;
@@ -825,8 +825,8 @@
       var dashboard = dashboardResponse && dashboardResponse.data ? dashboardResponse.data : dashboardResponse;
       currentDashboardName = dashboard && dashboard.name ? dashboard.name : '';
       loadDashboardSwitcher();
-      var actions = el('dashboardDetailActions');
-      if (actions) actions.hidden = false;
+      var banner = el('dashboardDetailBanner');
+      if (banner) banner.classList.remove('dashboard-detail-banner--no-actions');
       var layout = dashboard && dashboard.layout ? dashboard.layout : {};
       var type = VIEW_CONFIG[layout.dashboard_type] ? layout.dashboard_type : 'owner';
       var metricKeys = Array.isArray(layout.metric_keys) ? layout.metric_keys : [];
@@ -854,11 +854,6 @@
       currentSummary = null;
       renderMetrics([], null, currentDashboardType);
     }
-  }
-
-  function closeDashboardActions() {
-    var panel = el('dashboardDetailActionsPanel');
-    if (panel) panel.hidden = true;
   }
 
   async function deleteCurrentDashboard() {
@@ -921,12 +916,6 @@
     content.addEventListener('click', function (event) {
       if (event.target.closest('#openReportingBtn')) {
         Lex.Nav.go('admin/reporting.html');
-      }
-
-      if (event.target.closest('#dashboardDetailActionsTrigger')) {
-        var panel = el('dashboardDetailActionsPanel');
-        if (panel) panel.hidden = !panel.hidden;
-        return;
       }
 
       if (event.target.closest('#editDashboardBtn') && currentDashboardId) {
@@ -992,12 +981,7 @@
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
         closeMetricModal();
-        closeDashboardActions();
       }
-    });
-
-    document.addEventListener('click', function (event) {
-      if (!event.target.closest('#dashboardDetailActions')) closeDashboardActions();
     });
 
     var params = getParams();

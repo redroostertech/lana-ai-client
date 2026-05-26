@@ -43,7 +43,6 @@
   var currentEditFieldsMatter = null;
   var customFieldDefinitions = [];
   var customFieldValues = [];
-  var _tabIndicatorInitialized = false;
   var _navContext = null;              // navigation context (source, conversationId, etc.)
   var _pendingTaskDeepLinkId = null;
 
@@ -70,6 +69,7 @@
     activeTitle: '',
     contextDegraded: false,
     contextScope: 'all',
+    progressPercent: null,
     progressSteps: [],
     progressStartedAt: 0,
     progressTimer: null
@@ -520,52 +520,27 @@
           return;
         }
 
-        // More options toggle
-        if (id === 'headerMenuBtn') {
-          e.stopPropagation();
-          var dd = banner.querySelector('#headerOptionsDropdown');
-          if (dd) dd.classList.toggle('hidden');
-          return;
-        }
-
-        // Dropdown actions
-        var dropdown = banner.querySelector('#headerOptionsDropdown');
-
         if (id === 'headerOptionsEdit') {
-          if (dropdown) dropdown.classList.add('hidden');
           openEditMatterModal(matter);
           return;
         }
         if (id === 'headerOptionsStatus') {
-          if (dropdown) dropdown.classList.add('hidden');
           openStatusChangeModal(matter);
           return;
         }
         if (id === 'headerOptionsDelete') {
-          if (dropdown) dropdown.classList.add('hidden');
           deleteMatter(matterId);
           return;
         }
       });
-
-      // Close dropdown on click outside
-      trackDocListener('click', function (e) {
-        var dd = banner.querySelector('#headerOptionsDropdown');
-        if (dd && !dd.classList.contains('hidden')) {
-          var menuBtn = banner.querySelector('#headerMenuBtn');
-          if (!dd.contains(e.target) && e.target !== menuBtn) {
-            dd.classList.add('hidden');
-          }
-        }
-      });
     }
 
-    // Tab bar — event delegation (avoids inline onclick before script loads)
+    // Tab bar
     var tabBar = document.getElementById('tabBar');
     if (tabBar) {
-      tabBar.addEventListener('click', function (e) {
-        var btn = e.target.closest('[data-tab]');
-        if (btn) switchMatterTab(btn.dataset.tab);
+      tabBar.addEventListener('tab-change', function (e) {
+        var tab = e.detail && e.detail.tab;
+        if (tab) switchMatterTab(tab);
       });
     }
 
@@ -607,58 +582,22 @@
   // Tab System (from workspace.js)
   // =========================================================================
 
-  function _positionTabIndicator(tabBtn, animate) {
-    var indicator = document.getElementById('tabIndicator');
-    var tabBar = document.getElementById('tabBar');
-    if (!indicator || !tabBar || !tabBtn) return;
-
-    var barRect = tabBar.getBoundingClientRect();
-    var btnRect = tabBtn.getBoundingClientRect();
-    var left = btnRect.left - barRect.left + tabBar.scrollLeft;
-
-    if (!animate) {
-      indicator.style.transition = 'none';
-    }
-    indicator.style.left = left + 'px';
-    indicator.style.width = btnRect.width + 'px';
-
-    if (!animate) {
-      // Force reflow then restore transition
-      indicator.offsetWidth;
-      indicator.style.transition = 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-    }
-  }
-
   function switchMatterTab(tab) {
     var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'summary', 'docGeneration', 'analytics'];
-    var activeBtn = null;
+    var tabBar = document.getElementById('tabBar');
+    if (tabBar && tabBar.getAttribute('active') !== tab) {
+      tabBar.setAttribute('active', tab);
+    }
 
     tabs.forEach(function (t) {
-      var tabBtn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.substring(1));
       var content = document.getElementById('tabContent' + t.charAt(0).toUpperCase() + t.substring(1));
 
       if (t === tab) {
-        activeBtn = tabBtn;
-        if (tabBtn) {
-          tabBtn.style.color = 'var(--lex-text-accent)';
-          tabBtn.classList.remove('text-gray-500');
-        }
         if (content) content.classList.remove('hidden');
       } else {
-        if (tabBtn) {
-          tabBtn.style.color = '';
-          tabBtn.classList.add('text-gray-500');
-        }
         if (content) content.classList.add('hidden');
       }
     });
-
-    // Slide the indicator to the active tab
-    var shouldAnimate = !!_tabIndicatorInitialized;
-    if (activeBtn) {
-      _positionTabIndicator(activeBtn, shouldAnimate);
-      _tabIndicatorInitialized = true;
-    }
 
     // Render content for the selected tab
     if (!currentMatterData) return;
@@ -1209,15 +1148,7 @@
 
     if (!activities || activities.length === 0) {
       container.innerHTML =
-        '<div class="text-center py-12">' +
-          '<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">' +
-            '<svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
-            '</svg>' +
-          '</div>' +
-          '<h4 class="text-lg font-semibold text-gray-900 mb-2">No activity yet</h4>' +
-          '<p class="text-gray-500">Activity related to this matter will appear here</p>' +
-        '</div>';
+        '<lex-empty icon="inbox" message="No activity yet" description="Activity related to this matter will appear here"></lex-empty>';
       return;
     }
 
@@ -1594,13 +1525,7 @@
               '<p class="mt-1 text-xs text-gray-500">PDF, Word, Excel, Images up to 50MB</p>' +
             '</div>' +
           '</div>' +
-          '<div class="text-center">' +
-            '<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>' +
-            '</svg>' +
-            '<h4 class="text-lg font-semibold text-gray-900 mb-2">No documents yet</h4>' +
-            '<p class="text-gray-500">Upload documents to this matter to enable AI-powered search and analysis</p>' +
-          '</div>' +
+          '<lex-empty size="compact" icon="document" message="No documents yet" description="Upload documents to this matter to enable AI-powered search and analysis"></lex-empty>' +
         '</div>';
       setupDrawerUpload(matter, 'drawerEmptyDropZone', 'drawerEmptyFileInput');
       return;
@@ -2431,8 +2356,17 @@
   }
 
   function docStudioDocumentUrl(presentationId, view) {
-    var query = '?id=' + encodeURIComponent(presentationId) + '&view=' + encodeURIComponent(view || 'doc') + '&embed=1';
-    return 'doc-studio/index.html' + query;
+    var params = new URLSearchParams({
+      id: presentationId,
+      view: view || 'doc',
+      embed: '1'
+    });
+    var matter = currentMatterData && currentMatterData.matter ? currentMatterData.matter : null;
+    if (matter && matter.matter_id) {
+      params.set('matter_id', matter.matter_id);
+      params.set('matter_name', matter.matter_name || matter.name || matter.matter_id);
+    }
+    return 'doc-studio/index.html?' + params.toString();
   }
 
   function setDocStudioDocumentStatus(message, isError) {
@@ -2467,7 +2401,12 @@
     var completed = steps.filter(function (step) { return step.status === 'complete'; }).length;
     var failed = steps.some(function (step) { return step.status === 'error'; });
     var active = steps.filter(function (step) { return step.status === 'active'; }).pop() || steps[steps.length - 1];
-    var percent = failed ? 100 : Math.min(96, Math.round((completed / Math.max(steps.length, 1)) * 100));
+    var serverPercent = typeof docStudioDocumentState.progressPercent === 'number'
+      ? Math.max(0, Math.min(100, Math.round(docStudioDocumentState.progressPercent)))
+      : null;
+    var percent = failed
+      ? 100
+      : (serverPercent !== null ? serverPercent : Math.min(96, Math.round((completed / Math.max(steps.length, 1)) * 100)));
     if (steps.length && steps[steps.length - 1].status === 'complete') {
       percent = 100;
     }
@@ -2500,6 +2439,7 @@
 
   function resetDocStudioProgress() {
     stopDocStudioProgressTimer();
+    docStudioDocumentState.progressPercent = null;
     docStudioDocumentState.progressSteps = [];
     docStudioDocumentState.progressStartedAt = Date.now();
     docStudioDocumentState.progressTimer = setInterval(renderDocStudioProgress, 1000);
@@ -2514,6 +2454,55 @@
     steps.push({ id: id, label: label, detail: detail || '', status: 'active' });
     docStudioDocumentState.progressSteps = steps;
     renderDocStudioProgress();
+  }
+
+  function normalizeDocStudioProgressStatus(status) {
+    var value = String(status || '').toLowerCase();
+    if (value === 'completed' || value === 'complete' || value === 'done' || value === 'success' || value === 'succeeded') return 'complete';
+    if (value === 'failed' || value === 'error' || value === 'cancelled' || value === 'canceled') return 'error';
+    if (value === 'pending' || value === 'queued' || value === 'waiting') return 'pending';
+    return 'active';
+  }
+
+  function setDocStudioServerProgressSteps(steps) {
+    if (!Array.isArray(steps) || !steps.length) return;
+    docStudioDocumentState.progressSteps = steps.map(function (step, index) {
+      var label = step.label || step.title || step.name || step.message || ('Step ' + (index + 1));
+      var detail = step.detail || step.description || step.note || step.status_label || '';
+      return {
+        id: step.id || step.key || ('server-' + index),
+        label: label,
+        detail: detail,
+        status: normalizeDocStudioProgressStatus(step.status || step.state)
+      };
+    });
+    renderDocStudioProgress();
+  }
+
+  function docStudioProgressPercent(payload) {
+    var progress = payload && payload.progress && typeof payload.progress === 'object' ? payload.progress : {};
+    var raw = payload && (
+      payload.progress_percent ??
+      payload.percent_complete ??
+      payload.percent ??
+      progress.progress_percent ??
+      progress.percent_complete ??
+      progress.percent ??
+      payload.progress
+    );
+    if (raw === null || raw === undefined || raw === '') return null;
+    var percent = Number(raw);
+    if (!isFinite(percent)) return null;
+    return percent <= 1 ? percent * 100 : percent;
+  }
+
+  function isDocStudioAsyncUnavailable(error) {
+    return !!(error && (
+      error.statusCode === 404 ||
+      error.statusCode === 405 ||
+      error.statusCode === 503 ||
+      error.statusCode === 501
+    ));
   }
 
   function completeDocStudioProgressStep(id, detail) {
@@ -2542,13 +2531,18 @@
 
   async function docStudioApiPost(endpoint, data) {
     var controller = new AbortController();
-    var requestTimeoutMs = endpoint === '/api/v1/deck-studio/generate/legal-document' ? 300000 : 180000;
+    var requestTimeoutMs = endpoint === '/api/v1/deck-studio/generate/legal-document'
+      ? 300000
+      : (endpoint === '/api/v1/deck-studio/review/legal-document' ? 60000 : 180000);
     var timeout = setTimeout(function () { controller.abort(); }, requestTimeoutMs);
     try {
       var headers = api && typeof api.getHeaders === 'function'
         ? api.getHeaders()
         : { 'Content-Type': 'application/json' };
-      var response = await fetch((api && api.baseUrl ? api.baseUrl : '') + endpoint, {
+      var url = String(endpoint || '').indexOf('http') === 0
+        ? endpoint
+        : (api && api.baseUrl ? api.baseUrl : '') + endpoint;
+      var response = await fetch(url, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(data || {}),
@@ -2564,12 +2558,56 @@
         }
       }
       if (!response.ok) {
-        throw new Error(payload.error?.message || payload.detail || payload.message || 'Doc Studio request failed.');
+        var requestError = new Error(payload.error?.message || payload.detail || payload.message || 'Doc Studio request failed.');
+        requestError.statusCode = response.status;
+        requestError.payload = payload;
+        throw requestError;
       }
       return payload;
     } catch (error) {
       if (error.name === 'AbortError') {
         throw new Error('Doc Studio generation timed out.');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async function docStudioApiGet(endpoint) {
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); }, 60000);
+    try {
+      var headers = api && typeof api.getHeaders === 'function'
+        ? api.getHeaders()
+        : { 'Content-Type': 'application/json' };
+      var url = String(endpoint || '').indexOf('http') === 0
+        ? endpoint
+        : (api && api.baseUrl ? api.baseUrl : '') + endpoint;
+      var response = await fetch(url, {
+        method: 'GET',
+        headers: headers,
+        signal: controller.signal
+      });
+      var text = await response.text();
+      var payload = {};
+      if (text) {
+        try {
+          payload = JSON.parse(text);
+        } catch (parseError) {
+          throw new Error('Server returned an invalid Doc Studio response.');
+        }
+      }
+      if (!response.ok) {
+        var requestError = new Error(payload.error?.message || payload.detail || payload.message || 'Doc Studio request failed.');
+        requestError.statusCode = response.status;
+        requestError.payload = payload;
+        throw requestError;
+      }
+      return payload;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Doc Studio progress check timed out.');
       }
       throw error;
     } finally {
@@ -2584,7 +2622,10 @@
       var headers = api && typeof api.getHeaders === 'function'
         ? api.getHeaders()
         : { 'Content-Type': 'application/json' };
-      var response = await fetch((api && api.baseUrl ? api.baseUrl : '') + endpoint, {
+      var url = String(endpoint || '').indexOf('http') === 0
+        ? endpoint
+        : (api && api.baseUrl ? api.baseUrl : '') + endpoint;
+      var response = await fetch(url, {
         method: 'PATCH',
         headers: headers,
         body: JSON.stringify(data || {}),
@@ -2600,7 +2641,10 @@
         }
       }
       if (!response.ok) {
-        throw new Error(payload.error?.message || payload.detail || payload.message || 'Doc Studio request failed.');
+        var requestError = new Error(payload.error?.message || payload.detail || payload.message || 'Doc Studio request failed.');
+        requestError.statusCode = response.status;
+        requestError.payload = payload;
+        throw requestError;
       }
       return payload;
     } catch (error) {
@@ -2759,6 +2803,330 @@
     window.open(docStudioDocumentState.activeUrl, '_blank', 'noopener,noreferrer');
   }
 
+  function buildDocStudioDocumentRequest(format, style, title, prompt, matterContext) {
+    var matter = currentMatterData && currentMatterData.matter ? currentMatterData.matter : {};
+    var generationPayload = {
+      mode: format,
+      title: title,
+      audience: 'legal team and matter stakeholders',
+      tone: 'precise, balanced, attorney-review ready',
+      style: style,
+      cardCount: 8,
+      useLlm: true,
+      useLegalSidecar: false,
+      prompt: matterContext + '\n\n' + docStudioGenerationInstructions(format) + '\n\nUser request:\n' + prompt
+    };
+    var savePayload = {
+      export_as: format === 'presentation' ? 'pptx' : 'pdf',
+      mode: format,
+      prompt: prompt,
+      context_scope: docStudioDocumentState.contextScope,
+      context_degraded: docStudioDocumentState.contextDegraded
+    };
+    if (matter.matter_id) {
+      savePayload.matter_id = matter.matter_id;
+    }
+    return {
+      format: format,
+      style: style,
+      title: title,
+      prompt: prompt,
+      matter: matter,
+      generationPayload: generationPayload,
+      saveEndpoint: matter.matter_id
+        ? '/api/v1/deck-studio/matter-documents'
+        : '/api/v1/deck-studio/presentations',
+      savePayload: savePayload
+    };
+  }
+
+  function docStudioAsyncCompletionPayload(payload) {
+    var result = payload && (payload.result || payload.output || payload.data);
+    result = result && (result.result || result.output || result.data || result);
+    if (result) return result;
+    if (payload && (
+      payload.presentation_id ||
+      payload.presentationId ||
+      payload.preview_url ||
+      payload.previewUrl ||
+      payload.document_url ||
+      payload.documentUrl ||
+      payload.saved ||
+      payload.presentation ||
+      payload.generated ||
+      payload.deck
+    )) {
+      return payload;
+    }
+    return null;
+  }
+
+  function openCompletedDocStudioDocument(result, request) {
+    var saved = result.saved || result.save || result.presentation || result.document || result;
+    var generated = result.generated || result.generation || result;
+    var presentationId = result.presentation_id || result.presentationId || result.id ||
+      saved.presentation_id || saved.presentationId || saved.id;
+    var documentTitle = result.title || result.document_title || result.documentTitle ||
+      (generated.document && generated.document.title) ||
+      (generated.deck && generated.deck.title) ||
+      request.title;
+    var view = request.format === 'presentation' ? 'slides' : 'doc';
+    var url = result.preview_url || result.previewUrl || result.url || result.document_url || result.documentUrl ||
+      (presentationId ? docStudioDocumentUrl(presentationId, view) : '');
+
+    if (!url) {
+      throw new Error('Doc Studio finished but did not return a saved preview.');
+    }
+
+    addDocStudioProgressStep('preview', 'Opening Doc Studio preview', documentTitle);
+    completeDocStudioProgressStep('preview', 'Preview ready.');
+    stopDocStudioProgressTimer();
+    setDocStudioDocumentStatus('File generated. Opening preview...', false);
+    closeCreateDocStudioDocumentModal();
+    openDocStudioDocumentViewer(
+      url,
+      documentTitle,
+      request.format + ' · saved in Doc Studio' + (saved && saved.document ? ' · attached to matter' : '') + (docStudioDocumentState.contextDegraded ? ' · limited file investigation' : '')
+    );
+    if (request.matter.matter_id) {
+      refreshDrawerDocuments(request.matter.matter_id);
+    }
+    Lex.Toast.success('File generated in Doc Studio');
+  }
+
+  async function runDocStudioDocumentSync(request) {
+    addDocStudioProgressStep(
+      'draft',
+      request.format === 'document' ? 'Drafting the legal document' : 'Generating with Doc Studio',
+      'Deriving the structure, sections, placeholders, notes, and output from your prompt.'
+    );
+    var generated = await docStudioApiPost(
+      request.format === 'document' ? '/api/v1/deck-studio/generate/legal-document' : '/api/v1/deck-studio/generate',
+      request.generationPayload
+    );
+
+      if (!generated || !generated.deck) {
+        throw new Error('Doc Studio did not return a document deck.');
+      }
+      var generationMode = generated.metadata && generated.metadata.generation_mode
+        ? generated.metadata.generation_mode.replace(/_/g, ' ')
+        : 'AI draft returned';
+      completeDocStudioProgressStep('draft', generationMode);
+
+      if (request.format === 'document' && generated.document) {
+        addDocStudioProgressStep(
+          'review',
+          'Reviewing the legal draft',
+          'Checking for missing facts, execution issues, and attorney review notes.'
+        );
+        try {
+          var reviewed = await docStudioApiPost('/api/v1/deck-studio/review/legal-document', {
+            document: generated.document,
+            deck: generated.deck,
+            metadata: generated.metadata || {},
+            prompt: request.prompt,
+            style: request.style,
+            timeout_ms: 45000
+          });
+          if (reviewed && reviewed.deck) {
+            generated = reviewed;
+          }
+          var reviewMode = reviewed && reviewed.metadata && reviewed.metadata.legal_review_mode;
+          completeDocStudioProgressStep(
+            'review',
+            reviewMode === 'legal_sidecar_review'
+              ? 'Legal review notes and targeted corrections were applied.'
+              : 'Legal review was unavailable; the draft is ready for attorney review.'
+          );
+        } catch (reviewError) {
+          completeDocStudioProgressStep(
+            'review',
+            'Legal review was unavailable; the draft is ready for attorney review.'
+          );
+          generated.metadata = {
+            ...(generated.metadata || {}),
+            legal_review_mode: 'skipped',
+            legal_review_error: reviewError.message
+          };
+        }
+      }
+
+      addDocStudioProgressStep(
+        'save',
+        'Saving and exporting the file',
+        request.matter.matter_id
+          ? 'Saving in Doc Studio and attaching the export to this matter.'
+          : 'Saving in the Doc Studio library.'
+      );
+      var savePayload = {
+        ...request.savePayload,
+        deck: generated.deck
+      };
+      var saved = await docStudioApiPost(request.saveEndpoint, savePayload);
+      var presentationId = saved.presentation_id || saved.id;
+      if (!presentationId) {
+        throw new Error('Doc Studio generated the document but did not return a saved file id.');
+      }
+      completeDocStudioProgressStep('save', saved.document ? 'Saved and attached to matter documents.' : 'Saved in Doc Studio.');
+
+      var documentTitle = generated.document && generated.document.title
+        ? generated.document.title
+        : (generated.deck.title || request.title);
+      openCompletedDocStudioDocument({
+        presentation_id: presentationId,
+        title: documentTitle,
+        generated: generated,
+        saved: saved
+      }, request);
+  }
+
+  function docStudioAsyncStartPayload(request) {
+    return {
+      mode: request.format,
+      export_as: request.format === 'presentation' ? 'pptx' : 'pdf',
+      title: request.title,
+      prompt: request.prompt,
+      style: request.style,
+      generation: request.generationPayload,
+      save: {
+        endpoint: request.saveEndpoint,
+        payload: request.savePayload
+      },
+      matter_id: request.matter.matter_id || null,
+      document_ids: selectedMatterDocumentIds(),
+      context_scope: docStudioDocumentState.contextScope,
+      context_degraded: docStudioDocumentState.contextDegraded
+    };
+  }
+
+  async function startDocStudioAsyncJob(request) {
+    var endpoints = [
+      '/api/v1/deck-studio/matter-document-jobs',
+      '/api/v1/deck-studio/generation-jobs',
+      '/api/v1/deck-studio/generate/async'
+    ];
+    var lastUnavailable = null;
+    for (var i = 0; i < endpoints.length; i++) {
+      try {
+        var started = await docStudioApiPost(endpoints[i], docStudioAsyncStartPayload(request));
+        started._startEndpoint = endpoints[i];
+        return started;
+      } catch (error) {
+        if (!isDocStudioAsyncUnavailable(error)) throw error;
+        lastUnavailable = error;
+      }
+    }
+    throw lastUnavailable || new Error('Background generation is unavailable.');
+  }
+
+  function docStudioAsyncStatusEndpoint(started) {
+    var statusUrl = started.status_url || started.statusUrl || started.progress_url || started.progressUrl;
+    if (statusUrl) return statusUrl;
+    var jobId = started.job_id || started.jobId || started.id;
+    if (!jobId) return '';
+    if (started._startEndpoint && started._startEndpoint.indexOf('/generation-jobs') !== -1) {
+      return '/api/v1/deck-studio/generation-jobs/' + encodeURIComponent(jobId);
+    }
+    return '/api/v1/deck-studio/generate/async/' + encodeURIComponent(jobId);
+  }
+
+  function docStudioAsyncStageSteps(payload) {
+    var stage = String(payload.stage || payload.current_stage || '').toLowerCase();
+    var status = String(payload.status || payload.state || '').toLowerCase();
+    if (!stage && !status) return null;
+    var order = ['queued', 'matter_context', 'draft', 'legal_review', 'save_export', 'completed'];
+    var currentIndex = order.indexOf(stage);
+    if (currentIndex < 0 && status === 'completed') currentIndex = order.length - 1;
+    if (currentIndex < 0 && status === 'failed') currentIndex = Math.max(0, order.indexOf(stage));
+    var failed = status === 'failed' || status === 'error';
+    return [
+      {
+        id: 'queued',
+        label: 'Starting Doc Studio',
+        detail: 'Preparing the request and background workspace.',
+        status: failed && currentIndex <= 0 ? 'failed' : (currentIndex > 0 ? 'completed' : 'active')
+      },
+      {
+        id: 'matter_context',
+        label: 'Investigating matter files',
+        detail: 'Gathering matter summaries and available excerpts.',
+        status: failed && currentIndex <= 1 ? 'failed' : (currentIndex > 1 ? 'completed' : (currentIndex === 1 ? 'active' : 'pending'))
+      },
+      {
+        id: 'draft',
+        label: payload.request && payload.request.export_as === 'pptx' ? 'Generating the presentation' : 'Drafting the document',
+        detail: 'Deriving the structure, sections, placeholders, notes, and output from your prompt.',
+        status: failed && currentIndex <= 2 ? 'failed' : (currentIndex > 2 ? 'completed' : (currentIndex === 2 ? 'active' : 'pending'))
+      },
+      {
+        id: 'legal_review',
+        label: 'Reviewing the legal document',
+        detail: 'Checking for missing facts, execution issues, and attorney review notes.',
+        status: failed && currentIndex <= 3 ? 'failed' : (currentIndex > 3 ? 'completed' : (currentIndex === 3 ? 'active' : 'pending'))
+      },
+      {
+        id: 'save_export',
+        label: 'Saving and attaching the file',
+        detail: 'Saving in Doc Studio and attaching the export to this matter.',
+        status: failed && currentIndex <= 4 ? 'failed' : (currentIndex > 4 ? 'completed' : (currentIndex === 4 ? 'active' : 'pending'))
+      }
+    ];
+  }
+
+  function updateDocStudioAsyncProgress(payload) {
+    var percent = docStudioProgressPercent(payload || {});
+    if (percent !== null) {
+      docStudioDocumentState.progressPercent = percent;
+    }
+    var steps = payload.steps ||
+      (payload.progress && payload.progress.steps) ||
+      (payload.status && payload.status.steps);
+    setDocStudioServerProgressSteps(steps || docStudioAsyncStageSteps(payload || {}));
+  }
+
+  async function pollDocStudioAsyncJob(started, request) {
+    var statusEndpoint = docStudioAsyncStatusEndpoint(started);
+    var latest = started;
+    updateDocStudioAsyncProgress(latest);
+
+    for (var attempt = 0; attempt < 180; attempt++) {
+      var state = String(latest.status || latest.state || '').toLowerCase();
+      if (state === 'completed' || state === 'complete' || state === 'done' || state === 'success' || state === 'succeeded') {
+        docStudioDocumentState.progressPercent = 100;
+        var result = docStudioAsyncCompletionPayload(latest);
+        if (!result) throw new Error('Doc Studio finished but did not return a saved file.');
+        openCompletedDocStudioDocument(result, request);
+        return;
+      }
+      if (state === 'failed' || state === 'error' || state === 'cancelled' || state === 'canceled') {
+        throw new Error(latest.error?.message || latest.detail || latest.message || 'Doc Studio could not generate the file.');
+      }
+      if (!statusEndpoint) {
+        throw new Error('Doc Studio started the work but did not return a progress link.');
+      }
+      await new Promise(function (resolve) { setTimeout(resolve, 2000); });
+      latest = await docStudioApiGet(statusEndpoint);
+      updateDocStudioAsyncProgress(latest);
+    }
+    throw new Error('Doc Studio is still working. Try again in a moment.');
+  }
+
+  async function runDocStudioDocumentAsyncWithFallback(request) {
+    addDocStudioProgressStep('start', 'Starting Doc Studio', 'Preparing the file in the background.');
+    var started = null;
+    try {
+      started = await startDocStudioAsyncJob(request);
+    } catch (error) {
+      if (!isDocStudioAsyncUnavailable(error)) throw error;
+      completeDocStudioProgressStep('start', 'Continuing in this window.');
+      docStudioDocumentState.progressPercent = null;
+      await runDocStudioDocumentSync(request);
+      return;
+    }
+    completeDocStudioProgressStep('start', 'Doc Studio is working on the file.');
+    await pollDocStudioAsyncJob(started, request);
+  }
+
   async function submitDocStudioDocument(event) {
     event.preventDefault();
     if (!currentMatterData || !currentMatterData.matter) {
@@ -2799,83 +3167,8 @@
           ? 'Continuing with summaries and available matter metadata.'
           : 'Matter summaries and available excerpts are attached.'
       );
-      addDocStudioProgressStep(
-        'draft',
-        format === 'document' ? 'Drafting and reviewing the legal document' : 'Generating with Doc Studio AI',
-        'Deriving the structure, sections, placeholders, notes, and output from your prompt.'
-      );
-      var generationPayload = {
-        mode: format,
-        title: title,
-        audience: 'legal team and matter stakeholders',
-        tone: 'precise, balanced, attorney-review ready',
-        style: style,
-        cardCount: 8,
-        useLlm: true,
-        useLegalSidecar: format === 'document',
-        prompt: matterContext + '\n\n' + docStudioGenerationInstructions(format) + '\n\nUser request:\n' + prompt
-      };
-      var generated = await docStudioApiPost(
-        format === 'document' ? '/api/v1/deck-studio/generate/legal-document' : '/api/v1/deck-studio/generate',
-        generationPayload
-      );
-
-      if (!generated || !generated.deck) {
-        throw new Error('Doc Studio did not return a document deck.');
-      }
-      var generationMode = generated.metadata && generated.metadata.generation_mode
-        ? generated.metadata.generation_mode.replace(/_/g, ' ')
-        : 'AI draft returned';
-      completeDocStudioProgressStep('draft', generationMode);
-
-      addDocStudioProgressStep(
-        'save',
-        'Saving and exporting the file',
-        currentMatterData.matter && currentMatterData.matter.matter_id
-          ? 'Saving in Doc Studio and attaching the export to this matter.'
-          : 'Saving in the Doc Studio library.'
-      );
-      var matter = currentMatterData && currentMatterData.matter ? currentMatterData.matter : {};
-      var saveEndpoint = matter.matter_id
-        ? '/api/v1/deck-studio/matter-documents'
-        : '/api/v1/deck-studio/presentations';
-      var savePayload = {
-        deck: generated.deck,
-        export_as: format === 'presentation' ? 'pptx' : 'pdf',
-        mode: format,
-        prompt: prompt,
-        context_scope: docStudioDocumentState.contextScope,
-        context_degraded: docStudioDocumentState.contextDegraded
-      };
-      if (matter.matter_id) {
-        savePayload.matter_id = matter.matter_id;
-      }
-      var saved = await docStudioApiPost(saveEndpoint, savePayload);
-      var presentationId = saved.presentation_id || saved.id;
-      if (!presentationId) {
-        throw new Error('Doc Studio generated the document but did not return a saved file id.');
-      }
-      completeDocStudioProgressStep('save', saved.document ? 'Saved and attached to matter documents.' : 'Saved in Doc Studio.');
-
-      var documentTitle = generated.document && generated.document.title
-        ? generated.document.title
-        : (generated.deck.title || title);
-      var view = format === 'presentation' ? 'slides' : 'doc';
-      var url = docStudioDocumentUrl(presentationId, view);
-      addDocStudioProgressStep('preview', 'Opening Doc Studio preview', documentTitle);
-      completeDocStudioProgressStep('preview', 'Preview ready.');
-      stopDocStudioProgressTimer();
-      setDocStudioDocumentStatus('File generated. Opening preview...', false);
-      closeCreateDocStudioDocumentModal();
-      openDocStudioDocumentViewer(
-        url,
-        documentTitle,
-        format + ' · saved in Doc Studio' + (saved.document ? ' · attached to matter' : '') + (docStudioDocumentState.contextDegraded ? ' · limited file investigation' : '')
-      );
-      if (matter.matter_id) {
-        refreshDrawerDocuments(matter.matter_id);
-      }
-      Lex.Toast.success('File generated in Doc Studio');
+      var request = buildDocStudioDocumentRequest(format, style, title, prompt, matterContext);
+      await runDocStudioDocumentAsyncWithFallback(request);
     } catch (error) {
       failDocStudioProgressStep(error.message || 'Document generation failed.');
       setDocStudioDocumentStatus(error.message || 'Document generation failed.', true);
@@ -3147,19 +3440,13 @@
 
     if ((!chats || chats.length === 0) && pinnedChats.length === 0) {
       content.innerHTML =
-        '<div class="text-center py-12">' +
-          '<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>' +
-          '</svg>' +
-          '<h4 class="text-lg font-semibold text-gray-900 mb-2">No conversations yet</h4>' +
-          '<p class="text-gray-500 mb-6">Start a conversation in this matter to organize all related chats</p>' +
-          '<button onclick="createMatterConversation(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg font-medium">' +
-            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>' +
-            '</svg>' +
-            'Start First Conversation' +
-          '</button>' +
-        '</div>';
+        '<lex-empty id="conversationsEmptyState" icon="comment" message="No conversations yet" description="Start a conversation in this matter to organize all related chats" action-label="Start First Conversation" action-icon="plus"></lex-empty>';
+      var conversationsEmpty = document.getElementById('conversationsEmptyState');
+      if (conversationsEmpty) {
+        conversationsEmpty.addEventListener('action', function () {
+          createMatterConversation(matter.matter_id);
+        });
+      }
       return;
     }
 
@@ -3452,13 +3739,7 @@
 
     if (comments.length === 0) {
       container.innerHTML =
-        '<div class="text-center py-12">' +
-          '<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>' +
-          '</svg>' +
-          '<h4 class="text-lg font-semibold text-gray-900 mb-2">No comments yet</h4>' +
-          '<p class="text-gray-500">Be the first to comment on this matter</p>' +
-        '</div>';
+        '<lex-empty icon="comment" message="No comments yet" description="Be the first to comment on this matter"></lex-empty>';
       return;
     }
 
@@ -4197,23 +4478,13 @@
 
     if (currentTasksList.length === 0) {
       content.innerHTML =
-        '<div class="text-center py-12">' +
-          '<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>' +
-          '</svg>' +
-          '<h4 class="text-lg font-semibold text-gray-900 mb-2">No tasks yet</h4>' +
-          '<p class="text-gray-500 mb-4">Create a task or connect ActionStep to import tasks</p>' +
-          '<div class="flex flex-wrap justify-center gap-2">' +
-            '<button onclick="openCreateTaskModal(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white text-sm rounded-lg font-medium transition-colors">' +
-              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
-              'Create Task' +
-            '</button>' +
-            '<button onclick="openCreateTaskPlanModal(\'' + matter.matter_id + '\')" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-lg font-medium hover:bg-gray-50 transition-colors">' +
-              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3 3L22 4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>' +
-              'Create Task Plan' +
-            '</button>' +
-          '</div>' +
-        '</div>';
+        '<lex-empty id="tasksEmptyState" icon="tasks" message="No tasks yet" description="Create a task or connect ActionStep to import tasks" action-label="Create Task" action-icon="plus"></lex-empty>';
+      var tasksEmpty = document.getElementById('tasksEmptyState');
+      if (tasksEmpty) {
+        tasksEmpty.addEventListener('action', function () {
+          openCreateTaskModal(matter.matter_id);
+        });
+      }
       return;
     }
 
@@ -4547,25 +4818,13 @@
         // Notes initialized
       } else {
         content.innerHTML =
-          '<div class="text-center py-12">' +
-            '<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>' +
-            '</svg>' +
-            '<h3 class="mt-2 text-sm font-medium text-gray-900">Notes feature not available</h3>' +
-            '<p class="mt-1 text-sm text-gray-500">The notes feature is still loading. Please refresh the page.</p>' +
-          '</div>';
+          '<lex-empty icon="document" message="Notes feature not available" description="The notes feature is still loading. Please refresh the page."></lex-empty>';
         console.error('[Notes] Matter Notes components not loaded');
       }
     } catch (error) {
       console.error('[Notes] Failed to initialize Matter Notes:', error);
       content.innerHTML =
-        '<div class="text-center py-12">' +
-          '<svg class="mx-auto h-12 w-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>' +
-          '</svg>' +
-          '<h3 class="mt-2 text-sm font-medium text-gray-900">Failed to load notes</h3>' +
-          '<p class="mt-1 text-sm text-gray-500">' + escapeHtml(error.message) + '</p>' +
-        '</div>';
+        '<lex-empty icon="alert" message="Failed to load notes" description="' + escapeHtml(error.message) + '"></lex-empty>';
     }
   }
 
@@ -10045,9 +10304,6 @@
 
     // 2. Clear sessionStorage matter ID (prevent stale navigation on restart)
     try { sessionStorage.removeItem('_lex_matter_detail_id'); } catch (e) {}
-
-    // 2b. Reset tab indicator
-    _tabIndicatorInitialized = false;
 
     // 3. Restore body scroll
     document.body.style.overflow = '';

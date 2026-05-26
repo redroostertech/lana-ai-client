@@ -225,10 +225,6 @@ const elements = {
   docView: document.getElementById('docView'),
   libraryView: document.getElementById('libraryView'),
   libraryList: document.getElementById('libraryList'),
-  librarySearch: document.getElementById('librarySearch'),
-  libraryStyleFilter: document.getElementById('libraryStyleFilter'),
-  librarySort: document.getElementById('librarySort'),
-  refreshLibraryBtn: document.getElementById('refreshLibraryBtn'),
   quickStarts: document.querySelectorAll('[data-quick-start]'),
   tabs: document.querySelectorAll('[data-view]')
 };
@@ -2074,14 +2070,13 @@ function renderLibrary() {
     return;
   }
 
-  renderLibraryStyleFilter();
-  const items = filteredLibraryItems();
+  const items = libraryItems();
   if (!items.length) {
     elements.libraryList.innerHTML = `
       <lex-empty
         icon="document"
-        message="${libraryItems().length ? 'No documents match these filters' : 'No documents yet'}"
-        description="${libraryItems().length ? 'Adjust search, file type, or sort to find a saved document.' : 'Generated Doc Studio files and uploaded matter documents will appear here.'}"
+        message="No documents yet"
+        description="Generated Doc Studio files and uploaded matter documents will appear here."
       ></lex-empty>
     `;
     return;
@@ -3803,19 +3798,6 @@ elements.templateGallery.addEventListener('click', event => {
   }
 
   applyTemplateToSelectedSlide(button.dataset.templateId);
-});
-elements.refreshLibraryBtn.addEventListener('click', loadLibrary);
-elements.librarySearch.addEventListener('input', () => {
-  state.libraryQuery = elements.librarySearch.value;
-  renderLibrary();
-});
-elements.libraryStyleFilter.addEventListener('change', () => {
-  state.libraryStyle = elements.libraryStyleFilter.value;
-  renderLibrary();
-});
-elements.librarySort.addEventListener('change', () => {
-  state.librarySort = elements.librarySort.value;
-  renderLibrary();
 });
 elements.libraryList.addEventListener('click', async event => {
   const libraryItemButton = event.target.closest('[data-open-library-item]');

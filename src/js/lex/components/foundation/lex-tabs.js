@@ -67,9 +67,9 @@
         display: none;
       }
 
-      /* Underline variant — bottom border track */
+      /* Underline variant */
       .lex-tabs-list--underline {
-        border-bottom: 1px solid var(--lex-border-default);
+        border-bottom: 0;
       }
 
       /* Pills variant — background container */

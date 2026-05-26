@@ -15,7 +15,7 @@
         window.LanaConfig.API_BASE_URL = '';
       }
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20260525-client-feature">
+    <link rel="stylesheet" href="./styles.css?v=20260526-doc-typography">
   </head>
   <body>
     <lex-app
@@ -238,9 +238,23 @@
 
       <section class="workspace">
         <div class="toolbar">
-          <div>
-            <strong id="deckTitle">Untitled file</strong>
-            <span id="deckSubtitle">Generate a file to begin</span>
+          <div class="workspace-heading">
+            <div id="standardHeader">
+              <strong id="deckTitle">Untitled file</strong>
+              <span id="deckSubtitle">Generate a file to begin</span>
+            </div>
+            <div id="docHeaderChrome" class="doc-header-chrome hidden">
+              <lex-banner id="docHeaderBanner" variant="light" heading="Untitled file" subtitle="Saved · Last saved just now" max-actions="0">
+                <lex-btn type="button" variant="ghost" leading-icon="download" data-doc-export="pdf">Download PDF</lex-btn>
+                <lex-btn type="button" variant="ghost" leading-icon="download" data-doc-export="docx">Download DOCX</lex-btn>
+              </lex-banner>
+              <div id="docHeaderBreadcrumbs" class="doc-header-breadcrumbs"></div>
+              <div class="doc-edit-actions" aria-label="Document editing actions">
+                <lex-btn type="button" variant="secondary" leading-icon="undo-2" data-doc-undo disabled>Undo</lex-btn>
+                <lex-btn type="button" variant="secondary" leading-icon="redo-2" data-doc-redo disabled>Redo</lex-btn>
+                <lex-btn type="button" variant="primary" leading-icon="save" data-save-document>Save document</lex-btn>
+              </div>
+            </div>
           </div>
           <div class="view-tabs" role="tablist">
             <button class="active" data-view="slides">Slides</button>
@@ -291,36 +305,18 @@
 
         <div id="slidesView" class="slides-view"></div>
         <section id="presentView" class="present-view hidden" aria-label="Presentation view"></section>
-        <article id="docView" class="doc-view hidden"></article>
+        <div id="docEditorLayout" class="doc-editor-layout hidden">
+          <article id="docView" class="doc-view"></article>
+          <aside id="docSidePanel" class="doc-side-panel" aria-label="Document activity"></aside>
+        </div>
         <section id="libraryView" class="library-view hidden">
-          <div class="library-header">
-            <div>
-              <h2>Doc Studio Library</h2>
-              <p>Generated and saved Doc Studio files.</p>
-            </div>
-            <div class="library-toolbar">
-              <label class="mini-field">
-                <span>Search</span>
-                <input id="librarySearch" type="search" placeholder="Title or subtitle">
-              </label>
-              <label class="mini-field">
-                <span>Style</span>
-                <select id="libraryStyleFilter">
-                  <option value="all">All styles</option>
-                </select>
-              </label>
-              <label class="mini-field">
-                <span>Sort</span>
-                <select id="librarySort">
-                  <option value="newest">Newest</option>
-                  <option value="oldest">Oldest</option>
-                  <option value="title">Title</option>
-                  <option value="cards">Section count</option>
-                </select>
-              </label>
-              <button id="refreshLibraryBtn" type="button">Refresh</button>
-            </div>
-          </div>
+          <lex-banner
+            id="libraryHeaderBanner"
+            variant="light"
+            heading="Doc Studio Library"
+            subtitle="Generated and saved Doc Studio files."
+            max-actions="0"
+          ></lex-banner>
           <div id="libraryList" class="library-list"></div>
         </section>
       </section>
@@ -339,7 +335,7 @@
     <script src="../js/lex/components/foundation/lex-card.js"></script>
     <script src="../js/lex/components/foundation/lex-action-card.js"></script>
     <script src="../js/lex/components/foundation/lex-badge.js"></script>
-    <script src="../js/lex/components/foundation/lex-empty.js"></script>
+    <script src="../js/lex/components/foundation/lex-empty.js?v=20260526-empty-state"></script>
     <script src="../js/lex/components/foundation/lex-banner.js"></script>
     <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
     <script src="../js/lex/components/foundation/lex-drawer.js"></script>
@@ -351,8 +347,10 @@
     <script src="../js/lex/components/form/lex-select.js"></script>
     <script src="../js/lex/components/form/lex-input.js"></script>
     <script src="../js/lex/components/form/lex-textarea.js"></script>
+    <script src="../js/lex/components/form/lex-document-comment-composer.js"></script>
     <script src="../js/lex/components/form/lex-toggle.js"></script>
     <script src="../js/lex/components/form/lex-checkbox.js"></script>
+    <script src="../js/lex/components/data/lex-table.js"></script>
     <script src="../js/lex/components/data/lex-pagination.js"></script>
     <script src="../js/lex/components/layout/lex-sidebar.js"></script>
     <script src="../js/lex/components/layout/lex-topbar.js"></script>
@@ -369,20 +367,22 @@
           var content = typeof shell.getContentEl === 'function' ? shell.getContentEl() : document.getElementById('lex-main-content');
           if (!content) return;
           shell.dataset.docStudioMounted = 'true';
+          var params = new URLSearchParams(window.location.search);
+          shell.setAttribute('active-nav-id', 'doc-studio-library');
           if (typeof shell.setSections === 'function') {
             shell.setSections([
               {
                 id: 'doc-studio',
                 isStaticTop: true,
                 items: [
-            { id: 'doc-studio', label: 'Studio', icon: 'file-text', href: 'index.html' }
+                  { id: 'doc-studio-library', label: 'Library', icon: 'table', isButton: true, onClick: 'openDocStudioLibrary' }
                 ]
               }
             ]);
           }
           content.appendChild(template.content.cloneNode(true));
           var script = document.createElement('script');
-          script.src = './app.js?v=20260525-client-feature';
+          script.src = './app.js?v=20260526-doc-edit';
           document.body.appendChild(script);
         }
 

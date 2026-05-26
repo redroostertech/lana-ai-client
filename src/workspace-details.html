@@ -35,6 +35,7 @@
         variant="light"
         heading="Loading..."
         subtitle=""
+        max-actions="1"
       >
         <!-- Ask Matter -->
         <button id="askMatterBtn" class="lana-insights-btn" style="padding:6px 12px;font-size:10.5px;">
@@ -44,21 +45,9 @@
           </span>
           <span>LANA</span>
         </button>
-        <!-- More Options -->
-        <div class="relative">
-          <button id="headerMenuBtn" class="p-2 rounded-lg transition-colors" style="color: var(--lex-text-secondary)" title="More actions"
-                  onmouseover="this.style.background='var(--lex-bg-hover)'" onmouseout="this.style.background='transparent'">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
-            </svg>
-          </button>
-          <div id="headerOptionsDropdown" class="hidden absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-            <button id="headerOptionsEdit" class="w-full px-4 py-2 text-left text-sm transition-colors" style="color: var(--lex-text-accent)" onmouseover="this.style.background='var(--lex-bg-accent-muted)'" onmouseout="this.style.background='transparent'">Edit Matter</button>
-            <button id="headerOptionsStatus" class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors">Change Status</button>
-            <div class="border-t border-gray-100 my-1"></div>
-            <button id="headerOptionsDelete" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Delete</button>
-          </div>
-        </div>
+        <button id="headerOptionsEdit">Edit Matter</button>
+        <button id="headerOptionsStatus">Change Status</button>
+        <button id="headerOptionsDelete" style="color: var(--lex-color-danger-600);">Delete</button>
       </lex-banner>
 
       <!-- Breadcrumbs -->
@@ -78,42 +67,14 @@
            dockPanelContext containers. -->
       <div class="flex-1 flex flex-col min-h-0">
         <!-- Tab bar -->
-        <div class="flex flex-shrink-0">
-          <div id="tabBar" class="flex-1 flex px-6 overflow-x-auto relative">
-            <button id="tabSummary" data-tab="summary" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
-              Summary
-            </button>
-            <button id="tabActivity" data-tab="activity" class="px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors" style="color: var(--lex-text-accent)">
-              Activity
-            </button>
-            <button id="tabNotes" data-tab="notes" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
-              Notes
-            </button>
-            <button id="tabTasks" data-tab="tasks" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
-              Tasks
-            </button>
-            <button id="tabComments" data-tab="comments" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
-              Discussions
-            </button>
-            <button id="tabDocuments" data-tab="documents" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
-              Documents
-            </button>
-            <button id="tabConversations" data-tab="conversations" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
-              Conversations
-            </button>
-            <button id="tabBillableHours" data-tab="billableHours" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
-              Billable Hours
-            </button>
-            <!-- Generate tab hidden -->
-            <button id="tabDocGeneration" data-tab="docGeneration" class="hidden px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
-              Generate
-            </button>
-            <button id="tabAnalytics" data-tab="analytics" class="hidden px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap transition-colors">
-              Analytics
-            </button>
-            <!-- Sliding underline indicator -->
-            <div id="tabIndicator" class="absolute bottom-0 h-0.5" style="background: var(--lex-border-accent); transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);"></div>
-          </div>
+        <div class="flex flex-shrink-0 px-6">
+          <lex-tabs
+            id="tabBar"
+            class="flex-1"
+            active="activity"
+            variant="underline"
+            tabs='[{"id":"summary","label":"Summary"},{"id":"activity","label":"Activity"},{"id":"notes","label":"Notes"},{"id":"tasks","label":"Tasks"},{"id":"comments","label":"Discussions"},{"id":"documents","label":"Documents"},{"id":"conversations","label":"Conversations"},{"id":"billableHours","label":"Billable Hours"}]'
+          ></lex-tabs>
         </div>
 
         <!-- Tab content (single column, scrollable) -->
@@ -1177,7 +1138,7 @@
   <script src="js/lex/components/foundation/lex-toast.js"></script>
   <script src="js/lex/components/foundation/lex-spinner.js"></script>
   <script src="js/lex/components/foundation/lex-btn.js"></script>
-  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js?v=20260526-empty-state"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
 
   <!-- ═══════════════════════════════════════════════════════════════════════

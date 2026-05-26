@@ -1,0 +1,32 @@
+/* file-viewer.css
+   Page-specific styles for file-viewer.html.
+   Owns the page header layout (back button + lex-banner action area) and
+   any overrides for the banner overflow menu used on this page. */
+
+.file-viewer-header {
+  padding: 16px 24px 0;
+  flex-shrink: 0;
+}
+
+.file-viewer-banner {
+  display: block;
+  min-width: 0;
+}
+
+.file-viewer-breadcrumb {
+  display: block;
+  padding: 8px 24px 12px;
+  flex-shrink: 0;
+}
+
+/* Tighten the action area inside the banner so the icon-only sidebar toggle
+   and the LANA button align cleanly without the default banner gap. */
+.file-viewer-banner .lex-banner-actions {
+  gap: 8px;
+}
+
+/* Hidden helper kept consistent with Tailwind .hidden so toggle logic in
+   file-viewer-page.js works whether or not Tailwind has loaded yet. */
+.file-viewer-overflow-item.hidden {
+  display: none;
+}

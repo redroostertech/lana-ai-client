@@ -544,6 +544,14 @@
   color: #b91c1c;
 }
 
+/* Dashboard-detail banner: Edit/Delete are slotted into lex-banner's
+   overflow menu, but they only apply when a saved dashboard is loaded.
+   In default-view mode (no currentDashboardId) we suppress the kebab so
+   the banner reads as actions-free. */
+.dashboard-detail-banner--no-actions .lex-banner-overflow {
+  display: none;
+}
+
 .dash-builder {
   display: grid;
   grid-template-columns: minmax(12rem, 14rem) minmax(0, 1fr);

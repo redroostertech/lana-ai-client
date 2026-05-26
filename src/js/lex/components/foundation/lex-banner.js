@@ -22,6 +22,7 @@
      size      — default | compact
      corners   — Show decorative corner brackets (default: true)
      align     — left (default) | center
+     max-actions — Number of visible action elements before overflow menu (-1 = no overflow)
 
    Events:
      banner-action — emitted when an action button in the slot is clicked
@@ -279,10 +280,122 @@
         align-items: center;
         gap: var(--lex-radius-xl);
         flex-shrink: 0;
+        position: relative;
       }
 
       .lex-banner-actions slot-content {
         display: contents;
+      }
+
+      .lex-banner-overflow {
+        position: relative;
+        display: inline-flex;
+      }
+
+      .lex-banner-overflow-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+        border: 0;
+        border-radius: var(--lex-radius-lg);
+        background: transparent;
+        color: var(--lex-text-secondary);
+        cursor: pointer;
+        padding: 0;
+        transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
+      }
+
+      .lex-banner-overflow-toggle:hover {
+        background: var(--lex-bg-hover);
+        color: var(--lex-text-primary);
+      }
+
+      .lex-banner-overflow-toggle > svg {
+        width: 20px;
+        height: 20px;
+        flex: 0 0 20px;
+      }
+
+      .lex-banner-overflow-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        z-index: 50;
+        /* width sizes to the widest item, with a sensible floor and ceiling
+           so a single short item still gives a clickable target and a very
+           long label doesn't run off the screen. */
+        width: max-content;
+        min-width: 200px;
+        max-width: 360px;
+        border: 1px solid var(--lex-border-default);
+        border-radius: var(--lex-radius-lg);
+        background: var(--lex-bg-primary);
+        box-shadow: var(--lex-shadow-lg);
+        padding: 4px;
+      }
+
+      .lex-banner-overflow-menu[hidden] {
+        display: none;
+      }
+
+      .lex-banner-overflow-menu button,
+      .lex-banner-overflow-menu lex-btn {
+        width: 100%;
+      }
+
+      /* Standard overflow row: a single visual shape used by every consumer.
+         [icon?] [label] — icon is optional, but row height, padding, font,
+         hover, and danger styling stay identical so an icon-less menu
+         (matter-detail) and an icon-bearing menu (file-viewer) look like
+         the same component across the app. */
+      .lex-banner-overflow-menu button {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 36px;
+        border: 0;
+        border-radius: var(--lex-radius-md);
+        background: transparent;
+        color: var(--lex-text-primary);
+        cursor: pointer;
+        font: inherit;
+        font-size: var(--lex-body-sm-size, 0.875rem);
+        padding: 8px 12px;
+        text-align: left;
+        white-space: nowrap;
+        justify-content: flex-start;
+      }
+
+      .lex-banner-overflow-menu button:hover {
+        background: var(--lex-bg-hover);
+      }
+
+      .lex-banner-overflow-menu button > svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        color: var(--lex-text-secondary);
+      }
+
+      .lex-banner-overflow-menu button[data-variant="danger"] {
+        color: var(--lex-status-danger-text, #B42318);
+      }
+
+      .lex-banner-overflow-menu button[data-variant="danger"] > svg {
+        color: var(--lex-status-danger-text, #B42318);
+      }
+
+      .lex-banner-overflow-menu button[data-variant="danger"]:hover {
+        background: var(--lex-status-danger-bg, #FEF3F2);
+      }
+
+      .lex-banner-overflow-menu hr {
+        border: 0;
+        border-top: 1px solid var(--lex-border-subtle, var(--lex-border-default));
+        margin: 4px 6px;
       }
 
       /* ── Meta area (slot under subtitle) ─────────────── */
@@ -326,7 +439,8 @@
         variant:  { type: String, default: 'dark' },
         size:     { type: String, default: 'default' },
         corners:  { type: Boolean, default: true },
-        align:    { type: String, default: 'left' }
+        align:    { type: String, default: 'left' },
+        maxActions: { type: Number, default: -1 }
       };
     }
 
@@ -400,6 +514,32 @@
       `;
     }
 
+    updated() {
+      this.delegate('click', '[data-lex-banner-overflow-toggle]', function (event, toggle) {
+        event.stopPropagation();
+        const menu = toggle.closest('.lex-banner-overflow')?.querySelector('.lex-banner-overflow-menu');
+        if (!menu) return;
+        const nextOpen = menu.hasAttribute('hidden');
+        menu.toggleAttribute('hidden', !nextOpen);
+        toggle.setAttribute('aria-expanded', String(nextOpen));
+      });
+
+      this.delegate('click', '.lex-banner-overflow-menu button, .lex-banner-overflow-menu lex-btn', function () {
+        const menu = this.querySelector('.lex-banner-overflow-menu');
+        const toggle = this.querySelector('[data-lex-banner-overflow-toggle]');
+        if (menu) menu.setAttribute('hidden', '');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      });
+
+      this.listen(document, 'click', (event) => {
+        if (this.contains(event.target)) return;
+        const menu = this.querySelector('.lex-banner-overflow-menu');
+        const toggle = this.querySelector('[data-lex-banner-overflow-toggle]');
+        if (menu) menu.setAttribute('hidden', '');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      });
+    }
+
     // Split original children into meta vs actions slots based on data-banner-meta marker
     _restoreContent() {
       if (!this._originalChildren) return;
@@ -409,11 +549,34 @@
       if (actionsSlot) actionsSlot.innerHTML = '';
       if (metaSlot) metaSlot.innerHTML = '';
       let hasMeta = false;
+      const actionNodes = [];
       for (const node of this._originalChildren) {
         const isMeta = node.nodeType === 1 && node.hasAttribute && node.hasAttribute('data-banner-meta');
         if (isMeta) hasMeta = true;
-        const target = isMeta && metaSlot ? metaSlot : actionsSlot;
-        if (target) target.appendChild(node.cloneNode(true));
+        if (isMeta && metaSlot) {
+          metaSlot.appendChild(node.cloneNode(true));
+        } else if (node.nodeType === 1 || (node.nodeType === 3 && node.textContent.trim())) {
+          actionNodes.push(node);
+        }
+      }
+      const maxActions = Number(this.maxActions);
+      if (actionsSlot && maxActions >= 0 && actionNodes.length > maxActions) {
+        actionNodes.slice(0, maxActions).forEach(node => actionsSlot.appendChild(node.cloneNode(true)));
+        const overflow = document.createElement('div');
+        overflow.className = 'lex-banner-overflow';
+        overflow.innerHTML = `
+          <button type="button" class="lex-banner-overflow-toggle" data-lex-banner-overflow-toggle aria-label="More actions" aria-expanded="false">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+            </svg>
+          </button>
+          <div class="lex-banner-overflow-menu" hidden></div>
+        `;
+        const menu = overflow.querySelector('.lex-banner-overflow-menu');
+        actionNodes.slice(maxActions).forEach(node => menu.appendChild(node.cloneNode(true)));
+        actionsSlot.appendChild(overflow);
+      } else if (actionsSlot) {
+        actionNodes.forEach(node => actionsSlot.appendChild(node.cloneNode(true)));
       }
       if (metaWrap) metaWrap.classList.toggle('lex-banner-meta--empty', !hasMeta);
     }

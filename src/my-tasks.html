@@ -48,43 +48,20 @@
         </div>
       </lex-banner>
 
-      <section class="my-tasks-toolbar" aria-label="Task filters">
-        <lex-segmented
-          id="myTasksStatusFilter"
-          value="open"
-          options='[{"value":"open","label":"Open"},{"value":"all","label":"All"},{"value":"complete","label":"Complete"}]'
-        ></lex-segmented>
-        <lex-select
-          id="myTasksPriorityFilter"
-          value=""
-          placeholder="All priorities"
-          options='[{"value":"","label":"All priorities"},{"value":"high","label":"High"},{"value":"medium","label":"Medium"},{"value":"normal","label":"Normal"},{"value":"low","label":"Low"}]'
-        ></lex-select>
-        <lex-input
-          id="myTasksSearch"
-          type="search"
-          clearable
-          leading-icon="search"
-          placeholder="Search title, matter, or description"
-        ></lex-input>
-      </section>
-
-      <section class="my-tasks-summary" aria-live="polite">
-        <span id="myTasksCount">Loading tasks...</span>
-      </section>
-
-      <section id="myTasksList" class="my-tasks-list" aria-live="polite">
-        <lex-spinner label="Loading tasks"></lex-spinner>
-      </section>
-
-      <lex-pagination
-        id="myTasksPagination"
-        class="my-tasks-pagination"
-        page="1"
-        total-pages="1"
-        total="0"
+      <lex-table
+        id="myTasksTable"
+        class="my-tasks-table"
+        columns="title,level,status,priority,due_date"
+        labels="Task,Level,Status,Priority,Due"
+        searchable
+        column-filters
+        sort-by="updated_at"
+        sort-dir="desc"
         limit="20"
-      ></lex-pagination>
+        id-key="id"
+        empty-text="No tasks assigned to you"
+        aria-label="My tasks"
+      ></lex-table>
 
       <lex-modal
         id="myTaskDetailsModal"
@@ -291,10 +268,9 @@
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-form.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
-  <script src="js/lex/components/form/lex-segmented.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
-  <script src="js/lex/components/data/lex-pagination.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
   <script src="js/lex/components/layout/lex-conversation-item.js"></script>

@@ -11,6 +11,7 @@
   <!-- lana-ask-btn.css replaced by self-contained lex-ask-lana-btn component -->
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
+  <link rel="stylesheet" href="css/file-viewer.css">
   <script src="js/tailwind-loader.js"></script>
 </head>
 <body>
@@ -29,56 +30,59 @@
   <main style="display:flex;flex-direction:column;height:100%">
 
     <!-- Header bar -->
-    <div id="viewerHeader" class="px-6 py-4 border-b flex items-center justify-between flex-shrink-0" style="border-color: var(--lex-border-default); background: var(--lex-bg-primary)">
-      <div class="flex items-center gap-3 min-w-0">
-        <!-- Back button -->
-        <button id="backBtn" class="flex-shrink-0 p-2 rounded-lg transition-colors" style="color: var(--lex-text-secondary)" title="Go back"
-                onmouseover="this.style.background='var(--lex-bg-hover)'" onmouseout="this.style.background='transparent'">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-          </svg>
-        </button>
-        <!-- File icon -->
-        <svg class="w-6 h-6 flex-shrink-0" style="color: var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-        </svg>
-        <div class="min-w-0">
-          <h3 id="viewerFileName" class="text-lg font-semibold truncate" style="color: var(--lex-text-primary)">Loading...</h3>
-          <p id="viewerFileInfo" class="text-sm" style="color: var(--lex-text-secondary)"></p>
-        </div>
-      </div>
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <!-- Download button -->
-        <lex-btn id="viewerDownloadBtn" variant="ghost">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-          Download
-        </lex-btn>
-        <!-- Template actions (DOCX + PDF, toggled via JS) -->
-        <lex-btn id="viewerTemplateBtn" variant="ghost" class="hidden">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-          <span id="viewerTemplateBtnLabel">Use as Template</span>
-        </lex-btn>
-        <lex-btn id="viewerGenerateBtn" variant="primary" class="hidden">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-          Generate
-        </lex-btn>
-        <!-- Delete file -->
-        <lex-btn id="viewerDeleteBtn" variant="ghost" title="Delete file">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"></path></svg>
-          Delete
-        </lex-btn>
-        <!-- Toggle Metadata Sidebar -->
-        <lex-btn id="toggleSidebarBtn" variant="ghost" icon="true" title="Toggle metadata sidebar">
+    <div id="viewerHeader" class="file-viewer-header">
+      <lex-banner
+        id="viewerBanner"
+        class="file-viewer-banner"
+        variant="light"
+        heading="Loading..."
+        subtitle=""
+        max-actions="2"
+      >
+        <!-- Visible action 1: Toggle metadata sidebar -->
+        <lex-btn id="toggleSidebarBtn" variant="ghost" icon="true" title="Toggle metadata sidebar" aria-label="Toggle metadata sidebar">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
           </svg>
         </lex-btn>
-        <!-- Divider -->
-        <div style="width:1px;height:20px;background:var(--lex-border-default);margin:0 4px;flex-shrink:0;"></div>
-        <!-- LANA button -->
+        <!-- Visible action 2: LANA -->
         <lex-ask-lana-btn id="askLanaBtn" panel="fileViewerLana" size="sm"></lex-ask-lana-btn>
-      </div>
+        <!-- Overflow action: Open in Doc Studio -->
+        <button id="openDocStudioBtn" type="button" class="hidden file-viewer-overflow-item" role="menuitem">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18 3h3m0 0v3m0-3L10 14"></path></svg>
+          Open in Doc Studio
+        </button>
+        <!-- Overflow action: Download -->
+        <button id="viewerDownloadBtn" type="button" class="file-viewer-overflow-item" role="menuitem">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          Download
+        </button>
+        <!-- Overflow action: Use as Template -->
+        <button id="viewerTemplateBtn" type="button" class="hidden file-viewer-overflow-item" role="menuitem">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          <span id="viewerTemplateBtnLabel">Use as Template</span>
+        </button>
+        <!-- Overflow action: Generate from Template -->
+        <button id="viewerGenerateBtn" type="button" class="hidden file-viewer-overflow-item" role="menuitem">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          Generate from Template
+        </button>
+        <hr />
+        <!-- Overflow action: Delete -->
+        <button id="viewerDeleteBtn" type="button" data-variant="danger" class="file-viewer-overflow-item" role="menuitem">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"></path></svg>
+          Delete
+        </button>
+      </lex-banner>
     </div>
+
+    <!-- Breadcrumb sits in its own row, sibling of the header (not nested
+         inside it) so it owns its spacing and the banner stays unaffected. -->
+    <lex-breadcrumb
+      id="viewerBreadcrumb"
+      class="file-viewer-breadcrumb"
+      items='[{"label":"Loading..."}]'
+    ></lex-breadcrumb>
 
     <!-- Two-column content area -->
     <div class="flex-1 flex overflow-hidden">
@@ -387,6 +391,8 @@
   <script src="js/lex/components/foundation/lex-toast.js"></script>
   <script src="js/lex/components/foundation/lex-spinner.js"></script>
   <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
 

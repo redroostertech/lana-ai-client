@@ -286,79 +286,8 @@
   }
 }
 
-.my-tasks-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--lex-spacing-md, 0.75rem);
-  align-items: center;
-  justify-content: space-between;
-  margin: var(--lex-spacing-lg, 1.5rem) 0 var(--lex-spacing-md, 0.75rem);
-}
-
-.my-tasks-toolbar lex-segmented {
-  flex: 0 0 auto;
-}
-
-.my-tasks-toolbar lex-input {
-  flex: 0 1 24rem;
-  width: min(100%, 24rem);
-}
-
-.my-tasks-toolbar lex-select {
-  flex: 0 0 12rem;
-}
-
-.my-tasks-summary {
-  color: var(--lex-text-secondary);
-  font-size: var(--lex-body-sm-size, 0.875rem);
-  margin-bottom: var(--lex-spacing-md, 0.75rem);
-}
-
-.my-tasks-list {
-  display: grid;
-  gap: var(--lex-spacing-sm, 0.5rem);
-}
-
-.my-tasks-table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--lex-border-default);
-  border-radius: var(--lex-radius-md, 0.5rem);
-  background: var(--lex-bg-primary);
-}
-
 .my-tasks-table {
-  width: 100%;
-  min-width: 38rem;
-  border-collapse: collapse;
-}
-
-.my-tasks-table th,
-.my-tasks-table td {
-  padding: var(--lex-spacing-sm, 0.5rem) var(--lex-spacing-md, 0.75rem);
-  border-bottom: 1px solid var(--lex-border-subtle, var(--lex-border-default));
-  text-align: left;
-  vertical-align: top;
-  font-size: var(--lex-body-sm-size, 0.875rem);
-}
-
-.my-tasks-table th {
-  color: var(--lex-text-secondary);
-  font-weight: var(--lex-weight-semibold, 600);
-  background: var(--lex-bg-secondary);
-  white-space: nowrap;
-}
-
-.my-tasks-table tbody tr {
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.my-tasks-table tbody tr:hover {
-  background: var(--lex-bg-secondary);
-}
-
-.my-tasks-table tr:last-child td {
-  border-bottom: 0;
+  margin-top: var(--lex-spacing-md, 0.75rem);
 }
 
 .my-task-table__title {
@@ -386,11 +315,6 @@
 .my-task-level-link:hover {
   background: var(--lex-bg-tertiary);
   border-color: var(--lex-border-strong, var(--lex-border-default));
-}
-
-.my-tasks-pagination {
-  display: block;
-  margin-top: var(--lex-spacing-md, 0.75rem);
 }
 
 .my-task-details-modal .lex-modal-overlay {
@@ -471,15 +395,3 @@
   color: var(--lex-text-secondary);
 }
 
-@media (max-width: 760px) {
-  .my-tasks-toolbar {
-    align-items: stretch;
-  }
-
-  .my-tasks-toolbar lex-input,
-  .my-tasks-toolbar lex-select,
-  .my-tasks-toolbar lex-segmented {
-    flex-basis: 100%;
-    width: 100%;
-  }
-}

@@ -3,14 +3,6 @@
 
   var state = {
     tasks: [],
-    loading: false,
-    statusFilter: 'open',
-    priorityFilter: '',
-    search: '',
-    searchTimer: null,
-    page: 1,
-    limit: 20,
-    total: 0,
     newMenuOpen: false,
     // Create/Edit Task modal selections
     editingTaskId: null,           // null when creating, set when editing
@@ -24,6 +16,14 @@
     planSelectedMatterId: null,
     planSelectedMatterName: null
   };
+
+  // The /api/v1/tasks/my endpoint caps `limit` at 100, so we page through
+  // up to TASK_FETCH_MAX rows to gather the full set for lex-table's
+  // client-side search/sort/filter/pagination. Past TASK_FETCH_MAX we stop
+  // and accept truncation rather than spamming the API; a user with that
+  // many open assignments warrants a different UX anyway.
+  var TASK_PAGE_LIMIT = 100;
+  var TASK_FETCH_MAX = 500;
 
   var TASK_PLAN_ROLES = ['system_admin', 'org_admin', 'admin', 'upper_leader', 'senior_leader', 'senior_user'];
 
@@ -48,18 +48,6 @@
     return [];
   }
 
-  function normalizeTaskResult(response) {
-    if (!response) return { tasks: [], hasMore: false, total: 0 };
-    if (response.data) return normalizeTaskResult(response.data);
-    var pagination = response.pagination || {};
-    return {
-      tasks: normalizeTasks(response),
-      hasMore: !!response.hasMore,
-      total: response.total || pagination.total || 0,
-      pagination: pagination
-    };
-  }
-
   function statusLabel(status) {
     if (status === 'in_progress') return 'In Progress';
     if (status === 'in_review') return 'In Review';
@@ -74,16 +62,15 @@
     return 'gray';
   }
 
+  function priorityLabel(priority) {
+    var p = priority ? String(priority).toLowerCase() : 'normal';
+    return p.charAt(0).toUpperCase() + p.slice(1);
+  }
+
   function priorityColor(priority) {
     if (priority === 'high') return 'red';
     if (priority === 'medium' || priority === 'normal') return 'yellow';
     return 'gray';
-  }
-
-  function statusQuery() {
-    if (state.statusFilter === 'complete') return 'complete,completed';
-    if (state.statusFilter === 'open') return 'pending,in_progress,in_review';
-    return '';
   }
 
   function taskMatterLabel(task) {
@@ -183,107 +170,80 @@
     state.viewingTask = null;
   }
 
-  function updatePagination() {
-    var pagination = el('myTasksPagination');
-    if (!pagination) return;
-    var totalPages = Math.max(1, Math.ceil(state.total / state.limit));
-    pagination.setAttribute('page', String(state.page));
-    pagination.setAttribute('total-pages', String(totalPages));
-    pagination.setAttribute('total', String(state.total));
-    pagination.setAttribute('limit', String(state.limit));
+  // Map a raw task into the row shape lex-table sees. Keep humanized values
+  // in the visible columns so the column-filter dropdowns show pretty labels
+  // (e.g. "In Progress" rather than "in_progress") while preserving the
+  // original task in `_raw` for row-click / action handlers.
+  function mapTaskForTable(task) {
+    return {
+      id: task.id,
+      title: task.title || 'Untitled task',
+      level: task.matter_id ? 'Matter' : 'Org',
+      status: statusLabel(task.status),
+      priority: priorityLabel(task.priority || 'normal'),
+      due_date: task.due_date || '',
+      updated_at: task.updated_at || '',
+      _raw: task
+    };
   }
 
-  function renderList() {
-    var list = el('myTasksList');
-    var count = el('myTasksCount');
-    if (!list) return;
-
-    if (state.loading) {
-      list.innerHTML = '<lex-spinner label="Loading tasks"></lex-spinner>';
-      if (count) count.textContent = 'Loading tasks...';
-      updatePagination();
-      return;
-    }
-
-    if (count) {
-      count.textContent = state.total + ' task' + (state.total === 1 ? '' : 's') + ' found';
-    }
-    updatePagination();
-
-    if (!state.tasks.length) {
-      list.innerHTML = '<lex-empty icon="tasks" message="No tasks assigned to you" description="Assigned tasks will appear here."></lex-empty>';
-      return;
-    }
-
-    var rowsHtml = state.tasks.map(function (task) {
-      return [
-        '<tr data-task-id="' + esc(task.id) + '">',
-        '  <td>',
-        '    <div class="my-task-table__title">' + esc(task.title || 'Untitled task') + '</div>',
-        '  </td>',
-        '  <td>' + levelHtml(task) + '</td>',
-        '  <td><lex-badge label="' + esc(statusLabel(task.status)) + '" color="' + esc(statusColor(task.status)) + '"></lex-badge></td>',
-        '  <td><lex-badge label="' + esc(task.priority || 'normal') + '" color="' + esc(priorityColor(task.priority)) + '"></lex-badge></td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    list.innerHTML = [
-      '<div class="my-tasks-table-wrap">',
-      '  <table class="my-tasks-table">',
-      '    <thead>',
-      '      <tr>',
-      '        <th scope="col">Task</th>',
-      '        <th scope="col">Level</th>',
-      '        <th scope="col">Status</th>',
-      '        <th scope="col">Priority</th>',
-      '      </tr>',
-      '    </thead>',
-      '    <tbody>',
-      rowsHtml,
-      '    </tbody>',
-      '  </table>',
-      '</div>'
-    ].join('');
+  function cellRenderers() {
+    return {
+      title: function (val) {
+        return '<div class="my-task-table__title">' + esc(val || '') + '</div>';
+      },
+      level: function (val, row) {
+        var task = row && row._raw;
+        if (!task || !task.matter_id) {
+          return '<lex-badge label="Org" color="green"></lex-badge>';
+        }
+        return [
+          '<button type="button" class="my-task-level-link" data-matter-id="' + esc(task.matter_id) + '" title="' + esc(taskMatterLabel(task)) + '">',
+          'Matter',
+          '</button>'
+        ].join('');
+      },
+      status: function (val, row) {
+        var task = row && row._raw;
+        var raw = task ? task.status : '';
+        return '<lex-badge label="' + esc(statusLabel(raw)) + '" color="' + esc(statusColor(raw)) + '"></lex-badge>';
+      },
+      priority: function (val, row) {
+        var task = row && row._raw;
+        var raw = task && task.priority ? task.priority : 'normal';
+        return '<lex-badge label="' + esc(priorityLabel(raw)) + '" color="' + esc(priorityColor(raw)) + '"></lex-badge>';
+      },
+      due_date: function (val) {
+        return val ? esc(formatDate(val)) : '<span class="my-task-detail__muted">—</span>';
+      }
+    };
   }
 
   async function loadTasks() {
-    state.loading = true;
-    renderList();
-
+    var table = el('myTasksTable');
+    if (!table) return;
     try {
-      var baseFilters = {
-        limit: state.limit,
-        offset: (state.page - 1) * state.limit,
-        sort_by: 'updated_at',
-        sort_dir: 'DESC'
-      };
-      var statuses = statusQuery();
-      if (statuses) baseFilters.statuses = statuses;
-      if (state.priorityFilter) baseFilters.priorities = state.priorityFilter;
-      if (state.search) baseFilters.search = state.search;
-
-      var result = normalizeTaskResult(await api.getMyTasks(baseFilters));
-      state.tasks = result.tasks;
-      state.total = result.total;
+      var collected = [];
+      var offset = 0;
+      while (collected.length < TASK_FETCH_MAX) {
+        var batch = normalizeTasks(await api.getMyTasks({
+          limit: TASK_PAGE_LIMIT,
+          offset: offset,
+          sort_by: 'updated_at',
+          sort_dir: 'DESC'
+        }));
+        if (!batch.length) break;
+        collected = collected.concat(batch);
+        if (batch.length < TASK_PAGE_LIMIT) break;
+        offset += TASK_PAGE_LIMIT;
+      }
+      state.tasks = collected;
+      table.setData(collected.map(mapTaskForTable));
     } catch (error) {
       Lex.Toast.error(error.message || 'Unable to load tasks');
       state.tasks = [];
-      state.total = 0;
-    } finally {
-      state.loading = false;
-      renderList();
+      if (typeof table.setData === 'function') table.setData([]);
     }
-  }
-
-  function resetAndLoad() {
-    state.page = 1;
-    loadTasks();
-  }
-
-  function queueSearch() {
-    clearTimeout(state.searchTimer);
-    state.searchTimer = setTimeout(resetAndLoad, 250);
   }
 
   function userHasRole(roleName) {
@@ -654,7 +614,7 @@
         );
       }
       closeNewTaskModal();
-      resetAndLoad();
+      loadTasks();
     } catch (error) {
       Lex.Toast.error(error.message || (state.editingTaskId ? 'Unable to update task' : 'Unable to create task'));
     } finally {
@@ -679,7 +639,7 @@
         await api.completeTask(task.id);
         Lex.Toast.success('Task marked complete');
         closeTaskDetails();
-        resetAndLoad();
+        loadTasks();
       } catch (error) {
         Lex.Toast.error(error.message || 'Unable to mark task complete');
       }
@@ -691,7 +651,7 @@
         await api.updateTask(task.id, { status: 'pending' });
         Lex.Toast.success('Task reopened');
         closeTaskDetails();
-        resetAndLoad();
+        loadTasks();
       } catch (error) {
         Lex.Toast.error(error.message || 'Unable to reopen task');
       }
@@ -705,7 +665,7 @@
         await api.deleteTask(task.id);
         Lex.Toast.success('Task deleted');
         closeTaskDetails();
-        resetAndLoad();
+        loadTasks();
       } catch (error) {
         Lex.Toast.error(error.message || 'Unable to delete task');
       }
@@ -796,59 +756,33 @@
   }
 
   function bindEvents() {
-    var status = el('myTasksStatusFilter');
-    var priority = el('myTasksPriorityFilter');
-    var search = el('myTasksSearch');
-    var pagination = el('myTasksPagination');
+    var table = el('myTasksTable');
+    if (table) {
+      // Renderers must be registered before the first setData so they are
+      // active for the initial render (lex-table caches them on the element).
+      if (typeof table.setCellRenderers === 'function') {
+        table.setCellRenderers(cellRenderers());
+      }
 
-    if (status) {
-      status.addEventListener('change', function () {
-        state.statusFilter = status.value || 'open';
-        resetAndLoad();
+      // lex-table emits `row-click` for any non-button/input/anchor click
+      // inside a row. Use it to open the task details modal.
+      table.addEventListener('row-click', function (event) {
+        var row = event.detail && event.detail.row;
+        var task = row && row._raw;
+        if (task) openTaskDetails(task);
       });
-      status.addEventListener('lex-change', function (event) {
-        state.statusFilter = event.detail && event.detail.value ? event.detail.value : status.value || 'open';
-        resetAndLoad();
-      });
-    }
 
-    if (priority) {
-      priority.addEventListener('lex-change', function (event) {
-        state.priorityFilter = event.detail && event.detail.value ? event.detail.value : '';
-        resetAndLoad();
-      });
-    }
-
-    if (search) {
-      search.addEventListener('input', function () {
-        state.search = String(search.value || '').trim();
-        queueSearch();
-      });
-    }
-
-    if (pagination) {
-      pagination.addEventListener('page-change', function (event) {
-        state.page = event.detail && event.detail.page ? event.detail.page : 1;
-        loadTasks();
-      });
-    }
-
-    var list = el('myTasksList');
-    if (list) {
-      list.addEventListener('click', function (event) {
+      // Level-column "Matter" button lives inside the row, so lex-table's
+      // row-click guard skips it. Catch it here via delegation — re-attached
+      // automatically after every lex-table re-render since the listener
+      // lives on the host element, not the inner table cells.
+      table.addEventListener('click', function (event) {
         var matterButton = event.target.closest('[data-matter-id]');
-        if (matterButton) {
-          Lex.Nav.go('workspace-details.html', {
-            params: { id: matterButton.getAttribute('data-matter-id'), tab: 'tasks' }
-          });
-          return;
-        }
-
-        var row = event.target.closest('[data-task-id]');
-        if (!row) return;
-        var taskId = row.getAttribute('data-task-id');
-        var task = state.tasks.find(function (item) { return item.id === taskId; });
-        openTaskDetails(task);
+        if (!matterButton) return;
+        event.stopPropagation();
+        Lex.Nav.go('workspace-details.html', {
+          params: { id: matterButton.getAttribute('data-matter-id'), tab: 'tasks' }
+        });
       });
     }
 
