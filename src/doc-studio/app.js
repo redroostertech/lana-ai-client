@@ -14,9 +14,6 @@ const state = {
   templates: [],
   brandKits: [],
   critique: null,
-  libraryQuery: '',
-  libraryStyle: 'all',
-  librarySort: 'updated',
   libraryCapabilities: {
     duplicate: true,
     rename: true,
@@ -2004,49 +2001,6 @@ function libraryItems() {
     });
 
   return storageItems.concat(presentationItems);
-}
-
-function filteredLibraryItems() {
-  const query = state.libraryQuery.trim().toLowerCase();
-  const fileType = state.libraryStyle;
-  const sorted = libraryItems().filter(item => {
-    const matchesQuery = !query || [
-      item.filename,
-      item.file_type,
-      item.matter,
-      item.is_template
-    ].some(value => String(value || '').toLowerCase().includes(query));
-    const matchesType = fileType === 'all' || item.file_type === fileType;
-    return matchesQuery && matchesType;
-  });
-
-  sorted.sort((a, b) => {
-    if (state.librarySort === 'updated') {
-      return String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || ''));
-    }
-    if (state.librarySort === 'oldest') {
-      return String(a.created_at || '').localeCompare(String(b.created_at || ''));
-    }
-    if (state.librarySort === 'filename') {
-      return String(a.filename || '').localeCompare(String(b.filename || ''));
-    }
-    if (state.librarySort === 'type') {
-      return String(a.file_type || '').localeCompare(String(b.file_type || ''));
-    }
-    if (state.librarySort === 'matter') {
-      return String(a.matter || '').localeCompare(String(b.matter || ''));
-    }
-    return String(b.created_at || '').localeCompare(String(a.created_at || ''));
-  });
-
-  return sorted;
-}
-
-function renderLibraryStyleFilter() {
-  const types = Array.from(new Set(libraryItems().map(item => item.file_type || 'Document'))).sort();
-  const options = ['<option value="all">All file types</option>']
-    .concat(types.map(type => `<option value="${escapeHtml(type)}" ${state.libraryStyle === type ? 'selected' : ''}>${escapeHtml(type)}</option>`));
-  elements.libraryStyleFilter.innerHTML = options.join('');
 }
 
 function presentationPreview(presentation) {

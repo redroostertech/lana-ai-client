@@ -780,6 +780,20 @@
       due.getDate() === today.getDate();
   }
 
+  function taskDaysPastDue(task) {
+    if (!task || !task.due_date) return 0;
+    var due = new Date(task.due_date);
+    if (isNaN(due.getTime())) return 0;
+    var today = new Date();
+    var dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
+    var todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    return Math.floor((todayStart - dueStart) / 86400000);
+  }
+
+  function isTaskSeverelyDelinquent(task) {
+    return taskDaysPastDue(task) >= 7;
+  }
+
   // ---- Task status / date helpers (used by row + drawer) ------------------
 
   var TASK_STATUSES = ['pending', 'in_progress', 'in_review', 'complete', 'cancelled'];
@@ -909,12 +923,24 @@
       return;
     }
 
-    var todayTasks = tasks.filter(isTaskDueToday).slice(0, 4);
+    var severelyDelinquentTasks = tasks.filter(isTaskSeverelyDelinquent).slice(0, 5);
+    var severeIds = {};
+    for (var si = 0; si < severelyDelinquentTasks.length; si++) {
+      var severeId = getTaskId(severelyDelinquentTasks[si]);
+      if (severeId) severeIds[severeId] = true;
+    }
+
+    var todayTasks = tasks.filter(function (task) {
+      return isTaskDueToday(task) && !severeIds[getTaskId(task)];
+    }).slice(0, 4);
     var grouped = {};
     var ungrouped = [];
 
     for (var i = 0; i < tasks.length; i++) {
       var task = tasks[i];
+      if (severeIds[getTaskId(task)]) {
+        continue;
+      }
       if (task.task_plan_id) {
         if (!grouped[task.task_plan_id]) {
           grouped[task.task_plan_id] = {
@@ -939,15 +965,22 @@
     outstandingRows += outstandingTasks.map(renderDashboardTaskRow).join('');
 
     var todayRows = todayTasks.map(renderDashboardTaskRow).join('');
+    var severeRows = severelyDelinquentTasks.map(renderDashboardTaskRow).join('');
 
     contentEl.innerHTML = [
       '<div class="cc-task-section">',
       '  <div class="cc-task-section__heading">Today</div>',
       todayRows || '  <div class="cc-task-empty">No tasks due today</div>',
       '</div>',
-      '<div class="cc-task-section">',
-      '  <div class="cc-task-section__heading">Outstanding</div>',
-      outstandingRows || '  <div class="cc-task-empty">No outstanding task groups</div>',
+      '<div class="cc-task-columns">',
+      '  <div class="cc-task-section">',
+      '    <div class="cc-task-section__heading">Outstanding</div>',
+      outstandingRows || '    <div class="cc-task-empty">No outstanding task groups</div>',
+      '  </div>',
+      '  <div class="cc-task-section cc-task-section--delinquent">',
+      '    <div class="cc-task-section__heading">Severely Delinquent</div>',
+      severeRows || '    <div class="cc-task-empty">No severely delinquent tasks</div>',
+      '  </div>',
       '</div>'
     ].join('');
     show(contentEl);
@@ -955,7 +988,7 @@
     // Build a quick lookup so click handlers can pass the full task object to
     // the drawer without re-fetching.
     var taskLookup = {};
-    var allRowTasks = todayTasks.concat(outstandingTasks);
+    var allRowTasks = todayTasks.concat(outstandingTasks).concat(severelyDelinquentTasks);
     for (var t = 0; t < allRowTasks.length; t++) {
       var tid = getTaskId(allRowTasks[t]);
       if (tid) taskLookup[tid] = allRowTasks[t];
