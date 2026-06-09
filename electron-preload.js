@@ -83,6 +83,45 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Brainchild MCP bridge (Phase B) — read the user's local vault.
+   *
+   * The renderer never spawns processes; it calls these thin wrappers which
+   * route to the main-process BrainchildManager over IPC. All methods resolve
+   * with a result object shaped `{ success, ... }` or `{ success: false, error }`.
+   *
+   *   discover()                  -> { success, installPath, vaultPath, mcpBin }
+   *   link({ installPath, vaultPath }) -> { success, status } | { success:false, error }
+   *   status()                    -> { success, status, reason?, vaultPath? }
+   *   listNotes({ filter? })      -> { success, notes, count }
+   *   search({ query, limit? })   -> { success, results }
+   *   getNote({ path })           -> { success, note }
+   *   openNote(path)              -> opens the note in the Brainchild app (deep link)
+   */
+  brainchild: {
+    discover: () => ipcRenderer.invoke('brainchild:discover'),
+    link: (config) => ipcRenderer.invoke('brainchild:link', config),
+    status: () => ipcRenderer.invoke('brainchild:status'),
+    listNotes: (options) => ipcRenderer.invoke('brainchild:listNotes', options || {}),
+    search: (options) => ipcRenderer.invoke('brainchild:search', options || {}),
+    getNote: (options) => ipcRenderer.invoke('brainchild:getNote', options || {}),
+    // Native folder pickers (main-mediated). pickInstall() returns a vetted
+    // { installPath }, pickVault() returns { vaultPath } — feed both to link().
+    pickInstall: () => ipcRenderer.invoke('brainchild:pickInstall'),
+    pickVault: () => ipcRenderer.invoke('brainchild:pickVault'),
+    // Forget the persisted link and stop the MCP child so the user can re-link
+    // to a different install/vault.
+    unlink: () => ipcRenderer.invoke('brainchild:unlink'),
+    // Reveal a note's vault file in the OS file manager — the always-available
+    // fallback for "Open in Brainchild" when no protocol handler is registered.
+    revealNote: (notePath) => ipcRenderer.invoke('brainchild:revealNote', { path: notePath }),
+    // Vault-relative paths routinely contain spaces and may contain '#', '%', or
+    // '?' (e.g. 'Daily/2026-05-16 notes.md'). encodeURI preserves the '/' path
+    // separators while escaping those characters so the deep link is not
+    // truncated at a '#' fragment or broken by raw spaces.
+    openNote: (notePath) => ipcRenderer.invoke('open-external-url', 'brainchild://vault/' + encodeURI(String(notePath || '')))
+  },
+
+  /**
    * Generic IPC invoke (for extensibility)
    */
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),

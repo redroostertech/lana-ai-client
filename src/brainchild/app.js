@@ -18,7 +18,10 @@
     orgRows: null,
     orgLoading: false,
     myRows: null,
-    myLoading: false
+    myLoading: false,
+    // Phase B: cached brainchild bridge status (degraded | linked | connected).
+    // Refreshed only on explicit user action (link/re-link) or first My load.
+    brainchildStatus: null
   };
 
   var els = {
@@ -28,8 +31,13 @@
     myPanel: document.getElementById('bcMyPanel'),
     myEmpty: document.getElementById('bcMyEmpty'),
     myTable: document.getElementById('bcMyTable'),
+    myBanner: document.getElementById('bcMyBanner'),
     status: document.getElementById('bcStatus')
   };
+
+  // Brainchild MCP bridge handle (exposed by electron-preload). Absent in a
+  // plain browser context — every call is guarded so the page still renders.
+  var brainchild = (window.electronAPI && window.electronAPI.brainchild) || null;
 
   // ---- Config / fetch wiring (mirrors doc-studio's apiFetch) ----------------
   //
@@ -164,19 +172,49 @@
     }
   }
 
-  // ---- My scope: stubbed loopback (Slice B) --------------------------------
+  // ---- My scope: Brainchild MCP bridge (Phase B) ---------------------------
+  //
+  // The renderer is presentation-only here. All node/spawn/MCP logic lives in
+  // Electron main (src/electron-brainchild-manager.js) and is reached through
+  // the contextIsolation-safe window.electronAPI.brainchild.* bridge. We fetch
+  // notes via list_notes, shape them through the shared mapper, and fall back
+  // to the connect/degraded states when the bridge reports it's not linked.
 
-  // Slice B will call the local Brainchild loopback API here. For Slice A this
-  // returns no notes so the "Connect Brainchild" empty state is shown.
+  // Read the user's vault note list over the MCP bridge. Returns the raw note
+  // DTOs (path/title/...) — shaping is delegated to the mapper. On any failure
+  // we return an empty array so the My panel degrades gently instead of crashing.
   async function fetchBrainchildNotes(/* scope */) {
-    // TODO (Slice B): read the local Brainchild vault over the loopback bridge.
-    return [];
+    if (!brainchild) return [];
+    try {
+      var result = await brainchild.listNotes({});
+      if (!result || result.success === false) return [];
+      return Array.isArray(result.notes) ? result.notes : [];
+    } catch (_error) {
+      return [];
+    }
   }
 
-  // Drive the My panel through the same mapper contract as Org so the Slice B
-  // seam is real: notes are fetched, normalized, and either rendered or fall
-  // back to the static "Connect Brainchild" empty state. No business logic —
-  // the loopback source of truth lives in the Brainchild app / backend.
+  // Refresh the cached bridge status (degraded | linked | connected). Cheap; does
+  // not spawn the MCP server. Cached so renders/scrolls never re-poll the bridge.
+  async function refreshBrainchildStatus() {
+    if (!brainchild) {
+      state.brainchildStatus = { status: 'degraded', reason: 'not_linked' };
+      return state.brainchildStatus;
+    }
+    try {
+      var result = await brainchild.status();
+      state.brainchildStatus = (result && result.success !== false)
+        ? result
+        : { status: 'degraded', reason: 'not_linked' };
+    } catch (_error) {
+      state.brainchildStatus = { status: 'degraded', reason: 'unavailable' };
+    }
+    return state.brainchildStatus;
+  }
+
+  // Drive the My panel through the same mapper contract as Org. Notes are
+  // fetched over the bridge, normalized, and either rendered or replaced by the
+  // connect/degraded empty state.
   async function ensureMyLoaded() {
     if (state.myLoading) return;
     if (Array.isArray(state.myRows)) {
@@ -185,7 +223,9 @@
     }
     state.myLoading = true;
     try {
-      var notes = await fetchBrainchildNotes('my');
+      await refreshBrainchildStatus();
+      var linked = state.brainchildStatus && state.brainchildStatus.status !== 'degraded';
+      var notes = linked ? await fetchBrainchildNotes('my') : [];
       state.myRows = mapper
         ? mapper.normalizeLibraryItems({ notes: notes }, 'my')
         : [];
@@ -195,17 +235,171 @@
     }
   }
 
+  // Map a degraded reason code to user-facing copy. No regex; plain lookup.
+  function degradedCopy(reason) {
+    if (reason === 'install_not_found') {
+      return 'Brainchild was not found on this device. Re-link and choose your install folder.';
+    }
+    if (reason === 'vault_not_found') {
+      return 'Your Brainchild vault could not be read. Re-link and choose the vault folder.';
+    }
+    if (reason === 'unavailable') {
+      return 'The Brainchild bridge is unavailable. Re-link to reconnect.';
+    }
+    return 'Connect Brainchild to read your personal notes here.';
+  }
+
+  function renderMyBanner() {
+    if (!els.myBanner) return;
+    var status = state.brainchildStatus || {};
+    var connected = status.status === 'connected' || status.status === 'linked';
+    var hasRows = Array.isArray(state.myRows) && state.myRows.length > 0;
+
+    // Connected + notes present: subtle confirmation banner.
+    if (connected && hasRows) {
+      els.myBanner.classList.remove('bc-hidden');
+      els.myBanner.setAttribute('status', 'connected');
+      els.myBanner.setAttribute('heading', 'Connected to Brainchild');
+      if (status.vaultPath) {
+        els.myBanner.setAttribute('subtitle', status.vaultPath);
+      } else {
+        els.myBanner.removeAttribute('subtitle');
+      }
+      return;
+    }
+
+    // Degraded after a link attempt: warn + offer re-link via the empty-state CTA.
+    if (status.status === 'degraded' && status.reason && status.reason !== 'not_linked') {
+      els.myBanner.classList.remove('bc-hidden');
+      els.myBanner.setAttribute('status', 'warning');
+      els.myBanner.setAttribute('heading', 'Brainchild connection issue');
+      els.myBanner.setAttribute('subtitle', degradedCopy(status.reason));
+      return;
+    }
+
+    els.myBanner.classList.add('bc-hidden');
+  }
+
   function renderMyPanel() {
     var rows = Array.isArray(state.myRows) ? state.myRows : [];
     var hasRows = rows.length > 0;
-    // When the loopback bridge returns notes (Slice B), render them in the
-    // table and hide the "Connect Brainchild" prompt. With no notes yet, the
-    // table stays hidden and the static empty state offers the connect CTA.
     if (els.myTable && typeof els.myTable.setData === 'function') {
       els.myTable.setData(rows);
     }
     if (els.myTable) els.myTable.classList.toggle('bc-hidden', !hasRows);
     if (els.myEmpty) els.myEmpty.classList.toggle('bc-hidden', hasRows);
+    renderMyBanner();
+  }
+
+  // ---- Read-only note preview ----------------------------------------------
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .split('&').join('&amp;')
+      .split('<').join('&lt;')
+      .split('>').join('&gt;')
+      .split('"').join('&quot;')
+      .split("'").join('&#39;');
+  }
+
+  // Find the source note (with _vaultPath) for a clicked row id.
+  function findMyRow(rowId) {
+    var rows = Array.isArray(state.myRows) ? state.myRows : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].id === rowId) return rows[i];
+    }
+    return null;
+  }
+
+  function buildPreviewHtml(note, vaultPath) {
+    var safeBody = escapeHtml((note && note.body) || '');
+    var meta = [];
+    var fm = (note && note.frontmatter) || {};
+    if (fm.date) meta.push('Date: ' + escapeHtml(fm.date));
+    if (fm.type) meta.push('Type: ' + escapeHtml(fm.type));
+    var metaLine = meta.length
+      ? '<p class="bc-preview-meta">' + meta.join(' · ') + '</p>'
+      : '';
+    // Actions use the Lex button primitive (lex-btn) rather than raw,
+    // bespoke-styled <button>s, per LEX-COMPONENT-RULES.md. lex-btn emits a
+    // normal DOM 'click' we wire after the modal body is set.
+    //
+    // "Open in Brainchild" attempts the brainchild:// deep link, which only
+    // works if the Brainchild app has registered the scheme. "Show in Finder"
+    // is the always-available fallback (reveals the file in the OS file
+    // manager) so the user is never stranded if the deep link no-ops.
+    var safePath = escapeHtml(vaultPath);
+    return '<div class="bc-preview">' +
+      metaLine +
+      '<pre class="bc-preview-body">' + safeBody + '</pre>' +
+      '<div class="bc-preview-actions">' +
+      '<lex-btn class="bc-reveal-note" variant="ghost" size="sm" ' +
+      'data-vault-path="' + safePath + '">Show in Finder</lex-btn>' +
+      '<lex-btn class="bc-open-brainchild" variant="primary" size="sm" ' +
+      'data-vault-path="' + safePath + '">Open in Brainchild</lex-btn>' +
+      '</div></div>';
+  }
+
+  // Write into the lex-modal's body slot rather than replacing the host element.
+  // After Lex.Modal.open() the component has already rendered its chrome
+  // (overlay/backdrop/panel/header/close button) into light DOM; reassigning
+  // modal.innerHTML would wipe that chrome (and render() will not rebuild it
+  // because _rendered is already true). Targeting the body keeps the modal a
+  // real modal — positioning, backdrop, scroll-lock, and the close (X) button.
+  // Guarded for null because the body may not be present on the first microtask.
+  function setModalBody(modal, html) {
+    if (!modal) return;
+    var body = modal.querySelector('.lex-modal-body slot-content') ||
+      modal.querySelector('.lex-modal-body') ||
+      modal;
+    body.innerHTML = html;
+  }
+
+  async function openNotePreview(row) {
+    if (!row || !brainchild || !window.Lex || !window.Lex.Modal) return;
+    var vaultPath = row._vaultPath || '';
+    if (!vaultPath) return;
+
+    var modal = window.Lex.Modal.open({
+      heading: row.filename || 'Note',
+      content: '<div class="bc-preview"><p class="bc-preview-meta">Loading…</p></div>',
+      size: 'lg',
+      hideActions: true
+    });
+
+    try {
+      var result = await brainchild.getNote({ path: vaultPath });
+      if (!result || result.success === false) {
+        setModalBody(modal, '<div class="bc-preview"><p class="bc-preview-meta">' +
+          'This note could not be read.</p></div>');
+        return;
+      }
+      setModalBody(modal, buildPreviewHtml(result.note, vaultPath));
+      var openBtn = modal.querySelector('.bc-open-brainchild');
+      if (openBtn) {
+        openBtn.addEventListener('click', function () {
+          if (brainchild.openNote) brainchild.openNote(vaultPath);
+        });
+      }
+      var revealBtn = modal.querySelector('.bc-reveal-note');
+      if (revealBtn) {
+        revealBtn.addEventListener('click', function () {
+          if (brainchild.revealNote) brainchild.revealNote(vaultPath);
+        });
+      }
+    } catch (_error) {
+      setModalBody(modal, '<div class="bc-preview"><p class="bc-preview-meta">' +
+        'This note could not be read.</p></div>');
+    }
+  }
+
+  function wireRowClick() {
+    if (!els.myTable) return;
+    els.myTable.addEventListener('row-click', function (event) {
+      var detail = (event && event.detail) || {};
+      var row = findMyRow(detail.id);
+      if (row) openNotePreview(row);
+    });
   }
 
   // ---- Scope switching -----------------------------------------------------
@@ -233,14 +427,86 @@
     });
   }
 
-  // "Launch Brainchild" CTA on the My-scope empty state. Slice B replaces this
-  // with the real loopback connect handshake; for now it re-triggers a load so
-  // the seam is wired and discoverable. No business logic lives here — the
-  // connect/source-of-truth flow belongs to the Brainchild app / bridge.
-  function startConnectBrainchild() {
-    setStatus('Looking for Brainchild on this device…');
+  // Persist a link and load the vault. Shared by the auto-discovery and the
+  // manual folder-picker paths. Returns true on success.
+  async function applyBrainchildLink(installPath, vaultPath) {
+    var linked = await brainchild.link({ installPath: installPath, vaultPath: vaultPath });
+    if (!linked || linked.success === false) {
+      setStatus('Could not link Brainchild (' + ((linked && linked.error) || 'unknown') + ').');
+      await refreshBrainchildStatus();
+      renderMyBanner();
+      return false;
+    }
+    setStatus('Connected to Brainchild. Loading your notes…');
     state.myRows = null;
-    ensureMyLoaded();
+    await ensureMyLoaded();
+    setStatus('');
+    return true;
+  }
+
+  // Manual re-link via native folder pickers (main-mediated). Used when
+  // auto-discovery can't find a usable install + vault, so the "Re-link to point
+  // at your install / vault folder" copy actually leads somewhere. No node/spawn
+  // logic here — pickInstall/pickVault open native dialogs in Electron main.
+  async function pickAndLinkBrainchild() {
+    if (!brainchild || !brainchild.pickInstall || !brainchild.pickVault) {
+      setStatus('Choosing a folder is only available in the desktop app.');
+      return false;
+    }
+    setStatus('Choose your Brainchild install folder…');
+    var install = await brainchild.pickInstall();
+    if (!install || install.canceled) { setStatus(''); return false; }
+    if (install.success === false) {
+      setStatus('That folder does not contain Brainchild (bin/brainchild-mcp.js).');
+      return false;
+    }
+    setStatus('Choose your Brainchild vault folder…');
+    var vault = await brainchild.pickVault();
+    if (!vault || vault.canceled) { setStatus(''); return false; }
+    if (vault.success === false) {
+      setStatus('Could not read that vault folder.');
+      return false;
+    }
+    return applyBrainchildLink(install.installPath, vault.vaultPath);
+  }
+
+  // "Launch Brainchild" / "Re-link" CTA on the My-scope empty state. Runs the
+  // one-time link flow: auto-discover install + vault from OS defaults, persist
+  // the link in main, then load the vault. If discovery can't find both, fall
+  // back to the native folder pickers so the user can point at their install /
+  // vault. No node/spawn logic here — it's all in the Electron-main bridge; this
+  // is presentation + light wiring only.
+  async function startConnectBrainchild() {
+    if (!brainchild) {
+      setStatus('Brainchild is only available in the desktop app.');
+      return;
+    }
+    setStatus('Looking for Brainchild on this device…');
+    try {
+      var found = await brainchild.discover();
+      if (!found || !found.installPath || !found.vaultPath) {
+        // Auto-discovery came up short — let the user point at the folders.
+        setStatus('Could not find Brainchild automatically. Choose its folders to connect.');
+        await pickAndLinkBrainchild();
+        return;
+      }
+      await applyBrainchildLink(found.installPath, found.vaultPath);
+    } catch (error) {
+      setStatus('Could not connect to Brainchild: ' + (error && error.message ? error.message : 'unknown error'));
+    }
+  }
+
+  // Unlink: forget the persisted link and stop the MCP child, then re-render the
+  // My panel back to its connect prompt. Exposed for explicit re-link flows.
+  async function unlinkBrainchild() {
+    if (!brainchild || !brainchild.unlink) return;
+    try {
+      await brainchild.unlink();
+    } catch (_error) { /* best-effort */ }
+    state.myRows = null;
+    state.brainchildStatus = { status: 'degraded', reason: 'not_linked' };
+    renderMyPanel();
+    setStatus('');
   }
 
   function wireConnectAction() {
@@ -253,13 +519,14 @@
   function init() {
     wireScopeToggle();
     wireConnectAction();
+    wireRowClick();
     var initialScope = (els.scopeToggle && els.scopeToggle.value) || 'org';
     applyScope(initialScope);
   }
 
   init();
 
-  // Exposed for manual debugging / future Slice B wiring (not business logic).
+  // Exposed for manual debugging / future wiring (not business logic).
   window.LanaBrainchild = {
     state: state,
     reloadOrg: function () {
@@ -271,6 +538,9 @@
       return ensureMyLoaded();
     },
     fetchBrainchildNotes: fetchBrainchildNotes,
-    startConnectBrainchild: startConnectBrainchild
+    refreshBrainchildStatus: refreshBrainchildStatus,
+    startConnectBrainchild: startConnectBrainchild,
+    pickAndLinkBrainchild: pickAndLinkBrainchild,
+    unlinkBrainchild: unlinkBrainchild
   };
 })();

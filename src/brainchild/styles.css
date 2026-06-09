@@ -49,6 +49,43 @@
   color: var(--lex-text-tertiary);
 }
 
+/* Read-only note preview (rendered inside a lex-modal). */
+.bc-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bc-preview-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lex-text-tertiary);
+}
+
+.bc-preview-body {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--lex-text-primary);
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 8px;
+  padding: 14px 16px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+/* Actions row: Lex buttons (lex-btn) carry their own styling — only layout
+   lives here, per the no-bespoke-button-styles rule. */
+.bc-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @media (max-width: 720px) {
   .bc-shell {
     padding: 16px 14px 32px;
