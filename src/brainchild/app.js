@@ -12,6 +12,9 @@
   'use strict';
 
   var mapper = window.DocumentLibraryMapper || null;
+  // Phase C: pure payload builder + gate predicate. Presentation only here; all
+  // org-isolation / embedding / audit authority lives on the backend.
+  var promoteBuilder = window.BrainchildPromoteBuilder || null;
 
   var state = {
     scope: 'org',
@@ -21,7 +24,9 @@
     myLoading: false,
     // Phase B: cached brainchild bridge status (degraded | linked | connected).
     // Refreshed only on explicit user action (link/re-link) or first My load.
-    brainchildStatus: null
+    brainchildStatus: null,
+    // Phase C: guards against a double-submit while a promote POST is in flight.
+    promoteInProgress: false
   };
 
   var els = {
@@ -88,6 +93,30 @@
       return localStorage.getItem('token') || '';
     } catch (_error) {
       return '';
+    }
+  }
+
+  // Phase C auth gate. The brainchild page does its own token wiring (see the
+  // apiFetch block above), so the authoritative session signal here is the same
+  // token apiFetch sends. Prefer the global ApiClient when present (it owns
+  // refresh), else fall back to the raw token — both resolve to "is there a
+  // live lana-ai session?".
+  function isAuthenticated() {
+    if (window.api && typeof window.api.isAuthenticated === 'function') {
+      return !!window.api.isAuthenticated();
+    }
+    return !!authToken();
+  }
+
+  // The authenticated user (id + organizationId), persisted by ApiClient
+  // (loadUserProfile) in localStorage. Read-only; never the source of truth for
+  // org isolation — the backend re-derives org/user from the JWT.
+  function currentUser() {
+    if (window.api && window.api.user) return window.api.user;
+    try {
+      return JSON.parse(localStorage.getItem('user') || 'null');
+    } catch (_error) {
+      return null;
     }
   }
 
@@ -311,7 +340,7 @@
     return null;
   }
 
-  function buildPreviewHtml(note, vaultPath) {
+  function buildPreviewHtml(note, vaultPath, showPromote) {
     var safeBody = escapeHtml((note && note.body) || '');
     var meta = [];
     var fm = (note && note.frontmatter) || {};
@@ -329,15 +358,128 @@
     // is the always-available fallback (reveals the file in the OS file
     // manager) so the user is never stranded if the deep link no-ops.
     var safePath = escapeHtml(vaultPath);
+
+    // Phase C: the "Promote to Org" action is only rendered when the auth +
+    // bridge + org gate passes (showPromote). COPY semantics — the note stays in
+    // the vault — are stated up front so the user is never surprised.
+    var promoteBlock = '';
+    if (showPromote) {
+      promoteBlock =
+        '<p class="bc-promote-note">Promoting copies this note into your ' +
+        'organization’s shared knowledge base. Your personal copy stays in ' +
+        'Brainchild.</p>' +
+        '<lex-btn class="bc-promote-note-btn" variant="primary" size="sm" ' +
+        'data-vault-path="' + safePath + '">Promote to Org</lex-btn>';
+    }
+
     return '<div class="bc-preview">' +
       metaLine +
       '<pre class="bc-preview-body">' + safeBody + '</pre>' +
+      promoteBlock +
       '<div class="bc-preview-actions">' +
       '<lex-btn class="bc-reveal-note" variant="ghost" size="sm" ' +
       'data-vault-path="' + safePath + '">Show in Finder</lex-btn>' +
       '<lex-btn class="bc-open-brainchild" variant="primary" size="sm" ' +
       'data-vault-path="' + safePath + '">Open in Brainchild</lex-btn>' +
       '</div></div>';
+  }
+
+  // Lex toast helper (auto-injects its own container/styles). Guarded so the
+  // page still works if the toast component failed to load.
+  function toast(kind, message) {
+    if (window.Lex && window.Lex.Toast && typeof window.Lex.Toast[kind] === 'function') {
+      window.Lex.Toast[kind](message);
+    } else {
+      setStatus(message);
+    }
+  }
+
+  // Translate an HTTP failure into one user-facing line (never a stack trace).
+  // 401 is left to the global ApiClient session-expired handling; we surface a
+  // gentle fallback only if that machinery isn't present.
+  async function promoteErrorMessage(response) {
+    var status = response ? response.status : 0;
+    if (status === 403) return 'You do not have permission to promote to this organization.';
+    if (status === 409) return 'This note was already promoted to the organization.';
+    if (status === 401) return 'Your session expired. Please sign in again.';
+    var detail = '';
+    try {
+      var body = await response.json();
+      detail = (body && (body.detail || body.message || body.error)) || '';
+    } catch (_error) { /* non-JSON error body */ }
+    return detail || 'Failed to promote note.';
+  }
+
+  // Phase C: fetch the note body (reusing what the preview already loaded when
+  // available), build the payload via the PURE builder, and POST to the new
+  // org-knowledge endpoint. COPY semantics: nothing is deleted or moved.
+  //
+  // route: POST /api/v1/organizations/:org_id/promoted-knowledge — org_id is a
+  // convenience scope; the backend re-derives org + user from the JWT and is the
+  // authoritative org-isolation gate.
+  async function executePromote(row, note, button) {
+    if (state.promoteInProgress) return;
+    if (!promoteBuilder) {
+      toast('error', 'Promote is unavailable.');
+      return;
+    }
+    if (!isAuthenticated()) {
+      toast('error', 'Sign in to lana-ai to promote notes.');
+      return;
+    }
+
+    var payload;
+    try {
+      payload = promoteBuilder.buildPromotePayload(row, note || {}, currentUser());
+    } catch (error) {
+      // Builder throws on empty content / no org — surface its message verbatim.
+      toast('error', (error && error.message) || 'Could not prepare this note.');
+      return;
+    }
+
+    state.promoteInProgress = true;
+    if (button) {
+      button.setAttribute('disabled', '');
+      button.textContent = 'Promoting…';
+    }
+
+    try {
+      var response = await apiFetch(
+        '/api/v1/organizations/' + encodeURIComponent(payload.orgId) + '/promoted-knowledge',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload.body)
+        }
+      );
+      if (!response.ok) {
+        var message = await promoteErrorMessage(response);
+        toast('error', message);
+        if (button) {
+          button.removeAttribute('disabled');
+          button.textContent = 'Promote to Org';
+        }
+        return;
+      }
+      // Success: the personal copy remains in the vault (COPY semantics).
+      toast('success', 'Note promoted to your organization. Your copy stays in Brainchild.');
+      // Close the owning modal the way Lex itself does (emits lex-close, which
+      // the open() handler wires to modal.remove()).
+      var modal = button && button.closest ? button.closest('lex-modal') : null;
+      if (modal && typeof modal.emit === 'function') {
+        modal.emit('lex-close');
+      } else if (modal && modal.remove) {
+        modal.remove();
+      }
+    } catch (_error) {
+      toast('error', 'Failed to promote note. Check your connection and try again.');
+      if (button) {
+        button.removeAttribute('disabled');
+        button.textContent = 'Promote to Org';
+      }
+    } finally {
+      state.promoteInProgress = false;
+    }
   }
 
   // Write into the lex-modal's body slot rather than replacing the host element.
@@ -374,7 +516,18 @@
           'This note could not be read.</p></div>');
         return;
       }
-      setModalBody(modal, buildPreviewHtml(result.note, vaultPath));
+      // Phase C gate: offer "Promote to Org" only with an authenticated lana-ai
+      // session, the bridge present (it is — we just used it), and the user in
+      // an org. Pure predicate keeps the rule testable and out of the renderer.
+      var showPromote = promoteBuilder
+        ? promoteBuilder.canPromote({
+          authenticated: isAuthenticated(),
+          user: currentUser(),
+          bridge: brainchild
+        })
+        : false;
+
+      setModalBody(modal, buildPreviewHtml(result.note, vaultPath, showPromote));
       var openBtn = modal.querySelector('.bc-open-brainchild');
       if (openBtn) {
         openBtn.addEventListener('click', function () {
@@ -385,6 +538,14 @@
       if (revealBtn) {
         revealBtn.addEventListener('click', function () {
           if (brainchild.revealNote) brainchild.revealNote(vaultPath);
+        });
+      }
+      var promoteBtn = modal.querySelector('.bc-promote-note-btn');
+      if (promoteBtn) {
+        // Reuse the note body already fetched for the preview — no second bridge
+        // call. The row + note + user feed the pure payload builder on click.
+        promoteBtn.addEventListener('click', function () {
+          executePromote(row, result.note, promoteBtn);
         });
       }
     } catch (_error) {
@@ -541,6 +702,7 @@
     refreshBrainchildStatus: refreshBrainchildStatus,
     startConnectBrainchild: startConnectBrainchild,
     pickAndLinkBrainchild: pickAndLinkBrainchild,
-    unlinkBrainchild: unlinkBrainchild
+    unlinkBrainchild: unlinkBrainchild,
+    executePromote: executePromote
   };
 })();

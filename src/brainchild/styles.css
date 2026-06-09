@@ -86,6 +86,24 @@
   gap: 8px;
 }
 
+/* Phase C "Promote to Org" — copy line + action inside the note preview modal.
+   The lex-btn carries its own button styling; only layout + the explanatory
+   copy line live here, per the no-bespoke-button-styles rule. */
+.bc-promote-note {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--lex-text-secondary);
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 8px;
+}
+
+.bc-promote-note-btn {
+  align-self: flex-start;
+}
+
 @media (max-width: 720px) {
   .bc-shell {
     padding: 16px 14px 32px;
