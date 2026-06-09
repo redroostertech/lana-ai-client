@@ -1,0 +1,60 @@
+/*
+ * Brainchild surface styling (Slice A).
+ * Lex design tokens only — no hard-coded theme colors, no inline styles.
+ */
+
+.bc-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 28px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.bc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--lex-shadow-sm);
+}
+
+.bc-panel.bc-hidden {
+  display: none;
+}
+
+/* Generic hidden utility so non-panel elements (e.g. the My-scope empty state)
+   can be toggled off once Slice B renders a notes table in its place. */
+.bc-hidden {
+  display: none;
+}
+
+.bc-status {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 13px;
+  color: var(--lex-text-tertiary);
+}
+
+@media (max-width: 720px) {
+  .bc-shell {
+    padding: 16px 14px 32px;
+  }
+
+  .bc-toolbar {
+    justify-content: stretch;
+  }
+}
