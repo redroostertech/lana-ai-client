@@ -1,12 +1,12 @@
 /**
- * folder.js — Folder view page script (SPA lifecycle).
+ * folder.js - Folder view page script (SPA lifecycle).
  * Handles viewing files and subfolders inside a matter.
- * Extracted from drive.js — matter-view branch only, no root/matter branching.
+ * Extracted from drive.js - matter-view branch only, no root/matter branching.
  *
  * Dependencies (loaded via page descriptor before this file):
  *   - lex.utils.js   (escapeHtml, formatFileSize, formatRelativeDate, getFileType)
  *   - lex.icons.js   (getFileIcon, getFileIconSmall, getFileIconSVG)
- *   - lex-nav.js     (Lex.Nav.go — navigates to file-viewer.html)
+ *   - lex-nav.js     (Lex.Nav.go - navigates to file-viewer.html)
  */
 (function () {
   'use strict';
@@ -282,14 +282,12 @@
     folderState.loadingContent = true;
 
     var loadingEl = document.getElementById('contentLoading');
-    var gridViewEl = document.getElementById('gridView');
-    var listViewEl = document.getElementById('listView');
+    var contentsEl = document.getElementById('folderContents');
     var emptyEl = document.getElementById('contentEmpty');
 
     if (!silent) {
       loadingEl && loadingEl.classList.remove('hidden');
-      gridViewEl && gridViewEl.classList.add('hidden');
-      listViewEl && listViewEl.classList.add('hidden');
+      contentsEl && contentsEl.classList.add('hidden');
       emptyEl && emptyEl.classList.add('hidden');
     }
 
@@ -341,15 +339,21 @@
   // ── Rendering (grid + list) ─────────────────────────────────────────
 
   /**
-   * Render folder/file contents into grid or list view based on folderState.viewMode.
+   * Render folder/file contents based on folderState.viewMode.
    * Filters folders to only show items at the current depth.
+   *
+   * Folders and files share ONE region (#folderContents): subfolder cards/rows
+   * render first into #folderItems, then the MatterDocumentsView component
+   * renders the file cards/rows into #matterDocumentsViewHost directly below.
+   * The lf-view-grid / lf-view-list modifier on #folderContents makes both
+   * sections form one continuous grid (grid mode) or table (list mode); the
+   * grid/list toggle switches that modifier so it affects folders + files at
+   * once (instance.setViewMode keeps the file section in sync).
    */
   function renderFolderContents() {
     var loadingEl = document.getElementById('contentLoading');
-    var gridViewEl = document.getElementById('gridView');
-    var listViewEl = document.getElementById('listView');
+    var contentsEl = document.getElementById('folderContents');
     var emptyEl = document.getElementById('contentEmpty');
-    var docsHostEl = document.getElementById('matterDocumentsViewHost');
 
     loadingEl && loadingEl.classList.add('hidden');
 
@@ -361,56 +365,62 @@
       return f.parent_folder_id === folderState.currentFolderId;
     });
 
-    var hasFolders = foldersToShow.length > 0;
-    var hasFiles = folderState.files.length > 0;
     var totalItems = foldersToShow.length + folderState.files.length;
+
+    // Apply the active view-mode modifier so folders + files share one layout.
+    applyViewModeClass();
 
     if (totalItems === 0) {
       emptyEl && emptyEl.classList.remove('hidden');
-      gridViewEl && gridViewEl.classList.add('hidden');
-      listViewEl && listViewEl.classList.add('hidden');
-      docsHostEl && docsHostEl.classList.add('hidden');
-      // Keep the component in sync even when empty so a later refresh works.
-      syncDocumentsView();
+      contentsEl && contentsEl.classList.add('hidden');
+      // Keep the component mounted/in-sync even when empty so a later refresh
+      // works. Clear any stale folder items from the shared region.
+      renderFolderItems([]);
+      ensureDocumentsView();
+      if (documentsView) {
+        documentsView.refresh(folderState.files);
+      }
       return;
     }
 
     emptyEl && emptyEl.classList.add('hidden');
+    contentsEl && contentsEl.classList.remove('hidden');
 
     var sortedFolders = foldersToShow.slice().sort(function (a, b) {
       return a.name.localeCompare(b.name);
     });
 
-    // Subfolders render in grid or list view (folders only). The file list is
-    // delegated to the MatterDocumentsView component below.
-    if (hasFolders) {
-      if (folderState.viewMode === 'grid') {
-        renderGridView(sortedFolders);
-        gridViewEl && gridViewEl.classList.remove('hidden');
-        listViewEl && listViewEl.classList.add('hidden');
-      } else {
-        renderListView(sortedFolders);
-        listViewEl && listViewEl.classList.remove('hidden');
-        gridViewEl && gridViewEl.classList.add('hidden');
-      }
-    } else {
-      gridViewEl && gridViewEl.classList.add('hidden');
-      listViewEl && listViewEl.classList.add('hidden');
-    }
+    // Folders render first (top of the shared region) ...
+    renderFolderItems(sortedFolders);
 
-    // Files render through the reusable component.
-    if (docsHostEl) {
-      docsHostEl.classList.toggle('hidden', !hasFiles);
+    // ... then the component renders the file cards/rows below them, in the
+    // same view mode. setViewMode + refresh re-render the file section.
+    ensureDocumentsView();
+    if (documentsView) {
+      documentsView.setViewMode(folderState.viewMode);
+      documentsView.refresh(folderState.files);
     }
-    syncDocumentsView();
   }
 
   /**
-   * Mount the MatterDocumentsView component (first call) or refresh it with the
-   * current folder's files. The component owns the file list, search, filter,
-   * pagination, and per-file Download/Delete/Open actions.
+   * Toggle the lf-view-grid / lf-view-list modifier on the shared region so
+   * folders and files share one grid (grid mode) or table (list mode).
    */
-  function syncDocumentsView() {
+  function applyViewModeClass() {
+    var contentsEl = document.getElementById('folderContents');
+    if (!contentsEl) return;
+    var grid = folderState.viewMode === 'grid';
+    contentsEl.classList.toggle('lf-view-grid', grid);
+    contentsEl.classList.toggle('lf-view-list', !grid);
+  }
+
+  /**
+   * Mount the MatterDocumentsView component once. The component OWNS the file
+   * list rendering and every per-file action (Open / Download / Rename /
+   * Delete), and re-fetches via the api after each mutation. Files render into
+   * #matterDocumentsViewHost, directly below the folder cards/rows.
+   */
+  function ensureDocumentsView() {
     var docsHostEl = document.getElementById('matterDocumentsViewHost');
     if (!docsHostEl || !window.MatterDocumentsView) return;
 
@@ -420,8 +430,9 @@
         matterId: folderState.currentMatterId,
         matterDisplayId: folderState.currentMatterName || folderState.currentMatterId,
         files: folderState.files,
+        viewMode: folderState.viewMode,
+        pageSize: 12,
         onFileOpen: function (fileId) { _navToFileViewer(fileId); },
-        enableDocStudio: true,
         onCreateDocStudio: function () {
           if (folderState.currentMatterId) {
             Lex.Nav.go('doc-studio/index.html', {
@@ -431,77 +442,82 @@
             Lex.Nav.go('doc-studio/index.html');
           }
         },
+        // Library defaults: rename on; advanced matter-only features off.
+        enableRename: true,
         enableTemplates: false,
-        enableOrphans: false
+        enableOrphans: false,
+        enableWorkflow: false,
+        enableBatch: false,
+        enableTemplateToggle: false,
+        enableRetry: false,
+        enableReplace: false
       });
-    } else {
-      // Reload path: re-render with the latest files without re-fetching.
-      documentsView.refresh(folderState.files);
     }
   }
 
   /**
-   * Render the grid view with subfolder cards only.
-   * Files are rendered separately by the MatterDocumentsView component.
+   * Render the subfolder cards (grid mode) or rows (list mode) into the shared
+   * #folderItems container. Files are rendered separately by the
+   * MatterDocumentsView component, directly below these folders.
    * @param {Array} folders
    */
-  function renderGridView(folders) {
-    var gridViewEl = document.getElementById('gridView');
-    if (!gridViewEl) return;
+  function renderFolderItems(folders) {
+    var folderItemsEl = document.getElementById('folderItems');
+    if (!folderItemsEl) return;
 
-    var folderCards = folders.map(function (folder) {
-      return [
-        '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '" onclick="handleFolderClick(this)">',
-        '  <button class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-tertiary); opacity: 1" onclick="event.stopPropagation(); showFolderMenu(' + JSON.stringify(folder.id) + ', event)">',
-        '    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-        '  </button>',
-        '  <div class="flex flex-col items-center">',
-        '    <svg class="w-16 h-16 mb-2" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-        '    </svg>',
-        '    <h3 class="text-sm font-medium text-center truncate w-full" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</h3>',
-        '    <p class="text-xs text-center mt-1" style="color: var(--lex-text-secondary)">' + (folder.document_count || 0) + ' files</p>',
-        '  </div>',
-        '</div>'
-      ].join('');
-    }).join('');
-
-    gridViewEl.innerHTML = folderCards;
+    if (folderState.viewMode === 'grid') {
+      folderItemsEl.className = 'lf-grid';
+      folderItemsEl.innerHTML = folders.map(folderCardHtml).join('');
+    } else {
+      folderItemsEl.className = 'lf-list';
+      folderItemsEl.innerHTML = folders.map(folderRowHtml).join('');
+    }
   }
 
   /**
-   * Render the list/table view with subfolder rows only.
-   * Files are rendered separately by the MatterDocumentsView component.
-   * @param {Array} folders
+   * Subfolder grid card markup (grid mode).
+   * @param {Object} folder
    */
-  function renderListView(folders) {
-    var listViewBodyEl = document.getElementById('listViewBody');
-    if (!listViewBodyEl) return;
+  function folderCardHtml(folder) {
+    return [
+      '<div class="lf-card" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '" onclick="handleFolderClick(this)">',
+      '  <button class="lf-card-menu" onclick="event.stopPropagation(); showFolderMenu(' + JSON.stringify(folder.id) + ', event)" title="Folder actions">',
+      '    <svg class="lf-icon-sm" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
+      '  </button>',
+      '  <div class="lf-card-body">',
+      '    <svg class="lf-card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+      '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
+      '    </svg>',
+      '    <h3 class="lf-card-name">' + escapeHtml(folder.name) + '</h3>',
+      '    <p class="lf-card-sub">' + (folder.document_count || 0) + ' files</p>',
+      '  </div>',
+      '</div>'
+    ].join('');
+  }
 
-    var folderRows = folders.map(function (folder) {
-      return [
-        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '" onclick="handleFolderClick(this)">',
-        '  <td class="px-6 py-4">',
-        '    <div class="flex items-center">',
-        '      <svg class="w-5 h-5 mr-3" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-        '      </svg>',
-        '      <span class="text-sm font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</span>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">\u2014</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatRelativeDate(folder.created_at) + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + (folder.document_count || 0) + ' items</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm">',
-        '    <button style="color: var(--lex-text-tertiary)" onclick="event.stopPropagation(); showFolderMenu(' + JSON.stringify(folder.id) + ', event)">',
-        '      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-        '    </button>',
-        '  </td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    listViewBodyEl.innerHTML = folderRows;
+  /**
+   * Subfolder list row markup (list mode). Mirrors the shared table columns.
+   * @param {Object} folder
+   */
+  function folderRowHtml(folder) {
+    return [
+      '<div class="lf-row" data-folder-id="' + escapeHtml(folder.id) + '" data-name="' + escapeHtml(folder.name) + '" onclick="handleFolderClick(this)">',
+      '  <div class="lf-row-name">',
+      '    <svg class="lf-row-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+      '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
+      '    </svg>',
+      '    <span class="lf-row-label">' + escapeHtml(folder.name) + '</span>',
+      '  </div>',
+      '  <div class="lf-row-cell">-</div>',
+      '  <div class="lf-row-cell">' + formatRelativeDate(folder.created_at) + '</div>',
+      '  <div class="lf-row-cell">' + (folder.document_count || 0) + ' items</div>',
+      '  <div class="lf-row-cell lf-row-actions">',
+      '    <button class="lf-row-menu" onclick="event.stopPropagation(); showFolderMenu(' + JSON.stringify(folder.id) + ', event)" title="Folder actions">',
+      '      <svg class="lf-icon-sm" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
+      '    </button>',
+      '  </div>',
+      '</div>'
+    ].join('');
   }
 
   // ── View toggle ─────────────────────────────────────────────────────
@@ -916,240 +932,22 @@
     }
   }
 
-  // ── File operations ──────────────────────────────────────────────────
+  // -- File operations --------------------------------------------------
+  //
+  // Per-file actions (Open / Download / Rename / Delete) are OWNED by the
+  // MatterDocumentsView component (its own kebab menu + component-owned Lex
+  // rename modal + injected confirm dialogs). folder.js no longer renders any
+  // per-file download/rename/delete wiring or modals.
 
-  /**
-   * Download a file by ID using blob approach (prevents navigation/white screen).
-   * @param {string} fileId
-   */
-  async function downloadFile(fileId) {
-    console.log('[Folder] Downloading file:', fileId);
-
-    try {
-      var fileMetadata = await api.get('/api/v1/storage/files/' + fileId);
-      if (!fileMetadata || !fileMetadata.filename) {
-        throw new Error('Failed to retrieve file metadata');
-      }
-
-      var filename = fileMetadata.filename;
-
-      var response = await fetch(api.baseUrl + '/api/v1/storage/files/' + fileId + '/download', {
-        headers: {
-          'Authorization': 'Bearer ' + api.token
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Download failed: ' + response.status);
-      }
-
-      var blob = await response.blob();
-      var url = URL.createObjectURL(blob);
-
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log('[Folder] Download started:', filename);
-    } catch (error) {
-      console.error('[Folder] Failed to download file:', error);
-      Lex.Toast.error('Failed to download file. Please try again.');
-    }
-  }
-
-  // ── Rename / Delete file modals ──────────────────────────────────────
-
-  // File id currently targeted by the rename or delete modal.
-  var pendingRenameFileId = null;
-  var pendingRenameOriginalName = null;
-  var pendingDeleteFileId = null;
-
-  /**
-   * Open the rename modal prefilled with the file's current name.
-   * @param {Object} file
-   */
-  function showRenameFileModal(file) {
-    if (!file) return;
-
-    pendingRenameFileId = file.id;
-    pendingRenameOriginalName = file.filename || '';
-
-    var lexInput = document.getElementById('renameFileInput');
-    if (lexInput) lexInput.value = pendingRenameOriginalName;
-
-    var modal = document.getElementById('renameFileModal');
-    if (modal) modal.open = true;
-
-    // Focus the inner input after the modal opens.
-    setTimeout(function () {
-      var inner = lexInput && lexInput.querySelector('input');
-      inner && inner.focus();
-    }, 100);
-  }
-
-  /**
-   * Hide and reset the rename modal.
-   */
-  function hideRenameFileModal() {
-    var modal = document.getElementById('renameFileModal');
-    if (modal) modal.open = false;
-    var lexInput = document.getElementById('renameFileInput');
-    if (lexInput) lexInput.value = '';
-    pendingRenameFileId = null;
-    pendingRenameOriginalName = null;
-  }
-
-  /**
-   * Handle rename form submission. Renames the targeted file via the backend.
-   * @param {Event} event
-   */
-  async function handleRenameFile(event) {
-    if (event) event.preventDefault();
-
-    if (!pendingRenameFileId) {
-      Lex.Toast.error('No file selected');
-      return;
-    }
-
-    var lexInput = document.getElementById('renameFileInput');
-    var newName = lexInput ? (lexInput.value || '').trim() : '';
-
-    if (!newName) {
-      Lex.Toast.error('Please enter a file name');
-      return;
-    }
-
-    if (newName === (pendingRenameOriginalName || '').trim()) {
-      hideRenameFileModal();
-      return;
-    }
-
-    var fileId = pendingRenameFileId;
-
-    try {
-      await api.post('/api/v1/files/' + fileId + '/rename', { new_filename: newName });
-
-      hideRenameFileModal();
-      Lex.Toast.success('File renamed');
-      await loadFolderContents({ silent: true });
-    } catch (error) {
-      console.error('[Folder] Failed to rename file:', error);
-      Lex.Toast.error('Failed to rename file. Please try again.');
-    }
-  }
-
-  /**
-   * Open the delete confirmation modal for the given file.
-   * @param {Object} file
-   */
-  function showDeleteFileModal(file) {
-    if (!file) return;
-
-    pendingDeleteFileId = file.id;
-
-    var nameEl = document.getElementById('deleteFileName');
-    if (nameEl) nameEl.textContent = file.filename || 'this file';
-
-    var modal = document.getElementById('deleteFileModal');
-    if (modal) modal.open = true;
-  }
-
-  /**
-   * Hide and reset the delete confirmation modal.
-   */
-  function hideDeleteFileModal() {
-    var modal = document.getElementById('deleteFileModal');
-    if (modal) modal.open = false;
-    pendingDeleteFileId = null;
-  }
-
-  /**
-   * Confirm deletion. Soft-deletes the targeted file via the backend.
-   */
-  async function handleDeleteFile() {
-    if (!pendingDeleteFileId) {
-      Lex.Toast.error('No file selected');
-      return;
-    }
-
-    var fileId = pendingDeleteFileId;
-
-    try {
-      await api.delete('/api/v1/storage/files/' + fileId);
-
-      hideDeleteFileModal();
-      Lex.Toast.success('File deleted');
-      await loadFolderContents({ silent: true });
-    } catch (error) {
-      console.error('[Folder] Failed to delete file:', error);
-      Lex.Toast.error('Failed to delete file. Please try again.');
-    }
-  }
-
-  // ── Context menu ─────────────────────────────────────────────────────
-
-  /**
-   * Show the context menu for a file item.
-   * @param {string} fileId
-   * @param {Event} event
-   */
-  function showFileMenu(fileId, event) {
-    console.log('[Folder] Show file menu:', fileId);
-    event && event.stopPropagation();
-
-    var file = null;
-    for (var i = 0; i < folderState.files.length; i++) {
-      if (folderState.files[i].id === fileId) {
-        file = folderState.files[i];
-        break;
-      }
-    }
-    if (!file) return;
-
-    var menuItems = [
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>',
-        label: 'Download',
-        action: function () { downloadFile(fileId); }
-      },
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>',
-        label: 'Preview',
-        action: function () {
-          hideContextMenu();
-          _navToFileViewer(fileId);
-        }
-      },
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>',
-        label: 'Rename',
-        action: function () {
-          hideContextMenu();
-          showRenameFileModal(file);
-        }
-      },
-      { divider: true },
-      {
-        icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>',
-        label: 'Delete',
-        className: 'text-red-600 hover:bg-red-50',
-        action: function () {
-          hideContextMenu();
-          showDeleteFileModal(file);
-        }
-      }
-    ];
-
-    showContextMenu(menuItems, event);
-  }
+  // -- Context menu -----------------------------------------------------
+  //
+  // Per-file actions (Open/Download/Rename/Delete) are owned by the
+  // MatterDocumentsView component's own kebab menu. folder.js keeps only the
+  // subfolder context menu below.
 
   /**
    * Show the context menu for a subfolder item.
-   * No isMatter pin option — subfolders only.
+   * No isMatter pin option - subfolders only.
    * @param {string|Object} folderOrId - Folder object or folder ID string
    * @param {Event} event
    */
@@ -1297,69 +1095,23 @@
     document.removeEventListener('click', hideContextMenu);
   }
 
-  // ── File icon SVG fallback ───────────────────────────────────────────
+  // File icons are owned by the MatterDocumentsView component (files) and the
+  // inline folder SVG in folderCardHtml / folderRowHtml (folders), so folder.js
+  // no longer maintains a local getFileIconSVG fallback.
 
-  /**
-   * Return the SVG icon string for a given MIME content type.
-   * Delegates to the global getFileIconSVG from lex.icons.js.
-   * Local fallback uses indexOf-based matching (no regex).
-   * @param {string} contentType
-   * @returns {string} SVG HTML string
-   */
-  function getFileIconSVG(contentType) {
-    if (window.getFileIconSVG) {
-      return window.getFileIconSVG(contentType);
-    }
-
-    // Fallback if lex.icons.js not yet loaded
-    if (!contentType) {
-      return '<svg class="w-10 h-10" style="color: var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
-    }
-
-    if (contentType.indexOf('pdf') !== -1) {
-      return '<svg class="w-10 h-10 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8.5 13.5v3h1v-1h.5a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1h-1.5zm1 1h.5v1h-.5v-1zm2.5-1v3h1.5a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1H12zm1 1h.5v1H13v-1zm2.5-1v3h1v-1.5h.5v-1h-.5v-.5h1v-1h-2z"/></svg>';
-    }
-    if (contentType.indexOf('word') !== -1 || contentType.indexOf('document') !== -1) {
-      return '<svg class="w-10 h-10 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9 13l1.5 6 1.5-4 1.5 4 1.5-6h-1l-.75 3-1.25-3.5h-.5L10.25 16 9.5 13H9z"/></svg>';
-    }
-    if (contentType.indexOf('csv') !== -1 || contentType.indexOf('sheet') !== -1 || contentType.indexOf('excel') !== -1) {
-      return '<svg class="w-10 h-10 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8 13h2v2H8v-2zm0 3h2v2H8v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2zm3-3h2v2h-2v-2zm0 3h2v2h-2v-2z"/></svg>';
-    }
-    if (contentType.indexOf('image') !== -1) {
-      return '<svg class="w-10 h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
-    }
-    if (contentType.indexOf('presentation') !== -1 || contentType.indexOf('powerpoint') !== -1) {
-      return '<svg class="w-10 h-10 text-orange-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM9 13v6h1.5v-2h1a1.5 1.5 0 0 0 1.5-1.5v-1a1.5 1.5 0 0 0-1.5-1.5H9zm1.5 1.5h1v1h-1v-1z"/></svg>';
-    }
-    if (contentType.indexOf('video') !== -1) {
-      return '<svg class="w-10 h-10 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>';
-    }
-    if (contentType.indexOf('audio') !== -1) {
-      return '<svg class="w-10 h-10" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>';
-    }
-    if (contentType.indexOf('zip') !== -1 || contentType.indexOf('archive') !== -1 || contentType.indexOf('compressed') !== -1) {
-      return '<svg class="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path></svg>';
-    }
-    if (contentType.indexOf('text') !== -1) {
-      return '<svg class="w-10 h-10" style="color: var(--lex-text-secondary)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
-    }
-
-    return '<svg class="w-10 h-10" style="color: var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
-  }
-
-  // ── Event listeners ──────────────────────────────────────────────────
+  // -- Event listeners --------------------------------------------------
 
   /**
    * Wire up all DOM event listeners for the folder page.
    * Uses trackDocListener for document-level events so they are removed on onLeave.
-   * No source filter — folder.html only shows matter-scoped content.
+   * No source filter - folder.html only shows matter-scoped content.
    */
   function setupEventListeners() {
     // New Folder button (lex-btn fires native click events)
     var newFolderBtn = document.getElementById('newFolderBtn');
     newFolderBtn && newFolderBtn.addEventListener('click', showNewFolderModal);
 
-    // Empty state upload button — lex-empty fires 'action' event
+    // Empty state upload button - lex-empty fires 'action' event
     var contentEmptyWidget = document.getElementById('contentEmptyWidget');
     contentEmptyWidget && contentEmptyWidget.addEventListener('action', function () {
       var input = document.getElementById('fileUploadInput');
@@ -1392,19 +1144,8 @@
     var newFolderForm = document.getElementById('newFolderForm');
     newFolderForm && newFolderForm.addEventListener('submit', handleCreateFolder);
 
-    // Rename file modal (lex-btn fires native click; form fires submit)
-    var renameFileForm = document.getElementById('renameFileForm');
-    renameFileForm && renameFileForm.addEventListener('submit', handleRenameFile);
-
-    var cancelRenameFileBtn = document.getElementById('cancelRenameFileBtn');
-    cancelRenameFileBtn && cancelRenameFileBtn.addEventListener('click', hideRenameFileModal);
-
-    // Delete file confirmation modal (lex-btn fires native click)
-    var cancelDeleteFileBtn = document.getElementById('cancelDeleteFileBtn');
-    cancelDeleteFileBtn && cancelDeleteFileBtn.addEventListener('click', hideDeleteFileModal);
-
-    var confirmDeleteFileBtn = document.getElementById('confirmDeleteFileBtn');
-    confirmDeleteFileBtn && confirmDeleteFileBtn.addEventListener('click', handleDeleteFile);
+    // Per-file Rename and Delete (and their modals/confirm dialogs) are owned by
+    // the MatterDocumentsView component, so no per-file modal wiring lives here.
 
     // Upload button triggers file picker (lex-btn fires native click)
     var uploadBtn = document.getElementById('uploadBtn');
@@ -1451,7 +1192,7 @@
     var listViewBtn = document.getElementById('listViewBtn');
     listViewBtn && listViewBtn.addEventListener('click', function () { switchView('list'); });
 
-    // Search with debounce — lex-input fires 'lex-input' event
+    // Search with debounce - lex-input fires 'lex-input' event
     var searchLexInput = document.getElementById('searchInput');
     var searchTimeout;
 
@@ -1473,7 +1214,7 @@
       });
     }
 
-    // Sort by dropdown — lex-select fires 'lex-change'
+    // Sort by dropdown - lex-select fires 'lex-change'
     var sortSelect = document.getElementById('sortSelect');
     if (sortSelect) {
       sortSelect.addEventListener('lex-change', function (e) {
@@ -1568,8 +1309,6 @@
     exposeGlobal('navigateToFolder', navigateToFolder);
     exposeGlobal('navigateToRoot', navigateToRoot);
     exposeGlobal('navigateToMatterBreadcrumb', navigateToMatterBreadcrumb);
-    exposeGlobal('downloadFile', downloadFile);
-    exposeGlobal('showFileMenu', showFileMenu);
     exposeGlobal('showFolderMenu', showFolderMenu);
     exposeGlobal('_navToFileViewer', _navToFileViewer);
 
@@ -1641,7 +1380,7 @@
   // ── Register with router ─────────────────────────────────────────────
   // registerPageInit ensures onEnter() is called on every navigation
   // (first load + re-navigation from cached scripts).
-  // registerView only carries onLeave for cleanup — onEnter is handled
+  // registerView only carries onLeave for cleanup - onEnter is handled
   // by registerPageInit to avoid double-init.
   if (window.LexRouter) {
     LexRouter.registerPageInit('folder.html', function () {

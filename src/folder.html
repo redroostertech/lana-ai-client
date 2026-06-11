@@ -111,30 +111,19 @@
         <p class="text-sm" style="color: var(--lex-text-secondary)">Loading...</p>
       </div>
 
-      <!-- Subfolder Grid (folders only; files render via MatterDocumentsView below).
-           folder.js keeps subfolder navigation; the component owns the file list. -->
-      <div id="gridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
-
-      <!-- Subfolder List (folders only). The file list is rendered by the
-           MatterDocumentsView component in #matterDocumentsViewHost. -->
-      <div id="listView" class="hidden bg-white rounded-lg shadow-sm border overflow-hidden" style="border-color: var(--lex-border-default)">
-        <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
-          <thead style="background-color: var(--lex-bg-secondary)">
-            <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Name</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created By</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created On</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Size</th>
-              <th scope="col" class="w-20 px-6 py-3"></th>
-            </tr>
-          </thead>
-          <tbody id="listViewBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
-        </table>
+      <!-- Shared folders + files region. folder.js renders subfolder cards/rows
+           into #folderItems (folders first); the MatterDocumentsView component
+           renders the file cards/rows into #matterDocumentsViewHost directly
+           below. Both share the SAME grid (grid mode) or table (list mode) via
+           the lf-view-grid / lf-view-list modifiers on #folderContents. The
+           grid/list toggle switches the modifier so it affects folders + files
+           at once. -->
+      <div id="folderContents" class="hidden lf-view-list">
+        <!-- Subfolder cards/rows (rendered by folder.js, shown first). -->
+        <div id="folderItems"></div>
+        <!-- File cards/rows (rendered by the MatterDocumentsView component). -->
+        <div id="matterDocumentsViewHost"></div>
       </div>
-
-      <!-- Reusable file list (MatterDocumentsView). Mounted by folder.js for the
-           current folder's files. Folders stay above this in grid/list views. -->
-      <div id="matterDocumentsViewHost" class="hidden mt-4"></div>
 
       <!-- Empty State -->
       <div id="contentEmpty" class="hidden">
@@ -360,34 +349,9 @@
       </div>
     </lex-modal>
 
-    <!-- Rename File Modal -->
-    <lex-modal id="renameFileModal" heading="Rename File" size="md" hide-actions="true">
-      <form id="renameFileForm">
-        <lex-input
-          id="renameFileInput"
-          label="File Name"
-          placeholder="Enter file name"
-          required="true"
-        ></lex-input>
-        <div class="rename-file-actions">
-          <lex-btn type="button" variant="secondary" id="cancelRenameFileBtn">Cancel</lex-btn>
-          <lex-btn type="submit" variant="primary" id="confirmRenameFileBtn">Save</lex-btn>
-        </div>
-      </form>
-    </lex-modal>
-
-    <!-- Delete File Modal -->
-    <lex-modal id="deleteFileModal" heading="Delete File" size="md" variant="danger" hide-actions="true">
-      <p class="text-sm" style="color: var(--lex-text-secondary)">
-        Are you sure you want to delete
-        <span class="font-medium" style="color: var(--lex-text-primary)" id="deleteFileName"></span>?
-        This action moves the file to deleted items.
-      </p>
-      <div class="delete-file-actions">
-        <lex-btn type="button" variant="secondary" id="cancelDeleteFileBtn">Cancel</lex-btn>
-        <lex-btn type="button" variant="danger" id="confirmDeleteFileBtn">Delete</lex-btn>
-      </div>
-    </lex-modal>
+    <!-- Per-file Rename and Delete are owned by the MatterDocumentsView
+         component, which injects its own Lex rename modal and confirm dialogs.
+         No per-file rename/delete modal markup lives here. -->
 
     <!-- Context Menu Container -->
     <div id="contextMenu" class="hidden fixed bg-white rounded-lg shadow-xl border py-1 z-50 min-w-[180px]" style="border-color: var(--lex-border-default)"></div>

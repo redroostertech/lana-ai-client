@@ -46,11 +46,15 @@
   var _navContext = null;              // navigation context (source, conversationId, etc.)
   var _pendingTaskDeepLinkId = null;
 
-  // Document tab pagination/search state
-  var _docPage = 1;
+  // Document tab page size, passed to the MatterDocumentsView component, which
+  // owns the file-list search and pagination state internally.
   var _docPageSize = 12;
-  var _docSearch = '';
-  var _docSearchTimeout = null;
+
+  // Shared matter file-list component (window.MatterDocumentsView). The matter
+  // Documents tab renders its file list (and all per-row / batch / orphan /
+  // workflow actions) exclusively through this component. See
+  // renderDocumentsTab() for the host chrome that stays host-side.
+  var _matterDocsViewInstance = null;
 
   // Document generation state
   var docGenState = {
@@ -1379,117 +1383,16 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
-  function getDocumentLifecycle(doc) {
-    if (window.documentLifecycle && typeof window.documentLifecycle.getDocumentLifecycle === 'function') {
-      return window.documentLifecycle.getDocumentLifecycle(doc);
-    }
+  // Document status/lifecycle/badge helpers and the matter-specific Doc Studio
+  // workflow badges now live inside the shared MatterDocumentsView component,
+  // which owns all file-row rendering for the Documents tab.
 
-    var status = String((doc && doc.status) || '').toLowerCase();
-    var processingStatus = String((doc && doc.processing_status) || '').toLowerCase();
-    var hasCompletedWork = Boolean((doc && doc.processed_at) || (doc && doc.chunk_count > 0) || (doc && doc.vector_count > 0));
-
-    if (processingStatus === 'failed' || status === 'failed' || status === 'error') {
-      return 'needs_attention';
+  // Tear down a mounted MatterDocumentsView instance, if any.
+  function destroyMatterDocsView() {
+    if (_matterDocsViewInstance) {
+      try { _matterDocsViewInstance.destroy(); } catch (e) {}
+      _matterDocsViewInstance = null;
     }
-    if (processingStatus === 'processing' || status === 'processing' || status === 'text_extracted') {
-      return 'processing';
-    }
-    if (processingStatus === 'completed' || status === 'completed' || status === 'active' || hasCompletedWork) {
-      return 'ready';
-    }
-    if (status === 'cancelled' || status === 'deleted') {
-      return 'inactive';
-    }
-    if (status === 'queued' || status === 'pending' || status === 'ready') {
-      return 'uploaded';
-    }
-    return hasCompletedWork ? 'ready' : 'uploaded';
-  }
-
-  function getDocumentStatusDisplay(doc) {
-    if (window.documentLifecycle && typeof window.documentLifecycle.getDocumentLifecycleDisplay === 'function') {
-      return window.documentLifecycle.getDocumentLifecycleDisplay(doc);
-    }
-
-    var lifecycle = getDocumentLifecycle(doc);
-    var presentations = {
-      'ready': {
-        label: 'Ready',
-        badgeClass: 'bg-green-100 text-green-700',
-        progressLabel: 'Ready to review'
-      },
-      'processing': {
-        label: 'Processing',
-        badgeClass: 'bg-yellow-100 text-yellow-700',
-        progressLabel: 'Preparing for AI'
-      },
-      'uploaded': {
-        label: 'Uploaded',
-        badgeClass: 'bg-blue-100 text-blue-700',
-        progressLabel: 'Uploaded, awaiting processing'
-      },
-      'needs_attention': {
-        label: 'Needs Attention',
-        badgeClass: 'bg-red-100 text-red-700',
-        progressLabel: 'Processing needs attention'
-      },
-      'inactive': {
-        label: 'Inactive',
-        badgeClass: 'bg-gray-100 text-gray-700',
-        progressLabel: 'Inactive'
-      }
-    };
-    return presentations[lifecycle] || presentations.uploaded;
-  }
-
-  // Document processing status badge
-  function docStatusBadge(doc) {
-    var display = getDocumentStatusDisplay(doc);
-    return '<span data-status-badge class="px-2 py-0.5 text-xs font-medium rounded-full ' + display.badgeClass + '">' + display.label + '</span>';
-  }
-
-  function parseDocumentMetadata(doc) {
-    var metadata = doc && doc.metadata ? doc.metadata : {};
-    if (typeof metadata === 'string') {
-      try {
-        metadata = JSON.parse(metadata);
-      } catch (error) {
-        metadata = {};
-      }
-    }
-    return metadata && typeof metadata === 'object' ? metadata : {};
-  }
-
-  function isDocStudioGeneratedDocument(doc) {
-    var metadata = parseDocumentMetadata(doc);
-    return metadata.source === 'doc_studio' ||
-      doc.document_type === 'generated_legal_document' ||
-      doc.document_type === 'generated_presentation';
-  }
-
-  function docStudioWorkflowBadges(doc) {
-    var metadata = parseDocumentMetadata(doc);
-    var badges = '';
-    if (isDocStudioGeneratedDocument(doc)) {
-      badges += '<span class="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-medium rounded">Doc Studio</span>';
-    }
-    if (metadata.legal_review && metadata.legal_review.status) {
-      var reviewClass = metadata.legal_review.status === 'approved'
-        ? 'bg-green-100 text-green-700'
-        : metadata.legal_review.status === 'changes_requested'
-          ? 'bg-amber-100 text-amber-700'
-          : 'bg-blue-100 text-blue-700';
-      badges += '<span class="inline-flex items-center px-2 py-0.5 ' + reviewClass + ' text-xs font-medium rounded">Review: ' + escapeHtml(metadata.legal_review.status.replace(/_/g, ' ')) + '</span>';
-    }
-    if (metadata.signature_workflow && metadata.signature_workflow.status) {
-      var signClass = metadata.signature_workflow.status === 'completed'
-        ? 'bg-green-100 text-green-700'
-        : metadata.signature_workflow.status === 'cancelled'
-          ? 'bg-gray-100 text-gray-600'
-          : 'bg-purple-100 text-purple-700';
-      badges += '<span class="inline-flex items-center px-2 py-0.5 ' + signClass + ' text-xs font-medium rounded">Sign: ' + escapeHtml(metadata.signature_workflow.status.replace(/_/g, ' ')) + '</span>';
-    }
-    return badges;
   }
 
   function renderDocumentsTab(matter, documents, pagination, orphanedFiles) {
@@ -1499,7 +1402,13 @@
     documents = documents || [];
     orphanedFiles = orphanedFiles || [];
 
-    // Empty state
+    // Any prior component instance is replaced by the render below; tear it
+    // down so its listeners and timers do not leak across renders.
+    destroyMatterDocsView();
+
+    // Empty state: no matter documents and no orphaned files. Render the host
+    // chrome (header + Create with Doc Studio + upload drop zone + empty
+    // placeholder) only; the component is not mounted until there is data.
     if (documents.length === 0 && orphanedFiles.length === 0) {
       container.innerHTML =
         '<div class="py-6">' +
@@ -1531,293 +1440,10 @@
       return;
     }
 
-    // Build document list HTML
-    var docListHtml = '';
-    if (documents.length > 0) {
-      // Client-side search filter
-      var allDocs = documents;
-      var filteredDocs = allDocs;
-      if (_docSearch) {
-        var searchLower = _docSearch.toLowerCase();
-        filteredDocs = allDocs.filter(function (d) {
-          var name = (d.original_filename || d.filename || '').toLowerCase();
-          return name.indexOf(searchLower) !== -1;
-        });
-      }
-
-      // Count templates (from filtered set)
-      var templateCount = 0;
-      for (var tc = 0; tc < filteredDocs.length; tc++) { if (filteredDocs[tc].is_template) templateCount++; }
-      var nonTemplateCount = filteredDocs.length - templateCount;
-
-      // Client-side pagination
-      var totalCount = filteredDocs.length;
-      var currentPage = _docPage;
-      var totalPages = Math.ceil(totalCount / _docPageSize) || 1;
-      if (currentPage > totalPages) { currentPage = 1; _docPage = 1; }
-      var startIdx = (currentPage - 1) * _docPageSize;
-      var pageDocs = filteredDocs.slice(startIdx, startIdx + _docPageSize);
-
-      var docItems = '';
-      for (var di = 0; di < pageDocs.length; di++) {
-        var doc = pageDocs[di];
-        var docName = doc.original_filename || doc.filename || '';
-        var docMetadata = parseDocumentMetadata(doc);
-        var isGeneratedDocStudioFile = isDocStudioGeneratedDocument(doc);
-        var sourceBadge = '';
-        if (doc.source === 'workspace') {
-          sourceBadge =
-            '<span class="text-gray-300">|</span>' +
-            '<span class="inline-flex items-center gap-1 px-2 py-0.5 lex-bg-accent-soft lex-text-accent text-xs font-medium rounded">' +
-              '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>' +
-              'From Workspace' +
-            '</span>';
-        } else if (doc.source === 'inherited') {
-          sourceBadge =
-            '<span class="text-gray-300">|</span>' +
-            '<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">' +
-              '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>' +
-              'Shared' +
-            '</span>';
-        }
-
-        var statusDisplay = getDocumentStatusDisplay(doc);
-        var lifecycle = getDocumentLifecycle(doc);
-        var isReady = lifecycle === 'ready' || lifecycle === 'summarized';
-        var isBusy = statusDisplay && typeof statusDisplay.isInProgress === 'boolean'
-          ? statusDisplay.isInProgress
-          : (lifecycle === 'processing' || lifecycle === 'uploaded' || lifecycle === 'parsed' || lifecycle === 'indexed');
-        var needsAttention = lifecycle === 'needs_attention';
-
-        var actionButtons = '';
-        if (isReady || isGeneratedDocStudioFile) {
-          actionButtons =
-            '<button onclick="_navToFileViewer(\'' + doc.id + '\')" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1">' +
-              '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>' +
-              'View' +
-            '</button>' +
-            '<button onclick="downloadDocument(\'' + doc.id + '\', \'' + matter.matter_id + '\', \'' + escapeHtml(doc.filename || '') + '\')" class="text-xs lex-text-accent hover:lex-text-accent font-medium flex items-center gap-1">' +
-              '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>' +
-              'Download' +
-            '</button>';
-          if (isGeneratedDocStudioFile) {
-            var hasReviewRequest = docMetadata.legal_review && docMetadata.legal_review.status && docMetadata.legal_review.status !== 'not_requested';
-            var hasSignatureRequest = docMetadata.signature_workflow && docMetadata.signature_workflow.status && docMetadata.signature_workflow.status !== 'not_requested';
-            actionButtons +=
-              '<button onclick="requestDocStudioLegalReview(\'' + doc.id + '\', \'' + matter.matter_id + '\')" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">' +
-                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7 3h10a2 2 0 012 2v14l-4-2-4 2-4-2-4 2V5a2 2 0 012-2z"></path></svg>' +
-                (hasReviewRequest ? 'Re-request Review' : 'Request Review') +
-              '</button>' +
-              '<button onclick="requestDocStudioSignatures(\'' + doc.id + '\', \'' + matter.matter_id + '\')" class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1">' +
-                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M4 20h4l10.5-10.5a2.5 2.5 0 00-3.536-3.536L4 16.929V20z"></path></svg>' +
-                (hasSignatureRequest ? 'Re-request Signatures' : 'Request Signatures') +
-              '</button>';
-            if (hasReviewRequest && docMetadata.legal_review.status !== 'approved') {
-              actionButtons +=
-                '<button onclick="updateDocStudioLegalReviewStatus(\'' + doc.id + '\', \'' + matter.matter_id + '\', \'approved\')" class="text-xs text-green-600 hover:text-green-800 font-medium flex items-center gap-1">Mark Approved</button>';
-            }
-            if (hasSignatureRequest && docMetadata.signature_workflow.status !== 'completed') {
-              actionButtons +=
-                '<button onclick="updateDocStudioSignatureStatus(\'' + doc.id + '\', \'' + matter.matter_id + '\', \'completed\')" class="text-xs text-green-600 hover:text-green-800 font-medium flex items-center gap-1">Mark Signed</button>';
-            }
-          }
-        } else if (isBusy && doc.job_id) {
-          actionButtons =
-            '<span class="text-xs text-gray-500 italic flex items-center gap-1">' +
-              '<svg class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">' +
-                '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
-                '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>' +
-              '</svg>' +
-              escapeHtml(statusDisplay.progressLabel) +
-            '</span>';
-        } else if (needsAttention) {
-          if (doc.error_message) {
-            var errText = doc.error_message.substring(0, 50) + (doc.error_message.length > 50 ? '...' : '');
-            actionButtons +=
-              '<span class="text-xs text-red-600 italic flex items-center gap-1" title="' + escapeHtml(doc.error_message) + '">' +
-                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>' +
-                escapeHtml(errText) +
-              '</span>';
-          }
-          actionButtons +=
-            '<button onclick="retryDocumentIngestion(\'' + doc.id + '\', \'' + matter.matter_id + '\', \'' + escapeHtml(docName) + '\')" class="text-xs text-amber-600 hover:text-amber-800 font-medium flex items-center gap-1">' +
-              '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>' +
-              'Retry Ingestion' +
-            '</button>';
-        }
-
-        // Template action buttons (DOCX + PDF)
-        var isDocxFile = (doc.content_type || '').indexOf('wordprocessingml') !== -1 ||
-                         (doc.filename || '').toLowerCase().endsWith('.docx') ||
-                         (doc.original_filename || '').toLowerCase().endsWith('.docx');
-        var isPdfFile = (doc.content_type || '') === 'application/pdf' ||
-                        (doc.filename || '').toLowerCase().endsWith('.pdf') ||
-                        (doc.original_filename || '').toLowerCase().endsWith('.pdf');
-        var isTemplateable = isDocxFile || isPdfFile;
-
-        if (isTemplateable && !doc.read_only && isReady) {
-          if (doc.is_template) {
-            actionButtons +=
-              '<button onclick="openDocxTemplateModal(\'' + doc.id + '\', \'' + matter.matter_id + '\', \'' + escapeHtml(docName).split("'").join("\\'") + '\')" class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1">' +
-                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>' +
-                'Generate' +
-              '</button>' +
-              '<button onclick="toggleDocxTemplate(\'' + doc.id + '\', \'' + matter.matter_id + '\', false)" class="text-xs text-gray-500 hover:text-gray-700 font-medium flex items-center gap-1" title="Remove template flag">' +
-                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
-                'Unmark' +
-              '</button>';
-          } else {
-            actionButtons +=
-              '<button onclick="toggleDocxTemplate(\'' + doc.id + '\', \'' + matter.matter_id + '\', true)" class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1" title="Mark as document template">' +
-                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>' +
-                'Use as Template' +
-              '</button>';
-          }
-        }
-
-        if (!doc.read_only) {
-          actionButtons +=
-            '<button onclick="replaceDrawerDocument(\'' + doc.id + '\', \'' + matter.matter_id + '\')" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1" title="Replace file and re-index" style="display: none;">' +
-              '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>' +
-              'Replace' +
-            '</button>' +
-            '<button onclick="deleteDrawerDocument(\'' + doc.id + '\', \'' + matter.matter_id + '\')" class="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1">' +
-              '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
-              'Delete' +
-            '</button>';
-        } else {
-          actionButtons +=
-            '<span class="text-xs text-gray-400 italic flex items-center gap-1">' +
-              '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>' +
-              'Read-only' +
-            '</span>';
-        }
-
-        var docType = doc.is_template ? 'template' : 'document';
-        docItems +=
-          '<div class="bg-white border border-gray-200 hover:lex-border-accent rounded-lg p-3 transition-all group" data-doc-id="' + doc.id + '" data-doc-type="' + docType + '">' +
-            '<div class="flex items-start gap-3">' +
-              '<input type="checkbox" class="doc-select-cb mt-2 rounded border-gray-300 text-purple-600 focus:ring-purple-500 flex-shrink-0" data-doc-id="' + doc.id + '" onclick="event.stopPropagation(); updateDocSelection()">' +
-              '<div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">' +
-                getFileIcon(doc.content_type) +
-              '</div>' +
-              '<div class="flex-1 min-w-0">' +
-                '<div class="flex items-start justify-between gap-2">' +
-                  '<div class="min-w-0">' +
-                    '<h6 class="text-sm font-medium text-gray-900 truncate" title="' + escapeHtml(docName) + '">' + escapeHtml(docName) + '</h6>' +
-                    '<p class="text-xs text-gray-500 flex items-center gap-2 mt-0.5">' +
-                      '<span>' + formatSize(doc.file_size) + '</span>' +
-                      '<span class="text-gray-300">|</span>' +
-                      '<span>' + timeAgo(doc.created_at) + '</span>' +
-                      sourceBadge +
-                    '</p>' +
-                  '</div>' +
-                  '<div class="flex items-center gap-2 flex-shrink-0">' +
-                    (doc.is_template ? '<span class="inline-flex items-center px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">Template</span>' : '') +
-                    docStudioWorkflowBadges(doc) +
-                    docStatusBadge(doc) +
-                  '</div>' +
-                '</div>' +
-                '<div class="flex items-center gap-2 mt-2" data-doc-actions>' +
-                  actionButtons +
-                '</div>' +
-              '</div>' +
-            '</div>' +
-          '</div>';
-      }
-
-      docListHtml =
-        // Search bar
-        '<div class="mb-3">' +
-          '<div class="relative">' +
-            '<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>' +
-            '<input type="text" id="docSearchInput" placeholder="Search documents..." value="' + escapeHtml(_docSearch) + '" class="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">' +
-          '</div>' +
-        '</div>' +
-        // Filter tabs + batch actions bar
-        '<div class="flex items-center justify-between mb-3">' +
-          '<div class="flex items-center gap-1">' +
-            '<button onclick="filterDocs(\'all\')" class="doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-900 text-white" data-filter="all">All ' + totalCount + '</button>' +
-            (templateCount > 0 ? '<button onclick="filterDocs(\'template\')" class="doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="template">Templates ' + templateCount + '</button>' : '') +
-            (nonTemplateCount > 0 ? '<button onclick="filterDocs(\'document\')" class="doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200" data-filter="document">Documents ' + nonTemplateCount + '</button>' : '') +
-          '</div>' +
-          '<div class="flex items-center gap-2">' +
-            '<label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">' +
-              '<input type="checkbox" id="docSelectAll" onchange="toggleDocSelectAll(this.checked)" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">' +
-              'Select All' +
-            '</label>' +
-            '<button id="docBatchDeleteBtn" onclick="batchDeleteDocs()" class="hidden px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors">' +
-              'Delete Selected' +
-            '</button>' +
-          '</div>' +
-        '</div>' +
-        '<div id="docListContainer" class="space-y-2">' +
-          (filteredDocs.length === 0
-            ? '<div class="text-center py-8"><p class="text-sm text-gray-500">No documents matching "' + escapeHtml(_docSearch) + '"</p></div>'
-            : docItems) +
-        '</div>' +
-        // Pagination
-        (totalPages > 1 ? '<lex-pagination id="docPagination" class="mt-4 border-t pt-4" page="' + currentPage + '" total-pages="' + totalPages + '" total="' + totalCount + '" limit="' + _docPageSize + '"></lex-pagination>' : '');
-    }
-
-    // Build orphaned files HTML
-    var orphanedHtml = '';
-    if (orphanedFiles.length > 0) {
-      var orphanItems = '';
-      for (var oi = 0; oi < orphanedFiles.length; oi++) {
-        var file = orphanedFiles[oi];
-        var fileDisplayName = file.filename || '';
-        var connectorBadge = file.connector_id
-          ? '<span class="text-gray-300">|</span><span class="text-xs bg-gray-200 px-1.5 py-0.5 rounded">' + escapeHtml(file.connector_id) + '</span>'
-          : '';
-
-        // Build assign button — avoid single-quotes in onclick by escaping the filename
-        var safeFilename = fileDisplayName.split("'").join("\\'");
-        var safeContentType = (file.content_type || '').split("'").join("\\'");
-
-        orphanItems +=
-          '<div class="bg-yellow-50 border border-yellow-200 hover:border-yellow-300 rounded-lg p-3 transition-all" data-orphan-key="' + escapeHtml(file.storage_key) + '">' +
-            '<div class="flex items-start gap-3">' +
-              '<div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">' +
-                getFileIcon(file.content_type) +
-              '</div>' +
-              '<div class="flex-1 min-w-0">' +
-                '<div class="flex items-start justify-between gap-2">' +
-                  '<div class="min-w-0">' +
-                    '<h6 class="text-sm font-medium text-gray-900 truncate" title="' + escapeHtml(fileDisplayName) + '">' + escapeHtml(fileDisplayName) + '</h6>' +
-                    '<p class="text-xs text-gray-500 flex items-center gap-2 mt-0.5">' +
-                      '<span>' + formatSize(file.file_size) + '</span>' +
-                      connectorBadge +
-                    '</p>' +
-                    '<p class="text-xs text-gray-400 mt-1 font-mono truncate" title="' + escapeHtml(file.storage_key) + '">' + escapeHtml(file.storage_key) + '</p>' +
-                  '</div>' +
-                '</div>' +
-                '<div class="flex items-center gap-2 mt-2">' +
-                  '<button onclick="assignOrphanedFile(\'' + escapeHtml(file.storage_key) + '\', \'' + matter.matter_id + '\', \'' + safeFilename + '\', \'' + safeContentType + '\', ' + (file.file_size || 0) + ', \'' + (file.id || '') + '\', \'' + (file.source || 'minio') + '\')" class="text-xs lex-text-accent hover:lex-text-accent font-medium flex items-center gap-1">' +
-                    '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
-                    'Assign to Matter' +
-                  '</button>' +
-                  '<button onclick="deleteOrphanedFile(\'' + escapeHtml(file.storage_key) + '\', \'' + matter.matter_id + '\', \'' + safeFilename + '\')" class="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1">' +
-                    '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
-                    'Delete' +
-                  '</button>' +
-                '</div>' +
-              '</div>' +
-            '</div>' +
-          '</div>';
-      }
-
-      orphanedHtml =
-        '<div class="mt-6">' +
-          '<div class="flex items-center justify-between mb-3">' +
-            '<h5 class="text-sm font-medium text-gray-700">Unassigned Documents</h5>' +
-            '<span class="text-xs text-gray-500 bg-yellow-50 px-2 py-1 rounded">' + orphanedFiles.length + ' file' + (orphanedFiles.length !== 1 ? 's' : '') + ' found in storage</span>' +
-          '</div>' +
-          '<p class="text-xs text-gray-500 mb-3">These files exist in storage but are not tracked in the database. Click "Assign to Matter" to add them.</p>' +
-          '<div class="space-y-2">' + orphanItems + '</div>' +
-        '</div>';
-    }
-
+    // Populated state: render the host chrome (header + Create with Doc Studio
+    // button + upload drop zone) and mount the shared MatterDocumentsView into
+    // #matterDocsViewHost. The component owns the entire file list and every
+    // per-row / batch / orphan / workflow action via the injected api.
     container.innerHTML =
       '<div class="space-y-4">' +
         '<div class="flex items-center justify-between gap-4">' +
@@ -1843,41 +1469,43 @@
             '<span id="drawerDocUploadText" class="text-sm text-gray-600">Uploading...</span>' +
           '</div>' +
         '</div>' +
-        docListHtml +
-        orphanedHtml +
+        '<div id="matterDocsViewHost"></div>' +
       '</div>';
 
     setupDrawerUpload(matter, 'drawerDocDropZone', 'drawerDocFileInput');
 
-    // Wire up document search
-    var searchInput = document.getElementById('docSearchInput');
-    if (searchInput) {
-      // Restore focus if user was actively searching
-      if (_docSearch) {
-        searchInput.focus();
-        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
-      }
-      searchInput.addEventListener('input', function () {
-        clearTimeout(_docSearchTimeout);
-        _docSearchTimeout = setTimeout(function () {
-          _docSearch = searchInput.value.trim();
-          _docPage = 1;
-          loadDocumentsPage(matter.matter_id);
-        }, 300);
-      });
+    var host = document.getElementById('matterDocsViewHost');
+    if (!host) return;
+
+    if (!window.MatterDocumentsView || typeof window.MatterDocumentsView.mount !== 'function') {
+      // Component script failed to load. Surface a minimal message rather than
+      // silently rendering nothing so the regression is visible.
+      host.innerHTML = '<div class="text-center py-8"><p class="text-sm text-gray-500">Document list unavailable. Please reload.</p></div>';
+      return;
     }
 
-    // Wire up document pagination
-    var docPag = document.getElementById('docPagination');
-    if (docPag) {
-      docPag.addEventListener('page-change', function (e) {
-        var newPage = e.detail && e.detail.page;
-        if (newPage) {
-          _docPage = newPage;
-          loadDocumentsPage(matter.matter_id);
-        }
-      });
-    }
+    _matterDocsViewInstance = window.MatterDocumentsView.mount(host, {
+      api: api,
+      matterId: matter.matter_id,
+      matterDisplayId: matter.matter_id,
+      files: documents,
+      orphanedFiles: orphanedFiles,
+      onFileOpen: function (fileId) { _navToFileViewer(fileId); },
+      onCreateDocStudio: function () { openCreateDocStudioDocumentModal(); },
+      toast: (window.Lex && window.Lex.Toast) || null,
+      confirm: (window.Lex && window.Lex.Modal && window.Lex.Modal.confirm) || null,
+      viewMode: 'list',
+      pageSize: _docPageSize,
+      enableRename: true,
+      enableTemplates: true,
+      enableOrphans: true,
+      enableWorkflow: true,
+      enableBatch: true,
+      enableTemplateToggle: true,
+      enableRetry: true,
+      enableReplace: true,
+      enableDocStudio: true
+    });
   }
 
   // Setup drag-and-drop / click-to-upload handlers for a drop zone
@@ -1964,13 +1592,6 @@
     }
   }
 
-  // Re-render documents with current search/page state (no API call)
-  function loadDocumentsPage(matterId) {
-    if (currentMatterData && currentMatterData.matter) {
-      renderDocumentsTab(currentMatterData.matter, currentMatterData.documents, currentMatterData.docPagination, currentMatterData.orphanedFiles);
-    }
-  }
-
   function focusDocumentUploadExperience() {
     var attempts = 0;
 
@@ -2009,141 +1630,26 @@
       }
 
       if (currentMatterData && currentMatterData.matter) {
-        renderDocumentsTab(currentMatterData.matter, documents, pagination, orphanedFiles);
+        // When the component is mounted, refresh it in place with the new file
+        // and orphan sets. If the tab transitioned in or out of the empty state
+        // (no mounted instance), do a full host re-render so the chrome and the
+        // mount/teardown stay correct.
+        var hadData = documents.length > 0 || orphanedFiles.length > 0;
+        if (_matterDocsViewInstance && hadData) {
+          _matterDocsViewInstance.refresh(documents, orphanedFiles);
+        } else {
+          renderDocumentsTab(currentMatterData.matter, documents, pagination, orphanedFiles);
+        }
       }
     } catch (error) {
       console.error('[refreshDrawerDocuments] Failed to refresh documents:', error);
     }
   }
 
-  // Delete a document from the current matter
-  function deleteDrawerDocument(fileId, matterId) {
-    Lex.Modal.confirm(
-      'Delete Document',
-      'Are you sure you want to delete this document? This action cannot be undone.',
-      async function () {
-        try {
-          await api.deleteDocument(fileId);
-          Lex.Toast.success('Document deleted successfully');
-          await refreshDrawerDocuments(matterId);
-        } catch (error) {
-          Lex.Toast.error(error.message || 'Failed to delete document');
-        }
-      }
-    );
-  }
-
-  // Retry document ingestion for a failed document
-  async function retryDocumentIngestion(fileId, matterId, filename) {
-    if (typeof Modal !== 'undefined' && Modal.confirm) {
-      Modal.confirm(
-        'Retry Document Processing',
-        'Retry processing for "' + filename + '"? This will re-attempt to parse, chunk, and embed the document.',
-        async function () {
-          try {
-            Lex.Toast.info('Retriggering document ingestion...');
-            await api.post('/api/v1/storage/documents/' + fileId + '/retry-ingestion', {});
-            Lex.Toast.success('Document processing started. This may take a few minutes.');
-            trackTimeout(setTimeout(async function () {
-              await refreshDrawerDocuments(matterId);
-            }, 2000));
-          } catch (error) {
-            console.error('[retryDocumentIngestion] Failed:', error);
-            Lex.Toast.error(error.message || 'Failed to retry document processing');
-          }
-        },
-        'Retry',
-        'primary'
-      );
-    }
-  }
-
-  // Replace a document file (triggers re-vectorization)
-  async function replaceDrawerDocument(fileId, matterId) {
-    var input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.pdf,.doc,.docx,.txt,.html,.rtf';
-
-    input.onchange = async function (e) {
-      var file = e.target.files[0];
-      if (!file) return;
-
-      if (typeof Modal !== 'undefined' && Modal.confirm) {
-        Modal.confirm(
-          'Replace Document',
-          'Replace document with "' + file.name + '"? This will re-process the document and update all embeddings for search.',
-          async function () {
-            try {
-              Lex.Toast.info('Replacing document...');
-              await api.replaceDocument(fileId, file, function (progress) {
-                console.log('Upload progress: ' + progress + '%');
-              });
-              Lex.Toast.success('Document replaced successfully. Re-processing for search...');
-              await refreshDrawerDocuments(matterId);
-            } catch (error) {
-              Lex.Toast.error(error.message || 'Failed to replace document');
-            }
-          }
-        );
-      }
-    };
-
-    input.click();
-  }
-
-  // Assign an orphaned storage file to this matter
-  async function assignOrphanedFile(storageKey, matterId, filename, contentType, fileSize, documentId, source) {
-    var message = source === 'database'
-      ? 'Link "' + filename + '" to this matter? The file is already in the database.'
-      : 'Assign "' + filename + '" to this matter? This will create a database record and make it available for AI search.';
-
-    if (typeof Modal !== 'undefined' && Modal.confirm) {
-      Modal.confirm(
-        'Assign File to Matter',
-        message,
-        async function () {
-          try {
-            Lex.Toast.info('Assigning file...');
-            await api.assignOrphanedFile({
-              storage_key: storageKey,
-              matter_id: matterId,
-              filename: filename,
-              content_type: contentType,
-              file_size: fileSize,
-              document_id: documentId || null,
-              source: source || 'minio'
-            });
-            Lex.Toast.success('Document assigned! Processing started - refresh page in a few moments to see the processed document', { duration: 8000 });
-            await refreshDrawerDocuments(matterId);
-          } catch (error) {
-            Lex.Toast.error(error.message || 'Failed to assign file');
-          }
-        },
-        'Assign',
-        'primary'
-      );
-    }
-  }
-
-  // Delete an orphaned file from storage
-  async function deleteOrphanedFile(storageKey, matterId, filename) {
-    if (typeof Modal !== 'undefined' && Modal.confirm) {
-      Modal.confirm(
-        'Delete File',
-        'Permanently delete "' + filename + '" from storage? This action cannot be undone.',
-        async function () {
-          try {
-            Lex.Toast.info('Deleting file...');
-            await api.delete('/api/v1/storage/orphaned?storage_key=' + encodeURIComponent(storageKey));
-            Lex.Toast.success('File deleted successfully');
-            await refreshDrawerDocuments(matterId);
-          } catch (error) {
-            Lex.Toast.error(error.message || 'Failed to delete file');
-          }
-        }
-      );
-    }
-  }
+  // Per-row document actions (delete, retry ingestion, replace) and the
+  // orphaned-file actions (assign to matter, delete from storage) are now owned
+  // by the shared MatterDocumentsView component, which performs them via the
+  // injected api. The host only re-fetches through refreshDrawerDocuments.
 
   // =========================================================================
   // DOCX Template — uses shared DocxTemplateModal module
@@ -2181,15 +1687,9 @@
     });
   }
 
-  async function toggleDocxTemplate(docId, matterId, isTemplate) {
-    try {
-      await DocxTemplateModal.toggleTemplate(docId, matterId, isTemplate, {
-        onSuccess: function (msg) { Lex.Toast.success(msg); },
-        onError: function (msg) { Lex.Toast.error(msg); }
-      });
-      await refreshDrawerDocuments(matterId);
-    } catch (_) { /* handled by callbacks */ }
-  }
+  // Template mark/unmark (template toggle) is owned by the MatterDocumentsView
+  // component (enableTemplateToggle). The DOCX template GENERATE modal stays
+  // host-side and is opened by the component via openDocxTemplateModal below.
 
   function openDocxTemplateModal(docId, matterId, docName) {
     if (!_wsDocxModal) _initWsDocxTemplateModal();
@@ -2235,7 +1735,11 @@
   }
 
   function selectedMatterDocumentIds() {
-    return Array.from(document.querySelectorAll('.doc-select-cb:checked'))
+    // The Documents tab file list is rendered by the MatterDocumentsView
+    // component, whose batch-select checkboxes use the .mdv-select-cb class.
+    // Match that here (plus the legacy .doc-select-cb) so the Doc Studio
+    // "scope to selected documents" context continues to read the selection.
+    return Array.from(document.querySelectorAll('.mdv-select-cb:checked, .doc-select-cb:checked'))
       .map(function (checkbox) { return checkbox.getAttribute('data-doc-id'); })
       .filter(Boolean);
   }
@@ -3220,92 +2724,11 @@
   // Window globals for onclick handlers in HTML
   // =========================================================================
 
-  // Document filter, select, batch delete
-  function filterDocs(type) {
-    var cards = document.querySelectorAll('[data-doc-id][data-doc-type]');
-    var btns = document.querySelectorAll('.doc-filter-btn');
-    btns.forEach(function (b) {
-      var isActive = b.getAttribute('data-filter') === type;
-      b.className = 'doc-filter-btn px-2.5 py-1 text-xs font-medium rounded-full ' +
-        (isActive ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200');
-    });
-    cards.forEach(function (c) {
-      if (type === 'all' || c.getAttribute('data-doc-type') === type) {
-        c.style.display = '';
-      } else {
-        c.style.display = 'none';
-      }
-    });
-    // Uncheck all when filtering
-    document.querySelectorAll('.doc-select-cb').forEach(function (cb) { cb.checked = false; });
-    var selectAll = document.getElementById('docSelectAll');
-    if (selectAll) selectAll.checked = false;
-    updateDocSelection();
-  }
-
-  function toggleDocSelectAll(checked) {
-    document.querySelectorAll('.doc-select-cb').forEach(function (cb) {
-      if (cb.closest('[data-doc-id]').style.display !== 'none') {
-        cb.checked = checked;
-      }
-    });
-    updateDocSelection();
-  }
-
-  function updateDocSelection() {
-    var selected = document.querySelectorAll('.doc-select-cb:checked');
-    var batchBtn = document.getElementById('docBatchDeleteBtn');
-    if (batchBtn) {
-      if (selected.length > 0) {
-        batchBtn.classList.remove('hidden');
-        batchBtn.textContent = 'Delete ' + selected.length + ' Selected';
-      } else {
-        batchBtn.classList.add('hidden');
-      }
-    }
-  }
-
-  function batchDeleteDocs() {
-    var selected = document.querySelectorAll('.doc-select-cb:checked');
-    if (selected.length === 0) return;
-
-    var count = selected.length;
-    Lex.Modal.confirm(
-      'Delete ' + count + ' Document' + (count !== 1 ? 's' : ''),
-      'Are you sure you want to delete ' + count + ' document' + (count !== 1 ? 's' : '') + '? This action cannot be undone.',
-      async function () {
-        var matterId = currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id;
-        var deleted = 0;
-        var failed = 0;
-        for (var i = 0; i < selected.length; i++) {
-          var docId = selected[i].getAttribute('data-doc-id');
-          try {
-            await api.delete('/api/v1/storage/files/' + docId + '?matter_id=' + encodeURIComponent(matterId));
-            deleted++;
-          } catch (_) {
-            failed++;
-          }
-        }
-        if (deleted > 0) Lex.Toast.success(deleted + ' document' + (deleted !== 1 ? 's' : '') + ' deleted');
-        if (failed > 0) Lex.Toast.error(failed + ' failed to delete');
-        await refreshDrawerDocuments(matterId);
-      }
-    );
-  }
-
-  window.filterDocs = filterDocs;
-  window.toggleDocSelectAll = toggleDocSelectAll;
-  window.updateDocSelection = updateDocSelection;
-  window.batchDeleteDocs = batchDeleteDocs;
+  // Document filter chips, batch select / Select All, and batch delete are now
+  // owned by the MatterDocumentsView component (enableTemplates / enableBatch).
 
   window.loadActivityPage = loadActivityPage;
-  window.deleteDrawerDocument = deleteDrawerDocument;
-  window.retryDocumentIngestion = retryDocumentIngestion;
-  window.replaceDrawerDocument = replaceDrawerDocument;
   window.refreshDrawerDocuments = refreshDrawerDocuments;
-  window.assignOrphanedFile = assignOrphanedFile;
-  window.deleteOrphanedFile = deleteOrphanedFile;
-  window.toggleDocxTemplate = toggleDocxTemplate;
   window.openDocxTemplateModal = openDocxTemplateModal;
   window.openCreateDocStudioDocumentModal = openCreateDocStudioDocumentModal;
   window.requestDocStudioLegalReview = requestDocStudioLegalReview;
@@ -3313,9 +2736,7 @@
   window.updateDocStudioLegalReviewStatus = updateDocStudioLegalReviewStatus;
   window.updateDocStudioSignatureStatus = updateDocStudioSignatureStatus;
 
-  ['loadActivityPage', 'deleteDrawerDocument', 'retryDocumentIngestion',
-   'replaceDrawerDocument', 'refreshDrawerDocuments', 'assignOrphanedFile',
-   'deleteOrphanedFile', 'toggleDocxTemplate', 'openDocxTemplateModal',
+  ['loadActivityPage', 'refreshDrawerDocuments', 'openDocxTemplateModal',
    'openCreateDocStudioDocumentModal', 'requestDocStudioLegalReview',
    'requestDocStudioSignatures', 'updateDocStudioLegalReviewStatus',
    'updateDocStudioSignatureStatus'].forEach(_trackGlobal);
@@ -10350,6 +9771,7 @@
     if (typeof destroyMatterNotes === 'function') {
       try { destroyMatterNotes(); } catch (e) {}
     }
+    destroyMatterDocsView();
 
     // 9. Clean up persistent window state
     try {
@@ -10372,10 +9794,6 @@
     currentTaskMatterId = null;
     currentEditingTask = null;
     currentTasksList = [];
-    _docPage = 1;
-    _docSearch = '';
-    clearTimeout(_docSearchTimeout);
-    _docSearchTimeout = null;
     docGenState = {
       documentTypes: [], templateSets: [], contacts: [],
       isGenerating: false, isAnalyzing: false, generatedContent: '',
