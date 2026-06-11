@@ -121,6 +121,22 @@
     var newFolderForm = document.getElementById('newFolderForm');
     newFolderForm && newFolderForm.addEventListener('submit', handleCreateFolder);
 
+    // Refresh Recently Opened / Pinned when returning to the Library (e.g. back
+    // from the file viewer). Opening a file logs a file_activity row server-side;
+    // a back/forward restore reuses the cached page without re-running onEnter,
+    // so re-fetch here so a just-opened file appears at the top of recents.
+    function refreshRecentsOnReturn() {
+      if (isBrainchildScope()) return;
+      loadRecentMatters();
+      loadPinnedMatters();
+    }
+    trackDocListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') refreshRecentsOnReturn();
+    });
+    window.addEventListener('pageshow', function (e) {
+      if (e && e.persisted) refreshRecentsOnReturn();
+    });
+
     // View toggle (plain buttons)
     var gridViewBtn = document.getElementById('gridViewBtn');
     gridViewBtn && gridViewBtn.addEventListener('click', function () { switchView('grid'); });
