@@ -56,6 +56,11 @@
     compareBy: 'monthly',
     label: 'Current period',
   };
+  // Track whether the active period came from a week/month/quarter preset.
+  // Presets compare against the previous calendar period; custom date ranges
+  // compare against the previous equal-length window (METRIC_GOALS_DESIGN.md
+  // section 11.2). Defaults true because the page boots on a preset.
+  var currentPeriodIsPreset = true;
 
   function el(id) { return document.getElementById(id); }
 
@@ -160,6 +165,13 @@
     if (period.start) params.periodStart = toPeriodISOString(period.start, false);
     if (period.end) params.periodEnd = toPeriodISOString(period.end, true);
     if (period.compareBy) params.compareBy = period.compareBy;
+    // Period-over-period comparison: ask the metric layer to attach a
+    // `comparison` block. Preset periods use the calendar mode, custom ranges
+    // use the contiguous equal-length mode.
+    params.compareToPrevious = true;
+    params.compareMode = (typeof MetricGoalComparison !== 'undefined')
+      ? MetricGoalComparison.resolveCompareMode(currentPeriodIsPreset)
+      : (currentPeriodIsPreset ? 'previous_calendar' : 'previous_period');
     return params;
   }
 
@@ -220,6 +232,7 @@
     var end = el('dashboardPeriodEnd');
     if (start) start.value = formatDate(startDate);
     if (end) end.value = formatDate(endDate);
+    currentPeriodIsPreset = true;
     updateCompareByOptions(formatDate(startDate), formatDate(endDate), preset);
     readPeriodControls();
     if (reload) reloadDashboardMetricsForCurrentPeriod();
@@ -646,6 +659,9 @@
     var periodLabel = metric.period || metric.period_label || currentPeriod.label || 'Current period';
     metricInfoById[cardId] = metric;
 
+    var comparisonHtml = renderComparison(metric.comparison);
+    var goalHtml = renderGoal(metric.goal);
+
     return '<article class="dash-metric-card">'
       + '<div class="dash-metric-card__top">'
       + '<div>'
@@ -658,7 +674,59 @@
       + '<div class="dash-metric-card__value">' + escapeHtml(value) + '</div>'
       + '<div class="dash-metric-card__period">' + escapeHtml(periodLabel) + '</div>'
       + '</div>'
+      + comparisonHtml
+      + goalHtml
       + '</article>';
+  }
+
+  // Period-over-period comparison row. The backend metric layer attaches a
+  // `comparison` block (METRIC_GOALS_DESIGN.md section 11); null -> render
+  // nothing so cards without snapshot history degrade gracefully.
+  function renderComparison(comparison) {
+    if (typeof MetricGoalComparison === 'undefined') return '';
+    var view = MetricGoalComparison.buildComparisonView(comparison);
+    if (!view) return '';
+
+    var dirClass = 'dash-metric-card__delta--flat';
+    var sign = '';
+    if (view.direction === 'up') { dirClass = 'dash-metric-card__delta--up'; sign = '+'; }
+    else if (view.direction === 'down') { dirClass = 'dash-metric-card__delta--down'; sign = '-'; }
+
+    var deltaHtml = view.deltaLabel
+      ? '<span class="dash-metric-card__delta ' + dirClass + '">' + escapeHtml(sign + view.deltaLabel) + '</span>'
+      : '';
+    var priorHtml = view.hasPrevious
+      ? '<span class="dash-metric-card__delta-prior">was ' + escapeHtml(formatMetricCardValue({ value: view.previousValue, format: 'number' })) + '</span>'
+      : '';
+
+    return '<div class="dash-metric-card__comparison">'
+      + deltaHtml
+      + '<span class="dash-metric-card__delta-label">vs previous period</span>'
+      + priorHtml
+      + '</div>';
+  }
+
+  // Goal status band: status pill + attainment + optional pace indicator.
+  // Null goal -> render nothing.
+  function renderGoal(goal) {
+    if (typeof MetricGoalComparison === 'undefined') return '';
+    var view = MetricGoalComparison.buildGoalView(goal);
+    if (!view) return '';
+
+    var attainmentHtml = view.hasAttainment
+      ? '<span class="dash-metric-card__goal-attainment">' + escapeHtml(view.attainmentLabel) + ' of goal</span>'
+      : '';
+    var paceHtml = view.pace
+      ? '<span class="dash-metric-card__goal-pace">' + escapeHtml(view.pace.label) + '</span>'
+      : '';
+
+    return '<div class="dash-metric-card__goal">'
+      + '<span class="dash-metric-card__goal-band dash-metric-card__goal-band--' + escapeHtml(view.band) + '">'
+      + escapeHtml(view.statusLabel)
+      + '</span>'
+      + attainmentHtml
+      + paceHtml
+      + '</div>';
   }
 
   function renderModalDetails(metric) {
@@ -886,6 +954,8 @@
     function handlePeriodChange() {
       var start = el('dashboardPeriodStart');
       var end = el('dashboardPeriodEnd');
+      // A manual edit to the start/end inputs is a custom range, not a preset.
+      currentPeriodIsPreset = false;
       if (start && end && start.value && end.value) {
         updateCompareByOptions(start.value, end.value, null);
       }

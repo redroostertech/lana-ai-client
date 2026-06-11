@@ -64,6 +64,21 @@
         value = formatNumber(data.count);
       }
 
+      // Goal status (green/yellow/red band) overrides the ad-hoc status color
+      // when the backend metric layer attached a `goal` block to this widget's
+      // payload (METRIC_GOALS_DESIGN.md section 7). Null goal -> render nothing
+      // extra and keep the existing neutral card.
+      var goalView = (typeof MetricGoalComparison !== 'undefined' && data)
+        ? MetricGoalComparison.buildGoalView(data.goal)
+        : null;
+      var comparisonView = (typeof MetricGoalComparison !== 'undefined' && data)
+        ? MetricGoalComparison.buildComparisonView(data.comparison)
+        : null;
+
+      if (goalView && goalView.band !== 'neutral') {
+        statusColor = goalView.band;
+      }
+
       var colors = getStatusColors(statusColor);
 
       // Build change indicator arrow SVG (no regex - string comparison only)
@@ -117,6 +132,13 @@
         gridHtml += '</div>';
       }
 
+      // "vs previous period" comparison indicator. Direction drives the arrow
+      // and color; null comparison renders nothing.
+      var comparisonHtml = buildComparisonHtml(comparisonView);
+
+      // Goal band: status pill, attainment, and optional pace indicator.
+      var goalHtml = buildGoalHtml(goalView);
+
       container.innerHTML = '<div class="' + colors.bg + ' rounded-xl shadow-sm border ' + colors.border + ' p-6 hover:shadow-md transition-shadow h-full">'
 
         // Metric name header
@@ -136,12 +158,82 @@
         // Change indicator
         + arrowHtml
 
+        // vs previous period
+        + comparisonHtml
+
+        // Goal status band + attainment + pace
+        + goalHtml
+
         // Prior / Target grid
         + gridHtml
 
         + '</div>';
     }
   });
+
+  /**
+   * Build the "vs previous period" comparison row from a comparison view model.
+   * @param {Object|null} view - Output of MetricGoalComparison.buildComparisonView
+   * @returns {string} HTML string (empty when view is null)
+   */
+  function buildComparisonHtml(view) {
+    if (!view) return '';
+
+    var dirClass = 'text-gray-500';
+    var arrow = '-';
+    if (view.direction === 'up') {
+      dirClass = 'text-green-600';
+      arrow = '+';
+    } else if (view.direction === 'down') {
+      dirClass = 'text-red-600';
+      arrow = '-';
+    }
+
+    var deltaHtml = view.deltaLabel
+      ? '<span class="text-sm font-semibold ' + dirClass + '">' + arrow + escapeHtml(view.deltaLabel) + '</span>'
+      : '';
+    var priorHtml = view.hasPrevious
+      ? '<span class="text-xs text-gray-400">was ' + escapeHtml(formatNumber(view.previousValue)) + '</span>'
+      : '';
+
+    return '<div class="flex items-center gap-2 mt-2">'
+      + deltaHtml
+      + '<span class="text-xs text-gray-400 uppercase tracking-wide">vs previous period</span>'
+      + priorHtml
+      + '</div>';
+  }
+
+  /**
+   * Build the goal status band (status pill + attainment + optional pace).
+   * @param {Object|null} view - Output of MetricGoalComparison.buildGoalView
+   * @returns {string} HTML string (empty when view is null)
+   */
+  function buildGoalHtml(view) {
+    if (!view) return '';
+
+    var bandColors = {
+      green: 'bg-green-100 text-green-700',
+      yellow: 'bg-yellow-100 text-yellow-700',
+      red: 'bg-red-100 text-red-700',
+      neutral: 'bg-gray-100 text-gray-600'
+    };
+    var pillClass = bandColors[view.band] || bandColors.neutral;
+
+    var attainmentHtml = view.hasAttainment
+      ? '<span class="text-xs font-semibold text-gray-700">' + escapeHtml(view.attainmentLabel) + ' of goal</span>'
+      : '';
+    var paceHtml = view.pace
+      ? '<span class="text-xs text-gray-400">' + escapeHtml(view.pace.label) + '</span>'
+      : '';
+
+    return '<div class="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100">'
+      + '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' + pillClass + '">'
+      + escapeHtml(view.statusLabel)
+      + '</span>'
+      + attainmentHtml
+      + paceHtml
+      + '</div>';
+  }
 
   /**
    * Return Tailwind color classes for a given status color name.

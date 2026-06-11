@@ -381,6 +381,7 @@
       title: 'Dashboard',
       activeNav: 'insights-dashboard',
       scripts: [
+        'js/dashboard/metric-goal-comparison.js',
         'js/admin/dashboard-detail.js'
       ],
       stylesheets: [

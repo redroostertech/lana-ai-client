@@ -14,6 +14,12 @@
   var moduleCategories = {};
   var selectedModuleKey = null;
 
+  // Period-over-period comparison mode for the next execute call. Presets carry
+  // a grain and compare against the matching calendar window; custom date edits
+  // compare against the immediately-preceding equal-length window.
+  // (METRIC_GOALS_DESIGN.md section 11.2.)
+  var selectedCompareMode = 'previous_calendar';
+
   // Visualization state
   var currentDataSources = [];
   var currentMissingEntities = [];
@@ -182,6 +188,9 @@
     if (periodStartEl) periodStartEl.value = formatDate(startDate);
     if (periodEndEl) periodEndEl.value = formatDate(endDate);
 
+    // A preset selection compares against the matching calendar window.
+    selectedCompareMode = 'previous_calendar';
+
     updateCompareByOptions(startDate, endDate, preset);
     showInfo('Period set to: ' + formatDate(startDate) + ' to ' + formatDate(endDate));
   }
@@ -234,6 +243,9 @@
       periodStartEl.addEventListener('lex-change', function () {
         var startVal = periodStartEl.value;
         var endVal = periodEndEl ? periodEndEl.value : '';
+        // A manual date edit is a custom range: compare against the prior
+        // equal-length window.
+        selectedCompareMode = 'previous_period';
         if (startVal && endVal) {
           updateCompareByOptions(new Date(startVal + 'T00:00:00'), new Date(endVal + 'T23:59:59'), null);
         }
@@ -244,6 +256,7 @@
       periodEndEl.addEventListener('lex-change', function () {
         var startVal = periodStartEl ? periodStartEl.value : '';
         var endVal = periodEndEl.value;
+        selectedCompareMode = 'previous_period';
         if (startVal && endVal) {
           updateCompareByOptions(new Date(startVal + 'T00:00:00'), new Date(endVal + 'T23:59:59'), null);
         }
@@ -477,6 +490,8 @@
         periodStart: periodStartISO,
         periodEnd: periodEndISO,
         compareBy: periodType,
+        compareToPrevious: true,
+        compareMode: selectedCompareMode,
         useCache: false
       });
 
@@ -1207,20 +1222,42 @@
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
     };
 
-    var currentValue, priorValue, targetValue;
-    if (isCurrency) {
-      currentValue = fmtCurrency(metric.current);
-      priorValue = metric.prior !== null ? fmtCurrency(metric.prior) : 'N/A';
-      targetValue = fmtCurrency(metric.target);
-    } else {
-      currentValue = metric.formattedCurrent || formatNumber(metric.current, 0);
-      priorValue = metric.formattedPrior || (metric.prior !== null ? formatNumber(metric.prior, 0) : 'N/A');
-      targetValue = metric.formattedTarget || formatNumber(metric.target, 0);
-    }
+    // Prior and Target now flow from the backend-provided goal/comparison blocks
+    // (METRIC_GOALS_DESIGN.md sections 7 and 11). The metric layer owns the
+    // status band and the prior value; the mapper degrades onto the flat fields
+    // when a block is absent so older payloads keep rendering.
+    var vm = ReportingGoalComparisonMapper.buildGoalComparisonViewModel(metric);
 
-    var statusColor = metric.status === 'error' ? 'gray' : (metric.status || 'gray');
+    var fmtValue = function (value) {
+      if (value === null || value === undefined || isNaN(value)) return 'N/A';
+      return isCurrency ? fmtCurrency(value) : formatNumber(value, 0);
+    };
+
+    var currentValue = isCurrency
+      ? fmtCurrency(metric.current)
+      : (metric.formattedCurrent || formatNumber(metric.current, 0));
+
+    var priorValue = vm.hasComparison
+      ? fmtValue(vm.priorValue)
+      : (isCurrency
+          ? (metric.prior !== null ? fmtCurrency(metric.prior) : 'N/A')
+          : (metric.formattedPrior || (metric.prior !== null ? formatNumber(metric.prior, 0) : 'N/A')));
+
+    var targetValue = vm.hasGoal
+      ? fmtValue(vm.targetValue)
+      : (isCurrency
+          ? fmtCurrency(metric.target)
+          : (metric.formattedTarget || formatNumber(metric.target, 0)));
+
+    // Attainment annotation under the Target (goal block only).
+    var attainmentText = (vm.hasGoal && vm.attainmentPct !== null)
+      ? formatNumber(vm.attainmentPct, 0) + '% of target'
+      : '';
+
+    var statusColor = vm.statusColor;
     var change = (metric.change !== null && metric.change !== undefined) ? metric.change : null;
-    var changeDirection = metric.changeDirection || 'flat';
+    // Direction drives the comparison arrow; prefer the comparison block.
+    var changeDirection = vm.changeDirection;
     var upColor = metric.invertTrend ? 'text-red-600' : 'text-green-600';
     var downColor = metric.invertTrend ? 'text-green-600' : 'text-red-600';
 
@@ -1233,8 +1270,16 @@
       changeArrow = '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"></path></svg>';
     }
 
+    // When the comparison block is present, the delta text and its sign come
+    // from the backend (percent_change + direction); otherwise fall back to the
+    // flat change field. Direction is purely numeric; invertTrend decides
+    // whether up/down is good or bad for coloring.
+    var isUp = changeDirection === 'up';
+    var isDown = changeDirection === 'down';
     var changeText;
-    if (isCurrency && change !== null) {
+    if (vm.hasComparison) {
+      changeText = vm.percentChange !== null ? formatPercentage(Math.abs(vm.percentChange), 1) : 'N/A';
+    } else if (isCurrency && change !== null) {
       changeText = fmtCurrency(Math.abs(change));
     } else {
       changeText = metric.formattedChange || (change !== null ? formatNumber(Math.abs(change), 1) : 'N/A');
@@ -1242,11 +1287,11 @@
 
     var changeColor;
     if (metric.invertTrend) {
-      changeColor = change > 0 ? 'text-red-600' : change < 0 ? 'text-green-600' : 'text-gray-600';
+      changeColor = isUp ? 'text-red-600' : isDown ? 'text-green-600' : 'text-gray-600';
     } else {
-      changeColor = change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-600';
+      changeColor = isUp ? 'text-green-600' : isDown ? 'text-red-600' : 'text-gray-600';
     }
-    var changeLabel = (change !== null && change !== 0) ? (change > 0 ? 'increase' : 'decrease') : 'no change';
+    var changeLabel = isUp ? 'increase' : isDown ? 'decrease' : 'no change';
 
     var statusColors = getStatusColors(statusColor);
 
@@ -1268,8 +1313,11 @@
         '<span class="text-sm font-medium ' + changeColor + '">' + changeText + ' ' + changeLabel + '</span></div>';
     }
 
-    // Override button
-    var overrideBtn = '<button onclick="window._reporting.openDataOverridePanel(\'' + metric.key + '\', \'' + metric.name + '\', \'' + (metric.description || '').split("'").join("\\'") + '\', ' + metric.target + ', \'target\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1" title="Override target value">' +
+    // Override button. Seed the panel with the resolved target the card is
+    // showing (goal block) so the admin overrides against the displayed value;
+    // fall back to the flat target when no goal is configured.
+    var overrideSeed = (vm.hasGoal && vm.targetValue !== null) ? vm.targetValue : metric.target;
+    var overrideBtn = '<button onclick="window._reporting.openDataOverridePanel(\'' + metric.key + '\', \'' + metric.name + '\', \'' + (metric.description || '').split("'").join("\\'") + '\', ' + overrideSeed + ', \'target\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1" title="Override target value">' +
       '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Override</button>';
 
     return '<div data-metric-card class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' hover:shadow-md transition-shadow" style="position:relative;padding:24px 24px 56px 24px;">' +
@@ -1287,6 +1335,7 @@
       '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + priorValue + '</p></div>' +
       '<div><p class="text-xs text-gray-500 mb-1">Target</p>' +
       '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + targetValue + '</p>' +
+      (attainmentText ? '<p class="text-xs text-gray-500 mt-1">' + attainmentText + '</p>' : '') +
       '<div class="mt-1">' + overrideBtn + '</div>' +
       '</div></div>' +
       // Footer: pinned to card bottom-left / bottom-right with 12px insets.

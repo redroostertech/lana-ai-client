@@ -1258,6 +1258,94 @@
   font-weight: 700;
 }
 
+/* Period-over-period comparison row (backend `comparison` block). */
+.dash-metric-card__comparison {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.dash-metric-card__delta {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.dash-metric-card__delta--up {
+  color: var(--lex-color-green-600, #16a34a);
+}
+
+.dash-metric-card__delta--down {
+  color: var(--lex-color-red-600, #dc2626);
+}
+
+.dash-metric-card__delta--flat {
+  color: var(--lex-text-tertiary, #9ca3af);
+}
+
+.dash-metric-card__delta-label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lex-text-tertiary, #9ca3af);
+}
+
+.dash-metric-card__delta-prior {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary, #9ca3af);
+}
+
+/* Goal status band (backend `goal` block). */
+.dash-metric-card__goal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--lex-border-subtle, #e5e7eb);
+}
+
+.dash-metric-card__goal-band {
+  border-radius: 9999px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dash-metric-card__goal-band--green {
+  background: var(--lex-color-green-100, #dcfce7);
+  color: var(--lex-color-green-700, #15803d);
+}
+
+.dash-metric-card__goal-band--yellow {
+  background: var(--lex-color-yellow-100, #fef9c3);
+  color: var(--lex-color-yellow-700, #a16207);
+}
+
+.dash-metric-card__goal-band--red {
+  background: var(--lex-color-red-100, #fee2e2);
+  color: var(--lex-color-red-700, #b91c1c);
+}
+
+.dash-metric-card__goal-band--neutral {
+  background: var(--lex-bg-secondary, #f3f4f6);
+  color: var(--lex-text-secondary, #6b7280);
+}
+
+.dash-metric-card__goal-attainment {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--lex-text-primary, #111827);
+}
+
+.dash-metric-card__goal-pace {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary, #9ca3af);
+}
+
 .dash-pill {
   border-radius: 9999px;
   background: var(--lex-bg-secondary, #f3f4f6);

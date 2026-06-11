@@ -2785,6 +2785,8 @@ class ApiClient {
     if (params.periodStart) queryParts.push('periodStart=' + encodeURIComponent(params.periodStart));
     if (params.periodEnd) queryParts.push('periodEnd=' + encodeURIComponent(params.periodEnd));
     if (params.compareBy) queryParts.push('compareBy=' + encodeURIComponent(params.compareBy));
+    if (params.compareToPrevious !== undefined) queryParts.push('compareToPrevious=' + encodeURIComponent(String(params.compareToPrevious)));
+    if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
     return this.get(url);
   }
