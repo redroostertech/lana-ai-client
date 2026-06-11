@@ -533,9 +533,13 @@
 
     emptyEl && emptyEl.classList.add('hidden');
 
-    var sorted = matters.slice().sort(function (a, b) {
-      return a.name.localeCompare(b.name);
-    });
+    // Matters arrive already sorted SERVER-SIDE: loadMatters passes sort + order
+    // to /api/v1/storage/root, which sorts the full matter set by name /
+    // created_at / updated_at / document_count / folder_count and returns the
+    // correct page. Render in the returned order. (The previous code re-sorted the
+    // page here and hard-coded name ascending, which silently overrode the server
+    // sort, so changing the column or direction had no visible effect.)
+    var sorted = matters.slice();
 
     if (storageState.viewMode === 'grid') {
       renderGridView(sorted);
