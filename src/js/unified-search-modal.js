@@ -590,18 +590,32 @@
     });
   }
 
-  // Chat entity types surfaced from the unified index. These open the
-  // conversation directly (via result.url -> chat-v2.html) rather than the
-  // generic result-details inspector.
-  var CONVERSATION_TYPES = { conversation: 'Conversation', conversation_message: 'Message' };
+  // Friendly type-badge labels (override the underscored default).
+  var TYPE_LABELS = { conversation: 'Conversation', conversation_message: 'Message' };
 
-  function isConversationType(result) {
-    var t = (result && (result.entity_type || result.source_type)) || '';
-    return Object.prototype.hasOwnProperty.call(CONVERSATION_TYPES, t);
+  // Entity types that open the REAL entity directly (deep-link via result.url)
+  // instead of the generic result-details inspector, with a context-specific
+  // button label. Falls back to the inspector when the result has no url.
+  var OPEN_ACTIONS = {
+    conversation: 'Open chat',
+    conversation_message: 'Open chat',
+    matter: 'Open workspace'
+  };
+
+  function entityTypeOf(result) {
+    return (result && (result.entity_type || result.source_type)) || '';
+  }
+
+  // Returns the deep-link button label for a result, or null to use the
+  // generic inspector. Requires a url so the label never promises a jump we
+  // can't make.
+  function openActionLabel(result) {
+    if (!result || !result.url) return null;
+    return OPEN_ACTIONS[entityTypeOf(result)] || null;
   }
 
   function typeLabel(type) {
-    return CONVERSATION_TYPES[type] || formatType(type);
+    return TYPE_LABELS[type] || formatType(type);
   }
 
   function formatType(type) {
@@ -784,7 +798,7 @@
           </span>
           ${result.snippet ? `<span class="unified-search-result-snippet">${escapeHtml(result.snippet)}</span>` : ''}
         </div>
-        <button type="button" class="unified-search-result-open" data-open-result-index="${index}">${isConversationType(result) ? 'Open' : 'Open details'}</button>
+        <button type="button" class="unified-search-result-open" data-open-result-index="${index}">${openActionLabel(result) || 'Open details'}</button>
         <span class="unified-search-result-type">${escapeHtml(typeLabel(result.entity_type || result.source_type))}</span>
       </div>
     `).join('');
@@ -883,7 +897,7 @@
     </section>` : '';
 
     const actions = `<div class="unified-search-detail-actions">
-      <button type="button" class="unified-search-detail-action" data-search-action="open-result" data-primary="true">Open Details</button>
+      <button type="button" class="unified-search-detail-action" data-search-action="open-result" data-primary="true">${openActionLabel(result) || 'Open Details'}</button>
       <button type="button" class="unified-search-detail-action" data-search-action="copy-id">Copy ID</button>
     </div>`;
 
@@ -920,9 +934,10 @@
 
   function openResult(result) {
     if (!result) return;
-    // Conversations/messages open the conversation directly (deep-link from the
-    // unified index url) instead of the generic result-details inspector.
-    if (isConversationType(result) && result.url) {
+    // Types with a dedicated open action (conversations -> chat, matters ->
+    // workspace) deep-link to the real entity via the unified-index url instead
+    // of the generic result-details inspector.
+    if (openActionLabel(result)) {
       close();
       if (window.Lex && window.Lex.Nav && window.Lex.Nav.go && !/^(https?:)?\/\//.test(result.url)) {
         window.Lex.Nav.go(result.url);
