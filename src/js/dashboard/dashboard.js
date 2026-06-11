@@ -2262,7 +2262,7 @@
     if (hasAdmin) {
       Lex.Nav.go('admin/orphaned-documents.html');
     } else {
-      Lex.Nav.go('storage.html', { params: { tab: 'orphaned' } });
+      Lex.Nav.go('drive.html', { params: { tab: 'orphaned' } });
     }
   });
 
@@ -2297,7 +2297,7 @@
     // Configure heading, action label, action href
     var config = {
       team:    { heading: 'Team Overview',     actionLabel: 'View all members',   actionHref: 'admin/users.html' },
-      docs:    { heading: 'Recent Documents',  actionLabel: 'View all documents', actionHref: 'storage.html?view=documents' },
+      docs:    { heading: 'Recent Documents',  actionLabel: 'View all documents', actionHref: 'drive.html?view=documents' },
       storage: { heading: 'Storage Breakdown', actionLabel: 'View system health', actionHref: 'admin/health.html' }
     };
     var c = config[key];

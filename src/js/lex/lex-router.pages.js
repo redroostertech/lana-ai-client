@@ -144,28 +144,33 @@
       ]
     },
 
-    // ── My Drive (root matters list) ──
+    // ── Library (root matters list + Brainchild notes scope) ──
     'drive.html': {
-      title: 'My Drive',
-      activeNav: 'storage',
+      title: 'Library',
+      activeNav: 'library',
       scripts: [
         // Lex components not globally loaded
         'js/lex/components/foundation/lex-banner.js',
         'js/lex/components/foundation/lex-modal.js',
         'js/lex/components/form/lex-input.js',
         'js/lex/components/form/lex-select.js',
+        // Brainchild scope: shared mapper + promote builder + scope controller
+        'js/shared/document-library-mapper.js',
+        'js/shared/brainchild-promote-builder.js',
+        'js/library/brainchild-scope.js',
         // Page controller
         'js/drive.js'
       ],
       stylesheets: [
-        'css/drive.css'
+        'css/drive.css',
+        'css/library-brainchild.css'
       ]
     },
 
     // ── Folder (inside a matter — files, subfolders) ──
     'folder.html': {
       title: 'Folder',
-      activeNav: 'storage',
+      activeNav: 'library',
       scripts: [
         // Lex components not globally loaded
         'js/lex/components/foundation/lex-banner.js',

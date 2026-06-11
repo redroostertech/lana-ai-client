@@ -1,0 +1,85 @@
+/* library-brainchild.css
+   Styles for the Brainchild ("My Notes") scope inside the Library (drive.html).
+   Loaded via the drive.html router entry alongside drive.css. No inline styles
+   for the Brainchild UI live anywhere else; everything is keyed off the
+   .library-bc- prefix so it never collides with the matters/files presentation.
+
+   Plain ASCII only: no emojis, no em dashes, no en dashes. */
+
+/* Connected confirmation note shown above the notes list. */
+.library-bc-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background-color: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-default);
+}
+
+.library-bc-banner.library-bc-hidden {
+  display: none;
+}
+
+.library-bc-banner-text {
+  min-width: 0;
+}
+
+.library-bc-banner-heading {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.library-bc-banner-path {
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Degraded state block: copy plus the contextual connect action. */
+.library-bc-degraded {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.library-bc-degraded.library-bc-hidden {
+  display: none;
+}
+
+.library-bc-degraded-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--lex-text-tertiary);
+}
+
+.library-bc-degraded-copy {
+  max-width: 28rem;
+  font-size: 0.9375rem;
+  color: var(--lex-text-secondary);
+}
+
+/* Status line shown while connect / link flows run. */
+.library-bc-status {
+  margin-bottom: 12px;
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+}
+
+.library-bc-status.library-bc-hidden {
+  display: none;
+}
+
+/* Promote action button inside a note grid card. */
+.library-bc-promote {
+  margin-top: 8px;
+}

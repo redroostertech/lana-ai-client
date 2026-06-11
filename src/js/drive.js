@@ -1,5 +1,5 @@
 /**
- * drive.js — My Drive page script (SPA lifecycle).
+ * drive.js - My Drive page script (SPA lifecycle).
  * Root view only: matters list, pinned section, recents section, pagination.
  * Subfolder navigation, file uploads, and file operations live in folder.js.
  *
@@ -42,8 +42,13 @@
   // Currently selected matter for the actions modal
   var selectedMatter = null;
 
-  // Search debounce timer — module-level so onLeave can cancel it on SPA navigation
+  // Search debounce timer - module-level so onLeave can cancel it on SPA navigation
   var searchTimeout = null;
+
+  // Brainchild scope controller (library/brainchild-scope.js). Created lazily the
+  // first time the user switches the Source filter to "My Notes (Brainchild)".
+  // It owns all bridge/status/promote logic; this page is presentation + wiring.
+  var brainchildScope = null;
 
   // ── State reset ─────────────────────────────────────────────────────
 
@@ -69,7 +74,7 @@
 
   /**
    * Update button state for drive.html root view.
-   * Upload button does not exist on drive.html — only New Folder is enabled.
+   * Upload button does not exist on drive.html - only New Folder is enabled.
    */
   function updateViewButtons() {
     var newFolderBtn = document.getElementById('newFolderBtn');
@@ -106,7 +111,7 @@
     var newFolderBtn = document.getElementById('newFolderBtn');
     newFolderBtn && newFolderBtn.addEventListener('click', showNewFolderModal);
 
-    // Empty state new folder button — lex-empty fires 'action' event
+    // Empty state new folder button - lex-empty fires 'action' event
     var contentEmptyWidget = document.getElementById('contentEmptyWidget');
     contentEmptyWidget && contentEmptyWidget.addEventListener('action', showNewFolderModal);
 
@@ -123,7 +128,7 @@
     var listViewBtn = document.getElementById('listViewBtn');
     listViewBtn && listViewBtn.addEventListener('click', function () { switchView('list'); });
 
-    // Search with debounce — lex-input fires 'lex-input' and 'lex-change' events
+    // Search with debounce - lex-input fires 'lex-input' and 'lex-change' events
     var searchLexInput = document.getElementById('searchInput');
 
     if (searchLexInput) {
@@ -134,7 +139,11 @@
         searchTimeout = setTimeout(function () {
           storageState.searchQuery = query;
           storageState.currentPage = 1;
-          loadMatters({ silent: true });
+          if (isBrainchildScope()) {
+            runBrainchildSearch(query);
+          } else {
+            loadMatters({ silent: true });
+          }
         }, 500);
       });
 
@@ -144,16 +153,21 @@
         toggleQuickSections(query);
         storageState.searchQuery = query;
         storageState.currentPage = 1;
-        loadMatters({ silent: true });
+        if (isBrainchildScope()) {
+          runBrainchildSearch(query);
+        } else {
+          loadMatters({ silent: true });
+        }
       });
     }
 
-    // Sort by dropdown — lex-select fires 'lex-change'
+    // Sort by dropdown - lex-select fires 'lex-change'
     var sortSelect = document.getElementById('sortSelect');
     if (sortSelect) {
       sortSelect.addEventListener('lex-change', function (e) {
         storageState.sortBy = e.detail.value || 'name';
         storageState.currentPage = 1;
+        if (isBrainchildScope()) return; // sort applies to matters/files only
         loadMatters({ silent: true });
       });
     }
@@ -179,26 +193,45 @@
           }
         }
 
+        if (isBrainchildScope()) return; // sort applies to matters/files only
         loadMatters({ silent: true });
       });
     }
 
-    // Source filter — lex-select fires 'lex-change'
+    // Source filter - lex-select fires 'lex-change'
     var sourceFilter = document.getElementById('sourceFilter');
     if (sourceFilter) {
       sourceFilter.addEventListener('lex-change', function (e) {
         storageState.sourceFilter = e.detail.value || 'all';
         storageState.currentPage = 1;
-        loadMatters({ silent: true });
+        if (isBrainchildScope()) {
+          // Clear any matters query and load the personal notes vault.
+          storageState.searchQuery = '';
+          var searchEl = document.getElementById('searchInput');
+          if (searchEl) searchEl.value = '';
+          loadBrainchildNotes();
+        } else {
+          hideBrainchildChrome();
+          loadMatters({ silent: true });
+        }
       });
     }
 
-    // Pagination — lex-pagination fires 'page-change'
+    // Pagination - lex-pagination fires 'page-change'
     var drivePagination = document.getElementById('drivePagination');
     if (drivePagination) {
       drivePagination.addEventListener('page-change', function (e) {
         storageState.currentPage = e.detail.page;
+        if (isBrainchildScope()) return; // notes scope is single-page
         loadMatters();
+      });
+    }
+
+    // Brainchild "Unlink" action on the connected banner.
+    var bcUnlinkBtn = document.getElementById('bcUnlinkBtn');
+    if (bcUnlinkBtn) {
+      bcUnlinkBtn.addEventListener('click', function () {
+        if (brainchildScope) brainchildScope.unlink();
       });
     }
   }
@@ -219,7 +252,7 @@
   }
 
   /**
-   * Navigate back to root view — reloads the current page data.
+   * Navigate back to root view - reloads the current page data.
    * We are already on drive.html so no URL change is needed.
    */
   function navigateToRoot() {
@@ -482,6 +515,346 @@
     listViewBodyEl.innerHTML = rows;
   }
 
+  // ── Brainchild scope (personal notes) ────────────────────────────────
+  //
+  // When the Source filter is set to "My Notes (Brainchild)" the list switches
+  // from matters/files to the user's personal Brainchild vault notes. All
+  // node/spawn/MCP logic lives in Electron main and is reached only through the
+  // frozen window.electronAPI.brainchild bridge, wrapped by the already-built,
+  // unit-tested LibraryBrainchildScope controller. This page only renders the
+  // normalized rows through the existing grid/list renderers and shows the
+  // status-driven connect / degraded chrome.
+
+  /**
+   * @returns {boolean} true when the active Source filter is the Brainchild scope.
+   */
+  function isBrainchildScope() {
+    return storageState.sourceFilter === 'brainchild';
+  }
+
+  /**
+   * Lazily construct the Brainchild scope controller. Returns null when the
+   * controller module is unavailable (e.g. plain browser context).
+   */
+  function ensureBrainchildScope() {
+    if (brainchildScope) return brainchildScope;
+    if (!window.LibraryBrainchildScope || typeof window.LibraryBrainchildScope.create !== 'function') {
+      return null;
+    }
+    brainchildScope = window.LibraryBrainchildScope.create({
+      api: window.api,
+      onToast: function (kind, message) {
+        if (window.Lex && Lex.Toast && typeof Lex.Toast[kind] === 'function') {
+          Lex.Toast[kind](message);
+        }
+      },
+      onStatus: setBrainchildStatus,
+      onChange: renderBrainchildScope
+    });
+    return brainchildScope;
+  }
+
+  /**
+   * Show or clear the Brainchild status line (link / connect progress copy).
+   * @param {string} message
+   */
+  function setBrainchildStatus(message) {
+    var statusEl = document.getElementById('bcStatusLine');
+    if (!statusEl) return;
+    if (message) {
+      statusEl.textContent = message;
+      statusEl.classList.remove('library-bc-hidden');
+    } else {
+      statusEl.textContent = '';
+      statusEl.classList.add('library-bc-hidden');
+    }
+  }
+
+  /**
+   * Hide all Brainchild-specific chrome (banner, degraded state, status line).
+   * Called when leaving the Brainchild scope back to matters/files.
+   */
+  function hideBrainchildChrome() {
+    var banner = document.getElementById('bcConnectedBanner');
+    var degraded = document.getElementById('bcDegradedState');
+    if (banner) banner.classList.add('library-bc-hidden');
+    if (degraded) degraded.classList.add('library-bc-hidden');
+    setBrainchildStatus('');
+  }
+
+  /**
+   * Load the Brainchild vault notes and render the scope. Mounts the controller
+   * on first use. In the normal auto-bound case status() returns linked and the
+   * notes render with zero clicks.
+   */
+  async function loadBrainchildNotes() {
+    var scope = ensureBrainchildScope();
+    if (!scope) {
+      // No controller (plain browser). Present the connect prompt copy.
+      renderBrainchildDegraded({ status: 'degraded', reason: 'unavailable' });
+      return;
+    }
+
+    var loadingEl = document.getElementById('contentLoading');
+    loadingEl && loadingEl.classList.remove('hidden');
+    hideBrainchildChrome();
+    // Pinned and Recents are matters-only; hide them while the notes scope renders.
+    var bcPinned = document.getElementById('pinnedSection');
+    var bcRecents = document.getElementById('recentsSection');
+    if (bcPinned) bcPinned.classList.add('hidden');
+    if (bcRecents) bcRecents.classList.add('hidden');
+
+    try {
+      await scope.load();
+    } catch (error) {
+      console.error('[Drive] Failed to load Brainchild notes:', error);
+    } finally {
+      loadingEl && loadingEl.classList.add('hidden');
+    }
+    renderBrainchildScope();
+  }
+
+  /**
+   * Run a vault search (or full list when query is empty) in the Brainchild scope.
+   * @param {string} query
+   */
+  async function runBrainchildSearch(query) {
+    var scope = ensureBrainchildScope();
+    if (!scope) return;
+    try {
+      await scope.runSearch(query || '');
+    } catch (error) {
+      console.error('[Drive] Brainchild search failed:', error);
+    }
+    renderBrainchildScope();
+  }
+
+  /**
+   * Render the current Brainchild scope state: connected (notes list + banner)
+   * or degraded (hide list, show degraded copy + the contextual action).
+   */
+  function renderBrainchildScope() {
+    if (!isBrainchildScope() || !brainchildScope) return;
+
+    var status = brainchildScope.state.status || {};
+    var loadingEl = document.getElementById('contentLoading');
+    loadingEl && loadingEl.classList.add('hidden');
+
+    if (brainchildScope.isConnected(status)) {
+      renderBrainchildConnected(status);
+    } else {
+      renderBrainchildDegraded(status);
+    }
+  }
+
+  /**
+   * Connected render path: show the optional "Connected to Brainchild" banner
+   * and render the normalized note rows through the shared grid/list renderers.
+   * @param {Object} status
+   */
+  function renderBrainchildConnected(status) {
+    var degraded = document.getElementById('bcDegradedState');
+    var banner = document.getElementById('bcConnectedBanner');
+    var pathEl = document.getElementById('bcConnectedPath');
+    var sectionHeading = document.getElementById('driveSectionHeading');
+    var sectionCount = document.getElementById('driveSectionCount');
+    var resultsCountEl = document.getElementById('resultsCount');
+
+    if (degraded) degraded.classList.add('library-bc-hidden');
+
+    var rows = Array.isArray(brainchildScope.state.rows) ? brainchildScope.state.rows : [];
+
+    if (banner) {
+      banner.classList.remove('library-bc-hidden');
+      if (pathEl) pathEl.textContent = status.vaultPath || '';
+    }
+
+    if (sectionHeading) sectionHeading.textContent = 'My Notes';
+    if (sectionCount) sectionCount.textContent = rows.length + ' note' + (rows.length !== 1 ? 's' : '');
+    if (resultsCountEl) {
+      resultsCountEl.textContent = rows.length + ' note' + (rows.length !== 1 ? 's' : '');
+    }
+
+    // Pagination is matters-only; hide its counts in this scope.
+    var pager = document.getElementById('drivePagination');
+    if (pager) {
+      pager.page = 1;
+      pager.totalPages = 1;
+      pager.total = rows.length;
+      pager.limit = rows.length || 1;
+    }
+
+    var emptyEl = document.getElementById('contentEmpty');
+    var gridViewEl = document.getElementById('gridView');
+    var listViewEl = document.getElementById('listView');
+
+    if (rows.length === 0) {
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      if (gridViewEl) gridViewEl.classList.add('hidden');
+      if (listViewEl) listViewEl.classList.add('hidden');
+      return;
+    }
+
+    if (emptyEl) emptyEl.classList.add('hidden');
+
+    if (storageState.viewMode === 'grid') {
+      renderBrainchildGrid(rows);
+      if (gridViewEl) gridViewEl.classList.remove('hidden');
+      if (listViewEl) listViewEl.classList.add('hidden');
+    } else {
+      renderBrainchildList(rows);
+      if (listViewEl) listViewEl.classList.remove('hidden');
+      if (gridViewEl) gridViewEl.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Degraded render path: hide the notes list and show the degraded copy plus
+   * the contextual action (Choose folder / Reconnect / Connect).
+   * @param {Object} status
+   */
+  function renderBrainchildDegraded(status) {
+    var reason = (status && status.reason) || 'not_linked';
+    var degraded = document.getElementById('bcDegradedState');
+    var banner = document.getElementById('bcConnectedBanner');
+    var copyEl = document.getElementById('bcDegradedCopy');
+    var actionBtn = document.getElementById('bcDegradedAction');
+
+    if (banner) banner.classList.add('library-bc-hidden');
+
+    var gridViewEl = document.getElementById('gridView');
+    var listViewEl = document.getElementById('listView');
+    var emptyEl = document.getElementById('contentEmpty');
+    if (gridViewEl) gridViewEl.classList.add('hidden');
+    if (listViewEl) listViewEl.classList.add('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+
+    var sectionHeading = document.getElementById('driveSectionHeading');
+    var sectionCount = document.getElementById('driveSectionCount');
+    var resultsCountEl = document.getElementById('resultsCount');
+    if (sectionHeading) sectionHeading.textContent = 'My Notes';
+    if (sectionCount) sectionCount.textContent = '';
+    if (resultsCountEl) resultsCountEl.textContent = '';
+
+    if (copyEl && brainchildScope) {
+      copyEl.textContent = brainchildScope.degradedCopy(reason);
+    }
+
+    if (actionBtn) {
+      // Choose the action label + handler by reason.
+      var label = 'Connect Brainchild';
+      var handler = function () { if (brainchildScope) brainchildScope.connect(); };
+      if (reason === 'install_not_found' || reason === 'vault_not_found') {
+        label = 'Choose folder';
+        handler = function () { if (brainchildScope) brainchildScope.pickAndLink(); };
+      } else if (reason === 'unlinked_by_user') {
+        label = 'Reconnect Brainchild';
+        handler = function () { if (brainchildScope) brainchildScope.reconnect(); };
+      }
+      actionBtn.textContent = label;
+      actionBtn.onclick = handler;
+    }
+
+    if (degraded) degraded.classList.remove('library-bc-hidden');
+  }
+
+  /**
+   * Render Brainchild note rows as grid cards, reusing the existing #gridView
+   * container. Each card carries a "Promote to Org" action when permitted.
+   * @param {Array} rows - normalized Brainchild row view models
+   */
+  function renderBrainchildGrid(rows) {
+    var gridViewEl = document.getElementById('gridView');
+    if (!gridViewEl) return;
+
+    var canPromote = brainchildScope && brainchildScope.canPromote();
+
+    var cards = rows.map(function (row, index) {
+      var name = escapeHtml(row.filename || 'Untitled note');
+      var vaultPath = escapeHtml(row._vaultPath || '');
+      var promoteBtn = canPromote
+        ? '<lex-btn class="library-bc-promote bc-promote-btn" variant="secondary" size="sm" data-bc-index="' + index + '" data-bc-path="' + vaultPath + '">Promote to Org</lex-btn>'
+        : '';
+
+      return [
+        '<div class="grid-item rounded-lg border p-4 relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)">',
+        '  <div class="flex flex-col items-center">',
+        '    <svg class="w-16 h-16 mb-2" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+        '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>',
+        '    </svg>',
+        '    <h3 class="text-sm font-medium text-center truncate w-full" style="color: var(--lex-text-primary)" title="' + name + '">' + name + '</h3>',
+        '    <p class="text-xs text-center mt-1" style="color: var(--lex-text-secondary)">Note</p>',
+        '    ' + promoteBtn,
+        '  </div>',
+        '</div>'
+      ].join('');
+    }).join('');
+
+    gridViewEl.innerHTML = cards;
+    wireBrainchildPromoteButtons(gridViewEl, rows);
+  }
+
+  /**
+   * Render Brainchild note rows as table rows, reusing the existing #listViewBody.
+   * @param {Array} rows - normalized Brainchild row view models
+   */
+  function renderBrainchildList(rows) {
+    var listViewBodyEl = document.getElementById('listViewBody');
+    if (!listViewBodyEl) return;
+
+    var canPromote = brainchildScope && brainchildScope.canPromote();
+
+    var html = rows.map(function (row, index) {
+      var name = escapeHtml(row.filename || 'Untitled note');
+      var vaultPath = escapeHtml(row._vaultPath || '');
+      var updated = row.updated_at ? formatRelativeDate(row.updated_at) : '-';
+      var promoteCell = canPromote
+        ? '<lex-btn class="bc-promote-btn" variant="secondary" size="sm" data-bc-index="' + index + '" data-bc-path="' + vaultPath + '">Promote to Org</lex-btn>'
+        : '';
+
+      return [
+        '<tr style="background: transparent">',
+        '  <td class="px-6 py-4">',
+        '    <div class="flex items-center">',
+        '      <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>',
+        '      </svg>',
+        '      <div class="min-w-0 flex-1">',
+        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + name + '">' + name + '</div>',
+        '      </div>',
+        '    </div>',
+        '  </td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">You</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + updated + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">Note</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm">' + promoteCell + '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+
+    listViewBodyEl.innerHTML = html;
+    wireBrainchildPromoteButtons(listViewBodyEl, rows);
+  }
+
+  /**
+   * Wire each rendered "Promote to Org" button to the controller's promote().
+   * The controller fetches the note body, builds the payload, and POSTs it.
+   * @param {HTMLElement} container
+   * @param {Array} rows
+   */
+  function wireBrainchildPromoteButtons(container, rows) {
+    if (!container || !brainchildScope) return;
+    var buttons = container.querySelectorAll('.bc-promote-btn');
+    Array.prototype.forEach.call(buttons, function (button) {
+      button.addEventListener('click', function () {
+        var index = parseInt(button.getAttribute('data-bc-index'), 10);
+        var row = rows[index];
+        if (!row) return;
+        brainchildScope.promote(row, null, button);
+      });
+    });
+  }
+
   // ── View toggle ──────────────────────────────────────────────────────
 
   /**
@@ -503,7 +876,11 @@
       gridBtn && (gridBtn.variant = 'ghost');
     }
 
-    renderMatters();
+    if (isBrainchildScope()) {
+      renderBrainchildScope();
+    } else {
+      renderMatters();
+    }
   }
 
   // ── New folder modal ─────────────────────────────────────────────────
@@ -832,7 +1209,7 @@
       }
     } catch (error) {
       console.error('[Drive] Failed to load recent items:', error);
-      // Silently fail — recents are not critical
+      // Silently fail - recents are not critical
     }
   }
 
@@ -922,7 +1299,7 @@
       }
     } catch (error) {
       console.error('[Drive] Failed to load pinned matters:', error);
-      // Silently fail — pinned are not critical
+      // Silently fail - pinned are not critical
     }
   }
 
@@ -1056,7 +1433,7 @@
   /**
    * Called by LexRouter when navigating to the drive page.
    * Initializes state, exposes globals, wires events, and loads initial data.
-   * drive.html is always the root view — no URL params to parse.
+   * drive.html is always the root view - no URL params to parse.
    */
   function onEnter() {
     resetState();
@@ -1115,6 +1492,7 @@
 
     // Reset module-level state
     selectedMatter = null;
+    brainchildScope = null;
     resetState();
 
     // Clear search input so it doesn't persist on re-navigation
@@ -1125,7 +1503,7 @@
   // ── Register with router ─────────────────────────────────────────────
   // registerPageInit ensures onEnter() is called on every navigation
   // (first load + re-navigation from cached scripts).
-  // registerView only carries onLeave for cleanup — onEnter is handled
+  // registerView only carries onLeave for cleanup - onEnter is handled
   // by registerPageInit to avoid double-init.
   if (window.LexRouter) {
     LexRouter.registerPageInit('drive.html', function () {

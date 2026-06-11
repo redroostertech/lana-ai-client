@@ -5,8 +5,8 @@
       id="driveBanner"
       variant="light"
       corners
-      heading="My Drive"
-      subtitle="Manage your matters, folders, and documents"
+      heading="Library"
+      subtitle="Your file and knowledge hub: matters, documents, and personal notes"
     >
       <lex-btn id="newFolderBtn" variant="primary">
         New Folder
@@ -48,7 +48,7 @@
           <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Source:</label>
           <lex-select
             id="sourceFilter"
-            options='[{"value":"all","label":"All Sources"},{"value":"client_matters","label":"My Matters"},{"value":"connector","label":"Connected Systems"}]'
+            options='[{"value":"all","label":"All Sources"},{"value":"client_matters","label":"My Matters"},{"value":"connector","label":"Connected Systems"},{"value":"brainchild","label":"My Notes (Brainchild)"}]'
             value="all"
           ></lex-select>
         </div>
@@ -110,6 +110,27 @@
       <p class="text-sm" style="color: var(--lex-text-secondary)">Loading...</p>
     </div>
 
+    <!-- Brainchild status line (connect / link progress) -->
+    <p id="bcStatusLine" class="library-bc-status library-bc-hidden"></p>
+
+    <!-- Brainchild connected confirmation note -->
+    <div id="bcConnectedBanner" class="library-bc-banner library-bc-hidden">
+      <div class="library-bc-banner-text">
+        <p class="library-bc-banner-heading">Connected to Brainchild</p>
+        <p id="bcConnectedPath" class="library-bc-banner-path"></p>
+      </div>
+      <lex-btn id="bcUnlinkBtn" variant="ghost" size="sm">Unlink</lex-btn>
+    </div>
+
+    <!-- Brainchild degraded state (not connected / link issue) -->
+    <div id="bcDegradedState" class="library-bc-degraded library-bc-hidden">
+      <svg class="library-bc-degraded-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+      </svg>
+      <p id="bcDegradedCopy" class="library-bc-degraded-copy"></p>
+      <lex-btn id="bcDegradedAction" variant="primary">Connect Brainchild</lex-btn>
+    </div>
+
     <!-- Section Header -->
     <div class="flex items-center justify-between mb-3">
       <h2 id="driveSectionHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Folders</h2>
@@ -151,7 +172,7 @@
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════
-       MODALS — using <lex-modal> web component
+       MODALS - using <lex-modal> web component
        ══════════════════════════════════════════════════════════════════ -->
 
   <!-- New Folder Modal -->
