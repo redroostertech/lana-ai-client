@@ -1,315 +1,421 @@
-<div id="lex-page-content">
-  <main>
-    <!-- Page Banner (heading updated dynamically by folder.js) -->
-    <lex-banner
-      id="folderBanner"
-      variant="light"
-      corners
-      heading="Folder"
-      subtitle="Browse files and subfolders"
-    >
-      <lex-btn id="uploadBtn" variant="secondary" leading-icon="upload">
-        Upload
-      </lex-btn>
-      <lex-btn id="newFolderBtn" variant="primary" leading-icon="folder-plus">
-        New Folder
-      </lex-btn>
-    </lex-banner>
-    <input type="file" id="fileUploadInput" class="hidden" multiple>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Folder - LanaAI</title>
 
-    <!-- Breadcrumb Navigation (always visible on folder page) -->
-    <nav id="breadcrumbs" class="mb-4 mt-4 flex items-center text-sm" style="color: var(--lex-text-secondary)">
-    </nav>
+  <!-- CSS + Tailwind in head - behavioral scripts at end of body -->
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/drive.css">
+  <script src="js/tailwind-loader.js"></script>
 
-    <!-- Search, Sort & View Toolbar -->
-    <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)">
-      <div class="flex items-center gap-4 flex-wrap">
-        <!-- Search Input -->
-        <div class="flex-1 min-w-[200px]">
-          <lex-input
-            id="searchInput"
-            placeholder="Search files and folders..."
-            clearable="true"
-            leading-icon="search"
-          ></lex-input>
-        </div>
+</head>
+<body>
 
-        <!-- Sort By Dropdown -->
-        <div class="flex items-center gap-2">
-          <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
-          <lex-select
-            id="sortSelect"
-            options='[{"value":"name","label":"Name"},{"value":"created_at","label":"Created Date"},{"value":"updated_at","label":"Modified Date"},{"value":"file_size","label":"Size"}]'
-            value="name"
-          ></lex-select>
-        </div>
+  <!-- Branded loader - shows once lex-loader.js upgrades the element -->
+  <lex-loader theme="light"></lex-loader>
 
-        <!-- Sort Order Toggle -->
-        <lex-btn id="sortOrderBtn" variant="ghost" icon="true" title="Toggle sort order" data-order="asc">
-          <svg id="sortOrderIcon" class="w-5 h-5" style="color: var(--lex-text-secondary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
-          </svg>
+  <!-- App shell - sidebar, topbar, empty content area.
+       Page content lives in <template> below and gets injected after
+       the shell renders. This avoids double-rendering of child components. -->
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id="library"
+    page-title="Folder"
+  ></lex-app>
+
+  <!-- Page content as inert <template> - elements inside are NOT upgraded
+       by the browser until cloned into the live DOM. Zero double-rendering. -->
+  <template id="page-content">
+
+    <main>
+      <!-- Page Banner (heading updated dynamically by folder.js) -->
+      <lex-banner
+        id="folderBanner"
+        variant="light"
+        corners
+        heading="Folder"
+        subtitle="Browse files and subfolders"
+      >
+        <lex-btn id="uploadBtn" variant="secondary" leading-icon="upload">
+          Upload
         </lex-btn>
+        <lex-btn id="newFolderBtn" variant="primary" leading-icon="folder-plus">
+          New Folder
+        </lex-btn>
+      </lex-banner>
+      <input type="file" id="fileUploadInput" class="hidden" multiple>
 
-        <!-- Results Count -->
-        <div id="resultsCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
+      <!-- Breadcrumb Navigation (always visible on folder page) -->
+      <nav id="breadcrumbs" class="mb-4 mt-4 flex items-center text-sm" style="color: var(--lex-text-secondary)">
+      </nav>
 
-        <!-- View Toggle -->
-        <div class="flex items-center gap-1 ml-auto" style="border-left: 1px solid var(--lex-border-default); padding-left: 12px;">
-          <lex-btn id="gridViewBtn" variant="ghost" icon="true" title="Grid View">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+      <!-- Search, Sort & View Toolbar -->
+      <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)">
+        <div class="flex items-center gap-4 flex-wrap">
+          <!-- Search Input -->
+          <div class="flex-1 min-w-[200px]">
+            <lex-input
+              id="searchInput"
+              placeholder="Search files and folders..."
+              clearable="true"
+              leading-icon="search"
+            ></lex-input>
+          </div>
+
+          <!-- Sort By Dropdown -->
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+            <lex-select
+              id="sortSelect"
+              options='[{"value":"name","label":"Name"},{"value":"created_at","label":"Created Date"},{"value":"updated_at","label":"Modified Date"},{"value":"file_size","label":"Size"}]'
+              value="name"
+            ></lex-select>
+          </div>
+
+          <!-- Sort Order Toggle -->
+          <lex-btn id="sortOrderBtn" variant="ghost" icon="true" title="Toggle sort order" data-order="asc">
+            <svg id="sortOrderIcon" class="w-5 h-5" style="color: var(--lex-text-secondary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
             </svg>
           </lex-btn>
-          <lex-btn id="listViewBtn" variant="primary" icon="true" title="List View">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-            </svg>
-          </lex-btn>
-        </div>
-      </div>
-    </div>
 
-    <!-- Loading State -->
-    <div id="contentLoading" class="flex flex-col items-center justify-center py-16 gap-3">
-      <lex-spinner size="lg"></lex-spinner>
-      <p class="text-sm" style="color: var(--lex-text-secondary)">Loading...</p>
-    </div>
+          <!-- Results Count -->
+          <div id="resultsCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
 
-    <!-- Grid View -->
-    <div id="gridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
-
-    <!-- List View -->
-    <div id="listView" class="hidden bg-white rounded-lg shadow-sm border overflow-hidden" style="border-color: var(--lex-border-default)">
-      <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
-        <thead style="background-color: var(--lex-bg-secondary)">
-          <tr>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Name</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created By</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created On</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Size</th>
-            <th scope="col" class="w-20 px-6 py-3"></th>
-          </tr>
-        </thead>
-        <tbody id="listViewBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
-      </table>
-    </div>
-
-    <!-- Empty State -->
-    <div id="contentEmpty" class="hidden">
-      <lex-empty
-        message="This folder is empty"
-        description="Upload files or create a new folder to get started"
-        icon="folder"
-        action-label="Upload File"
-        id="contentEmptyWidget"
-      ></lex-empty>
-    </div>
-  </main>
-
-  <!-- ══════════════════════════════════════════════════════════════════
-       MODALS — using <lex-modal> web component
-       ══════════════════════════════════════════════════════════════════ -->
-
-  <!-- New Folder Modal -->
-  <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true">
-    <form id="newFolderForm">
-      <lex-input
-        id="folderNameInput"
-        label="Folder Name"
-        placeholder="Enter folder name"
-        required="true"
-      ></lex-input>
-      <p class="mt-2 text-xs" style="color: var(--lex-text-secondary)">
-        <svg class="inline-block w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        Creates a subfolder within the current matter.
-      </p>
-      <div class="flex items-center justify-end gap-3 mt-4">
-        <lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn>
-        <lex-btn type="submit" variant="primary">Create</lex-btn>
-      </div>
-    </form>
-  </lex-modal>
-
-  <!-- Document Metadata Modal -->
-  <lex-modal id="documentMetadataModal" heading="Document Details" size="lg" hide-actions="true">
-    <div class="space-y-4">
-      <div class="rounded-lg p-3 border" style="background-color: var(--lex-bg-secondary); border-color: var(--lex-border-default)">
-        <p class="text-sm" style="color: var(--lex-text-secondary)">
-          <span class="font-medium" style="color: var(--lex-text-primary)" id="metadataFileName">filename.pdf</span>
-          <span class="mx-1" style="color: var(--lex-text-tertiary)">&bull;</span>
-          <span id="metadataFileSize">1.2 MB</span>
-        </p>
-      </div>
-
-      <lex-select
-        id="metadataDocType"
-        label="Document Type"
-        help='Leave as "Auto-detect" to let AI classify the document'
-        options='[{"value":"","label":"Auto-detect (recommended)"},{"value":"contract","label":"Contract"},{"value":"pleading","label":"Pleading"},{"value":"deposition","label":"Deposition"},{"value":"medical_record","label":"Medical Record"},{"value":"police_report","label":"Police Report"},{"value":"email","label":"Email"},{"value":"expert_report","label":"Expert Report"},{"value":"correspondence","label":"Correspondence"},{"value":"document","label":"Other Document"}]'
-      ></lex-select>
-
-      <div>
-        <label class="block text-sm font-medium mb-2" style="color: var(--lex-text-primary)">Document Contains (Optional)</label>
-        <div class="space-y-2">
-          <label class="flex items-center cursor-pointer drive-hover-row p-2 rounded">
-            <lex-checkbox id="metadataHasSignatures" label="Signatures (will use Vision OCR for detection)"></lex-checkbox>
-          </label>
-          <label class="flex items-center cursor-pointer drive-hover-row p-2 rounded">
-            <lex-checkbox id="metadataHasForms" label="Fillable form fields (will extract values)"></lex-checkbox>
-          </label>
-        </div>
-        <p class="text-xs mt-1" style="color: var(--lex-text-secondary)">These hints help optimize document processing. Leave unchecked for automatic detection.</p>
-      </div>
-
-      <lex-input
-        id="metadataTags"
-        label="Tags"
-        placeholder="e.g., important, confidential, draft"
-        maxlength="500"
-        help="Separate multiple tags with commas (max 10 tags, 500 chars total)"
-      ></lex-input>
-
-      <lex-textarea
-        id="metadataNotes"
-        label="Notes"
-        placeholder="Add any notes about this document..."
-        rows="3"
-        maxlength="2000"
-        show-count="true"
-      ></lex-textarea>
-    </div>
-    <div slot="footer">
-      <lex-btn id="cancelMetadataUpload" variant="secondary">Cancel</lex-btn>
-      <lex-btn id="confirmMetadataUpload" variant="primary">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-        </svg>
-        Upload Document
-      </lex-btn>
-    </div>
-  </lex-modal>
-
-  <!-- Single File Upload Modal -->
-  <lex-modal id="uploadSingleFileModal" heading="Upload Document" size="md" hide-actions="true">
-    <div class="space-y-4">
-      <div class="mb-5 p-3 rounded-lg" style="background-color: var(--lex-bg-secondary)">
-        <div class="flex items-start gap-3">
-          <svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-          </svg>
-          <div class="flex-1 min-w-0">
-            <p id="singleFileName" class="text-sm font-medium truncate" style="color: var(--lex-text-primary)"></p>
-            <p id="singleFileSize" class="text-xs mt-0.5" style="color: var(--lex-text-secondary)"></p>
+          <!-- View Toggle -->
+          <div class="flex items-center gap-1 ml-auto" style="border-left: 1px solid var(--lex-border-default); padding-left: 12px;">
+            <lex-btn id="gridViewBtn" variant="ghost" icon="true" title="Grid View">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+              </svg>
+            </lex-btn>
+            <lex-btn id="listViewBtn" variant="primary" icon="true" title="List View">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+              </svg>
+            </lex-btn>
           </div>
         </div>
       </div>
-      <div class="space-y-4">
-        <div>
-          <h4 class="text-sm font-medium mb-3" style="color: var(--lex-text-primary)">Processing Hints <span style="color: var(--lex-text-secondary)" class="font-normal">(optional)</span></h4>
-          <p class="text-xs mb-3" style="color: var(--lex-text-secondary)">Select document characteristics to optimize AI processing. Leave unchecked for automatic detection.</p>
-        </div>
-        <div class="p-3 border rounded-lg drive-hover-row transition-colors" style="border-color: var(--lex-border-default)">
-          <div class="flex items-start gap-3">
-            <div class="flex-shrink-0 mt-0.5">
-              <lex-checkbox id="singleHasSignatures"></lex-checkbox>
-            </div>
-            <div class="flex-1">
-              <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                </svg>
-                <span class="text-sm font-medium" style="color: var(--lex-text-primary)">Contains Signatures</span>
-              </div>
-              <p class="text-xs mt-1" style="color: var(--lex-text-secondary)">Document includes handwritten or electronic signatures</p>
-            </div>
-          </div>
-        </div>
-        <div class="p-3 border rounded-lg drive-hover-row transition-colors" style="border-color: var(--lex-border-default)">
-          <div class="flex items-start gap-3">
-            <div class="flex-shrink-0 mt-0.5">
-              <lex-checkbox id="singleHasForms"></lex-checkbox>
-            </div>
-            <div class="flex-1">
-              <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <span class="text-sm font-medium" style="color: var(--lex-text-primary)">Contains Forms</span>
-              </div>
-              <p class="text-xs mt-1" style="color: var(--lex-text-secondary)">Document includes fillable forms or checkboxes</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div slot="footer">
-      <lex-btn id="cancelSingleUploadBtnFooter" variant="secondary">Cancel</lex-btn>
-      <lex-btn id="confirmSingleUploadBtn" variant="primary">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-        </svg>
-        Upload Document
-      </lex-btn>
-    </div>
-  </lex-modal>
 
-  <!-- Bulk Upload Grid Modal -->
-  <lex-modal id="bulkUploadModal" heading="Bulk Upload Documents" size="xl" hide-actions="true">
-    <div class="space-y-4">
-      <p class="text-sm" style="color: var(--lex-text-secondary)"><span id="bulkFileCount">0</span> files selected - Configure hints for each file</p>
-      <!-- Apply to All Controls -->
-      <div class="px-0 py-3 border rounded-lg flex items-center gap-4 flex-wrap p-3" style="background-color: var(--lex-bg-secondary); border-color: var(--lex-border-default)">
-        <span class="text-sm font-medium" style="color: var(--lex-text-primary)">Apply to All:</span>
-        <div class="flex items-center gap-2">
-          <lex-select
-            id="bulkApplyDocType"
-            placeholder="Select type..."
-            options='[{"value":"contract","label":"Contract"},{"value":"pleading","label":"Pleading"},{"value":"deposition","label":"Deposition"},{"value":"medical_record","label":"Medical Record"},{"value":"police_report","label":"Police Report"},{"value":"email","label":"Email"},{"value":"expert_report","label":"Expert Report"},{"value":"correspondence","label":"Correspondence"},{"value":"document","label":"Other Document"}]'
-          ></lex-select>
-          <lex-btn id="applyDocTypeBtn" variant="secondary" size="sm">Apply Type</lex-btn>
-        </div>
-        <lex-btn id="applySignaturesBtn" variant="secondary" size="sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          Check Signatures
-        </lex-btn>
-        <lex-btn id="applyFormsBtn" variant="secondary" size="sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          Check Forms
-        </lex-btn>
-        <lex-btn id="clearAllHintsBtn" variant="ghost" size="sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          Clear All
-        </lex-btn>
+      <!-- Loading State -->
+      <div id="contentLoading" class="flex flex-col items-center justify-center py-16 gap-3">
+        <lex-spinner size="lg"></lex-spinner>
+        <p class="text-sm" style="color: var(--lex-text-secondary)">Loading...</p>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full border-collapse">
-          <thead class="sticky top-0" style="background-color: var(--lex-bg-secondary)">
+
+      <!-- Grid View -->
+      <div id="gridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+
+      <!-- List View -->
+      <div id="listView" class="hidden bg-white rounded-lg shadow-sm border overflow-hidden" style="border-color: var(--lex-border-default)">
+        <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
+          <thead style="background-color: var(--lex-bg-secondary)">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border-b" style="color: var(--lex-text-primary); border-color: var(--lex-border-default)">File Name</th>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border-b" style="color: var(--lex-text-primary); border-color: var(--lex-border-default)">Size</th>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border-b" style="color: var(--lex-text-primary); border-color: var(--lex-border-default)">Document Type</th>
-              <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider border-b" style="color: var(--lex-text-primary); border-color: var(--lex-border-default)">Signatures</th>
-              <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider border-b" style="color: var(--lex-text-primary); border-color: var(--lex-border-default)">Forms</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Name</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created By</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created On</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Size</th>
+              <th scope="col" class="w-20 px-6 py-3"></th>
             </tr>
           </thead>
-          <tbody id="bulkUploadGridBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
+          <tbody id="listViewBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
         </table>
       </div>
-    </div>
-    <div slot="footer">
-      <lex-btn id="cancelBulkUploadBtn" variant="secondary">Cancel</lex-btn>
-      <lex-btn id="confirmBulkUploadBtn" variant="primary">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-        </svg>
-        Upload Documents
-      </lex-btn>
-    </div>
-  </lex-modal>
 
-  <!-- Context Menu Container -->
-  <div id="contextMenu" class="hidden fixed bg-white rounded-lg shadow-xl border py-1 z-50 min-w-[180px]" style="border-color: var(--lex-border-default)"></div>
-</div>
+      <!-- Empty State -->
+      <div id="contentEmpty" class="hidden">
+        <lex-empty
+          message="This folder is empty"
+          description="Upload files or create a new folder to get started"
+          icon="folder"
+          action-label="Upload File"
+          id="contentEmptyWidget"
+        ></lex-empty>
+      </div>
+    </main>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         MODALS - using <lex-modal> web component
+         ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- New Folder Modal -->
+    <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true">
+      <form id="newFolderForm">
+        <lex-input
+          id="folderNameInput"
+          label="Folder Name"
+          placeholder="Enter folder name"
+          required="true"
+        ></lex-input>
+        <p class="mt-2 text-xs" style="color: var(--lex-text-secondary)">
+          <svg class="inline-block w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Creates a subfolder within the current matter.
+        </p>
+        <div class="flex items-center justify-end gap-3 mt-4">
+          <lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn>
+          <lex-btn type="submit" variant="primary">Create</lex-btn>
+        </div>
+      </form>
+    </lex-modal>
+
+    <!-- Document Metadata Modal -->
+    <lex-modal id="documentMetadataModal" heading="Document Details" size="lg" hide-actions="true">
+      <div class="space-y-4">
+        <div class="rounded-lg p-3 border" style="background-color: var(--lex-bg-secondary); border-color: var(--lex-border-default)">
+          <p class="text-sm" style="color: var(--lex-text-secondary)">
+            <span class="font-medium" style="color: var(--lex-text-primary)" id="metadataFileName">filename.pdf</span>
+            <span class="mx-1" style="color: var(--lex-text-tertiary)">&bull;</span>
+            <span id="metadataFileSize">1.2 MB</span>
+          </p>
+        </div>
+
+        <lex-select
+          id="metadataDocType"
+          label="Document Type"
+          help='Leave as "Auto-detect" to let AI classify the document'
+          options='[{"value":"","label":"Auto-detect (recommended)"},{"value":"contract","label":"Contract"},{"value":"pleading","label":"Pleading"},{"value":"deposition","label":"Deposition"},{"value":"medical_record","label":"Medical Record"},{"value":"police_report","label":"Police Report"},{"value":"email","label":"Email"},{"value":"expert_report","label":"Expert Report"},{"value":"correspondence","label":"Correspondence"},{"value":"document","label":"Other Document"}]'
+        ></lex-select>
+
+        <div>
+          <label class="block text-sm font-medium mb-2" style="color: var(--lex-text-primary)">Document Contains (Optional)</label>
+          <div class="space-y-2">
+            <label class="flex items-center cursor-pointer drive-hover-row p-2 rounded">
+              <lex-checkbox id="metadataHasSignatures" label="Signatures (will use Vision OCR for detection)"></lex-checkbox>
+            </label>
+            <label class="flex items-center cursor-pointer drive-hover-row p-2 rounded">
+              <lex-checkbox id="metadataHasForms" label="Fillable form fields (will extract values)"></lex-checkbox>
+            </label>
+          </div>
+          <p class="text-xs mt-1" style="color: var(--lex-text-secondary)">These hints help optimize document processing. Leave unchecked for automatic detection.</p>
+        </div>
+
+        <lex-input
+          id="metadataTags"
+          label="Tags"
+          placeholder="e.g., important, confidential, draft"
+          maxlength="500"
+          help="Separate multiple tags with commas (max 10 tags, 500 chars total)"
+        ></lex-input>
+
+        <lex-textarea
+          id="metadataNotes"
+          label="Notes"
+          placeholder="Add any notes about this document..."
+          rows="3"
+          maxlength="2000"
+          show-count="true"
+        ></lex-textarea>
+      </div>
+      <div slot="footer">
+        <lex-btn id="cancelMetadataUpload" variant="secondary">Cancel</lex-btn>
+        <lex-btn id="confirmMetadataUpload" variant="primary">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
+          Upload Document
+        </lex-btn>
+      </div>
+    </lex-modal>
+
+    <!-- Single File Upload Modal -->
+    <lex-modal id="uploadSingleFileModal" heading="Upload Document" size="md" hide-actions="true">
+      <div class="space-y-4">
+        <div class="mb-5 p-3 rounded-lg" style="background-color: var(--lex-bg-secondary)">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: var(--lex-text-tertiary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <div class="flex-1 min-w-0">
+              <p id="singleFileName" class="text-sm font-medium truncate" style="color: var(--lex-text-primary)"></p>
+              <p id="singleFileSize" class="text-xs mt-0.5" style="color: var(--lex-text-secondary)"></p>
+            </div>
+          </div>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <h4 class="text-sm font-medium mb-3" style="color: var(--lex-text-primary)">Processing Hints <span style="color: var(--lex-text-secondary)" class="font-normal">(optional)</span></h4>
+            <p class="text-xs mb-3" style="color: var(--lex-text-secondary)">Select document characteristics to optimize AI processing. Leave unchecked for automatic detection.</p>
+          </div>
+          <div class="p-3 border rounded-lg drive-hover-row transition-colors" style="border-color: var(--lex-border-default)">
+            <div class="flex items-start gap-3">
+              <div class="flex-shrink-0 mt-0.5">
+                <lex-checkbox id="singleHasSignatures"></lex-checkbox>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                  </svg>
+                  <span class="text-sm font-medium" style="color: var(--lex-text-primary)">Contains Signatures</span>
+                </div>
+                <p class="text-xs mt-1" style="color: var(--lex-text-secondary)">Document includes handwritten or electronic signatures</p>
+              </div>
+            </div>
+          </div>
+          <div class="p-3 border rounded-lg drive-hover-row transition-colors" style="border-color: var(--lex-border-default)">
+            <div class="flex items-start gap-3">
+              <div class="flex-shrink-0 mt-0.5">
+                <lex-checkbox id="singleHasForms"></lex-checkbox>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <span class="text-sm font-medium" style="color: var(--lex-text-primary)">Contains Forms</span>
+                </div>
+                <p class="text-xs mt-1" style="color: var(--lex-text-secondary)">Document includes fillable forms or checkboxes</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div slot="footer">
+        <lex-btn id="cancelSingleUploadBtnFooter" variant="secondary">Cancel</lex-btn>
+        <lex-btn id="confirmSingleUploadBtn" variant="primary">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
+          Upload Document
+        </lex-btn>
+      </div>
+    </lex-modal>
+
+    <!-- Bulk Upload Grid Modal -->
+    <lex-modal id="bulkUploadModal" heading="Bulk Upload Documents" size="xl" hide-actions="true">
+      <div class="space-y-4">
+        <p class="text-sm" style="color: var(--lex-text-secondary)"><span id="bulkFileCount">0</span> files selected - Configure hints for each file</p>
+        <!-- Apply to All Controls -->
+        <div class="px-0 py-3 border rounded-lg flex items-center gap-4 flex-wrap p-3" style="background-color: var(--lex-bg-secondary); border-color: var(--lex-border-default)">
+          <span class="text-sm font-medium" style="color: var(--lex-text-primary)">Apply to All:</span>
+          <div class="flex items-center gap-2">
+            <lex-select
+              id="bulkApplyDocType"
+              placeholder="Select type..."
+              options='[{"value":"contract","label":"Contract"},{"value":"pleading","label":"Pleading"},{"value":"deposition","label":"Deposition"},{"value":"medical_record","label":"Medical Record"},{"value":"police_report","label":"Police Report"},{"value":"email","label":"Email"},{"value":"expert_report","label":"Expert Report"},{"value":"correspondence","label":"Correspondence"},{"value":"document","label":"Other Document"}]'
+            ></lex-select>
+            <lex-btn id="applyDocTypeBtn" variant="secondary" size="sm">Apply Type</lex-btn>
+          </div>
+          <lex-btn id="applySignaturesBtn" variant="secondary" size="sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Check Signatures
+          </lex-btn>
+          <lex-btn id="applyFormsBtn" variant="secondary" size="sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Check Forms
+          </lex-btn>
+          <lex-btn id="clearAllHintsBtn" variant="ghost" size="sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            Clear All
+          </lex-btn>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full border-collapse">
+            <thead class="sticky top-0" style="background-color: var(--lex-bg-secondary)">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border-b" style="color: var(--lex-text-primary); border-color: var(--lex-border-default)">File Name</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border-b" style="color: var(--lex-text-primary); border-color: var(--lex-border-default)">Size</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider border-b" style="color: var(--lex-text-primary); border-color: var(--lex-border-default)">Document Type</th>
+                <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider border-b" style="color: var(--lex-text-primary); border-color: var(--lex-border-default)">Signatures</th>
+                <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider border-b" style="color: var(--lex-text-primary); border-color: var(--lex-border-default)">Forms</th>
+              </tr>
+            </thead>
+            <tbody id="bulkUploadGridBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
+          </table>
+        </div>
+      </div>
+      <div slot="footer">
+        <lex-btn id="cancelBulkUploadBtn" variant="secondary">Cancel</lex-btn>
+        <lex-btn id="confirmBulkUploadBtn" variant="primary">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
+          Upload Documents
+        </lex-btn>
+      </div>
+    </lex-modal>
+
+    <!-- Context Menu Container -->
+    <div id="contextMenu" class="hidden fixed bg-white rounded-lg shadow-xl border py-1 z-50 min-w-[180px]" style="border-color: var(--lex-border-default)"></div>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       Scripts at end of body - HTML renders first, scripts load after
+       ══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Universal shell scripts -->
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/utils/rename-conversation.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/new-project-modal.js"></script>
+  <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI layout (shell components - lex-app builds sidebar/topbar) -->
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components - ALL loaded BEFORE inject so custom elements
+       are defined when template content enters the DOM. Tree-order upgrade ensures
+       parents capture un-rendered children (no double-rendering). -->
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/form/lex-checkbox.js"></script>
+  <script src="js/lex/components/form/lex-textarea.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="js/lex/lex-page-init.js"></script>
+
+  <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/folder.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="js/auth-guard.js"></script>
+</body>
+</html>
