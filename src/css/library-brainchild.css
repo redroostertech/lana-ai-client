@@ -83,3 +83,46 @@
 .library-bc-promote {
   margin-top: 8px;
 }
+
+/* Vault folder breadcrumb shown above the notes/folders list. */
+.library-bc-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 0.8125rem;
+}
+
+.library-bc-breadcrumb.library-bc-hidden {
+  display: none;
+}
+
+.library-bc-crumb {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: var(--lex-text-accent);
+}
+
+.library-bc-crumb:hover {
+  text-decoration: underline;
+}
+
+.library-bc-crumb[aria-current="page"] {
+  color: var(--lex-text-primary);
+  font-weight: 600;
+  cursor: default;
+  text-decoration: none;
+}
+
+.library-bc-crumb-sep {
+  color: var(--lex-text-tertiary);
+}
+
+/* Folder card/row inside the Brainchild scope is clickable to drill in. */
+.library-bc-folder-card {
+  cursor: pointer;
+}

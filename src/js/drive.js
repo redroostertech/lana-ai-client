@@ -621,6 +621,10 @@
   async function runBrainchildSearch(query) {
     var scope = ensureBrainchildScope();
     if (!scope) return;
+    // Clearing the search returns to the folder view at the vault root.
+    if (!(query || '').trim()) {
+      scope.goToFolder('');
+    }
     try {
       await scope.runSearch(query || '');
     } catch (error) {
@@ -662,33 +666,49 @@
 
     if (degraded) degraded.classList.add('library-bc-hidden');
 
-    var rows = Array.isArray(brainchildScope.state.rows) ? brainchildScope.state.rows : [];
+    var allRows = Array.isArray(brainchildScope.state.rows) ? brainchildScope.state.rows : [];
+
+    // When a search query is active, render flat results across the whole vault
+    // (folders are ignored). Otherwise fold the rows into the current folder.
+    var searching = !!(storageState.searchQuery && storageState.searchQuery.trim());
+    var folders;
+    var notes;
+    if (searching) {
+      folders = [];
+      notes = allRows;
+    } else {
+      var view = brainchildScope.folderView();
+      folders = view.folders || [];
+      notes = view.notes || [];
+    }
 
     if (banner) {
       banner.classList.remove('library-bc-hidden');
       if (pathEl) pathEl.textContent = status.vaultPath || '';
     }
 
+    renderBrainchildBreadcrumb(searching ? '' : (brainchildScope.state.currentFolder || ''), searching);
+
+    var itemCount = folders.length + notes.length;
+    var countText = describeBrainchildCount(folders.length, notes.length);
     if (sectionHeading) sectionHeading.textContent = 'My Notes';
-    if (sectionCount) sectionCount.textContent = rows.length + ' note' + (rows.length !== 1 ? 's' : '');
-    if (resultsCountEl) {
-      resultsCountEl.textContent = rows.length + ' note' + (rows.length !== 1 ? 's' : '');
-    }
+    if (sectionCount) sectionCount.textContent = countText;
+    if (resultsCountEl) resultsCountEl.textContent = countText;
 
     // Pagination is matters-only; hide its counts in this scope.
     var pager = document.getElementById('drivePagination');
     if (pager) {
       pager.page = 1;
       pager.totalPages = 1;
-      pager.total = rows.length;
-      pager.limit = rows.length || 1;
+      pager.total = itemCount;
+      pager.limit = itemCount || 1;
     }
 
     var emptyEl = document.getElementById('contentEmpty');
     var gridViewEl = document.getElementById('gridView');
     var listViewEl = document.getElementById('listView');
 
-    if (rows.length === 0) {
+    if (itemCount === 0) {
       if (emptyEl) emptyEl.classList.remove('hidden');
       if (gridViewEl) gridViewEl.classList.add('hidden');
       if (listViewEl) listViewEl.classList.add('hidden');
@@ -698,14 +718,76 @@
     if (emptyEl) emptyEl.classList.add('hidden');
 
     if (storageState.viewMode === 'grid') {
-      renderBrainchildGrid(rows);
+      renderBrainchildGrid(folders, notes);
       if (gridViewEl) gridViewEl.classList.remove('hidden');
       if (listViewEl) listViewEl.classList.add('hidden');
     } else {
-      renderBrainchildList(rows);
+      renderBrainchildList(folders, notes);
       if (listViewEl) listViewEl.classList.remove('hidden');
       if (gridViewEl) gridViewEl.classList.add('hidden');
     }
+  }
+
+  /**
+   * Build the count copy for the current folder view ("2 folders, 5 notes").
+   * @param {number} folderCount
+   * @param {number} noteCount
+   * @returns {string}
+   */
+  function describeBrainchildCount(folderCount, noteCount) {
+    var parts = [];
+    if (folderCount > 0) {
+      parts.push(folderCount + ' folder' + (folderCount !== 1 ? 's' : ''));
+    }
+    parts.push(noteCount + ' note' + (noteCount !== 1 ? 's' : ''));
+    return parts.join(', ');
+  }
+
+  /**
+   * Render the vault breadcrumb: "My Notes" (root) then each path segment, all
+   * clickable to jump there via the scope controller. Hidden while searching.
+   * @param {string} folderPath - vault relative folder path ('' = root)
+   * @param {boolean} searching - true when a search query is active
+   */
+  function renderBrainchildBreadcrumb(folderPath, searching) {
+    var crumbEl = document.getElementById('bcBreadcrumb');
+    if (!crumbEl) return;
+
+    if (searching) {
+      crumbEl.innerHTML = '';
+      crumbEl.classList.add('library-bc-hidden');
+      return;
+    }
+
+    crumbEl.classList.remove('library-bc-hidden');
+
+    var segments = (folderPath || '').split('/').filter(function (s) { return !!s; });
+    var rootActive = segments.length === 0;
+    var crumbs = [
+      '<button type="button" class="library-bc-crumb" data-bc-folder="" ' +
+      (rootActive ? 'aria-current="page" ' : '') + '>My Notes</button>'
+    ];
+
+    var accum = '';
+    segments.forEach(function (segment, index) {
+      accum = accum ? accum + '/' + segment : segment;
+      var isLast = index === segments.length - 1;
+      crumbs.push('<span class="library-bc-crumb-sep" aria-hidden="true">/</span>');
+      crumbs.push(
+        '<button type="button" class="library-bc-crumb" data-bc-folder="' + escapeHtml(accum) + '" ' +
+        (isLast ? 'aria-current="page" ' : '') + '>' + escapeHtml(segment) + '</button>'
+      );
+    });
+
+    crumbEl.innerHTML = crumbs.join('');
+
+    var buttons = crumbEl.querySelectorAll('.library-bc-crumb');
+    Array.prototype.forEach.call(buttons, function (button) {
+      button.addEventListener('click', function () {
+        if (!brainchildScope) return;
+        brainchildScope.goToFolder(button.getAttribute('data-bc-folder') || '');
+      });
+    });
   }
 
   /**
@@ -759,17 +841,37 @@
   }
 
   /**
-   * Render Brainchild note rows as grid cards, reusing the existing #gridView
-   * container. Each card carries a "Promote to Org" action when permitted.
-   * @param {Array} rows - normalized Brainchild row view models
+   * Render Brainchild folder cards (clickable to drill in) followed by note
+   * cards, reusing the existing #gridView container. Each note card carries a
+   * "Promote to Org" action when permitted.
+   * @param {Array} folders - immediate child folders ({ name, path, count })
+   * @param {Array} notes - normalized Brainchild row view models
    */
-  function renderBrainchildGrid(rows) {
+  function renderBrainchildGrid(folders, notes) {
     var gridViewEl = document.getElementById('gridView');
     if (!gridViewEl) return;
 
     var canPromote = brainchildScope && brainchildScope.canPromote();
 
-    var cards = rows.map(function (row, index) {
+    var folderCards = (folders || []).map(function (folder) {
+      var folderName = escapeHtml(folder.name || '');
+      var count = folder.count || 0;
+      var countLabel = count + ' note' + (count !== 1 ? 's' : '');
+
+      return [
+        '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group library-bc-folder-card" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" data-bc-folder-name="' + folderName + '">',
+        '  <div class="flex flex-col items-center">',
+        '    <svg class="w-16 h-16 mb-2" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+        '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
+        '    </svg>',
+        '    <h3 class="text-sm font-medium text-center truncate w-full" style="color: var(--lex-text-primary)" title="' + folderName + '">' + folderName + '</h3>',
+        '    <p class="text-xs text-center mt-1" style="color: var(--lex-text-secondary)">' + countLabel + '</p>',
+        '  </div>',
+        '</div>'
+      ].join('');
+    }).join('');
+
+    var noteCards = (notes || []).map(function (row, index) {
       var name = escapeHtml(row.filename || 'Untitled note');
       var vaultPath = escapeHtml(row._vaultPath || '');
       var promoteBtn = canPromote
@@ -790,21 +892,49 @@
       ].join('');
     }).join('');
 
-    gridViewEl.innerHTML = cards;
-    wireBrainchildPromoteButtons(gridViewEl, rows);
+    gridViewEl.innerHTML = folderCards + noteCards;
+    wireBrainchildFolderCards(gridViewEl);
+    wireBrainchildPromoteButtons(gridViewEl, notes);
   }
 
   /**
-   * Render Brainchild note rows as table rows, reusing the existing #listViewBody.
-   * @param {Array} rows - normalized Brainchild row view models
+   * Render Brainchild folder rows (clickable to drill in) followed by note rows,
+   * reusing the existing #listViewBody table body.
+   * @param {Array} folders - immediate child folders ({ name, path, count })
+   * @param {Array} notes - normalized Brainchild row view models
    */
-  function renderBrainchildList(rows) {
+  function renderBrainchildList(folders, notes) {
     var listViewBodyEl = document.getElementById('listViewBody');
     if (!listViewBodyEl) return;
 
     var canPromote = brainchildScope && brainchildScope.canPromote();
 
-    var html = rows.map(function (row, index) {
+    var folderRows = (folders || []).map(function (folder) {
+      var folderName = escapeHtml(folder.name || '');
+      var count = folder.count || 0;
+      var countLabel = count + ' note' + (count !== 1 ? 's' : '');
+
+      return [
+        '<tr class="cursor-pointer library-bc-folder-card" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" data-bc-folder-name="' + folderName + '">',
+        '  <td class="px-6 py-4">',
+        '    <div class="flex items-center">',
+        '      <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
+        '      </svg>',
+        '      <div class="min-w-0 flex-1">',
+        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + folderName + '">' + folderName + '</div>',
+        '      </div>',
+        '    </div>',
+        '  </td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">You</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">-</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + countLabel + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm"></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+
+    var noteRows = (notes || []).map(function (row, index) {
       var name = escapeHtml(row.filename || 'Untitled note');
       var vaultPath = escapeHtml(row._vaultPath || '');
       var updated = row.updated_at ? formatRelativeDate(row.updated_at) : '-';
@@ -832,8 +962,26 @@
       ].join('');
     }).join('');
 
-    listViewBodyEl.innerHTML = html;
-    wireBrainchildPromoteButtons(listViewBodyEl, rows);
+    listViewBodyEl.innerHTML = folderRows + noteRows;
+    wireBrainchildFolderCards(listViewBodyEl);
+    wireBrainchildPromoteButtons(listViewBodyEl, notes);
+  }
+
+  /**
+   * Wire each rendered Brainchild folder card/row to drill into that folder via
+   * the scope controller. The controller's onChange re-renders the view.
+   * @param {HTMLElement} container
+   */
+  function wireBrainchildFolderCards(container) {
+    if (!container || !brainchildScope) return;
+    var cards = container.querySelectorAll('.library-bc-folder-card');
+    Array.prototype.forEach.call(cards, function (card) {
+      card.addEventListener('click', function () {
+        var name = card.getAttribute('data-bc-folder-name') || '';
+        if (!name) return;
+        brainchildScope.enterFolder(name);
+      });
+    });
   }
 
   /**

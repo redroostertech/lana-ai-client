@@ -52,6 +52,87 @@
     return 'Connect Brainchild to read your personal notes here.';
   }
 
+  /*
+   * folderView(rows, currentFolder)
+   *
+   * Pure helper. Given the normalized Library rows (each carrying a vault
+   * relative _vaultPath that may contain "/" for nested folders) and the
+   * current folder path ('' = vault root), returns the immediate folder/note
+   * view for that folder:
+   *
+   *   {
+   *     folders: [{ name, path, count }, ...],  // immediate child folders
+   *     notes:   [row, ...]                     // notes directly in the folder
+   *   }
+   *
+   * notes   = rows whose _vaultPath sits directly inside currentFolder (no
+   *           further "/" after stripping the "currentFolder + '/'" prefix; at
+   *           root, rows whose _vaultPath has no "/").
+   * folders = the distinct immediate child folder names under currentFolder,
+   *           each with its full path and a count of notes anywhere beneath it.
+   *
+   * Folders sort alphabetically (case-insensitive); notes sort by filename.
+   * Names beginning with "." (dotfolders / dotfiles) are ignored.
+   */
+  function folderView(rows, currentFolder) {
+    var list = Array.isArray(rows) ? rows : [];
+    var base = currentFolder || '';
+    var prefix = base ? base + '/' : '';
+
+    var notes = [];
+    var folderCounts = {}; // child folder name -> rollup note count
+    var folderNames = [];  // preserves first-seen order before sort
+
+    list.forEach(function (row) {
+      var path = (row && row._vaultPath) || '';
+      if (!path) return;
+
+      // Only consider rows that live under the current folder.
+      if (prefix) {
+        if (path.indexOf(prefix) !== 0) return;
+      }
+      var rest = prefix ? path.slice(prefix.length) : path;
+      if (!rest) return;
+
+      var slash = rest.indexOf('/');
+      if (slash === -1) {
+        // Direct note in this folder. Skip dotfiles.
+        if (rest.charAt(0) === '.') return;
+        notes.push(row);
+        return;
+      }
+
+      // Lives inside a child folder. Skip dotfolders.
+      var childName = rest.slice(0, slash);
+      if (!childName || childName.charAt(0) === '.') return;
+      if (!Object.prototype.hasOwnProperty.call(folderCounts, childName)) {
+        folderCounts[childName] = 0;
+        folderNames.push(childName);
+      }
+      folderCounts[childName] += 1;
+    });
+
+    var folders = folderNames.map(function (name) {
+      return {
+        name: name,
+        path: prefix ? prefix + name : name,
+        count: folderCounts[name]
+      };
+    });
+
+    folders.sort(function (a, b) {
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+    });
+
+    notes.sort(function (a, b) {
+      var an = ((a && a.filename) || '').toLowerCase();
+      var bn = ((b && b.filename) || '').toLowerCase();
+      return an.localeCompare(bn);
+    });
+
+    return { folders: folders, notes: notes };
+  }
+
   // Translate an ApiError (thrown by api.post on non 2xx) into promote copy.
   function promoteErrorMessage(error) {
     var status = error && typeof error.status === 'number' ? error.status : 0;
@@ -102,8 +183,27 @@
       status: null,
       rows: null,
       loading: false,
-      promoteInProgress: false
+      promoteInProgress: false,
+      currentFolder: ''
     };
+
+    // Append a single child folder name to the current folder path and notify.
+    function enterFolder(name) {
+      var child = (name || '').trim();
+      if (!child) return state.currentFolder;
+      state.currentFolder = state.currentFolder
+        ? state.currentFolder + '/' + child
+        : child;
+      notify();
+      return state.currentFolder;
+    }
+
+    // Jump to an absolute vault folder path ('' for the vault root) and notify.
+    function goToFolder(path) {
+      state.currentFolder = path || '';
+      notify();
+      return state.currentFolder;
+    }
 
     function isConnected(status) {
       var s = status || state.status;
@@ -164,6 +264,7 @@
     async function load() {
       if (state.loading) return state.rows || [];
       state.loading = true;
+      state.currentFolder = '';
       try {
         await refreshStatus();
         var notes = isConnected() ? await fetchNotes() : [];
@@ -258,6 +359,7 @@
         await bridge.unlink();
       } catch (_error) { /* best effort */ }
       state.rows = null;
+      state.currentFolder = '';
       state.status = { status: 'degraded', reason: 'unlinked_by_user' };
       notify();
       onStatus('');
@@ -345,14 +447,18 @@
       pickAndLink: pickAndLink,
       unlink: unlink,
       canPromote: canPromote,
-      promote: promote
+      promote: promote,
+      enterFolder: enterFolder,
+      goToFolder: goToFolder,
+      folderView: function () { return folderView(state.rows, state.currentFolder); }
     };
   }
 
   var moduleApi = {
     create: create,
     degradedCopy: degradedCopy,
-    promoteErrorMessage: promoteErrorMessage
+    promoteErrorMessage: promoteErrorMessage,
+    folderView: folderView
   };
 
   if (typeof module !== 'undefined' && module.exports) {

@@ -38,6 +38,197 @@ function apiError(status, message) {
   return Object.assign(new Error(message || 'err'), { status: status });
 }
 
+describe('folderView (pure helper)', () => {
+  function r(path, name) {
+    return { _vaultPath: path, filename: name || path.split('/').pop() };
+  }
+
+  test('root level: distinct child folders plus root notes', () => {
+    const rows = [
+      r('readme.md', 'readme.md'),
+      r('Forms/intake.md', 'intake.md'),
+      r('Forms/release.md', 'release.md'),
+      r('Introduction/welcome.md', 'welcome.md'),
+      r('todo.md', 'todo.md'),
+    ];
+
+    const view = scope.folderView(rows, '');
+
+    expect(view.folders.map(function (f) { return f.name; })).toEqual(['Forms', 'Introduction']);
+    expect(view.folders[0]).toEqual({ name: 'Forms', path: 'Forms', count: 2 });
+    expect(view.folders[1]).toEqual({ name: 'Introduction', path: 'Introduction', count: 1 });
+    // Root notes only (not the ones inside folders), sorted by filename.
+    expect(view.notes.map(function (n) { return n.filename; })).toEqual(['readme.md', 'todo.md']);
+  });
+
+  test('drilling into a folder shows that folder\'s direct notes', () => {
+    const rows = [
+      r('readme.md', 'readme.md'),
+      r('Forms/intake.md', 'intake.md'),
+      r('Forms/release.md', 'release.md'),
+    ];
+
+    const view = scope.folderView(rows, 'Forms');
+
+    expect(view.folders).toEqual([]);
+    expect(view.notes.map(function (n) { return n.filename; })).toEqual(['intake.md', 'release.md']);
+  });
+
+  test('nested subfolders surface as immediate children with rollup counts', () => {
+    const rows = [
+      r('Forms/intake.md', 'intake.md'),
+      r('Forms/Archived/2024/old.md', 'old.md'),
+      r('Forms/Archived/2025/new.md', 'new.md'),
+      r('Forms/Templates/blank.md', 'blank.md'),
+    ];
+
+    const view = scope.folderView(rows, 'Forms');
+
+    // Immediate children of Forms: Archived (rolls up 2) and Templates (1).
+    expect(view.folders.map(function (f) { return f.name; })).toEqual(['Archived', 'Templates']);
+    const archived = view.folders.find(function (f) { return f.name === 'Archived'; });
+    expect(archived).toEqual({ name: 'Archived', path: 'Forms/Archived', count: 2 });
+    const templates = view.folders.find(function (f) { return f.name === 'Templates'; });
+    expect(templates).toEqual({ name: 'Templates', path: 'Forms/Templates', count: 1 });
+    // Only the direct note in Forms remains.
+    expect(view.notes.map(function (n) { return n.filename; })).toEqual(['intake.md']);
+  });
+
+  test('count rolls up all notes anywhere beneath a child folder', () => {
+    const rows = [
+      r('Projects/a/1.md', '1.md'),
+      r('Projects/a/2.md', '2.md'),
+      r('Projects/b/deep/3.md', '3.md'),
+    ];
+
+    const view = scope.folderView(rows, '');
+
+    expect(view.folders).toEqual([{ name: 'Projects', path: 'Projects', count: 3 }]);
+    expect(view.notes).toEqual([]);
+  });
+
+  test('folders sort case-insensitively and notes sort by filename', () => {
+    const rows = [
+      r('zebra/z.md', 'z.md'),
+      r('Apple/a.md', 'a.md'),
+      r('banana/b.md', 'b.md'),
+      r('Yak.md', 'Yak.md'),
+      r('apex.md', 'apex.md'),
+    ];
+
+    const view = scope.folderView(rows, '');
+
+    expect(view.folders.map(function (f) { return f.name; })).toEqual(['Apple', 'banana', 'zebra']);
+    expect(view.notes.map(function (n) { return n.filename; })).toEqual(['apex.md', 'Yak.md']);
+  });
+
+  test('dotfolders and dotfiles are excluded at every level', () => {
+    const rows = [
+      r('.obsidian/config.md', 'config.md'),
+      r('.hidden.md', '.hidden.md'),
+      r('Forms/.trash/old.md', 'old.md'),
+      r('Forms/intake.md', 'intake.md'),
+      r('visible.md', 'visible.md'),
+    ];
+
+    const rootView = scope.folderView(rows, '');
+    expect(rootView.folders.map(function (f) { return f.name; })).toEqual(['Forms']);
+    expect(rootView.notes.map(function (n) { return n.filename; })).toEqual(['visible.md']);
+
+    const formsView = scope.folderView(rows, 'Forms');
+    // .trash dotfolder is excluded, leaving only the direct intake note.
+    expect(formsView.folders).toEqual([]);
+    expect(formsView.notes.map(function (n) { return n.filename; })).toEqual(['intake.md']);
+  });
+
+  test('tolerates empty and missing inputs', () => {
+    expect(scope.folderView([], '')).toEqual({ folders: [], notes: [] });
+    expect(scope.folderView(undefined, '')).toEqual({ folders: [], notes: [] });
+  });
+});
+
+describe('folder navigation state (controller)', () => {
+  function makeNoteBridge(notes) {
+    return {
+      status: jest.fn().mockResolvedValue({ status: 'linked', source: 'auto', vaultPath: '/v' }),
+      listNotes: jest.fn().mockResolvedValue({ success: true, notes: notes }),
+    };
+  }
+
+  function pathMapper() {
+    return {
+      normalizeLibraryItems: jest.fn(function (data) {
+        return (data.notes || []).map(function (n) {
+          return { filename: n.title, _vaultPath: n.path };
+        });
+      }),
+    };
+  }
+
+  test('defaults currentFolder to root and exposes a no-arg folderView()', async () => {
+    const bridge = makeNoteBridge([
+      { title: 'intake.md', path: 'Forms/intake.md' },
+      { title: 'readme.md', path: 'readme.md' },
+    ]);
+    const s = scope.create({ bridge: bridge, mapper: pathMapper(), api: makeApi(), promoteBuilder: makePromoteBuilder() });
+
+    await s.load();
+
+    expect(s.state.currentFolder).toBe('');
+    const view = s.folderView();
+    expect(view.folders.map(function (f) { return f.name; })).toEqual(['Forms']);
+    expect(view.notes.map(function (n) { return n.filename; })).toEqual(['readme.md']);
+  });
+
+  test('enterFolder appends to currentFolder and notifies onChange', async () => {
+    const bridge = makeNoteBridge([{ title: 'intake.md', path: 'Forms/intake.md' }]);
+    const changes = [];
+    const s = scope.create({
+      bridge: bridge,
+      mapper: pathMapper(),
+      api: makeApi(),
+      promoteBuilder: makePromoteBuilder(),
+      onChange: function () { changes.push(true); },
+    });
+
+    await s.load();
+    const before = changes.length;
+    s.enterFolder('Forms');
+    expect(s.state.currentFolder).toBe('Forms');
+    s.enterFolder('Archived');
+    expect(s.state.currentFolder).toBe('Forms/Archived');
+    expect(changes.length).toBe(before + 2);
+  });
+
+  test('goToFolder sets an absolute path; empty string returns to root', () => {
+    const s = scope.create({ bridge: {}, mapper: pathMapper(), api: makeApi(), promoteBuilder: makePromoteBuilder() });
+
+    s.goToFolder('Forms/Archived');
+    expect(s.state.currentFolder).toBe('Forms/Archived');
+    s.goToFolder('');
+    expect(s.state.currentFolder).toBe('');
+  });
+
+  test('load() resets currentFolder back to root', async () => {
+    const bridge = makeNoteBridge([{ title: 'readme.md', path: 'readme.md' }]);
+    const s = scope.create({ bridge: bridge, mapper: pathMapper(), api: makeApi(), promoteBuilder: makePromoteBuilder() });
+
+    s.goToFolder('Forms');
+    expect(s.state.currentFolder).toBe('Forms');
+    await s.load();
+    expect(s.state.currentFolder).toBe('');
+  });
+
+  test('unlink() resets currentFolder back to root', async () => {
+    const bridge = { unlink: jest.fn().mockResolvedValue({ success: true }) };
+    const s = scope.create({ bridge: bridge, mapper: pathMapper(), api: makeApi(), promoteBuilder: makePromoteBuilder() });
+
+    s.goToFolder('Forms/Archived');
+    await s.unlink();
+    expect(s.state.currentFolder).toBe('');
+  });
+});
+
 describe('degradedCopy', () => {
   test('maps each known reason and falls back to the connect prompt', () => {
     expect(scope.degradedCopy('install_not_found')).toMatch(/install folder/i);
