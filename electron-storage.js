@@ -279,6 +279,40 @@ function clearBrainchildLink() {
 }
 
 /**
+ * Persist whether the user has suppressed auto-binding the Brainchild bridge.
+ *
+ * Auto-bind lets the bridge attach to a handshake-discovered vault when there is
+ * no explicit persisted link. An explicit Unlink sets this flag so discovery does
+ * not immediately re-bind; an explicit Connect clears it. The vault is the user's
+ * own local data, so this is a plain preference flag (no token).
+ * @param {boolean} disabled
+ * @returns {boolean} Success status
+ */
+function setBrainchildAutoBindDisabled(disabled) {
+  try {
+    store.set('brainchildAutoBindDisabled', Boolean(disabled));
+    return true;
+  } catch (error) {
+    logError('[electron-storage] Failed to set brainchild auto-bind flag', error);
+    return false;
+  }
+}
+
+/**
+ * Read the Brainchild auto-bind suppression flag. Defaults to false (auto-bind
+ * allowed) when unset.
+ * @returns {boolean}
+ */
+function isBrainchildAutoBindDisabled() {
+  try {
+    return Boolean(store.get('brainchildAutoBindDisabled', false));
+  } catch (error) {
+    logError('[electron-storage] Failed to get brainchild auto-bind flag', error);
+    return false;
+  }
+}
+
+/**
  * Get user preferences
  * @returns {Object} User preferences
  */
@@ -397,6 +431,8 @@ module.exports = {
   saveBrainchildLink,
   getBrainchildLink,
   clearBrainchildLink,
+  setBrainchildAutoBindDisabled,
+  isBrainchildAutoBindDisabled,
   getPreferences,
   updatePreferences,
   getAllData,

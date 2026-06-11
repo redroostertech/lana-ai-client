@@ -39,12 +39,12 @@ app.setVersion(packageJson.version);
 
 // Import thin client modules
 const { verifyServer } = require('./electron-discovery');
-const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink } = require('./electron-storage');
+const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled } = require('./electron-storage');
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
-const { BrainchildManager, discover, validateLink, mcpBinForRoot } = require('./src/electron-brainchild-manager');
+const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
 
 /**
  * Brainchild MCP bridge — reads the user's local vault over the MCP stdio
@@ -54,6 +54,8 @@ const { BrainchildManager, discover, validateLink, mcpBinForRoot } = require('./
  */
 const brainchildManager = new BrainchildManager({
   getLink: () => getBrainchildLink(),
+  discoverFn: () => discover(),
+  isAutoBindDisabled: () => isBrainchildAutoBindDisabled(),
   logInfo: (msg, error) => logInfo(msg, error),
   logError: (msg, error) => logError(msg, error)
 });
@@ -64,6 +66,14 @@ const brainchildManager = new BrainchildManager({
 // default candidates. This is the only sanctioned way an out-of-candidate
 // install path can be linked — a renderer-passed arbitrary string is not.
 const brainchildPickedInstallRoots = new Set();
+
+// Vault roots the user explicitly chose via the native folder picker in THIS
+// session. Same trust model as brainchildPickedInstallRoots: the MCP server
+// reads file contents from the vault and returns them to the renderer/chat, so
+// a vault outside the OS-default candidate set may only be linked if the user
+// deliberately picked it through the native dialog — not via a renderer-passed
+// arbitrary string (which could otherwise point at ~/.ssh, ~/.aws, etc.).
+const brainchildPickedVaultRoots = new Set();
 
 /**
  * Companion Bridge — in-app consent prompts
@@ -829,10 +839,22 @@ ipcMain.handle('brainchild:link', async (_event, payload) => {
     if (!installExists) {
       return { success: false, error: 'install_not_found' };
     }
+    // Mirror the install-root trust model for the vault: honor either an
+    // OS-default vault candidate OR a vault the user explicitly chose via the
+    // native picker this session. A bare renderer-passed string outside both
+    // sets is rejected before any spawn / file read.
+    const vaultPicked = link.vaultPath &&
+      brainchildPickedVaultRoots.has(require('path').resolve(link.vaultPath));
+    if (!isAllowedVaultRoot(link.vaultPath) && !vaultPicked) {
+      return { success: false, error: 'vault_not_allowed' };
+    }
     if (!checks.vaultValid) {
       return { success: false, error: 'vault_not_found' };
     }
     saveBrainchildLink({ installPath: link.installPath, vaultPath: link.vaultPath, verified: true });
+    // An explicit Connect clears any prior auto-bind suppression so discovery is
+    // allowed to bind again after a future unlink/re-link.
+    setBrainchildAutoBindDisabled(false);
     return { success: true, status: brainchildManager.getStatus() };
   } catch (error) {
     logError('[electron-main] brainchild:link failed', error);
@@ -927,6 +949,8 @@ ipcMain.handle('brainchild:pickVault', async () => {
     if (result.canceled || !result.filePaths || !result.filePaths.length) {
       return { success: false, canceled: true };
     }
+    // Trust this user-picked vault for subsequent brainchild:link in this session.
+    brainchildPickedVaultRoots.add(require('path').resolve(result.filePaths[0]));
     return { success: true, vaultPath: result.filePaths[0] };
   } catch (error) {
     logError('[electron-main] brainchild:pickVault failed', error);
@@ -934,13 +958,16 @@ ipcMain.handle('brainchild:pickVault', async () => {
   }
 });
 
-// Unlink: stop the MCP child and forget the persisted link so the user can
-// re-link to a different install/vault. Backed by the already-present
-// clearBrainchildLink() in electron-storage.
+// Unlink: stop the MCP child, forget the persisted link, and suppress auto-bind
+// so discovery does not instantly re-bind the handshake vault. Backed by
+// clearBrainchildLink() + setBrainchildAutoBindDisabled() in electron-storage.
 ipcMain.handle('brainchild:unlink', async () => {
   try {
     brainchildManager.stop();
     clearBrainchildLink();
+    // Persist suppression so auto-bind does not immediately re-bind the
+    // handshake-discovered vault. Explicit Connect clears this flag.
+    setBrainchildAutoBindDisabled(true);
     return { success: true, status: brainchildManager.getStatus() };
   } catch (error) {
     logError('[electron-main] brainchild:unlink failed', error);

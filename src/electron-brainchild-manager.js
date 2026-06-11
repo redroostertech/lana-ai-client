@@ -122,6 +122,55 @@ function vaultCandidates(env, platform, homedir) {
 }
 
 /**
+ * Path to the Brainchild vault-discovery handshake file. Brainchild publishes
+ * its real vault path here on every boot (electron/main.ts writeVaultLink), so
+ * the client never has to guess the app-name-dependent userData dir. The base
+ * dir is `<appData>/lana-brain`, computed the same way vaultCandidates() derives
+ * the per-OS appData root (Application Support / APPDATA / .config). The
+ * `lana-brain` dir name is the stable shared wire id and must not change. Pure.
+ * @param {Object} env
+ * @param {string} platform
+ * @param {string} homedir
+ * @returns {string}
+ */
+function lanaVaultLinkPath(env, platform, homedir) {
+  const home = homedir || os.homedir();
+  const e = env || {};
+  let appData;
+  if (platform === 'darwin') {
+    appData = path.join(home, 'Library', 'Application Support');
+  } else if (platform === 'win32') {
+    appData = e['APPDATA'] || path.join(home, 'AppData', 'Roaming');
+  } else {
+    appData = path.join(home, '.config');
+  }
+  return path.join(appData, 'lana-brain', 'vault-link.json');
+}
+
+/**
+ * Read + parse the handshake file. Returns the published coordinates, or null
+ * on a missing/unreadable/malformed file or one without a usable vaultPath. The
+ * fs dependency is injected so this stays pure and unit-testable.
+ * @param {string} filePath
+ * @param {{ readFileSync: Function }} fsLike
+ * @returns {{ vaultPath: string, installRoot: string|null, mcpBin: string|null }|null}
+ */
+function readVaultLink(filePath, fsLike) {
+  try {
+    const raw = fsLike.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.vaultPath !== 'string' || !parsed.vaultPath) return null;
+    return {
+      vaultPath: parsed.vaultPath,
+      installRoot: typeof parsed.installRoot === 'string' && parsed.installRoot ? parsed.installRoot : null,
+      mcpBin: typeof parsed.mcpBin === 'string' && parsed.mcpBin ? parsed.mcpBin : null
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+/**
  * Given a resolved link config + a child of the link describing what's missing,
  * derive the degraded reason code. Pure.
  * @param {{ installValid: boolean, vaultValid: boolean }} checks
@@ -171,6 +220,30 @@ function isAllowedInstallRoot(installPath, options = {}) {
   const homedir = options.homedir || os.homedir();
   const normalized = path.resolve(installPath);
   return installRootCandidates(env, platform, homedir)
+    .some((candidate) => path.resolve(candidate) === normalized);
+}
+
+/**
+ * Decide whether a renderer-supplied vault root is one we are willing to spawn
+ * the MCP server against (the server reads file contents from the vault and
+ * returns them to the renderer / chat context). Mirrors isAllowedInstallRoot:
+ * the renderer never supplies arbitrary paths today, but the IPC contract is
+ * broader than the UI, so a compromised/XSS'd renderer could otherwise point
+ * vaultPath at ~/.ssh, ~/.aws, etc. and exfiltrate file contents. Constrain to
+ * the same vaultCandidates set the discovery flow uses. Pure (path comparison
+ * only; readability is checked separately by validateLink/dirReadable).
+ *
+ * @param {string} vaultPath
+ * @param {Object} [options] - { env, platform, homedir } overridable for tests
+ * @returns {boolean}
+ */
+function isAllowedVaultRoot(vaultPath, options = {}) {
+  if (!vaultPath || typeof vaultPath !== 'string') return false;
+  const env = options.env || process.env;
+  const platform = options.platform || process.platform;
+  const homedir = options.homedir || os.homedir();
+  const normalized = path.resolve(vaultPath);
+  return vaultCandidates(env, platform, homedir)
     .some((candidate) => path.resolve(candidate) === normalized);
 }
 
@@ -230,14 +303,44 @@ function discover(options = {}) {
 
   let installPath = null;
   let mcpBin = null;
-  for (const root of installRootCandidates(env, platform, homedir)) {
-    const bin = mcpBinForRoot(root);
-    if (fileExists(bin)) { installPath = root; mcpBin = bin; break; }
+  let vaultPath = null;
+
+  // Priority 1: explicit env override always wins for the vault path. (It is
+  // also the first vaultCandidates() entry, but resolving it here keeps it
+  // strictly above the handshake.)
+  if (env && env.LANA_BRAIN_VAULT && dirReadable(env.LANA_BRAIN_VAULT)) {
+    vaultPath = env.LANA_BRAIN_VAULT;
   }
 
-  let vaultPath = null;
-  for (const candidate of vaultCandidates(env, platform, homedir)) {
-    if (dirReadable(candidate)) { vaultPath = candidate; break; }
+  // Priority 2: trust the handshake Brainchild itself published. It is written
+  // by the Brainchild main process (not the renderer), so it does NOT need to
+  // pass the renderer-input allowlist that vets picker-supplied paths; we still
+  // require the published dir to actually exist + be readable.
+  const link = readVaultLink(lanaVaultLinkPath(env, platform, homedir), fs);
+  if (link) {
+    if (!vaultPath && dirReadable(link.vaultPath)) vaultPath = link.vaultPath;
+    if (link.mcpBin && fileExists(link.mcpBin)) {
+      mcpBin = link.mcpBin;
+      installPath = link.installRoot || path.resolve(path.dirname(link.mcpBin), '..');
+    } else if (link.installRoot) {
+      const bin = mcpBinForRoot(link.installRoot);
+      if (fileExists(bin)) { installPath = link.installRoot; mcpBin = bin; }
+    }
+  }
+
+  // Priority 3: fall back to OS-default candidate guessing for anything the
+  // env override and handshake did not supply.
+  if (!installPath) {
+    for (const root of installRootCandidates(env, platform, homedir)) {
+      const bin = mcpBinForRoot(root);
+      if (fileExists(bin)) { installPath = root; mcpBin = bin; break; }
+    }
+  }
+
+  if (!vaultPath) {
+    for (const candidate of vaultCandidates(env, platform, homedir)) {
+      if (dirReadable(candidate)) { vaultPath = candidate; break; }
+    }
   }
 
   return { installPath, vaultPath, mcpBin };
@@ -251,12 +354,16 @@ class BrainchildManager {
   /**
    * @param {Object} [deps]
    * @param {() => (Object|null)} [deps.getLink] - reads persisted link config
+   * @param {() => (Object|null)} [deps.discoverFn] - handshake/OS-default discovery (defaults to discover())
+   * @param {() => boolean} [deps.isAutoBindDisabled] - reads persisted auto-bind suppression flag
    * @param {(msg: string, error?: Error) => void} [deps.logInfo]
    * @param {(msg: string, error?: Error) => void} [deps.logError]
    * @param {Function} [deps.spawnFn] - injectable for tests (defaults to child_process.spawn)
    */
   constructor(deps = {}) {
     this._getLink = typeof deps.getLink === 'function' ? deps.getLink : function () { return null; };
+    this._discoverFn = typeof deps.discoverFn === 'function' ? deps.discoverFn : function () { return discover(); };
+    this._isAutoBindDisabled = typeof deps.isAutoBindDisabled === 'function' ? deps.isAutoBindDisabled : function () { return false; };
     this._logInfo = typeof deps.logInfo === 'function' ? deps.logInfo : function () {};
     this._logError = typeof deps.logError === 'function' ? deps.logError : function () {};
     this._spawn = typeof deps.spawnFn === 'function' ? deps.spawnFn : spawn;
@@ -269,22 +376,45 @@ class BrainchildManager {
   }
 
   /**
+   * Resolve the link the bridge should bind to. Priority:
+   *   1. an explicit persisted link (source 'explicit');
+   *   2. otherwise, if the user has NOT suppressed auto-bind, the
+   *      handshake/OS-default discovery result (source 'auto');
+   *   3. otherwise null (nothing to bind, or the user opted out).
+   * Does NOT touch the filesystem beyond what discover() does; does NOT spawn.
+   * @returns {{ installPath: string, vaultPath: string, mcpBin?: string, source: 'explicit'|'auto' }|null}
+   */
+  _resolveLink() {
+    const explicit = this._getLink();
+    if (explicit && explicit.installPath && explicit.vaultPath) {
+      return { installPath: explicit.installPath, vaultPath: explicit.vaultPath, source: 'explicit' };
+    }
+    if (this._isAutoBindDisabled()) return null; // user opted out -> stay unlinked
+    const d = this._discoverFn();
+    if (d && d.installPath && d.vaultPath) {
+      return { installPath: d.installPath, vaultPath: d.vaultPath, mcpBin: d.mcpBin, source: 'auto' };
+    }
+    return null;
+  }
+
+  /**
    * Current bridge status for the renderer. Does NOT spawn.
-   * @returns {{ status: 'connected'|'linked'|'degraded', reason?: string, vaultPath?: string }}
+   * @returns {{ status: 'connected'|'linked'|'degraded', reason?: string, source?: string, vaultPath?: string }}
    */
   getStatus() {
-    const link = this._getLink();
-    if (!link || !link.installPath || !link.vaultPath) {
-      return { status: 'degraded', reason: 'not_linked' };
+    const link = this._resolveLink();
+    if (!link) {
+      return { status: 'degraded', reason: this._isAutoBindDisabled() ? 'unlinked_by_user' : 'not_linked' };
     }
-    // Persisted link — filesystem check only (allowlist was enforced at link time).
+    // Filesystem check only (allowlist was enforced at link time for explicit
+    // links; discovery already validated the handshake/candidate paths exist).
     const checks = validateLinkFs(link);
     const reason = degradedReason(checks);
     if (reason) return { status: 'degraded', reason, installPath: link.installPath, vaultPath: link.vaultPath };
     if (this._client && this._child && !this._child.killed) {
-      return { status: 'connected', vaultPath: link.vaultPath, installPath: link.installPath };
+      return { status: 'connected', vaultPath: link.vaultPath, installPath: link.installPath, source: link.source };
     }
-    return { status: 'linked', vaultPath: link.vaultPath, installPath: link.installPath };
+    return { status: 'linked', vaultPath: link.vaultPath, installPath: link.installPath, source: link.source };
   }
 
   _resolveNodeExec() {
@@ -300,11 +430,12 @@ class BrainchildManager {
    * @returns {Promise<StdioMcpClient>}
    */
   async _ensureClient() {
-    const link = this._getLink();
-    if (!link || !link.installPath || !link.vaultPath) {
-      throw new Error('not_linked');
+    const link = this._resolveLink();
+    if (!link) {
+      throw new Error(this._isAutoBindDisabled() ? 'unlinked_by_user' : 'not_linked');
     }
-    // Persisted link — filesystem check only (allowlist was enforced at link time).
+    // Filesystem check only (allowlist was enforced at link time for explicit
+    // links; discovery already validated the handshake/candidate paths exist).
     const checks = validateLinkFs(link);
     const reason = degradedReason(checks);
     if (reason) throw new Error(reason);
@@ -430,8 +561,11 @@ module.exports = {
   installRootCandidates,
   mcpBinForRoot,
   vaultCandidates,
+  lanaVaultLinkPath,
+  readVaultLink,
   degradedReason,
   isAllowedInstallRoot,
+  isAllowedVaultRoot,
   validateLinkFs,
   validateLink,
   // fs-backed

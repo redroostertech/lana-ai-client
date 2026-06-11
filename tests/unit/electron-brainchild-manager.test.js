@@ -1,13 +1,18 @@
 const path = require('path');
+const fs = require('fs');
 
 const {
   installRootCandidates,
   mcpBinForRoot,
   vaultCandidates,
+  lanaVaultLinkPath,
+  readVaultLink,
   degradedReason,
   isAllowedInstallRoot,
+  isAllowedVaultRoot,
   validateLink,
-  validateLinkFs
+  validateLinkFs,
+  discover
 } = require(path.join(__dirname, '../../src/electron-brainchild-manager.js'));
 
 const HOME = '/Users/tester';
@@ -74,6 +79,62 @@ describe('electron-brainchild-manager (pure path/discovery helpers)', () => {
     });
   });
 
+  describe('lanaVaultLinkPath', () => {
+    test('macOS uses Application Support/lana-brain', () => {
+      expect(lanaVaultLinkPath({}, 'darwin', HOME)).toBe(
+        path.join(HOME, 'Library', 'Application Support', 'lana-brain', 'vault-link.json')
+      );
+    });
+
+    test('linux uses ~/.config/lana-brain', () => {
+      expect(lanaVaultLinkPath({}, 'linux', HOME)).toBe(
+        path.join(HOME, '.config', 'lana-brain', 'vault-link.json')
+      );
+    });
+
+    test('windows uses APPDATA/lana-brain', () => {
+      expect(lanaVaultLinkPath({ APPDATA: 'C:\\Users\\t\\AppData\\Roaming' }, 'win32', 'C:\\Users\\t')).toBe(
+        path.join('C:\\Users\\t\\AppData\\Roaming', 'lana-brain', 'vault-link.json')
+      );
+    });
+  });
+
+  describe('readVaultLink', () => {
+    const fsWith = (raw) => ({ readFileSync: () => raw });
+
+    test('parses a valid handshake', () => {
+      const raw = JSON.stringify({
+        app: 'lana-brain',
+        vaultPath: '/data/brainchild/vault',
+        installRoot: '/data/brainchild',
+        mcpBin: '/data/brainchild/bin/brainchild-mcp.js'
+      });
+      expect(readVaultLink('/p', fsWith(raw))).toEqual({
+        vaultPath: '/data/brainchild/vault',
+        installRoot: '/data/brainchild',
+        mcpBin: '/data/brainchild/bin/brainchild-mcp.js'
+      });
+    });
+
+    test('null installRoot/mcpBin are normalized to null', () => {
+      const raw = JSON.stringify({ vaultPath: '/v', installRoot: null, mcpBin: null });
+      expect(readVaultLink('/p', fsWith(raw))).toEqual({ vaultPath: '/v', installRoot: null, mcpBin: null });
+    });
+
+    test('returns null on a missing file', () => {
+      const fsLike = { readFileSync: () => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); } };
+      expect(readVaultLink('/p', fsLike)).toBeNull();
+    });
+
+    test('returns null on malformed JSON', () => {
+      expect(readVaultLink('/p', fsWith('{ not json'))).toBeNull();
+    });
+
+    test('returns null when vaultPath is absent', () => {
+      expect(readVaultLink('/p', fsWith(JSON.stringify({ app: 'lana-brain' })))).toBeNull();
+    });
+  });
+
   describe('isAllowedInstallRoot', () => {
     const opts = { env: {}, platform: 'darwin', homedir: HOME };
 
@@ -96,6 +157,32 @@ describe('electron-brainchild-manager (pure path/discovery helpers)', () => {
     test('honors the BRAINCHILD_HOME override (it is a candidate root)', () => {
       const withHome = { env: { BRAINCHILD_HOME: '/custom/brain' }, platform: 'darwin', homedir: HOME };
       expect(isAllowedInstallRoot('/custom/brain', withHome)).toBe(true);
+    });
+  });
+
+  describe('isAllowedVaultRoot', () => {
+    const opts = { env: {}, platform: 'darwin', homedir: HOME };
+
+    test('rejects empty / non-string paths', () => {
+      expect(isAllowedVaultRoot('', opts)).toBe(false);
+      expect(isAllowedVaultRoot(null, opts)).toBe(false);
+      expect(isAllowedVaultRoot(undefined, opts)).toBe(false);
+    });
+
+    test('accepts a path that is one of the OS-default vault candidates', () => {
+      const candidate = path.join(HOME, 'Library', 'Application Support', 'Brainchild', 'vault');
+      expect(isAllowedVaultRoot(candidate, opts)).toBe(true);
+    });
+
+    test('rejects an arbitrary renderer-supplied path outside the candidate set', () => {
+      expect(isAllowedVaultRoot('/Users/tester/.ssh', opts)).toBe(false);
+      expect(isAllowedVaultRoot('/Users/tester/.aws', opts)).toBe(false);
+      expect(isAllowedVaultRoot('/Users/tester/Documents', opts)).toBe(false);
+    });
+
+    test('honors the LANA_BRAIN_VAULT override (it is a candidate root)', () => {
+      const withEnv = { env: { LANA_BRAIN_VAULT: '/my/vault' }, platform: 'darwin', homedir: HOME };
+      expect(isAllowedVaultRoot('/my/vault', withEnv)).toBe(true);
     });
   });
 
@@ -147,6 +234,86 @@ describe('electron-brainchild-manager (pure path/discovery helpers)', () => {
   });
 });
 
+describe('discover (handshake-first resolution)', () => {
+  const HANDSHAKE = path.join(HOME, 'Library', 'Application Support', 'lana-brain', 'vault-link.json');
+  const HANDSHAKE_VAULT = '/data/brainchild/vault';
+  const HANDSHAKE_ROOT = '/data/brainchild';
+  const HANDSHAKE_BIN = path.join(HANDSHAKE_ROOT, 'bin', 'brainchild-mcp.js');
+
+  // Configure the mocked fs from a set of paths that should "exist". Dirs in
+  // `readableDirs` pass dirReadable; files in `existingFiles` pass fileExists;
+  // `linkContents` (keyed by handshake path) is returned by readFileSync.
+  function mockFs({ readableDirs = [], existingFiles = [], linkContents = {} } = {}) {
+    const dirs = new Set(readableDirs);
+    const files = new Set(existingFiles);
+    jest.spyOn(fs, 'existsSync').mockImplementation((p) => dirs.has(p) || files.has(p) || (p in linkContents));
+    jest.spyOn(fs, 'statSync').mockImplementation((p) => ({
+      isDirectory: () => dirs.has(p),
+      isFile: () => files.has(p)
+    }));
+    jest.spyOn(fs, 'accessSync').mockImplementation((p) => {
+      if (!dirs.has(p)) throw new Error('EACCES');
+    });
+    jest.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+      if (p in linkContents) return linkContents[p];
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+    });
+  }
+
+  afterEach(() => jest.restoreAllMocks());
+
+  const opts = { env: {}, platform: 'darwin', homedir: HOME };
+
+  test('prefers a valid handshake vaultPath/mcpBin over candidate guesses', () => {
+    mockFs({
+      readableDirs: [HANDSHAKE_VAULT],
+      existingFiles: [HANDSHAKE_BIN],
+      linkContents: {
+        [HANDSHAKE]: JSON.stringify({
+          vaultPath: HANDSHAKE_VAULT,
+          installRoot: HANDSHAKE_ROOT,
+          mcpBin: HANDSHAKE_BIN
+        })
+      }
+    });
+    const out = discover(opts);
+    expect(out.vaultPath).toBe(HANDSHAKE_VAULT);
+    expect(out.installPath).toBe(HANDSHAKE_ROOT);
+    expect(out.mcpBin).toBe(HANDSHAKE_BIN);
+  });
+
+  test('falls back to candidate guessing when the handshake is absent', () => {
+    const candidateVault = path.join(HOME, 'Library', 'Application Support', 'Electron', 'vault');
+    mockFs({ readableDirs: [candidateVault] });
+    const out = discover(opts);
+    expect(out.vaultPath).toBe(candidateVault);
+  });
+
+  test('falls back when the handshake vaultPath is unreadable', () => {
+    const candidateVault = path.join(HOME, 'Library', 'Application Support', 'Brainchild', 'vault');
+    mockFs({
+      readableDirs: [candidateVault], // handshake vault NOT readable
+      linkContents: {
+        [HANDSHAKE]: JSON.stringify({ vaultPath: HANDSHAKE_VAULT, installRoot: null, mcpBin: null })
+      }
+    });
+    const out = discover(opts);
+    expect(out.vaultPath).toBe(candidateVault);
+  });
+
+  test('env override wins over the handshake', () => {
+    const override = '/env/override/vault';
+    mockFs({
+      readableDirs: [override, HANDSHAKE_VAULT],
+      linkContents: {
+        [HANDSHAKE]: JSON.stringify({ vaultPath: HANDSHAKE_VAULT, installRoot: null, mcpBin: null })
+      }
+    });
+    const out = discover({ env: { LANA_BRAIN_VAULT: override }, platform: 'darwin', homedir: HOME });
+    expect(out.vaultPath).toBe(override);
+  });
+});
+
 describe('BrainchildManager lifecycle (injected spawn)', () => {
   const { BrainchildManager } = require(path.join(__dirname, '../../src/electron-brainchild-manager.js'));
   const { EventEmitter } = require('events');
@@ -165,7 +332,13 @@ describe('BrainchildManager lifecycle (injected spawn)', () => {
   }
 
   test('getStatus reports not_linked when no link is persisted', () => {
-    const mgr = new BrainchildManager({ getLink: () => null });
+    // Inject discovery so this stays isolated from the real filesystem (a real
+    // brainchild install/vault on the dev machine would otherwise auto-bind).
+    const mgr = new BrainchildManager({
+      getLink: () => null,
+      discoverFn: () => ({ installPath: null, vaultPath: null, mcpBin: null }),
+      isAutoBindDisabled: () => false
+    });
     expect(mgr.getStatus()).toEqual({ status: 'degraded', reason: 'not_linked' });
   });
 
@@ -203,6 +376,129 @@ describe('BrainchildManager lifecycle (injected spawn)', () => {
     expect(child.kill).toHaveBeenCalled();
     expect(mgr._child).toBeNull();
     expect(mgr._client).toBeNull();
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Auto-bind resolution: _resolveLink priority, status() source/reason codes,
+// and _ensureClient suppression. All deps injected (getLink, discoverFn,
+// isAutoBindDisabled, spawnFn) so no real filesystem or process is touched.
+// validateLinkFs on the resolved link is satisfied by pointing installPath at
+// the dev sibling checkout (has bin/brainchild-mcp.js) and vaultPath at a real
+// readable dir; that is the only on-disk dependency and it mirrors the existing
+// JSON-RPC round-trip tests below.
+// ───────────────────────────────────────────────────────────────────────────
+describe('BrainchildManager auto-bind (_resolveLink / status / _ensureClient)', () => {
+  const { BrainchildManager } = require(path.join(__dirname, '../../src/electron-brainchild-manager.js'));
+
+  // Real on-disk install + vault so validateLinkFs passes for resolved links.
+  const INSTALL = path.resolve(__dirname, '../../..', 'brainchild');
+  const VAULT = __dirname;
+  const EXPLICIT = { installPath: INSTALL, vaultPath: VAULT };
+  const DISCOVERED = { installPath: INSTALL, vaultPath: VAULT, mcpBin: path.join(INSTALL, 'bin', 'brainchild-mcp.js') };
+
+  describe('_resolveLink priority', () => {
+    test('an explicit persisted link wins (source explicit), discovery not consulted', () => {
+      const discoverFn = jest.fn(() => DISCOVERED);
+      const mgr = new BrainchildManager({
+        getLink: () => EXPLICIT,
+        discoverFn,
+        isAutoBindDisabled: () => false
+      });
+      const resolved = mgr._resolveLink();
+      expect(resolved).toEqual({ installPath: INSTALL, vaultPath: VAULT, source: 'explicit' });
+      expect(discoverFn).not.toHaveBeenCalled();
+    });
+
+    test('no explicit link + suppressed returns null even though discovery would resolve', () => {
+      const discoverFn = jest.fn(() => DISCOVERED);
+      const mgr = new BrainchildManager({
+        getLink: () => null,
+        discoverFn,
+        isAutoBindDisabled: () => true
+      });
+      expect(mgr._resolveLink()).toBeNull();
+      expect(discoverFn).not.toHaveBeenCalled();
+    });
+
+    test('no explicit link + not suppressed + valid discovery returns source auto', () => {
+      const mgr = new BrainchildManager({
+        getLink: () => null,
+        discoverFn: () => DISCOVERED,
+        isAutoBindDisabled: () => false
+      });
+      expect(mgr._resolveLink()).toEqual({
+        installPath: INSTALL,
+        vaultPath: VAULT,
+        mcpBin: DISCOVERED.mcpBin,
+        source: 'auto'
+      });
+    });
+
+    test('no explicit link + discovery returns nulls -> null', () => {
+      const mgr = new BrainchildManager({
+        getLink: () => null,
+        discoverFn: () => ({ installPath: null, vaultPath: null, mcpBin: null }),
+        isAutoBindDisabled: () => false
+      });
+      expect(mgr._resolveLink()).toBeNull();
+    });
+  });
+
+  describe('getStatus source + reason codes', () => {
+    test('reports source explicit for a persisted link', () => {
+      const mgr = new BrainchildManager({
+        getLink: () => EXPLICIT,
+        discoverFn: () => DISCOVERED,
+        isAutoBindDisabled: () => false
+      });
+      const status = mgr.getStatus();
+      expect(status.status).toBe('linked');
+      expect(status.source).toBe('explicit');
+    });
+
+    test('reports source auto when bound via discovery', () => {
+      const mgr = new BrainchildManager({
+        getLink: () => null,
+        discoverFn: () => DISCOVERED,
+        isAutoBindDisabled: () => false
+      });
+      const status = mgr.getStatus();
+      expect(status.status).toBe('linked');
+      expect(status.source).toBe('auto');
+    });
+
+    test('degraded reason unlinked_by_user when suppressed', () => {
+      const mgr = new BrainchildManager({
+        getLink: () => null,
+        discoverFn: () => DISCOVERED,
+        isAutoBindDisabled: () => true
+      });
+      expect(mgr.getStatus()).toEqual({ status: 'degraded', reason: 'unlinked_by_user' });
+    });
+
+    test('degraded reason not_linked when nothing discoverable and not suppressed', () => {
+      const mgr = new BrainchildManager({
+        getLink: () => null,
+        discoverFn: () => ({ installPath: null, vaultPath: null, mcpBin: null }),
+        isAutoBindDisabled: () => false
+      });
+      expect(mgr.getStatus()).toEqual({ status: 'degraded', reason: 'not_linked' });
+    });
+  });
+
+  describe('_ensureClient respects suppression', () => {
+    test('throws unlinked_by_user when suppressed even though discovery would resolve, never spawns', async () => {
+      const spawnFn = jest.fn();
+      const mgr = new BrainchildManager({
+        getLink: () => null,
+        discoverFn: () => DISCOVERED,
+        isAutoBindDisabled: () => true,
+        spawnFn
+      });
+      await expect(mgr.call('list_notes', {})).rejects.toThrow('unlinked_by_user');
+      expect(spawnFn).not.toHaveBeenCalled();
+    });
   });
 });
 
