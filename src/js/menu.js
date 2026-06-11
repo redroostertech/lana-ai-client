@@ -103,7 +103,7 @@ const MenuConfig = {
   // Default menu for main portal pages - three sections: static top (4 items), scrollable (Your Chats + conversations), static footer
   portal: {
     sections: [
-      // Section 1: Non-scrollable – Dashboard, Search Conversations, Matters, Drive
+      // Section 1: Non-scrollable – Dashboard, Matters, Drive
       {
         id: 'main',
         title: null,
@@ -112,12 +112,6 @@ const MenuConfig = {
         items: [
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
-          {
-            id: 'search-conversations',
-            label: 'Search Conversations',
-            href: '/search-conversations.html',
-            icon: 'search'
-          },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'my-tasks', label: 'My Tasks', href: '/my-tasks.html', icon: 'tasks' },
         ]
@@ -236,12 +230,6 @@ const MenuConfig = {
         items: [
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
-          {
-            id: 'search-conversations',
-            label: 'Search Conversations',
-            href: '/search-conversations.html',
-            icon: 'search'
-          },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
         ]
       },
@@ -307,12 +295,6 @@ const MenuConfig = {
         items: [
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
-          {
-            id: 'search-conversations',
-            label: 'Search Conversations',
-            href: '/search-conversations.html',
-            icon: 'search'
-          },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
         ]
       },
@@ -378,12 +360,6 @@ const MenuConfig = {
         items: [
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
-          {
-            id: 'search-conversations',
-            label: 'Search Conversations',
-            href: '/search-conversations.html',
-            icon: 'search'
-          },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
         ]
       },
@@ -441,7 +417,7 @@ const MenuConfig = {
   // Chat page: same three-section structure – Section 1 static (4 items), Section 2 scrollable (Your Chats + conversations), Section 3 footer
   chat: {
     sections: [
-      // Section 1: Non-scrollable – Dashboard, Search Conversations, Matters, Drive
+      // Section 1: Non-scrollable – Dashboard, Matters, Drive
       {
         id: 'chat-main',
         title: null,
@@ -450,14 +426,6 @@ const MenuConfig = {
         items: [
           { id: 'chat-dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
-          {
-            id: 'chat-search',
-            label: 'Search Conversations',
-            href: '#',
-            icon: 'search',
-            isButton: true,
-            onClick: 'openConversationSearchModal'
-          },
           { id: 'chat-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
         ]
       },

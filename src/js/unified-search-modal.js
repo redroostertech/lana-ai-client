@@ -446,11 +446,11 @@
     css();
     const html = `
       <div id="unifiedSearchBackdrop" class="unified-search-backdrop" data-open="false">
-        <div class="unified-search-modal" role="dialog" aria-modal="true" aria-label="Search all data">
+        <div class="unified-search-modal" role="dialog" aria-modal="true" aria-label="Search Lana">
           <section class="unified-search-main">
             <div class="unified-search-input-row">
               ${searchIcon()}
-              <input id="unifiedSearchInput" class="unified-search-input" type="search" placeholder="Search matters, contacts, documents, emails, tasks, invoices..." autocomplete="off">
+              <input id="unifiedSearchInput" class="unified-search-input" type="search" placeholder="Search Lana — matters, contacts, documents, conversations, messages, tasks…" autocomplete="off">
               <button id="unifiedSearchClose" class="unified-search-close" type="button">Esc</button>
             </div>
             <div id="unifiedSearchResults" class="unified-search-results">
@@ -588,6 +588,20 @@
         search(query);
       });
     });
+  }
+
+  // Chat entity types surfaced from the unified index. These open the
+  // conversation directly (via result.url -> chat-v2.html) rather than the
+  // generic result-details inspector.
+  var CONVERSATION_TYPES = { conversation: 'Conversation', conversation_message: 'Message' };
+
+  function isConversationType(result) {
+    var t = (result && (result.entity_type || result.source_type)) || '';
+    return Object.prototype.hasOwnProperty.call(CONVERSATION_TYPES, t);
+  }
+
+  function typeLabel(type) {
+    return CONVERSATION_TYPES[type] || formatType(type);
   }
 
   function formatType(type) {
@@ -770,8 +784,8 @@
           </span>
           ${result.snippet ? `<span class="unified-search-result-snippet">${escapeHtml(result.snippet)}</span>` : ''}
         </div>
-        <button type="button" class="unified-search-result-open" data-open-result-index="${index}">Open details</button>
-        <span class="unified-search-result-type">${escapeHtml(formatType(result.entity_type || result.source_type))}</span>
+        <button type="button" class="unified-search-result-open" data-open-result-index="${index}">${isConversationType(result) ? 'Open' : 'Open details'}</button>
+        <span class="unified-search-result-type">${escapeHtml(typeLabel(result.entity_type || result.source_type))}</span>
       </div>
     `).join('');
 
@@ -906,6 +920,17 @@
 
   function openResult(result) {
     if (!result) return;
+    // Conversations/messages open the conversation directly (deep-link from the
+    // unified index url) instead of the generic result-details inspector.
+    if (isConversationType(result) && result.url) {
+      close();
+      if (window.Lex && window.Lex.Nav && window.Lex.Nav.go && !/^(https?:)?\/\//.test(result.url)) {
+        window.Lex.Nav.go(result.url);
+      } else {
+        window.location.href = result.url;
+      }
+      return;
+    }
     const key = resultKey(result);
     try {
       sessionStorage.setItem('lana-search-result:' + key, JSON.stringify(result));

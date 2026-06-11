@@ -3,171 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Search Conversations - LANA AI</title>
-
-  <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
-  <link rel="stylesheet" href="css/lex-tokens.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/tailwind-output.css">
-  <link rel="stylesheet" href="css/companion-bridge-consent.css">
-  <script src="js/tailwind-loader.js"></script>
-
+  <title>Search — LANA AI</title>
+  <!--
+    RETIRED: the dedicated "Search Conversations" page has been unified into
+    "Search Lana" (the global ⌘K search), which now covers conversation
+    threads and individual messages (lexical + semantic) alongside every other
+    entity. This stub redirects any lingering link/bookmark to the dashboard and
+    auto-opens the unified search so the flow is seamless.
+  -->
+  <script>
+    try { sessionStorage.setItem('lana-open-global-search', '1'); } catch (e) {}
+    window.location.replace('dashboard.html');
+  </script>
 </head>
-<body>
-
-  <!-- Branded loader — shows once lex-loader.js upgrades the element -->
-  <lex-loader theme="light"></lex-loader>
-
-  <!-- App shell — sidebar, topbar, empty content area.
-       Page content lives in <template> below and gets injected after
-       the shell renders. This avoids double-rendering of child components. -->
-  <lex-app
-    logo-src="img/logo-light.png"
-    logo-alt="LANA AI"
-    logo-href="dashboard.html"
-    active-nav-id="search"
-    page-title="Search Conversations"
-  ></lex-app>
-
-  <!-- Page content as inert <template> — elements inside are NOT upgraded
-       by the browser until cloned into the live DOM. Zero double-rendering. -->
-  <template id="page-content">
-
-    <main>
-
-      <!-- Page Header -->
-      <lex-banner
-        id="ccZoneA"
-        variant="light"
-        corners
-        heading="Search Conversations"
-        subtitle="Find your chats by title, message content, or matter name"
-      >
-      </lex-banner>
-
-      <!-- Search Input -->
-      <div class="bg-white rounded-lg shadow-sm border mb-4 p-4 mt-4" style="border-color: var(--lex-border-default)">
-        <lex-input
-          id="searchConversationsInput"
-          data-lex-type="search"
-          placeholder="Search conversations..."
-          leading-icon="search"
-          clearable
-        ></lex-input>
-      </div>
-
-      <!-- Results Container -->
-      <div id="searchConversationsResults">
-
-        <!-- Loading State (shown during fetch) -->
-        <div id="searchConvLoading" class="hidden">
-          <div class="flex flex-col items-center justify-center py-12">
-            <lex-spinner label="Searching..."></lex-spinner>
-          </div>
-        </div>
-
-        <!-- Empty State (shown when no results) -->
-        <div id="searchConvEmpty" class="hidden">
-          <lex-empty
-            id="searchConvEmptyState"
-            icon="search"
-            message="No conversations found"
-            description="Try a different search term"
-          ></lex-empty>
-        </div>
-
-        <!-- Results List -->
-        <div id="searchConvList">
-          <!-- Section header (changes between "Recent Conversations" and "Search Results") -->
-          <div id="searchConvSectionHeader" class="mb-4">
-            <h2 id="searchConvSectionTitle" class="text-sm font-semibold lex-text-secondary uppercase tracking-wider">Recent Conversations</h2>
-            <p id="searchConvSectionSubtitle" class="text-xs lex-text-tertiary mt-1">Your most recent chats</p>
-          </div>
-
-          <!-- Result items rendered here by JS -->
-          <div id="searchConvItems" class="space-y-2"></div>
-
-          <!-- Load More (infinite scroll indicator) -->
-          <div id="searchConvLoadMore" class="hidden py-6 flex justify-center">
-            <lex-spinner id="searchConvLoadMoreSpinner" size="sm" label="Loading more..."></lex-spinner>
-          </div>
-        </div>
-
-      </div>
-
-    </main>
-
-  </template>
-
-  <noscript>
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
-      Please enable JavaScript to use LANA AI.
-    </div>
-  </noscript>
-
-  <!-- ══════════════════════════════════════════════════════════════════
-       Scripts at end of body — HTML renders first, scripts load after
-       ══════════════════════════════════════════════════════════════════ -->
-
-  <!-- Universal shell scripts -->
-  <script src="js/error-reporter.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/mock-data.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/utils.js"></script>
-  <script src="js/utils/rename-conversation.js"></script>
-  <script src="js/components.js"></script>
-  <script src="js/version.js"></script>
-  <script src="js/menu.js"></script>
-  <script src="js/navigation-helpers.js"></script>
-  <script src="js/new-project-modal.js"></script>
-  <script src="js/conversation-menu.js"></script>
-  <script src="js/conversation-search-modal.js"></script>
-  <script src="js/contact-search-modal.js"></script>
-  <script src="js/notifications.js"></script>
-
-  <!-- Lex UI core -->
-  <script src="js/lex/lex.core.js"></script>
-  <script src="js/lex/lex.icons.js"></script>
-  <script src="js/lex/lex.data.js"></script>
-  <script src="js/lex/lex.forms.js"></script>
-  <script src="js/lex/lex.state.js"></script>
-  <script src="js/lex/lex.utils.js"></script>
-  <script src="js/lex/lex.auth.js"></script>
-  <script src="js/lex/lex-nav.js"></script>
-
-  <!-- Lex UI foundation -->
-  <script src="js/lex/components/foundation/lex-loader.js"></script>
-  <script src="js/lex/components/foundation/lex-toast.js"></script>
-  <script src="js/lex/components/foundation/lex-spinner.js"></script>
-  <script src="js/lex/components/foundation/lex-btn.js"></script>
-  <script src="js/lex/components/foundation/lex-empty.js"></script>
-
-  <!-- Lex UI layout -->
-  <script src="js/lex/components/layout/lex-sidebar.js"></script>
-  <script src="js/lex/components/layout/lex-topbar.js"></script>
-  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
-  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
-  <script src="js/lex/components/layout/lex-app.js"></script>
-
-  <!-- Page-specific Lex components — ALL loaded BEFORE inject so custom elements
-       are defined when template content enters the DOM. Tree-order upgrade ensures
-       parents capture un-rendered children (no double-rendering). -->
-  <script src="js/lex/components/foundation/lex-banner.js"></script>
-  <script src="js/lex/components/foundation/lex-card.js"></script>
-  <script src="js/lex/components/foundation/lex-modal.js"></script>
-  <script src="js/lex/components/form/lex-input.js"></script>
-
-  <!-- Inject page content + hoist modals -->
-  <script src="js/lex/lex-page-init.js"></script>
-
-  <!-- Page controller (MUST be last before auth-guard) -->
-  <script src="js/search-conversations.js"></script>
-
-  <!-- PAC bridge consent handler (Lex modal for token requests) -->
-  <script src="js/companion-bridge-consent.js"></script>
-
-  <!-- Auth guard + loader dismiss (MUST be last) -->
-  <script src="js/auth-guard.js"></script>
-</body>
+<body></body>
 </html>

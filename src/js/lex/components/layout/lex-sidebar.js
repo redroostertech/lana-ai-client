@@ -1284,9 +1284,9 @@
 
     _renderUnifiedSearch() {
       const shortcut = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '') ? '⌘K' : 'Ctrl K';
-      return `<button type="button" class="lex-sidebar-global-search" data-action="global-search" data-tooltip="Search all data">
+      return `<button type="button" class="lex-sidebar-global-search" data-action="global-search" data-tooltip="Search Lana">
         ${icon('search', 'normal')}
-        <span class="lex-sidebar-global-search-label">Search all data</span>
+        <span class="lex-sidebar-global-search-label">Search Lana</span>
         <span class="lex-sidebar-global-search-shortcut">${this.escapeHtml(shortcut)}</span>
       </button>`;
     }
