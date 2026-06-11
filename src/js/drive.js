@@ -46,7 +46,7 @@
   var searchTimeout = null;
 
   // Brainchild scope controller (library/brainchild-scope.js). Created lazily the
-  // first time the user switches the Source filter to "My Notes (Brainchild)".
+  // first time the user switches the Source filter to "Knowledgebase".
   // It owns all bridge/status/promote logic; this page is presentation + wiring.
   var brainchildScope = null;
 
@@ -168,6 +168,7 @@
         storageState.sortBy = e.detail.value || 'name';
         storageState.currentPage = 1;
         if (isBrainchildScope()) return; // sort applies to matters/files only
+        updateSortHeaderIndicators();
         loadMatters({ silent: true });
       });
     }
@@ -193,6 +194,7 @@
           }
         }
 
+        updateSortHeaderIndicators();
         if (isBrainchildScope()) return; // sort applies to matters/files only
         loadMatters({ silent: true });
       });
@@ -234,6 +236,105 @@
         if (brainchildScope) brainchildScope.unlink();
       });
     }
+
+    // Brainchild "Open Brainchild" action: deep-link into the Brainchild app at
+    // the vault root via the frozen bridge. Guard for the bridge existing.
+    var bcOpenAppBtn = document.getElementById('bcOpenAppBtn');
+    if (bcOpenAppBtn) {
+      bcOpenAppBtn.addEventListener('click', function () {
+        if (window.electronAPI && window.electronAPI.brainchild &&
+            typeof window.electronAPI.brainchild.openNote === 'function') {
+          window.electronAPI.brainchild.openNote('');
+        }
+      });
+    }
+
+    // Matters list-view sortable column headers. Each clickable header drives the
+    // same sortBy/sortOrder state the #sortSelect / #sortOrderBtn use, then
+    // reloads matters so the server-side sort applies. Brainchild scope is unaffected.
+    var sortHeaders = document.querySelectorAll('.drive-sort-th[data-sort-field]');
+    Array.prototype.forEach.call(sortHeaders, function (header) {
+      var activate = function () {
+        if (isBrainchildScope()) return; // sort applies to matters/files only
+        handleHeaderSort(header.getAttribute('data-sort-field'));
+      };
+      header.addEventListener('click', activate);
+      header.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault();
+          activate();
+        }
+      });
+    });
+  }
+
+  /**
+   * Sort the matters list by a column header field. Toggles asc/desc when the
+   * same field is clicked again; defaults to asc when switching fields. Keeps
+   * #sortSelect, #sortOrderBtn, and the active-column caret in sync, then reloads
+   * matters so the server-side sort applies.
+   * @param {string} field - storage sort field (name | created_at | document_count)
+   */
+  function handleHeaderSort(field) {
+    if (!field) return;
+
+    if (storageState.sortBy === field) {
+      storageState.sortOrder = storageState.sortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+      storageState.sortBy = field;
+      storageState.sortOrder = 'asc';
+    }
+    storageState.currentPage = 1;
+
+    syncSortControls();
+    loadMatters({ silent: true });
+  }
+
+  /**
+   * Reflect the active sortBy/sortOrder in the #sortSelect dropdown, the
+   * #sortOrderBtn icon, and the list-view header carets.
+   */
+  function syncSortControls() {
+    var sortSelect = document.getElementById('sortSelect');
+    if (sortSelect && sortSelect.value !== storageState.sortBy) {
+      sortSelect.value = storageState.sortBy;
+    }
+
+    var sortOrderBtn = document.getElementById('sortOrderBtn');
+    if (sortOrderBtn) {
+      sortOrderBtn.dataset.order = storageState.sortOrder;
+      var icon = document.getElementById('sortOrderIcon');
+      if (icon) {
+        if (storageState.sortOrder === 'asc') {
+          icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>';
+          sortOrderBtn.title = 'Sort ascending';
+        } else {
+          icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h6m3 0h9m-9 4h13m-5 8l-4 4m0 0l-4-4m4 4V8"></path>';
+          sortOrderBtn.title = 'Sort descending';
+        }
+      }
+    }
+
+    updateSortHeaderIndicators();
+  }
+
+  /**
+   * Mark the active matters list-view column header and show its sort-direction
+   * caret. Only one header carries the active state at a time.
+   */
+  function updateSortHeaderIndicators() {
+    var headers = document.querySelectorAll('.drive-sort-th[data-sort-field]');
+    Array.prototype.forEach.call(headers, function (header) {
+      var field = header.getAttribute('data-sort-field');
+      var active = field === storageState.sortBy;
+      var asc = storageState.sortOrder === 'asc';
+      header.classList.toggle('drive-sort-th--active', active);
+      header.classList.toggle('drive-sort-th--asc', active && asc);
+      header.classList.toggle('drive-sort-th--desc', active && !asc);
+      header.setAttribute('aria-sort', active
+        ? (asc ? 'ascending' : 'descending')
+        : 'none');
+    });
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -517,7 +618,7 @@
 
   // ── Brainchild scope (personal notes) ────────────────────────────────
   //
-  // When the Source filter is set to "My Notes (Brainchild)" the list switches
+  // When the Source filter is set to "Knowledgebase" the list switches
   // from matters/files to the user's personal Brainchild vault notes. All
   // node/spawn/MCP logic lives in Electron main and is reached only through the
   // frozen window.electronAPI.brainchild bridge, wrapped by the already-built,
@@ -659,7 +760,6 @@
   function renderBrainchildConnected(status) {
     var degraded = document.getElementById('bcDegradedState');
     var banner = document.getElementById('bcConnectedBanner');
-    var pathEl = document.getElementById('bcConnectedPath');
     var sectionHeading = document.getElementById('driveSectionHeading');
     var sectionCount = document.getElementById('driveSectionCount');
     var resultsCountEl = document.getElementById('resultsCount');
@@ -684,14 +784,13 @@
 
     if (banner) {
       banner.classList.remove('library-bc-hidden');
-      if (pathEl) pathEl.textContent = status.vaultPath || '';
     }
 
     renderBrainchildBreadcrumb(searching ? '' : (brainchildScope.state.currentFolder || ''), searching);
 
     var itemCount = folders.length + notes.length;
     var countText = describeBrainchildCount(folders.length, notes.length);
-    if (sectionHeading) sectionHeading.textContent = 'My Notes';
+    if (sectionHeading) sectionHeading.textContent = 'Knowledgebase';
     if (sectionCount) sectionCount.textContent = countText;
     if (resultsCountEl) resultsCountEl.textContent = countText;
 
@@ -744,7 +843,7 @@
   }
 
   /**
-   * Render the vault breadcrumb: "My Notes" (root) then each path segment, all
+   * Render the vault breadcrumb: "Knowledgebase" (root) then each path segment, all
    * clickable to jump there via the scope controller. Hidden while searching.
    * @param {string} folderPath - vault relative folder path ('' = root)
    * @param {boolean} searching - true when a search query is active
@@ -765,7 +864,7 @@
     var rootActive = segments.length === 0;
     var crumbs = [
       '<button type="button" class="library-bc-crumb" data-bc-folder="" ' +
-      (rootActive ? 'aria-current="page" ' : '') + '>My Notes</button>'
+      (rootActive ? 'aria-current="page" ' : '') + '>Knowledgebase</button>'
     ];
 
     var accum = '';
@@ -814,7 +913,7 @@
     var sectionHeading = document.getElementById('driveSectionHeading');
     var sectionCount = document.getElementById('driveSectionCount');
     var resultsCountEl = document.getElementById('resultsCount');
-    if (sectionHeading) sectionHeading.textContent = 'My Notes';
+    if (sectionHeading) sectionHeading.textContent = 'Knowledgebase';
     if (sectionCount) sectionCount.textContent = '';
     if (resultsCountEl) resultsCountEl.textContent = '';
 
@@ -879,7 +978,7 @@
         : '';
 
       return [
-        '<div class="grid-item rounded-lg border p-4 relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)">',
+        '<div class="grid-item rounded-lg border p-4 relative group library-bc-note-card" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" data-bc-note-path="' + vaultPath + '">',
         '  <div class="flex flex-col items-center">',
         '    <svg class="w-16 h-16 mb-2" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
         '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>',
@@ -894,6 +993,7 @@
 
     gridViewEl.innerHTML = folderCards + noteCards;
     wireBrainchildFolderCards(gridViewEl);
+    wireBrainchildNoteCards(gridViewEl);
     wireBrainchildPromoteButtons(gridViewEl, notes);
   }
 
@@ -943,7 +1043,7 @@
         : '';
 
       return [
-        '<tr style="background: transparent">',
+        '<tr class="cursor-pointer library-bc-note-card" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" data-bc-note-path="' + vaultPath + '">',
         '  <td class="px-6 py-4">',
         '    <div class="flex items-center">',
         '      <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
@@ -964,6 +1064,7 @@
 
     listViewBodyEl.innerHTML = folderRows + noteRows;
     wireBrainchildFolderCards(listViewBodyEl);
+    wireBrainchildNoteCards(listViewBodyEl);
     wireBrainchildPromoteButtons(listViewBodyEl, notes);
   }
 
@@ -985,8 +1086,30 @@
   }
 
   /**
+   * Wire each rendered Brainchild note card/row to open that note inside the
+   * Brainchild app via the frozen bridge (openNote(vaultPath)). Folder cards are
+   * handled separately by wireBrainchildFolderCards and keep enterFolder behavior.
+   * @param {HTMLElement} container
+   */
+  function wireBrainchildNoteCards(container) {
+    if (!container) return;
+    var cards = container.querySelectorAll('.library-bc-note-card');
+    Array.prototype.forEach.call(cards, function (card) {
+      card.addEventListener('click', function () {
+        var path = card.getAttribute('data-bc-note-path') || '';
+        if (!path) return;
+        if (window.electronAPI && window.electronAPI.brainchild &&
+            typeof window.electronAPI.brainchild.openNote === 'function') {
+          window.electronAPI.brainchild.openNote(path);
+        }
+      });
+    });
+  }
+
+  /**
    * Wire each rendered "Promote to Org" button to the controller's promote().
    * The controller fetches the note body, builds the payload, and POSTs it.
+   * stopPropagation keeps a promote click from also opening the note in Brainchild.
    * @param {HTMLElement} container
    * @param {Array} rows
    */
@@ -994,7 +1117,10 @@
     if (!container || !brainchildScope) return;
     var buttons = container.querySelectorAll('.bc-promote-btn');
     Array.prototype.forEach.call(buttons, function (button) {
-      button.addEventListener('click', function () {
+      button.addEventListener('click', function (event) {
+        if (event && typeof event.stopPropagation === 'function') {
+          event.stopPropagation();
+        }
         var index = parseInt(button.getAttribute('data-bc-index'), 10);
         var row = rows[index];
         if (!row) return;
@@ -1603,6 +1729,7 @@
 
     setupEventListeners();
     updateViewButtons();
+    updateSortHeaderIndicators();
     loadMatters();
     Promise.all([loadRecentMatters(), loadPinnedMatters()]).catch(function (err) {
       console.error('[Drive] Failed to load recents/pinned:', err);

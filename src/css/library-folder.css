@@ -1,0 +1,14 @@
+/* library-folder.css
+   Styles for the Library folder (matter) file-browser empty state.
+   Loaded by folder.html. Keep presentation here - no inline styles. */
+
+/* Empty-state action row: Upload + Create using Doc Studio.
+   Centered to match the lex-empty content above it. */
+.folder-empty-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+}

@@ -27,18 +27,18 @@
   min-width: 0;
 }
 
+/* Action group on the right of the connected banner (Open Brainchild + Unlink). */
+.library-bc-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .library-bc-banner-heading {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--lex-text-primary);
-}
-
-.library-bc-banner-path {
-  font-size: 0.75rem;
-  color: var(--lex-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Degraded state block: copy plus the contextual connect action. */
@@ -125,4 +125,14 @@
 /* Folder card/row inside the Brainchild scope is clickable to drill in. */
 .library-bc-folder-card {
   cursor: pointer;
+}
+
+/* Note card/row inside the Brainchild scope is clickable to open the note in
+   the Brainchild app. Subtle pointer affordance, no inline styles. */
+.library-bc-note-card {
+  cursor: pointer;
+}
+
+.library-bc-note-card:hover {
+  box-shadow: var(--lex-shadow-md);
 }

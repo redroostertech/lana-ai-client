@@ -1221,6 +1221,26 @@
       input && input.click();
     });
 
+    // Empty state Upload action - reuses the existing file picker / upload flow
+    var emptyUploadBtn = document.getElementById('emptyUploadBtn');
+    emptyUploadBtn && emptyUploadBtn.addEventListener('click', function () {
+      var input = document.getElementById('fileUploadInput');
+      input && input.click();
+    });
+
+    // Empty state Create using Doc Studio action - navigates to Doc Studio,
+    // scoped to the current matter when a matter id is available.
+    var emptyDocStudioBtn = document.getElementById('emptyDocStudioBtn');
+    emptyDocStudioBtn && emptyDocStudioBtn.addEventListener('click', function () {
+      if (folderState.currentMatterId) {
+        Lex.Nav.go('doc-studio/index.html', {
+          params: { matter_id: folderState.currentMatterId }
+        });
+      } else {
+        Lex.Nav.go('doc-studio/index.html');
+      }
+    });
+
     var cancelNewFolderBtn = document.getElementById('cancelNewFolderBtn');
     cancelNewFolderBtn && cancelNewFolderBtn.addEventListener('click', hideNewFolderModal);
 

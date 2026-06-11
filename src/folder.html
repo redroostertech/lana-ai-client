@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/drive.css">
+  <link rel="stylesheet" href="css/library-folder.css">
   <script src="js/tailwind-loader.js"></script>
 
 </head>
@@ -133,11 +134,20 @@
       <div id="contentEmpty" class="hidden">
         <lex-empty
           message="This folder is empty"
-          description="Upload files or create a new folder to get started"
+          description="Add documents to this matter to get started"
           icon="folder"
-          action-label="Upload File"
           id="contentEmptyWidget"
         ></lex-empty>
+        <!-- Dedicated empty-state actions: reuse existing upload flow,
+             plus Create using Doc Studio navigation. -->
+        <div id="folderEmptyState" class="folder-empty-actions">
+          <lex-btn id="emptyUploadBtn" variant="primary" leading-icon="upload">
+            Upload Documents
+          </lex-btn>
+          <lex-btn id="emptyDocStudioBtn" variant="secondary" leading-icon="file-plus">
+            Create using Doc Studio
+          </lex-btn>
+        </div>
       </div>
     </main>
 

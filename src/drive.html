@@ -83,7 +83,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Source:</label>
             <lex-select
               id="sourceFilter"
-              options='[{"value":"all","label":"All Sources"},{"value":"client_matters","label":"My Matters"},{"value":"connector","label":"Connected Systems"},{"value":"brainchild","label":"My Notes (Brainchild)"}]'
+              options='[{"value":"all","label":"All Sources"},{"value":"client_matters","label":"My Matters"},{"value":"connector","label":"Connected Systems"},{"value":"brainchild","label":"Knowledgebase"}]'
               value="all"
             ></lex-select>
           </div>
@@ -152,9 +152,11 @@
       <div id="bcConnectedBanner" class="library-bc-banner library-bc-hidden">
         <div class="library-bc-banner-text">
           <p class="library-bc-banner-heading">Connected to Brainchild</p>
-          <p id="bcConnectedPath" class="library-bc-banner-path"></p>
         </div>
-        <lex-btn id="bcUnlinkBtn" variant="ghost" size="sm">Unlink</lex-btn>
+        <div class="library-bc-banner-actions">
+          <lex-btn id="bcOpenAppBtn" variant="secondary" size="sm">Open Brainchild</lex-btn>
+          <lex-btn id="bcUnlinkBtn" variant="ghost" size="sm">Unlink</lex-btn>
+        </div>
       </div>
 
       <!-- Brainchild degraded state (not connected / link issue) -->
@@ -166,7 +168,7 @@
         <lex-btn id="bcDegradedAction" variant="primary">Connect Brainchild</lex-btn>
       </div>
 
-      <!-- Brainchild vault breadcrumb (My Notes scope folder navigation) -->
+      <!-- Brainchild vault breadcrumb (Knowledgebase scope folder navigation) -->
       <nav id="bcBreadcrumb" class="library-bc-breadcrumb library-bc-hidden" aria-label="Vault folders"></nav>
 
       <!-- Section Header -->
@@ -183,10 +185,10 @@
         <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
           <thead style="background-color: var(--lex-bg-secondary)">
             <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Name</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider drive-sort-th" style="color: var(--lex-text-secondary)" id="sortHeaderName" data-sort-field="name" role="button" tabindex="0">Name<span class="drive-sort-caret" aria-hidden="true"></span></th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created By</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created On</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Size</th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider drive-sort-th" style="color: var(--lex-text-secondary)" id="sortHeaderCreated" data-sort-field="created_at" role="button" tabindex="0">Created On<span class="drive-sort-caret" aria-hidden="true"></span></th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider drive-sort-th" style="color: var(--lex-text-secondary)" id="sortHeaderSize" data-sort-field="document_count" role="button" tabindex="0">Size<span class="drive-sort-caret" aria-hidden="true"></span></th>
               <th scope="col" class="w-20 px-6 py-3"></th>
             </tr>
           </thead>

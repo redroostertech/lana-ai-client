@@ -73,6 +73,49 @@
   background-color: var(--lex-bg-secondary);
 }
 
+/* Sortable matters list-view column headers.
+   Clickable affordance plus an active-column sort-direction caret drawn with
+   CSS borders (no glyph characters, no inline styles). */
+.drive-sort-th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.drive-sort-th:hover {
+  color: var(--lex-text-primary);
+}
+
+.drive-sort-th:focus-visible {
+  outline: 2px solid var(--lex-border-accent);
+  outline-offset: -2px;
+}
+
+.drive-sort-th--active {
+  color: var(--lex-text-primary);
+}
+
+/* Caret placeholder; only shows a triangle on the active column. */
+.drive-sort-caret {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.drive-sort-th--active.drive-sort-th--asc .drive-sort-caret {
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 5px solid currentColor;
+}
+
+.drive-sort-th--active.drive-sort-th--desc .drive-sort-caret {
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+}
+
 /* Fade transition for pinned/recents sections */
 .drive-fade-section {
   transition: opacity 0.25s ease, max-height 0.3s ease;
