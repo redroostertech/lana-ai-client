@@ -111,10 +111,12 @@
         <p class="text-sm" style="color: var(--lex-text-secondary)">Loading...</p>
       </div>
 
-      <!-- Grid View -->
+      <!-- Subfolder Grid (folders only; files render via MatterDocumentsView below).
+           folder.js keeps subfolder navigation; the component owns the file list. -->
       <div id="gridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 
-      <!-- List View -->
+      <!-- Subfolder List (folders only). The file list is rendered by the
+           MatterDocumentsView component in #matterDocumentsViewHost. -->
       <div id="listView" class="hidden bg-white rounded-lg shadow-sm border overflow-hidden" style="border-color: var(--lex-border-default)">
         <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
           <thead style="background-color: var(--lex-bg-secondary)">
@@ -129,6 +131,10 @@
           <tbody id="listViewBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
         </table>
       </div>
+
+      <!-- Reusable file list (MatterDocumentsView). Mounted by folder.js for the
+           current folder's files. Folders stay above this in grid/list views. -->
+      <div id="matterDocumentsViewHost" class="hidden mt-4"></div>
 
       <!-- Empty State -->
       <div id="contentEmpty" class="hidden">
@@ -354,6 +360,35 @@
       </div>
     </lex-modal>
 
+    <!-- Rename File Modal -->
+    <lex-modal id="renameFileModal" heading="Rename File" size="md" hide-actions="true">
+      <form id="renameFileForm">
+        <lex-input
+          id="renameFileInput"
+          label="File Name"
+          placeholder="Enter file name"
+          required="true"
+        ></lex-input>
+        <div class="rename-file-actions">
+          <lex-btn type="button" variant="secondary" id="cancelRenameFileBtn">Cancel</lex-btn>
+          <lex-btn type="submit" variant="primary" id="confirmRenameFileBtn">Save</lex-btn>
+        </div>
+      </form>
+    </lex-modal>
+
+    <!-- Delete File Modal -->
+    <lex-modal id="deleteFileModal" heading="Delete File" size="md" variant="danger" hide-actions="true">
+      <p class="text-sm" style="color: var(--lex-text-secondary)">
+        Are you sure you want to delete
+        <span class="font-medium" style="color: var(--lex-text-primary)" id="deleteFileName"></span>?
+        This action moves the file to deleted items.
+      </p>
+      <div class="delete-file-actions">
+        <lex-btn type="button" variant="secondary" id="cancelDeleteFileBtn">Cancel</lex-btn>
+        <lex-btn type="button" variant="danger" id="confirmDeleteFileBtn">Delete</lex-btn>
+      </div>
+    </lex-modal>
+
     <!-- Context Menu Container -->
     <div id="contextMenu" class="hidden fixed bg-white rounded-lg shadow-xl border py-1 z-50 min-w-[180px]" style="border-color: var(--lex-border-default)"></div>
 
@@ -418,9 +453,13 @@
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
+  <script src="js/lex/components/data/lex-pagination.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>
+
+  <!-- Reusable file-list component (must load before folder.js) -->
+  <script src="js/components/matter-documents-view.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/folder.js"></script>

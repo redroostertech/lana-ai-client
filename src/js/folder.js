@@ -57,6 +57,10 @@
   // Temporary state for pending file upload
   var pendingUploadFiles = null;
 
+  // Mounted MatterDocumentsView instance (renders the current folder's FILES).
+  // folder.js keeps subfolder rendering/navigation; the component owns files.
+  var documentsView = null;
+
   // ── State reset ─────────────────────────────────────────────────────
 
   /**
@@ -345,6 +349,7 @@
     var gridViewEl = document.getElementById('gridView');
     var listViewEl = document.getElementById('listView');
     var emptyEl = document.getElementById('contentEmpty');
+    var docsHostEl = document.getElementById('matterDocumentsViewHost');
 
     loadingEl && loadingEl.classList.add('hidden');
 
@@ -356,12 +361,17 @@
       return f.parent_folder_id === folderState.currentFolderId;
     });
 
+    var hasFolders = foldersToShow.length > 0;
+    var hasFiles = folderState.files.length > 0;
     var totalItems = foldersToShow.length + folderState.files.length;
 
     if (totalItems === 0) {
       emptyEl && emptyEl.classList.remove('hidden');
       gridViewEl && gridViewEl.classList.add('hidden');
       listViewEl && listViewEl.classList.add('hidden');
+      docsHostEl && docsHostEl.classList.add('hidden');
+      // Keep the component in sync even when empty so a later refresh works.
+      syncDocumentsView();
       return;
     }
 
@@ -370,28 +380,72 @@
     var sortedFolders = foldersToShow.slice().sort(function (a, b) {
       return a.name.localeCompare(b.name);
     });
-    var sortedFiles = folderState.files.slice().sort(function (a, b) {
-      return new Date(b.updated_at) - new Date(a.updated_at);
-    });
 
-    if (folderState.viewMode === 'grid') {
-      renderGridView(sortedFolders, sortedFiles);
-      gridViewEl && gridViewEl.classList.remove('hidden');
-      listViewEl && listViewEl.classList.add('hidden');
+    // Subfolders render in grid or list view (folders only). The file list is
+    // delegated to the MatterDocumentsView component below.
+    if (hasFolders) {
+      if (folderState.viewMode === 'grid') {
+        renderGridView(sortedFolders);
+        gridViewEl && gridViewEl.classList.remove('hidden');
+        listViewEl && listViewEl.classList.add('hidden');
+      } else {
+        renderListView(sortedFolders);
+        listViewEl && listViewEl.classList.remove('hidden');
+        gridViewEl && gridViewEl.classList.add('hidden');
+      }
     } else {
-      renderListView(sortedFolders, sortedFiles);
-      listViewEl && listViewEl.classList.remove('hidden');
       gridViewEl && gridViewEl.classList.add('hidden');
+      listViewEl && listViewEl.classList.add('hidden');
+    }
+
+    // Files render through the reusable component.
+    if (docsHostEl) {
+      docsHostEl.classList.toggle('hidden', !hasFiles);
+    }
+    syncDocumentsView();
+  }
+
+  /**
+   * Mount the MatterDocumentsView component (first call) or refresh it with the
+   * current folder's files. The component owns the file list, search, filter,
+   * pagination, and per-file Download/Delete/Open actions.
+   */
+  function syncDocumentsView() {
+    var docsHostEl = document.getElementById('matterDocumentsViewHost');
+    if (!docsHostEl || !window.MatterDocumentsView) return;
+
+    if (!documentsView) {
+      documentsView = window.MatterDocumentsView.mount(docsHostEl, {
+        api: window.api,
+        matterId: folderState.currentMatterId,
+        matterDisplayId: folderState.currentMatterName || folderState.currentMatterId,
+        files: folderState.files,
+        onFileOpen: function (fileId) { _navToFileViewer(fileId); },
+        enableDocStudio: true,
+        onCreateDocStudio: function () {
+          if (folderState.currentMatterId) {
+            Lex.Nav.go('doc-studio/index.html', {
+              params: { matter_id: folderState.currentMatterId }
+            });
+          } else {
+            Lex.Nav.go('doc-studio/index.html');
+          }
+        },
+        enableTemplates: false,
+        enableOrphans: false
+      });
+    } else {
+      // Reload path: re-render with the latest files without re-fetching.
+      documentsView.refresh(folderState.files);
     }
   }
 
   /**
-   * Render the grid view with subfolder cards and file cards.
-   * No isMatter branching — subfolders only.
+   * Render the grid view with subfolder cards only.
+   * Files are rendered separately by the MatterDocumentsView component.
    * @param {Array} folders
-   * @param {Array} files
    */
-  function renderGridView(folders, files) {
+  function renderGridView(folders) {
     var gridViewEl = document.getElementById('gridView');
     if (!gridViewEl) return;
 
@@ -412,32 +466,15 @@
       ].join('');
     }).join('');
 
-    var fileCards = files.map(function (file) {
-      return [
-        '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" onclick="_navToFileViewer(' + JSON.stringify(file.id) + ')">',
-        '  <button class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-tertiary); opacity: 1" onclick="event.stopPropagation(); showFileMenu(' + JSON.stringify(file.id) + ', event)">',
-        '    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-        '  </button>',
-        '  <div class="flex flex-col items-center">',
-        '    ' + getFileIcon(file.filename),
-        '    <h3 class="text-sm font-medium text-center truncate w-full mt-2" style="color: var(--lex-text-primary)">' + escapeHtml(file.filename) + '</h3>',
-        '    <p class="text-xs mt-1" style="color: var(--lex-text-secondary)">' + formatFileSize(file.file_size) + '</p>',
-        '    <p class="text-xs" style="color: var(--lex-text-tertiary)">' + formatRelativeDate(file.updated_at) + '</p>',
-        '  </div>',
-        '</div>'
-      ].join('');
-    }).join('');
-
-    gridViewEl.innerHTML = folderCards + fileCards;
+    gridViewEl.innerHTML = folderCards;
   }
 
   /**
-   * Render the list/table view with subfolder rows and file rows.
-   * No isMatter branching — subfolders only.
+   * Render the list/table view with subfolder rows only.
+   * Files are rendered separately by the MatterDocumentsView component.
    * @param {Array} folders
-   * @param {Array} files
    */
-  function renderListView(folders, files) {
+  function renderListView(folders) {
     var listViewBodyEl = document.getElementById('listViewBody');
     if (!listViewBodyEl) return;
 
@@ -464,28 +501,7 @@
       ].join('');
     }).join('');
 
-    var fileRows = files.map(function (file) {
-      return [
-        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" onclick="_navToFileViewer(' + JSON.stringify(file.id) + ')">',
-        '  <td class="px-6 py-4 whitespace-nowrap">',
-        '    <div class="flex items-center">',
-        '      ' + getFileIconSmall(file.filename),
-        '      <span class="text-sm font-medium" style="color: var(--lex-text-primary)">' + escapeHtml(file.filename) + '</span>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + escapeHtml(file.created_by_username || 'Unknown') + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatRelativeDate(file.created_at) + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatFileSize(file.file_size) + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm">',
-        '    <button style="color: var(--lex-text-tertiary)" onclick="event.stopPropagation(); showFileMenu(' + JSON.stringify(file.id) + ', event)">',
-        '      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-        '    </button>',
-        '  </td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    listViewBodyEl.innerHTML = folderRows + fileRows;
+    listViewBodyEl.innerHTML = folderRows;
   }
 
   // ── View toggle ─────────────────────────────────────────────────────
@@ -945,6 +961,135 @@
     }
   }
 
+  // ── Rename / Delete file modals ──────────────────────────────────────
+
+  // File id currently targeted by the rename or delete modal.
+  var pendingRenameFileId = null;
+  var pendingRenameOriginalName = null;
+  var pendingDeleteFileId = null;
+
+  /**
+   * Open the rename modal prefilled with the file's current name.
+   * @param {Object} file
+   */
+  function showRenameFileModal(file) {
+    if (!file) return;
+
+    pendingRenameFileId = file.id;
+    pendingRenameOriginalName = file.filename || '';
+
+    var lexInput = document.getElementById('renameFileInput');
+    if (lexInput) lexInput.value = pendingRenameOriginalName;
+
+    var modal = document.getElementById('renameFileModal');
+    if (modal) modal.open = true;
+
+    // Focus the inner input after the modal opens.
+    setTimeout(function () {
+      var inner = lexInput && lexInput.querySelector('input');
+      inner && inner.focus();
+    }, 100);
+  }
+
+  /**
+   * Hide and reset the rename modal.
+   */
+  function hideRenameFileModal() {
+    var modal = document.getElementById('renameFileModal');
+    if (modal) modal.open = false;
+    var lexInput = document.getElementById('renameFileInput');
+    if (lexInput) lexInput.value = '';
+    pendingRenameFileId = null;
+    pendingRenameOriginalName = null;
+  }
+
+  /**
+   * Handle rename form submission. Renames the targeted file via the backend.
+   * @param {Event} event
+   */
+  async function handleRenameFile(event) {
+    if (event) event.preventDefault();
+
+    if (!pendingRenameFileId) {
+      Lex.Toast.error('No file selected');
+      return;
+    }
+
+    var lexInput = document.getElementById('renameFileInput');
+    var newName = lexInput ? (lexInput.value || '').trim() : '';
+
+    if (!newName) {
+      Lex.Toast.error('Please enter a file name');
+      return;
+    }
+
+    if (newName === (pendingRenameOriginalName || '').trim()) {
+      hideRenameFileModal();
+      return;
+    }
+
+    var fileId = pendingRenameFileId;
+
+    try {
+      await api.post('/api/v1/files/' + fileId + '/rename', { new_filename: newName });
+
+      hideRenameFileModal();
+      Lex.Toast.success('File renamed');
+      await loadFolderContents({ silent: true });
+    } catch (error) {
+      console.error('[Folder] Failed to rename file:', error);
+      Lex.Toast.error('Failed to rename file. Please try again.');
+    }
+  }
+
+  /**
+   * Open the delete confirmation modal for the given file.
+   * @param {Object} file
+   */
+  function showDeleteFileModal(file) {
+    if (!file) return;
+
+    pendingDeleteFileId = file.id;
+
+    var nameEl = document.getElementById('deleteFileName');
+    if (nameEl) nameEl.textContent = file.filename || 'this file';
+
+    var modal = document.getElementById('deleteFileModal');
+    if (modal) modal.open = true;
+  }
+
+  /**
+   * Hide and reset the delete confirmation modal.
+   */
+  function hideDeleteFileModal() {
+    var modal = document.getElementById('deleteFileModal');
+    if (modal) modal.open = false;
+    pendingDeleteFileId = null;
+  }
+
+  /**
+   * Confirm deletion. Soft-deletes the targeted file via the backend.
+   */
+  async function handleDeleteFile() {
+    if (!pendingDeleteFileId) {
+      Lex.Toast.error('No file selected');
+      return;
+    }
+
+    var fileId = pendingDeleteFileId;
+
+    try {
+      await api.delete('/api/v1/storage/files/' + fileId);
+
+      hideDeleteFileModal();
+      Lex.Toast.success('File deleted');
+      await loadFolderContents({ silent: true });
+    } catch (error) {
+      console.error('[Folder] Failed to delete file:', error);
+      Lex.Toast.error('Failed to delete file. Please try again.');
+    }
+  }
+
   // ── Context menu ─────────────────────────────────────────────────────
 
   /**
@@ -976,7 +1121,7 @@
         label: 'Preview',
         action: function () {
           hideContextMenu();
-          Lex.Toast.info('Preview feature coming soon!');
+          _navToFileViewer(fileId);
         }
       },
       {
@@ -984,7 +1129,7 @@
         label: 'Rename',
         action: function () {
           hideContextMenu();
-          Lex.Toast.info('Rename feature coming soon!');
+          showRenameFileModal(file);
         }
       },
       { divider: true },
@@ -994,7 +1139,7 @@
         className: 'text-red-600 hover:bg-red-50',
         action: function () {
           hideContextMenu();
-          Lex.Toast.info('Delete feature coming soon!');
+          showDeleteFileModal(file);
         }
       }
     ];
@@ -1247,6 +1392,20 @@
     var newFolderForm = document.getElementById('newFolderForm');
     newFolderForm && newFolderForm.addEventListener('submit', handleCreateFolder);
 
+    // Rename file modal (lex-btn fires native click; form fires submit)
+    var renameFileForm = document.getElementById('renameFileForm');
+    renameFileForm && renameFileForm.addEventListener('submit', handleRenameFile);
+
+    var cancelRenameFileBtn = document.getElementById('cancelRenameFileBtn');
+    cancelRenameFileBtn && cancelRenameFileBtn.addEventListener('click', hideRenameFileModal);
+
+    // Delete file confirmation modal (lex-btn fires native click)
+    var cancelDeleteFileBtn = document.getElementById('cancelDeleteFileBtn');
+    cancelDeleteFileBtn && cancelDeleteFileBtn.addEventListener('click', hideDeleteFileModal);
+
+    var confirmDeleteFileBtn = document.getElementById('confirmDeleteFileBtn');
+    confirmDeleteFileBtn && confirmDeleteFileBtn.addEventListener('click', handleDeleteFile);
+
     // Upload button triggers file picker (lex-btn fires native click)
     var uploadBtn = document.getElementById('uploadBtn');
     uploadBtn && uploadBtn.addEventListener('click', function () {
@@ -1430,6 +1589,12 @@
    * and dynamic contextMenuAction_* globals.
    */
   function onLeave() {
+    // Tear down the reusable file-list component (removes its listeners/timers).
+    if (documentsView) {
+      try { documentsView.destroy(); } catch (e) { /* ignore */ }
+      documentsView = null;
+    }
+
     // Reset all module state
     resetState();
 
