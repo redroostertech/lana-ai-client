@@ -1,0 +1,115 @@
+/*
+ * Brainchild surface styling (Slice A).
+ * Lex design tokens only — no hard-coded theme colors, no inline styles.
+ */
+
+.bc-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 28px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.bc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--lex-shadow-sm);
+}
+
+.bc-panel.bc-hidden {
+  display: none;
+}
+
+/* Generic hidden utility so non-panel elements (e.g. the My-scope empty state)
+   can be toggled off once Slice B renders a notes table in its place. */
+.bc-hidden {
+  display: none;
+}
+
+.bc-status {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 13px;
+  color: var(--lex-text-tertiary);
+}
+
+/* Read-only note preview (rendered inside a lex-modal). */
+.bc-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bc-preview-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lex-text-tertiary);
+}
+
+.bc-preview-body {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--lex-text-primary);
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 8px;
+  padding: 14px 16px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+/* Actions row: Lex buttons (lex-btn) carry their own styling — only layout
+   lives here, per the no-bespoke-button-styles rule. */
+.bc-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Phase C "Promote to Org" — copy line + action inside the note preview modal.
+   The lex-btn carries its own button styling; only layout + the explanatory
+   copy line live here, per the no-bespoke-button-styles rule. */
+.bc-promote-note {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--lex-text-secondary);
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 8px;
+}
+
+.bc-promote-note-btn {
+  align-self: flex-start;
+}
+
+@media (max-width: 720px) {
+  .bc-shell {
+    padding: 16px 14px 32px;
+  }
+
+  .bc-toolbar {
+    justify-content: stretch;
+  }
+}

@@ -29,6 +29,13 @@
       description: 'Generate decks, legal documents, PDFs, and pages',
       route: 'doc-studio/index.html',
       colors: ['#2f6f73', '#b56b45', '#17201f', '#f7f4ef']
+    },
+    'brainchild': {
+      id: 'brainchild',
+      label: 'Brainchild',
+      description: 'Consolidated documents across your org and personal knowledge',
+      route: 'brainchild/index.html',
+      colors: ['#f4b740', '#e8743b', '#6b3fa0', '#1b1430']
     }
   };
 
@@ -42,7 +49,17 @@
     'lana-insights': 'lana-insights',
     'doc-studio': 'doc-studio',
     'deck-studio': 'doc-studio',
-    documents: 'doc-studio'
+    documents: 'doc-studio',
+    brainchild: 'brainchild',
+    brain: 'brainchild',
+    knowledge: 'brainchild'
+    // NOTE: 'lana-brain' is intentionally NOT aliased here. That string is the
+    // loopback bridge's protocol/companion app id (see electron-bridge.js
+    // KNOWN_APPS) used to authorize token issuance — a different namespace from
+    // this UI catalog. The canonical enable keys for the Brainchild surface in
+    // enabled_apps are 'brainchild' / 'brain' / 'knowledge'. Aliasing the bridge
+    // id would couple UI tile visibility to a companion identifier that was
+    // never meant to gate the surface.
   };
 
   function canonicalId(value) {

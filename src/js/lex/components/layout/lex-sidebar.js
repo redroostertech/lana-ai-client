@@ -1096,10 +1096,14 @@
 
     _getAppPrefix() {
       const path = window.location.pathname || '';
-      const nestedDirs = ['/admin/', '/automation/', '/doc-studio/', '/deck-studio/', '/integrations/', '/insights/', '/matters/', '/voice/'];
+      const nestedDirs = ['/admin/', '/automation/', '/brainchild/', '/doc-studio/', '/deck-studio/', '/integrations/', '/insights/', '/matters/', '/voice/'];
       return nestedDirs.some((dir) => path.indexOf(dir) !== -1) ? '../' : '';
     }
 
+    // DEPRECATED FALLBACK. Source of truth is src/js/app-catalog.js
+    // (window.LanaClientApps.catalog); this inline copy only runs when that
+    // module is absent. Keep in sync or remove once LanaClientApps is
+    // guaranteed loaded on every shell page.
     _getAppCatalog() {
       if (window.LanaClientApps && window.LanaClientApps.catalog) {
         return window.LanaClientApps.catalog;
@@ -1132,6 +1136,13 @@
           description: 'Generate decks, legal documents, PDFs, and pages',
           route: 'doc-studio/index.html',
           colors: ['#2f6f73', '#b56b45', '#17201f', '#f7f4ef']
+        },
+        'brainchild': {
+          id: 'brainchild',
+          label: 'Brainchild',
+          description: 'Consolidated documents across your org and personal knowledge',
+          route: 'brainchild/index.html',
+          colors: ['#f4b740', '#e8743b', '#6b3fa0', '#1b1430']
         }
       };
     }
@@ -1147,6 +1158,12 @@
       return [catalog['lana-works'], catalog['lana-agents']];
     }
 
+    // DEPRECATED FALLBACK. The source of truth for the app catalog + aliases is
+    // src/js/app-catalog.js (window.LanaClientApps). This inline copy only runs
+    // on the rare shell page where app-catalog.js failed to load. Keep it in
+    // sync with app-catalog.js, or remove it once LanaClientApps is guaranteed
+    // present on every shell page. (Note: 'lana-brain' is intentionally omitted
+    // here too — it is the bridge protocol id, not a UI catalog alias.)
     _normalizeAppItem(item) {
       if (window.LanaClientApps && typeof window.LanaClientApps.normalizeApp === 'function') {
         return window.LanaClientApps.normalizeApp(item);
@@ -1166,7 +1183,10 @@
         'lana-insights': 'lana-insights',
         'doc-studio': 'doc-studio',
         'deck-studio': 'doc-studio',
-        documents: 'doc-studio'
+        documents: 'doc-studio',
+        brainchild: 'brainchild',
+        brain: 'brainchild',
+        knowledge: 'brainchild'
       };
       const id = aliases[String(rawId).trim()] || String(rawId).trim();
       const base = catalog[id] || {};
@@ -1207,6 +1227,11 @@
     }
 
     _getCurrentApp() {
+      // NOTE: the dropdown filter (enabled_apps) governs tile *visibility* only.
+      // It is presentation, not access control: a direct/cached route to a
+      // disabled sub-app still loads and falls back to highlighting items[0].
+      // True surface gating must be enforced server-side (Phase B/C protocol
+      // auth); route-file presence is not an access boundary.
       const path = (window.history && window.history.state && window.history.state.path)
         || window.location.pathname
         || '';
@@ -1232,6 +1257,7 @@
       ) return byId('lana-insights') || items[0];
       if (path.indexOf('/voice/') !== -1) return byId('lana-voice') || items[0];
       if (path.indexOf('/agents/') !== -1) return byId('lana-agents') || items[0];
+      if (path.indexOf('/brainchild/') !== -1) return byId('brainchild') || items[0];
       if (path.indexOf('/doc-studio/') !== -1 || path.indexOf('/deck-studio/') !== -1) return byId('doc-studio') || items[0];
       return byId('lana-works') || items[0];
     }
@@ -1258,9 +1284,9 @@
 
     _renderUnifiedSearch() {
       const shortcut = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '') ? '⌘K' : 'Ctrl K';
-      return `<button type="button" class="lex-sidebar-global-search" data-action="global-search" data-tooltip="Search all data">
+      return `<button type="button" class="lex-sidebar-global-search" data-action="global-search" data-tooltip="Search Lana">
         ${icon('search', 'normal')}
-        <span class="lex-sidebar-global-search-label">Search all data</span>
+        <span class="lex-sidebar-global-search-label">Search Lana</span>
         <span class="lex-sidebar-global-search-shortcut">${this.escapeHtml(shortcut)}</span>
       </button>`;
     }

@@ -218,6 +218,67 @@ function clearSavedServer() {
 }
 
 /**
+ * Save the Brainchild link config (one-time, persisted).
+ *
+ * Phase B: the client reads the user's brainchild vault through the MCP stdio
+ * server. The link pins the install root (which contains bin/brainchild-mcp.js)
+ * and the vault path. This is the user's own local data — no auth token is ever
+ * cached here (the vault is read from disk).
+ *
+ * @param {Object} link - { installPath, vaultPath, verified?, installVersion? }
+ * @returns {boolean} Success status
+ */
+function saveBrainchildLink(link) {
+  try {
+    const data = {
+      installPath: (link && link.installPath) || '',
+      vaultPath: (link && link.vaultPath) || '',
+      verified: Boolean(link && link.verified),
+      installVersion: (link && link.installVersion) || null,
+      linkedAt: new Date().toISOString()
+    };
+    store.set('brainchildLink', data);
+    logInfo(`[electron-storage] Brainchild link saved (vault: ${data.vaultPath})`);
+    return true;
+  } catch (error) {
+    logError('[electron-storage] Failed to save brainchild link', error);
+    return false;
+  }
+}
+
+/**
+ * Get the saved Brainchild link config.
+ * @returns {Object|null}
+ */
+function getBrainchildLink() {
+  try {
+    return store.get('brainchildLink') || null;
+  } catch (error) {
+    logError('[electron-storage] Failed to get brainchild link', error);
+    return null;
+  }
+}
+
+/**
+ * Clear the saved Brainchild link config.
+ *
+ * Product decision (per Phase B spec): on logout we KEEP the link (the vault is
+ * the user's local file, not org-dependent) and only stop the MCP process. This
+ * helper exists for explicit unlink / re-link flows.
+ * @returns {boolean}
+ */
+function clearBrainchildLink() {
+  try {
+    store.delete('brainchildLink');
+    logInfo('[electron-storage] Brainchild link cleared');
+    return true;
+  } catch (error) {
+    logError('[electron-storage] Failed to clear brainchild link', error);
+    return false;
+  }
+}
+
+/**
  * Get user preferences
  * @returns {Object} User preferences
  */
@@ -333,6 +394,9 @@ module.exports = {
   getSavedServer,
   updateLastVerified,
   clearSavedServer,
+  saveBrainchildLink,
+  getBrainchildLink,
+  clearBrainchildLink,
   getPreferences,
   updatePreferences,
   getAllData,

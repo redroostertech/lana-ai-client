@@ -39,11 +39,31 @@ app.setVersion(packageJson.version);
 
 // Import thin client modules
 const { verifyServer } = require('./electron-discovery');
-const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified } = require('./electron-storage');
+const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink } = require('./electron-storage');
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
+const { BrainchildManager, discover, validateLink, mcpBinForRoot } = require('./src/electron-brainchild-manager');
+
+/**
+ * Brainchild MCP bridge — reads the user's local vault over the MCP stdio
+ * server (brainchild/bin/brainchild-mcp.js). Spawned lazily on first read and
+ * reused; torn down on quit. The link config (install + vault path) is persisted
+ * via electron-storage. See src/electron-brainchild-manager.js.
+ */
+const brainchildManager = new BrainchildManager({
+  getLink: () => getBrainchildLink(),
+  logInfo: (msg, error) => logInfo(msg, error),
+  logError: (msg, error) => logError(msg, error)
+});
+
+// Install roots the user explicitly chose via the native folder picker in THIS
+// session. A native dialog is a deliberate, main-process-mediated user action,
+// so a picked root is trusted to spawn from even if it is not one of the OS
+// default candidates. This is the only sanctioned way an out-of-candidate
+// install path can be linked — a renderer-passed arbitrary string is not.
+const brainchildPickedInstallRoots = new Set();
 
 /**
  * Companion Bridge — in-app consent prompts
@@ -770,6 +790,196 @@ ipcMain.handle('open-external-url', async (event, url) => {
   return true;
 });
 
+// ───────────────────────────────────────────────────────────────────────────
+// Brainchild MCP bridge — renderer-facing read API (thin; spawn/IPC only here)
+// ───────────────────────────────────────────────────────────────────────────
+
+// Auto-discover an install + vault from OS defaults. Pure-helper backed.
+ipcMain.handle('brainchild:discover', async () => {
+  try {
+    return { success: true, ...discover() };
+  } catch (error) {
+    logError('[electron-main] brainchild:discover failed', error);
+    return { success: false, error: String(error && error.message || error) };
+  }
+});
+
+// Establish + persist the link, then validate. Communicate via MCP only AFTER
+// the link is persisted and verified.
+ipcMain.handle('brainchild:link', async (_event, payload) => {
+  try {
+    const link = {
+      installPath: (payload && payload.installPath) || '',
+      vaultPath: (payload && payload.vaultPath) || ''
+    };
+    const checks = validateLink(link);
+    // Honor either an OS-default candidate root (checks.installAllowed) or a root
+    // the user explicitly chose via the native picker this session. A bare
+    // renderer-passed string outside both sets is rejected before any spawn.
+    const picked = link.installPath &&
+      brainchildPickedInstallRoots.has(require('path').resolve(link.installPath));
+    if (!checks.installAllowed && !picked) {
+      return { success: false, error: 'install_not_allowed' };
+    }
+    // installValid folds the allowlist in; for a picked root, fall back to a
+    // direct existence check of bin/brainchild-mcp.js.
+    const fs = require('fs');
+    const installExists = checks.installValid ||
+      (picked && checks.mcpBin && fs.existsSync(checks.mcpBin));
+    if (!installExists) {
+      return { success: false, error: 'install_not_found' };
+    }
+    if (!checks.vaultValid) {
+      return { success: false, error: 'vault_not_found' };
+    }
+    saveBrainchildLink({ installPath: link.installPath, vaultPath: link.vaultPath, verified: true });
+    return { success: true, status: brainchildManager.getStatus() };
+  } catch (error) {
+    logError('[electron-main] brainchild:link failed', error);
+    return { success: false, error: String(error && error.message || error) };
+  }
+});
+
+ipcMain.handle('brainchild:status', async () => {
+  try {
+    return { success: true, ...brainchildManager.getStatus() };
+  } catch (error) {
+    logError('[electron-main] brainchild:status failed', error);
+    return { success: false, error: String(error && error.message || error) };
+  }
+});
+
+ipcMain.handle('brainchild:listNotes', async (_event, payload) => {
+  try {
+    const args = {};
+    if (payload && payload.filter) args.filter = String(payload.filter);
+    const out = await brainchildManager.call('list_notes', args);
+    return { success: true, notes: Array.isArray(out.notes) ? out.notes : [], count: out.count || 0 };
+  } catch (error) {
+    logError('[electron-main] brainchild:listNotes failed', error);
+    return { success: false, error: String(error && error.message || error) };
+  }
+});
+
+ipcMain.handle('brainchild:search', async (_event, payload) => {
+  try {
+    const args = { query: (payload && payload.query) || '' };
+    if (payload && payload.limit) args.limit = Number(payload.limit);
+    const out = await brainchildManager.call('search', args);
+    return { success: true, results: Array.isArray(out.results) ? out.results : [] };
+  } catch (error) {
+    logError('[electron-main] brainchild:search failed', error);
+    return { success: false, error: String(error && error.message || error) };
+  }
+});
+
+ipcMain.handle('brainchild:getNote', async (_event, payload) => {
+  try {
+    const notePath = (payload && payload.path) || '';
+    if (!notePath) return { success: false, error: 'missing_path' };
+    const note = await brainchildManager.call('get_note', { path: notePath });
+    return { success: true, note };
+  } catch (error) {
+    logError('[electron-main] brainchild:getNote failed', error);
+    return { success: false, error: String(error && error.message || error) };
+  }
+});
+
+// Native folder picker for the Brainchild INSTALL root. The chosen directory
+// must contain bin/brainchild-mcp.js (the install we will spawn Node against).
+// Path entry stays main-chosen (dialog) rather than renderer-passed, so the
+// renderer never supplies an arbitrary install path. Returns the resolved
+// install root for the renderer to pass back to brainchild:link.
+ipcMain.handle('brainchild:pickInstall', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: 'Choose your Brainchild install folder',
+      properties: ['openDirectory'],
+      message: 'Select the Brainchild app folder (contains bin/brainchild-mcp.js).'
+    });
+    if (result.canceled || !result.filePaths || !result.filePaths.length) {
+      return { success: false, canceled: true };
+    }
+    const installPath = result.filePaths[0];
+    const fs = require('fs');
+    const mcpBin = mcpBinForRoot(installPath);
+    if (!fs.existsSync(mcpBin)) {
+      return { success: false, error: 'install_not_found', installPath };
+    }
+    // Trust this user-picked root for subsequent brainchild:link in this session.
+    brainchildPickedInstallRoots.add(require('path').resolve(installPath));
+    return { success: true, installPath, mcpBin };
+  } catch (error) {
+    logError('[electron-main] brainchild:pickInstall failed', error);
+    return { success: false, error: String(error && error.message || error) };
+  }
+});
+
+// Native folder picker for the Brainchild VAULT directory. Returns the chosen
+// path for the renderer to pass to brainchild:link as vaultPath.
+ipcMain.handle('brainchild:pickVault', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: 'Choose your Brainchild vault folder',
+      properties: ['openDirectory'],
+      message: 'Select the folder that holds your Brainchild notes.'
+    });
+    if (result.canceled || !result.filePaths || !result.filePaths.length) {
+      return { success: false, canceled: true };
+    }
+    return { success: true, vaultPath: result.filePaths[0] };
+  } catch (error) {
+    logError('[electron-main] brainchild:pickVault failed', error);
+    return { success: false, error: String(error && error.message || error) };
+  }
+});
+
+// Unlink: stop the MCP child and forget the persisted link so the user can
+// re-link to a different install/vault. Backed by the already-present
+// clearBrainchildLink() in electron-storage.
+ipcMain.handle('brainchild:unlink', async () => {
+  try {
+    brainchildManager.stop();
+    clearBrainchildLink();
+    return { success: true, status: brainchildManager.getStatus() };
+  } catch (error) {
+    logError('[electron-main] brainchild:unlink failed', error);
+    return { success: false, error: String(error && error.message || error) };
+  }
+});
+
+// Reveal a vault note in the OS file manager. The always-available fallback for
+// "Open in Brainchild": resolve the vault-relative note path against the linked
+// vault root and show it in Finder/Explorer. The note path is constrained to the
+// linked vault (no traversal outside it) before revealing.
+ipcMain.handle('brainchild:revealNote', async (_event, payload) => {
+  try {
+    const link = getBrainchildLink();
+    if (!link || !link.vaultPath) return { success: false, error: 'not_linked' };
+    const notePath = (payload && payload.path) || '';
+    if (!notePath) return { success: false, error: 'missing_path' };
+    const path = require('path');
+    const fs = require('fs');
+    const vaultRoot = path.resolve(link.vaultPath);
+    const resolved = path.resolve(vaultRoot, notePath);
+    // Containment check: the resolved file must stay inside the vault root.
+    if (resolved !== vaultRoot && !resolved.startsWith(vaultRoot + path.sep)) {
+      return { success: false, error: 'path_outside_vault' };
+    }
+    const { shell } = require('electron');
+    if (fs.existsSync(resolved)) {
+      shell.showItemInFolder(resolved);
+      return { success: true, revealed: resolved };
+    }
+    // File not on disk — fall back to opening the vault root.
+    await shell.openPath(vaultRoot);
+    return { success: true, revealed: vaultRoot };
+  } catch (error) {
+    logError('[electron-main] brainchild:revealNote failed', error);
+    return { success: false, error: String(error && error.message || error) };
+  }
+});
+
 ipcMain.handle('generate-oauth-state', async () => {
   return generateOAuthState();
 });
@@ -1347,6 +1557,13 @@ app.on('before-quit', async () => {
     companionBridge.stop();
   } catch (error) {
     logError('[electron-main] Failed to stop companion bridge', error);
+  }
+
+  // Tear down the brainchild MCP child process (if spawned).
+  try {
+    brainchildManager.stop();
+  } catch (error) {
+    logError('[electron-main] Failed to stop brainchild manager', error);
   }
 
   // End session tracking

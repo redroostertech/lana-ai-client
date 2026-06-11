@@ -44,7 +44,6 @@
     'matters.html':                           { matter_id: 'string', open: 'string', tab: 'string', action: 'string' },
     'drive.html':                             { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string' },
     'storage.html':                           { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string', view: 'string' },
-    'search-conversations.html':               {},
     'search-results.html':                    { q: 'string' },
     'article.html':                           { section: 'string', id: 'string' },
     'help.html':                              { section: 'string' },

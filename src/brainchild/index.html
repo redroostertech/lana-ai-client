@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Brainchild</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231b1430'/%3E%3Cpath d='M32 14a12 12 0 0 0-9 20l1 6h16l1-6a12 12 0 0 0-9-20z' fill='%23f4b740'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/tailwind-output.css">
+    <script src="../js/tailwind-loader.js"></script>
+    <link rel="stylesheet" href="../css/lex-tokens.css">
+    <script src="../js/config.js"></script>
+    <script src="../js/app-catalog.js"></script>
+    <script>
+      if (window.location.protocol !== 'file:' && window.LanaConfig) {
+        window.LanaConfig.API_BASE_URL = '';
+      }
+    </script>
+    <link rel="stylesheet" href="./styles.css?v=20260609-brainchild">
+  </head>
+  <body>
+    <lex-app
+      id="brainchild-shell"
+      logo-src="../img/logo-light.png"
+      logo-alt="LANA AI"
+      logo-href="../dashboard.html"
+      active-nav-id="brainchild-library"
+      page-title="Brainchild"
+    ></lex-app>
+
+    <template id="brainchildTemplate">
+      <main class="bc-shell">
+        <lex-banner
+          id="brainchildBanner"
+          variant="light"
+          heading="Brainchild"
+          subtitle="One surface for your organization's documents and your personal knowledge."
+          max-actions="0"
+        ></lex-banner>
+
+        <div class="bc-toolbar">
+          <lex-segmented
+            id="bcScopeToggle"
+            value="org"
+            options='[{"value":"org","label":"Organization"},{"value":"my","label":"My"}]'
+          ></lex-segmented>
+        </div>
+
+        <section id="bcOrgPanel" class="bc-panel" aria-label="Organization documents">
+          <lex-table
+            id="bcOrgTable"
+            columns="filename,file_type,matter,is_template,updated_at"
+            labels="Name,Type,Matter,Template,Updated"
+            empty-text="No organization documents found."
+            searchable
+          ></lex-table>
+        </section>
+
+        <section id="bcMyPanel" class="bc-panel bc-hidden" aria-label="My personal knowledge">
+          <lex-banner
+            id="bcMyBanner"
+            class="bc-hidden"
+            variant="light"
+            size="compact"
+            max-actions="0"
+          ></lex-banner>
+          <lex-empty
+            id="bcMyEmpty"
+            icon="link"
+            message="Connect Brainchild"
+            description="Your personal notes live in the Brainchild app on this device. Launch and connect Brainchild to read your vault here."
+            action-label="Launch Brainchild"
+          ></lex-empty>
+          <lex-table
+            id="bcMyTable"
+            class="bc-hidden"
+            columns="filename,file_type,matter,updated_at"
+            labels="Name,Type,Source,Updated"
+            empty-text="No personal notes found."
+            searchable
+          ></lex-table>
+        </section>
+
+        <p id="bcStatus" class="bc-status" role="status"></p>
+      </main>
+    </template>
+
+    <script src="../js/version.js"></script>
+    <script src="../js/lex/lex.core.js"></script>
+    <script src="../js/lex/lex.icons.js"></script>
+    <script src="../js/lex/lex.utils.js"></script>
+    <script src="../js/lex/lex.data.js"></script>
+    <script src="../js/lex/lex.forms.js"></script>
+    <script src="../js/lex/lex.state.js"></script>
+    <script src="../js/lex/lex-nav.js"></script>
+    <script src="../js/lex/components/foundation/lex-btn.js"></script>
+    <script src="../js/lex/components/foundation/lex-badge.js"></script>
+    <script src="../js/lex/components/foundation/lex-empty.js?v=20260526-empty-state"></script>
+    <script src="../js/lex/components/foundation/lex-banner.js"></script>
+    <script src="../js/lex/components/foundation/lex-modal.js"></script>
+    <script src="../js/lex/components/foundation/lex-toast.js"></script>
+    <script src="../js/lex/components/form/lex-segmented.js"></script>
+    <script src="../js/lex/components/data/lex-table.js"></script>
+    <script src="../js/lex/components/data/lex-pagination.js"></script>
+    <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+    <script src="../js/lex/components/layout/lex-topbar.js"></script>
+    <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+    <script src="../js/lex/components/layout/lex-app.js"></script>
+    <script src="../js/lex/index.js"></script>
+    <script src="../js/sidebar-footer-hydrate.js"></script>
+    <script src="../js/shared/document-library-mapper.js"></script>
+    <script src="../js/shared/brainchild-promote-builder.js"></script>
+    <script>
+      (function () {
+        function mountBrainchild() {
+          var shell = document.getElementById('brainchild-shell');
+          var template = document.getElementById('brainchildTemplate');
+          if (!shell || !template || shell.dataset.brainchildMounted === 'true') return;
+          var content = typeof shell.getContentEl === 'function'
+            ? shell.getContentEl()
+            : document.getElementById('lex-main-content');
+          if (!content) return;
+          shell.dataset.brainchildMounted = 'true';
+          shell.setAttribute('active-nav-id', 'brainchild-library');
+          if (typeof shell.setSections === 'function') {
+            shell.setSections([
+              {
+                id: 'brainchild',
+                isStaticTop: true,
+                items: [
+                  { id: 'brainchild-library', label: 'Library', icon: 'table', isButton: true }
+                ]
+              }
+            ]);
+          }
+          content.appendChild(template.content.cloneNode(true));
+          var script = document.createElement('script');
+          script.src = './app.js?v=20260609-brainchild';
+          document.body.appendChild(script);
+        }
+
+        var shell = document.getElementById('brainchild-shell');
+        if (shell) {
+          shell.addEventListener('lex-app-ready', mountBrainchild, { once: true });
+          requestAnimationFrame(mountBrainchild);
+        }
+      })();
+    </script>
+  </body>
+</html>

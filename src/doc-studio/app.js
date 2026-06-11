@@ -1927,80 +1927,21 @@ function formatDate(value) {
   }
 }
 
-function fileExtension(filename) {
-  const clean = String(filename || '').split('?')[0];
-  const index = clean.lastIndexOf('.');
-  return index > -1 && index < clean.length - 1 ? clean.slice(index + 1).toUpperCase() : '';
-}
-
-function humanFileType(item) {
-  const raw = item?.file_type || item?.content_type || item?.document_type || item?.format || '';
-  if (raw) {
-    const value = String(raw);
-    if (value.includes('/')) {
-      if (value.includes('pdf')) return 'PDF';
-      if (value.includes('wordprocessingml') || value.includes('msword')) return 'DOCX';
-      if (value.includes('presentation')) return 'PPTX';
-      if (value.includes('html')) return 'HTML';
-      return value.split('/').pop().toUpperCase();
-    }
-    return value.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
-  }
-  return fileExtension(item?.filename || item?.title) || 'Document';
-}
-
-function docStudioFilename(presentation) {
-  const documentModel = presentation?.deck?.document;
-  if (presentation?.filename) return presentation.filename;
-  if (documentModel?.file_name) return documentModel.file_name;
-  if (documentModel?.metadata?.filename) return documentModel.metadata.filename;
-  const title = presentation?.title || 'Untitled file';
-  const normalized = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'doc-studio-file';
-  return `${normalized}.${documentModel ? 'pdf' : 'html'}`;
-}
-
+// Library row shaping is owned by the shared, pure window.DocumentLibraryMapper
+// module (src/js/shared/document-library-mapper.js). Doc Studio and the
+// Brainchild surface consume the same normalization contract so identical
+// documents never drift between the two surfaces. Do NOT re-implement
+// fileExtension / humanFileType / filename / row mapping here — extend the
+// shared mapper instead.
 function libraryItems() {
-  const storageRows = Array.isArray(state.libraryDocuments) ? state.libraryDocuments : [];
-  const storageItems = storageRows.map(document => ({
-    id: `storage:${document.id}`,
-    filename: document.filename || document.original_filename || document.name || 'Untitled document',
-    file_type: humanFileType(document),
-    matter: document.matter_name || document.client_matter || document.matter_id || 'Unassigned',
-    is_template: document.is_template ? 'Yes' : 'No',
-    created_at: document.created_at || '',
-    updated_at: document.updated_at || document.created_at || '',
-    _kind: 'storage',
-    _fileId: document.id,
-    _matterId: document.client_matter || document.matter_id || '',
-    _source: document
-  }));
-
-  const seenFileIds = new Set(storageItems.map(item => String(item._fileId)));
-  const presentationItems = state.presentations
-    .filter(presentation => {
-      const fileId = presentation.deck?.document?.metadata?.file_id || presentation.file_id;
-      return !fileId || !seenFileIds.has(String(fileId));
-    })
-    .map(presentation => {
-      const documentModel = presentation.deck?.document;
-      return {
-        id: `deck:${presentation.id}`,
-        filename: docStudioFilename(presentation),
-        file_type: documentModel ? 'Doc Studio Draft' : 'Presentation',
-        matter: documentModel?.metadata?.matter_name || documentModel?.metadata?.matter_id || presentation.matter_name || presentation.matter_id || 'Doc Studio',
-        is_template: presentation.is_template || documentModel?.is_template ? 'Yes' : 'No',
-        created_at: presentation.created_at || '',
-        updated_at: presentation.updated_at || presentation.created_at || '',
-        _kind: 'deck',
-        _presentationId: presentation.id,
-        _source: presentation
-      };
-    });
-
-  return storageItems.concat(presentationItems);
+  const mapper = window.DocumentLibraryMapper;
+  if (!mapper || typeof mapper.normalizeLibraryItems !== 'function') {
+    return [];
+  }
+  return mapper.normalizeLibraryItems({
+    documents: Array.isArray(state.libraryDocuments) ? state.libraryDocuments : [],
+    presentations: Array.isArray(state.presentations) ? state.presentations : []
+  }, 'org');
 }
 
 function presentationPreview(presentation) {

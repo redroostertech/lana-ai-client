@@ -6,7 +6,7 @@
      <lex-empty message="No results" description="Try adjusting your search" action-label="Clear filters"></lex-empty>
      <lex-empty size="compact" message="No comments yet" description="Comments will appear here."></lex-empty>
 
-   Icons: folder | search | document | inbox | chart | users | comment | alert | tasks
+   Icons: folder | search | document | inbox | chart | users | comment | alert | tasks | link
 */
 
 (function () {
@@ -142,7 +142,8 @@
         users: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M16 19a4 4 0 0 0-8 0"/><circle cx="12" cy="8" r="3" stroke-width="1.6"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M20 18a3 3 0 0 0-3-3M4 18a3 3 0 0 1 3-3"/>',
         comment: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M5 5.5A2.5 2.5 0 0 1 7.5 3h9A2.5 2.5 0 0 1 19 5.5v6A2.5 2.5 0 0 1 16.5 14H11l-5 4v-4.5A2.5 2.5 0 0 1 5 11.5z"/><path stroke-linecap="round" stroke-width="1.6" d="M8.5 7.5h7M8.5 10.5h5"/>',
         alert: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 8v5M12 17h.01"/><path stroke-linejoin="round" stroke-width="1.6" d="M10.3 4.6 2.8 18a1.7 1.7 0 0 0 1.5 2.5h15.4a1.7 1.7 0 0 0 1.5-2.5L13.7 4.6a2 2 0 0 0-3.4 0z"/>',
-        tasks: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>'
+        tasks: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
+        link: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M9.5 14.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1.5 1.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M14.5 9.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1.5-1.5"/>'
       };
 
       const actionIcons = {
