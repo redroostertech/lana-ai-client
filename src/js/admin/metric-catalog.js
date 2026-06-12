@@ -592,6 +592,27 @@
     return value == null ? '' : escapeHtml(String(value));
   }
 
+  // Plain-language help shown under the Type select. Copy matches the goal
+  // engine: static compares the actual directly to the entered value;
+  // rolling_average ignores the entered value and uses the average of the last
+  // 3 completed periods; growth_rate treats the entered value as a percent over
+  // the prior period.
+  function goalTypeHelp(type) {
+    if (type === 'rolling_average') {
+      return 'Rolling average: the goal is set automatically to the average of the last 3 completed periods, so it tracks your recent norm and adjusts over time. Use it when keeping pace with recent performance matters more than a fixed number. This type does not use the Target value field.';
+    }
+    if (type === 'growth_rate') {
+      return 'Growth rate: the goal is the prior period plus a percent you set. Enter the percent in Target value (5 means 5 percent above the previous period). Use it for steady, period-over-period improvement. Example: if last period was 100 and you set 5, the target becomes 105.';
+    }
+    return 'Static: a fixed target for the period. The metric is compared directly to the number you enter in Target value, in the metric\'s own unit. Use it for a concrete, absolute goal. Example: bill 160 hours this month, or sign 12 new clients.';
+  }
+
+  // Help for the colour bands. Matches the engine: Green and Yellow are absolute
+  // values; Red is whatever falls below Yellow (the Red field is not yet read by
+  // the status calculation). Blank thresholds fall back to percent-of-target
+  // ratio bands.
+  var GOAL_THRESHOLD_HELP = 'Thresholds are absolute values in the metric\'s own unit, not percentages. An actual at or above Green shows green, at or above Yellow shows yellow, and anything below Yellow shows red (for metrics where lower is better, the comparison flips). Leave them blank to use automatic bands from percent of target: 100 percent or more is green, 80 percent or more is yellow, below that is red. Example, for a goal of 12 new clients: set Green to 12 and Yellow to 9, so an actual of 13 reads green, 10 reads yellow, and 6 reads red. Note: red is anything below Yellow; the Red threshold field is not currently used by the status calculation.';
+
   // Build the editor form for a metric, pre-filled with the goal for the
   // currently selected period (period defaults to monthly).
   function renderGoalForm(metric, period) {
@@ -631,6 +652,8 @@
       + '</select></label>';
     html += '</div>';
 
+    html += '<p class="metric-catalog-goal-help" id="metricGoalTypeHelp">' + goalTypeHelp(targetType) + '</p>';
+
     html += '<label class="metric-catalog-goal-field">'
       + '<span class="metric-catalog-goal-field__label">Target value <span class="metric-catalog-goal-req">*</span></span>'
       + '<input type="number" step="any" id="metricGoalTargetValue" class="metric-catalog-goal-field__input" value="' + numAttr(g.target_value) + '" />'
@@ -648,6 +671,8 @@
       + '<span class="metric-catalog-goal-field__label">Red threshold</span>'
       + '<input type="number" step="any" id="metricGoalRed" class="metric-catalog-goal-field__input" value="' + numAttr(g.red_threshold) + '" /></label>';
     html += '</div>';
+
+    html += '<p class="metric-catalog-goal-help metric-catalog-goal-help--thresholds">' + GOAL_THRESHOLD_HELP + '</p>';
 
     html += '<label class="metric-catalog-goal-field">'
       + '<span class="metric-catalog-goal-field__label">Notes</span>'
@@ -722,12 +747,25 @@
         var body = bodyNode();
         if (body) body.innerHTML = renderGoalForm(metric, currentPeriod);
         bindPeriodSelect();
+        bindTypeSelect();
         syncRemoveButton();
+      });
+    }
+
+    // Update the Type help text in place when the operator changes the type,
+    // without re-rendering the body (which would discard other field input).
+    function bindTypeSelect() {
+      var typeSel = el('metricGoalType');
+      var helpNode = el('metricGoalTypeHelp');
+      if (!typeSel || !helpNode) return;
+      typeSel.addEventListener('change', function () {
+        helpNode.textContent = goalTypeHelp(typeSel.value);
       });
     }
 
     function wireGoalButtons() {
       bindPeriodSelect();
+      bindTypeSelect();
       syncRemoveButton();
 
       var saveBtn = document.getElementById('metricGoalSave');
@@ -779,6 +817,7 @@
             var body = bodyNode();
             if (body) body.innerHTML = renderGoalForm(metric, period);
             bindPeriodSelect();
+            bindTypeSelect();
             rerenderRow();
             if (Lex.Toast) Lex.Toast.success('Goal removed');
           } catch (err) {
