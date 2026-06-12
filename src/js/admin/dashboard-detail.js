@@ -172,6 +172,13 @@
     params.compareMode = (typeof MetricGoalComparison !== 'undefined')
       ? MetricGoalComparison.resolveCompareMode(currentPeriodIsPreset)
       : (currentPeriodIsPreset ? 'previous_calendar' : 'previous_period');
+    // Goal visibility: the backend matches a goal's weekly/monthly target_period
+    // exactly against periodType, which otherwise defaults to daily and never
+    // matches. Forward the selected grain so monthly/weekly goals attach to the
+    // dashboard cards (and the comparison uses the matching snapshot grain).
+    params.periodType = (typeof MetricGoalComparison !== 'undefined')
+      ? MetricGoalComparison.resolveGoalPeriodType(period.compareBy)
+      : 'monthly';
     return params;
   }
 

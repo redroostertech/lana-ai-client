@@ -140,9 +140,23 @@
     return isPreset ? 'previous_calendar' : 'previous_period';
   }
 
+  // Map the dashboard grain (compareBy: daily|weekly|monthly|quarterly|yearly) to a
+  // backend observation/goal periodType (hourly|daily|weekly|monthly). The backend
+  // matches a goal's target_period (weekly/monthly) EXACTLY against periodType, so
+  // the dashboard must forward the grain it is viewing at; previously periodType
+  // defaulted to daily and never matched a weekly/monthly goal. quarterly/yearly and
+  // unknown clamp to 'monthly' (the coarsest goal grain and the dashboard default)
+  // so a monthly goal still surfaces.
+  function resolveGoalPeriodType(grain) {
+    var g = String(grain || '').toLowerCase();
+    if (g === 'hourly' || g === 'daily' || g === 'weekly' || g === 'monthly') return g;
+    return 'monthly';
+  }
+
   return {
     buildGoalView: buildGoalView,
     buildComparisonView: buildComparisonView,
     resolveCompareMode: resolveCompareMode,
+    resolveGoalPeriodType: resolveGoalPeriodType,
   };
 });

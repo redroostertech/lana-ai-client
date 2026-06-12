@@ -14,7 +14,24 @@ const {
   buildGoalView,
   buildComparisonView,
   resolveCompareMode,
+  resolveGoalPeriodType,
 } = require(path.join(__dirname, '../../src/js/dashboard/metric-goal-comparison.js'));
+
+describe('resolveGoalPeriodType', () => {
+  test('passes goal-relevant grains through', () => {
+    expect(resolveGoalPeriodType('hourly')).toBe('hourly');
+    expect(resolveGoalPeriodType('daily')).toBe('daily');
+    expect(resolveGoalPeriodType('weekly')).toBe('weekly');
+    expect(resolveGoalPeriodType('monthly')).toBe('monthly');
+  });
+  test('clamps quarterly/yearly/unknown/empty to monthly so a monthly goal still surfaces', () => {
+    expect(resolveGoalPeriodType('quarterly')).toBe('monthly');
+    expect(resolveGoalPeriodType('yearly')).toBe('monthly');
+    expect(resolveGoalPeriodType('')).toBe('monthly');
+    expect(resolveGoalPeriodType(undefined)).toBe('monthly');
+    expect(resolveGoalPeriodType('MONTHLY')).toBe('monthly');
+  });
+});
 
 describe('buildGoalView', () => {
   test('returns null when goal is null/undefined (graceful degrade)', () => {
