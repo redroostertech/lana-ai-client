@@ -66,6 +66,9 @@
   // and the detail drawer share a single source of truth without a re-fetch
   // every render.
   var lastRunByKey = {};
+  // Lineage ("Appears in") per metric key, loaded once when the detail drawer
+  // opens. Values: undefined (not loaded), 'pending', 'error', or the usage object.
+  var usageByKey = {};
   var allMetrics = [];
   var visibleMetrics = [];
   var passedCount = 0;
@@ -469,6 +472,68 @@
       + '</div>';
   }
 
+  function renderUsageGroup(label, items, nameFn) {
+    var list = Array.isArray(items) ? items : [];
+    var body = list.length === 0
+      ? '<span class="metric-catalog-muted">None</span>'
+      : list.map(function (it) {
+        return '<span class="metric-catalog-pill metric-catalog-pill--muted">' + escapeHtml(nameFn(it)) + '</span>';
+      }).join(' ');
+    return '<div class="metric-catalog-usage__group">'
+      + '<div class="metric-catalog-usage__sublabel">' + escapeHtml(label) + ' (' + list.length + ')</div>'
+      + '<div class="metric-catalog-usage__pills">' + body + '</div>'
+      + '</div>';
+  }
+
+  // "Appears in" lineage section. Renders from the usageByKey cache so a Run-
+  // triggered body re-render keeps the loaded lineage; loadUsage fills it.
+  function renderUsageSection(metricKey) {
+    var usage = usageByKey[metricKey];
+    var html = '<div class="metric-catalog-drawer__section" id="metricUsageSection">';
+    html += '<div class="metric-catalog-drawer__label">Appears in</div>';
+    if (usage == null || usage === 'pending') {
+      html += '<div class="metric-catalog-muted">Loading usage...</div>';
+    } else if (usage === 'error') {
+      html += '<div class="metric-catalog-muted">Usage is unavailable.</div>';
+    } else {
+      if (usage.defined_in) {
+        var di = usage.defined_in;
+        var diText = [di.namespace, di.module_key, di.section].filter(Boolean).join(' / ');
+        if (diText) html += '<div class="metric-catalog-usage__defined">Defined in ' + escapeHtml(diText) + '</div>';
+      }
+      html += renderUsageGroup('Dashboards', usage.dashboards, function (d) {
+        return d.via === 'question' ? (d.name + ' (question)') : d.name;
+      });
+      html += renderUsageGroup('Boards', usage.boards, function (b) { return b.name; });
+      html += renderUsageGroup('Modules', usage.modules, function (m) { return m.name; });
+      html += renderUsageGroup('Reports', usage.reports, function (r) {
+        return r.confidence === 'low' ? (r.name + ' (low confidence)') : r.name;
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
+  // Fetch the lineage once per metric and patch the section in place. Only
+  // retries after an error; a missing endpoint degrades to "unavailable".
+  async function loadUsage(metricKey) {
+    if (!metricKey) return;
+    if (usageByKey[metricKey] && usageByKey[metricKey] !== 'error') return;
+    if (!window.api || typeof api.getMetricUsage !== 'function') {
+      usageByKey[metricKey] = 'error';
+    } else {
+      usageByKey[metricKey] = 'pending';
+      try {
+        var resp = await api.getMetricUsage(metricKey);
+        usageByKey[metricKey] = (resp && resp.data) ? resp.data : (resp || {});
+      } catch (err) {
+        usageByKey[metricKey] = 'error';
+      }
+    }
+    var section = document.getElementById('metricUsageSection');
+    if (section) section.outerHTML = renderUsageSection(metricKey);
+  }
+
   function renderDrawerBody(metric) {
     var run = lastRunByKey[metric.key] || {};
     var calculation = metric.calculation == null ? '(no calculation defined)' : metric.calculation;
@@ -514,6 +579,8 @@
       html += '<pre class="metric-catalog-drawer__code">' + escapeHtml(displayText(businessLogic)) + '</pre>';
       html += '</div>';
     }
+
+    html += renderUsageSection(metric.key);
 
     html += '<div class="metric-catalog-drawer__section">';
     html += '<div class="metric-catalog-drawer__label">Last Run</div>';
@@ -577,6 +644,7 @@
         closeBtn.dataset.bound = '1';
         closeBtn.addEventListener('click', function () { if (Lex.Drawer.close) Lex.Drawer.close(); });
       }
+      loadUsage(metric.key);
     }
     setTimeout(wireDrawerButtons, 50);
   }

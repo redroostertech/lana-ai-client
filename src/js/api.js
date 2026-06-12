@@ -2829,6 +2829,16 @@ class ApiClient {
   }
 
   /**
+   * Lineage for a metric: which dashboards, boards, and modules/reports
+   * reference it. Read-only, org-scoped.
+   * @param {string} metricKey - Registry metric key
+   * @returns {Promise<Object>} { data: { defined_in, dashboards, boards, modules, reports, summary } }
+   */
+  async getMetricUsage(metricKey) {
+    return this.get('/api/v1/modules/metric-catalog/' + encodeURIComponent(metricKey) + '/usage');
+  }
+
+  /**
    * List configured metric goals (module targets) for the organization.
    * Read is allowed for all org members; the catalog uses this to surface a
    * goal indicator per metric. See LANA-AI/docs/METRIC_GOALS_DESIGN.md.
