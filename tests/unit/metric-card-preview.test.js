@@ -157,6 +157,26 @@ describe('metric-card-preview', () => {
       expect(html).not.toContain('x'.repeat(400));
       expect(html).toContain('matter, contact');
     });
+
+    test('object format renders its type token, not [object Object]', () => {
+      const html = preview.renderRulesPanel(null, { format: { type: 'percentage', decimals: 1 } });
+      expect(html).toContain('percentage');
+      expect(html).not.toContain('[object Object]');
+    });
+
+    test('calculation extracts the SQL query from a JSON wrapper (object and string)', () => {
+      const fromObject = preview.renderRulesPanel(null, {
+        calculation: { query: 'SELECT count(*) FROM matters', drilldown: { foo: 1 } },
+      });
+      expect(fromObject).toContain('SELECT count(*) FROM matters');
+      expect(fromObject).not.toContain('"query"');
+
+      const fromString = preview.renderRulesPanel(null, {
+        calculation: '{"query":"SELECT 1 FROM dual"}',
+      });
+      expect(fromString).toContain('SELECT 1 FROM dual');
+      expect(fromString).not.toContain('"query"');
+    });
   });
 
   describe('renderDrilldownTable', () => {

@@ -48,13 +48,47 @@
     return (g && g.ReportingGoalComparisonMapper) || (global && global.ReportingGoalComparisonMapper) || null;
   }
 
+  // Coerce a metric format (which may be a plain string token like "currency"
+  // or a registry config object like { type: 'percentage', ... }) into a
+  // readable token. Used both for value formatting and the Rules "Format" row
+  // so an object never renders as "[object Object]".
+  function formatToken(format) {
+    if (format == null) return '';
+    if (typeof format === 'string') return format;
+    if (typeof format === 'object') {
+      var t = format.type || format.style || format.format || format.name || format.unit;
+      if (t) return String(t);
+      try { return JSON.stringify(format); } catch (e) { return '(object)'; }
+    }
+    return String(format);
+  }
+
+  // Extract human-readable calculation text. Registry calculations are often a
+  // JSON wrapper { "query": "SELECT ...", ... } (as an object or a JSON string);
+  // show just the SQL rather than the wrapper.
+  function calculationText(calc) {
+    if (calc == null) return '';
+    var obj = calc;
+    if (typeof calc === 'string') {
+      var s = calc.trim();
+      if (s.charAt(0) !== '{') return s;
+      try { obj = JSON.parse(s); } catch (e) { return s; }
+    }
+    if (obj && typeof obj === 'object') {
+      if (typeof obj.query === 'string') return obj.query;
+      if (typeof obj.sql === 'string') return obj.sql;
+      try { return JSON.stringify(obj); } catch (e) { return String(obj); }
+    }
+    return String(obj);
+  }
+
   // Shared value formatter for the preview cards. Coerces the backend value
   // (number or numeric string) into a display string honoring the metric
   // format. Non-numeric / empty values render as a dash so an empty metric
   // never looks populated.
   function formatValue(value, format) {
     if (value == null || value === '') return '-';
-    var fmt = String(format || 'number').toLowerCase();
+    var fmt = (formatToken(format) || 'number').toLowerCase();
     var num = Number(value);
     if (value === 0 || num === 0) return '-';
     if (!isFinite(num)) return escapeHtml(String(value));
@@ -278,7 +312,8 @@
     if (definition) {
       parts.push('<div class="metric-catalog-playground-rules__section">');
       parts.push('<div class="metric-catalog-playground-rules__heading">Definition</div>');
-      if (definition.format != null) parts.push(rulesRow('Format', String(definition.format)));
+      var fmtLabel = formatToken(definition.format);
+      if (fmtLabel) parts.push(rulesRow('Format', fmtLabel));
       if (definition.inverse != null) parts.push(rulesRow('Inverse', definition.inverse ? 'Yes (lower is better)' : 'No'));
       if (definition.accumulation != null) parts.push(rulesRow('Accumulation', String(definition.accumulation)));
 
@@ -294,7 +329,7 @@
 
       var calc = definition.calculation;
       if (calc != null) {
-        var calcText = typeof calc === 'string' ? calc : JSON.stringify(calc);
+        var calcText = calculationText(calc);
         if (calcText && calcText.length > 240) calcText = calcText.slice(0, 240) + '...';
         if (calcText) {
           parts.push('<div class="metric-catalog-playground-rules__calc">'
