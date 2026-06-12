@@ -16,6 +16,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   padding: 16px 20px;
   background: var(--lex-bg-primary);
@@ -76,6 +77,32 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.agent-run-legal-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-basis: 100%;
+  margin-top: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-sm, 4px);
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-secondary);
+  font-size: 0.75rem;
+}
+
+.agent-run-legal-strip-label {
+  color: var(--lex-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.agent-run-legal-strip strong {
+  color: var(--lex-text-primary);
 }
 
 /* Badges */
@@ -507,6 +534,34 @@
 .agent-run-artifact-validation--invalid  { background: rgba(239, 68, 68, 0.14); color: #b91c1c; }
 .agent-run-artifact-validation--skipped  { background: var(--lex-bg-tertiary); color: var(--lex-text-tertiary); }
 
+.agent-run-artifact-legal-chip,
+.agent-run-artifact-provenance-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.agent-run-artifact-legal-chip--high {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
+.agent-run-artifact-legal-chip--normal {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.agent-run-artifact-provenance-chip {
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-tertiary);
+}
+
 .agent-run-artifact-validation-panel {
   margin: 8px 0;
   padding: 10px 12px;
@@ -548,6 +603,94 @@
 
 .agent-run-artifact-validation-msg {
   color: var(--lex-text-primary);
+}
+
+.agent-run-artifact-legal-panel {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-left: 3px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.07);
+  border-radius: 0 6px 6px 0;
+}
+
+.agent-run-artifact-legal-panel--blocked {
+  border-left-color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.agent-run-artifact-legal-panel-head {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #b91c1c;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.agent-run-artifact-legal-panel-message,
+.agent-run-artifact-legal-panel-detail {
+  font-size: 0.8125rem;
+  color: var(--lex-text-primary);
+  line-height: 1.5;
+}
+
+.agent-run-artifact-legal-panel-code {
+  display: inline-flex;
+  margin-top: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(220, 38, 38, 0.1);
+  color: #991b1b;
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+}
+
+.agent-run-artifact-legal-checks {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--lex-text-secondary);
+  font-size: 0.75rem;
+}
+
+.agent-run-artifact-legal-checks li {
+  margin: 2px 0;
+}
+
+.agent-run-artifact-legal-checks strong {
+  margin-left: 6px;
+  color: var(--lex-text-primary);
+}
+
+.agent-run-artifact-legal-checks em {
+  margin-left: 6px;
+  color: var(--lex-text-tertiary);
+  font-style: normal;
+}
+
+.agent-run-artifact-meta-panel {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-sm, 4px);
+  background: var(--lex-bg-secondary);
+  font-size: 0.75rem;
+}
+
+.agent-run-artifact-meta-panel div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.agent-run-artifact-meta-panel span {
+  color: var(--lex-text-tertiary);
+}
+
+.agent-run-artifact-meta-panel strong,
+.agent-run-artifact-meta-panel code {
+  color: var(--lex-text-primary);
+  font-weight: 600;
 }
 
 /* Phase 7: categorical outcome badge on the run-detail header */

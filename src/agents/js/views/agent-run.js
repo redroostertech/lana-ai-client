@@ -41,6 +41,7 @@
     +   '<div class="agent-run-header-actions">'
     +     '<lex-btn id="agentRunCancelBtn" variant="ghost" size="sm">Cancel Run</lex-btn>'
     +   '</div>'
+    +   '<div id="agentRunLegalHarnessStrip" class="agent-run-legal-strip hidden"></div>'
     + '</div>'
 
     + '<div class="agent-run-body">'
@@ -163,6 +164,7 @@
       startTimeMs: null,
       steps: [],
       artifacts: [],
+      legalHarnessManifest: null,
       artifactStates: {},
       opInFlight: false,
       destroyed: false,
@@ -211,7 +213,30 @@
       if (streamStatus) streamStatus.textContent = 'Closed';
     }
 
+    renderLegalHarnessStrip(state);
+
     document.title = (run.agent_name || run.agent_slug || 'Run') + ' - LANA AI';
+  }
+
+  function renderLegalHarnessStrip(state) {
+    var strip = el('agentRunLegalHarnessStrip');
+    if (!strip) return;
+    var manifest = state && state.legalHarnessManifest;
+    if (!manifest) {
+      hide(strip);
+      strip.innerHTML = '';
+      return;
+    }
+    var data = manifest.manifest || manifest.output_jsonb || manifest.output || manifest;
+    var policy = data.policy || {};
+    var feature = data.feature_flag || data.featureFlag || {};
+    var enabled = feature.enabled !== false;
+    strip.innerHTML = ''
+      + '<span class="agent-run-legal-strip-label">Legal harness</span>'
+      + '<strong>' + escHtml(enabled ? 'Enabled' : 'Disabled') + '</strong>'
+      + (policy.policy_version ? '<span>' + escHtml(policy.policy_version) + '</span>' : '')
+      + (policy.fail_closed_unknown === true ? '<span>Fail-closed unknown tools</span>' : '');
+    show(strip);
   }
 
   function startTimer(state) {
@@ -499,13 +524,21 @@
       + '<span class="agent-run-artifact-kind">' + escHtml(kind) + '</span>'
       + '<span class="agent-run-artifact-title">' + escHtml(title) + '</span>'
       + '<span class="agent-run-artifact-state ' + stateClass + '">' + escHtml(artState) + '</span>'
-      + renderValidationChip(artifact.validation);
+      + renderValidationChip(artifact.validation)
+      + renderLegalApprovalChip(artifact)
+      + renderProvenanceChip(artifact);
     card.appendChild(head);
 
     // Phase 7: when validation failed, surface the zod errors directly under
     // the head so reviewers can see WHY the artifact got flipped to 'failed'.
     if (artifact.validation && artifact.validation.status === 'invalid') {
       card.appendChild(renderValidationErrorPanel(artifact.validation));
+    }
+    if (artifact.application_gate_failure) {
+      card.appendChild(renderApplicationGateFailurePanel(artifact.application_gate_failure));
+    }
+    if (artifact.provenance_ref || artifact.approval_decision_history || artifact.approval_decisions) {
+      card.appendChild(renderArtifactMetadataPanel(artifact));
     }
 
     var body = document.createElement('div');
@@ -788,6 +821,10 @@
         var steps = (resp && resp.steps) || (run && run.steps) || [];
         var artifacts = (resp && resp.artifacts) || (run && run.artifacts) || [];
         if (!run) return { refreshed: false, error: null };
+        state.legalHarnessManifest = (resp && resp.legal_harness_manifest)
+          || (run && run.legal_harness_manifest)
+          || state.legalHarnessManifest
+          || null;
         state.artifactStates = {};
         renderHeader(state, run);
         hydrateSteps(state, steps);
@@ -926,6 +963,10 @@
   function dispatchEvent(state, eventName, data) {
     if (eventName === 'snapshot') {
       var snapRun = (data && data.run) ? data.run : data;
+      state.legalHarnessManifest = (data && data.legal_harness_manifest)
+        || (snapRun && snapRun.legal_harness_manifest)
+        || state.legalHarnessManifest
+        || null;
       if (snapRun) {
         renderHeader(state, snapRun);
       }
@@ -1104,6 +1145,9 @@
         // Phase 7: categorical outcome row from agent_run_outcomes.
         var outcome = resp && resp.outcome ? resp.outcome : null;
         if (!run) return;
+        state.legalHarnessManifest = (resp && resp.legal_harness_manifest)
+          || (run && run.legal_harness_manifest)
+          || null;
         renderHeader(state, run);
         hydrateSteps(state, steps);
         hydrateArtifacts(state, artifacts);
@@ -1164,6 +1208,105 @@
       + '<div class="agent-run-artifact-validation-panel-head">Schema validation failed</div>'
       + '<ol class="agent-run-artifact-validation-errors">' + (list || '<li>(no error details)</li>') + '</ol>';
     return panel;
+  }
+
+  function renderLegalApprovalChip(artifact) {
+    var legal = artifact && (artifact.legal_approval || (artifact.payload && artifact.payload.legal_approval));
+    if (!legal && artifact && artifact.approval_decision_history && artifact.approval_decision_history.length) {
+      for (var i = 0; i < artifact.approval_decision_history.length; i++) {
+        var row = artifact.approval_decision_history[i] || {};
+        var meta = row.metadata || {};
+        var payload = meta.payload || meta;
+        if (payload && payload.legal_approval) {
+          legal = payload.legal_approval;
+          break;
+        }
+      }
+    }
+    if (!legal) return '';
+    var tier = String(legal.risk_tier || legal.riskTier || 'legal').toLowerCase();
+    var mod = tier === 'critical' || tier === 'high'
+      ? 'agent-run-artifact-legal-chip--high'
+      : 'agent-run-artifact-legal-chip--normal';
+    return '<span class="agent-run-artifact-legal-chip ' + mod + '">Legal ' + escHtml(tier) + '</span>';
+  }
+
+  function renderProvenanceChip(artifact) {
+    var ref = artifact && artifact.provenance_ref;
+    if (!ref) return '';
+    var status = ref.lookup_status || ref.recording_mode || 'provenance';
+    return '<span class="agent-run-artifact-provenance-chip">Provenance ' + escHtml(status) + '</span>';
+  }
+
+  function renderApplicationGateFailurePanel(failure) {
+    var panel = document.createElement('div');
+    panel.className = 'agent-run-artifact-legal-panel agent-run-artifact-legal-panel--blocked';
+    var code = failure && failure.code ? String(failure.code) : 'legal_application_gate_blocked';
+    var message = failure && failure.message ? String(failure.message) : legalFailureMessage(code);
+    var checks = Array.isArray(failure && failure.checks) ? failure.checks : [];
+    var checksHtml = '';
+    for (var i = 0; i < checks.length; i++) {
+      var c = checks[i] || {};
+      checksHtml += '<li>'
+        + '<span>' + escHtml(c.name || 'check') + '</span>'
+        + '<strong>' + escHtml(c.ok === false ? 'blocked' : 'passed') + '</strong>'
+        + (c.reason ? '<em>' + escHtml(c.reason) + '</em>' : '')
+        + '</li>';
+    }
+    panel.innerHTML = ''
+      + '<div class="agent-run-artifact-legal-panel-head">Legal application blocked</div>'
+      + '<div class="agent-run-artifact-legal-panel-message">'
+      +   escHtml(legalFailureMessage(code))
+      + '</div>'
+      + '<div class="agent-run-artifact-legal-panel-code">' + escHtml(code) + '</div>'
+      + (message && message !== legalFailureMessage(code)
+        ? '<div class="agent-run-artifact-legal-panel-detail">' + escHtml(message) + '</div>'
+        : '')
+      + (failure && failure.output_hash
+        ? '<div class="agent-run-artifact-legal-panel-detail">Output hash: <code>' + escHtml(failure.output_hash) + '</code></div>'
+        : '')
+      + (checksHtml ? '<ul class="agent-run-artifact-legal-checks">' + checksHtml + '</ul>' : '');
+    return panel;
+  }
+
+  function renderArtifactMetadataPanel(artifact) {
+    var ref = artifact && artifact.provenance_ref;
+    var history = artifact && (artifact.approval_decision_history || artifact.approval_decisions) || [];
+    if (!ref && (!history || history.length === 0)) return document.createTextNode('');
+    var panel = document.createElement('div');
+    panel.className = 'agent-run-artifact-meta-panel';
+    var rows = '';
+    if (ref) {
+      rows += '<div><span>Provenance</span><strong>' + escHtml(ref.lookup_status || ref.recording_mode || 'available') + '</strong></div>';
+      if (ref.output_hash) rows += '<div><span>Output hash</span><code>' + escHtml(shortHash(ref.output_hash)) + '</code></div>';
+    }
+    if (history && history.length > 0) {
+      rows += '<div><span>Approval decisions</span><strong>' + escHtml(String(history.length)) + '</strong></div>';
+    }
+    panel.innerHTML = rows;
+    return panel;
+  }
+
+  function legalFailureMessage(code) {
+    switch (code) {
+      case 'privilege_review_required':
+        return 'Privilege review is required before this artifact can be applied.';
+      case 'disclosure_evidence_missing':
+        return 'Disclosure-like output needs cited source documents before it can be applied.';
+      case 'disclosure_gate_disabled':
+        return 'The disclosure gate must be enabled before this disclosure-like artifact can be applied.';
+      case 'disclosure_blocked':
+        return 'A source document is blocked by the disclosure gate.';
+      case 'unresolved_conflict':
+        return 'A conflict marker is unresolved and must be cleared first.';
+      default:
+        return 'The legal application gate blocked this artifact.';
+    }
+  }
+
+  function shortHash(value) {
+    var s = String(value || '');
+    return s.length > 16 ? s.slice(0, 12) + '...' : s;
   }
 
   // =========================================================================
