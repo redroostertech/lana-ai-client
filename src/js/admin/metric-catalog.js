@@ -316,6 +316,7 @@
     var html = '<div class="metric-catalog-actions">'
       + goalIndicator(metric)
       + '<button type="button" class="metric-catalog-btn metric-catalog-btn--run" data-metric-run="' + escapeHtml(metric.key) + '">Run</button>'
+      + '<button type="button" class="metric-catalog-btn metric-catalog-btn--playground" data-metric-playground="' + escapeHtml(metric.key) + '">Playground</button>'
       + '<button type="button" class="metric-catalog-btn" data-metric-view="' + escapeHtml(metric.key) + '">View</button>';
     if (isGoalAdmin) {
       html += '<button type="button" class="metric-catalog-btn metric-catalog-btn--goal" data-metric-goal="' + escapeHtml(metric.key) + '">Goal</button>';
@@ -578,6 +579,300 @@
       }
     }
     setTimeout(wireDrawerButtons, 50);
+  }
+
+  // --- Playground ------------------------------------------------------------
+
+  // Pure preset date math, replicated from dashboard-detail.js so the drawer
+  // stays self-contained. Returns YYYY-MM-DD strings plus the grain the preset
+  // implies. Presets carry a calendar grain; manual edits override the grain.
+  function presetRange(name) {
+    var today = new Date();
+    var startDate;
+    var endDate;
+    var grain = 'monthly';
+
+    function fmt(date) {
+      var year = date.getFullYear();
+      var month = String(date.getMonth() + 1).padStart(2, '0');
+      var day = String(date.getDate()).padStart(2, '0');
+      return year + '-' + month + '-' + day;
+    }
+
+    switch (name) {
+      case 'lastMonth':
+        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        grain = 'monthly';
+        break;
+      case 'last30days':
+        endDate = new Date(today);
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 29);
+        grain = 'daily';
+        break;
+      case 'thisQuarter':
+        var currentQuarter = Math.floor(today.getMonth() / 3);
+        startDate = new Date(today.getFullYear(), currentQuarter * 3, 1);
+        endDate = new Date(today);
+        grain = 'monthly';
+        break;
+      case 'thisYear':
+        startDate = new Date(today.getFullYear(), 0, 1);
+        endDate = new Date(today);
+        grain = 'monthly';
+        break;
+      case 'thisMonth':
+      default:
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        endDate = new Date(today);
+        grain = 'monthly';
+        break;
+    }
+
+    return { start: fmt(startDate), end: fmt(endDate), grain: grain };
+  }
+
+  // ISO conversion mirroring dashboard-detail.toPeriodISOString: start clamps to
+  // 00:00:00, end clamps to 23:59:59 so the window includes the full end day.
+  function playgroundISO(value, endOfDay) {
+    if (!value) return '';
+    var hasTime = String(value).indexOf('T') !== -1;
+    var parsed = new Date(hasTime ? value : value + (endOfDay ? 'T23:59:59' : 'T00:00:00'));
+    return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : '';
+  }
+
+  function preview() {
+    return (typeof window !== 'undefined' && window.MetricCardPreview) || null;
+  }
+
+  // Presets shared between the control buttons and the preset-range resolver.
+  var PLAYGROUND_PRESETS = [
+    { key: 'thisMonth', label: 'This month' },
+    { key: 'lastMonth', label: 'Last month' },
+    { key: 'last30days', label: 'Last 30 days' },
+    { key: 'thisQuarter', label: 'This quarter' },
+    { key: 'thisYear', label: 'This year' },
+  ];
+
+  function playgroundBodyHtml() {
+    var presetBtns = PLAYGROUND_PRESETS.map(function (p) {
+      return '<lex-btn variant="secondary" size="sm" data-playground-preset="' + escapeHtml(p.key) + '">' + escapeHtml(p.label) + '</lex-btn>';
+    }).join('');
+
+    return '<div class="metric-catalog-playground">'
+      + '<div class="metric-catalog-playground__controls">'
+      + '<div class="metric-catalog-playground__presets">' + presetBtns + '</div>'
+      + '<div class="metric-catalog-playground__range">'
+      + '<lex-input type="date" label="Start" name="playgroundStart" id="metricPlaygroundStart"></lex-input>'
+      + '<lex-input type="date" label="End" name="playgroundEnd" id="metricPlaygroundEnd"></lex-input>'
+      + '<lex-segmented name="playgroundGrain" id="metricPlaygroundGrain"></lex-segmented>'
+      + '<lex-btn variant="primary" size="sm" id="metricPlaygroundPreview">Preview</lex-btn>'
+      + '</div>'
+      + '</div>'
+      + '<lex-tabs id="metricPlaygroundTabs"></lex-tabs>'
+      + '<lex-card heading="Preview" padding="compact">'
+      + '<div class="metric-catalog-playground__card" id="metricPlaygroundCard">'
+      + '<div class="metric-catalog-muted">Loading preview...</div>'
+      + '</div>'
+      + '</lex-card>'
+      + '<lex-card heading="Rules" padding="compact">'
+      + '<div id="metricPlaygroundRules"><div class="metric-catalog-muted">-</div></div>'
+      + '</lex-card>'
+      + '<lex-card heading="Drilldown" padding="compact">'
+      + '<div id="metricPlaygroundDrilldown"><lex-empty message="Run a preview to see drilldown rows." size="compact"></lex-empty></div>'
+      + '</lex-card>'
+      + '</div>';
+  }
+
+  function openPlaygroundDrawer(metric) {
+    if (!window.Lex || !Lex.Drawer) return;
+
+    Lex.Drawer.open({
+      heading: 'Playground: ' + (metric.display_name || metric.key),
+      content: playgroundBodyHtml(),
+      width: 'xl',
+      buttons: [
+        { label: 'Close', variant: 'secondary', id: 'metricPlaygroundClose' },
+      ],
+    });
+
+    // Last payload cache so tab switches re-render the active card without
+    // refetching. definitionLoaded guards the lazy one-time catalog/goals fetch.
+    var lastData = null;
+    var lastDefinition = null;
+    var lastGoalForPeriod = null;
+    var activeTab = 'dashboard';
+    var definitionLoaded = false;
+
+    function bodyNode() {
+      return document.querySelector('.lex-drawer__body, .lex-drawer-body');
+    }
+
+    function renderActiveCard() {
+      var card = el('metricPlaygroundCard');
+      var pv = preview();
+      if (!card || !pv) return;
+      if (!lastData) {
+        card.innerHTML = '<div class="metric-catalog-muted">Run a preview to see this card.</div>';
+        return;
+      }
+      var current = lastData.current || {};
+      if (activeTab === 'report') {
+        card.innerHTML = pv.renderReportPreviewCard({
+          name: metric.display_name || metric.key,
+          key: metric.key,
+          current: current.value,
+          format: current.format,
+          goal: lastData.goal || null,
+          comparison: lastData.comparison || null,
+        });
+      } else {
+        card.innerHTML = pv.renderDashboardPreviewCard({
+          title: metric.display_name || metric.key,
+          key: metric.key,
+          value: current.value,
+          format: current.format,
+          goal: lastData.goal || null,
+          comparison: lastData.comparison || null,
+        });
+      }
+    }
+
+    function setActiveTab(tab) {
+      activeTab = tab;
+      var tabs = el('metricPlaygroundTabs');
+      // Keep the lex-tabs strip in sync when the switch was driven by code.
+      if (tabs && tabs.active !== tab) tabs.active = tab;
+      renderActiveCard();
+    }
+
+    function applyPreset(name) {
+      var range = presetRange(name);
+      var start = el('metricPlaygroundStart');
+      var end = el('metricPlaygroundEnd');
+      var grain = el('metricPlaygroundGrain');
+      if (start) start.value = range.start;
+      if (end) end.value = range.end;
+      if (grain) grain.value = range.grain;
+      // Presets compare against the matching calendar window.
+      runPreview(true);
+    }
+
+    async function runPreview(isPreset) {
+      var pv = preview();
+      var card = el('metricPlaygroundCard');
+      var rulesNode = el('metricPlaygroundRules');
+      var drillNode = el('metricPlaygroundDrilldown');
+      var start = (el('metricPlaygroundStart') || {}).value || '';
+      var end = (el('metricPlaygroundEnd') || {}).value || '';
+      var grain = (el('metricPlaygroundGrain') || {}).value || 'monthly';
+      if (!start || !end) return;
+
+      if (card) card.innerHTML = '<div class="metric-catalog-muted">Loading...</div>';
+
+      var compareMode = (typeof MetricGoalComparison !== 'undefined')
+        ? MetricGoalComparison.resolveCompareMode(!!isPreset)
+        : (isPreset ? 'previous_calendar' : 'previous_period');
+
+      try {
+        var response = await api.getMetricDetail(metric.key, {
+          periodStart: playgroundISO(start, false),
+          periodEnd: playgroundISO(end, true),
+          periodType: grain,
+          compareToPrevious: true,
+          compareMode: compareMode,
+        });
+        var data = response && response.data ? response.data : response;
+        lastData = data || {};
+        lastGoalForPeriod = lastData.goal || null;
+
+        // Lazily load the catalog definition + configured goal once. The goal
+        // attached to the detail payload (data.goal) is already period-aware;
+        // the goals list is a fallback when the detail omits one for the grain.
+        if (!definitionLoaded) {
+          definitionLoaded = true;
+          try {
+            var defResp = await api.getMetricCatalogEntry(metric.key);
+            lastDefinition = (defResp && defResp.data) ? defResp.data : (defResp || null);
+          } catch (e) {
+            lastDefinition = null;
+          }
+        }
+
+        renderActiveCard();
+        if (rulesNode && pv) rulesNode.innerHTML = pv.renderRulesPanel(lastGoalForPeriod, lastDefinition);
+        if (drillNode && pv) {
+          var current = lastData.current || {};
+          drillNode.innerHTML = pv.renderDrilldownTable(current.raw_rows);
+        }
+      } catch (err) {
+        lastData = null;
+        if (card) card.innerHTML = '<div class="metric-catalog-drawer__run metric-catalog-drawer__run--fail">'
+          + '<div><strong>Error:</strong> ' + escapeHtml((err && err.message) || 'Preview failed') + '</div></div>';
+      }
+    }
+
+    function wirePlaygroundButtons() {
+      // The drawer body is set via innerHTML, so the Lex elements must have their
+      // array/value JS properties assigned and their listeners (re)bound here,
+      // mirroring the goal-editor re-bind pattern. A body-level guard keeps the
+      // delegated click handler from stacking across re-renders.
+      var grain = el('metricPlaygroundGrain');
+      if (grain) {
+        grain.options = [
+          { value: 'daily', label: 'Daily' },
+          { value: 'weekly', label: 'Weekly' },
+          { value: 'monthly', label: 'Monthly' },
+        ];
+        if (!grain.value) grain.value = 'monthly';
+      }
+
+      var tabs = el('metricPlaygroundTabs');
+      if (tabs) {
+        tabs.tabs = [
+          { id: 'dashboard', label: 'Dashboard' },
+          { id: 'report', label: 'Report' },
+        ];
+        tabs.active = activeTab;
+        if (!tabs.dataset.bound) {
+          tabs.dataset.bound = '1';
+          // Cached-payload tab switch: re-render the active card, no refetch.
+          tabs.addEventListener('tab-change', function (event) {
+            setActiveTab(event.detail.tab);
+          });
+        }
+      }
+
+      var body = bodyNode();
+      if (body && !body.dataset.playgroundBound) {
+        body.dataset.playgroundBound = '1';
+        // lex-btn surfaces a bubbling click, so a delegated handler still works
+        // for the preset buttons and the Preview button.
+        body.addEventListener('click', function (event) {
+          var presetBtn = event.target.closest('[data-playground-preset]');
+          if (presetBtn) {
+            applyPreset(presetBtn.getAttribute('data-playground-preset'));
+            return;
+          }
+          if (event.target.closest('#metricPlaygroundPreview')) {
+            // A manual preview run uses whatever is in the inputs; treat it as a
+            // custom range so the comparison is the prior equal-length window.
+            runPreview(false);
+          }
+        });
+      }
+
+      var closeBtn = document.getElementById('metricPlaygroundClose');
+      if (closeBtn && !closeBtn.dataset.bound) {
+        closeBtn.dataset.bound = '1';
+        closeBtn.addEventListener('click', function () { if (Lex.Drawer.close) Lex.Drawer.close(); });
+      }
+
+      // Default on open: This month preset, monthly grain, auto-run once.
+      applyPreset('thisMonth');
+    }
+    setTimeout(wirePlaygroundButtons, 50);
   }
 
   // --- Goal editor -----------------------------------------------------------
@@ -869,6 +1164,15 @@
           event.preventDefault();
           event.stopPropagation();
           runMetric(runBtn.getAttribute('data-metric-run'));
+          return;
+        }
+        var playgroundBtn = event.target.closest('[data-metric-playground]');
+        if (playgroundBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          var pgKey = playgroundBtn.getAttribute('data-metric-playground');
+          var pgMetric = allMetrics.find(function (m) { return m.key === pgKey; });
+          if (pgMetric) openPlaygroundDrawer(pgMetric);
           return;
         }
         var viewBtn = event.target.closest('[data-metric-view]');

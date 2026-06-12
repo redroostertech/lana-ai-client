@@ -2809,9 +2809,23 @@ class ApiClient {
     const queryParts = [];
     if (params.periodStart) queryParts.push('periodStart=' + encodeURIComponent(params.periodStart));
     if (params.periodEnd) queryParts.push('periodEnd=' + encodeURIComponent(params.periodEnd));
+    if (params.periodType) queryParts.push('periodType=' + encodeURIComponent(params.periodType));
     if (params.compareBy) queryParts.push('compareBy=' + encodeURIComponent(params.compareBy));
+    if (params.compareToPrevious !== undefined) queryParts.push('compareToPrevious=' + encodeURIComponent(String(params.compareToPrevious)));
+    if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
     return this.get(url);
+  }
+
+  /**
+   * Get the full catalog definition for a single metric (calculation,
+   * businessLogic, format, entities, dimensions, inverse, accumulation,
+   * target, ...). Drives the Playground Rules panel.
+   * @param {string} metricKey - Registry metric key
+   * @returns {Promise<Object>} { data: { calculation, businessLogic, format, entities, ... } }
+   */
+  async getMetricCatalogEntry(metricKey) {
+    return this.get('/api/v1/modules/metric-catalog/' + encodeURIComponent(metricKey));
   }
 
   /**
