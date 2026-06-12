@@ -1,0 +1,229 @@
+/*
+ * doc-studio-create-modal.css - Styles for the global DocStudioCreateModal.
+ *
+ * Scoped to the injected modal's own elements (dscm- prefixed classes), ported
+ * from the Tailwind utility classes used by the workspace-details Doc Studio
+ * markup. Self-contained: does not rely on external utility CSS.
+ */
+
+/* Create form layout */
+.dscm-form {
+  padding: 1.5rem;
+}
+
+.dscm-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .dscm-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.dscm-form > * + * {
+  margin-top: 1.25rem;
+}
+
+.dscm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Progress panel */
+.dscm-progress {
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  padding: 0.75rem;
+}
+
+.dscm-progress.hidden {
+  display: none;
+}
+
+.dscm-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dscm-progress-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.dscm-progress-subtitle {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.dscm-progress-elapsed {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.dscm-progress-track {
+  margin-top: 0.75rem;
+  height: 0.375rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: #e5e7eb;
+}
+
+.dscm-progress-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 9999px;
+  background: var(--lex-bg-accent);
+  transition: width 0.3s ease;
+}
+
+.dscm-progress-steps {
+  margin: 0.75rem 0 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+
+.dscm-progress-steps > li + li {
+  margin-top: 0.5rem;
+}
+
+/* Progress steps */
+.dscm-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.dscm-step-icon {
+  display: inline-flex;
+  height: 1.25rem;
+  width: 1.25rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.dscm-step-icon-done {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.dscm-step-icon-error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.dscm-step-icon-active {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+}
+
+.dscm-step-dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 9999px;
+  background: var(--lex-bg-accent);
+  animation: dscm-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes dscm-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.dscm-step-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.dscm-step-label {
+  font-weight: 500;
+}
+
+.dscm-step-text {
+  color: #374151;
+}
+
+.dscm-step-text-error {
+  color: #b91c1c;
+}
+
+.dscm-step-detail {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* Status message */
+.dscm-status {
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.dscm-status.hidden {
+  display: none;
+}
+
+.dscm-status-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+/* Viewer modal */
+.dscm-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 76vh;
+}
+
+.dscm-viewer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dscm-viewer-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.dscm-viewer-meta {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.dscm-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dscm-viewer-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  border: 0;
+  background: #ffffff;
+}

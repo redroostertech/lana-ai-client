@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/drive.css">
   <link rel="stylesheet" href="css/library-brainchild.css">
+  <link rel="stylesheet" href="css/library-org-knowledge.css">
   <script src="js/tailwind-loader.js"></script>
 
 </head>
@@ -83,7 +84,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Source:</label>
             <lex-select
               id="sourceFilter"
-              options='[{"value":"all","label":"All Sources"},{"value":"client_matters","label":"My Matters"},{"value":"connector","label":"Connected Systems"},{"value":"brainchild","label":"Knowledgebase"}]'
+              options='[{"value":"all","label":"All Sources"},{"value":"client_matters","label":"My Matters"},{"value":"connector","label":"Connected Systems"},{"value":"brainchild","label":"Knowledgebase"},{"value":"org_knowledge","label":"Shared Knowledge"}]'
               value="all"
             ></lex-select>
           </div>
@@ -181,7 +182,7 @@
       <div id="gridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 
       <!-- List View -->
-      <div id="listView" class="hidden bg-white rounded-lg shadow-sm border overflow-hidden" style="border-color: var(--lex-border-default)">
+      <div id="listView" class="hidden bg-white rounded-lg shadow-sm border overflow-x-auto" style="border-color: var(--lex-border-default)">
         <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
           <thead style="background-color: var(--lex-bg-secondary)">
             <tr>
@@ -205,6 +206,33 @@
           action-label="Create Folder"
           id="contentEmptyWidget"
         ></lex-empty>
+      </div>
+
+      <!-- Files Section (shown only while searching, when there are file matches) -->
+      <div id="driveFilesSection" class="hidden mt-8">
+        <!-- Section Header -->
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="driveFilesHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">Files</h2>
+          <span id="driveFilesCount" class="text-sm" style="color: var(--lex-text-secondary)"></span>
+        </div>
+
+        <!-- Grid View -->
+        <div id="filesGridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+
+        <!-- List View -->
+        <div id="filesListView" class="hidden bg-white rounded-lg shadow-sm border overflow-hidden" style="border-color: var(--lex-border-default)">
+          <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
+            <thead style="background-color: var(--lex-bg-secondary)">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Name</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Matter</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created On</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Size</th>
+              </tr>
+            </thead>
+            <tbody id="filesListViewBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Pagination Controls -->
@@ -373,6 +401,7 @@
   <script src="js/shared/document-library-mapper.js"></script>
   <script src="js/shared/brainchild-promote-builder.js"></script>
   <script src="js/library/brainchild-scope.js"></script>
+  <script src="js/library/org-knowledge-scope.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/drive.js"></script>

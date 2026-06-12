@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/drive.css">
   <link rel="stylesheet" href="css/library-folder.css">
+  <link rel="stylesheet" href="css/components/doc-studio-create-modal.css">
   <script src="js/tailwind-loader.js"></script>
 
 </head>
@@ -424,6 +425,9 @@
 
   <!-- Reusable file-list component (must load before folder.js) -->
   <script src="js/components/matter-documents-view.js"></script>
+
+  <!-- In-page Doc Studio create modal (self-injecting; must load before folder.js) -->
+  <script src="js/components/doc-studio-create-modal.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/folder.js"></script>

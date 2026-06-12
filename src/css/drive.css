@@ -129,3 +129,11 @@
   max-height: 0;
   margin-bottom: 0;
 }
+
+/* Files search results: constrain the shared file icon svg to the list-row size.
+   getFileIconSVG returns icons sized for grid cards, so scale them down inside
+   the Files list-view name cell to match the matters list-row icon footprint. */
+#filesListViewBody .flex-shrink-0 svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}

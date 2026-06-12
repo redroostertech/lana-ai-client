@@ -242,17 +242,6 @@
       }
     }
 
-    async function searchNotes(query, limit) {
-      if (!bridge || !bridge.search) return fetchNotes();
-      try {
-        var result = await bridge.search({ query: query, limit: limit || 50 });
-        if (!result || result.success === false) return [];
-        return Array.isArray(result.notes) ? result.notes : [];
-      } catch (_error) {
-        return [];
-      }
-    }
-
     function normalizeRows(notes) {
       if (!mapper || typeof mapper.normalizeLibraryItems !== 'function') return [];
       return mapper.normalizeLibraryItems({ notes: notes }, 'my');
@@ -279,8 +268,16 @@
     async function runSearch(query) {
       var trimmed = (query || '').trim();
       if (!isConnected()) { state.rows = []; notify(); return state.rows; }
-      var notes = trimmed ? await searchNotes(trimmed) : await fetchNotes();
-      state.rows = normalizeRows(notes);
+      var allRows = normalizeRows(await fetchNotes());
+      if (!trimmed) {
+        state.rows = allRows;
+      } else {
+        var needle = trimmed.toLowerCase();
+        state.rows = allRows.filter(function (r) {
+          var name = ((r && (r.filename || r.name || r.title)) || '').toLowerCase();
+          return name.indexOf(needle) !== -1;
+        });
+      }
       notify();
       return state.rows;
     }
@@ -440,7 +437,6 @@
       load: load,
       runSearch: runSearch,
       fetchNotes: fetchNotes,
-      searchNotes: searchNotes,
       getNote: getNote,
       connect: connect,
       reconnect: reconnect,

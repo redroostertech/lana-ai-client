@@ -303,9 +303,16 @@
 
       .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-global-search {
         width: 2.5rem;
+        height: 2.5rem;
         justify-content: center;
         padding: 0.5rem;
         gap: 0;
+        box-sizing: border-box;
+      }
+
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-global-search svg {
+        width: 1.25rem;
+        height: 1.25rem;
       }
 
       .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-global-search-label,
@@ -315,6 +322,11 @@
         flex: 0 0 0px;
         overflow: hidden;
         pointer-events: none;
+        /* Zero the residual box (the shortcut keeps its base padding + 1px
+           border otherwise) so the icon centers in the collapsed square. */
+        padding: 0;
+        margin: 0;
+        border-width: 0;
       }
 
       .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-app-switcher {

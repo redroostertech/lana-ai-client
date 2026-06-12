@@ -1,0 +1,102 @@
+/* library-org-knowledge.css
+   Styles for the "Shared Knowledge" scope inside the Library (drive.html).
+   This scope lists the organization's promoted knowledge notes. Loaded via the
+   drive.html head alongside drive.css and library-brainchild.css. Everything is
+   keyed off the .library-ok- prefix so it never collides with the
+   matters/files/Brainchild presentation. No inline styles for this UI live
+   anywhere else.
+
+   Plain ASCII only: no emojis, no em dashes, no en dashes. */
+
+/* Note card in the grid view. */
+.library-ok-note-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.library-ok-note-card:hover {
+  box-shadow: var(--lex-shadow-md);
+}
+
+.library-ok-note-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+  margin-bottom: 6px;
+}
+
+/* Truncated note preview text inside a card. */
+.library-ok-note-preview {
+  font-size: 0.8125rem;
+  color: var(--lex-text-secondary);
+  margin-bottom: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* "Promoted by {name}" meta line. */
+.library-ok-note-meta {
+  font-size: 0.75rem;
+  color: var(--lex-text-tertiary);
+  margin-bottom: 10px;
+}
+
+.library-ok-note-meta-name {
+  color: var(--lex-text-secondary);
+}
+
+/* Footer row of a grid card holding the remove action. */
+.library-ok-note-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Remove action button (grid card and list row). */
+.library-ok-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--lex-border-default);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--lex-status-error-text, var(--lex-text-secondary));
+}
+
+.library-ok-remove-btn:hover {
+  background-color: var(--lex-bg-secondary);
+}
+
+.library-ok-remove-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Empty state shown when the org has no promoted notes (or none match search). */
+.library-ok-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.library-ok-empty-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--lex-text-tertiary);
+}
+
+.library-ok-empty-copy {
+  max-width: 28rem;
+  font-size: 0.9375rem;
+  color: var(--lex-text-secondary);
+}

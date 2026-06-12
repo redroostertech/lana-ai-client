@@ -261,6 +261,15 @@
     var enableTemplateToggle = opts.enableTemplateToggle === true;
     var enableRetry = opts.enableRetry === true;
     var enableReplace = opts.enableReplace === true;
+    // Host may own search via its own toolbar (e.g. the Library folder view),
+    // in which case the component's built-in search bar is suppressed to avoid
+    // a duplicate control. Defaults on for standalone use (workspace-details).
+    var enableSearch = opts.enableSearch !== false;
+    // Whether the component renders its own "Create using Doc Studio" button.
+    // Hosts that already provide their own Doc Studio entry point (e.g. the
+    // workspace-details Matter documents header) pass false to avoid a
+    // duplicate. Defaults on so standalone hosts (the Library folder) keep it.
+    var enableDocStudio = opts.enableDocStudio !== false;
     var pageSize = opts.pageSize || 12;
 
     // Instance-local state.
@@ -576,7 +585,7 @@
       var documentCount = totalCount - templateCount;
 
       var headerHtml = '';
-      if (onCreateDocStudio) {
+      if (onCreateDocStudio && enableDocStudio) {
         headerHtml =
           '<div class="mdv-header">' +
             '<button type="button" class="mdv-doc-studio-btn" data-action="create-doc-studio">' +
@@ -585,11 +594,12 @@
           '</div>';
       }
 
-      var searchHtml =
-        '<div class="mdv-search">' +
-          ICON_SEARCH +
-          '<input type="text" class="mdv-search-input" data-mdv-search placeholder="Search files..." value="' + esc(state.search) + '">' +
-        '</div>';
+      var searchHtml = enableSearch
+        ? '<div class="mdv-search">' +
+            ICON_SEARCH +
+            '<input type="text" class="mdv-search-input" data-mdv-search placeholder="Search files..." value="' + esc(state.search) + '">' +
+          '</div>'
+        : '';
 
       var controlsHtml = '';
       var filtersHtml = '';

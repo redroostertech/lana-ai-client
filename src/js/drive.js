@@ -50,6 +50,20 @@
   // It owns all bridge/status/promote logic; this page is presentation + wiring.
   var brainchildScope = null;
 
+  // Map of org-promoted note key -> org promoted-knowledge document id. The key
+  // is the promoted item's original_note_id (which equals the source note's
+  // vault path); the value is the org document id used to unpromote (remove the
+  // org copy). Populated when the Brainchild scope loads so already-promoted
+  // notes render an actionable "Promoted" pill instead of the Promote action.
+  // null until loaded / when unavailable; reset to null on leave.
+  var brainchildPromotedIds = null;
+
+  // Shared Knowledge scope controller (library/org-knowledge-scope.js). Created
+  // lazily the first time the user switches the Source filter to "Shared
+  // Knowledge". It owns the org-promoted-knowledge list/delete logic; this page
+  // is presentation + wiring.
+  var orgKnowledgeScope = null;
+
   // ── State reset ─────────────────────────────────────────────────────
 
   /**
@@ -60,6 +74,7 @@
     storageState = {
       viewMode: 'list',
       folders: [],
+      files: [],
       searchQuery: '',
       sortBy: 'name',
       sortOrder: 'asc',
@@ -126,7 +141,7 @@
     // a back/forward restore reuses the cached page without re-running onEnter,
     // so re-fetch here so a just-opened file appears at the top of recents.
     function refreshRecentsOnReturn() {
-      if (isBrainchildScope()) return;
+      if (isBrainchildScope() || isOrgKnowledgeScope()) return;
       loadRecentMatters();
       loadPinnedMatters();
     }
@@ -157,6 +172,8 @@
           storageState.currentPage = 1;
           if (isBrainchildScope()) {
             runBrainchildSearch(query);
+          } else if (isOrgKnowledgeScope()) {
+            runOrgKnowledgeSearch(query);
           } else {
             loadMatters({ silent: true });
           }
@@ -171,6 +188,8 @@
         storageState.currentPage = 1;
         if (isBrainchildScope()) {
           runBrainchildSearch(query);
+        } else if (isOrgKnowledgeScope()) {
+          runOrgKnowledgeSearch(query);
         } else {
           loadMatters({ silent: true });
         }
@@ -183,7 +202,8 @@
       sortSelect.addEventListener('lex-change', function (e) {
         storageState.sortBy = e.detail.value || 'name';
         storageState.currentPage = 1;
-        if (isBrainchildScope()) return; // sort applies to matters/files only
+        if (isBrainchildScope()) { updateSortHeaderIndicators(); renderBrainchildScope(); return; }
+        if (isOrgKnowledgeScope()) { updateSortHeaderIndicators(); renderOrgKnowledgeScope(); return; }
         updateSortHeaderIndicators();
         loadMatters({ silent: true });
       });
@@ -211,7 +231,8 @@
         }
 
         updateSortHeaderIndicators();
-        if (isBrainchildScope()) return; // sort applies to matters/files only
+        if (isBrainchildScope()) { renderBrainchildScope(); return; }
+        if (isOrgKnowledgeScope()) { renderOrgKnowledgeScope(); return; }
         loadMatters({ silent: true });
       });
     }
@@ -228,8 +249,21 @@
           var searchEl = document.getElementById('searchInput');
           if (searchEl) searchEl.value = '';
           loadBrainchildNotes();
+        } else if (isOrgKnowledgeScope()) {
+          // Clear any matters query and load the org's promoted knowledge.
+          storageState.searchQuery = '';
+          var searchOkEl = document.getElementById('searchInput');
+          if (searchOkEl) searchOkEl.value = '';
+          hideBrainchildChrome();
+          loadOrgKnowledge();
         } else {
           hideBrainchildChrome();
+          // Pinned/Recents are matters-only and were hidden by the notes
+          // scopes; un-hide them when returning to a matters view.
+          var pinnedSection = document.getElementById('pinnedSection');
+          var recentsSection = document.getElementById('recentsSection');
+          if (pinnedSection) pinnedSection.classList.remove('hidden');
+          if (recentsSection) recentsSection.classList.remove('hidden');
           loadMatters({ silent: true });
         }
       });
@@ -240,7 +274,7 @@
     if (drivePagination) {
       drivePagination.addEventListener('page-change', function (e) {
         storageState.currentPage = e.detail.page;
-        if (isBrainchildScope()) return; // notes scope is single-page
+        if (isBrainchildScope() || isOrgKnowledgeScope()) return; // notes scope is single-page
         loadMatters();
       });
     }
@@ -271,7 +305,6 @@
     var sortHeaders = document.querySelectorAll('.drive-sort-th[data-sort-field]');
     Array.prototype.forEach.call(sortHeaders, function (header) {
       var activate = function () {
-        if (isBrainchildScope()) return; // sort applies to matters/files only
         handleHeaderSort(header.getAttribute('data-sort-field'));
       };
       header.addEventListener('click', activate);
@@ -303,6 +336,8 @@
     storageState.currentPage = 1;
 
     syncSortControls();
+    if (isBrainchildScope()) { renderBrainchildScope(); return; }
+    if (isOrgKnowledgeScope()) { renderOrgKnowledgeScope(); return; }
     loadMatters({ silent: true });
   }
 
@@ -351,6 +386,43 @@
         ? (asc ? 'ascending' : 'descending')
         : 'none');
     });
+  }
+
+  /**
+   * Build a compare function for client-side sorting of the notes scopes
+   * (Knowledgebase / Shared Knowledge) from the active storageState.sortBy /
+   * sortOrder. Date fields sort by parsed timestamp; everything else (including
+   * the matters-only count fields, which do not apply to notes) sorts by name.
+   * @returns {Function} compare(a, b)
+   */
+  function scopeSortComparator() {
+    var field = storageState.sortBy;
+    var desc = storageState.sortOrder === 'desc';
+    var isDateField = field === 'created_at' || field === 'updated_at';
+
+    function nameOf(item) {
+      return ((item && (item.filename || item.title || item.name)) || '').toLowerCase();
+    }
+
+    function dateOf(item) {
+      if (!item) return 0;
+      var raw = item[field] || item.created_at || item.updated_at;
+      return raw ? new Date(raw).getTime() : 0;
+    }
+
+    return function (a, b) {
+      var cmp;
+      if (isDateField) {
+        var av = dateOf(a);
+        var bv = dateOf(b);
+        cmp = av < bv ? -1 : (av > bv ? 1 : 0);
+      } else {
+        var an = nameOf(a);
+        var bn = nameOf(b);
+        cmp = an < bn ? -1 : (an > bn ? 1 : 0);
+      }
+      return desc ? cmp * -1 : cmp;
+    };
   }
 
   // ── Navigation ───────────────────────────────────────────────────────
@@ -468,6 +540,10 @@
 
         updateResultsCount();
         renderMatters();
+        // Keep the Files section in sync with the current search/sort state.
+        // loadRootFiles only fetches when a search query is present; otherwise it
+        // clears and hides the Files section so the default root stays matters-only.
+        loadRootFiles();
       } else {
         throw new Error(response.error || 'Failed to load matters');
       }
@@ -511,6 +587,30 @@
   // ── Render ───────────────────────────────────────────────────────────
 
   /**
+   * Set the root empty-state widget copy based on whether a search is active.
+   * A search with no folder or file matches shows a "No files found" message
+   * and hides the Create Folder action; the default (no search) keeps the
+   * new-folder call to action for a genuinely empty library.
+   */
+  function applyRootEmptyState() {
+    var widget = document.getElementById('contentEmptyWidget');
+    if (!widget) return;
+
+    var searching = !!(storageState.searchQuery && storageState.searchQuery.trim());
+    if (searching) {
+      widget.icon = 'search';
+      widget.message = 'No files found';
+      widget.description = 'Try a different search term.';
+      widget.actionLabel = '';
+    } else {
+      widget.icon = 'folder';
+      widget.message = 'No matters found';
+      widget.description = 'Create a new folder to get started';
+      widget.actionLabel = 'Create Folder';
+    }
+  }
+
+  /**
    * Render matter cards/rows into grid or list view based on storageState.viewMode.
    */
   function renderMatters() {
@@ -524,6 +624,7 @@
     var matters = storageState.folders.filter(function (f) { return f.isMatter; });
 
     if (matters.length === 0) {
+      applyRootEmptyState();
       emptyEl && emptyEl.classList.remove('hidden');
       gridViewEl && gridViewEl.classList.add('hidden');
       listViewEl && listViewEl.classList.add('hidden');
@@ -636,6 +737,179 @@
     listViewBodyEl.innerHTML = rows;
   }
 
+  // ── Files load (search-only) ─────────────────────────────────────────
+
+  /**
+   * Map the matters sort field to a /storage/documents sort_by value. The files
+   * endpoint maps 'name' -> filename internally, supports created_at / updated_at
+   * directly, and does not understand the matters-only counts; those fall back to
+   * 'name'.
+   * @param {string} sortBy
+   * @returns {string}
+   */
+  function mapFilesSortBy(sortBy) {
+    if (sortBy === 'created_at' || sortBy === 'updated_at') return sortBy;
+    return 'name';
+  }
+
+  /**
+   * Load matching files for the current search query from
+   * /api/v1/storage/documents and render the Files section. Files are fetched
+   * ONLY while searching: when the query is empty the section is cleared and
+   * hidden so the default root view stays matters-only. The Source filter applies
+   * to matters only and is intentionally not passed to this endpoint.
+   */
+  async function loadRootFiles() {
+    var query = (storageState.searchQuery || '').trim();
+
+    if (!query) {
+      storageState.files = [];
+      renderFilesSection();
+      return;
+    }
+
+    try {
+      var params = new URLSearchParams({
+        search: query,
+        page: 1,
+        page_size: 50,
+        sort_by: mapFilesSortBy(storageState.sortBy),
+        sort_order: storageState.sortOrder
+      });
+
+      var response = await api.get('/api/v1/storage/documents?' + params.toString());
+      var files = (response && (response.files || response.documents)) || [];
+      storageState.files = Array.isArray(files) ? files : [];
+    } catch (error) {
+      console.error('[Drive] Failed to load files:', error);
+      storageState.files = [];
+    }
+
+    renderFilesSection();
+  }
+
+  /**
+   * Render (or hide) the Files section based on storageState.files and the current
+   * search/view state. Mirrors the matters grid/list toggle so the view switch
+   * affects files too. Also reconciles the matters empty state: the "no results"
+   * empty state must only show when BOTH folders and files are empty during a
+   * search, never while files are visible.
+   */
+  function renderFilesSection() {
+    var section = document.getElementById('driveFilesSection');
+    var countEl = document.getElementById('driveFilesCount');
+    var gridEl = document.getElementById('filesGridView');
+    var listEl = document.getElementById('filesListView');
+    if (!section) return;
+
+    var files = Array.isArray(storageState.files) ? storageState.files : [];
+    var searching = !!(storageState.searchQuery && storageState.searchQuery.trim());
+
+    if (!searching || files.length === 0) {
+      section.classList.add('hidden');
+      if (gridEl) gridEl.classList.add('hidden');
+      if (listEl) listEl.classList.add('hidden');
+      if (countEl) countEl.textContent = '';
+      reconcileEmptyState();
+      return;
+    }
+
+    section.classList.remove('hidden');
+    if (countEl) {
+      countEl.textContent = files.length + ' file' + (files.length !== 1 ? 's' : '');
+    }
+
+    if (storageState.viewMode === 'grid') {
+      renderFilesGridView(files);
+      if (gridEl) gridEl.classList.remove('hidden');
+      if (listEl) listEl.classList.add('hidden');
+    } else {
+      renderFilesListView(files);
+      if (listEl) listEl.classList.remove('hidden');
+      if (gridEl) gridEl.classList.add('hidden');
+    }
+
+    reconcileEmptyState();
+  }
+
+  /**
+   * Hide the matters empty state when there are file matches, so the page never
+   * shows a misleading "no results" message while files are displayed. The empty
+   * state stays visible only when both folders and files are empty.
+   */
+  function reconcileEmptyState() {
+    var emptyEl = document.getElementById('contentEmpty');
+    if (!emptyEl) return;
+    var folders = (storageState.folders || []).filter(function (f) { return f.isMatter; });
+    var files = Array.isArray(storageState.files) ? storageState.files : [];
+    if (folders.length === 0 && files.length > 0) {
+      emptyEl.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Render file cards into the Files grid view, mirroring renderFileCardInRecents
+   * for look/feel. Clicking a card opens the file viewer via openRecentFile.
+   * @param {Array} files
+   */
+  function renderFilesGridView(files) {
+    var gridEl = document.getElementById('filesGridView');
+    if (!gridEl) return;
+
+    gridEl.innerHTML = (files || []).map(function (file) {
+      var fileName = escapeHtml(file.filename || file.original_filename || 'Untitled');
+      var fileSize = formatFileSize(file.file_size || 0);
+      var fileIcon = getFileIconSVG(file.content_type);
+
+      return [
+        '<div class="file-card rounded-lg shadow-sm border p-4 cursor-pointer relative group hover:shadow-md transition-shadow" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)"',
+        '     onclick="openRecentFile(' + escapeHtml(JSON.stringify(file.id)) + ', ' + escapeHtml(JSON.stringify(file.client_matter || '')) + ')">',
+        '  <div class="flex flex-col items-center text-center">',
+        '    <div class="w-12 h-12 mb-3 flex items-center justify-center">' + fileIcon + '</div>',
+        '    <p class="text-sm font-medium truncate w-full mb-1" style="color: var(--lex-text-primary)" title="' + fileName + '">' + fileName + '</p>',
+        '    <p class="text-xs" style="color: var(--lex-text-secondary)">' + fileSize + '</p>',
+        '  </div>',
+        '</div>'
+      ].join('');
+    }).join('');
+  }
+
+  /**
+   * Render file rows into the Files list view, mirroring the matters list row
+   * structure/classes. Columns: Name, Matter, Created On, Size. Clicking a row
+   * opens the file viewer via openRecentFile.
+   * @param {Array} files
+   */
+  function renderFilesListView(files) {
+    var listBodyEl = document.getElementById('filesListViewBody');
+    if (!listBodyEl) return;
+
+    listBodyEl.innerHTML = (files || []).map(function (file) {
+      var fileName = escapeHtml(file.filename || file.original_filename || 'Untitled');
+      var matterName = escapeHtml(file.matter_name || file.client_matter || '');
+      var fileSize = formatFileSize(file.file_size || 0);
+      var created = file.created_at ? formatRelativeDate(file.created_at) : '-';
+      var fileIcon = getFileIconSVG(file.content_type);
+      var openArgs = escapeHtml(JSON.stringify(file.id)) + ', ' + escapeHtml(JSON.stringify(file.client_matter || ''));
+
+      return [
+        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" onclick="openRecentFile(' + openArgs + ')">',
+        '  <td class="px-6 py-4">',
+        '    <div class="flex items-center">',
+        '      <div class="w-5 h-5 mr-3 flex-shrink-0 flex items-center justify-center">' + fileIcon + '</div>',
+        '      <div class="min-w-0 flex-1">',
+        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + fileName + '">' + fileName + '</div>',
+        '      </div>',
+        '    </div>',
+        '  </td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + (matterName || '-') + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + created + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + fileSize + '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+  }
+
   // ── Brainchild scope (personal notes) ────────────────────────────────
   //
   // When the Source filter is set to "Knowledgebase" the list switches
@@ -719,6 +993,9 @@
     var loadingEl = document.getElementById('contentLoading');
     loadingEl && loadingEl.classList.remove('hidden');
     hideBrainchildChrome();
+    // The Files section is matters-search-only; clear and hide it in this scope.
+    storageState.files = [];
+    renderFilesSection();
     // Pinned and Recents are matters-only; hide them while the notes scope renders.
     var bcPinned = document.getElementById('pinnedSection');
     var bcRecents = document.getElementById('recentsSection');
@@ -727,6 +1004,8 @@
 
     try {
       await scope.load();
+      // Best effort: flag notes already shared with the org as "Promoted".
+      await loadBrainchildPromotedIds();
     } catch (error) {
       console.error('[Drive] Failed to load Brainchild notes:', error);
     } finally {
@@ -758,6 +1037,24 @@
    * Render the current Brainchild scope state: connected (notes list + banner)
    * or degraded (hide list, show degraded copy + the contextual action).
    */
+  function applyBrainchildEmptyState() {
+    var widget = document.getElementById('contentEmptyWidget');
+    if (!widget) return;
+
+    var searching = !!(storageState.searchQuery && storageState.searchQuery.trim());
+    if (searching) {
+      widget.icon = 'search';
+      widget.message = 'No notes found';
+      widget.description = 'No notes match your search.';
+      widget.actionLabel = '';
+    } else {
+      widget.icon = 'document';
+      widget.message = 'No notes found';
+      widget.description = 'Your Brainchild vault has no notes here yet.';
+      widget.actionLabel = '';
+    }
+  }
+
   function renderBrainchildScope() {
     if (!isBrainchildScope() || !brainchildScope) return;
 
@@ -802,6 +1099,18 @@
       notes = view.notes || [];
     }
 
+    // Sort copies; never mutate the scope's source arrays. Notes follow the
+    // active sortBy/sortOrder. Folders (name + count only) always sort by name,
+    // honoring the active direction.
+    notes = notes.slice().sort(scopeSortComparator());
+    var folderDesc = storageState.sortOrder === 'desc';
+    folders = folders.slice().sort(function (a, b) {
+      var an = ((a && a.name) || '').toLowerCase();
+      var bn = ((b && b.name) || '').toLowerCase();
+      var cmp = an < bn ? -1 : (an > bn ? 1 : 0);
+      return folderDesc ? cmp * -1 : cmp;
+    });
+
     if (banner) {
       banner.classList.remove('library-bc-hidden');
     }
@@ -828,6 +1137,7 @@
     var listViewEl = document.getElementById('listView');
 
     if (itemCount === 0) {
+      applyBrainchildEmptyState();
       if (emptyEl) emptyEl.classList.remove('hidden');
       if (gridViewEl) gridViewEl.classList.add('hidden');
       if (listViewEl) listViewEl.classList.add('hidden');
@@ -960,6 +1270,73 @@
   }
 
   /**
+   * @returns {boolean} true when a Brainchild note row has already been promoted
+   * to the org. Matched by the note key (vault path, else filename) the same way
+   * the promote builder derives note_id / the backend stores original_note_id.
+   */
+  function brainchildPromotedHas(row) {
+    if (!brainchildPromotedIds || typeof brainchildPromotedIds.has !== 'function') return false;
+    var key = ((row && (row._vaultPath || row.filename)) || '').trim();
+    return key ? brainchildPromotedIds.has(key) : false;
+  }
+
+  /**
+   * @returns {*} the org promoted-knowledge document id for a Brainchild note
+   * row (used to unpromote / remove the org copy), or null when the note is not
+   * promoted or the map is unavailable. Matched by the same note key as
+   * brainchildPromotedHas.
+   */
+  function brainchildPromotedDocId(row) {
+    if (!brainchildPromotedIds || typeof brainchildPromotedIds.get !== 'function') return null;
+    var key = ((row && (row._vaultPath || row.filename)) || '').trim();
+    if (!key) return null;
+    var docId = brainchildPromotedIds.get(key);
+    return docId == null ? null : docId;
+  }
+
+  /**
+   * Load the set of already-promoted note ids (each promoted item's
+   * original_note_id, which equals the source note's vault path) via the Shared
+   * Knowledge scope controller, so the Brainchild scope can flag notes already
+   * shared with the org. Best effort: leaves the set null on any failure.
+   */
+  async function loadBrainchildPromotedIds() {
+    var scope = ensureOrgKnowledgeScope();
+    if (!scope) { brainchildPromotedIds = null; return; }
+    try {
+      await scope.load();
+      var ids = new Map();
+      (scope.state.items || []).forEach(function (item) {
+        var key = (item && item.original_note_id ? String(item.original_note_id) : '').trim();
+        if (key) ids.set(key, item.id);
+      });
+      brainchildPromotedIds = ids;
+    } catch (error) {
+      console.error('[Drive] Failed to load promoted note ids:', error);
+      brainchildPromotedIds = null;
+    }
+  }
+
+  /**
+   * Build the promote control for a Brainchild note: an actionable "Promoted"
+   * pill (click to unpromote / remove the org copy) when the note is already
+   * shared with the org, else the Promote action (only when promotion is
+   * permitted).
+   * @param {Object} row
+   * @param {number} index
+   * @param {string} vaultPath - already escaped for attribute use
+   * @param {boolean} canPromote
+   * @returns {string}
+   */
+  function brainchildPromoteControl(row, index, vaultPath, canPromote) {
+    if (brainchildPromotedHas(row)) {
+      return '<button type="button" class="library-bc-promoted-badge bc-unpromote-btn" data-bc-index="' + index + '" title="Remove from Shared Knowledge">Promoted</button>';
+    }
+    if (!canPromote) return '';
+    return '<lex-btn class="library-bc-promote bc-promote-btn" variant="secondary" size="sm" data-bc-index="' + index + '" data-bc-path="' + vaultPath + '">Promote to Org</lex-btn>';
+  }
+
+  /**
    * Render Brainchild folder cards (clickable to drill in) followed by note
    * cards, reusing the existing #gridView container. Each note card carries a
    * "Promote to Org" action when permitted.
@@ -993,9 +1370,7 @@
     var noteCards = (notes || []).map(function (row, index) {
       var name = escapeHtml(row.filename || 'Untitled note');
       var vaultPath = escapeHtml(row._vaultPath || '');
-      var promoteBtn = canPromote
-        ? '<lex-btn class="library-bc-promote bc-promote-btn" variant="secondary" size="sm" data-bc-index="' + index + '" data-bc-path="' + vaultPath + '">Promote to Org</lex-btn>'
-        : '';
+      var promoteBtn = brainchildPromoteControl(row, index, vaultPath, canPromote);
 
       return [
         '<div class="grid-item rounded-lg border p-4 relative group library-bc-note-card" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" data-bc-note-path="' + vaultPath + '">',
@@ -1015,6 +1390,7 @@
     wireBrainchildFolderCards(gridViewEl);
     wireBrainchildNoteCards(gridViewEl);
     wireBrainchildPromoteButtons(gridViewEl, notes);
+    wireBrainchildUnpromoteButtons(gridViewEl, notes);
   }
 
   /**
@@ -1058,9 +1434,7 @@
       var name = escapeHtml(row.filename || 'Untitled note');
       var vaultPath = escapeHtml(row._vaultPath || '');
       var updated = row.updated_at ? formatRelativeDate(row.updated_at) : '-';
-      var promoteCell = canPromote
-        ? '<lex-btn class="bc-promote-btn" variant="secondary" size="sm" data-bc-index="' + index + '" data-bc-path="' + vaultPath + '">Promote to Org</lex-btn>'
-        : '';
+      var promoteCell = brainchildPromoteControl(row, index, vaultPath, canPromote);
 
       return [
         '<tr class="cursor-pointer library-bc-note-card" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" data-bc-note-path="' + vaultPath + '">',
@@ -1086,6 +1460,7 @@
     wireBrainchildFolderCards(listViewBodyEl);
     wireBrainchildNoteCards(listViewBodyEl);
     wireBrainchildPromoteButtons(listViewBodyEl, notes);
+    wireBrainchildUnpromoteButtons(listViewBodyEl, notes);
   }
 
   /**
@@ -1137,6 +1512,38 @@
     if (!container || !brainchildScope) return;
     var buttons = container.querySelectorAll('.bc-promote-btn');
     Array.prototype.forEach.call(buttons, function (button) {
+      button.addEventListener('click', async function (event) {
+        if (event && typeof event.stopPropagation === 'function') {
+          event.stopPropagation();
+        }
+        var index = parseInt(button.getAttribute('data-bc-index'), 10);
+        var row = rows[index];
+        if (!row) return;
+        var result = await brainchildScope.promote(row, null, button);
+        if (result && result.success) {
+          // Refresh the promoted map so the new promotion's org document id is
+          // known (needed for a later unpromote), then re-render so the action
+          // flips to the "Promoted" pill without a full reload.
+          await loadBrainchildPromotedIds();
+          renderBrainchildScope();
+        }
+      });
+    });
+  }
+
+  /**
+   * Wire each rendered "Promoted" pill to unpromote the note: remove the org's
+   * shared copy. This does NOT touch the personal Brainchild note. Confirms
+   * first, then deletes via the Shared Knowledge scope controller, refreshes the
+   * promoted map, and re-renders so the pill flips back to "Promote to Org".
+   * stopPropagation keeps the click from also opening the note in Brainchild.
+   * @param {HTMLElement} container
+   * @param {Array} rows
+   */
+  function wireBrainchildUnpromoteButtons(container, rows) {
+    if (!container) return;
+    var buttons = container.querySelectorAll('.bc-unpromote-btn');
+    Array.prototype.forEach.call(buttons, function (button) {
       button.addEventListener('click', function (event) {
         if (event && typeof event.stopPropagation === 'function') {
           event.stopPropagation();
@@ -1144,9 +1551,271 @@
         var index = parseInt(button.getAttribute('data-bc-index'), 10);
         var row = rows[index];
         if (!row) return;
-        brainchildScope.promote(row, null, button);
+
+        var run = async function () {
+          var docId = brainchildPromotedDocId(row);
+          if (!docId) return;
+          var oks = ensureOrgKnowledgeScope();
+          if (!oks) return;
+          var result = await oks.remove(docId);
+          if (result && result.success) {
+            await loadBrainchildPromotedIds();
+            renderBrainchildScope();
+          }
+        };
+
+        var title = 'Remove from Shared Knowledge';
+        var message = 'Remove this note from your organization\'s shared knowledge? Your personal Brainchild copy is not affected.';
+        if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
+          Lex.Modal.confirm(title, message, run, {
+            confirmText: 'Remove',
+            cancelText: 'Cancel',
+            variant: 'default',
+            size: 'sm'
+          });
+        } else if (window.confirm(message)) {
+          run();
+        }
       });
     });
+  }
+
+  // ── Shared Knowledge scope (org promoted notes) ──────────────────────
+  //
+  // When the Source filter is set to "Shared Knowledge" the list switches from
+  // matters/files to the organization's promoted knowledge notes (notes a user
+  // promoted from their personal Brainchild vault into the shared org knowledge
+  // base). All list/delete logic lives in the already-built
+  // LibraryOrgKnowledgeScope controller, which talks only to the LANA-AI backend
+  // through the api client. This page renders the items into the existing
+  // grid/list containers and wires the remove action.
+
+  /**
+   * @returns {boolean} true when the active Source filter is the Shared Knowledge scope.
+   */
+  function isOrgKnowledgeScope() {
+    return storageState.sourceFilter === 'org_knowledge';
+  }
+
+  /**
+   * Lazily construct the Shared Knowledge scope controller. Returns null when the
+   * controller module is unavailable (e.g. plain browser context).
+   */
+  function ensureOrgKnowledgeScope() {
+    if (orgKnowledgeScope) return orgKnowledgeScope;
+    if (!window.LibraryOrgKnowledgeScope || typeof window.LibraryOrgKnowledgeScope.create !== 'function') {
+      return null;
+    }
+    orgKnowledgeScope = window.LibraryOrgKnowledgeScope.create({
+      api: window.api,
+      onToast: function (kind, message) {
+        if (window.Lex && Lex.Toast && typeof Lex.Toast[kind] === 'function') {
+          Lex.Toast[kind](message);
+        }
+      },
+      onStatus: function () {},
+      onChange: renderOrgKnowledgeScope
+    });
+    return orgKnowledgeScope;
+  }
+
+  /**
+   * Load the organization's promoted knowledge notes and render the scope.
+   * Hides the matters-only chrome (Files, Pinned, Recents, Brainchild) the same
+   * way loadBrainchildNotes does.
+   */
+  async function loadOrgKnowledge() {
+    var scope = ensureOrgKnowledgeScope();
+
+    var loadingEl = document.getElementById('contentLoading');
+    loadingEl && loadingEl.classList.remove('hidden');
+    hideBrainchildChrome();
+    // The Files section is matters-search-only; clear and hide it in this scope.
+    storageState.files = [];
+    renderFilesSection();
+    // Pinned and Recents are matters-only; hide them while the notes scope renders.
+    var okPinned = document.getElementById('pinnedSection');
+    var okRecents = document.getElementById('recentsSection');
+    if (okPinned) okPinned.classList.add('hidden');
+    if (okRecents) okRecents.classList.add('hidden');
+
+    if (!scope) {
+      // No controller (plain browser). Present an empty state.
+      loadingEl && loadingEl.classList.add('hidden');
+      renderOrgKnowledgeEmpty();
+      return;
+    }
+
+    try {
+      await scope.load();
+    } catch (error) {
+      console.error('[Drive] Failed to load shared knowledge:', error);
+    } finally {
+      loadingEl && loadingEl.classList.add('hidden');
+    }
+    renderOrgKnowledgeScope();
+  }
+
+  /**
+   * Run a shared-knowledge search (or full list when query is empty).
+   * @param {string} query
+   */
+  async function runOrgKnowledgeSearch(query) {
+    var scope = ensureOrgKnowledgeScope();
+    if (!scope) return;
+    try {
+      await scope.runSearch(query || '');
+    } catch (error) {
+      console.error('[Drive] Shared knowledge search failed:', error);
+    }
+    renderOrgKnowledgeScope();
+  }
+
+  /**
+   * Render the current Shared Knowledge scope state into the grid/list view.
+   * Shows an empty state when there are no items (or none match the search).
+   */
+  function renderOrgKnowledgeScope() {
+    if (!isOrgKnowledgeScope() || !orgKnowledgeScope) return;
+
+    var loadingEl = document.getElementById('contentLoading');
+    loadingEl && loadingEl.classList.add('hidden');
+
+    var items = Array.isArray(orgKnowledgeScope.state.items) ? orgKnowledgeScope.state.items : [];
+
+    var sectionHeading = document.getElementById('driveSectionHeading');
+    var sectionCount = document.getElementById('driveSectionCount');
+    var resultsCountEl = document.getElementById('resultsCount');
+    if (sectionHeading) sectionHeading.textContent = 'Shared Knowledge';
+    var countText = items.length + ' note' + (items.length !== 1 ? 's' : '');
+    if (sectionCount) sectionCount.textContent = countText;
+    if (resultsCountEl) resultsCountEl.textContent = countText;
+
+    // Pagination is matters-only; pin it to a single page in this scope.
+    var pager = document.getElementById('drivePagination');
+    if (pager) {
+      pager.page = 1;
+      pager.totalPages = 1;
+      pager.total = items.length;
+      pager.limit = items.length || 1;
+    }
+
+    if (items.length === 0) {
+      renderOrgKnowledgeEmpty();
+      return;
+    }
+
+    var emptyEl = document.getElementById('contentEmpty');
+    var gridViewEl = document.getElementById('gridView');
+    var listViewEl = document.getElementById('listView');
+    if (emptyEl) emptyEl.classList.add('hidden');
+
+    // Sort a copy by the active sortBy/sortOrder; never mutate the scope's items.
+    var sorted = items.slice().sort(scopeSortComparator());
+
+    if (storageState.viewMode === 'grid') {
+      renderOrgKnowledgeGrid(sorted);
+      if (gridViewEl) gridViewEl.classList.remove('hidden');
+      if (listViewEl) listViewEl.classList.add('hidden');
+    } else {
+      renderOrgKnowledgeList(sorted);
+      if (listViewEl) listViewEl.classList.remove('hidden');
+      if (gridViewEl) gridViewEl.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Show the Shared Knowledge empty state in the grid container and hide the
+   * matters/list views. Copy adapts to whether a search is active.
+   */
+  function renderOrgKnowledgeEmpty() {
+    var gridViewEl = document.getElementById('gridView');
+    var listViewEl = document.getElementById('listView');
+    var emptyEl = document.getElementById('contentEmpty');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (listViewEl) listViewEl.classList.add('hidden');
+    if (!gridViewEl) return;
+
+    var error = orgKnowledgeScope && orgKnowledgeScope.state.error;
+    var searching = !!(storageState.searchQuery && storageState.searchQuery.trim());
+
+    var copy;
+    if (error === 'no_org') {
+      copy = 'Sign in to lana-ai to view shared knowledge.';
+    } else if (searching) {
+      copy = 'No shared knowledge notes match your search.';
+    } else {
+      copy = 'No shared knowledge yet. Promote a note from your Knowledgebase to share it with your organization.';
+    }
+
+    gridViewEl.innerHTML = [
+      '<div class="library-ok-empty" style="grid-column: 1 / -1">',
+      '  <svg class="library-ok-empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+      '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>',
+      '  </svg>',
+      '  <p class="library-ok-empty-copy">' + escapeHtml(copy) + '</p>',
+      '</div>'
+    ].join('');
+    gridViewEl.classList.remove('hidden');
+  }
+
+  /**
+   * Render promoted-knowledge note cards into the existing #gridView container.
+   * @param {Array} items
+   */
+  function renderOrgKnowledgeGrid(items) {
+    var gridViewEl = document.getElementById('gridView');
+    if (!gridViewEl) return;
+
+    gridViewEl.innerHTML = (items || []).map(function (item) {
+      var title = escapeHtml(item.title || 'Untitled note');
+      var preview = escapeHtml(item.preview || '');
+      var byName = escapeHtml(item.created_by_name || 'a teammate');
+      var created = item.created_at ? formatDate(item.created_at) : '';
+
+      return [
+        '<div class="grid-item rounded-lg border p-4 relative group library-ok-note-card" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)">',
+        '  <h3 class="library-ok-note-title truncate" title="' + title + '">' + title + '</h3>',
+        preview ? '  <p class="library-ok-note-preview">' + preview + '</p>' : '',
+        '  <p class="library-ok-note-meta">Promoted by <span class="library-ok-note-meta-name">' + byName + '</span>' + (created ? ' on ' + escapeHtml(created) : '') + '</p>',
+        '</div>'
+      ].join('');
+    }).join('');
+  }
+
+  /**
+   * Render promoted-knowledge note rows into the existing #listViewBody table.
+   * Columns mirror the matters list: Name, Created By, Created On, Type, Action.
+   * @param {Array} items
+   */
+  function renderOrgKnowledgeList(items) {
+    var listViewBodyEl = document.getElementById('listViewBody');
+    if (!listViewBodyEl) return;
+
+    listViewBodyEl.innerHTML = (items || []).map(function (item) {
+      var title = escapeHtml(item.title || 'Untitled note');
+      var byName = escapeHtml(item.created_by_name || 'a teammate');
+      var created = item.created_at ? formatRelativeDate(item.created_at) : '-';
+
+      return [
+        '<tr style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'">',
+        '  <td class="px-6 py-4">',
+        '    <div class="flex items-center">',
+        '      <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
+        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>',
+        '      </svg>',
+        '      <div class="min-w-0 flex-1">',
+        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + title + '">' + title + '</div>',
+        '      </div>',
+        '    </div>',
+        '  </td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + byName + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + created + '</td>',
+        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">Note</td>',
+        '  <td class="px-6 py-4"></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
   }
 
   // ── View toggle ──────────────────────────────────────────────────────
@@ -1172,8 +1841,11 @@
 
     if (isBrainchildScope()) {
       renderBrainchildScope();
+    } else if (isOrgKnowledgeScope()) {
+      renderOrgKnowledgeScope();
     } else {
       renderMatters();
+      renderFilesSection();
     }
   }
 
@@ -1788,6 +2460,8 @@
     // Reset module-level state
     selectedMatter = null;
     brainchildScope = null;
+    orgKnowledgeScope = null;
+    brainchildPromotedIds = null;
     resetState();
 
     // Clear search input so it doesn't persist on re-navigation

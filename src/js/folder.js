@@ -250,11 +250,16 @@
     var resultsCountEl = document.getElementById('resultsCount');
     if (!resultsCountEl) return;
 
-    var folderCount = folderState.folders.filter(function (f) {
+    var foldersAtDepth = folderState.folders.filter(function (f) {
       if (!folderState.currentFolderId) {
         return !f.parent_folder_id;
       }
       return f.parent_folder_id === folderState.currentFolderId;
+    });
+    // folderState.files is already query-filtered in loadFolderContents; apply
+    // the same query to folders so the count matches what is displayed.
+    var folderCount = filterItemsByQuery(foldersAtDepth, function (folder) {
+      return folder.name || '';
     }).length;
     var fileCount = folderState.files.length;
     var total = folderCount + fileCount;
@@ -311,14 +316,20 @@
         fileParams.append('folder_id', folderState.currentFolderId);
       }
 
-      if (folderState.searchQuery) {
-        fileParams.append('search', folderState.searchQuery);
-      }
+      // The /storage/files endpoint ignores a `search` param, so folder.js
+      // filters files by name client-side (see filterItemsByQuery below).
 
       var filesResponse = await api.get('/api/v1/storage/files?' + fileParams.toString());
 
       if (filesResponse.files || filesResponse.data || filesResponse.status === 'success') {
         folderState.files = (filesResponse.data && filesResponse.data.files) || filesResponse.files || [];
+        // The toolbar search box filters by name (endpoint ignores `search`),
+        // and the endpoint does not sort, so apply the active query then the
+        // toolbar's sort field/order client-side before the component renders.
+        folderState.files = filterItemsByQuery(folderState.files, function (file) {
+          return file.original_filename || file.filename || '';
+        });
+        folderState.files = sortItems(folderState.files, folderState.sortBy, folderState.sortOrder);
         buildFolderPath();
         updateResultsCount();
         renderFolderContents();
@@ -334,6 +345,57 @@
     } finally {
       folderState.loadingContent = false;
     }
+  }
+
+  // ── Sorting (shared by files + folders) ─────────────────────────────
+
+  /**
+   * Resolve the comparable value for an item (file or folder) under a given
+   * sort field. Names are lowercased strings; dates are epoch millis; size is
+   * numeric. Folders lack file_size, so they collapse to 0 and fall back to
+   * stable order under a size sort.
+   */
+  function sortValue(item, field) {
+    if (field === 'file_size') {
+      return Number(item.file_size || item.size || 0);
+    }
+    if (field === 'created_at' || field === 'updated_at') {
+      var raw = item[field];
+      return raw ? new Date(raw).getTime() : 0;
+    }
+    // Default: sort by display name.
+    return (item.original_filename || item.filename || item.name || '').toLowerCase();
+  }
+
+  /**
+   * Filter a copy of items by the active toolbar search query, matching the
+   * query as a case-insensitive substring against the item's display name.
+   * The /storage/files endpoint ignores the search param, so folder.js does
+   * this client-side for both files and folders before rendering.
+   * @param {Array} items
+   * @param {Function} nameOf - returns the display name string for an item
+   */
+  function filterItemsByQuery(items, nameOf) {
+    var q = (folderState.searchQuery || '').trim().toLowerCase();
+    if (!q) return items.slice();
+    return items.filter(function (item) {
+      return (nameOf(item) || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  /**
+   * Sort a copy of items by the active toolbar field/order. Works for both
+   * files and folders so the shared region orders consistently.
+   */
+  function sortItems(items, field, order) {
+    var dir = order === 'desc' ? -1 : 1;
+    return items.slice().sort(function (a, b) {
+      var av = sortValue(a, field);
+      var bv = sortValue(b, field);
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
   }
 
   // ── Rendering (grid + list) ─────────────────────────────────────────
@@ -365,6 +427,12 @@
       return f.parent_folder_id === folderState.currentFolderId;
     });
 
+    // Apply the toolbar search query to folders by name (folderState.files is
+    // already filtered in loadFolderContents) so both sections reflect it.
+    foldersToShow = filterItemsByQuery(foldersToShow, function (folder) {
+      return folder.name || '';
+    });
+
     var totalItems = foldersToShow.length + folderState.files.length;
 
     // Apply the active view-mode modifier so folders + files share one layout.
@@ -386,9 +454,7 @@
     emptyEl && emptyEl.classList.add('hidden');
     contentsEl && contentsEl.classList.remove('hidden');
 
-    var sortedFolders = foldersToShow.slice().sort(function (a, b) {
-      return a.name.localeCompare(b.name);
-    });
+    var sortedFolders = sortItems(foldersToShow, folderState.sortBy, folderState.sortOrder);
 
     // Folders render first (top of the shared region) ...
     renderFolderItems(sortedFolders);
@@ -433,15 +499,7 @@
         viewMode: folderState.viewMode,
         pageSize: 12,
         onFileOpen: function (fileId) { _navToFileViewer(fileId); },
-        onCreateDocStudio: function () {
-          if (folderState.currentMatterId) {
-            Lex.Nav.go('doc-studio/index.html', {
-              params: { matter_id: folderState.currentMatterId }
-            });
-          } else {
-            Lex.Nav.go('doc-studio/index.html');
-          }
-        },
+        onCreateDocStudio: function () { openDocStudioCreate(); },
         // Library defaults: rename on; advanced matter-only features off.
         enableRename: true,
         enableTemplates: false,
@@ -450,7 +508,10 @@
         enableBatch: false,
         enableTemplateToggle: false,
         enableRetry: false,
-        enableReplace: false
+        enableReplace: false,
+        // The folder page owns search via its top toolbar (#searchInput), so
+        // suppress the component's built-in search bar to avoid a duplicate.
+        enableSearch: false
       });
     }
   }
@@ -1099,6 +1160,36 @@
   // inline folder SVG in folderCardHtml / folderRowHtml (folders), so folder.js
   // no longer maintains a local getFileIconSVG fallback.
 
+  // -- Doc Studio create --------------------------------------------------
+
+  /**
+   * Open the in-page Doc Studio create modal scoped to the current matter.
+   * Used by both the component's onCreateDocStudio callback and the empty-state
+   * "Create using Doc Studio" action. Falls back to navigating to the Doc Studio
+   * page if the shared modal module is not loaded.
+   */
+  function openDocStudioCreate() {
+    if (window.DocStudioCreateModal && window.DocStudioCreateModal.open) {
+      window.DocStudioCreateModal.open({
+        api: api,
+        matterId: folderState.currentMatterId,
+        matterDisplayId: folderState.currentMatterId,
+        matterName: folderState.currentMatterName || folderState.currentMatterId,
+        contextDocIds: [],
+        onCreated: function () { loadFolderContents(); }
+      });
+    } else {
+      // Graceful fallback: keep the existing Lex.Nav.go navigation.
+      if (folderState.currentMatterId) {
+        Lex.Nav.go('doc-studio/index.html', {
+          params: { matter_id: folderState.currentMatterId }
+        });
+      } else {
+        Lex.Nav.go('doc-studio/index.html');
+      }
+    }
+  }
+
   // -- Event listeners --------------------------------------------------
 
   /**
@@ -1125,17 +1216,11 @@
       input && input.click();
     });
 
-    // Empty state Create using Doc Studio action - navigates to Doc Studio,
-    // scoped to the current matter when a matter id is available.
+    // Empty state Create using Doc Studio action - opens the in-page Doc Studio
+    // create modal (falls back to navigation if the module is unavailable).
     var emptyDocStudioBtn = document.getElementById('emptyDocStudioBtn');
     emptyDocStudioBtn && emptyDocStudioBtn.addEventListener('click', function () {
-      if (folderState.currentMatterId) {
-        Lex.Nav.go('doc-studio/index.html', {
-          params: { matter_id: folderState.currentMatterId }
-        });
-      } else {
-        Lex.Nav.go('doc-studio/index.html');
-      }
+      openDocStudioCreate();
     });
 
     var cancelNewFolderBtn = document.getElementById('cancelNewFolderBtn');

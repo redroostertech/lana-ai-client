@@ -1504,7 +1504,9 @@
       enableTemplateToggle: true,
       enableRetry: true,
       enableReplace: true,
-      enableDocStudio: true
+      // The Matter documents header already renders its own "Create with Doc
+      // Studio" button, so suppress the component's duplicate one here.
+      enableDocStudio: false
     });
   }
 
