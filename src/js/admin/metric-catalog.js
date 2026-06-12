@@ -71,6 +71,19 @@
   var passedCount = 0;
   var failedCount = 0;
 
+  // Goal index: metric_key -> { weekly?: goal, monthly?: goal }. Loaded once
+  // after the catalog loads (see loadGoals). The actions cell reads this to
+  // render the read-only goal pill and, for admins, the Goal editor button.
+  var goalIndex = {};
+  // Cached admin flag: only system_admin / org_admin may set or edit goals.
+  // Resolved once at init from Lex.Auth (same source the page already uses to
+  // gate access). Non-admins never see the Goal action.
+  var isGoalAdmin = false;
+
+  function goalMapper() {
+    return (typeof window !== 'undefined' && window.MetricGoalFormMapper) || null;
+  }
+
   function normalizeMetric(metric) {
     var executableLabel = metric.executable === true ? 'Yes' : 'No';
     var statusLabel = metric.display_status || metric.status || 'unknown';
@@ -285,11 +298,30 @@
     return '<span class="metric-catalog-runcell-value">' + escapeHtml(summary) + '</span>';
   }
 
+  // Compact read-only indicator shown in the row when a goal exists for the
+  // metric. Prefers the monthly target value (the common case); falls back to
+  // the weekly one. Visible to everyone; the editor button is admin-only.
+  function goalIndicator(metric) {
+    var mapper = goalMapper();
+    if (!mapper || !mapper.hasAnyGoal(goalIndex, metric.key)) return '';
+    var goal = mapper.getGoal(goalIndex, metric.key, 'monthly')
+      || mapper.getGoal(goalIndex, metric.key, 'weekly');
+    var label = goal && goal.target_value != null
+      ? 'Goal ' + displayText(goal.target_value)
+      : 'Goal';
+    return '<span class="metric-catalog-goal-pill" title="Goal set for this metric">' + escapeHtml(label) + '</span>';
+  }
+
   function actionsCell(metric) {
-    return '<div class="metric-catalog-actions">'
+    var html = '<div class="metric-catalog-actions">'
+      + goalIndicator(metric)
       + '<button type="button" class="metric-catalog-btn metric-catalog-btn--run" data-metric-run="' + escapeHtml(metric.key) + '">Run</button>'
-      + '<button type="button" class="metric-catalog-btn" data-metric-view="' + escapeHtml(metric.key) + '">View</button>'
-      + '</div>';
+      + '<button type="button" class="metric-catalog-btn" data-metric-view="' + escapeHtml(metric.key) + '">View</button>';
+    if (isGoalAdmin) {
+      html += '<button type="button" class="metric-catalog-btn metric-catalog-btn--goal" data-metric-goal="' + escapeHtml(metric.key) + '">Goal</button>';
+    }
+    html += '</div>';
+    return html;
   }
 
   function renderTable() {
@@ -548,6 +580,225 @@
     setTimeout(wireDrawerButtons, 50);
   }
 
+  // --- Goal editor -----------------------------------------------------------
+
+  // Re-render just the row(s) for one metric after a goal save/remove so the
+  // indicator updates without a full table reload.
+  function rerenderRow() {
+    renderTable();
+  }
+
+  function numAttr(value) {
+    return value == null ? '' : escapeHtml(String(value));
+  }
+
+  // Build the editor form for a metric, pre-filled with the goal for the
+  // currently selected period (period defaults to monthly).
+  function renderGoalForm(metric, period) {
+    var mapper = goalMapper();
+    var goal = mapper ? mapper.getGoal(goalIndex, metric.key, period) : null;
+    var g = goal || {};
+    var targetType = g.target_type || 'static';
+
+    function typeOption(value, label) {
+      var sel = targetType === value ? ' selected' : '';
+      return '<option value="' + value + '"' + sel + '>' + label + '</option>';
+    }
+    function periodOption(value, label) {
+      var sel = period === value ? ' selected' : '';
+      return '<option value="' + value + '"' + sel + '>' + label + '</option>';
+    }
+
+    var html = '<div class="metric-catalog-goal-form">';
+    html += '<div class="metric-catalog-drawer__section">';
+    html += '<div class="metric-catalog-drawer__label">Metric</div>';
+    html += '<code class="metric-catalog-key">' + escapeHtml(metric.key) + '</code>';
+    html += '</div>';
+
+    html += '<div class="metric-catalog-goal-form__row">';
+    html += '<label class="metric-catalog-goal-field">'
+      + '<span class="metric-catalog-goal-field__label">Period</span>'
+      + '<select id="metricGoalPeriod" class="metric-catalog-goal-field__input">'
+      + periodOption('monthly', 'Monthly')
+      + periodOption('weekly', 'Weekly')
+      + '</select></label>';
+    html += '<label class="metric-catalog-goal-field">'
+      + '<span class="metric-catalog-goal-field__label">Type</span>'
+      + '<select id="metricGoalType" class="metric-catalog-goal-field__input">'
+      + typeOption('static', 'Static')
+      + typeOption('rolling_average', 'Rolling average')
+      + typeOption('growth_rate', 'Growth rate')
+      + '</select></label>';
+    html += '</div>';
+
+    html += '<label class="metric-catalog-goal-field">'
+      + '<span class="metric-catalog-goal-field__label">Target value <span class="metric-catalog-goal-req">*</span></span>'
+      + '<input type="number" step="any" id="metricGoalTargetValue" class="metric-catalog-goal-field__input" value="' + numAttr(g.target_value) + '" />'
+      + '<span class="metric-catalog-goal-error" id="metricGoalTargetValueError"></span>'
+      + '</label>';
+
+    html += '<div class="metric-catalog-goal-form__row metric-catalog-goal-form__row--thirds">';
+    html += '<label class="metric-catalog-goal-field">'
+      + '<span class="metric-catalog-goal-field__label">Green threshold</span>'
+      + '<input type="number" step="any" id="metricGoalGreen" class="metric-catalog-goal-field__input" value="' + numAttr(g.green_threshold) + '" /></label>';
+    html += '<label class="metric-catalog-goal-field">'
+      + '<span class="metric-catalog-goal-field__label">Yellow threshold</span>'
+      + '<input type="number" step="any" id="metricGoalYellow" class="metric-catalog-goal-field__input" value="' + numAttr(g.yellow_threshold) + '" /></label>';
+    html += '<label class="metric-catalog-goal-field">'
+      + '<span class="metric-catalog-goal-field__label">Red threshold</span>'
+      + '<input type="number" step="any" id="metricGoalRed" class="metric-catalog-goal-field__input" value="' + numAttr(g.red_threshold) + '" /></label>';
+    html += '</div>';
+
+    html += '<label class="metric-catalog-goal-field">'
+      + '<span class="metric-catalog-goal-field__label">Notes</span>'
+      + '<textarea id="metricGoalNotes" class="metric-catalog-goal-field__input" rows="2">' + escapeHtml(g.notes || '') + '</textarea></label>';
+
+    html += '</div>';
+    return html;
+  }
+
+  function readGoalForm() {
+    return {
+      target_value: (el('metricGoalTargetValue') || {}).value,
+      target_type: (el('metricGoalType') || {}).value,
+      target_period: (el('metricGoalPeriod') || {}).value,
+      green_threshold: (el('metricGoalGreen') || {}).value,
+      yellow_threshold: (el('metricGoalYellow') || {}).value,
+      red_threshold: (el('metricGoalRed') || {}).value,
+      notes: (el('metricGoalNotes') || {}).value,
+    };
+  }
+
+  function clearGoalErrors() {
+    var node = el('metricGoalTargetValueError');
+    if (node) node.textContent = '';
+  }
+
+  function showGoalErrors(errors) {
+    var node = el('metricGoalTargetValueError');
+    if (node) node.textContent = errors.target_value || '';
+  }
+
+  function openGoalEditor(metric) {
+    if (!isGoalAdmin || !window.Lex || !Lex.Drawer) return;
+    var mapper = goalMapper();
+    if (!mapper) return;
+
+    // currentPeriod tracks the period select so the body can be re-rendered
+    // with the right pre-filled values when the operator switches Weekly/Monthly.
+    var currentPeriod = mapper.getGoal(goalIndex, metric.key, 'monthly') ? 'monthly'
+      : (mapper.getGoal(goalIndex, metric.key, 'weekly') ? 'weekly' : 'monthly');
+
+    Lex.Drawer.open({
+      heading: 'Goal: ' + (metric.display_name || metric.key),
+      content: renderGoalForm(metric, currentPeriod),
+      width: 'md',
+      buttons: [
+        { label: 'Save goal', variant: 'primary', id: 'metricGoalSave' },
+        { label: 'Remove', variant: 'danger', id: 'metricGoalRemove' },
+        { label: 'Close', variant: 'secondary', id: 'metricGoalClose' },
+      ],
+    });
+
+    function bodyNode() {
+      return document.querySelector('.lex-drawer__body, .lex-drawer-body');
+    }
+
+    // Reflect the Remove button availability against the period currently shown.
+    function syncRemoveButton() {
+      var removeBtn = document.getElementById('metricGoalRemove');
+      if (!removeBtn) return;
+      var existing = mapper.getGoal(goalIndex, metric.key, currentPeriod);
+      removeBtn.disabled = !existing;
+    }
+
+    // Bind the period select inside the (re-rendered) body each time so the
+    // form reloads that period's saved values.
+    function bindPeriodSelect() {
+      var sel = el('metricGoalPeriod');
+      if (!sel) return;
+      sel.addEventListener('change', function () {
+        currentPeriod = sel.value;
+        var body = bodyNode();
+        if (body) body.innerHTML = renderGoalForm(metric, currentPeriod);
+        bindPeriodSelect();
+        syncRemoveButton();
+      });
+    }
+
+    function wireGoalButtons() {
+      bindPeriodSelect();
+      syncRemoveButton();
+
+      var saveBtn = document.getElementById('metricGoalSave');
+      if (saveBtn && !saveBtn.dataset.bound) {
+        saveBtn.dataset.bound = '1';
+        saveBtn.addEventListener('click', async function () {
+          clearGoalErrors();
+          var result = mapper.buildGoalPayload(readGoalForm());
+          if (!result.ok) {
+            showGoalErrors(result.errors);
+            return;
+          }
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving...';
+          try {
+            await api.upsertMetricGoal(metric.key, result.payload);
+            // Reflect the saved goal in the in-memory index, then re-render.
+            if (!goalIndex[metric.key]) goalIndex[metric.key] = {};
+            goalIndex[metric.key][result.payload.target_period] = Object.assign(
+              { metric_key: metric.key }, result.payload
+            );
+            rerenderRow();
+            syncRemoveButton();
+            if (Lex.Toast) Lex.Toast.success('Goal saved');
+          } catch (err) {
+            if (Lex.Toast) Lex.Toast.error('Failed to save goal: ' + ((err && err.message) || 'error'));
+          } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save goal';
+          }
+        });
+      }
+
+      var removeBtn = document.getElementById('metricGoalRemove');
+      if (removeBtn && !removeBtn.dataset.bound) {
+        removeBtn.dataset.bound = '1';
+        removeBtn.addEventListener('click', async function () {
+          var period = (el('metricGoalPeriod') || {}).value || currentPeriod;
+          if (!mapper.getGoal(goalIndex, metric.key, period)) return;
+          removeBtn.disabled = true;
+          removeBtn.textContent = 'Removing...';
+          try {
+            await api.deleteMetricGoal(metric.key, period);
+            if (goalIndex[metric.key]) {
+              delete goalIndex[metric.key][period];
+              if (Object.keys(goalIndex[metric.key]).length === 0) delete goalIndex[metric.key];
+            }
+            // Clear the form fields for the now-removed period.
+            var body = bodyNode();
+            if (body) body.innerHTML = renderGoalForm(metric, period);
+            bindPeriodSelect();
+            rerenderRow();
+            if (Lex.Toast) Lex.Toast.success('Goal removed');
+          } catch (err) {
+            if (Lex.Toast) Lex.Toast.error('Failed to remove goal: ' + ((err && err.message) || 'error'));
+          } finally {
+            removeBtn.textContent = 'Remove';
+            syncRemoveButton();
+          }
+        });
+      }
+
+      var closeBtn = document.getElementById('metricGoalClose');
+      if (closeBtn && !closeBtn.dataset.bound) {
+        closeBtn.dataset.bound = '1';
+        closeBtn.addEventListener('click', function () { if (Lex.Drawer.close) Lex.Drawer.close(); });
+      }
+    }
+    setTimeout(wireGoalButtons, 50);
+  }
+
   function wireToolbar() {
     var search = el('metricCatalogSearch');
     if (search) {
@@ -579,6 +830,15 @@
           var key = viewBtn.getAttribute('data-metric-view');
           var metric = allMetrics.find(function (m) { return m.key === key; });
           if (metric) openDetailDrawer(metric);
+          return;
+        }
+        var goalBtn = event.target.closest('[data-metric-goal]');
+        if (goalBtn && isGoalAdmin) {
+          event.preventDefault();
+          event.stopPropagation();
+          var goalKey = goalBtn.getAttribute('data-metric-goal');
+          var goalMetric = allMetrics.find(function (m) { return m.key === goalKey; });
+          if (goalMetric) openGoalEditor(goalMetric);
         }
       });
 
@@ -592,6 +852,24 @@
     }
   }
 
+  // Fetch configured goals once and index them by metric_key + period. A
+  // failure here is non-fatal: the catalog still renders, just without goal
+  // indicators. Re-renders the table so the indicators appear.
+  async function loadGoals() {
+    var mapper = goalMapper();
+    if (!mapper || !window.api || typeof api.getMetricGoals !== 'function') return;
+    try {
+      var response = await api.getMetricGoals();
+      var goals = (response && Array.isArray(response.goals)) ? response.goals
+        : (response && response.data && Array.isArray(response.data.goals)) ? response.data.goals
+        : [];
+      goalIndex = mapper.indexGoals(goals);
+      renderTable();
+    } catch (err) {
+      console.error('[MetricCatalog] Failed to load metric goals:', err);
+    }
+  }
+
   async function load() {
     if (!window.api || typeof api.getMetricCatalog !== 'function') return;
     try {
@@ -601,6 +879,9 @@
       buildFilters();
       applyFilters();
       updateSummary(response && response.summary);
+      // Goals are loaded after the catalog so a slow/failed goals call never
+      // blocks the metric table from rendering.
+      loadGoals();
     } catch (err) {
       console.error('[MetricCatalog] Failed to load metrics:', err);
       if (window.Lex && Lex.Toast) Lex.Toast.error('Failed to load metric catalog');
@@ -612,6 +893,10 @@
       Lex.Nav.go('dashboard.html', { replace: true });
       return;
     }
+    // Only system_admin / org_admin may set or edit goals. Reuse the same
+    // Lex.Auth role source the page already gates access on; non-admins reach
+    // the catalog but see no Goal action.
+    isGoalAdmin = !!(window.Lex && Lex.Auth && (Lex.Auth.isSystemAdmin() || Lex.Auth.isOrgAdmin()));
     wireToolbar();
     load();
   }

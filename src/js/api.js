@@ -2814,6 +2814,36 @@ class ApiClient {
     return this.get(url);
   }
 
+  /**
+   * List configured metric goals (module targets) for the organization.
+   * Read is allowed for all org members; the catalog uses this to surface a
+   * goal indicator per metric. See LANA-AI/docs/METRIC_GOALS_DESIGN.md.
+   * @returns {Promise<Object>} { goals: [ { metric_key, target_value, ... } ] }
+   */
+  async getMetricGoals() {
+    return this.get('/api/v1/modules/metric-goals');
+  }
+
+  /**
+   * Create or update the goal for a metric. Admin-only on the backend.
+   * @param {string} metricKey - Registry metric key
+   * @param {Object} body - { target_value (required), target_type, target_period, green_threshold?, yellow_threshold?, red_threshold?, notes? }
+   * @returns {Promise<Object>} { target_id, metric_key, target_period }
+   */
+  async upsertMetricGoal(metricKey, body) {
+    return this.put('/api/v1/modules/metric-catalog/' + encodeURIComponent(metricKey) + '/goal', body);
+  }
+
+  /**
+   * Remove the goal for a metric and period. Admin-only on the backend.
+   * @param {string} metricKey - Registry metric key
+   * @param {string} targetPeriod - 'weekly' | 'monthly'
+   * @returns {Promise<Object>} { deleted, metric_key, target_period }
+   */
+  async deleteMetricGoal(metricKey, targetPeriod) {
+    return this.delete('/api/v1/modules/metric-catalog/' + encodeURIComponent(metricKey) + '/goal', { target_period: targetPeriod });
+  }
+
   async listBIDashboards(params = {}) {
     let url = '/api/v1/business-intelligence/dashboards';
     const queryParts = [];
