@@ -218,10 +218,6 @@
   gap: 0.75rem;
 }
 
-.metric-catalog-goal-form__row--thirds {
-  grid-template-columns: repeat(3, 1fr);
-}
-
 .metric-catalog-goal-field {
   display: flex;
   flex-direction: column;
@@ -282,8 +278,7 @@ textarea.metric-catalog-goal-field__input {
 }
 
 @media (max-width: 540px) {
-  .metric-catalog-goal-form__row,
-  .metric-catalog-goal-form__row--thirds {
+  .metric-catalog-goal-form__row {
     grid-template-columns: 1fr;
   }
 }

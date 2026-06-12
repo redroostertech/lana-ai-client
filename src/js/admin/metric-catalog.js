@@ -599,7 +599,7 @@
   // the prior period.
   function goalTypeHelp(type) {
     if (type === 'rolling_average') {
-      return 'Rolling average: the goal is set automatically to the average of the last 3 completed periods, so it tracks your recent norm and adjusts over time. Use it when keeping pace with recent performance matters more than a fixed number. This type does not use the Target value field.';
+      return 'Rolling average: the goal tracks your recent norm and adjusts over time. Use it when keeping pace with recent performance matters more than a fixed number. Target value sets how many recent completed periods to average (N) - for example, 3 averages the last three periods.';
     }
     if (type === 'growth_rate') {
       return 'Growth rate: the goal is the prior period plus a percent you set. Enter the percent in Target value (5 means 5 percent above the previous period). Use it for steady, period-over-period improvement. Example: if last period was 100 and you set 5, the target becomes 105.';
@@ -607,11 +607,19 @@
     return 'Static: a fixed target for the period. The metric is compared directly to the number you enter in Target value, in the metric\'s own unit. Use it for a concrete, absolute goal. Example: bill 160 hours this month, or sign 12 new clients.';
   }
 
-  // Help for the colour bands. Matches the engine: Green and Yellow are absolute
-  // values; Red is whatever falls below Yellow (the Red field is not yet read by
-  // the status calculation). Blank thresholds fall back to percent-of-target
-  // ratio bands.
-  var GOAL_THRESHOLD_HELP = 'Thresholds are absolute values in the metric\'s own unit, not percentages. An actual at or above Green shows green, at or above Yellow shows yellow, and anything below Yellow shows red (for metrics where lower is better, the comparison flips). Leave them blank to use automatic bands from percent of target: 100 percent or more is green, 80 percent or more is yellow, below that is red. Example, for a goal of 12 new clients: set Green to 12 and Yellow to 9, so an actual of 13 reads green, 10 reads yellow, and 6 reads red. Note: red is anything below Yellow; the Red threshold field is not currently used by the status calculation.';
+  // Help for the colour bands. Matches the engine: Green and Red are floors,
+  // Yellow is the implicit middle. Blank thresholds fall back to
+  // percent-of-target ratio bands.
+  var GOAL_THRESHOLD_HELP = 'Green and Red are absolute values in the metric\'s own unit. An actual at or above Green shows green, at or below Red shows red, and anything in between shows yellow (for metrics where lower is better, the comparison flips). Leave both blank to use automatic bands from percent of target: 100 percent or more is green, 80 percent or more is yellow, below that is red. Example, for a goal of 12 new clients: set Green to 12 and Red to 8, so 13 reads green, 10 reads yellow, and 7 reads red.';
+
+  // Label for the Target value field, which changes meaning per type:
+  // static -> the absolute target, growth_rate -> a percent over the prior
+  // period, rolling_average -> the window N (how many periods to average).
+  function targetValueLabel(type) {
+    if (type === 'growth_rate') return 'Growth percent';
+    if (type === 'rolling_average') return 'Periods to average (N)';
+    return 'Target value';
+  }
 
   // Build the editor form for a metric, pre-filled with the goal for the
   // currently selected period (period defaults to monthly).
@@ -655,18 +663,15 @@
     html += '<p class="metric-catalog-goal-help" id="metricGoalTypeHelp">' + goalTypeHelp(targetType) + '</p>';
 
     html += '<label class="metric-catalog-goal-field">'
-      + '<span class="metric-catalog-goal-field__label">Target value <span class="metric-catalog-goal-req">*</span></span>'
+      + '<span class="metric-catalog-goal-field__label"><span id="metricGoalTargetValueLabel">' + escapeHtml(targetValueLabel(targetType)) + '</span> <span class="metric-catalog-goal-req">*</span></span>'
       + '<input type="number" step="any" id="metricGoalTargetValue" class="metric-catalog-goal-field__input" value="' + numAttr(g.target_value) + '" />'
       + '<span class="metric-catalog-goal-error" id="metricGoalTargetValueError"></span>'
       + '</label>';
 
-    html += '<div class="metric-catalog-goal-form__row metric-catalog-goal-form__row--thirds">';
+    html += '<div class="metric-catalog-goal-form__row">';
     html += '<label class="metric-catalog-goal-field">'
       + '<span class="metric-catalog-goal-field__label">Green threshold</span>'
       + '<input type="number" step="any" id="metricGoalGreen" class="metric-catalog-goal-field__input" value="' + numAttr(g.green_threshold) + '" /></label>';
-    html += '<label class="metric-catalog-goal-field">'
-      + '<span class="metric-catalog-goal-field__label">Yellow threshold</span>'
-      + '<input type="number" step="any" id="metricGoalYellow" class="metric-catalog-goal-field__input" value="' + numAttr(g.yellow_threshold) + '" /></label>';
     html += '<label class="metric-catalog-goal-field">'
       + '<span class="metric-catalog-goal-field__label">Red threshold</span>'
       + '<input type="number" step="any" id="metricGoalRed" class="metric-catalog-goal-field__input" value="' + numAttr(g.red_threshold) + '" /></label>';
@@ -688,7 +693,6 @@
       target_type: (el('metricGoalType') || {}).value,
       target_period: (el('metricGoalPeriod') || {}).value,
       green_threshold: (el('metricGoalGreen') || {}).value,
-      yellow_threshold: (el('metricGoalYellow') || {}).value,
       red_threshold: (el('metricGoalRed') || {}).value,
       notes: (el('metricGoalNotes') || {}).value,
     };
@@ -752,14 +756,17 @@
       });
     }
 
-    // Update the Type help text in place when the operator changes the type,
-    // without re-rendering the body (which would discard other field input).
+    // Update the Type help text and the Target value label in place when the
+    // operator changes the type, without re-rendering the body (which would
+    // discard other field input).
     function bindTypeSelect() {
       var typeSel = el('metricGoalType');
       var helpNode = el('metricGoalTypeHelp');
       if (!typeSel || !helpNode) return;
       typeSel.addEventListener('change', function () {
         helpNode.textContent = goalTypeHelp(typeSel.value);
+        var labelNode = el('metricGoalTargetValueLabel');
+        if (labelNode) labelNode.textContent = targetValueLabel(typeSel.value);
       });
     }
 

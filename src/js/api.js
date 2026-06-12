@@ -2827,7 +2827,7 @@ class ApiClient {
   /**
    * Create or update the goal for a metric. Admin-only on the backend.
    * @param {string} metricKey - Registry metric key
-   * @param {Object} body - { target_value (required), target_type, target_period, green_threshold?, yellow_threshold?, red_threshold?, notes? }
+   * @param {Object} body - { target_value (required; window N for rolling_average), target_type, target_period, green_threshold?, red_threshold?, notes? }
    * @returns {Promise<Object>} { target_id, metric_key, target_period }
    */
   async upsertMetricGoal(metricKey, body) {

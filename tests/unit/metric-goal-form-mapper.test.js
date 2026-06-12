@@ -73,7 +73,6 @@ describe('metric-goal-form-mapper', () => {
         target_type: 'growth_rate',
         target_period: 'weekly',
         green_threshold: '90',
-        yellow_threshold: '',
         red_threshold: '60',
         notes: '  pace it  ',
       });
@@ -106,6 +105,33 @@ describe('metric-goal-form-mapper', () => {
       const result = mapper.buildGoalPayload({ target_value: '10', green_threshold: 'nope' });
       expect(result.ok).toBe(false);
       expect(result.errors.green_threshold).toBeTruthy();
+    });
+
+    test('rolling_average requires an integer window N of 1 or more', () => {
+      const fraction = mapper.buildGoalPayload({
+        target_value: '2.5',
+        target_type: 'rolling_average',
+        target_period: 'monthly',
+      });
+      expect(fraction.ok).toBe(false);
+      expect(fraction.errors.target_value).toBeTruthy();
+
+      const tooLow = mapper.buildGoalPayload({
+        target_value: '0',
+        target_type: 'rolling_average',
+        target_period: 'monthly',
+      });
+      expect(tooLow.ok).toBe(false);
+      expect(tooLow.errors.target_value).toBeTruthy();
+
+      const ok = mapper.buildGoalPayload({
+        target_value: '3',
+        target_type: 'rolling_average',
+        target_period: 'monthly',
+      });
+      expect(ok.ok).toBe(true);
+      expect(ok.payload.target_value).toBe(3);
+      expect(ok.payload.target_type).toBe('rolling_average');
     });
 
     test('falls back to static/monthly when type or period is invalid', () => {

@@ -66,26 +66,29 @@
 
   // Map the editor's raw field values to the PUT payload, validating as we go.
   // form: { target_value, target_type, target_period, green_threshold,
-  //         yellow_threshold, red_threshold, notes }
+  //         red_threshold, notes }
   function buildGoalPayload(form) {
     var f = form || {};
     var errors = {};
 
-    // target_value: required, numeric.
+    var targetType = TARGET_TYPES.indexOf(f.target_type) !== -1 ? f.target_type : 'static';
+    var targetPeriod = TARGET_PERIODS.indexOf(f.target_period) !== -1 ? f.target_period : 'monthly';
+
+    // target_value: required, numeric. For rolling_average it is the window N
+    // (how many recent periods to average), so it must be an integer >= 1.
     if (isBlank(f.target_value)) {
       errors.target_value = 'Target value is required';
     } else {
       var tv = Number(f.target_value);
-      if (!isFinite(tv)) errors.target_value = 'Target value must be a number';
+      if (!isFinite(tv)) {
+        errors.target_value = 'Target value must be a number';
+      } else if (targetType === 'rolling_average' && (!Number.isInteger(tv) || tv < 1)) {
+        errors.target_value = 'Periods to average must be a whole number of 1 or more';
+      }
     }
-
-    var targetType = TARGET_TYPES.indexOf(f.target_type) !== -1 ? f.target_type : 'static';
-    var targetPeriod = TARGET_PERIODS.indexOf(f.target_period) !== -1 ? f.target_period : 'monthly';
 
     var green = parseOptionalNumber(f.green_threshold);
     if (!green.ok) errors.green_threshold = 'Green threshold must be a number';
-    var yellow = parseOptionalNumber(f.yellow_threshold);
-    if (!yellow.ok) errors.yellow_threshold = 'Yellow threshold must be a number';
     var red = parseOptionalNumber(f.red_threshold);
     if (!red.ok) errors.red_threshold = 'Red threshold must be a number';
 
@@ -99,7 +102,6 @@
       target_period: targetPeriod
     };
     if (green.value !== null) payload.green_threshold = green.value;
-    if (yellow.value !== null) payload.yellow_threshold = yellow.value;
     if (red.value !== null) payload.red_threshold = red.value;
     if (!isBlank(f.notes)) payload.notes = String(f.notes).trim();
 
