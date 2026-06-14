@@ -108,6 +108,9 @@
       // re-parsing the rendered HTML.
       last_run_status: 'never',
       last_run_value: null,
+      // Sortable underlying target for the Goal column; stamped each render
+      // from goalIndex (goals load after the catalog) by stampGoalsToRows.
+      goal_target: null,
       actions: 'actions_placeholder',
     });
   }
@@ -307,23 +310,24 @@
     return '<span class="metric-catalog-runcell-value">' + escapeHtml(summary) + '</span>';
   }
 
-  // Compact read-only indicator shown in the row when a goal exists for the
-  // metric. Prefers the monthly target value (the common case); falls back to
-  // the weekly one. Visible to everyone; the editor button is admin-only.
-  function goalIndicator(metric) {
+  // Read-only Goal column cell. Prefers the monthly target value (the common
+  // case); falls back to the weekly one. Shows a muted dash when no goal is set.
+  // Visible to everyone; the editor button stays admin-only in the Actions cell.
+  function goalCell(metric) {
     var mapper = goalMapper();
-    if (!mapper || !mapper.hasAnyGoal(goalIndex, metric.key)) return '';
-    var goal = mapper.getGoal(goalIndex, metric.key, 'monthly')
-      || mapper.getGoal(goalIndex, metric.key, 'weekly');
-    var label = goal && goal.target_value != null
-      ? 'Goal ' + displayText(goal.target_value)
-      : 'Goal';
-    return '<span class="metric-catalog-goal-pill" title="Goal set for this metric">' + escapeHtml(label) + '</span>';
+    if (!mapper || !mapper.hasAnyGoal(goalIndex, metric.key)) {
+      return '<span class="metric-catalog-muted">-</span>';
+    }
+    var period = mapper.getGoal(goalIndex, metric.key, 'monthly') ? 'monthly' : 'weekly';
+    var goal = mapper.getGoal(goalIndex, metric.key, period);
+    var periodLabel = period === 'monthly' ? 'mo' : 'wk';
+    var valueText = goal && goal.target_value != null ? displayText(goal.target_value) : 'set';
+    return '<span class="metric-catalog-goal-pill" title="Goal target (' + period + ')">'
+      + escapeHtml(valueText) + ' / ' + periodLabel + '</span>';
   }
 
   function actionsCell(metric) {
     var html = '<div class="metric-catalog-actions">'
-      + goalIndicator(metric)
       + '<button type="button" class="metric-catalog-btn metric-catalog-btn--run" data-metric-run="' + escapeHtml(metric.key) + '">Run</button>'
       + '<button type="button" class="metric-catalog-btn metric-catalog-btn--playground" data-metric-playground="' + escapeHtml(metric.key) + '">Playground</button>'
       + '<button type="button" class="metric-catalog-btn" data-metric-view="' + escapeHtml(metric.key) + '">View</button>';
@@ -351,6 +355,7 @@
         },
         last_run_status: function (_value, row) { return lastRunStatusCell(row); },
         last_run_value: function (_value, row) { return lastRunValueCell(row); },
+        goal_target: function (_value, row) { return goalCell(row); },
         actions: function (_value, row) { return actionsCell(row); },
       });
     }
@@ -360,7 +365,21 @@
       // built-in sort works on real underlying values (numeric for the
       // Value column, status string for the Last Run column).
       applyRunStateToRows();
+      stampGoalsToRows();
       table.setData(visibleMetrics);
+    }
+  }
+
+  // Stamp each visible metric with its sortable goal target (monthly preferred,
+  // then weekly) so the Goal column sorts numerically. The cell renderer reads
+  // goalIndex live for display; this only feeds the table's built-in sort.
+  function stampGoalsToRows() {
+    var mapper = goalMapper();
+    for (var i = 0; i < visibleMetrics.length; i++) {
+      var m = visibleMetrics[i];
+      var goal = mapper && (mapper.getGoal(goalIndex, m.key, 'monthly') || mapper.getGoal(goalIndex, m.key, 'weekly'));
+      var raw = goal ? goal.target_value : null;
+      m.goal_target = (raw != null && isFinite(Number(raw))) ? Number(raw) : null;
     }
   }
 
