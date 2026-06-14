@@ -16,7 +16,24 @@
    Events: lex-close
 */
 
-(function () {
+// Pure helper (no DOM dependency), exported for unit tests. Builds the footer
+// <button> markup for the imperative `buttons` array API. Unknown variants fall
+// back to secondary so a bad value can never inject a class.
+function buildDrawerFooterButtons(buttons, escapeHtml) {
+  var esc = typeof escapeHtml === 'function' ? escapeHtml : function (s) { return String(s == null ? '' : s); };
+  var list = Array.isArray(buttons) ? buttons.filter(Boolean) : [];
+  return list.map(function (btn) {
+    var variant = ['primary', 'secondary', 'danger'].indexOf(btn.variant) >= 0 ? btn.variant : 'secondary';
+    var idAttr = btn.id ? ' id="' + esc(btn.id) + '"' : '';
+    return '<button type="button" class="lex-drawer-btn lex-drawer-btn--' + variant + '"' + idAttr + '>' + esc(btn.label || '') + '</button>';
+  }).join('');
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { buildDrawerFooterButtons: buildDrawerFooterButtons };
+}
+
+if (typeof window !== 'undefined' && window.Lex) (function () {
   'use strict';
 
   const { LexElement, defineLex, ScrollLock } = window.Lex;
@@ -204,6 +221,15 @@
         background: var(--lex-bg-accent-hover);
       }
 
+      .lex-drawer-btn--danger {
+        background: var(--lex-color-danger-50, #FEF3F2);
+        color: var(--lex-color-danger-600, #dc2626);
+      }
+
+      .lex-drawer-btn--danger:hover {
+        background: var(--lex-color-danger-100, #FEE4E2);
+      }
+
       /* ── Animations ──────────────────────────────────── */
 
       @keyframes lex-drawer-fade-in {
@@ -269,6 +295,7 @@
         showFooter: { type: Boolean, default: false },
         confirmText: { type: String, default: 'Save' },
         cancelText:  { type: String, default: 'Cancel' },
+        buttons:     { type: Array, default: null },
         closeOnOverlay: { type: Boolean, default: true }
       };
     }
@@ -325,8 +352,15 @@
       // Body
       html += `<div class="lex-drawer-body"><slot-content></slot-content></div>`;
 
-      // Footer
-      if (this.showFooter) {
+      // Footer: an explicit `buttons` array takes precedence over the legacy
+      // showFooter confirm/cancel pair, so callers can render multiple actions
+      // (e.g. Save / Remove / Close) with stable ids they wire by getElementById.
+      const footerButtons = Array.isArray(this.buttons) ? this.buttons.filter(Boolean) : [];
+      if (footerButtons.length) {
+        html += `<div class="lex-drawer-footer">`;
+        html += buildDrawerFooterButtons(this.buttons, (s) => this.escapeHtml(s));
+        html += `</div>`;
+      } else if (this.showFooter) {
         html += `<div class="lex-drawer-footer">`;
         if (this.cancelText) {
           html += `<button type="button" class="lex-drawer-btn lex-drawer-btn--secondary" data-action="cancel">${this.escapeHtml(this.cancelText)}</button>`;
@@ -546,6 +580,12 @@
         drawer.cancelText = options.cancelText || 'Cancel';
       }
 
+      // Multi-button footer ([{ label, variant, id }]). Callers wire click
+      // handlers against each button id after open().
+      if (Array.isArray(options.buttons) && options.buttons.length) {
+        drawer.buttons = options.buttons;
+      }
+
       if (options.content) {
         drawer.innerHTML = options.content;
       }
@@ -567,6 +607,18 @@
 
       document.body.appendChild(drawer);
       return drawer;
+    }
+
+    /**
+     * Close the most recently opened drawer (the topmost one). Mirrors the
+     * header close button by emitting lex-close, which the open() listener
+     * handles by removing the element. Used by footer Close buttons that wire
+     * `Lex.Drawer.close()` directly.
+     */
+    static close() {
+      const drawers = document.querySelectorAll('lex-drawer');
+      const drawer = drawers[drawers.length - 1];
+      if (drawer) drawer.dispatchEvent(new CustomEvent('lex-close', { bubbles: true }));
     }
   }
 
