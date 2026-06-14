@@ -304,7 +304,9 @@
   function formatMetricCardValue(metric) {
     if (hasValue(metric && metric.formatted_value)) return displayText(metric.formatted_value);
     var value = metric ? metric.value : null;
-    var format = String((metric && metric.format) || 'number').toLowerCase();
+    var rawFormat = metric && metric.format;
+    if (rawFormat && typeof rawFormat === 'object') rawFormat = rawFormat.type || rawFormat.style;
+    var format = String(rawFormat || 'number').toLowerCase();
     var metadata = (metric && metric.metadata) || {};
     // Treat 0 and missing-value identically: a dashboard full of literal
     // zeros looks populated when it's actually empty. Render an em-dash so
@@ -666,7 +668,7 @@
     var periodLabel = metric.period || metric.period_label || currentPeriod.label || 'Current period';
     metricInfoById[cardId] = metric;
 
-    var comparisonHtml = renderComparison(metric.comparison);
+    var comparisonHtml = renderComparison(metric.comparison, metric.format);
     var goalHtml = renderGoal(metric.goal);
 
     return '<article class="dash-metric-card">'
@@ -689,7 +691,7 @@
   // Period-over-period comparison row. The backend metric layer attaches a
   // `comparison` block (METRIC_GOALS_DESIGN.md section 11); null -> render
   // nothing so cards without snapshot history degrade gracefully.
-  function renderComparison(comparison) {
+  function renderComparison(comparison, format) {
     if (typeof MetricGoalComparison === 'undefined') return '';
     var view = MetricGoalComparison.buildComparisonView(comparison);
     if (!view) return '';
@@ -699,11 +701,19 @@
     if (view.direction === 'up') { dirClass = 'dash-metric-card__delta--up'; sign = '+'; }
     else if (view.direction === 'down') { dirClass = 'dash-metric-card__delta--down'; sign = '-'; }
 
-    var deltaHtml = view.deltaLabel
-      ? '<span class="dash-metric-card__delta ' + dirClass + '">' + escapeHtml(sign + view.deltaLabel) + '</span>'
+    // A percent delta keeps its % label; an absolute delta is rendered in the
+    // metric's own unit (currency/days/number) rather than a bare number.
+    var deltaText = view.deltaLabel;
+    if (comparison && (comparison.percent_change === null || comparison.percent_change === undefined)
+        && typeof comparison.absolute_change === 'number' && isFinite(comparison.absolute_change)) {
+      deltaText = formatMetricCardValue({ value: Math.abs(comparison.absolute_change), format: format });
+    }
+
+    var deltaHtml = deltaText
+      ? '<span class="dash-metric-card__delta ' + dirClass + '">' + escapeHtml(sign + deltaText) + '</span>'
       : '';
     var priorHtml = view.hasPrevious
-      ? '<span class="dash-metric-card__delta-prior">was ' + escapeHtml(formatMetricCardValue({ value: view.previousValue, format: 'number' })) + '</span>'
+      ? '<span class="dash-metric-card__delta-prior">was ' + escapeHtml(formatMetricCardValue({ value: view.previousValue, format: format })) + '</span>'
       : '';
 
     return '<div class="dash-metric-card__comparison">'

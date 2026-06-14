@@ -140,6 +140,23 @@ describe('metric-card-preview', () => {
       expect(html).toContain('Percent-of-target bands');
     });
 
+    test('static target formats by metric type with comma grouping', () => {
+      const html = preview.renderRulesPanel(
+        { target_type: 'static', target_value: 285900 },
+        { format: 'currency' }
+      );
+      expect(html).toContain('$285,900');
+    });
+
+    test('explicit thresholds format by type and keep a zero floor', () => {
+      const html = preview.renderRulesPanel(
+        { target_type: 'static', target_value: 50000, green_threshold: 50000, red_threshold: 0 },
+        { format: 'currency' }
+      );
+      expect(html).toContain('Green $50,000');
+      expect(html).toContain('Red $0');
+    });
+
     test('no goal renders the no-goal message', () => {
       const html = preview.renderRulesPanel(null, { format: 'currency', inverse: true });
       expect(html).toContain('No goal configured for this period.');

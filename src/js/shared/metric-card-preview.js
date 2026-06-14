@@ -86,13 +86,11 @@
   // (number or numeric string) into a display string honoring the metric
   // format. Non-numeric / empty values render as a dash so an empty metric
   // never looks populated.
-  function formatValue(value, format) {
-    if (value == null || value === '') return '-';
+  // Core numeric formatter by metric format (comma grouping + unit). Does NOT
+  // special-case zero, so callers that treat 0 as a real value (configured
+  // targets/thresholds) get a real formatted number.
+  function formatNumberByType(num, format) {
     var fmt = (formatToken(format) || 'number').toLowerCase();
-    var num = Number(value);
-    if (value === 0 || num === 0) return '-';
-    if (!isFinite(num)) return escapeHtml(String(value));
-
     if (fmt === 'currency' || fmt === 'currency_breakdown') {
       return num.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
     }
@@ -106,6 +104,16 @@
       return num.toLocaleString('en-US', { maximumFractionDigits: 1 }) + (num === 1 ? ' day' : ' days');
     }
     return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+
+  // Card-value formatter: empty / zero render as a dash so an empty metric never
+  // looks populated.
+  function formatValue(value, format) {
+    if (value == null || value === '') return '-';
+    var num = Number(value);
+    if (value === 0 || num === 0) return '-';
+    if (!isFinite(num)) return escapeHtml(String(value));
+    return formatNumberByType(num, format);
   }
 
   // ---------------------------------------------------------------------------
@@ -270,7 +278,7 @@
       + '</div>';
   }
 
-  function targetSummary(goal) {
+  function targetSummary(goal, format) {
     var type = goal.target_type || 'static';
     if (type === 'rolling_average') {
       return 'Window ' + (goal.target_value != null ? goal.target_value : '?') + ' periods';
@@ -278,15 +286,19 @@
     if (type === 'growth_rate') {
       return (goal.target_value != null ? goal.target_value : '?') + ' percent over prior';
     }
-    return goal.target_value != null ? String(goal.target_value) : '(none)';
+    return (goal.target_value != null && isFinite(Number(goal.target_value)))
+      ? formatNumberByType(Number(goal.target_value), format)
+      : '(none)';
   }
 
-  function bandingSummary(goal) {
+  function bandingSummary(goal, format) {
     var hasFloors = goal.green_threshold != null || goal.red_threshold != null;
     if (hasFloors) {
-      return 'Green and Red are floors (Green ' + (goal.green_threshold != null ? goal.green_threshold : 'blank')
-        + ', Red ' + (goal.red_threshold != null ? goal.red_threshold : 'blank')
-        + '); Yellow is the band between.';
+      var green = (goal.green_threshold != null && isFinite(Number(goal.green_threshold)))
+        ? formatNumberByType(Number(goal.green_threshold), format) : 'blank';
+      var red = (goal.red_threshold != null && isFinite(Number(goal.red_threshold)))
+        ? formatNumberByType(Number(goal.red_threshold), format) : 'blank';
+      return 'Green and Red are floors (Green ' + green + ', Red ' + red + '); Yellow is the band between.';
     }
     return 'Percent-of-target bands: 100 percent or more is green, 80 percent or more is yellow, below that is red.';
   }
@@ -297,10 +309,11 @@
     parts.push('<div class="metric-catalog-playground-rules__section">');
     parts.push('<div class="metric-catalog-playground-rules__heading">Goal</div>');
     if (goal) {
-      parts.push(rulesRow('Target', targetSummary(goal)));
+      var goalFormat = definition && definition.format;
+      parts.push(rulesRow('Target', targetSummary(goal, goalFormat)));
       parts.push(rulesRow('Period', goal.target_period || '(unset)'));
       parts.push(rulesRow('Type', goal.target_type || 'static'));
-      parts.push('<div class="metric-catalog-playground-rules__note">' + escapeHtml(bandingSummary(goal)) + '</div>');
+      parts.push('<div class="metric-catalog-playground-rules__note">' + escapeHtml(bandingSummary(goal, goalFormat)) + '</div>');
       if (goal.notes) {
         parts.push('<div class="metric-catalog-playground-rules__note">' + escapeHtml(goal.notes) + '</div>');
       }

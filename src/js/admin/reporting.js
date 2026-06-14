@@ -1215,7 +1215,14 @@
       return createDistributionMetricCard(metric);
     }
 
-    var isCurrency = metric.type === 'currency' || metric.unit === 'dollars';
+    // Resolve the metric's display type from its format (object { type } or a
+    // string) or the legacy type/unit fields, so values render by type
+    // (currency, percentage, days) with comma grouping, not just currency-vs-number.
+    var fmtTypeRaw = (metric.format && typeof metric.format === 'object') ? (metric.format.type || metric.format.style) : metric.format;
+    var fmtType = String(fmtTypeRaw || metric.type || '').toLowerCase();
+    var isCurrency = fmtType === 'currency' || fmtType === 'currency_breakdown' || metric.type === 'currency' || metric.unit === 'dollars';
+    var isPercentage = fmtType === 'percentage' || fmtType === 'percent' || metric.type === 'percentage' || metric.unit === 'percent' || metric.unit === '%';
+    var isDays = fmtType === 'days' || metric.type === 'days' || metric.unit === 'days';
 
     var fmtCurrency = function (value) {
       if (value === null || value === undefined || isNaN(value)) return 'N/A';
@@ -1230,24 +1237,27 @@
 
     var fmtValue = function (value) {
       if (value === null || value === undefined || isNaN(value)) return 'N/A';
-      return isCurrency ? fmtCurrency(value) : formatNumber(value, 0);
+      if (isCurrency) return fmtCurrency(value);
+      if (isPercentage) return formatPercentage(value, 1);
+      if (isDays) return formatNumber(value, 1) + (Number(value) === 1 ? ' day' : ' days');
+      return formatNumber(value, 0);
     };
 
-    var currentValue = isCurrency
-      ? fmtCurrency(metric.current)
-      : (metric.formattedCurrent || formatNumber(metric.current, 0));
+    var currentValue = (metric.current !== null && metric.current !== undefined && !isNaN(metric.current))
+      ? fmtValue(metric.current)
+      : (metric.formattedCurrent || 'N/A');
 
     var priorValue = vm.hasComparison
       ? fmtValue(vm.priorValue)
-      : (isCurrency
-          ? (metric.prior !== null ? fmtCurrency(metric.prior) : 'N/A')
-          : (metric.formattedPrior || (metric.prior !== null ? formatNumber(metric.prior, 0) : 'N/A')));
+      : ((metric.prior !== null && metric.prior !== undefined)
+          ? fmtValue(metric.prior)
+          : (metric.formattedPrior || 'N/A'));
 
     var targetValue = vm.hasGoal
       ? fmtValue(vm.targetValue)
-      : (isCurrency
-          ? fmtCurrency(metric.target)
-          : (metric.formattedTarget || formatNumber(metric.target, 0)));
+      : ((metric.target !== null && metric.target !== undefined)
+          ? fmtValue(metric.target)
+          : (metric.formattedTarget || 'N/A'));
 
     // Attainment annotation under the Target (goal block only).
     var attainmentText = (vm.hasGoal && vm.attainmentPct !== null)
