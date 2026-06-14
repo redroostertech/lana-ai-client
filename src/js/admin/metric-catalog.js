@@ -83,6 +83,12 @@
   // gate access). Non-admins never see the Goal action.
   var isGoalAdmin = false;
 
+  // Per-open state for the goal editor. The drawer body re-renders via
+  // innerHTML on period/type change, so renderGoalForm reads the metric's
+  // format token and the cached per-period goal recommendation from here rather
+  // than threading them through every call. Reset each time the editor opens.
+  var goalEditorState = { formatToken: '', recommendations: {} };
+
   function goalMapper() {
     return (typeof window !== 'undefined' && window.MetricGoalFormMapper) || null;
   }
@@ -976,12 +982,52 @@
   var GOAL_THRESHOLD_HELP = 'Green and Red are absolute values in the metric\'s own unit. An actual at or above Green shows green, at or below Red shows red, and anything in between shows yellow (for metrics where lower is better, the comparison flips). Leave both blank to use automatic bands from percent of target: 100 percent or more is green, 80 percent or more is yellow, below that is red. Example, for a goal of 12 new clients: set Green to 12 and Red to 8, so 13 reads green, 10 reads yellow, and 7 reads red.';
 
   // Label for the Target value field, which changes meaning per type:
-  // static -> the absolute target, growth_rate -> a percent over the prior
-  // period, rolling_average -> the window N (how many periods to average).
+  // static -> the absolute target (carrying the metric unit), growth_rate -> a
+  // percent over the prior period, rolling_average -> the window N. Delegates to
+  // the pure mapper so the unit logic stays unit-testable.
   function targetValueLabel(type) {
+    var mapper = goalMapper();
+    if (mapper && mapper.targetValueLabel) {
+      return mapper.targetValueLabel(type, goalEditorState.formatToken);
+    }
     if (type === 'growth_rate') return 'Growth percent';
     if (type === 'rolling_average') return 'Periods to average (N)';
     return 'Target value';
+  }
+
+  // Soft unit hint shown under the Target value field for the static type only.
+  // Percentage metrics get a note that the value is a percent (we do not hard
+  // block values over 100; some percentages legitimately exceed it).
+  function targetValueHint(type) {
+    if (type !== 'static') return '';
+    var token = String(goalEditorState.formatToken || '').toLowerCase();
+    if (token === 'percentage' || token === 'percent') {
+      return 'Enter the percent as a number (for example, 95 for 95%). Values above 100 are allowed.';
+    }
+    if (token === 'currency' || token === 'currency_breakdown') {
+      return 'Enter the amount in dollars, no symbol (for example, 25000).';
+    }
+    return '';
+  }
+
+  // Build the suggestion row markup for the currently selected period and type.
+  // Returns '' when no recommendation applies (non-static type, or null value).
+  function recommendationRowHtml(type, period) {
+    var mapper = goalMapper();
+    if (!mapper || !mapper.buildRecommendationView) return '';
+    var rec = goalEditorState.recommendations[period];
+    var view = mapper.buildRecommendationView(rec, goalEditorState.formatToken, type);
+    if (!view.show) return '';
+    var basis = view.basis
+      ? '<span class="metric-catalog-goal-suggest__basis">' + escapeHtml(view.basis) + '</span>'
+      : '';
+    return '<div class="metric-catalog-goal-suggest" id="metricGoalSuggest">'
+      + '<span class="metric-catalog-goal-suggest__label">Suggested:</span> '
+      + '<span class="metric-catalog-goal-suggest__value">' + escapeHtml(view.valueDisplay) + '</span> '
+      + '<lex-btn id="metricGoalSuggestUse" variant="secondary" size="sm" '
+      + 'data-suggest-value="' + escapeHtml(String(view.rawValue)) + '">Use</lex-btn>'
+      + basis
+      + '</div>';
   }
 
   // Build the editor form for a metric, pre-filled with the goal for the
@@ -1028,8 +1074,11 @@
     html += '<label class="metric-catalog-goal-field">'
       + '<span class="metric-catalog-goal-field__label"><span id="metricGoalTargetValueLabel">' + escapeHtml(targetValueLabel(targetType)) + '</span> <span class="metric-catalog-goal-req">*</span></span>'
       + '<input type="number" step="any" id="metricGoalTargetValue" class="metric-catalog-goal-field__input" value="' + numAttr(g.target_value) + '" />'
+      + '<span class="metric-catalog-goal-hint" id="metricGoalTargetValueHint">' + escapeHtml(targetValueHint(targetType)) + '</span>'
       + '<span class="metric-catalog-goal-error" id="metricGoalTargetValueError"></span>'
       + '</label>';
+
+    html += '<div id="metricGoalSuggestSlot">' + recommendationRowHtml(targetType, period) + '</div>';
 
     html += '<div class="metric-catalog-goal-form__row">';
     html += '<label class="metric-catalog-goal-field">'
@@ -1081,6 +1130,13 @@
     var currentPeriod = mapper.getGoal(goalIndex, metric.key, 'monthly') ? 'monthly'
       : (mapper.getGoal(goalIndex, metric.key, 'weekly') ? 'weekly' : 'monthly');
 
+    // Reset the per-open format/recommendation cache. The form renders without
+    // these (label has no unit, no suggestion); both are patched in once the
+    // catalog entry and recommendation fetches resolve. definitionFetched
+    // guards the one-time format fetch.
+    goalEditorState = { formatToken: '', recommendations: {} };
+    var definitionFetched = false;
+
     Lex.Drawer.open({
       heading: 'Goal: ' + (metric.display_name || metric.key),
       content: renderGoalForm(metric, currentPeriod),
@@ -1104,6 +1160,51 @@
       removeBtn.disabled = !existing;
     }
 
+    function currentType() {
+      return (el('metricGoalType') || {}).value || 'static';
+    }
+
+    // Re-render just the suggestion slot for the current type/period. Called
+    // after the type changes (suggestion hides for growth/rolling) and after a
+    // recommendation fetch resolves.
+    function refreshSuggestionRow() {
+      var slot = el('metricGoalSuggestSlot');
+      if (slot) slot.innerHTML = recommendationRowHtml(currentType(), currentPeriod);
+    }
+
+    // Lazily fetch the metric's format from the catalog entry once, then patch
+    // the Target value label/hint and the suggestion row in place.
+    function ensureFormat() {
+      if (definitionFetched) return Promise.resolve();
+      definitionFetched = true;
+      return api.getMetricCatalogEntry(metric.key).then(function (resp) {
+        var def = (resp && resp.data) ? resp.data : (resp || null);
+        if (def && mapper.formatToken) {
+          goalEditorState.formatToken = mapper.formatToken(def.format);
+        }
+        var labelNode = el('metricGoalTargetValueLabel');
+        if (labelNode) labelNode.textContent = targetValueLabel(currentType());
+        var hintNode = el('metricGoalTargetValueHint');
+        if (hintNode) hintNode.textContent = targetValueHint(currentType());
+        refreshSuggestionRow();
+      }).catch(function () { /* format is optional; leave unitless */ });
+    }
+
+    // Fetch (and cache) the recommendation for a period, then patch the row.
+    // No-op when already cached. Tolerant of a failed/absent endpoint.
+    function ensureRecommendation(period) {
+      if (Object.prototype.hasOwnProperty.call(goalEditorState.recommendations, period)) {
+        refreshSuggestionRow();
+        return;
+      }
+      goalEditorState.recommendations[period] = null;
+      api.getGoalRecommendation(metric.key, period).then(function (resp) {
+        var rec = (resp && resp.data) ? resp.data : (resp || null);
+        goalEditorState.recommendations[period] = rec;
+        if (currentPeriod === period) refreshSuggestionRow();
+      }).catch(function () { /* graceful: no suggestion row */ });
+    }
+
     // Bind the period select inside the (re-rendered) body each time so the
     // form reloads that period's saved values.
     function bindPeriodSelect() {
@@ -1116,12 +1217,14 @@
         bindPeriodSelect();
         bindTypeSelect();
         syncRemoveButton();
+        ensureRecommendation(currentPeriod);
       });
     }
 
-    // Update the Type help text and the Target value label in place when the
-    // operator changes the type, without re-rendering the body (which would
-    // discard other field input).
+    // Update the Type help text and the Target value label/hint in place when
+    // the operator changes the type, without re-rendering the body (which would
+    // discard other field input). Also re-renders the suggestion slot, which
+    // hides for growth_rate / rolling_average.
     function bindTypeSelect() {
       var typeSel = el('metricGoalType');
       var helpNode = el('metricGoalTypeHelp');
@@ -1130,13 +1233,36 @@
         helpNode.textContent = goalTypeHelp(typeSel.value);
         var labelNode = el('metricGoalTargetValueLabel');
         if (labelNode) labelNode.textContent = targetValueLabel(typeSel.value);
+        var hintNode = el('metricGoalTargetValueHint');
+        if (hintNode) hintNode.textContent = targetValueHint(typeSel.value);
+        refreshSuggestionRow();
+      });
+    }
+
+    // Delegated handler for the suggestion's Use button: fills the target value
+    // input with the raw recommended value. Bound once on the body.
+    function bindSuggestionUse() {
+      var body = bodyNode();
+      if (!body || body.dataset.suggestBound) return;
+      body.dataset.suggestBound = '1';
+      body.addEventListener('click', function (event) {
+        var useBtn = event.target.closest('#metricGoalSuggestUse');
+        if (!useBtn) return;
+        var raw = useBtn.getAttribute('data-suggest-value');
+        var input = el('metricGoalTargetValue');
+        if (input && raw != null) input.value = raw;
       });
     }
 
     function wireGoalButtons() {
       bindPeriodSelect();
       bindTypeSelect();
+      bindSuggestionUse();
       syncRemoveButton();
+      // Kick off the lazy fetches; both patch their UI when they resolve and
+      // neither blocks the drawer render.
+      ensureFormat();
+      ensureRecommendation(currentPeriod);
 
       var saveBtn = document.getElementById('metricGoalSave');
       if (saveBtn && !saveBtn.dataset.bound) {

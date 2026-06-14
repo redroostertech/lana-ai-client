@@ -108,13 +108,100 @@
     return { ok: true, payload: payload, errors: {} };
   }
 
+  // --- Format-aware target field + recommendation -------------------------
+  //
+  // The goal editor's Target value field changes meaning per type, and for the
+  // static type it carries the metric's own unit. These helpers stay pure so
+  // the editor can render units and a recommended value without re-implementing
+  // the formatting that the Playground preview already does.
+
+  // Coerce a metric format (string token like "currency", or a registry object
+  // like { type: 'percentage' }) into a lowercase token. Mirrors
+  // metric-card-preview formatToken so the editor and preview agree.
+  function formatToken(format) {
+    if (format == null) return '';
+    if (typeof format === 'string') return format.toLowerCase();
+    if (typeof format === 'object') {
+      var t = format.type || format.style || format.format || format.name || format.unit;
+      if (t) return String(t).toLowerCase();
+      return '';
+    }
+    return String(format).toLowerCase();
+  }
+
+  // The unit suffix shown after "Target value" for the STATIC type only.
+  // Percentage -> " (%)", currency -> " ($)", everything else -> "".
+  function staticUnitSuffix(formatToken) {
+    var token = String(formatToken || '').toLowerCase();
+    if (token === 'percentage' || token === 'percent') return ' (%)';
+    if (token === 'currency' || token === 'currency_breakdown') return ' ($)';
+    return '';
+  }
+
+  // Label for the Target value field. static carries the metric unit;
+  // growth_rate is always a percent; rolling_average is always a count.
+  function targetValueLabel(targetType, formatTok) {
+    if (targetType === 'growth_rate') return 'Growth percent';
+    if (targetType === 'rolling_average') return 'Periods to average (N)';
+    return 'Target value' + staticUnitSuffix(formatTok);
+  }
+
+  // Format a raw goal value in the metric's format. Consistent with the
+  // Playground formatter (metric-card-preview formatValue) but tolerant of a
+  // legitimate 0 target (the preview treats 0 as "empty"; a goal of 0 is real).
+  function formatGoalValue(value, formatTok) {
+    if (value == null || value === '') return '';
+    var num = Number(value);
+    if (!isFinite(num)) return String(value);
+    var fmt = String(formatTok || 'number').toLowerCase();
+
+    if (fmt === 'currency' || fmt === 'currency_breakdown') {
+      return num.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    }
+    if (fmt === 'percentage' || fmt === 'percent') {
+      return num.toLocaleString('en-US', { maximumFractionDigits: 1 }) + '%';
+    }
+    if (fmt === 'integer' || fmt === 'count') {
+      return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    }
+    if (fmt === 'days') {
+      return num.toLocaleString('en-US', { maximumFractionDigits: 1 }) + (num === 1 ? ' day' : ' days');
+    }
+    return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+
+  // Shape the recommendation row for the editor. The suggestion only applies to
+  // the static target type (a metric-unit value); growth/rolling do not use it.
+  // Returns { show, valueDisplay, basis, rawValue }. show is false when the
+  // type is not static, the recommendation is missing, or its value is null.
+  function buildRecommendationView(recommendation, formatTok, targetType) {
+    var hidden = { show: false, valueDisplay: '', basis: '', rawValue: null };
+    if (targetType && targetType !== 'static') return hidden;
+    if (!recommendation || typeof recommendation !== 'object') return hidden;
+
+    var raw = recommendation.recommended_value;
+    if (raw == null || !isFinite(Number(raw))) return hidden;
+    var rawValue = Number(raw);
+
+    return {
+      show: true,
+      valueDisplay: formatGoalValue(rawValue, formatTok),
+      basis: recommendation.basis ? String(recommendation.basis) : '',
+      rawValue: rawValue
+    };
+  }
+
   var api = {
     TARGET_TYPES: TARGET_TYPES,
     TARGET_PERIODS: TARGET_PERIODS,
     indexGoals: indexGoals,
     getGoal: getGoal,
     hasAnyGoal: hasAnyGoal,
-    buildGoalPayload: buildGoalPayload
+    buildGoalPayload: buildGoalPayload,
+    formatToken: formatToken,
+    targetValueLabel: targetValueLabel,
+    formatGoalValue: formatGoalValue,
+    buildRecommendationView: buildRecommendationView
   };
 
   if (typeof module !== 'undefined' && module.exports) {

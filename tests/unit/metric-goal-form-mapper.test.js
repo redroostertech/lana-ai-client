@@ -145,4 +145,90 @@ describe('metric-goal-form-mapper', () => {
       expect(result.payload.target_period).toBe('monthly');
     });
   });
+
+  describe('formatToken', () => {
+    test('lowercases a string token', () => {
+      expect(mapper.formatToken('Currency')).toBe('currency');
+    });
+
+    test('reads .type from a registry object', () => {
+      expect(mapper.formatToken({ type: 'Percentage' })).toBe('percentage');
+    });
+
+    test('returns empty for null / unknown shapes', () => {
+      expect(mapper.formatToken(null)).toBe('');
+      expect(mapper.formatToken({})).toBe('');
+    });
+  });
+
+  describe('targetValueLabel', () => {
+    test('static carries the metric unit per format', () => {
+      expect(mapper.targetValueLabel('static', 'percentage')).toBe('Target value (%)');
+      expect(mapper.targetValueLabel('static', 'currency')).toBe('Target value ($)');
+      expect(mapper.targetValueLabel('static', 'number')).toBe('Target value');
+      expect(mapper.targetValueLabel('static', 'integer')).toBe('Target value');
+      expect(mapper.targetValueLabel('static', 'days')).toBe('Target value');
+      expect(mapper.targetValueLabel('static', '')).toBe('Target value');
+    });
+
+    test('growth_rate is always Growth percent regardless of format', () => {
+      expect(mapper.targetValueLabel('growth_rate', 'currency')).toBe('Growth percent');
+    });
+
+    test('rolling_average is always Periods to average (N)', () => {
+      expect(mapper.targetValueLabel('rolling_average', 'percentage')).toBe('Periods to average (N)');
+    });
+  });
+
+  describe('formatGoalValue', () => {
+    test('formats currency, percentage, integer, days, and plain numbers', () => {
+      expect(mapper.formatGoalValue(25000, 'currency')).toBe('$25,000');
+      expect(mapper.formatGoalValue(95, 'percentage')).toBe('95%');
+      expect(mapper.formatGoalValue(12, 'integer')).toBe('12');
+      expect(mapper.formatGoalValue(1, 'days')).toBe('1 day');
+      expect(mapper.formatGoalValue(3, 'days')).toBe('3 days');
+      expect(mapper.formatGoalValue(1.25, 'number')).toBe('1.25');
+    });
+
+    test('formats a real zero target (not treated as empty)', () => {
+      expect(mapper.formatGoalValue(0, 'integer')).toBe('0');
+    });
+
+    test('returns empty for blank / non-numeric values', () => {
+      expect(mapper.formatGoalValue(null, 'currency')).toBe('');
+      expect(mapper.formatGoalValue('', 'currency')).toBe('');
+    });
+  });
+
+  describe('buildRecommendationView', () => {
+    test('shows a formatted suggestion for static with a non-null value', () => {
+      const view = mapper.buildRecommendationView(
+        { recommended_value: 25000, basis: 'based on your trailing 6-period average' },
+        'currency',
+        'static'
+      );
+      expect(view.show).toBe(true);
+      expect(view.valueDisplay).toBe('$25,000');
+      expect(view.rawValue).toBe(25000);
+      expect(view.basis).toBe('based on your trailing 6-period average');
+    });
+
+    test('hides for growth_rate and rolling_average even with a value', () => {
+      const rec = { recommended_value: 10, basis: 'metric template default' };
+      expect(mapper.buildRecommendationView(rec, 'number', 'growth_rate').show).toBe(false);
+      expect(mapper.buildRecommendationView(rec, 'number', 'rolling_average').show).toBe(false);
+    });
+
+    test('hides when the recommendation is missing or its value is null', () => {
+      expect(mapper.buildRecommendationView(null, 'number', 'static').show).toBe(false);
+      expect(mapper.buildRecommendationView({ recommended_value: null }, 'number', 'static').show).toBe(false);
+      expect(mapper.buildRecommendationView({ recommended_value: 'x' }, 'number', 'static').show).toBe(false);
+    });
+
+    test('defaults missing targetType to static and shows the value', () => {
+      const view = mapper.buildRecommendationView({ recommended_value: 12 }, 'integer');
+      expect(view.show).toBe(true);
+      expect(view.valueDisplay).toBe('12');
+    });
+  });
 });

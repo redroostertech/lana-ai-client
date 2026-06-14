@@ -2869,6 +2869,20 @@ class ApiClient {
     return this.delete('/api/v1/modules/metric-catalog/' + encodeURIComponent(metricKey) + '/goal', { target_period: targetPeriod });
   }
 
+  /**
+   * Recommended goal value for a metric and period, used to seed the goal
+   * editor's Target value (static type only). Sourced from the org's own
+   * history when available, else the metric template default.
+   * @param {string} metricKey - Registry metric key
+   * @param {string} periodType - 'weekly' | 'monthly'
+   * @returns {Promise<Object>} { metric_key, period_type, recommended_value, source, basis, sample_size }
+   */
+  async getGoalRecommendation(metricKey, periodType) {
+    let url = '/api/v1/modules/metric-catalog/' + encodeURIComponent(metricKey) + '/goal-recommendation';
+    if (periodType) url += '?periodType=' + encodeURIComponent(periodType);
+    return this.get(url);
+  }
+
   async listBIDashboards(params = {}) {
     let url = '/api/v1/business-intelligence/dashboards';
     const queryParts = [];
