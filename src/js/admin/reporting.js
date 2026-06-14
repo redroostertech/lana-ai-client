@@ -28,8 +28,6 @@
   var currentModuleData = null;
   var chartInstances = {};
   var drilldownRenderer = null;
-  var currentOverrideMetric = null;
-  var currentOverrideData = null;
   var trendsChart = null;
   var statusChart = null;
   var timeSeriesChart = null;
@@ -1323,13 +1321,6 @@
         '<span class="text-sm font-medium ' + changeColor + '">' + changeText + ' ' + changeLabel + '</span></div>';
     }
 
-    // Override button. Seed the panel with the resolved target the card is
-    // showing (goal block) so the admin overrides against the displayed value;
-    // fall back to the flat target when no goal is configured.
-    var overrideSeed = (vm.hasGoal && vm.targetValue !== null) ? vm.targetValue : metric.target;
-    var overrideBtn = '<button onclick="window._reporting.openDataOverridePanel(\'' + metric.key + '\', \'' + metric.name + '\', \'' + (metric.description || '').split("'").join("\\'") + '\', ' + overrideSeed + ', \'target\')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1" title="Override target value">' +
-      '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Override</button>';
-
     return '<div data-metric-card class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' hover:shadow-md transition-shadow" style="position:relative;padding:24px 24px 56px 24px;">' +
       // Header: title (auto-fit, up to 2 lines, 14px -> 10px)
       '<div class="mb-4"><div class="flex items-start justify-between gap-2">' +
@@ -1339,14 +1330,13 @@
       '<div class="mb-4"><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Current Period</p></div>' +
       '<p data-fit-text="30:14:1" class="font-bold text-gray-900" style="font-size:30px;line-height:1.1;white-space:nowrap;overflow:hidden;">' + currentValue + '</p></div>' +
       comparisonHTML +
-      // Prior Period + Target side-by-side; Override sits next to the Target value.
+      // Prior Period + Goal(s) side-by-side.
       '<div class="grid grid-cols-2 gap-4 text-sm">' +
       '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p>' +
       '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + priorValue + '</p></div>' +
-      '<div><p class="text-xs text-gray-500 mb-1">Target</p>' +
+      '<div><p class="text-xs text-gray-500 mb-1">Goal(s)</p>' +
       '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + targetValue + '</p>' +
       (attainmentText ? '<p class="text-xs text-gray-500 mt-1">' + attainmentText + '</p>' : '') +
-      '<div class="mt-1">' + overrideBtn + '</div>' +
       '</div></div>' +
       // Footer: pinned to card bottom-left / bottom-right with 12px insets.
       '<div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">' +
@@ -3086,181 +3076,6 @@
   }
 
   // ==========================================================================
-  // Data Override Panel
-  // ==========================================================================
-
-  function openDataOverridePanel(metricKey, metricName, metricDescription, currentValue, overrideType) {
-    if (!overrideType) overrideType = 'target';
-    var moduleKey = selectedModuleKey;
-    var periodTypeEl = document.getElementById('periodType');
-    var periodStartEl = document.getElementById('periodStart');
-    var periodEndEl = document.getElementById('periodEnd');
-    var periodType = (periodTypeEl && periodTypeEl.value) ? periodTypeEl.value : 'monthly';
-    var periodStart = periodStartEl ? periodStartEl.value : '';
-    var periodEnd = periodEndEl ? periodEndEl.value : '';
-
-    if (!periodStart || !periodEnd) {
-      showError('Please select a date range first');
-      return;
-    }
-
-    currentOverrideMetric = {
-      key: metricKey, name: metricName, description: metricDescription,
-      currentValue: currentValue, overrideType: overrideType
-    };
-
-    var nameEl = document.getElementById('overrideMetricName');
-    var descEl = document.getElementById('overrideMetricDescription');
-    var rangeEl = document.getElementById('overridePeriodRange');
-    var currentEl = document.getElementById('overrideCurrentValue');
-
-    if (nameEl) nameEl.textContent = metricName;
-    if (descEl) descEl.textContent = metricDescription || 'No description available';
-    if (rangeEl) rangeEl.textContent = formatDateRange(new Date(periodStart + 'T00:00:00Z'), new Date(periodEnd + 'T23:59:59Z'));
-
-    var valueLabel = overrideType === 'target' ? 'Current Target' : 'Current Value';
-    if (currentEl) {
-      var labelEl = currentEl.parentElement.querySelector('p.text-xs');
-      if (labelEl) labelEl.textContent = valueLabel;
-      currentEl.textContent = formatNumber(currentValue, 2);
-    }
-
-    var form = document.getElementById('overrideForm');
-    if (form) form.reset();
-    var overrideValueEl = document.getElementById('overrideValue');
-    var overrideNotesEl = document.getElementById('overrideNotes');
-    if (overrideValueEl) overrideValueEl.value = '';
-    if (overrideNotesEl) overrideNotesEl.value = '';
-
-    var overrideTypeEl = document.getElementById('overrideType');
-    if (overrideTypeEl) overrideTypeEl.value = overrideType;
-
-    var hPeriodStart = document.getElementById('overridePeriodStart');
-    var hPeriodEnd = document.getElementById('overridePeriodEnd');
-    var hPeriodType = document.getElementById('overridePeriodType');
-    var hModuleKey = document.getElementById('overrideModuleKey');
-    var hMetricKey = document.getElementById('overrideMetricKey');
-    if (hPeriodStart) hPeriodStart.value = periodStart;
-    if (hPeriodEnd) hPeriodEnd.value = periodEnd;
-    if (hPeriodType) hPeriodType.value = periodType;
-    if (hModuleKey) hModuleKey.value = moduleKey;
-    if (hMetricKey) hMetricKey.value = metricKey;
-
-    loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd);
-
-    var overlay = document.getElementById('dataOverrideOverlay');
-    var panel = document.getElementById('dataOverridePanel');
-    if (overlay) overlay.classList.remove('hidden');
-    if (panel) panel.classList.remove('translate-x-full');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeDataOverridePanel() {
-    var overlay = document.getElementById('dataOverrideOverlay');
-    var panel = document.getElementById('dataOverridePanel');
-    if (panel) panel.classList.add('translate-x-full');
-    if (overlay) overlay.classList.add('hidden');
-    document.body.style.overflow = '';
-    currentOverrideMetric = null;
-    currentOverrideData = null;
-  }
-
-  async function loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd) {
-    try {
-      var periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
-      var periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
-
-      var data = await api.get('/api/v1/modules/' + moduleKey + '/data-overrides', {
-        periodStart: periodStartISO, periodEnd: periodEndISO
-      });
-
-      var metricOverrides = data.filter(function (o) { return o.metric_key === metricKey; });
-      var existingSection = document.getElementById('existingOverridesSection');
-      var existingList = document.getElementById('existingOverridesList');
-
-      if (metricOverrides.length > 0 && existingSection && existingList) {
-        existingSection.classList.remove('hidden');
-        existingList.innerHTML = metricOverrides.map(function (override) {
-          return '<div class="p-3 bg-gray-50 rounded-lg border border-gray-200">' +
-            '<div class="flex items-start justify-between mb-2"><div class="flex-1">' +
-            '<p class="text-sm font-semibold text-gray-900">Override Value: ' + formatNumber(override.override_value, 2) + '</p>' +
-            '<p class="text-xs text-gray-500 mt-1">Period: ' + formatDateRange(override.period_start, override.period_end) + '</p>' +
-            (override.notes ? '<p class="text-xs text-gray-600 mt-1 italic">"' + override.notes + '"</p>' : '') +
-            '</div>' +
-            '<button onclick="window._reporting.deleteOverride(\'' + override.override_id + '\')" class="text-red-600 hover:text-red-800 ml-2" title="Delete override">' +
-            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></div>' +
-            '<div class="text-xs text-gray-400">Created: ' + formatDate(override.created_at) + '</div></div>';
-        }).join('');
-      } else if (existingSection) {
-        existingSection.classList.add('hidden');
-      }
-    } catch (error) {
-      console.error('Failed to load existing overrides:', error);
-      var section = document.getElementById('existingOverridesSection');
-      if (section) section.classList.add('hidden');
-    }
-  }
-
-  async function saveOverride(e) {
-    if (e) e.preventDefault();
-    if (!currentOverrideMetric) { showError('No metric selected for override'); return; }
-
-    var moduleKey = document.getElementById('overrideModuleKey').value;
-    var periodType = document.getElementById('overridePeriodType').value;
-    var periodStart = document.getElementById('overridePeriodStart').value;
-    var periodEnd = document.getElementById('overridePeriodEnd').value;
-    var overrideValue = parseFloat(document.getElementById('overrideValue').value);
-    var overrideNotes = (document.getElementById('overrideNotes').value || '').trim();
-    var overrideType = document.getElementById('overrideType').value;
-
-    if (!periodStart || !periodEnd) { showError('Period dates are missing. Please close and reopen the panel.'); return; }
-    if (isNaN(overrideValue)) { showError('Please enter a valid numeric value'); return; }
-
-    var periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
-    var periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
-
-    var saveBtn = document.getElementById('saveOverrideBtn');
-    var saveBtnText = document.getElementById('saveOverrideBtnText');
-    if (saveBtn) saveBtn.disabled = true;
-    if (saveBtnText) saveBtnText.textContent = 'Saving...';
-
-    try {
-      await api.post('/api/v1/modules/' + moduleKey + '/data-overrides', {
-        metricKey: currentOverrideMetric.key,
-        periodStart: periodStartISO, periodEnd: periodEndISO,
-        periodType: periodType, overrideValue: overrideValue,
-        overrideType: overrideType, notes: overrideNotes || null
-      });
-      showInfo('Override saved for ' + currentOverrideMetric.name + '. Re-execute module to see updated values.');
-      closeDataOverridePanel();
-    } catch (error) {
-      console.error('Failed to save override:', error);
-      showError(error.message || 'Failed to save override. Please try again.');
-    } finally {
-      if (saveBtn) saveBtn.disabled = false;
-      if (saveBtnText) saveBtnText.textContent = 'Save Override';
-    }
-  }
-
-  async function deleteOverride(overrideId) {
-    if (!confirm('Are you sure you want to delete this override?')) return;
-    var moduleKey = selectedModuleKey;
-
-    try {
-      await api.delete('/api/v1/modules/' + moduleKey + '/data-overrides/' + overrideId);
-      showInfo('Override deleted successfully. Re-execute module to see updated values.');
-      var periodStart = document.getElementById('periodStart').value;
-      var periodEnd = document.getElementById('periodEnd').value;
-      if (currentOverrideMetric) {
-        await loadExistingOverrides(moduleKey, currentOverrideMetric.key, periodStart, periodEnd);
-      }
-    } catch (error) {
-      console.error('Failed to delete override:', error);
-      showError(error.message || 'Failed to delete override. Please try again.');
-    }
-  }
-
-  // ==========================================================================
   // Report Import & Management (V2)
   // ==========================================================================
 
@@ -4094,9 +3909,6 @@
     closeDrilldownModal: closeDrilldownModal,
     openGenericDrilldown: openGenericDrilldown,
     showMetricDrilldown: showMetricDrilldown,
-    openDataOverridePanel: openDataOverridePanel,
-    closeDataOverridePanel: closeDataOverridePanel,
-    deleteOverride: deleteOverride,
     closeDataSourcesModal: closeDataSourcesModal,
     closeMissingEntitiesModal: closeMissingEntitiesModal,
     askLanaAboutReport: askLanaAboutReport,
@@ -4117,9 +3929,6 @@
   window.closeMissingEntitiesModal = closeMissingEntitiesModal;
   window.closeModuleInfo = closeModuleInfo;
   window.showModuleInfo = showModuleInfo;
-  window.openDataOverridePanel = openDataOverridePanel;
-  window.closeDataOverridePanel = closeDataOverridePanel;
-  window.deleteOverride = deleteOverride;
 
   // ==========================================================================
   // Init
@@ -4205,16 +4014,6 @@
     if (missingEntitiesBtn) {
       missingEntitiesBtn.addEventListener('click', openMissingEntitiesModal);
     }
-
-    // Data override panel close handlers
-    var overlayEl = document.getElementById('dataOverrideOverlay');
-    if (overlayEl) overlayEl.addEventListener('click', closeDataOverridePanel);
-    var closePanelBtn = document.getElementById('closeDataOverridePanel');
-    if (closePanelBtn) closePanelBtn.addEventListener('click', closeDataOverridePanel);
-
-    // Override form submit
-    var overrideForm = document.getElementById('overrideForm');
-    if (overrideForm) overrideForm.addEventListener('submit', saveOverride);
 
     // Wire the in-card "Ask LANA" button to askLanaAboutReport
     var reportingLanaBtn = document.getElementById('reportingLanaBtn');

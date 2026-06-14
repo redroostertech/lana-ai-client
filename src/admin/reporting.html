@@ -230,61 +230,6 @@
         </div>
       </div>
 
-      <!-- Data Override Panel Overlay -->
-      <div id="dataOverrideOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-      <div id="dataOverridePanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-        <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-          <h2 class="text-lg font-semibold text-gray-900">Override Target Value</h2>
-          <button id="closeDataOverridePanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-        <div class="flex-1 overflow-y-auto p-6">
-          <div class="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-            <h3 id="overrideMetricName" class="font-semibold text-gray-900 mb-1"></h3>
-            <p id="overrideMetricDescription" class="text-sm text-gray-600"></p>
-            <div class="mt-3 text-xs text-gray-500">
-              <p>Period: <span id="overridePeriodRange" class="font-medium text-gray-700"></span></p>
-            </div>
-          </div>
-          <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Current Target</label>
-            <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <p id="overrideCurrentValue" class="text-2xl font-bold text-gray-900">-</p>
-              <p class="text-xs text-gray-500 mt-1">Default target value</p>
-            </div>
-          </div>
-          <form id="overrideForm" class="space-y-4">
-            <div>
-              <label for="overrideValue" class="block text-sm font-medium text-gray-700 mb-2">New Target Value <span class="text-red-500">*</span></label>
-              <input type="number" id="overrideValue" step="0.01" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter new target value">
-            </div>
-            <div>
-              <label for="overrideNotes" class="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
-              <textarea id="overrideNotes" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Why are you overriding this value?"></textarea>
-            </div>
-            <input type="hidden" id="overrideType" value="manual">
-            <input type="hidden" id="overridePeriodStart">
-            <input type="hidden" id="overridePeriodEnd">
-            <input type="hidden" id="overridePeriodType">
-            <input type="hidden" id="overrideModuleKey">
-            <input type="hidden" id="overrideMetricKey">
-            <div class="flex gap-3 pt-4">
-              <button type="submit" id="saveOverrideBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">
-                <span id="saveOverrideBtnText">Save Override</span>
-              </button>
-              <button type="button" onclick="window._reporting.closeDataOverridePanel()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
-            </div>
-          </form>
-          <div id="existingOverridesSection" class="hidden mt-8 pt-6 border-t border-gray-200">
-            <h3 class="text-sm font-semibold text-gray-900 mb-3">Existing Override</h3>
-            <div id="existingOverridesList" class="space-y-2"></div>
-          </div>
-        </div>
-      </div>
-
       <!-- Module Customization Panel -->
       <div id="customizeOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
       <div id="customizePanel" class="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
