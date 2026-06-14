@@ -231,4 +231,57 @@ describe('metric-goal-form-mapper', () => {
       expect(view.valueDisplay).toBe('12');
     });
   });
+
+  describe('buildThresholdSuggestionView', () => {
+    const rec = {
+      recommended_value: 12,
+      recommended_green: 12,
+      recommended_red: 8,
+      basis: 'metric template default',
+    };
+
+    test('shows the green suggestion formatted in the metric unit', () => {
+      const view = mapper.buildThresholdSuggestionView(rec, 'integer', 'green');
+      expect(view.show).toBe(true);
+      expect(view.valueDisplay).toBe('12');
+      expect(view.rawValue).toBe(12);
+    });
+
+    test('shows the red suggestion formatted in the metric unit', () => {
+      const view = mapper.buildThresholdSuggestionView(rec, 'currency', 'red');
+      expect(view.show).toBe(true);
+      expect(view.valueDisplay).toBe('$8');
+      expect(view.rawValue).toBe(8);
+    });
+
+    test('selects the field by which (green vs red are independent)', () => {
+      const onlyRed = { recommended_green: null, recommended_red: 5 };
+      expect(mapper.buildThresholdSuggestionView(onlyRed, 'number', 'green').show).toBe(false);
+      const greenView = mapper.buildThresholdSuggestionView(onlyRed, 'number', 'red');
+      expect(greenView.show).toBe(true);
+      expect(greenView.rawValue).toBe(5);
+    });
+
+    test('shows regardless of target type (thresholds are absolute, not type-gated)', () => {
+      // No targetType argument is consulted; the same rec yields a row.
+      const greenStatic = mapper.buildThresholdSuggestionView(rec, 'integer', 'green');
+      const greenAgain = mapper.buildThresholdSuggestionView(rec, 'integer', 'green');
+      expect(greenStatic.show).toBe(true);
+      expect(greenAgain.show).toBe(true);
+    });
+
+    test('hides when the recommendation is missing or the field is null / not finite', () => {
+      expect(mapper.buildThresholdSuggestionView(null, 'number', 'green').show).toBe(false);
+      expect(mapper.buildThresholdSuggestionView({ recommended_green: null }, 'number', 'green').show).toBe(false);
+      expect(mapper.buildThresholdSuggestionView({ recommended_red: 'x' }, 'number', 'red').show).toBe(false);
+      expect(mapper.buildThresholdSuggestionView({}, 'number', 'red').show).toBe(false);
+    });
+
+    test('formats a real zero threshold (not treated as empty)', () => {
+      const view = mapper.buildThresholdSuggestionView({ recommended_green: 0 }, 'integer', 'green');
+      expect(view.show).toBe(true);
+      expect(view.valueDisplay).toBe('0');
+      expect(view.rawValue).toBe(0);
+    });
+  });
 });

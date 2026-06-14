@@ -1030,6 +1030,27 @@
       + '</div>';
   }
 
+  // Build the Green/Red threshold suggestion row for the current period. which
+  // is 'green' | 'red'. Thresholds are absolute metric-unit values, so this row
+  // shows for ALL target types (no type gate); it appears only when the cached
+  // recommendation carries a finite recommended_green / recommended_red.
+  function thresholdSuggestionRowHtml(which, period) {
+    var mapper = goalMapper();
+    if (!mapper || !mapper.buildThresholdSuggestionView) return '';
+    var rec = goalEditorState.recommendations[period];
+    var view = mapper.buildThresholdSuggestionView(rec, goalEditorState.formatToken, which);
+    if (!view.show) return '';
+    var useId = which === 'red' ? 'metricGoalRedSuggestUse' : 'metricGoalGreenSuggestUse';
+    var target = which === 'red' ? 'metricGoalRed' : 'metricGoalGreen';
+    return '<div class="metric-catalog-goal-suggest metric-catalog-goal-suggest--threshold">'
+      + '<span class="metric-catalog-goal-suggest__label">Suggested:</span> '
+      + '<span class="metric-catalog-goal-suggest__value">' + escapeHtml(view.valueDisplay) + '</span> '
+      + '<lex-btn id="' + useId + '" variant="secondary" size="sm" '
+      + 'data-suggest-value="' + escapeHtml(String(view.rawValue)) + '" '
+      + 'data-suggest-target="' + target + '">Use</lex-btn>'
+      + '</div>';
+  }
+
   // Build the editor form for a metric, pre-filled with the goal for the
   // currently selected period (period defaults to monthly).
   function renderGoalForm(metric, period) {
@@ -1083,10 +1104,14 @@
     html += '<div class="metric-catalog-goal-form__row">';
     html += '<label class="metric-catalog-goal-field">'
       + '<span class="metric-catalog-goal-field__label">Green threshold</span>'
-      + '<input type="number" step="any" id="metricGoalGreen" class="metric-catalog-goal-field__input" value="' + numAttr(g.green_threshold) + '" /></label>';
+      + '<input type="number" step="any" id="metricGoalGreen" class="metric-catalog-goal-field__input" value="' + numAttr(g.green_threshold) + '" />'
+      + '<div id="metricGoalGreenSuggestSlot">' + thresholdSuggestionRowHtml('green', period) + '</div>'
+      + '</label>';
     html += '<label class="metric-catalog-goal-field">'
       + '<span class="metric-catalog-goal-field__label">Red threshold</span>'
-      + '<input type="number" step="any" id="metricGoalRed" class="metric-catalog-goal-field__input" value="' + numAttr(g.red_threshold) + '" /></label>';
+      + '<input type="number" step="any" id="metricGoalRed" class="metric-catalog-goal-field__input" value="' + numAttr(g.red_threshold) + '" />'
+      + '<div id="metricGoalRedSuggestSlot">' + thresholdSuggestionRowHtml('red', period) + '</div>'
+      + '</label>';
     html += '</div>';
 
     html += '<p class="metric-catalog-goal-help metric-catalog-goal-help--thresholds">' + GOAL_THRESHOLD_HELP + '</p>';
@@ -1170,6 +1195,10 @@
     function refreshSuggestionRow() {
       var slot = el('metricGoalSuggestSlot');
       if (slot) slot.innerHTML = recommendationRowHtml(currentType(), currentPeriod);
+      var greenSlot = el('metricGoalGreenSuggestSlot');
+      if (greenSlot) greenSlot.innerHTML = thresholdSuggestionRowHtml('green', currentPeriod);
+      var redSlot = el('metricGoalRedSuggestSlot');
+      if (redSlot) redSlot.innerHTML = thresholdSuggestionRowHtml('red', currentPeriod);
     }
 
     // Lazily fetch the metric's format from the catalog entry once, then patch
@@ -1239,17 +1268,20 @@
       });
     }
 
-    // Delegated handler for the suggestion's Use button: fills the target value
-    // input with the raw recommended value. Bound once on the body.
+    // Delegated handler for the suggestion Use buttons. The target-value button
+    // fills #metricGoalTargetValue; the Green/Red threshold buttons carry a
+    // data-suggest-target naming the input to fill. Bound once on the body, so
+    // it survives the slot re-renders done by refreshSuggestionRow.
     function bindSuggestionUse() {
       var body = bodyNode();
       if (!body || body.dataset.suggestBound) return;
       body.dataset.suggestBound = '1';
       body.addEventListener('click', function (event) {
-        var useBtn = event.target.closest('#metricGoalSuggestUse');
+        var useBtn = event.target.closest('[data-suggest-value]');
         if (!useBtn) return;
         var raw = useBtn.getAttribute('data-suggest-value');
-        var input = el('metricGoalTargetValue');
+        var targetId = useBtn.getAttribute('data-suggest-target') || 'metricGoalTargetValue';
+        var input = el(targetId);
         if (input && raw != null) input.value = raw;
       });
     }

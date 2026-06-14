@@ -191,6 +191,28 @@
     };
   }
 
+  // Shape a Green/Red threshold suggestion row for the editor. Unlike the
+  // target suggestion, thresholds are always absolute metric-unit values, so
+  // this applies to ALL target types and is not gated on target_type. which is
+  // 'green' | 'red' and selects the corresponding recommended_green /
+  // recommended_red field. Returns { show, valueDisplay, rawValue }; show is
+  // false when the recommendation is missing or its field is null/not finite.
+  function buildThresholdSuggestionView(recommendation, formatTok, which) {
+    var hidden = { show: false, valueDisplay: '', rawValue: null };
+    if (!recommendation || typeof recommendation !== 'object') return hidden;
+
+    var field = which === 'red' ? 'recommended_red' : 'recommended_green';
+    var raw = recommendation[field];
+    if (raw == null || !isFinite(Number(raw))) return hidden;
+    var rawValue = Number(raw);
+
+    return {
+      show: true,
+      valueDisplay: formatGoalValue(rawValue, formatTok),
+      rawValue: rawValue
+    };
+  }
+
   var api = {
     TARGET_TYPES: TARGET_TYPES,
     TARGET_PERIODS: TARGET_PERIODS,
@@ -201,7 +223,8 @@
     formatToken: formatToken,
     targetValueLabel: targetValueLabel,
     formatGoalValue: formatGoalValue,
-    buildRecommendationView: buildRecommendationView
+    buildRecommendationView: buildRecommendationView,
+    buildThresholdSuggestionView: buildThresholdSuggestionView
   };
 
   if (typeof module !== 'undefined' && module.exports) {
