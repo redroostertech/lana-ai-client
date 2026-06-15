@@ -171,4 +171,110 @@ describe('document-studio-templates-mapper', () => {
       expect(view.total).toBe(1);
     });
   });
+
+  describe('mapTemplateDetail', () => {
+    function fieldMap(section) {
+      const map = {};
+      (section.fields || []).forEach((f) => { map[f.label] = f.value; });
+      return map;
+    }
+
+    test('render: surfaces category, version, variables and public flag', () => {
+      const detail = mapper.mapTemplateDetail('render', {
+        kind: 'render',
+        id: 'tpl-9',
+        name: 'HTML Letter',
+        category: 'letters',
+        scope: 'org',
+        version: 2,
+        variable_count: 5,
+        is_public: true
+      });
+      expect(detail.kind).toBe('render');
+      expect(detail.kindLabel).toBe('Render');
+      expect(detail.base.name).toBe('HTML Letter');
+      expect(detail.sections).toHaveLength(1);
+      expect(detail.sections[0].title).toBe('Render template');
+      const f = fieldMap(detail.sections[0]);
+      expect(f.Category).toBe('letters');
+      expect(f.Version).toBe('2');
+      expect(f.Variables).toBe('5');
+      expect(f.Public).toBe('Yes');
+    });
+
+    test('render: is_public false renders "No", absent omits the field', () => {
+      const noPublic = mapper.mapTemplateDetail('render', { kind: 'render', id: 't', name: 'T' });
+      expect(fieldMap(noPublic.sections[0]).Public).toBeUndefined();
+
+      const isFalse = mapper.mapTemplateDetail('render', {
+        kind: 'render', id: 't', name: 'T', is_public: false
+      });
+      expect(fieldMap(isFalse.sections[0]).Public).toBe('No');
+    });
+
+    test('compose: surfaces document type label, document count and status', () => {
+      const detail = mapper.mapTemplateDetail('compose', {
+        kind: 'compose',
+        id: 'set-1',
+        name: 'Demand Package',
+        document_type: 'demand',
+        document_type_label: 'Demand Letter',
+        document_count: 3,
+        status: 'active',
+        scope: 'org'
+      });
+      expect(detail.sections[0].title).toBe('Compose set');
+      const f = fieldMap(detail.sections[0]);
+      expect(f['Document type']).toBe('Demand Letter');
+      expect(f['Documents in set']).toBe('3');
+      expect(f.Status).toBe('active');
+    });
+
+    test('compose: falls back to raw document_type when no label', () => {
+      const detail = mapper.mapTemplateDetail('compose', {
+        kind: 'compose', id: 's', name: 'S', document_type: 'demand'
+      });
+      expect(fieldMap(detail.sections[0])['Document type']).toBe('demand');
+    });
+
+    test('fill: surfaces document type, variables, matter and status', () => {
+      const detail = mapper.mapTemplateDetail('fill', {
+        kind: 'fill',
+        id: 'doc-1',
+        name: 'Intake Form',
+        document_type: 'intake',
+        variable_count: 7,
+        matter_id: 'M-100',
+        status: 'active',
+        scope: 'matter'
+      });
+      expect(detail.sections[0].title).toBe('Fill template');
+      const f = fieldMap(detail.sections[0]);
+      expect(f['Document type']).toBe('intake');
+      expect(f.Variables).toBe('7');
+      expect(f.Matter).toBe('M-100');
+      expect(f.Status).toBe('active');
+    });
+
+    test('drops empty/null fields from kind sections', () => {
+      const detail = mapper.mapTemplateDetail('compose', {
+        kind: 'compose', id: 's', name: 'S'
+      });
+      // No document_type, count, or status provided -> no fields.
+      expect(detail.sections[0].fields).toEqual([]);
+    });
+
+    test('handles null dto and derives kind from the argument', () => {
+      const detail = mapper.mapTemplateDetail('render', null);
+      expect(detail.kind).toBe('render');
+      expect(detail.kindLabel).toBe('Render');
+      expect(detail.base.name).toBe('Untitled template');
+      expect(detail.sections).toHaveLength(1);
+    });
+
+    test('unknown kind yields no kind-specific sections', () => {
+      const detail = mapper.mapTemplateDetail('bogus', { kind: 'bogus', id: 'x', name: 'X' });
+      expect(detail.sections).toEqual([]);
+    });
+  });
 });

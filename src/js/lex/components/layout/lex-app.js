@@ -802,6 +802,7 @@
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
             { id: 'my-tasks', label: 'My Tasks', icon: 'clipboard-check', href: 'my-tasks.html' },
             { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' },
+            { id: 'templates', label: 'Templates', icon: 'file-text', href: 'document-studio-templates.html' },
             { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html' }
           ];
 

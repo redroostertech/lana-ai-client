@@ -177,13 +177,95 @@
     };
   }
 
+  /**
+   * Build a { label, value } field, coercing value to a display string and
+   * dropping it (returns null) when there is nothing meaningful to show.
+   */
+  function _field(label, value) {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string' && value.trim() === '') return null;
+    return { label: label, value: String(value) };
+  }
+
+  /**
+   * Push a field onto the list only when it has a value.
+   */
+  function _pushField(fields, label, value) {
+    var f = _field(label, value);
+    if (f) fields.push(f);
+  }
+
+  /**
+   * Shape the kind-specific detail view-model for the drawer from a get-one
+   * UnifiedTemplate DTO. PURE: no DOM, no fetch.
+   *
+   * IMPORTANT — uses only the fields the get-one endpoint actually returns. The
+   * backend normalizers (template-registry.normalizers.js) collapse each engine
+   * row onto the shared UnifiedTemplate shape; the response carries no raw HTML
+   * template body, no document list, and no variable-name list (only counts).
+   * So this maps the per-kind subset of real fields, not invented extras.
+   *
+   * Returns:
+   *   {
+   *     kind, kindLabel,
+   *     base: row view-model (mapTemplateRow output),
+   *     sections: [ { title, fields: [{label,value}] } ]
+   *   }
+   *
+   * @param {string} kind - 'fill' | 'compose' | 'render'
+   * @param {Object} dto  - UnifiedTemplate from GET .../templates/:kind/:id
+   * @returns {Object}
+   */
+  function mapTemplateDetail(kind, dto) {
+    var base = mapTemplateRow(dto);
+    var k = base.kind || (kind ? String(kind).toLowerCase() : '');
+    var sections = [];
+
+    if (k === 'render') {
+      // render: org-scoped HTML template. Real fields: category, version,
+      // variable_count, is_public (status is always derived 'active').
+      var renderFields = [];
+      _pushField(renderFields, 'Category', base.category);
+      _pushField(renderFields, 'Version', base.version);
+      _pushField(renderFields, 'Variables', base.variableCount);
+      var isPublic = (dto && dto.is_public != null) ? (dto.is_public ? 'Yes' : 'No') : null;
+      _pushField(renderFields, 'Public', isPublic);
+      sections.push({ title: 'Render template', fields: renderFields });
+    } else if (k === 'compose') {
+      // compose: template set. Real fields: document_type(_label),
+      // document_count, status.
+      var composeFields = [];
+      _pushField(composeFields, 'Document type', base.documentTypeLabel || base.documentType);
+      _pushField(composeFields, 'Documents in set', base.documentCount);
+      _pushField(composeFields, 'Status', base.status);
+      sections.push({ title: 'Compose set', fields: composeFields });
+    } else if (k === 'fill') {
+      // fill: matter-scoped fillable document. Real fields: document_type,
+      // variable_count (placeholders), status, matter scope.
+      var fillFields = [];
+      _pushField(fillFields, 'Document type', base.documentType);
+      _pushField(fillFields, 'Variables', base.variableCount);
+      _pushField(fillFields, 'Matter', base.matterId);
+      _pushField(fillFields, 'Status', base.status);
+      sections.push({ title: 'Fill template', fields: fillFields });
+    }
+
+    return {
+      kind: k,
+      kindLabel: kindLabel(k),
+      base: base,
+      sections: sections
+    };
+  }
+
   var moduleApi = {
     VALID_KINDS: VALID_KINDS,
     buildListQuery: buildListQuery,
     kindLabel: kindLabel,
     scopeLabel: scopeLabel,
     mapTemplateRow: mapTemplateRow,
-    mapTemplates: mapTemplates
+    mapTemplates: mapTemplates,
+    mapTemplateDetail: mapTemplateDetail
   };
 
   if (typeof module !== 'undefined' && module.exports) {

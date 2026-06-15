@@ -270,26 +270,53 @@
       '</div>';
   }
 
+  /**
+   * Render a kind-specific section (title + field rows) from the pure
+   * mapTemplateDetail view-model. Skips sections that have no fields.
+   * @param {{title:string, fields:Array<{label:string,value:string}>}} section
+   * @returns {string}
+   */
+  function _renderDetailSection(section) {
+    if (!section || !section.fields || !section.fields.length) return '';
+
+    var rows = '';
+    for (var i = 0; i < section.fields.length; i++) {
+      rows += _detailRow(section.fields[i].label, section.fields[i].value);
+    }
+    if (!rows) return '';
+
+    return '<div class="dst-detail-section">' +
+      '<div class="dst-detail-section-title">' + escHtml(section.title) + '</div>' +
+      rows +
+      '</div>';
+  }
+
   function _renderDetail(dto) {
-    var row = mapper.mapTemplateRow(dto);
+    // Pure view-model: shared base fields + kind-specific sections. The get-one
+    // endpoint returns the UnifiedTemplate shape only (no raw HTML body, no
+    // document/variable lists), so detail surfaces the real per-kind fields.
+    var detail = mapper.mapTemplateDetail(dto && dto.kind, dto);
+    var row = detail.base;
 
     var html = '<div class="dst-detail">';
-    html += '<div class="dst-detail-head">' + kindBadge(row.kind, row.kindLabel) +
+    html += '<div class="dst-detail-head">' + kindBadge(detail.kind, detail.kindLabel) +
       '<span class="dst-detail-name">' + escHtml(row.name) + '</span></div>';
 
     if (row.description) {
       html += '<p class="dst-detail-desc">' + escHtml(row.description) + '</p>';
     }
 
-    html += _detailRow('Type', row.documentTypeLabel || row.documentType || row.category);
+    // Shared overview fields (common across all kinds).
+    html += '<div class="dst-detail-section">';
     html += _detailRow('Scope', row.scopeLabel);
-    html += _detailRow('Matter', row.matterId);
-    html += _detailRow('Status', row.status);
-    if (row.version !== null) html += _detailRow('Version', row.version);
-    if (row.documentCount !== null) html += _detailRow('Documents', row.documentCount);
-    if (row.variableCount !== null) html += _detailRow('Variables', row.variableCount);
     html += _detailRow('Created', formatTimestamp(row.createdAt));
     html += _detailRow('Updated', formatTimestamp(row.updatedAt));
+    html += '</div>';
+
+    // Kind-specific section(s).
+    for (var i = 0; i < detail.sections.length; i++) {
+      html += _renderDetailSection(detail.sections[i]);
+    }
 
     html += '</div>';
     return html;
