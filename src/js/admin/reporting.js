@@ -1163,10 +1163,12 @@
     var finalize = function (detail) {
       entry.detail = detail;
       var body = renderMetricInfoBody(entry, detail);
-      if (modal && modal.innerHTML !== undefined) {
-        // lex-modal.open creates a real DOM element; replacing its slot innerHTML
-        // works because we passed `content` as a string on open.
-        modal.innerHTML = body;
+      // Update ONLY the modal's body container. Setting modal.innerHTML would
+      // wipe the lex-modal's overlay/backdrop/dialog chrome (rendered by the
+      // component), making the modal vanish — the "flash" on open.
+      var bodyEl = modal && typeof modal.querySelector === 'function' ? modal.querySelector('.lex-modal-body') : null;
+      if (bodyEl) {
+        bodyEl.innerHTML = body;
       }
     };
 
