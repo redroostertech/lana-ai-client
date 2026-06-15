@@ -323,6 +323,17 @@
       };
     }
 
+    // Universal back: there is somewhere to go back to when the session has more
+    // than one history entry. Decided at first paint (the left zone is not
+    // rebuilt on the smart re-render path).
+    _canGoBack() {
+      try {
+        return typeof window !== 'undefined' && !!window.history && window.history.length > 1;
+      } catch (e) {
+        return false;
+      }
+    }
+
     render() {
       injectStyles();
 
@@ -363,7 +374,11 @@
 
       // ── Left ──
       html += `<div class="lex-topbar-left">`;
-      if (this.showBack) {
+      // Auto-show the back button whenever the session can go back, even if the
+      // page did not explicitly opt in via show-back. It replaces the hamburger
+      // on inner pages (the sidebar has its own collapse control).
+      const showBackBtn = this.showBack || this._canGoBack();
+      if (showBackBtn) {
         html += `<button type="button" class="lex-topbar-back" data-action="back" aria-label="${this.escapeHtml(this.backLabel)}">
           ${icon('arrow-left', 'medium')}
         </button>`;
@@ -420,6 +435,17 @@
 
       this.delegate('click', '[data-action="back"]', () => {
         this.emit('topbar-back-click', { href: this.backHref });
+        // Default behavior so every page gets a working back with no per-page
+        // wiring: honor an explicit backHref, otherwise step back in history.
+        if (this.backHref) {
+          if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
+            window.Lex.Nav.go(this.backHref);
+          } else {
+            window.location.href = this.backHref;
+          }
+        } else if (window.history && window.history.length > 1) {
+          window.history.back();
+        }
       });
 
       this.delegate('click', '[data-action="refresh"]', () => {
