@@ -1251,19 +1251,7 @@
           ? fmtValue(metric.prior)
           : (metric.formattedPrior || 'N/A'));
 
-    var targetValue = vm.hasGoal
-      ? fmtValue(vm.targetValue)
-      : ((metric.target !== null && metric.target !== undefined)
-          ? fmtValue(metric.target)
-          : (metric.formattedTarget || 'N/A'));
-
-    // Attainment annotation under the Target (goal block only).
-    var attainmentText = (vm.hasGoal && vm.attainmentPct !== null)
-      ? formatNumber(vm.attainmentPct, 0) + '% of target'
-      : '';
-
     var statusColor = vm.statusColor;
-    var change = (metric.change !== null && metric.change !== undefined) ? metric.change : null;
     // Direction drives the comparison arrow; prefer the comparison block.
     var changeDirection = vm.changeDirection;
     var upColor = metric.invertTrend ? 'text-red-600' : 'text-green-600';
@@ -1278,20 +1266,10 @@
       changeArrow = '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"></path></svg>';
     }
 
-    // When the comparison block is present, the delta text and its sign come
-    // from the backend (percent_change + direction); otherwise fall back to the
-    // flat change field. Direction is purely numeric; invertTrend decides
-    // whether up/down is good or bad for coloring.
+    // Direction is purely numeric; invertTrend decides whether up/down is good
+    // or bad for the % Change coloring.
     var isUp = changeDirection === 'up';
     var isDown = changeDirection === 'down';
-    var changeText;
-    if (vm.hasComparison) {
-      changeText = vm.percentChange !== null ? formatPercentage(Math.abs(vm.percentChange), 1) : 'N/A';
-    } else if (isCurrency && change !== null) {
-      changeText = fmtCurrency(Math.abs(change));
-    } else {
-      changeText = metric.formattedChange || (change !== null ? formatNumber(Math.abs(change), 1) : 'N/A');
-    }
 
     var changeColor;
     if (metric.invertTrend) {
@@ -1299,7 +1277,6 @@
     } else {
       changeColor = isUp ? 'text-green-600' : isDown ? 'text-red-600' : 'text-gray-600';
     }
-    var changeLabel = isUp ? 'increase' : isDown ? 'decrease' : 'no change';
 
     var statusColors = getStatusColors(statusColor);
 
@@ -1313,13 +1290,35 @@
         '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>Details</button>';
     }
 
-    // Comparison section
-    var comparisonHTML = '';
-    if (!currentModuleConfig || !currentModuleConfig.ui || currentModuleConfig.ui.showComparison !== false) {
-      comparisonHTML = '<div class="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">' +
-        changeArrow +
-        '<span class="text-sm font-medium ' + changeColor + '">' + changeText + ' ' + changeLabel + '</span></div>';
+    // Period qualifier on the goal reflects the report's Compare By (the period
+    // the goal is evaluated at).
+    var goalPeriod = (document.getElementById('periodType') || {}).value || 'monthly';
+
+    // % Change cell: arrow + percent from the comparison block; em dash when
+    // there is no prior snapshot to compare against.
+    var pctChangeCell = (vm.hasComparison && vm.percentChange !== null)
+      ? '<span class="inline-flex items-center gap-1 ' + changeColor + '">' + changeArrow + formatPercentage(Math.abs(vm.percentChange), 1) + '</span>'
+      : '<span class="text-gray-400">—</span>';
+
+    // Goal(s) cell: resolved goal target + period qualifier; falls back to a flat
+    // configured target (no period) and em dash when neither exists.
+    var goalCell;
+    if (vm.hasGoal && vm.targetValue !== null) {
+      goalCell = fmtValue(vm.targetValue) + ' <span class="text-xs font-normal text-gray-400">(' + goalPeriod + ')</span>';
+    } else if (metric.target !== null && metric.target !== undefined) {
+      goalCell = fmtValue(metric.target);
+    } else {
+      goalCell = '—';
     }
+
+    // Percent to Goal: backend attainment when a goal block exists; otherwise
+    // current / target client-side so flat-target cards still show progress.
+    var goalNumeric = (vm.hasGoal && isFinite(Number(vm.targetValue))) ? Number(vm.targetValue)
+      : ((metric.target !== null && metric.target !== undefined && isFinite(Number(metric.target))) ? Number(metric.target) : null);
+    var currentNumeric = (metric.current !== null && metric.current !== undefined && isFinite(Number(metric.current))) ? Number(metric.current) : null;
+    var pctToGoalNum = (vm.hasGoal && vm.attainmentPct !== null) ? vm.attainmentPct
+      : ((goalNumeric && goalNumeric !== 0 && currentNumeric !== null) ? (currentNumeric / goalNumeric * 100) : null);
+    var percentToGoalText = (pctToGoalNum !== null && isFinite(pctToGoalNum)) ? formatNumber(pctToGoalNum, 0) + '%' : '—';
 
     return '<div data-metric-card class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' hover:shadow-md transition-shadow" style="position:relative;padding:24px 24px 56px 24px;">' +
       // Header: title (auto-fit, up to 2 lines, 14px -> 10px)
@@ -1329,15 +1328,20 @@
       // Current period value (auto-fit, 1 line, 30px -> 14px)
       '<div class="mb-4"><div class="flex items-center justify-between mb-1"><p class="text-xs text-gray-500">Current Period</p></div>' +
       '<p data-fit-text="30:14:1" class="font-bold text-gray-900" style="font-size:30px;line-height:1.1;white-space:nowrap;overflow:hidden;">' + currentValue + '</p></div>' +
-      comparisonHTML +
-      // Prior Period + Goal(s) side-by-side.
-      '<div class="grid grid-cols-2 gap-4 text-sm">' +
+      // Row 1: Prior Period | % Change (bottom border doubles as the divider).
+      '<div class="grid grid-cols-2 gap-4 text-sm mb-4 pb-4 border-b border-gray-100">' +
       '<div><p class="text-xs text-gray-500 mb-1">Prior Period</p>' +
       '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + priorValue + '</p></div>' +
+      '<div><p class="text-xs text-gray-500 mb-1">% Change</p>' +
+      '<p class="font-semibold" style="font-size:16px;line-height:1.2;">' + pctChangeCell + '</p></div>' +
+      '</div>' +
+      // Row 2: Goal(s) | Percent to Goal.
+      '<div class="grid grid-cols-2 gap-4 text-sm">' +
       '<div><p class="text-xs text-gray-500 mb-1">Goal(s)</p>' +
-      '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + targetValue + '</p>' +
-      (attainmentText ? '<p class="text-xs text-gray-500 mt-1">' + attainmentText + '</p>' : '') +
-      '</div></div>' +
+      '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + goalCell + '</p></div>' +
+      '<div><p class="text-xs text-gray-500 mb-1">Percent to Goal</p>' +
+      '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + percentToGoalText + '</p></div>' +
+      '</div>' +
       // Footer: pinned to card bottom-left / bottom-right with 12px insets.
       '<div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">' +
       '<div>' + infoIconButtonHTML(metric) + '</div>' +
