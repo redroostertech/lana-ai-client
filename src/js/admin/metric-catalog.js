@@ -1474,13 +1474,40 @@
       buildFilters();
       applyFilters();
       updateSummary(response && response.summary);
-      // Goals are loaded after the catalog so a slow/failed goals call never
-      // blocks the metric table from rendering.
-      loadGoals();
+      // Goals load after the catalog so a slow/failed goals call never blocks
+      // the table (already rendered above). Await them so a deep-linked goal
+      // editor (from a reporting card) opens with the existing goal populated.
+      await loadGoals();
+      maybeOpenGoalDeepLink();
     } catch (err) {
       console.error('[MetricCatalog] Failed to load metrics:', err);
       if (window.Lex && Lex.Toast) Lex.Toast.error('Failed to load metric catalog');
     }
+  }
+
+  // Deep link from the reporting cards: ?editGoal=<key>&module=<moduleKey> opens
+  // the goal editor for that metric. Resolves the catalog metric module-scoped
+  // first so a bare key shared across modules can't open the wrong one.
+  function resolveDeepLinkMetric(rawKey, moduleKey) {
+    if (!rawKey) return null;
+    var exact = allMetrics.find(function (m) { return m.key === rawKey; });
+    if (exact) return exact;
+    if (moduleKey) {
+      var needle = '.' + moduleKey + '.' + rawKey;
+      var byModule = allMetrics.find(function (m) { return String(m.key).endsWith(needle); });
+      if (byModule) return byModule;
+    }
+    var suffix = '.' + rawKey;
+    return allMetrics.find(function (m) { return String(m.key).endsWith(suffix); }) || null;
+  }
+
+  function maybeOpenGoalDeepLink() {
+    if (!isGoalAdmin || typeof URLSearchParams === 'undefined') return;
+    var params = new URLSearchParams(window.location.search);
+    var rawKey = params.get('editGoal');
+    if (!rawKey) return;
+    var metric = resolveDeepLinkMetric(rawKey, params.get('module'));
+    if (metric) openGoalEditor(metric);
   }
 
   function init() {

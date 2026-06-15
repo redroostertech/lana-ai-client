@@ -1210,6 +1210,30 @@
       '<div class="mb-4"><canvas id="' + canvasId + '" style="max-height: 250px;"></canvas></div></div>';
   }
 
+  // Only system_admin / org_admin may set or edit goals (same Lex.Auth source
+  // the Metric Catalog gates on). Drives the admin-only edit-goal icon.
+  function isReportingGoalAdmin() {
+    return !!(window.Lex && Lex.Auth && (
+      (typeof Lex.Auth.isSystemAdmin === 'function' && Lex.Auth.isSystemAdmin()) ||
+      (typeof Lex.Auth.isOrgAdmin === 'function' && Lex.Auth.isOrgAdmin())
+    ));
+  }
+
+  // Admin-only: deep-link to the Metric Catalog with the goal editor open for
+  // this metric. The module is passed so the catalog resolves the correct
+  // metric when a bare key is shared across modules.
+  function editMetricGoal(metricKey) {
+    if (!metricKey) return;
+    var qs = 'editGoal=' + encodeURIComponent(metricKey);
+    if (selectedModuleKey) qs += '&module=' + encodeURIComponent(selectedModuleKey);
+    var target = 'metric-catalog.html?' + qs;
+    if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
+      Lex.Nav.go(target);
+    } else {
+      window.location.href = target;
+    }
+  }
+
   function createMetricCard(metric) {
     if (Array.isArray(metric.current)) {
       return createDistributionMetricCard(metric);
@@ -1333,6 +1357,18 @@
       pctToGoalCell = '<span class="text-gray-400">—</span>';
     }
 
+    // Admin-only edit-goal icon: deep-links to the Metric Catalog goal editor.
+    var editGoalBtn = '';
+    if (isReportingGoalAdmin()) {
+      var egk = String(metric.key).split("'").join("\\'");
+      editGoalBtn = '<button type="button" aria-label="Edit goal" title="Edit goal" ' +
+        'onclick="window._reporting.editMetricGoal(\'' + egk + '\')" ' +
+        'class="text-gray-400 hover:text-indigo-600 transition-colors">' +
+        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">' +
+        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>' +
+        '</svg></button>';
+    }
+
     return '<div data-metric-card class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow" style="position:relative;padding:24px 24px 56px 24px;">' +
       // Header: title (auto-fit, up to 2 lines, 14px -> 10px)
       '<div class="mb-4"><div class="flex items-start justify-between gap-2">' +
@@ -1357,7 +1393,7 @@
       '</div>' +
       // Footer: pinned to card bottom-left / bottom-right with 12px insets.
       '<div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">' +
-      '<div>' + infoIconButtonHTML(metric) + '</div>' +
+      '<div class="flex items-center gap-2">' + infoIconButtonHTML(metric) + editGoalBtn + '</div>' +
       '<div>' + drilldownBtn + '</div></div></div>';
   }
 
@@ -3919,6 +3955,7 @@
 
   window._reporting = {
     openMetricInfo: openMetricInfo,
+    editMetricGoal: editMetricGoal,
     showModuleInfo: showModuleInfo,
     closeModuleInfo: closeModuleInfo,
     exportToPDF: exportToPDF,
