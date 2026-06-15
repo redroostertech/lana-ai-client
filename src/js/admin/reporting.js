@@ -1319,8 +1319,11 @@
     var pctToGoalNum = (vm.hasGoal && vm.attainmentPct !== null) ? vm.attainmentPct
       : ((goalNumeric && goalNumeric !== 0 && currentNumeric !== null) ? (currentNumeric / goalNumeric * 100) : null);
     var percentToGoalText = (pctToGoalNum !== null && isFinite(pctToGoalNum)) ? formatNumber(pctToGoalNum, 0) + '%' : '—';
+    // Highlight Percent to Goal by goal status (inverse-aware via the backend
+    // status band); neutral dash when there is nothing to compare against.
+    var percentToGoalColor = (pctToGoalNum !== null && isFinite(pctToGoalNum)) ? statusColors.text : 'text-gray-400';
 
-    return '<div data-metric-card class="' + statusColors.bg + ' rounded-xl shadow-sm border ' + statusColors.border + ' hover:shadow-md transition-shadow" style="position:relative;padding:24px 24px 56px 24px;">' +
+    return '<div data-metric-card class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow" style="position:relative;padding:24px 24px 56px 24px;">' +
       // Header: title (auto-fit, up to 2 lines, 14px -> 10px)
       '<div class="mb-4"><div class="flex items-start justify-between gap-2">' +
       '<h3 data-fit-text="14:10:2" class="font-medium text-gray-500 uppercase tracking-wide flex-1 min-w-0" style="font-size:14px;line-height:1.2;">' + metric.name + '</h3>' +
@@ -1340,7 +1343,7 @@
       '<div><p class="text-xs text-gray-500 mb-1">Goal(s)</p>' +
       '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + goalCell + '</p></div>' +
       '<div><p class="text-xs text-gray-500 mb-1">Percent to Goal</p>' +
-      '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + percentToGoalText + '</p></div>' +
+      '<p data-fit-text="16:11:1" class="font-semibold ' + percentToGoalColor + '" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + percentToGoalText + '</p></div>' +
       '</div>' +
       // Footer: pinned to card bottom-left / bottom-right with 12px insets.
       '<div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">' +
