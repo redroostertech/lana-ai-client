@@ -1319,9 +1319,17 @@
     var pctToGoalNum = (vm.hasGoal && vm.attainmentPct !== null) ? vm.attainmentPct
       : ((goalNumeric && goalNumeric !== 0 && currentNumeric !== null) ? (currentNumeric / goalNumeric * 100) : null);
     var percentToGoalText = (pctToGoalNum !== null && isFinite(pctToGoalNum)) ? formatNumber(pctToGoalNum, 0) + '%' : '—';
-    // Highlight Percent to Goal by goal status (inverse-aware via the backend
-    // status band); neutral dash when there is nothing to compare against.
-    var percentToGoalColor = (pctToGoalNum !== null && isFinite(pctToGoalNum)) ? statusColors.text : 'text-gray-400';
+    // Percent to Goal: a +/- icon shows at/over (+) vs under (-) the goal
+    // (relative to 100% attainment); the value is tinted by the goal status band
+    // (inverse-aware via the backend status). Neutral dash when nothing to compare.
+    var pctToGoalCell;
+    if (pctToGoalNum !== null && isFinite(pctToGoalNum)) {
+      var goalIconPath = pctToGoalNum >= 100 ? 'M12 4v16m8-8H4' : 'M20 12H4';
+      var goalIcon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + goalIconPath + '"></path></svg>';
+      pctToGoalCell = '<span class="inline-flex items-center gap-1 ' + statusColors.text + '">' + goalIcon + percentToGoalText + '</span>';
+    } else {
+      pctToGoalCell = '<span class="text-gray-400">—</span>';
+    }
 
     return '<div data-metric-card class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow" style="position:relative;padding:24px 24px 56px 24px;">' +
       // Header: title (auto-fit, up to 2 lines, 14px -> 10px)
@@ -1343,7 +1351,7 @@
       '<div><p class="text-xs text-gray-500 mb-1">Goal(s)</p>' +
       '<p data-fit-text="16:11:1" class="font-semibold text-gray-700" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + goalCell + '</p></div>' +
       '<div><p class="text-xs text-gray-500 mb-1">Percent to Goal</p>' +
-      '<p data-fit-text="16:11:1" class="font-semibold ' + percentToGoalColor + '" style="font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;">' + percentToGoalText + '</p></div>' +
+      '<p class="font-semibold" style="font-size:16px;line-height:1.2;">' + pctToGoalCell + '</p></div>' +
       '</div>' +
       // Footer: pinned to card bottom-left / bottom-right with 12px insets.
       '<div style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">' +
