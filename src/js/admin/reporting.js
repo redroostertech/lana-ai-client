@@ -1226,7 +1226,7 @@
     if (!metricKey) return;
     var qs = 'editGoal=' + encodeURIComponent(metricKey);
     if (selectedModuleKey) qs += '&module=' + encodeURIComponent(selectedModuleKey);
-    var target = 'metric-catalog.html?' + qs;
+    var target = 'admin/metric-catalog.html?' + qs;
     if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
       Lex.Nav.go(target);
     } else {
