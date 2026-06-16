@@ -195,6 +195,60 @@ class AgenticUI {
   }
 
   /**
+   * Handle agentic_blocked SSE event.
+   * A blocked run stopped on a missing precondition; it is not a crashed task.
+   * @param {Object} data - Blocked precondition payload from backend
+   */
+  handleAgenticBlocked(data) {
+    console.log('[AgenticUI] Blocked event:', data);
+
+    this.stopElapsedTimeCounter();
+
+    if (data.failedStep) {
+      const stepElement = document.getElementById(`agentic-step-${data.failedStep}`);
+      if (stepElement) {
+        stepElement.querySelector('.step-icon').innerHTML = this.getStatusIcon('warning');
+        stepElement.querySelector('.step-description').classList.remove('text-blue-700');
+        stepElement.querySelector('.step-description').classList.add('text-amber-700');
+      }
+    }
+
+    setTimeout(() => {
+      this.hideProgressIndicator();
+    }, 1200);
+
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+
+    const reason = data.failureReason || 'missing_precondition';
+    const summary = data.summary || data.error || 'The agent stopped because a required precondition was missing.';
+    const followupCount = Array.isArray(data.suggestedFollowups) ? data.suggestedFollowups.length : 0;
+    const followupText = followupCount > 0
+      ? `${followupCount} follow-up option${followupCount === 1 ? '' : 's'} available below.`
+      : 'Resolve the missing prerequisite, then retry the workflow.';
+
+    const blockedHtml = `
+      <div class="agentic-blocked bg-amber-50 border border-amber-200 rounded-lg p-4 my-4">
+        <div class="flex items-start space-x-3">
+          <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
+          </svg>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-amber-900 text-sm">Workflow blocked</div>
+            <p class="text-sm text-amber-900 mt-1">${this.escapeHtml(summary)}</p>
+            <div class="text-xs text-amber-700 mt-2">
+              Reason: <span class="font-medium">${this.escapeHtml(reason)}</span>. ${this.escapeHtml(followupText)}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    chatMessages.insertAdjacentHTML('beforeend', blockedHtml);
+    this.scrollToBottom();
+  }
+
+  /**
    * Handle agentic_approval_required SSE event.
    * Rendered inline in the chat stream using Lex design tokens.
    *

@@ -898,6 +898,11 @@ class LanaChat {
                 if (window.AgenticUI) {
                   window.AgenticUI.handleAgenticError(data);
                 }
+              } else if (currentEvent === 'agentic_blocked') {
+                console.log('[SSE] Agentic Blocked:', data);
+                if (window.AgenticUI) {
+                  window.AgenticUI.handleAgenticBlocked(data);
+                }
               } else if (currentEvent === 'agentic_followup') {
                 console.log('[SSE] Agentic Follow-up:', data);
                 if (window.AgenticUI) {

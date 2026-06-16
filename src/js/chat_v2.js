@@ -806,6 +806,17 @@
       showFollowupChips(followups, message, chatEl);
     });
 
+    listen('lex-chat-agentic-blocked', function (e) {
+      var detail = e.detail || {};
+      var followups = detail.suggestedFollowups || [];
+      if (followups.length === 0) return;
+      showFollowupChips(
+        followups,
+        detail.message || 'The workflow is blocked. Choose a follow-up action to continue.',
+        chatEl
+      );
+    });
+
     // Gap 5 — Clear chips on next user send.
     listen('lex-chat-send', function () {
       clearFollowupChips();

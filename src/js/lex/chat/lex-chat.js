@@ -466,6 +466,7 @@
       }
 
       let responseStarted = false;
+      this._agenticBlockedReceived = false;
 
       try {
         // Iterate async generator
@@ -485,9 +486,9 @@
       if (this._activityEl) this._activityEl.hide();
       if (this._composerEl) this._composerEl.setGenerating(false);
 
-      // Suppress fallback when the stream intentionally yielded a plan card
-      // instead of streaming content (plan_ready flow has no 'content' events).
-      if (!responseStarted && !this._planReadyReceived && this._threadEl) {
+      // Suppress fallback when the stream intentionally yielded a plan card or
+      // blocked-state event instead of streaming content.
+      if (!responseStarted && !this._planReadyReceived && !this._agenticBlockedReceived && this._threadEl) {
         this._threadEl.addMessage('assistant', 'No response received.');
       }
 
@@ -820,6 +821,27 @@
         case 'agentic_error':
           if (this._activityEl) this._activityEl.hide();
           this.emit('lex-chat-error', { error: event.error, type: 'agentic' });
+          break;
+
+        case 'agentic_blocked':
+          this._agenticBlockedReceived = true;
+          if (this._activityEl) this._activityEl.hide();
+          this.emit('lex-chat-agentic-blocked', {
+            error: event.error,
+            message: event.message,
+            status: event.status,
+            failureClass: event.failureClass,
+            failureReason: event.failureReason,
+            suggestedFollowups: event.suggestedFollowups || []
+          });
+          if (event.suggestedFollowups && event.suggestedFollowups.length > 0) {
+            this.emit('lex-chat-agentic-followup', {
+              followups: event.suggestedFollowups,
+              message: 'Here are suggested follow-up actions you may want me to take next:',
+              matterId: null,
+              options: []
+            });
+          }
           break;
 
         case 'agentic_followup':

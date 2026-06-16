@@ -5106,6 +5106,14 @@
                   }
                 }
 
+                if (currentEvent === 'agentic_blocked') {
+                  console.log('[SSE] Agentic blocked:', data);
+                  hideTyping();
+                  if (window.AgenticUI && typeof window.AgenticUI.handleAgenticBlocked === 'function') {
+                    window.AgenticUI.handleAgenticBlocked(data);
+                  }
+                }
+
                 // Handle agentic_complete - dismiss progress widget on success
                 if (currentEvent === 'agentic_complete') {
                   console.log('[SSE] Agentic complete:', data);

@@ -537,6 +537,17 @@
         case 'agentic_error':
           return { type: 'agentic_error', error: data.error, message: data.message };
 
+        case 'agentic_blocked':
+          return {
+            type: 'agentic_blocked',
+            error: data.error,
+            message: data.message || data.summary || '',
+            status: data.status || 'blocked_precondition',
+            failureClass: data.failureClass || null,
+            failureReason: data.failureReason || null,
+            suggestedFollowups: data.suggestedFollowups || []
+          };
+
         case 'agentic_artifacts':
           return { type: 'agentic_artifacts', artifacts: data.artifacts || [] };
 
