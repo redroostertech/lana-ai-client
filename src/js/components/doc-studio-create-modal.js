@@ -19,7 +19,9 @@
  *     matterDisplayId,  // display id like 'MATT-10002' (optional)
  *     matterName,       // display name (optional)
  *     contextDocIds,    // array of selected document ids (optional, default [])
- *     onCreated         // function() callback after a document is saved (optional)
+ *     onCreated,        // function() callback after a document is saved (optional)
+ *     pickMatter        // when true (menu-launched), shows a searchable matter
+ *                       //   picker and requires a matter before generating
  *   };
  *
  * Note: workspace-details.js still keeps its own copy of this flow; this module
@@ -39,7 +41,8 @@
     matterDisplayId: '',
     matterName: '',
     contextDocIds: [],
-    onCreated: null
+    onCreated: null,
+    pickMatter: false
   };
 
   var state = {
@@ -51,7 +54,8 @@
     progressPercent: null,
     progressSteps: [],
     progressStartedAt: 0,
-    progressTimer: null
+    progressTimer: null,
+    matterSearchTimeout: null
   };
 
   // -- Small utilities ------------------------------------------------------
@@ -94,6 +98,22 @@
         'subtitle="Generate a matter-specific file from selected or all matter documents" ' +
         'size="lg" hide-actions close-on-overlay>' +
         '<form id="dscmCreateForm" class="p-6 space-y-5 dscm-form">' +
+          '<div id="dscmMatterPicker" class="dscm-matter-picker hidden">' +
+            '<label class="dscm-matter-label" for="dscmMatterSearch">Matter</label>' +
+            '<div class="dscm-matter-combo">' +
+              '<input id="dscmMatterSearch" type="text" class="dscm-matter-input" autocomplete="off" ' +
+                'placeholder="Search matters by name or ID...">' +
+              '<div id="dscmMatterResults" class="dscm-matter-results hidden"></div>' +
+            '</div>' +
+            '<div id="dscmMatterSelected" class="dscm-matter-selected hidden">' +
+              '<div class="dscm-matter-selected-info">' +
+                '<span id="dscmMatterSelectedName" class="dscm-matter-selected-name"></span>' +
+                '<span id="dscmMatterSelectedId" class="dscm-matter-selected-id"></span>' +
+              '</div>' +
+              '<button type="button" id="dscmMatterClearBtn" class="dscm-matter-clear">Change</button>' +
+            '</div>' +
+            '<p class="dscm-matter-hint">Attach this document to a matter to continue.</p>' +
+          '</div>' +
           '<div class="dscm-grid">' +
             '<lex-select id="dscmOutputFormat" label="Format" ' +
               "options='[{\"value\":\"document\",\"label\":\"Legal Document\"},{\"value\":\"presentation\",\"label\":\"Presentation\"},{\"value\":\"webpage\",\"label\":\"Webpage\"}]'>" +
@@ -183,6 +203,158 @@
     if (prompt) {
       prompt.addEventListener('input', function () { prompt.dataset.docStudioDefault = 'false'; });
     }
+
+    var matterSearch = document.getElementById('dscmMatterSearch');
+    if (matterSearch) {
+      matterSearch.addEventListener('input', onMatterSearchInput);
+      matterSearch.addEventListener('focus', onMatterSearchInput);
+    }
+    var matterResults = document.getElementById('dscmMatterResults');
+    if (matterResults) matterResults.addEventListener('click', onMatterResultClick);
+    var matterClear = document.getElementById('dscmMatterClearBtn');
+    if (matterClear) matterClear.addEventListener('click', clearMatterSelection);
+    document.addEventListener('click', onDocumentClickForMatter, true);
+  }
+
+  // -- Matter picker (menu-launched mode) -----------------------------------
+
+  function isMatterPicker() {
+    return !!opts.pickMatter;
+  }
+
+  function matterDisplayName(m) {
+    return m.name || m.matter_name || m.title || 'Untitled matter';
+  }
+
+  function onMatterSearchInput() {
+    var input = document.getElementById('dscmMatterSearch');
+    if (!input) return;
+    var query = (input.value || '').trim();
+    if (state.matterSearchTimeout) {
+      clearTimeout(state.matterSearchTimeout);
+      state.matterSearchTimeout = null;
+    }
+    state.matterSearchTimeout = setTimeout(function () { runMatterSearch(query); }, 250);
+  }
+
+  async function runMatterSearch(query) {
+    var results = document.getElementById('dscmMatterResults');
+    if (!results) return;
+    results.innerHTML = '<div class="dscm-matter-empty">Searching...</div>';
+    results.classList.remove('hidden');
+    try {
+      var endpoint = query
+        ? '/api/v1/matters?search=' + encodeURIComponent(query) + '&limit=10'
+        : '/api/v1/matters?limit=10';
+      var data = await docStudioApiGet(endpoint);
+      var matters = (data && data.matters ? data.matters : []).filter(function (m) {
+        return !m.matter_type || m.matter_type === 'matter';
+      });
+      renderMatterResults(matters);
+    } catch (error) {
+      results.innerHTML = '<div class="dscm-matter-empty dscm-matter-error">Search failed. Try again.</div>';
+    }
+  }
+
+  function renderMatterResults(matters) {
+    var results = document.getElementById('dscmMatterResults');
+    if (!results) return;
+    if (!matters.length) {
+      results.innerHTML = '<div class="dscm-matter-empty">No matters found.</div>';
+      results.classList.remove('hidden');
+      return;
+    }
+    results.innerHTML = matters.slice(0, 10).map(function (m) {
+      var name = escapeHtml(matterDisplayName(m));
+      var id = escapeHtml(m.matter_id || '');
+      var client = escapeHtml(m.client_name || (m.client && m.client.name) || '');
+      var sub = [m.matter_id || '', client].filter(Boolean).map(escapeHtml).join(' - ');
+      return '<button type="button" class="dscm-matter-option" ' +
+        'data-matter-id="' + id + '" data-matter-name="' + name + '">' +
+        '<span class="dscm-matter-option-name">' + name + '</span>' +
+        (sub ? '<span class="dscm-matter-option-sub">' + sub + '</span>' : '') +
+      '</button>';
+    }).join('');
+    results.classList.remove('hidden');
+  }
+
+  function onMatterResultClick(event) {
+    var option = event.target && event.target.closest ? event.target.closest('.dscm-matter-option') : null;
+    if (!option) return;
+    selectMatter(option.dataset.matterId || '', option.dataset.matterName || '');
+  }
+
+  function selectMatter(matterId, matterName) {
+    if (!matterId) return;
+    opts.matterId = matterId;
+    opts.matterName = matterName;
+    opts.matterDisplayId = matterId;
+
+    var input = document.getElementById('dscmMatterSearch');
+    var results = document.getElementById('dscmMatterResults');
+    var selected = document.getElementById('dscmMatterSelected');
+    var nameEl = document.getElementById('dscmMatterSelectedName');
+    var idEl = document.getElementById('dscmMatterSelectedId');
+    if (input) { input.value = ''; input.classList.add('hidden'); }
+    if (results) { results.innerHTML = ''; results.classList.add('hidden'); }
+    if (nameEl) nameEl.textContent = matterName || matterId;
+    if (idEl) idEl.textContent = matterId;
+    if (selected) selected.classList.remove('hidden');
+
+    var title = document.getElementById('dscmDocumentTitle');
+    if (title && (!title.value || title.dataset.docStudioDefault === 'true')) {
+      title.value = (matterName || 'Matter') + ' Document';
+      title.dataset.docStudioDefault = 'true';
+    }
+    setDocStudioDocumentStatus('Context scope: All accessible matter files.', false);
+    updateGenerateEnabled();
+  }
+
+  function clearMatterSelection() {
+    opts.matterId = '';
+    opts.matterName = '';
+    opts.matterDisplayId = '';
+    var input = document.getElementById('dscmMatterSearch');
+    var selected = document.getElementById('dscmMatterSelected');
+    if (selected) selected.classList.add('hidden');
+    if (input) { input.classList.remove('hidden'); input.value = ''; input.focus(); }
+    setDocStudioDocumentStatus('Select a matter to attach this document to.', false);
+    updateGenerateEnabled();
+  }
+
+  function onDocumentClickForMatter(event) {
+    if (!isMatterPicker()) return;
+    var picker = document.getElementById('dscmMatterPicker');
+    var results = document.getElementById('dscmMatterResults');
+    if (!picker || !results || results.classList.contains('hidden')) return;
+    if (picker.contains(event.target)) return;
+    results.classList.add('hidden');
+  }
+
+  function updateGenerateEnabled() {
+    var btn = document.getElementById('dscmGenerateBtn');
+    if (!btn) return;
+    btn.disabled = isMatterPicker() && !opts.matterId;
+  }
+
+  function setupMatterPicker() {
+    var picker = document.getElementById('dscmMatterPicker');
+    var input = document.getElementById('dscmMatterSearch');
+    var results = document.getElementById('dscmMatterResults');
+    var selected = document.getElementById('dscmMatterSelected');
+    if (picker) picker.classList.toggle('hidden', !isMatterPicker());
+    if (isMatterPicker()) {
+      if (selected) selected.classList.add('hidden');
+      if (results) { results.innerHTML = ''; results.classList.add('hidden'); }
+      if (input) { input.classList.remove('hidden'); input.value = ''; }
+      setDocStudioDocumentStatus('Select a matter to attach this document to.', false);
+    } else {
+      setDocStudioDocumentStatus(
+        'Context scope: ' + docStudioContextScopeLabel(selectedDocumentIds().length) + '.',
+        false
+      );
+    }
+    updateGenerateEnabled();
   }
 
   // -- API helpers (ported, use opts.api) -----------------------------------
@@ -918,6 +1090,13 @@
       return;
     }
 
+    if (isMatterPicker() && !opts.matterId) {
+      setDocStudioDocumentStatus('Select a matter to attach this document to.', true);
+      var matterInput = document.getElementById('dscmMatterSearch');
+      if (matterInput && !matterInput.classList.contains('hidden')) matterInput.focus();
+      return;
+    }
+
     if (submitBtn) submitBtn.disabled = true;
     resetDocStudioProgress();
     setDocStudioDocumentStatus('', false);
@@ -1001,10 +1180,7 @@
     state.progressStartedAt = 0;
     state.progressPercent = null;
     renderDocStudioProgress();
-    setDocStudioDocumentStatus(
-      'Context scope: ' + docStudioContextScopeLabel(selectedDocumentIds().length) + '.',
-      false
-    );
+    setupMatterPicker();
     if (modal) modal.open = true;
   }
 
@@ -1050,6 +1226,7 @@
       opts.matterName = options.matterName || '';
       opts.contextDocIds = Array.isArray(options.contextDocIds) ? options.contextDocIds : [];
       opts.onCreated = typeof options.onCreated === 'function' ? options.onCreated : null;
+      opts.pickMatter = !!options.pickMatter;
 
       if (!opts.api) {
         toast('error', 'Doc Studio is not available right now.');

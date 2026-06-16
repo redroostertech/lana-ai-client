@@ -32,6 +32,10 @@
     return status === 'failed' || status === 'error' || processingStatus === 'failed' || processingStatus === 'error';
   }
 
+  function isGenerating(doc) {
+    return toLower(getMetadata(doc).doc_studio_generation_state) === 'generating';
+  }
+
   function hasParsedSignals(doc, metadata) {
     var status = toLower(doc && doc.status);
     var processingStatus = toLower(doc && doc.processing_status);
@@ -86,6 +90,7 @@
 
     if (isInactive(doc)) return 'inactive';
     if (isNeedsAttention(doc)) return 'needs_attention';
+    if (isGenerating(doc)) return 'generating';
     if (ingestionStage === 'ready' || status === 'completed' || processingStatus === 'completed') return 'ready';
     if (hasIndexedSignals(doc, metadata)) return 'indexed';
     if (hasParsedSignals(doc, metadata)) return 'parsed';
@@ -137,6 +142,18 @@
       display.secondaryLabel = 'Lifecycle failed';
       display.isTerminal = true;
       display.isInProgress = false;
+      return display;
+    }
+
+    if (lifecycle === 'generating') {
+      display.label = 'Generating';
+      display.badgeClass = 'bg-amber-100 text-amber-700';
+      display.progressLabel = 'Generating with Doc Studio';
+      display.secondaryLabel = 'Doc Studio is drafting this document';
+      display.isReady = false;
+      display.isTerminal = false;
+      display.isInProgress = true;
+      display.isActionableInChat = false;
       return display;
     }
 

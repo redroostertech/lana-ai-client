@@ -699,6 +699,41 @@
         line-height: 1.4;
       }
 
+      /* ── Nav group + hover-expand submenu ────────────────── */
+
+      .lex-sidebar-subnav {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        margin-left: 1.625rem;
+        padding-left: 0.5rem;
+        border-left: 1px solid var(--_sb-border);
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        transition: max-height var(--lex-transition-fast),
+                    opacity var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-nav-group:hover .lex-sidebar-subnav,
+      .lex-sidebar-nav-group:focus-within .lex-sidebar-subnav {
+        max-height: 12rem;
+        opacity: 1;
+      }
+
+      .lex-sidebar-nav-item[data-child="true"] {
+        padding-top: 0.375rem;
+        padding-bottom: 0.375rem;
+        font-weight: var(--lex-weight-normal, 400);
+        font-size: var(--lex-body-xs-size, 0.8125rem);
+        color: var(--_sb-text-muted);
+      }
+
+      /* Collapsed (icon-only) sidebar: no room for an inline submenu */
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-subnav {
+        display: none;
+      }
+
       /* ── Conversation list container ─────────────────────── */
 
       .lex-sidebar-conversation-list {
@@ -1365,7 +1400,18 @@
       return html;
     }
 
-    _renderNavItem(item) {
+    _renderNavItem(item, isChild = false) {
+      // Items with children render a hover-expand group: the parent navigates
+      // on click, hovering reveals the indented child links below it.
+      if (!isChild && item.children && item.children.length) {
+        const parentHtml = this._renderNavItem({ ...item, children: undefined });
+        const childrenHtml = item.children.map((child) => this._renderNavItem(child, true)).join('');
+        return `<div class="lex-sidebar-nav-group">
+          ${parentHtml}
+          <div class="lex-sidebar-subnav">${childrenHtml}</div>
+        </div>`;
+      }
+
       const isActive = item.id === this.activeId;
       const tag = item.isButton ? 'button' : 'a';
       const hrefAttr = item.isButton ? '' : ` href="${this.escapeHtml(item.href || '#')}"`;
@@ -1378,7 +1424,9 @@
         ? `<span class="lex-sidebar-nav-badge">${this.escapeHtml(item.badge)}</span>`
         : '';
 
-      return `<${tag} class="lex-sidebar-nav-item"${hrefAttr}${typeAttr} data-active="${isActive}" data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}"${onClickAttr}${hrefDataAttr}${variantAttr}>
+      const childAttr = isChild ? ' data-child="true"' : '';
+
+      return `<${tag} class="lex-sidebar-nav-item"${hrefAttr}${typeAttr} data-active="${isActive}" data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}"${onClickAttr}${hrefDataAttr}${variantAttr}${childAttr}>
         ${iconHtml}
         <span class="lex-sidebar-nav-label">${this.escapeHtml(item.label || '')}</span>
         ${badgeHtml}

@@ -26,6 +26,88 @@
   const { LexElement, defineLex } = window.Lex;
 
   // ---------------------------------------------------------------------------
+  // Doc Studio (menu-launched): lazy-load the shared create modal and open it
+  // with a matter picker. The modal component is only bundled on a couple of
+  // pages, so when "Document Studio" is clicked from the global sidebar we load
+  // its assets on demand, then open it in matter-pick mode.
+  // ---------------------------------------------------------------------------
+
+  const LEX_APP_SCRIPT_SRC = (document.currentScript && document.currentScript.src) || '';
+
+  function docStudioAssetBase() {
+    // LEX_APP_SCRIPT_SRC looks like '<base>/js/lex/components/layout/lex-app.js'.
+    const marker = '/js/';
+    const idx = LEX_APP_SCRIPT_SRC.indexOf(marker);
+    return idx === -1 ? '' : LEX_APP_SCRIPT_SRC.slice(0, idx + marker.length);
+  }
+
+  function loadAssetOnce(kind, href) {
+    return new Promise((resolve, reject) => {
+      const selector = kind === 'script'
+        ? 'script[src="' + href + '"]'
+        : 'link[href="' + href + '"]';
+      if (document.querySelector(selector)) { resolve(); return; }
+      let el;
+      if (kind === 'script') {
+        el = document.createElement('script');
+        el.src = href;
+      } else {
+        el = document.createElement('link');
+        el.rel = 'stylesheet';
+        el.href = href;
+      }
+      el.addEventListener('load', () => resolve());
+      el.addEventListener('error', () => reject(new Error('Failed to load ' + href)));
+      document.head.appendChild(el);
+    });
+  }
+
+  // The create modal's form uses Lex components that are not loaded on every
+  // page (e.g. lex-textarea is only bundled on a couple of pages). When opening
+  // the overlay from the global menu we ensure each required component is
+  // registered first; otherwise its element (like the Prompt textarea) never
+  // upgrades and the field renders blank.
+  const DOC_STUDIO_LEX_COMPONENTS = {
+    'lex-modal': 'lex/components/foundation/lex-modal.js',
+    'lex-btn': 'lex/components/foundation/lex-btn.js',
+    'lex-input': 'lex/components/form/lex-input.js',
+    'lex-select': 'lex/components/form/lex-select.js',
+    'lex-textarea': 'lex/components/form/lex-textarea.js'
+  };
+
+  function ensureLexComponents(base) {
+    const pending = [];
+    Object.keys(DOC_STUDIO_LEX_COMPONENTS).forEach((tag) => {
+      if (!window.customElements || !window.customElements.get(tag)) {
+        pending.push(loadAssetOnce('script', base + DOC_STUDIO_LEX_COMPONENTS[tag]));
+      }
+    });
+    return Promise.all(pending);
+  }
+
+  async function openDocStudioFromMenu() {
+    try {
+      const base = docStudioAssetBase();
+      await ensureLexComponents(base);
+      if (!window.DocStudioCreateModal || !window.DocStudioCreateModal.open) {
+        await loadAssetOnce('link', base.replace(/\/js\/$/, '/css/') + 'components/doc-studio-create-modal.css');
+        await loadAssetOnce('script', base + 'components/doc-studio-create-modal.js');
+      }
+      if (!window.DocStudioCreateModal || !window.DocStudioCreateModal.open) {
+        throw new Error('Doc Studio modal unavailable.');
+      }
+      window.DocStudioCreateModal.open({ api: window.api, pickMatter: true });
+    } catch (error) {
+      console.error('[DocStudio] Failed to open from menu:', error);
+      if (window.Lex && window.Lex.Toast && window.Lex.Toast.error) {
+        window.Lex.Toast.error('Could not open Document Studio. Please try again.');
+      }
+    }
+  }
+
+  window.openDocStudioFromMenu = openDocStudioFromMenu;
+
+  // ---------------------------------------------------------------------------
   // Style injection (once per document)
   // ---------------------------------------------------------------------------
 
@@ -802,8 +884,10 @@
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
             { id: 'my-tasks', label: 'My Tasks', icon: 'clipboard-check', href: 'my-tasks.html' },
             { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' },
-            { id: 'templates', label: 'Templates', icon: 'file-text', href: 'document-studio-templates.html' },
-            { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html' }
+            { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html', children: [
+              { id: 'library-all-sources', label: 'All Sources', href: 'drive.html' },
+              { id: 'library-document-studio', label: 'Document Studio', isButton: true, onClick: 'openDocStudioFromMenu' }
+            ] }
           ];
 
       const sections = [

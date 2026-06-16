@@ -35,6 +35,158 @@
   border-top: 1px solid #e5e7eb;
 }
 
+/* Matter picker (menu-launched mode) */
+.dscm-matter-picker.hidden {
+  display: none;
+}
+
+.dscm-matter-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.375rem;
+}
+
+.dscm-matter-combo {
+  position: relative;
+}
+
+.dscm-matter-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: #111827;
+  background: #fff;
+}
+
+.dscm-matter-input:focus {
+  outline: none;
+  border-color: var(--lex-bg-accent, #57534e);
+  box-shadow: 0 0 0 3px rgba(87, 83, 78, 0.12);
+}
+
+.dscm-matter-input.hidden {
+  display: none;
+}
+
+.dscm-matter-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 16rem;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.dscm-matter-results.hidden {
+  display: none;
+}
+
+.dscm-matter-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+}
+
+.dscm-matter-option:last-child {
+  border-bottom: none;
+}
+
+.dscm-matter-option:hover {
+  background: #f9fafb;
+}
+
+.dscm-matter-option-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.dscm-matter-option-sub {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.dscm-matter-empty {
+  padding: 0.75rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.dscm-matter-error {
+  color: #dc2626;
+}
+
+.dscm-matter-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+}
+
+.dscm-matter-selected.hidden {
+  display: none;
+}
+
+.dscm-matter-selected-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.dscm-matter-selected-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.dscm-matter-selected-id {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.dscm-matter-clear {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--lex-bg-accent, #57534e);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.dscm-matter-clear:hover {
+  text-decoration: underline;
+}
+
+.dscm-matter-hint {
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
 /* Progress panel */
 .dscm-progress {
   border-radius: 0.5rem;
