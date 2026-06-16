@@ -712,13 +712,32 @@
         opacity: 0;
         overflow: hidden;
         transition: max-height var(--lex-transition-fast),
-                    opacity var(--lex-transition-fast);
+                    opacity var(--lex-transition-fast),
+                    padding-top var(--lex-transition-fast);
       }
 
-      .lex-sidebar-nav-group:hover .lex-sidebar-subnav,
-      .lex-sidebar-nav-group:focus-within .lex-sidebar-subnav {
+      .lex-sidebar-nav-group[data-expanded="true"] .lex-sidebar-subnav {
         max-height: 12rem;
         opacity: 1;
+        padding-top: 0.375rem;
+      }
+
+      /* Chevron rotates to signal the dropdown's open/closed state */
+      .lex-sidebar-nav-chevron {
+        display: inline-flex;
+        align-items: center;
+        flex-shrink: 0;
+        color: var(--_sb-text-muted);
+        transition: transform var(--lex-transition-fast),
+                    color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-nav-group-toggle:hover .lex-sidebar-nav-chevron {
+        color: var(--_sb-text-active);
+      }
+
+      .lex-sidebar-nav-group[data-expanded="true"] .lex-sidebar-nav-chevron {
+        transform: rotate(180deg);
       }
 
       .lex-sidebar-nav-item[data-child="true"] {
@@ -726,7 +745,7 @@
         padding-bottom: 0.375rem;
         font-weight: var(--lex-weight-normal, 400);
         font-size: var(--lex-body-xs-size, 0.8125rem);
-        color: var(--_sb-text-muted);
+        color: var(--_sb-text-active);
       }
 
       /* Collapsed (icon-only) sidebar: no room for an inline submenu */
@@ -1401,13 +1420,19 @@
     }
 
     _renderNavItem(item, isChild = false) {
-      // Items with children render a hover-expand group: the parent navigates
-      // on click, hovering reveals the indented child links below it.
+      // Items with children render a click-toggle group: the parent does NOT
+      // navigate — clicking it expands/collapses the indented child links, and
+      // a chevron on the right rotates to signal the dropdown state.
       if (!isChild && item.children && item.children.length) {
-        const parentHtml = this._renderNavItem({ ...item, children: undefined });
         const childrenHtml = item.children.map((child) => this._renderNavItem(child, true)).join('');
-        return `<div class="lex-sidebar-nav-group">
-          ${parentHtml}
+        const iconHtml = item.icon ? icon(item.icon, 'normal') : '';
+        const chevronHtml = `<span class="lex-sidebar-nav-chevron">${icon('chevron-down', 'small')}</span>`;
+        return `<div class="lex-sidebar-nav-group" data-expanded="false">
+          <button type="button" class="lex-sidebar-nav-item lex-sidebar-nav-group-toggle" data-nav-toggle data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}">
+            ${iconHtml}
+            <span class="lex-sidebar-nav-label">${this.escapeHtml(item.label || '')}</span>
+            ${chevronHtml}
+          </button>
           <div class="lex-sidebar-subnav">${childrenHtml}</div>
         </div>`;
       }
@@ -1572,8 +1597,21 @@
         }
       });
 
+      // Nav group toggle: expand/collapse the submenu instead of navigating
+      this.delegate('click', '[data-nav-toggle]', (e, target) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const group = target.closest('.lex-sidebar-nav-group');
+        if (group) {
+          const expanded = group.getAttribute('data-expanded') === 'true';
+          group.setAttribute('data-expanded', expanded ? 'false' : 'true');
+        }
+      });
+
       // Nav item click
       this.delegate('click', '.lex-sidebar-nav-item', (e, target) => {
+        // Group toggles are handled separately and never navigate
+        if (target.hasAttribute('data-nav-toggle')) return;
         const id = target.dataset.id;
         const isButton = target.tagName === 'BUTTON';
         const label = target.querySelector('.lex-sidebar-nav-label');
