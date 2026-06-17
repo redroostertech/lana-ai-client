@@ -79,10 +79,15 @@
   // second; this is a generous ceiling, not a target.
   var RUN_METRIC_TIMEOUT_MS = 20000;
 
-  function runWithTimeout(promise, ms, label) {
+  function runWithTimeout(promise, ms, label, controller) {
     var timer;
     var timeout = new Promise(function (_, reject) {
       timer = setTimeout(function () {
+        // Cancel the in-flight request so its backend connection is released
+        // instead of running on abandoned until the server query timeout.
+        if (controller && typeof controller.abort === 'function') {
+          try { controller.abort(); } catch (_err) {}
+        }
         reject(new Error('Timed out after ' + Math.round(ms / 1000) + 's' + (label ? ' (' + label + ')' : '')));
       }, ms);
     });
@@ -427,11 +432,13 @@
     renderTable();
 
     var started = Date.now();
+    var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     try {
       var response = await runWithTimeout(
-        api.getMetricDetail(metricKey),
+        api.getMetricDetail(metricKey, {}, controller ? { signal: controller.signal } : {}),
         RUN_METRIC_TIMEOUT_MS,
-        'metric calculation did not return'
+        'metric calculation did not return',
+        controller
       );
       var payload = response && response.data ? response.data : response;
       var elapsed = Date.now() - started;

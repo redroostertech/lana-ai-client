@@ -519,6 +519,14 @@ class ApiClient {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+      // Honor a caller-supplied AbortSignal (e.g. a per-request timeout) in
+      // addition to the internal request timeout: abort the fetch if either
+      // fires. Without this, a caller's signal passed via options would be
+      // silently overwritten by config.signal below.
+      if (options.signal) {
+        if (options.signal.aborted) controller.abort();
+        else options.signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
       config.signal = controller.signal;
 
       const response = await fetch(url, config);
@@ -2805,7 +2813,7 @@ class ApiClient {
     return this.post('/api/v1/modules/metric-snapshots/capture', data);
   }
 
-  async getMetricDetail(metricKey, params = {}) {
+  async getMetricDetail(metricKey, params = {}, options = {}) {
     let url = '/api/v1/modules/metric-detail/' + encodeURIComponent(metricKey);
     const queryParts = [];
     if (params.periodStart) queryParts.push('periodStart=' + encodeURIComponent(params.periodStart));
@@ -2815,7 +2823,9 @@ class ApiClient {
     if (params.compareToPrevious !== undefined) queryParts.push('compareToPrevious=' + encodeURIComponent(String(params.compareToPrevious)));
     if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
-    return this.get(url);
+    // options may carry { signal } so callers (e.g. the Metric Catalog "Run All"
+    // batch runner) can cancel the in-flight request on a per-metric timeout.
+    return this.request('GET', url, null, options);
   }
 
   /**
