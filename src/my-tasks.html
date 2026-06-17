@@ -48,12 +48,57 @@
         </div>
       </lex-banner>
 
+      <!-- Search / Sort / Filter toolbar — Library-style, drives the table below -->
+      <div class="my-tasks-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input
+              id="myTasksSearch"
+              placeholder="Search tasks..."
+              clearable="true"
+              leading-icon="search"
+            ></lex-input>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+            <lex-select
+              id="myTasksSort"
+              options='[{"value":"updated_at","label":"Last Updated"},{"value":"due_date","label":"Due Date"},{"value":"title","label":"Task"},{"value":"status","label":"Status"},{"value":"priority","label":"Priority"}]'
+              value="updated_at"
+            ></lex-select>
+          </div>
+
+          <lex-btn id="myTasksSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" style="color: var(--lex-text-secondary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
+            <lex-select
+              id="myTasksStatusFilter"
+              options='[{"value":"all","label":"All"},{"value":"Pending","label":"Pending"},{"value":"In Progress","label":"In Progress"},{"value":"In Review","label":"In Review"},{"value":"Complete","label":"Complete"},{"value":"Cancelled","label":"Cancelled"}]'
+              value="all"
+            ></lex-select>
+          </div>
+
+          <div id="myTasksCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
+        </div>
+      </div>
+
+      <!-- Section header — title + count, Library-style -->
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Tasks</h2>
+        <span id="myTasksSectionCount" class="text-sm" style="color: var(--lex-text-secondary)"></span>
+      </div>
+
       <lex-table
         id="myTasksTable"
-        class="my-tasks-table"
+        class="my-tasks-table lex-table--card"
         columns="title,level,status,priority,due_date"
         labels="Task,Level,Status,Priority,Due"
-        searchable
         column-filters
         sort-by="updated_at"
         sort-dir="desc"

@@ -47,6 +47,7 @@
         subtitle="Organize matters, cases, and projects into dedicated spaces with isolated documents, conversations, and AI context."
       >
         <lex-btn id="learnMoreBtn" variant="secondary">Learn More</lex-btn>
+        <lex-btn id="createMatterBtn" variant="primary" leading-icon="+">New Matter</lex-btn>
       </lex-banner>
 
       <!-- Summary Metrics -->
@@ -84,6 +85,59 @@
         </div>
       </div>
 
+      <!-- Search / Sort / Filter toolbar — Library-style, drives grid + list -->
+      <div class="matters-toolbar bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input
+              id="searchInput"
+              placeholder="Search matters by name or ID..."
+              clearable="true"
+              leading-icon="search"
+            ></lex-input>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+            <lex-select
+              id="mattersSort"
+              options='[{"value":"created_at","label":"Created Date"},{"value":"updated_at","label":"Modified Date"},{"value":"name","label":"Name"},{"value":"status","label":"Status"}]'
+              value="created_at"
+            ></lex-select>
+          </div>
+
+          <lex-btn id="mattersSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" style="color: var(--lex-text-secondary)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
+            <lex-select
+              id="statusFilter"
+              options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'
+              value="all"
+            ></lex-select>
+          </div>
+
+          <div id="listSectionCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
+
+          <div class="flex items-center gap-1 ml-auto" style="border-left: 1px solid var(--lex-border-default); padding-left: 12px;">
+            <lex-btn id="gridViewBtn" variant="ghost" icon="true" title="Grid View">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+              </svg>
+            </lex-btn>
+            <lex-btn id="listViewBtn" variant="primary" icon="true" title="List View">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+              </svg>
+            </lex-btn>
+          </div>
+        </div>
+      </div>
+
       <!-- Pinned Matters (list view only) -->
       <div id="listPinnedSection" class="hidden mb-4" style="transition: opacity var(--lex-transition-normal, 200ms) ease, max-height 300ms ease; overflow: hidden;">
         <div class="flex items-center justify-between mb-3">
@@ -98,58 +152,28 @@
         <div id="listPinnedCards" class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin"></div>
       </div>
 
-      <!-- Content card — header, view toggles, grid/list body -->
-      <lex-card padding="none">
-        <!-- Card header — title, count, New Matter, view toggles -->
-        <div class="flex items-center justify-between p-4">
-          <div>
-            <h2 id="listSectionHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Matters</h2>
-          </div>
-          <div class="flex items-center gap-3">
-            <!--
-              "Show archived" toggle — off by default. workspace.js reads this
-              checkbox in loadMatters() and filters status='archived' rows out
-              when unchecked. Backend endpoint already returns archived rows;
-              filter is purely client-side so we don't need a new query param.
-            -->
-            <label class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--lex-text-secondary);" title="Include archived matters in the list">
-              <input type="checkbox" id="showArchivedToggle" class="w-4 h-4 rounded border-gray-300">
-              <span>Show archived</span>
-            </label>
-            <lex-btn id="createMatterBtn" variant="primary" leading-icon="+">
-              New Matter
-            </lex-btn>
-            <div class="flex items-center gap-1" style="border-left: 1px solid var(--lex-border-default); padding-left: 12px;">
-              <lex-btn id="gridViewBtn" variant="ghost" icon="true" title="Grid View">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
-                </svg>
-              </lex-btn>
-              <lex-btn id="listViewBtn" variant="primary" icon="true" title="List View">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-                </svg>
-              </lex-btn>
-            </div>
-          </div>
-        </div>
+      <!-- Section header — title + count, Library-style -->
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Matters &amp; Workspaces</h2>
+        <span id="mattersSectionCount" class="text-sm" style="color: var(--lex-text-secondary)"></span>
+      </div>
 
+      <!-- Matters content (no card container) -->
+      <div class="matters-content">
         <!-- Loading State -->
         <div id="mattersLoading" class="flex justify-center py-16">
           <lex-spinner size="lg" label="Loading matters..."></lex-spinner>
         </div>
 
         <!-- Matters Grid View -->
-        <div id="mattersGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4"></div>
+        <div id="mattersGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
 
         <!-- Matters List View -->
         <lex-table
           id="mattersListView"
-          class="hidden"
+          class="hidden lex-table--card"
           columns="matter_id,name,status,matter_type,created_at"
           labels="Matter ID,Name,Status,Type,Created"
-          searchable
-          filterable
           column-filters
           selectable
           compact
@@ -162,7 +186,7 @@
 
         <!-- Pagination -->
         <lex-pagination id="pagination"></lex-pagination>
-      </lex-card>
+      </div>
     </main>
 
     <!-- Shared Matter Options Dropdown -->

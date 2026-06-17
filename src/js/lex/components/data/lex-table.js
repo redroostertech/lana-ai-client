@@ -144,6 +144,18 @@
         white-space: nowrap;
       }
 
+      /* ── "Card" modifier ─────────────────────────────────────
+         Opt-in (class on the <lex-table> host) that wraps the table in a
+         white, rounded, bordered card — matching the Library list table. */
+      lex-table.lex-table--card {
+        display: block;
+        background: var(--lex-bg-primary, #fff);
+        border: 1px solid var(--lex-border-default);
+        border-radius: var(--lex-radius-lg, 12px);
+        box-shadow: var(--lex-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
+        overflow: hidden;
+      }
+
       /* Page-size select */
       .lex-page-size-select {
         appearance: none;

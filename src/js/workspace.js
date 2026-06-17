@@ -71,6 +71,17 @@
     const pinnedPageSize = 20;
     let allPinnedMatters = [];
     let totalPinnedCount = 0;
+    let totalMattersCount = 0; // Grand total of matters for the toolbar count
+
+    // Reflect the current matter total in the toolbar chip and section header.
+    function updateMattersCount() {
+      var label = formatNumber(totalMattersCount) +
+        (totalMattersCount === 1 ? ' matter' : ' matters');
+      var toolbarEl = document.getElementById('listSectionCount');
+      if (toolbarEl) toolbarEl.textContent = label;
+      var sectionEl = document.getElementById('mattersSectionCount');
+      if (sectionEl) sectionEl.textContent = label;
+    }
 
     // View mode: 'grid' or 'list'
     let viewMode = 'list';
@@ -410,15 +421,8 @@
         // tbody re-injects on sort/page changes too.
         ensureListPinColumn(listEl, rows);
 
-        // Update section header with count
-        var sectionHeading = document.getElementById('listSectionHeading');
-        var sectionCount = document.getElementById('listSectionCount');
-        if (sectionHeading) {
-          sectionHeading.textContent = 'All Matters';
-        }
-        if (sectionCount) {
-          sectionCount.textContent = formatNumber(rows.length) + (rows.length === 1 ? ' matter' : ' matters');
-        }
+        // Update the toolbar count chip with the grand total.
+        updateMattersCount();
       }
     }
 
@@ -599,7 +603,7 @@
         let filters = { search };
         if (statusFilterValue === 'shared') {
           filters.shared_only = true;
-        } else if (statusFilterValue) {
+        } else if (statusFilterValue && statusFilterValue !== 'all') {
           filters.status = statusFilterValue;
         }
 
@@ -646,13 +650,9 @@
         // Combine for currentMatters (for select all functionality)
         matters = [...allPinnedMatters, ...unpinnedMatters];
 
-        // "Show archived" toggle — when off (default), hide rows with
-        // status === 'archived'. When on, archived rows get a status badge
-        // via the existing statusBadge helper (which already knows the
-        // 'archived' value). This is purely client-side; no extra request.
-        var _showArchivedEl = document.getElementById('showArchivedToggle');
-        var _showArchived = !!(_showArchivedEl && _showArchivedEl.checked);
-        if (!_showArchived) {
+        // Archived matters are hidden unless the Status filter explicitly
+        // selects "Archived". This is purely client-side; no extra request.
+        if (statusFilterValue !== 'archived') {
           matters = matters.filter(function (m) { return m && m.status !== 'archived'; });
         }
         currentMatters = matters;
@@ -783,6 +783,8 @@
 
         // Update pagination (based on unpinned matters only)
         const total = unpinnedResult.total || 0;
+        totalMattersCount = total;
+        updateMattersCount();
         const totalPages = Math.ceil(total / pageSize);
         updatePagination(totalPages, total);
       } catch (error) {
@@ -1004,6 +1006,23 @@
       loadMatters();
     });
 
+    // Toolbar "Sort by" dropdown — sets the sort column and reloads.
+    var _mattersSort = document.getElementById('mattersSort');
+    if (_mattersSort) _mattersSort.addEventListener('lex-change', function (e) {
+      sortBy = (e.detail && e.detail.value) ? e.detail.value : 'created_at';
+      currentPage = 1;
+      loadMatters({ soft: true });
+    });
+
+    // Toolbar sort-order toggle — flips asc/desc and reloads.
+    var _mattersSortOrder = document.getElementById('mattersSortOrder');
+    if (_mattersSortOrder) _mattersSortOrder.addEventListener('click', function () {
+      sortOrder = _mattersSortOrder.dataset.order === 'asc' ? 'desc' : 'asc';
+      _mattersSortOrder.dataset.order = sortOrder;
+      currentPage = 1;
+      loadMatters({ soft: true });
+    });
+
     var _matterTypeFilter = document.getElementById('matterTypeFilter');
     if (_matterTypeFilter) _matterTypeFilter.addEventListener('lex-change', (e) => {
       const filterValue = (e.detail && e.detail.value !== undefined) ? e.detail.value : document.getElementById('matterTypeFilter').value;
@@ -1023,19 +1042,6 @@
       totalPinnedCount = 0;
       loadMatters();
     });
-
-    // "Show archived" toggle — re-runs loadMatters() on change so the
-    // archived rows are filtered in/out of currentMatters.
-    var _showArchivedToggle = document.getElementById('showArchivedToggle');
-    if (_showArchivedToggle) {
-      _showArchivedToggle.addEventListener('change', function () {
-        currentPage = 1;
-        pinnedPage = 1;
-        allPinnedMatters = [];
-        totalPinnedCount = 0;
-        loadMatters();
-      });
-    }
 
     // View toggle (grid / list)
     var _gridViewBtn = document.getElementById('gridViewBtn');

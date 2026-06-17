@@ -358,11 +358,37 @@
       }
       state.tasks = collected;
       table.setData(collected.map(mapTaskForTable));
+      updateTaskCount();
     } catch (error) {
       Lex.Toast.error(error.message || 'Unable to load tasks');
       state.tasks = [];
       if (typeof table.setData === 'function') table.setData([]);
+      updateTaskCount();
     }
+  }
+
+  // Reflect the table's current (post-search/filter) row total in the toolbar
+  // and the section header.
+  function updateTaskCount() {
+    var table = el('myTasksTable');
+    if (!table) return;
+    var total = table.dataSource && table.dataSource.pagination
+      ? table.dataSource.pagination.total
+      : 0;
+    var label = (total || 0) + ' item' + (total === 1 ? '' : 's');
+    var countEl = el('myTasksCount');
+    if (countEl) countEl.textContent = label;
+    var sectionEl = el('myTasksSectionCount');
+    if (sectionEl) sectionEl.textContent = label;
+  }
+
+  // Apply a sort to the table and keep its header arrows in sync.
+  function applyTaskSort(column, direction) {
+    var table = el('myTasksTable');
+    if (!table) return;
+    table.sortBy = column;
+    table.sortDir = direction;
+    if (table.dataSource) table.dataSource.setSort(column, direction);
   }
 
   function userHasRole(roleName) {
@@ -890,6 +916,53 @@
         var task = row && row._raw;
         if (task) openTaskDetails(task);
       });
+
+      // Keep the toolbar count in sync as the client-side pipeline reprocesses.
+      table.addEventListener('lex-filter-change', updateTaskCount);
+      table.addEventListener('lex-data-loaded', updateTaskCount);
+
+      // --- Library-style toolbar: search / sort / order / status filter ---
+      var searchInput = el('myTasksSearch');
+      if (searchInput) {
+        var runSearch = function (event) {
+          if (table.dataSource) {
+            table.dataSource.setSearch(event && event.detail ? event.detail.value : '');
+          }
+        };
+        searchInput.addEventListener('lex-input', runSearch);
+        searchInput.addEventListener('lex-change', runSearch);
+      }
+
+      var sortSelect = el('myTasksSort');
+      var sortOrderBtn = el('myTasksSortOrder');
+      var currentOrder = function () {
+        return sortOrderBtn && sortOrderBtn.dataset.order === 'asc' ? 'asc' : 'desc';
+      };
+      if (sortSelect) {
+        sortSelect.addEventListener('lex-change', function (event) {
+          var col = event && event.detail ? event.detail.value : 'updated_at';
+          applyTaskSort(col, currentOrder());
+        });
+      }
+      if (sortOrderBtn) {
+        sortOrderBtn.addEventListener('click', function () {
+          var next = sortOrderBtn.dataset.order === 'asc' ? 'desc' : 'asc';
+          sortOrderBtn.dataset.order = next;
+          applyTaskSort(sortSelect ? sortSelect.value : 'updated_at', next);
+        });
+      }
+
+      var statusFilter = el('myTasksStatusFilter');
+      if (statusFilter) {
+        statusFilter.addEventListener('lex-change', function (event) {
+          var val = event && event.detail ? event.detail.value : 'all';
+          if (val === 'all') {
+            table.removeFilter('status');
+          } else {
+            table.addFilter('status', 'in', [val]);
+          }
+        });
+      }
 
       // Level-column "Matter" button lives inside the row, so lex-table's
       // row-click guard skips it. Catch it here via delegation — re-attached
