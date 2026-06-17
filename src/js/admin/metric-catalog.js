@@ -73,6 +73,21 @@
   var visibleMetrics = [];
   var passedCount = 0;
   var failedCount = 0;
+  // Per-metric run timeout. A single metric whose calculation hangs server-side
+  // must never block the rest of a "Run visible" batch — it is recorded as a
+  // timeout failure and the run moves on. Normal metrics return in well under a
+  // second; this is a generous ceiling, not a target.
+  var RUN_METRIC_TIMEOUT_MS = 20000;
+
+  function runWithTimeout(promise, ms, label) {
+    var timer;
+    var timeout = new Promise(function (_, reject) {
+      timer = setTimeout(function () {
+        reject(new Error('Timed out after ' + Math.round(ms / 1000) + 's' + (label ? ' (' + label + ')' : '')));
+      }, ms);
+    });
+    return Promise.race([promise, timeout]).finally(function () { clearTimeout(timer); });
+  }
 
   // Goal index: metric_key -> { weekly?: goal, monthly?: goal }. Loaded once
   // after the catalog loads (see loadGoals). The actions cell reads this to
@@ -413,7 +428,11 @@
 
     var started = Date.now();
     try {
-      var response = await api.getMetricDetail(metricKey);
+      var response = await runWithTimeout(
+        api.getMetricDetail(metricKey),
+        RUN_METRIC_TIMEOUT_MS,
+        'metric calculation did not return'
+      );
       var payload = response && response.data ? response.data : response;
       var elapsed = Date.now() - started;
       // status 'unregistered' is the synthesized stub for keys not in the
