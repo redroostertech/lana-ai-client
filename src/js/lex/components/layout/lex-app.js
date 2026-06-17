@@ -622,12 +622,16 @@
       // Topbar settings menu actions (sign out, settings)
       this.delegate('topbar-menu-action', 'lex-topbar', (e) => {
         var actionId = e.detail && e.detail.actionId;
+        var routes = {
+          admin: 'admin/index.html',
+          connectors: 'data-connectors.html',
+          settings: 'settings-v2.html',
+          help: 'help.html'
+        };
         if (actionId === 'logout') {
           this._handleSignOut();
-        } else if (actionId === 'settings') {
-          if (window.Lex && window.Lex.Nav) {
-            window.Lex.Nav.go('settings-v2.html');
-          }
+        } else if (routes[actionId] && window.Lex && window.Lex.Nav) {
+          window.Lex.Nav.go(routes[actionId]);
         }
       });
     }
@@ -834,12 +838,17 @@
         menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
         this.setUserMenuItems(menuItems);
 
-        // Topbar settings menu
-        this.setTopbarMenuItems([
-          { id: 'settings', label: 'Settings', icon: 'settings' },
-          { divider: true },
-          { id: 'logout', label: 'Sign out', icon: 'log-out', variant: 'danger' }
-        ]);
+        // Topbar settings menu — mirror the sidebar user menu links
+        const topbarMenuItems = [];
+        if (showAdmin) {
+          topbarMenuItems.push({ id: 'admin', label: 'Administration', icon: 'users' });
+        }
+        topbarMenuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug' });
+        topbarMenuItems.push({ id: 'settings', label: 'Settings', icon: 'settings' });
+        topbarMenuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle' });
+        topbarMenuItems.push({ divider: true });
+        topbarMenuItems.push({ id: 'logout', label: 'Sign out', icon: 'log-out', variant: 'danger' });
+        this.setTopbarMenuItems(topbarMenuItems);
       }
     }
 
