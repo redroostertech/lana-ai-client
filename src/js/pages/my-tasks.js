@@ -39,6 +39,13 @@
     return value ? Lex.Utils.formatDate(value) : '';
   }
 
+  function formatDateTime(value) {
+    if (!value) return '';
+    var d = new Date(value);
+    if (isNaN(d.getTime())) return formatDate(value);
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
   function normalizeTasks(response) {
     if (!response) return [];
     if (response.data) return normalizeTasks(response.data);
@@ -48,11 +55,38 @@
     return [];
   }
 
+  var STATUS_OPTIONS = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'in_review', label: 'In Review' },
+    { value: 'complete', label: 'Complete' },
+    { value: 'cancelled', label: 'Cancelled' }
+  ];
+
+  function normalizeStatus(status) {
+    var s = String(status || '').toLowerCase();
+    if (s === 'completed') return 'complete';
+    return s || 'pending';
+  }
+
   function statusLabel(status) {
     if (status === 'in_progress') return 'In Progress';
     if (status === 'in_review') return 'In Review';
     if (status === 'complete' || status === 'completed') return 'Complete';
     return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Pending';
+  }
+
+  function statusSelectHtml(task) {
+    var current = normalizeStatus(task.status);
+    var options = STATUS_OPTIONS.map(function (opt) {
+      var selected = opt.value === current ? ' selected' : '';
+      return '<option value="' + opt.value + '"' + selected + '>' + esc(opt.label) + '</option>';
+    }).join('');
+    return [
+      '<span class="my-task-status-control">',
+      '  <select class="my-task-status-select" data-task-status-select aria-label="Update status">' + options + '</select>',
+      '</span>'
+    ].join('');
   }
 
   function statusColor(status) {
@@ -101,13 +135,24 @@
     return task.task_plan_title || planMetadata.title || (task.task_plan_id ? 'Task plan' : '');
   }
 
+  // Level pill in the detail panel — same <lex-badge> as the status/priority
+  // pills, just a different color. The matter-open action lives on the matter
+  // title hyperlink (see matterLinkHtml), not on this badge.
   function levelHtml(task) {
     if (!task.matter_id) {
       return '<lex-badge label="Org" color="green"></lex-badge>';
     }
+    return '<lex-badge label="Matter" color="blue"></lex-badge>';
+  }
+
+  // The matter title rendered as a hyperlink that opens the matter workspace.
+  function matterLinkHtml(task) {
+    if (!task.matter_id) {
+      return esc('Organization-level');
+    }
     return [
-      '<button type="button" class="my-task-level-link" data-matter-id="' + esc(task.matter_id) + '" title="' + esc(taskMatterLabel(task)) + '">',
-      'Matter',
+      '<button type="button" class="my-task-matter-link" data-matter-id="' + esc(task.matter_id) + '">',
+      esc(taskMatterLabel(task)),
       '</button>'
     ].join('');
   }
@@ -123,18 +168,6 @@
 
     var checklist = taskChecklistItems(task);
     var planLabel = taskPlanLabel(task);
-    var isComplete = String(task.status || '').toLowerCase() === 'complete';
-    var completeLabel = isComplete ? 'Reopen' : 'Mark Complete';
-    var completeAction = isComplete ? 'reopen' : 'complete';
-
-    var actionButtons = [
-      '<lex-btn variant="primary" size="sm" data-task-action="edit">Edit</lex-btn>',
-      '<lex-btn variant="secondary" size="sm" data-task-action="' + completeAction + '">' + completeLabel + '</lex-btn>',
-      task.matter_id
-        ? '<lex-btn variant="secondary" size="sm" data-matter-id="' + esc(task.matter_id) + '">Open Matter</lex-btn>'
-        : '',
-      '<lex-btn variant="danger" size="sm" data-task-action="delete">Delete</lex-btn>'
-    ].filter(Boolean).join(' ');
 
     modal.heading = task.title || 'Task Details';
     content.innerHTML = [
@@ -142,13 +175,17 @@
       '  <div class="my-task-detail__badges">',
       '    ' + levelHtml(task),
       '    <lex-badge label="' + esc(statusLabel(task.status)) + '" color="' + esc(statusColor(task.status)) + '"></lex-badge>',
-      '    <lex-badge label="' + esc(task.priority || 'normal') + '" color="' + esc(priorityColor(task.priority)) + '"></lex-badge>',
+      '    <lex-badge label="' + esc(priorityLabel(task.priority || 'normal')) + '" color="' + esc(priorityColor(task.priority)) + '"></lex-badge>',
       '  </div>',
       '  <dl class="my-task-detail__meta">',
-      '    <div><dt>Level</dt><dd>' + esc(task.matter_id ? taskMatterLabel(task) : 'Organization-level') + '</dd></div>',
-      task.created_by_name ? '    <div><dt>Created By</dt><dd>' + esc(task.created_by_name) + '</dd></div>' : '',
-      task.due_date ? '    <div><dt>Due</dt><dd>' + esc(formatDate(task.due_date)) + '</dd></div>' : '',
-      planLabel ? '    <div><dt>Task Group</dt><dd>' + esc(planLabel) + '</dd></div>' : '',
+      '    <div class="my-task-detail__row"><dt>Status</dt><dd>' + statusSelectHtml(task) + '</dd></div>',
+      '    <div class="my-task-detail__row"><dt>Priority</dt><dd>' + esc(priorityLabel(task.priority || 'normal')) + '</dd></div>',
+      '    <div class="my-task-detail__row"><dt>' + (task.matter_id ? 'Matter' : 'Level') + '</dt><dd>' + matterLinkHtml(task) + '</dd></div>',
+      task.created_by_name ? '    <div class="my-task-detail__row"><dt>Created By</dt><dd>' + esc(task.created_by_name) + '</dd></div>' : '',
+      task.created_at ? '    <div class="my-task-detail__row"><dt>Created</dt><dd>' + esc(formatDateTime(task.created_at)) + '</dd></div>' : '',
+      task.updated_at ? '    <div class="my-task-detail__row"><dt>Updated</dt><dd>' + esc(formatDateTime(task.updated_at)) + '</dd></div>' : '',
+      task.due_date ? '    <div class="my-task-detail__row"><dt>Due</dt><dd>' + esc(formatDate(task.due_date)) + '</dd></div>' : '',
+      planLabel ? '    <div class="my-task-detail__row"><dt>Task Group</dt><dd>' + esc(planLabel) + '</dd></div>' : '',
       '  </dl>',
       task.description ? '  <section class="my-task-detail__section"><h3>Description</h3><p>' + esc(task.description) + '</p></section>' : '',
       '  <section class="my-task-detail__section">',
@@ -158,10 +195,92 @@
         return '<li>' + esc(label) + '</li>';
       }).join('') + '</ul>' : '    <p class="my-task-detail__muted">No checklist items attached.</p>',
       '  </section>',
-      '  <div class="my-task-detail__actions">' + actionButtons + '</div>',
       '</div>'
     ].join('');
+
+    renderHeaderActions(modal, task);
     modal.open = true;
+  }
+
+  // Inject (or refresh) the "Actions" dropdown in the modal header, next to the
+  // close button. Edit / Mark Complete (or Reopen) / Delete live here so they're
+  // reachable from the header instead of a button row at the bottom of the body.
+  function renderHeaderActions(modal, task) {
+    var header = modal.querySelector('.lex-modal-header');
+    if (!header) return;
+
+    var isComplete = normalizeStatus(task.status) === 'complete';
+    var completeLabel = isComplete ? 'Reopen' : 'Mark Complete';
+    var completeAction = isComplete ? 'reopen' : 'complete';
+
+    var wrap = header.querySelector('[data-task-actions-wrap]');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.className = 'my-task-header-actions';
+      wrap.setAttribute('data-task-actions-wrap', '');
+      var closeBtn = header.querySelector('.lex-modal-close');
+      header.insertBefore(wrap, closeBtn);
+    }
+
+    var chevron = '<svg class="my-task-actions-btn__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+    wrap.innerHTML = [
+      '<button type="button" class="my-task-actions-btn" data-task-actions-toggle aria-haspopup="true" aria-expanded="false">',
+      '  <span>Actions</span>' + chevron,
+      '</button>',
+      '<div class="my-task-actions-menu hidden" role="menu">',
+      '  <button type="button" role="menuitem" data-task-action="edit">Edit</button>',
+      '  <button type="button" role="menuitem" data-task-action="' + completeAction + '">' + completeLabel + '</button>',
+      '  <button type="button" role="menuitem" class="my-task-actions-menu__danger" data-task-action="delete">Delete</button>',
+      '</div>'
+    ].join('');
+  }
+
+  function taskActionsEls() {
+    var modal = el('myTaskDetailsModal');
+    if (!modal) return {};
+    return {
+      menu: modal.querySelector('.my-task-actions-menu'),
+      toggle: modal.querySelector('[data-task-actions-toggle]')
+    };
+  }
+
+  function toggleTaskActionsMenu() {
+    var refs = taskActionsEls();
+    if (!refs.menu) return;
+    if (refs.menu.classList.contains('hidden')) {
+      refs.menu.classList.remove('hidden');
+      if (refs.toggle) refs.toggle.setAttribute('aria-expanded', 'true');
+    } else {
+      closeTaskActionsMenu();
+    }
+  }
+
+  function closeTaskActionsMenu() {
+    var refs = taskActionsEls();
+    if (refs.menu) refs.menu.classList.add('hidden');
+    if (refs.toggle) refs.toggle.setAttribute('aria-expanded', 'false');
+  }
+
+  // Inline status change from the details list. Mirrors the Mark Complete /
+  // Reopen endpoints so the 'complete' transition goes through completeTask.
+  async function setTaskStatus(rawStatus) {
+    var task = state.viewingTask;
+    if (!task || !task.id) return;
+    var next = normalizeStatus(rawStatus);
+    if (next === normalizeStatus(task.status)) return;
+    try {
+      if (next === 'complete') {
+        await api.completeTask(task.id);
+      } else {
+        await api.updateTask(task.id, { status: next });
+      }
+      task.status = next;
+      Lex.Toast.success('Status updated');
+      openTaskDetails(task);
+      loadTasks();
+    } catch (error) {
+      Lex.Toast.error(error.message || 'Unable to update status');
+    }
   }
 
   function closeTaskDetails() {
@@ -788,24 +907,45 @@
 
     var modalContent = el('myTaskDetailsContent');
     if (modalContent) {
+      // Matter title hyperlink → open the matter workspace.
       modalContent.addEventListener('click', function (event) {
-        // Action buttons (edit / complete / reopen / delete) take
-        // precedence — they share the same DOM region as the "Open
-        // Matter" button and we don't want the matter-id click leak
-        // when clicking, e.g., "Edit" on a matter-scoped task.
-        var actionButton = event.target.closest('[data-task-action]');
-        if (actionButton) {
-          event.stopPropagation();
-          handleTaskAction(actionButton.getAttribute('data-task-action'));
-          return;
-        }
         var matterButton = event.target.closest('[data-matter-id]');
         if (!matterButton) return;
         Lex.Nav.go('workspace-details.html', {
           params: { id: matterButton.getAttribute('data-matter-id'), tab: 'tasks' }
         });
       });
+
+      // Inline status change from the details list.
+      modalContent.addEventListener('change', function (event) {
+        var select = event.target.closest('[data-task-status-select]');
+        if (!select) return;
+        setTaskStatus(select.value);
+      });
     }
+
+    // Header "Actions" dropdown (Edit / Mark Complete / Delete). The toggle
+    // and menu live in the modal header, outside #myTaskDetailsContent.
+    var detailsModal = el('myTaskDetailsModal');
+    if (detailsModal) {
+      detailsModal.addEventListener('click', function (event) {
+        if (event.target.closest('[data-task-actions-toggle]')) {
+          event.stopPropagation();
+          toggleTaskActionsMenu();
+          return;
+        }
+        var menuItem = event.target.closest('.my-task-actions-menu [data-task-action]');
+        if (menuItem) {
+          event.stopPropagation();
+          closeTaskActionsMenu();
+          handleTaskAction(menuItem.getAttribute('data-task-action'));
+        }
+      });
+    }
+    // Dismiss the actions menu on any outside click.
+    document.addEventListener('click', function (event) {
+      if (!event.target.closest('.my-task-header-actions')) closeTaskActionsMenu();
+    });
 
     var newBtn = el('myTasksNewBtn');
     var newMenu = el('myTasksNewMenu');
