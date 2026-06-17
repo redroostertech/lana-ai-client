@@ -74,7 +74,7 @@
   var passedCount = 0;
   var failedCount = 0;
   // Per-metric run timeout. A single metric whose calculation hangs server-side
-  // must never block the rest of a "Run visible" batch — it is recorded as a
+  // must never block the rest of a "Run All" batch — it is recorded as a
   // timeout failure and the run moves on. Normal metrics return in well under a
   // second; this is a generous ceiling, not a target.
   var RUN_METRIC_TIMEOUT_MS = 20000;
@@ -472,7 +472,7 @@
       // eslint-disable-next-line no-await-in-loop
       await runMetric(queue[i].key);
     }
-    if (btn) { btn.disabled = false; btn.textContent = 'Run visible'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Run All'; }
   }
 
   // Resolve the display name out of an entity entry. The registry uses
