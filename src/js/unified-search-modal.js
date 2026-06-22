@@ -12,7 +12,12 @@
     searchTimer: null,
     abortController: null,
     shortcutBound: false,
-    pendingQueryHandled: false
+    pendingQueryHandled: false,
+    // Full normalized result set for the current query (unfiltered), plus the
+    // active type-filter chip. Filtering is client-side over lastResults, so
+    // toggling a chip never re-queries the backend.
+    lastResults: [],
+    activeType: null
   };
 
   const RECENT_SEARCHES_KEY = 'lana-recent-global-searches';
@@ -99,6 +104,42 @@
         padding: 0.375rem 0.625rem;
         font-size: 0.75rem;
         cursor: pointer;
+      }
+
+      .unified-search-filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+        padding: 0.625rem 1rem;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .unified-search-filter-chip {
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        color: #374151;
+        border-radius: 999px;
+        padding: 0.25rem 0.625rem;
+        font-size: 0.75rem;
+        line-height: 1;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .unified-search-filter-chip:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+      }
+
+      .unified-search-filter-chip[aria-pressed="true"] {
+        background: #4f46e5;
+        border-color: #4f46e5;
+        color: #ffffff;
+      }
+
+      .unified-search-filter-chip-count {
+        opacity: 0.7;
+        margin-left: 0.25rem;
       }
 
       .unified-search-results {
@@ -453,6 +494,7 @@
               <input id="unifiedSearchInput" class="unified-search-input" type="search" placeholder="Search Lana — matters, contacts, documents, conversations, messages, tasks…" autocomplete="off">
               <button id="unifiedSearchClose" class="unified-search-close" type="button">Esc</button>
             </div>
+            <div id="unifiedSearchFilters" class="unified-search-filter-bar" hidden></div>
             <div id="unifiedSearchResults" class="unified-search-results">
               <div class="unified-search-empty">Start typing to search all indexed data.</div>
             </div>
@@ -514,7 +556,16 @@
   }
 
   function renderEmpty(message) {
+    hideFilterBar();
     document.getElementById('unifiedSearchResults').innerHTML = `<div class="unified-search-empty">${escapeHtml(message)}</div>`;
+  }
+
+  function hideFilterBar() {
+    const bar = document.getElementById('unifiedSearchFilters');
+    if (bar) {
+      bar.hidden = true;
+      bar.innerHTML = '';
+    }
   }
 
   function renderLoading() {
@@ -553,6 +604,7 @@
   }
 
   function renderStartState() {
+    hideFilterBar();
     const recents = getRecentSearches();
     if (!recents.length) {
       renderEmpty('Start typing to search all indexed data.');
@@ -781,15 +833,96 @@
     }
   }
 
+  // Lazily resolved so load order between this module and the filter helper
+  // never matters: the helper is only consulted at search time, by which point
+  // both scripts are present. If it is somehow absent, the modal degrades to an
+  // unfiltered list (current pre-feature behavior) rather than breaking.
+  function searchFilter() {
+    return (typeof window !== 'undefined' && window.UnifiedSearchFilter) || null;
+  }
+
+  function applyActiveFilter() {
+    const filter = searchFilter();
+    if (!filter) return state.lastResults;
+    return filter.filterResultsByType(state.lastResults, state.activeType);
+  }
+
+  function renderFilterBar() {
+    const bar = document.getElementById('unifiedSearchFilters');
+    if (!bar) return;
+    const filter = searchFilter();
+    if (!filter) {
+      hideFilterBar();
+      return;
+    }
+    const facetData = filter.computeTypeFacets(state.lastResults, typeLabel);
+    // A single type (or none) needs no filtering UI.
+    if (facetData.facets.length <= 1) {
+      hideFilterBar();
+      return;
+    }
+
+    const chips = [
+      `<button type="button" class="unified-search-filter-chip" data-filter-type="all" aria-pressed="${state.activeType ? 'false' : 'true'}">All<span class="unified-search-filter-chip-count">${facetData.total}</span></button>`
+    ];
+    facetData.facets.forEach((facet) => {
+      const pressed = state.activeType === facet.type ? 'true' : 'false';
+      chips.push(`<button type="button" class="unified-search-filter-chip" data-filter-type="${escapeHtml(facet.type)}" aria-pressed="${pressed}">${escapeHtml(facet.label)}<span class="unified-search-filter-chip-count">${facet.count}</span></button>`);
+    });
+    bar.innerHTML = chips.join('');
+    bar.hidden = false;
+
+    Array.from(bar.querySelectorAll('[data-filter-type]')).forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const type = chip.getAttribute('data-filter-type');
+        state.activeType = (type && type !== 'all') ? type : null;
+        renderFilterBar();
+        renderResultList(applyActiveFilter(), { autoSelect: false });
+      });
+    });
+  }
+
   function renderResults(results, response) {
-    if (!results.length) {
+    state.lastResults = Array.isArray(results) ? results : [];
+    state.activeType = null;
+
+    if (!state.lastResults.length) {
+      hideFilterBar();
       renderEmpty(response && response.message ? response.message : 'No results found.');
       renderDetails(null);
       return;
     }
 
-    document.getElementById('unifiedSearchResults').innerHTML = results.map((result, index) => `
-      <div role="button" tabindex="0" class="unified-search-result" data-result-index="${index}" data-active="${index === 0}">
+    renderFilterBar();
+    renderResultList(applyActiveFilter(), { autoSelect: true });
+  }
+
+  function renderResultList(results, options) {
+    options = options || {};
+    const container = document.getElementById('unifiedSearchResults');
+    if (!container) return;
+    if (!results.length) {
+      container.innerHTML = '<div class="unified-search-empty">No results of this type.</div>';
+      renderDetails(null);
+      return;
+    }
+
+    // Decide which row is active and whether to (re)load the detail pane. On a
+    // fresh query (autoSelect) we select the first result. On a filter toggle we
+    // keep the current selection if it survived the filter, so the detail pane
+    // and its related-data fetch are not needlessly redone (which would also
+    // race overlapping fetches). Only when the selected result was filtered out
+    // do we move selection to the first visible row.
+    const filter = searchFilter();
+    const selectedKey = state.selected ? resultKey(state.selected) : '';
+    const active = filter
+      ? filter.resolveActiveSelection(results, selectedKey, resultKey, options.autoSelect)
+      : { index: 0, preserved: false };
+    const activeIndex = active.index;
+    const selectionPreserved = active.preserved;
+
+    container.innerHTML = results.map((result, index) => `
+      <div role="button" tabindex="0" class="unified-search-result" data-result-index="${index}" data-active="${index === activeIndex}">
         <div class="unified-search-result-main">
           <span class="unified-search-result-title">${escapeHtml(result.title || 'Untitled')}</span>
           <span class="unified-search-result-submeta">
@@ -803,7 +936,9 @@
       </div>
     `).join('');
 
-    const buttons = Array.from(document.querySelectorAll('.unified-search-result'));
+    // Scope listener binding to the results container (not document-wide) so it
+    // can never cross-bind to like-named rows elsewhere in the document.
+    const buttons = Array.from(container.querySelectorAll('.unified-search-result'));
     buttons.forEach((button, index) => {
       button.addEventListener('click', () => {
         buttons.forEach((el) => { el.dataset.active = 'false'; });
@@ -819,7 +954,7 @@
       });
       button.addEventListener('dblclick', () => openResult(results[index]));
     });
-    document.querySelectorAll('[data-open-result-index]').forEach((button) => {
+    container.querySelectorAll('[data-open-result-index]').forEach((button) => {
       button.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -827,8 +962,16 @@
         openResult(results[index]);
       });
     });
-    selectResult(results[0]);
+
+    if (!selectionPreserved) {
+      selectResult(results[activeIndex]);
+    }
   }
+
+  // Monotonic token so a slower related-data response from a prior selection
+  // can never overwrite the detail pane of the current one (last-write-wins
+  // race when the user changes selection or toggles a filter quickly).
+  let relatedRequestId = 0;
 
   function selectResult(result) {
     state.selected = result;
@@ -837,6 +980,7 @@
   }
 
   async function loadRelated(result) {
+    const requestId = ++relatedRequestId;
     if (!result || !window.api || typeof window.api.get !== 'function') {
       renderDetails(result, { relationships: [] });
       return;
@@ -852,8 +996,10 @@
 
     try {
       const graph = await window.api.get('/api/v1/search/related?' + params.toString());
+      if (requestId !== relatedRequestId) return; // a newer selection superseded this
       renderDetails(result, graph);
     } catch (error) {
+      if (requestId !== relatedRequestId) return; // a newer selection superseded this
       renderDetails(result, { error: error.message || 'Failed to load related data.' });
     }
   }

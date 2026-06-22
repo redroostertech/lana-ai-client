@@ -465,6 +465,15 @@
         window.UnifiedSearchModal.init();
         return;
       }
+      // The modal consumes the type-filter helper at search time; inject it
+      // first (idempotent) so it is present by the time a query runs.
+      if (!window.UnifiedSearchFilter && !document.querySelector('script[data-lana-search-filter="true"]')) {
+        const filterScript = document.createElement('script');
+        filterScript.src = this._sharedAssetUrl('js/unified-search-filter.js');
+        filterScript.dataset.lanaSearchFilter = 'true';
+        document.head.appendChild(filterScript);
+      }
+
       const existing = document.querySelector('script[data-lana-global-search="true"], script[src$="js/unified-search-modal.js"]');
       if (existing) return;
 
