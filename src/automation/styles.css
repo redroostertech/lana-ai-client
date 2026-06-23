@@ -1064,6 +1064,146 @@ button:disabled {
   min-height: 72px;
 }
 
+/* Build with Lana — natural-language draft panel at the top of the builder. */
+.build-with-lana-card {
+  border: 1px solid var(--black-700);
+  border-radius: 14px;
+  background: var(--paper);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.build-with-lana-head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.build-with-lana-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--black-700);
+  color: var(--paper);
+}
+
+.build-with-lana-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.build-with-lana-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.build-with-lana-copy strong {
+  font-size: 0.98rem;
+  color: var(--black-700);
+}
+
+.build-with-lana-copy span {
+  font-size: 0.82rem;
+  color: var(--black-500);
+}
+
+.build-with-lana-field {
+  display: block;
+}
+
+.build-with-lana-field span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--black-500);
+}
+
+.build-with-lana-field textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+
+.build-with-lana-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.build-with-lana-hint {
+  font-size: 0.78rem;
+  color: var(--black-500);
+}
+
+.build-with-lana-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: build-with-lana-spin 800ms linear infinite;
+}
+
+@keyframes build-with-lana-spin {
+  to { transform: rotate(360deg); }
+}
+
+.build-with-lana-preview {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white-200);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.build-with-lana-preview strong {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--black-500);
+}
+
+.build-with-lana-preview p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--black-700);
+}
+
+.build-with-lana-validation {
+  border: 1px solid var(--black-700);
+  border-radius: 10px;
+  background: var(--white-200);
+  padding: 10px 12px;
+}
+
+.build-with-lana-validation strong {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--black-700);
+  margin-bottom: 6px;
+}
+
+.build-with-lana-validation ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+}
+
+.build-with-lana-validation li {
+  font-size: 0.82rem;
+  color: var(--black-500);
+}
+
 .automations-sequencer {
   position: relative;
   display: grid;
