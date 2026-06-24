@@ -56,6 +56,7 @@
   // Handler kept on module scope so it can be referenced before `init` runs
   // (and so cleanup detaches the exact instance that was attached).
   var _onConversationRenamed = null;
+  var _onTopbarBackClick = null;
 
   // Intent definitions (hardcoded for V1; V2 will pull from org config)
   var INTENTS = [
@@ -149,6 +150,27 @@
   }
 
   /**
+   * Take over the shared topbar back button while a matter is open so it
+   * returns to that matter's workspace (with chat context) instead of doing a
+   * plain history.back(). The topbar emits a cancelable `topbar-back-click`;
+   * calling preventDefault() suppresses its default navigation. When no matter
+   * is active we leave the default behavior intact.
+   */
+  function attachTopbarBackListener() {
+    if (_onTopbarBackClick) return; // idempotent — never double-bind
+    _onTopbarBackClick = function (e) {
+      if (!_matter || !_matter.id) return;
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      openWorkspaceDetails('conversations');
+    };
+    window.addEventListener('topbar-back-click', _onTopbarBackClick);
+    _windowEventListeners.push({
+      event: 'topbar-back-click',
+      handler: _onTopbarBackClick
+    });
+  }
+
+  /**
    * Inject or update "View Workspace Details" button next to the topbar heading.
    * Placed inside lex-topbar .lex-topbar-center, after the h1.
    */
@@ -164,34 +186,11 @@
     center.style.alignItems = 'center';
     center.style.gap = '12px';
 
-    var existingBack = center.querySelector('[data-action="workspace-back"]');
     var existingDetails = center.querySelector('[data-action="workspace-details"]');
 
     if (!_matter || !_matter.id) {
-      if (existingBack) existingBack.remove();
       if (existingDetails) existingDetails.remove();
       return;
-    }
-
-    if (!existingBack) {
-      var backBtn = document.createElement('button');
-      backBtn.setAttribute('data-action', 'workspace-back');
-      backBtn.title = 'Back to workspace';
-      backBtn.setAttribute('aria-label', 'Back to workspace');
-      backBtn.style.cssText = 'flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:5px 10px;font-size:12px;font-weight:600;color:var(--lex-text-primary);background:var(--lex-bg-primary);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-sm);cursor:pointer;white-space:nowrap;transition:background var(--lex-transition-fast),border-color var(--lex-transition-fast);';
-      backBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg><span>Back</span>';
-      backBtn.addEventListener('mouseenter', function () {
-        backBtn.style.background = 'var(--lex-bg-secondary)';
-        backBtn.style.borderColor = 'var(--lex-border-strong)';
-      });
-      backBtn.addEventListener('mouseleave', function () {
-        backBtn.style.background = 'var(--lex-bg-primary)';
-        backBtn.style.borderColor = 'var(--lex-border-default)';
-      });
-      backBtn.addEventListener('click', function () {
-        openWorkspaceDetails('conversations');
-      });
-      center.insertBefore(backBtn, center.firstChild);
     }
 
     var label = _matter.name ? 'View ' + _matter.name : 'View Workspace Details';
@@ -239,8 +238,6 @@
   function removeWorkspaceDetailsButton() {
     var topbar = dom.app ? dom.app.querySelector('lex-topbar') : null;
     if (!topbar) return;
-    var backBtn = topbar.querySelector('[data-action="workspace-back"]');
-    if (backBtn) backBtn.remove();
     var btn = topbar.querySelector('[data-action="workspace-details"]');
     if (btn) btn.remove();
   }
@@ -1460,6 +1457,7 @@
     // RenameConversation helper dispatches `conversation:renamed` on window
     // after the PUT resolves.
     attachConversationRenamedListener();
+    attachTopbarBackListener();
 
     // Activate skeleton shimmer for the cards area
     if (window.Lex && window.Lex.Redact) {
@@ -1559,6 +1557,7 @@
     });
     _windowEventListeners = [];
     _onConversationRenamed = null;
+    _onTopbarBackClick = null;
     // Remove workspace details button
     removeWorkspaceDetailsButton();
     // Remove document click handler

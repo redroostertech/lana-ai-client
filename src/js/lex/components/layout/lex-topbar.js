@@ -97,26 +97,35 @@
       /* ── Back button (embedded chrome mode) ── */
 
       .lex-topbar-back {
+        flex-shrink: 0;
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        padding: 0.5rem;
-        border: none;
-        background: none;
-        color: var(--lex-topbar-icon-color);
+        gap: 5px;
+        padding: 5px 10px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: var(--lex-weight-semibold);
+        color: var(--lex-text-primary);
+        background: var(--lex-bg-primary);
+        border: 1px solid var(--lex-border-default);
+        border-radius: var(--lex-radius-sm);
         cursor: pointer;
-        border-radius: var(--lex-radius-md);
-        transition: color var(--lex-transition-fast),
-                    background var(--lex-transition-fast);
+        white-space: nowrap;
+        transition: background var(--lex-transition-fast),
+                    border-color var(--lex-transition-fast);
       }
 
       .lex-topbar-back:hover {
-        color: var(--lex-topbar-icon-hover);
-        background: var(--lex-bg-tertiary);
+        background: var(--lex-bg-secondary);
+        border-color: var(--lex-border-strong);
       }
 
       .lex-topbar-back svg {
         display: block;
+      }
+
+      .lex-topbar-back-label {
+        line-height: 1;
       }
 
       /* ── Center section ─────────────────────────────────── */
@@ -380,7 +389,8 @@
       const showBackBtn = this.showBack || this._canGoBack();
       if (showBackBtn) {
         html += `<button type="button" class="lex-topbar-back" data-action="back" aria-label="${this.escapeHtml(this.backLabel)}">
-          ${icon('arrow-left', 'medium')}
+          ${icon('arrow-left', 'small')}
+          <span class="lex-topbar-back-label">${this.escapeHtml(this.backLabel)}</span>
         </button>`;
       } else if (this.showMenuToggle) {
         html += `<button type="button" class="lex-topbar-hamburger" data-action="menu-toggle">
@@ -434,7 +444,11 @@
       });
 
       this.delegate('click', '[data-action="back"]', () => {
-        this.emit('topbar-back-click', { href: this.backHref });
+        // Emit a cancelable event first so a page can take over the back action
+        // (e.g. navigate to a specific destination with context). If the page
+        // calls preventDefault(), we skip the default navigation entirely.
+        const ev = this.emit('topbar-back-click', { href: this.backHref }, { cancelable: true });
+        if (ev && ev.defaultPrevented) return;
         // Default behavior so every page gets a working back with no per-page
         // wiring: honor an explicit backHref, otherwise step back in history.
         if (this.backHref) {

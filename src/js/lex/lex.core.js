@@ -248,12 +248,15 @@
     $$(selector) { return [...this.querySelectorAll(selector)]; }
 
     // Emit a custom event
-    emit(name, detail = {}) {
-      this.dispatchEvent(new CustomEvent(name, {
+    emit(name, detail = {}, options = {}) {
+      const event = new CustomEvent(name, {
         detail,
         bubbles: true,
-        composed: true
-      }));
+        composed: true,
+        cancelable: options.cancelable === true
+      });
+      this.dispatchEvent(event);
+      return event;
     }
 
     // Safe HTML escaping
