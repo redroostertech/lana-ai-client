@@ -49,6 +49,7 @@
  */
 
 const http = require('node:http');
+const https = require('node:https');
 const Store = require('electron-store');
 const { dialog, BrowserWindow } = require('electron');
 const { logInfo, logError } = require('./electron-logger');
@@ -57,7 +58,23 @@ const BRIDGE_HOST = '127.0.0.1';
 const BRIDGE_PORT = 7890;
 const BRIDGE_PATH = '/lana-bridge/companion/request-token';
 const MAX_BODY_BYTES = 16 * 1024; // 16 KB is plenty for the request shape
-const KNOWN_APPS = new Set(['lana-companion', 'lana-brain']);
+const KNOWN_APPS = new Set(['lana-companion', 'lana-brain', 'lana-extension']);
+
+// The browser extension is a companion too, but it runs in the browser sandbox,
+// so it must NOT receive the desktop's raw session token. Instead the bridge
+// mints a SCOPED, app-gated, revocable token for it via the backend
+// POST /api/v1/oauth/provision (client_id=lana-extension). See
+// ai-context-bridge/docs/IDENTITY_AND_ROAMING.md.
+const SCOPED_TOKEN_APPS = new Set(['lana-extension']);
+
+// Human-readable requester names for consent prompts — informed consent requires
+// naming the ACTUAL app (review MEDIUM), not a hardcoded one.
+const APP_LABELS = {
+  'lana-companion': 'PAC (Personal AI Companion)',
+  'lana-brain': 'Lana Brain',
+  'lana-extension': 'the LANA browser extension',
+};
+function appLabel(appName) { return APP_LABELS[appName] || String(appName || 'A companion app'); }
 // Max time we'll wait for the renderer to answer the in-app consent modal
 // before treating the request as denied. The modal should give the user
 // enough time to read, but a forgotten/ignored prompt must not pin the HTTP
@@ -247,11 +264,12 @@ async function promptForConsentViaRenderer(appName) {
  *   { allow: boolean, alwaysAllow: boolean }
  */
 async function promptForConsentViaNativeDialog(appName, parentWindow) {
+  const label = appLabel(appName);
   const dialogOptions = {
     type: 'question',
-    title: 'PAC is requesting access',
-    message: 'PAC is requesting access',
-    detail: 'Allow PAC (Personal AI Companion) to use your current Lana session for this device?',
+    title: `${label} is requesting access`,
+    message: `${label} is requesting access`,
+    detail: `Allow ${label} to connect to your current Lana session on this device?`,
     buttons: ['Allow', 'Deny'],
     defaultId: 0,
     cancelId: 1,
@@ -332,6 +350,59 @@ function buildServerPayload(savedServer) {
     version: savedServer.version || null,
     apiVersion: savedServer.apiVersion || null
   };
+}
+
+/**
+ * Mint a SCOPED extension token via the backend, using the desktop's own session
+ * bearer to authenticate. The browser extension never sees the session token —
+ * only this app-gated, revocable token. Returns { access_token, refresh_token,
+ * token_type, expires_in }. Throws on any non-2xx / transport error.
+ *
+ * The session bearer is passed only in the Authorization header to the tenant's
+ * own backend over its configured (https, or http-loopback in dev) origin.
+ */
+function provisionScopedToken(serverUrl, sessionToken, clientId) {
+  return new Promise((resolve, reject) => {
+    let u;
+    // Preserve any base path in the tenant URL (e.g. https://host/lana) rather
+    // than dropping it with an absolute-path URL (review INFO).
+    try { u = new URL(String(serverUrl).replace(/\/+$/, '') + '/api/v1/oauth/provision'); } catch (e) { reject(new Error('bad_server_url')); return; }
+    if (u.protocol !== 'https:' && !(u.protocol === 'http:' && isLoopbackHostHeader(u.host))) {
+      reject(new Error('insecure_server_url')); return;
+    }
+    const payload = Buffer.from(JSON.stringify({ client_id: clientId }), 'utf8');
+    const mod = u.protocol === 'https:' ? https : http;
+    const req = mod.request(u, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': payload.length,
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      timeout: 15000,
+    }, (resp) => {
+      const chunks = [];
+      let total = 0;
+      let aborted = false;
+      const MAX_RESP_BYTES = 64 * 1024; // a token response is tiny; cap by bytes + destroy (review LOW)
+      resp.on('data', (c) => {
+        if (aborted) return;
+        total += c.length;
+        if (total > MAX_RESP_BYTES) { aborted = true; req.destroy(new Error('provision_response_too_large')); return; }
+        chunks.push(c);
+      });
+      resp.on('end', () => {
+        if (aborted) return;
+        let body = null;
+        try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { body = null; }
+        if (resp.statusCode >= 200 && resp.statusCode < 300 && body && body.access_token) resolve(body);
+        else reject(new Error((body && body.error) ? body.error : `provision_http_${resp.statusCode}`));
+      });
+    });
+    req.on('error', () => reject(new Error('provision_unreachable')));
+    req.on('timeout', () => { req.destroy(new Error('provision_timeout')); });
+    req.end(payload);
+  });
 }
 
 async function handleRequestToken(req, res) {
@@ -434,6 +505,29 @@ async function handleRequestToken(req, res) {
   if (!serverPayload || !serverPayload.url) {
     // We have a token but no server info — treat as not-ready.
     writeJson(res, 401, { error: 'not_signed_in' });
+    return;
+  }
+
+  // Browser extension: hand back a SCOPED token (minted server-side), never the
+  // raw desktop session token. PAC/desktop siblings keep the session-share path.
+  if (SCOPED_TOKEN_APPS.has(appName)) {
+    let scoped;
+    try {
+      scoped = await provisionScopedToken(serverPayload.url, token, appName);
+    } catch (error) {
+      logError('[electron-bridge] scoped token provisioning failed', error);
+      writeJson(res, 502, { error: 'provision_failed' });
+      return;
+    }
+    writeJson(res, 200, {
+      account: {
+        instanceUrl: serverPayload.url,
+        accessToken: scoped.access_token,
+        refreshToken: scoped.refresh_token || null,
+        tokenType: scoped.token_type || 'Bearer',
+        expiresIn: scoped.expires_in || null,
+      },
+    });
     return;
   }
 
