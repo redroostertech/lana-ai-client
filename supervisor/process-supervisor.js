@@ -140,6 +140,13 @@ class ProcessSupervisor {
     });
     if (child.stdout && child.stdout.on) child.stdout.on('data', (d) => this._drain(spec.name, 'out', d));
     if (child.stderr && child.stderr.on) child.stderr.on('data', (d) => this._drain(spec.name, 'err', d));
+    // A spawn failure (e.g. ENOENT for a missing/optional binary) emits 'error',
+    // NOT 'exit'. Without this handler the unhandled event crashes the process.
+    // Record it on the child so readiness bails fast, and surface it as a failure.
+    child.on('error', (err) => {
+      child._spawnError = err;
+      this._log.error(`[supervisor] ${spec.name} spawn error: ${err.message}`);
+    });
     child.on('exit', (code, signal) => this._onExit(spec.name, code, signal));
     return child;
   }
@@ -185,6 +192,8 @@ class ProcessSupervisor {
     const deadline = this._clock.now() + timeoutMs;
     for (;;) {
       if (rec.stopping) throw new Error('stopped before ready');
+      // Bail fast if the process failed to spawn (e.g. a missing optional binary).
+      if (rec.child && rec.child._spawnError) throw new Error(`spawn failed: ${rec.child._spawnError.message}`);
       let ok = false;
       try { ok = await spec.readiness(); } catch (_e) { ok = false; }
       if (ok) return;

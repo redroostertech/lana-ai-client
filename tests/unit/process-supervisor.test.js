@@ -144,6 +144,25 @@ describe('ProcessSupervisor restart + teardown', () => {
     await sup.stopAll();
   });
 
+  it('treats a spawn error (missing binary) as a service failure, not a crash', async () => {
+    let pid = 3000;
+    const spawn = (command) => {
+      pid += 1;
+      const child = makeFakeChild(pid);
+      // a missing/optional binary emits 'error' (ENOENT), not 'exit'
+      if (command === 'docling') setImmediate(() => child.emit('error', Object.assign(new Error('ENOENT'), { code: 'ENOENT' })));
+      return child;
+    };
+    const sup = new ProcessSupervisor({ spawn, logger: silentLogger });
+    sup.register({ name: 'pg', command: 'postgres', readiness: async () => true });
+    sup.register({ name: 'docling', command: 'docling', critical: false, readiness: async () => false, readinessTimeoutMs: 500, readinessIntervalMs: 5 });
+    sup.register({ name: 'backend', command: 'node', dependsOn: ['pg'], readiness: async () => true });
+    // Must NOT throw / crash; docling fails fast and is skipped (non-critical).
+    const started = await sup.startAll();
+    expect(started).toEqual(['pg', 'backend']);
+    await sup.stopAll();
+  });
+
   it('stops in reverse start order', async () => {
     const { spawn, calls } = makeSpawnRecorder();
     const stopOrder = [];

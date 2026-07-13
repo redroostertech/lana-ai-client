@@ -206,6 +206,12 @@ function createStackBootstrap(opts = {}) {
       paths = resolveDevPaths({ home, repoRoot, modelsDir, fs: io.fs });
     }
     if (!paths.backendCwd) throw new Error('bootstrap could not resolve the backend directory');
+    // Optional doc parsers may be absent from the bundle (e.g. staged with
+    // --skip-python). Only wire them when actually present so the supervisor never
+    // spawns a missing binary; the backend degrades to its native parser.
+    for (const k of ['doclingCmd', 'unstructuredUvicorn']) {
+      if (paths[k] && !io.fs.existsSync(paths[k])) paths = { ...paths, [k]: undefined };
+    }
     let chatModel;
     if (plan.localChat) {
       const f = nodePath.join(modelsDir, plan.chatModelFile);

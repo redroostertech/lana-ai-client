@@ -369,14 +369,22 @@ stage_backend() {
   if [[ ! -d "$BACKEND_SRC/src" ]] || [[ ! -f "$BACKEND_SRC/package.json" ]]; then
     warn "backend: source not found at $BACKEND_SRC (need src/ + package.json)"; add_record "backend" "missing-dependency" "$BACKEND_SRC" "$dest" "src/ or package.json missing"; return
   fi
-  log "backend: staging from $BACKEND_SRC (src + scripts + node_modules) ..."
+  log "backend: staging from $BACKEND_SRC (code tree + node_modules) ..."
   mkdir -p "$dest"
-  # Copy the runtime pieces; exclude the client submodule + VCS + logs.
-  rsync -a "$BACKEND_SRC/src" "$dest/" 2>/dev/null
-  [[ -d "$BACKEND_SRC/scripts" ]] && rsync -a "$BACKEND_SRC/scripts" "$dest/" 2>/dev/null
-  [[ -d "$BACKEND_SRC/config" ]] && rsync -a "$BACKEND_SRC/config" "$dest/" 2>/dev/null
-  cp "$BACKEND_SRC/package.json" "$dest/" 2>/dev/null || true
-  cp "$BACKEND_SRC/package-lock.json" "$dest/" 2>/dev/null || true
+  # Copy the whole backend repo EXCEPT the client submodule, VCS, docs, test
+  # artifacts, and large runtime/data dirs the app doesn't need at boot. This keeps
+  # ALL code dirs the backend requires at boot -- src, scripts, config, the scoped
+  # @* modules (whose @*/migrations schema-sync scans for a fresh DB), plus infra/
+  # (the tier ladder), native/, flavors/, prompts/, data/, packages/. node_modules
+  # is copied separately below (it's large and handled with its own excludes).
+  rsync -a \
+    --exclude='client' --exclude='.git' --exclude='docs' --exclude='node_modules' \
+    --exclude='tests' --exclude='test-results' --exclude='coverage' \
+    --exclude='dist' --exclude='dist-*' --exclude='audit-output' --exclude='bench-results' \
+    --exclude='postman' --exclude='connectors-storage' --exclude='sidecar' \
+    --exclude='evidence' --exclude='pilot' --exclude='_pending-registrations' \
+    --exclude='*.log' \
+    "$BACKEND_SRC/" "$dest/" 2>/dev/null
   rsync -a --exclude='.cache' "$BACKEND_SRC/node_modules" "$dest/" 2>/dev/null
   if [[ -d "$dest/node_modules" ]] && [[ -f "$dest/src/index.js" ]]; then
     add_record "backend" "staged" "$BACKEND_SRC" "$dest" ""

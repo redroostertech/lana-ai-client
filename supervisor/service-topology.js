@@ -155,8 +155,12 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
     cwd: p.backendCwd,
     env: backendEnv,
     dependsOn: ['postgres', 'minio', 'llama-embed'],
-    readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.backend}/api/health/discovery` }),
-    readinessTimeoutMs: 90000, // backend mounts routes ~30s in
+    // The discovery health endpoint does network checks and can take ~2-3s to
+    // answer, so the per-request probe timeout must exceed that (default 2s would
+    // kill the request before the backend's 2xx arrives — a false negative).
+    readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.backend}/api/health/discovery`, timeoutMs: 8000 }),
+    readinessTimeoutMs: 120000, // backend mounts routes ~30s in; slow health check
+    readinessIntervalMs: 1500,
     critical: true,
   });
 
