@@ -27,7 +27,7 @@ const IS_LANA_ONE = process.env.LANA_ONE_EDITION === '1' || _bakedEdition === 'l
 
 // Per-edition GitHub releases repo. Must match the `publish` block of the edition's
 // electron-builder config (electron-builder.lana-one.js / electron-builder.client.json).
-const UPDATE_FEED_REPO = IS_LANA_ONE ? 'lana-one-client' : 'lana-ai-client';
+const UPDATE_FEED_REPO = IS_LANA_ONE ? 'lana-one' : 'lana-ai-client';
 
 // Update state
 let updateCheckInProgress = false;

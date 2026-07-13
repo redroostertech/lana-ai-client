@@ -46,7 +46,7 @@ module.exports = {
   publish: {
     provider: 'github',
     owner: 'redroostertech',
-    repo: 'lana-one-client',
+    repo: 'lana-one',
     releaseType: 'release',
   },
   protocols: [{ name: 'LANA One', schemes: ['lana-one'] }],
