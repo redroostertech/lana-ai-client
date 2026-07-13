@@ -47,9 +47,16 @@ const companionBridge = require('./electron-bridge');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
 
 // LANA One edition flag — enables the individual "Log in with LANA" cloud login.
+// True when built as the LANA One edition (extraMetadata.lanaEdition is baked into
+// the packaged package.json by electron-builder.lana-one.js) OR when the
+// LANA_ONE_EDITION=1 env is set (dev / runtime override). The env check keeps dev
+// behavior identical; the baked check makes the flag survive into a packaged app,
+// where env vars are not present.
 // ADDITIVE + EDITION-GATED: false for the stock lana-ai-client, so its org
 // hosted-discovery flow is completely unaffected. See electron-cloud-auth.js.
-const IS_LANA_ONE = process.env.LANA_ONE_EDITION === '1';
+let _bakedEdition = '';
+try { _bakedEdition = require('./package.json').lanaEdition || ''; } catch (_e) { /* dev / unpackaged */ }
+const IS_LANA_ONE = process.env.LANA_ONE_EDITION === '1' || _bakedEdition === 'lana-one';
 // The LOCAL sovereign backend the desktop adopts its cloud identity into. The
 // packaged shell will set this to the backend it spawns; 8090 is the dev default.
 const LANA_LOCAL_BACKEND_URL = process.env.LANA_LOCAL_BACKEND_URL || 'http://localhost:8090';
