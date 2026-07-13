@@ -112,11 +112,22 @@ class ProcessSupervisor {
   }
 
   async _startOne(spec) {
+    // prepare() runs BEFORE spawn (e.g. Postgres initdb on first run).
+    if (typeof spec.prepare === 'function') {
+      this._log.info(`[supervisor] preparing ${spec.name}`);
+      await spec.prepare();
+    }
     this._log.info(`[supervisor] starting ${spec.name}: ${spec.command} ${(spec.args || []).join(' ')}`);
     const child = this._launch(spec);
     const rec = { child, spec, retries: 0, stopping: false, started: false };
     this._procs.set(spec.name, rec);
     await this._awaitReadiness(spec, rec);
+    // onReady() runs AFTER readiness, BEFORE dependents (e.g. createdb + extensions
+    // + migrate once Postgres is accepting connections).
+    if (typeof spec.onReady === 'function') {
+      this._log.info(`[supervisor] ${spec.name} post-ready init`);
+      await spec.onReady();
+    }
     rec.started = true;
     this._log.info(`[supervisor] ${spec.name} ready (pid ${child.pid})`);
   }
