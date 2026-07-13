@@ -35,6 +35,10 @@ function cleanEnv(obj) {
  * @param {object} [cfg.ports] - overrides for { pg, minio, minioConsole, llamaEmbed, llamaChat, docling, unstructured, backend }
  * @param {object} cfg.secrets - from SecretManager.ensureSecrets()
  * @param {string} [cfg.tier='demo']
+ * @param {object} [cfg.localModelsStatus] - boot-time local-model capability snapshot
+ *   (hardware, selected tier/model, localChat availability, tier ladder, routing),
+ *   serialized into the backend env as LANA_LOCAL_MODELS_STATUS for
+ *   GET /api/v1/system/local-models
  * @param {string} cfg.desktopKey - per-launch LANA_DESKTOP_KEY
  * @param {object} [cfg.extraEnv]
  * @param {object} [cfg.hooks] - { postgresPrepare, postgresOnReady } from postgres-init
@@ -142,6 +146,10 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
     LLAMACPP_EMBEDDING_URL: `http://127.0.0.1:${ports.llamaEmbed}`,
     // Only point chat at a local server when one exists; otherwise unset -> relay.
     LLAMACPP_MAIN_URL: p.chatModel ? `http://127.0.0.1:${ports.llamaChat}` : undefined,
+    // Boot-time local-model capability snapshot (the plan model-selector chose +
+    // download outcome), surfaced by the backend at GET /api/v1/system/local-models
+    // so the frontend can read this machine's local-model capability + routing.
+    LANA_LOCAL_MODELS_STATUS: cfg.localModelsStatus ? JSON.stringify(cfg.localModelsStatus) : undefined,
     DOCLING_API_URL: p.doclingCmd ? `http://127.0.0.1:${ports.docling}` : undefined,
     UNSTRUCTURED_API_URL: p.unstructuredUvicorn ? `http://127.0.0.1:${ports.unstructured}` : undefined,
     JWT_SECRET: s.JWT_SECRET,

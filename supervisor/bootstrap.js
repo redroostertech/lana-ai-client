@@ -20,7 +20,7 @@ const { ProcessSupervisor } = require('./process-supervisor');
 const { SecretManager } = require('./secret-manager');
 const { buildServiceSpecs } = require('./service-topology');
 const { makePostgresHooks } = require('./postgres-init');
-const { selectModelPlan } = require('./model-selector');
+const { selectModelPlan, EMBED_MODEL_FILE } = require('./model-selector');
 const defaultProbes = require('./probes');
 
 // Promisified spawn that captures output and rejects on non-zero exit.
@@ -212,15 +212,23 @@ function createStackBootstrap(opts = {}) {
     for (const k of ['doclingCmd', 'unstructuredUvicorn']) {
       if (paths[k] && !io.fs.existsSync(paths[k])) paths = { ...paths, [k]: undefined };
     }
+    // Boot-time snapshot of the chat-model download outcome, surfaced to the
+    // frontend via the backend's GET /api/v1/system/local-models endpoint.
+    // downloadState is a settled state (bootstrap awaits the download), so
+    // 'downloading' is not a persisted boot value; live progress is out of scope.
     let chatModel;
+    let downloadState = null; // 'present' | 'missing' | 'error' (null when no local chat selected)
+    let downloadReason = null;
     if (plan.localChat) {
       const f = nodePath.join(modelsDir, plan.chatModelFile);
       if (io.fs.existsSync(f)) {
         chatModel = f;
+        downloadState = 'present';
       } else {
         // Attempt a runtime download, but ONLY when the catalog entry is real
         // (pinned sha256 + https url). With placeholder shas (pre-release) or any
         // download failure, chat routes to the relay until the file is present.
+        downloadState = 'missing';
         try {
           const { resolveChatModel, validateCatalogEntry } = require('./model-catalog');
           const { ensureModel } = require('./model-downloader');
@@ -232,11 +240,48 @@ function createStackBootstrap(opts = {}) {
             sha256: entry.sha256, sizeBytes: entry.sizeBytes,
             onProgress: (p) => log.info(`[bootstrap] model dl: ${p.bytesWritten || 0}/${p.totalBytes || '?'} bytes`),
           });
+          downloadState = 'present';
         } catch (err) {
+          downloadState = 'error';
+          downloadReason = err.message;
           log.warn(`[bootstrap] local chat model unavailable (${err.message}); chat routes to relay`);
         }
       }
     }
+
+    // Local-model capability snapshot for the backend to expose (workstream
+    // "Expose the plan"). buildServiceSpecs serializes this into the backend
+    // spawn env as LANA_LOCAL_MODELS_STATUS; the backend reflects it verbatim.
+    const localChatAvailable = Boolean(chatModel);
+    const localModelsStatus = {
+      hardware: plan.hardware,
+      localChat: {
+        available: localChatAvailable,
+        reason: localChatAvailable ? plan.reason : (downloadReason || plan.reason),
+        tier: plan.tier,
+        model: plan.chatModelFile,
+        contextWindow: plan.contextWindow,
+        downloadState,
+        downloadProgress: null, // best-effort; download is settled by this point
+      },
+      embedding: { model: plan.embedModelFile || EMBED_MODEL_FILE, bundled: true },
+      // Single source of truth for `fits` = the selector's KV/context fit math
+      // (model-selector estimateTierFit), NOT a re-derived floor-only check, so the
+      // ladder the UI shows never contradicts the actual selection / localChat.available
+      // (e.g. under LANA_ALLOW_NON_METAL_LOCAL a tier can fit CPU-only while a naive
+      // isAppleSilicon gate would wrongly show every row as not-fitting).
+      tiers: (plan.tiers || []).map((t) => ({
+        tier: t.tier,
+        minMemoryGB: t.minMemoryGB,
+        model: t.model,
+        contextWindow: t.contextWindow,
+        fits: t.fits,
+      })),
+      routing: {
+        chatDestination: localChatAvailable ? 'local' : 'relay',
+        reason: localChatAvailable ? `local_${plan.tier}` : (downloadReason || plan.reason),
+      },
+    };
 
     // 4. Per-launch desktop capability key + data dirs
     const desktopKey = io.crypto.randomBytes(24).toString('hex');
@@ -260,6 +305,7 @@ function createStackBootstrap(opts = {}) {
       dataDirs, ports, secrets,
       tier: plan.tier || opts.tier || 'demo',
       chatContext: plan.contextWindow,
+      localModelsStatus,
       desktopKey,
       extraEnv: opts.extraEnv,
       hooks: { postgresPrepare: pgHooks.prepare, postgresOnReady: pgHooks.onReady },

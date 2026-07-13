@@ -130,6 +130,19 @@
       </section>
 
 
+      <!-- Local models (LANA One — revealed by JS when the edition supports it)
+           Read-only surfacing of what this machine can run locally, the active
+           local model, its download state, and the live routing outcome.
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-local-models" class="sv2-hidden" style="margin-bottom:0.5rem">
+        <lex-card heading="Local models" subtitle="What this machine can run on device, and where chat is routed">
+          <div id="sv2-local-models-content">
+            <!-- Loading / states rendered by js/pages/settings-local-models.js -->
+          </div>
+        </lex-card>
+      </section>
+
+
       <!-- Regional
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-regional" style="margin-bottom:0.5rem">
@@ -337,6 +350,7 @@
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/settings-v2.js"></script>
   <script src="js/pages/settings-personalization.js"></script>
+  <script src="js/pages/settings-local-models.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->
   <script src="js/companion-bridge-consent.js"></script>
