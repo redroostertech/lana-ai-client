@@ -44,15 +44,34 @@ function makePostgresHooks(deps) {
   async function prepare() {
     if (fs.existsSync(path.join(dataDir, 'PG_VERSION'))) {
       log.info('[pg-init] data dir already initialized; skipping initdb');
-      return;
+    } else {
+      log.info(`[pg-init] initdb into ${dataDir}`);
+      // --auth=trust: loopback-only, single-user desktop cluster. Password-auth
+      // hardening (scram + pg_hba) is a Phase-C security follow-up.
+      await exec(bins.initdb, [
+        '-D', dataDir, '-U', 'postgres',
+        '--encoding=UTF8', '--locale=en_US.UTF-8', '--auth=trust',
+      ]);
     }
-    log.info(`[pg-init] initdb into ${dataDir}`);
-    // --auth=trust: loopback-only, single-user desktop cluster. Password-auth
-    // hardening (scram + pg_hba) is a Phase-C security follow-up.
-    await exec(bins.initdb, [
-      '-D', dataDir, '-U', 'postgres',
-      '--encoding=UTF8', '--locale=en_US.UTF-8', '--auth=trust',
-    ]);
+    // timescaledb MUST be listed in shared_preload_libraries BEFORE the server
+    // starts, or `CREATE EXTENSION timescaledb` (run by the migrations, two of
+    // which hard-fail without it) errors. Set it in postgresql.conf now. Idempotent.
+    ensureTimescalePreload();
+  }
+
+  // Guarded on fs.readFileSync/appendFileSync so a minimal injected fs (existsSync
+  // only, as in unit tests) is a safe no-op; the real fs writes the setting.
+  function ensureTimescalePreload() {
+    const confPath = path.join(dataDir, 'postgresql.conf');
+    try {
+      if (!fs.appendFileSync) return;
+      const cur = (fs.existsSync(confPath) && fs.readFileSync) ? fs.readFileSync(confPath, 'utf8') : '';
+      if (/shared_preload_libraries\s*=\s*'[^']*timescaledb/.test(cur)) return;
+      fs.appendFileSync(confPath, "\n# LANA One: timescaledb hypertable migrations require this preload\nshared_preload_libraries = 'timescaledb'\n");
+      log.info('[pg-init] enabled timescaledb shared_preload_libraries');
+    } catch (e) {
+      log.warn(`[pg-init] could not set timescaledb preload: ${e.message}`);
+    }
   }
 
   async function onReady() {

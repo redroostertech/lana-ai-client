@@ -1,0 +1,37 @@
+{
+  "_comment": "Release contract for the runtime chat-model downloader (client/supervisor/model-downloader.js + model-catalog.js). Copy to models-manifest.json and fill in every TODO_REAL_RELEASE_* value with the sha256 of the EXACT bytes served at `url`, and the exact file size in bytes, before cutting a release. validateCatalogEntry() refuses placeholder/all-zero sha256, non-https url, and path-traversal filenames -- a release cannot ship until this file is real.",
+  "schemaVersion": 1,
+  "embedModel": {
+    "_comment": "Bundled into the .dmg (always local, never downloaded at runtime). Listed here only so the sha256 is pinned once, in one place, for both the bundler and any future 'verify what shipped' tooling.",
+    "file": "nomic-embed-text-v1.5.f16.gguf",
+    "url": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.f16.gguf",
+    "sha256": "TODO_REAL_RELEASE_SHA256",
+    "sizeBytes": 0
+  },
+  "chatModelsByTier": {
+    "demo": {
+      "file": "Qwen3-1.7B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf",
+      "sha256": "TODO_REAL_RELEASE_SHA256",
+      "sizeBytes": 0
+    },
+    "edge": {
+      "file": "Qwen3.5-9B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/lmstudio-community/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf",
+      "sha256": "TODO_REAL_RELEASE_SHA256",
+      "sizeBytes": 0
+    },
+    "professional": {
+      "file": "Qwen3.5-35B-A3B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/lmstudio-community/Qwen3.5-35B-A3B-GGUF/resolve/main/Qwen3.5-35B-A3B-Q4_K_M.gguf",
+      "sha256": "TODO_REAL_RELEASE_SHA256",
+      "sizeBytes": 0
+    },
+    "enterprise": {
+      "file": "Qwen3.5-122B-A10B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/lmstudio-community/Qwen3.5-122B-A10B-GGUF/resolve/main/Qwen3.5-122B-A10B-Q4_K_M.gguf",
+      "sha256": "TODO_REAL_RELEASE_SHA256",
+      "sizeBytes": 0
+    }
+  }
+}

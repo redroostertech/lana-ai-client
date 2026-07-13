@@ -39,6 +39,40 @@ describe('makePostgresHooks.prepare', () => {
   });
 });
 
+describe('makePostgresHooks.prepare timescaledb preload', () => {
+  it('writes shared_preload_libraries=timescaledb to postgresql.conf', async () => {
+    const appended = [];
+    const fs = {
+      existsSync: (p) => p.endsWith('.conf'), // conf exists; PG_VERSION does not -> initdb runs
+      readFileSync: () => '', // no existing preload line
+      appendFileSync: (p, data) => appended.push({ p, data }),
+    };
+    const hooks = makePostgresHooks({
+      bins: { initdb: 'initdb', psql: 'psql', createdb: 'createdb' },
+      dataDir: '/data/pg', port: 5432, exec: async () => ({ stdout: '', code: 0 }),
+      migrate: async () => {}, fs,
+    });
+    await hooks.prepare();
+    expect(appended.length).toBe(1);
+    expect(appended[0].data).toMatch(/shared_preload_libraries\s*=\s*'timescaledb'/);
+  });
+
+  it('does not duplicate the preload when already present', async () => {
+    const appended = [];
+    const fs = {
+      existsSync: (p) => p.endsWith('.conf'),
+      readFileSync: () => "shared_preload_libraries = 'timescaledb'\n",
+      appendFileSync: (p, data) => appended.push({ p, data }),
+    };
+    const hooks = makePostgresHooks({
+      bins: { initdb: 'initdb', psql: 'psql', createdb: 'createdb' },
+      dataDir: '/data/pg', port: 5432, exec: async () => ({ stdout: '', code: 0 }), migrate: async () => {}, fs,
+    });
+    await hooks.prepare();
+    expect(appended.length).toBe(0);
+  });
+});
+
 describe('makePostgresHooks.onReady', () => {
   it('creates the db, ensures extensions, and migrates on a fresh cluster', async () => {
     const h = makeHarness({ dbExists: false, tableCount: 0 });
