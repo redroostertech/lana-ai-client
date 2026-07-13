@@ -605,6 +605,7 @@
       oauthCallbackRegistered: false,
       authStatusPollTimer: null,
       editingConfig: false,
+      useOwnOAuthApp: false,
       deleteConfigModalOpen: false,
       selectedLogId: '',
       logDetailPollTimer: null,
@@ -1602,6 +1603,23 @@
       return authStatus === 'connected' || authStatus === 'active';
     }
 
+    // LANA-managed OAuth app credentials (portal broker). The backend reports
+    // availability + a masked client_id only; the secret stays server-side and
+    // is resolved automatically at authorize/exchange time.
+    function isLanaManagedAvailable() {
+      return isOAuthConnector() && Boolean(state.configResponse?.lana_managed_available);
+    }
+
+    function getCredentialSource() {
+      return state.configResponse?.credential_source || 'none';
+    }
+
+    function isUsingLanaManagedCredentials() {
+      return isLanaManagedAvailable() &&
+        !state.useOwnOAuthApp &&
+        getCredentialSource() !== 'firm';
+    }
+
     function isConnectorReady() {
       if (!isConnectorConfigured()) {
         return false;
@@ -1616,6 +1634,13 @@
 
     function getConnectorSetupState() {
       if (!isConnectorConfigured()) {
+        if (isUsingLanaManagedCredentials()) {
+          return {
+            label: 'Ready to Authorize',
+            badge: 'badge-yellow',
+            message: 'LANA-managed credentials are available for this connector. No OAuth app setup is needed — just authorize.'
+          };
+        }
         return {
           label: 'Needs Setup',
           badge: 'badge-yellow',
@@ -2809,6 +2834,8 @@
       const oauthAuthorized = isOAuthAuthorized();
       const configured = isConnectorConfigured();
       const setupState = getConnectorSetupState();
+      const lanaAvailable = isLanaManagedAvailable();
+      const usingLanaManaged = isUsingLanaManagedCredentials();
       const maskedFields = fields
         .filter((field) => currentConfig[field.name] && field.type === 'password')
         .map((field) => ({
@@ -2825,7 +2852,7 @@
           <div class="flex flex-wrap gap-2">
             ${isOauthConnector ? `
               <button type="button" id="connectOAuthBtn" onclick="connectOAuthConnector()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
-                ${oauthAuthorized ? 'Reconnect' : configured ? 'Authorize' : 'Save & Authorize'}
+                ${oauthAuthorized ? 'Reconnect' : (configured || usingLanaManaged) ? 'Authorize' : 'Save & Authorize'}
               </button>
             ` : ''}
             ${supportsCredentialTest ? `
@@ -2914,6 +2941,11 @@
             <button type="button" onclick="openDeleteConfigModal()" class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
               Delete
             </button>
+            ${lanaAvailable && getCredentialSource() === 'firm' ? `
+              <button type="button" onclick="switchToLanaManagedCredentials()" class="rounded-xl border border-green-200 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">
+                Switch to LANA-managed
+              </button>
+            ` : ''}
             ${supportsCredentialTest ? `
               <button type="button" onclick="testConnection()" class="rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
                 Test Connection
@@ -2923,11 +2955,39 @@
         `;
       } else {
         configForm.innerHTML = `
-          ${authFields.length ? `
+          ${authFields.length && usingLanaManaged ? `
+            <div>
+              <div class="connector-label">Authentication</div>
+              <div class="mt-2 text-sm text-gray-500">LANA-managed credentials are ready for this connector.</div>
+            </div>
+            <div class="rounded-xl border border-green-200 bg-green-50 p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-green-800">LANA-managed credentials</div>
+                  <div class="mt-1 text-sm text-green-700">
+                    No OAuth app setup is required. Click Authorize and sign in with your ${escapeHtml(state.connectorName)} account — LANA's pre-registered app handles the rest.
+                  </div>
+                  ${state.configResponse?.lana_client_id ? `
+                    <div class="mt-2 text-xs text-green-700">Client ID: <span class="font-mono">${escapeHtml(state.configResponse.lana_client_id)}</span></div>
+                  ` : ''}
+                </div>
+                <button type="button" onclick="useOwnOAuthAppMode()" class="text-sm font-semibold text-green-800 underline hover:text-green-900">
+                  Use your own OAuth app instead
+                </button>
+              </div>
+            </div>
+          ` : ''}
+          ${authFields.length && !usingLanaManaged ? `
             <div>
               <div class="connector-label">Authentication</div>
               <div class="mt-2 text-sm text-gray-500">Provide the credentials required by this connector.</div>
             </div>
+            ${lanaAvailable && state.useOwnOAuthApp ? `
+              <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                Prefer zero setup? LANA-managed credentials are available for this connector.
+                <button type="button" onclick="useLanaManagedMode()" class="ml-1 font-semibold text-blue-600 underline hover:text-blue-700">Use LANA-managed credentials</button>
+              </div>
+            ` : ''}
             ${authModes.length > 1 ? `
               <label class="block">
                 <div class="mb-2 text-sm font-medium text-gray-900">Authentication Method</div>
@@ -6622,6 +6682,59 @@
       }
     }
 
+    function useOwnOAuthAppMode() {
+      state.useOwnOAuthApp = true;
+      renderConfiguration();
+    }
+
+    function useLanaManagedMode() {
+      state.useOwnOAuthApp = false;
+      renderConfiguration();
+    }
+
+    async function switchToLanaManagedCredentials() {
+      if (!state.sourceId || !isLanaManagedAvailable()) return;
+
+      const confirmed = window.confirm(
+        `Remove your own OAuth app credentials for ${state.connectorName} and use LANA-managed credentials instead?\n\n` +
+        'Existing connections will need to be re-authorized.'
+      );
+      if (!confirmed) return;
+
+      try {
+        showPageAlert('Switching to LANA-managed credentials...', 'info');
+
+        // Clear per-connection auth secrets (empty string deletes stored secrets).
+        const clearPayload = {};
+        getCatalogAuthFields().forEach((field) => {
+          if (field?.name) clearPayload[field.name] = '';
+        });
+        if (Object.keys(clearPayload).length > 0) {
+          await api.patch(connectorApi('/config'), clearPayload);
+        }
+
+        // Clear firm-level OAuth app credentials (404 = none stored, fine).
+        const connectorType = state.connectorType || state.connectorId || state.configResponse?.connector_id;
+        if (connectorType) {
+          try {
+            await api.delete(`/api/connectors/${encodeURIComponent(connectorType)}/oauth-app`);
+          } catch (deleteError) {
+            if (!String(deleteError?.message || '').toLowerCase().includes('not found')) {
+              throw deleteError;
+            }
+          }
+        }
+
+        state.useOwnOAuthApp = false;
+        state.formDraft = null;
+        await refreshBaseData(false);
+        showPageAlert('Now using LANA-managed credentials. Click Authorize to reconnect.', 'success');
+      } catch (error) {
+        console.error('[Connector Viewer] Failed to switch to LANA-managed credentials', error);
+        showPageAlert(error.message || 'Failed to switch to LANA-managed credentials.', 'error');
+      }
+    }
+
     async function openOAuthAuthorizationUrl(authUrl, { sameWindow = false } = {}) {
       if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
         await window.electronAPI.invoke('open-external-url', authUrl);
@@ -7787,6 +7900,9 @@
     window.confirmDeleteConfig = confirmDeleteConfig;
     window.copyTextToClipboard = copyTextToClipboard;
     window.connectOAuthConnector = connectOAuthConnector;
+    window.useOwnOAuthAppMode = useOwnOAuthAppMode;
+    window.useLanaManagedMode = useLanaManagedMode;
+    window.switchToLanaManagedCredentials = switchToLanaManagedCredentials;
     window.copyAuthorizationUrl = copyAuthorizationUrl;
     window.openAuthorizationUrl = openAuthorizationUrl;
     window.refreshAuthorizationUrl = refreshAuthorizationUrl;
