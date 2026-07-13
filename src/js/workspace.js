@@ -687,10 +687,20 @@
               </div>
             </div>
           `;
-          // Show grid for empty state (col-span-full layout)
-          grid.classList.remove('hidden');
+          // Show exactly ONE empty state, matching the active view (never both):
+          // grid view -> the rich custom empty above; list view -> the lex-table's
+          // own empty state (which now carries the same "Create your first matter" CTA).
           var _listViewEmpty = document.getElementById('mattersListView');
-          if (_listViewEmpty) _listViewEmpty.classList.add('hidden');
+          if (viewMode === 'grid') {
+            grid.classList.remove('hidden');
+            if (_listViewEmpty) _listViewEmpty.classList.add('hidden');
+          } else {
+            grid.classList.add('hidden');
+            if (_listViewEmpty) {
+              _listViewEmpty.classList.remove('hidden');
+              if (typeof _listViewEmpty.setData === 'function') _listViewEmpty.setData([]);
+            }
+          }
           return;
         }
 
@@ -1057,6 +1067,12 @@
         if (row && row.matter_id) {
           viewMatter(row.matter_id);
         }
+      });
+
+      // Empty-state CTA: "Create your first matter" reuses the header create action.
+      _mattersTable.addEventListener('empty-action', function () {
+        var b = document.getElementById('createMatterBtn');
+        if (b) b.click();
       });
       _mattersTable.addEventListener('bulk-action', function (e) {
         var action = e.detail && e.detail.action;

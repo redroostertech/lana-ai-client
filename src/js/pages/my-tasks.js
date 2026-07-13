@@ -921,6 +921,10 @@
       table.addEventListener('lex-filter-change', updateTaskCount);
       table.addEventListener('lex-data-loaded', updateTaskCount);
 
+      // Empty-state CTA: "Create a task" on a genuine no-data state opens the new
+      // task modal (same as the header "+ New" -> New task).
+      table.addEventListener('empty-action', function () { openNewTaskModal(); });
+
       // --- Library-style toolbar: search / sort / order / status filter ---
       var searchInput = el('myTasksSearch');
       if (searchInput) {

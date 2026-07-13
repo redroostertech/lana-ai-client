@@ -85,4 +85,17 @@
   setTimeout(dismiss, 2000);
   // Safety net
   setTimeout(dismiss, 4000);
+
+  // LANA One: load the edition-gated matters->workspaces terminology overlay on
+  // every authenticated app page (auth-guard.js is the shared, end-of-body include).
+  // The overlay self-gates on the LANA One edition, so this is inert in the org build.
+  try {
+    if (!document.getElementById('lana-one-terminology-loader')) {
+      var _termScript = document.createElement('script');
+      _termScript.id = 'lana-one-terminology-loader';
+      _termScript.src = 'js/lana-one-terminology.js';
+      _termScript.defer = true;
+      (document.head || document.documentElement).appendChild(_termScript);
+    }
+  } catch (_e) { /* noop */ }
 })();

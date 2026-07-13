@@ -122,6 +122,13 @@
     filterChips = document.getElementById('filter-chips');
     gridViewContainer = document.getElementById('grid-view-container');
     skillsListView = document.getElementById('skillsListView');
+    if (skillsListView) {
+      // Empty-state CTA: "Create a skill" reuses the header create action.
+      skillsListView.addEventListener('empty-action', function () {
+        var b = document.getElementById('create-skill-btn');
+        if (b) b.click();
+      });
+    }
     gridPagination = document.getElementById('grid-pagination');
     listPagination = document.getElementById('list-pagination');
     skillDetailsModal = document.getElementById('skill-details-modal');

@@ -154,7 +154,7 @@
 
       <!-- Section header — title + count, Library-style -->
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Matters &amp; Workspaces</h2>
+        <h2 class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Matters</h2>
         <span id="mattersSectionCount" class="text-sm" style="color: var(--lex-text-secondary)"></span>
       </div>
 
@@ -180,6 +180,7 @@
           sort-by="created_at"
           sort-dir="desc"
           empty-text="No matters found"
+          empty-action-label="Create your first matter"
           id-key="matter_id"
           bulk-actions='[{"label":"Delete","action":"delete","variant":"danger"}]'
         ></lex-table>
@@ -447,5 +448,36 @@
 
   <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="js/auth-guard.js"></script>
+
+  <!-- LANA One edition: simplify the Create Workspace modals for the individual
+       product. Hide the billable "Client Workspace" type (keep only the
+       collaborative Workspace), the Client Name field, and "Share with Team
+       Members" (no collaboration at launch). Edition-gated + inline !important so it
+       wins over the modal's own show/hide; the org / LANA AI build keeps all fields. -->
+  <script>
+    (function () {
+      if (!window.electronAPI || typeof window.electronAPI.getConfig !== 'function') return;
+      Promise.resolve(window.electronAPI.getConfig()).then(function (cfg) {
+        if (!cfg || cfg.isLanaOne !== true) return;
+        function hideEl(el) { if (el) el.style.setProperty('display', 'none', 'important'); }
+        function byId(id) { return document.getElementById(id); }
+        function fullRow(el) { var g = el && el.closest ? el.closest('.grid') : null; if (g) g.classList.remove('md:grid-cols-2'); }
+        // Main "Create Workspace" (matter) modal.
+        var clientName = byId('clientName'); fullRow(clientName); hideEl(clientName);
+        var clientType = document.querySelector('#matterForm input[name="matterType"][value="matter"]');
+        if (clientType) {
+          hideEl(clientType.closest('label'));
+          var tg = clientType.closest('.grid'); if (tg) tg.classList.remove('md:grid-cols-2');
+        }
+        var wsType = document.querySelector('#matterForm input[name="matterType"][value="workspace"]');
+        if (wsType) wsType.checked = true;
+        hideEl(document.querySelector('#matterTypeSection .bg-amber-50'));
+        hideEl(byId('shareWithSection'));
+        // "Create matter in workspace" modal.
+        var wsClientName = byId('workspaceClientName'); fullRow(wsClientName); hideEl(wsClientName);
+        hideEl(byId('workspaceShareWithSection'));
+      }).catch(function () { /* inert */ });
+    })();
+  </script>
 </body>
 </html>

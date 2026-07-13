@@ -413,6 +413,11 @@
         compact:       { type: Boolean, default: false },
         columnFilters: { type: Boolean, default: false },
         emptyText:     { type: String, default: 'No data found' },
+        // When set, a "no data yet" empty state (NOT a filtered/searched-empty one)
+        // renders a primary CTA button; clicking it emits an 'empty-action' event the
+        // page wires to its create flow. emptyActionIcon defaults to a plus glyph.
+        emptyActionLabel: { type: String },
+        emptyActionIcon:  { type: String, default: 'plus' },
         bulkActions:   { type: Array, default: [] }   // [{label, action, variant, icon}]
       };
     }
@@ -759,7 +764,14 @@
       const toolbarHtml = this._renderToolbar(data);
 
       if (!hasData) {
-        return `${toolbarHtml}<lex-empty message="${this.escapeHtml(this.emptyText)}" icon="folder"></lex-empty>`;
+        // A create CTA belongs on a genuine "no data yet" state, never when the user
+        // has filtered/searched everything out (the toolbar already offers a clear).
+        const isFiltered = !!this._searchValue ||
+          (this.dataSource && this.dataSource._filters && this.dataSource._filters.size > 0);
+        const actionAttrs = (this.emptyActionLabel && !isFiltered)
+          ? ` action-label="${this.escapeHtml(this.emptyActionLabel)}" action-icon="${this.escapeHtml(this.emptyActionIcon || 'plus')}"`
+          : '';
+        return `${toolbarHtml}<lex-empty message="${this.escapeHtml(this.emptyText)}" icon="folder"${actionAttrs}></lex-empty>`;
       }
 
       const columns = this._getColumns();
@@ -893,6 +905,14 @@
           input.selectionStart = input.selectionEnd = input.value.length;
         }
         this._searchHadFocus = false;
+      }
+
+      // Empty-state CTA: the internal lex-empty emits 'action' on its button click;
+      // re-surface it as a specific 'empty-action' event the page wires to its create
+      // flow (only rendered on a genuine no-data state, per the render logic above).
+      const emptyEl = this.$('lex-empty');
+      if (emptyEl) {
+        this.listen(emptyEl, 'action', () => { this.emit('empty-action'); });
       }
 
       // Row click
