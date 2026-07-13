@@ -94,6 +94,42 @@
       </section>
 
 
+      <!-- Personalization (LANA One — revealed by JS when the edition supports it)
+           ══════════════════════════════════════════════════════════════ -->
+      <section id="sv2-section-personalization" class="sv2-hidden" style="margin-bottom:0.5rem">
+        <lex-card heading="Personalization" subtitle="How LANA tailors its replies to you">
+          <lex-form id="sv2-personalization-form">
+            <lex-stack direction="vertical" gap="4">
+              <lex-select id="sv2-pz-base-style" name="base_style" label="Base style and tone"
+                options='[{"value":"default","label":"Default"},{"value":"professional","label":"Professional"},{"value":"concise","label":"Concise"},{"value":"friendly","label":"Friendly"}]'></lex-select>
+              <lex-input id="sv2-pz-nickname" name="nickname" label="Nickname" placeholder="What should LANA call you?"></lex-input>
+              <lex-input id="sv2-pz-occupation" name="occupation" label="Occupation" placeholder="e.g. Litigation associate"></lex-input>
+              <lex-textarea id="sv2-pz-custom-instructions" name="custom_instructions" label="Custom instructions" rows="4"
+                placeholder="Tone, formatting, citation style, things to always include or avoid..."></lex-textarea>
+            </lex-stack>
+
+            <lex-divider spacing="md"></lex-divider>
+            <lex-text variant="secondary" size="body-sm">About your practice — LANA uses this to tailor every answer to your work.</lex-text>
+
+            <lex-stack direction="vertical" gap="4" style="margin-top:0.75rem">
+              <lex-input id="sv2-pz-practice-areas" name="practice_areas" label="Practice areas" placeholder="Comma-separated, e.g. estate planning, personal injury"></lex-input>
+              <lex-input id="sv2-pz-jurisdictions" name="jurisdictions" label="Jurisdictions" placeholder="Comma-separated, e.g. Georgia, Alabama, Florida"></lex-input>
+              <lex-input id="sv2-pz-role" name="role" label="Role" placeholder="e.g. solo lawyer with a paralegal"></lex-input>
+              <lex-input id="sv2-pz-represents" name="represents" label="Who you usually represent" placeholder="e.g. individuals and families"></lex-input>
+              <lex-input id="sv2-pz-typical-tasks" name="typical_tasks" label="Typical tasks" placeholder="Comma-separated"></lex-input>
+              <lex-textarea id="sv2-pz-goals" name="goals" label="Goals" rows="2"></lex-textarea>
+              <lex-textarea id="sv2-pz-about" name="about" label="About you" rows="3"></lex-textarea>
+            </lex-stack>
+
+            <div class="sv2-form-actions">
+              <lex-btn id="sv2-pz-save-btn" type="submit" variant="primary" size="sm">Save</lex-btn>
+              <lex-text id="sv2-pz-status" variant="tertiary" size="body-sm"></lex-text>
+            </div>
+          </lex-form>
+        </lex-card>
+      </section>
+
+
       <!-- Regional
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-regional" style="margin-bottom:0.5rem">
@@ -291,6 +327,7 @@
   <script src="js/lex/components/form/lex-form.js"></script>
   <script src="js/lex/components/form/lex-toggle.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
 
@@ -299,6 +336,7 @@
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/settings-v2.js"></script>
+  <script src="js/pages/settings-personalization.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->
   <script src="js/companion-bridge-consent.js"></script>
