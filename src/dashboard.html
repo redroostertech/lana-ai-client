@@ -520,17 +520,23 @@
   <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="js/auth-guard.js"></script>
 
-  <!-- LANA One edition: hide org/business-only dashboard cards (Activity Overview,
-       Billable Hours, Data Pulse). Edition-gated and additive; the org/LANA AI build
-       is unaffected (electronAPI absent or isLanaOne false leaves them visible). -->
+  <!-- LANA One edition: keep the Activity Overview + Heatmap, but hide the
+       org/legal-only signals (Billable Hours, Data Pulse) and let the heatmap span
+       the full row. Edition-gated and additive; the org/LANA AI build is unaffected
+       (electronAPI absent or isLanaOne false leaves all zones visible). -->
   <script>
     (function () {
       try {
         if (!window.electronAPI || typeof window.electronAPI.getConfig !== 'function') return;
         Promise.resolve(window.electronAPI.getConfig()).then(function (cfg) {
           if (cfg && cfg.isLanaOne) {
+            var billable = document.getElementById('ccZoneFBillable');
+            if (billable) billable.style.display = 'none';
+            var right = document.getElementById('ccZoneFRight');
+            if (right) right.style.display = 'none';
+            // Heatmap zone (Zone F left) now spans the full width of the row.
             var row = document.getElementById('ccZoneFRow');
-            if (row) row.style.display = 'none';
+            if (row) row.style.gridTemplateColumns = '1fr';
           }
         }).catch(function () { /* non-electron / config unavailable */ });
       } catch (e) { /* noop */ }
