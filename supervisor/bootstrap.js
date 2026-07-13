@@ -108,6 +108,11 @@ function resolveBundledPaths({ resourcesPath, home, fs } = {}) {
     doclingCmd: nodePath.join(doclingVenv, 'bin', 'docling-serve'),
     unstructuredUvicorn: nodePath.join(unstructuredVenv, 'bin', 'uvicorn'),
     unstructuredCwd: unstructuredVenv,
+    // Bundled Node runtime + the staged lana-one backend (src + node_modules). The
+    // bundled node matches the ABI the backend's native modules were built against,
+    // so no electron-rebuild dance. stage-sovereign-resources.sh stages both.
+    node: nodePath.join(resourcesPath, 'node', 'node'),
+    backendCwd: nodePath.join(resourcesPath, 'backend'),
   };
 }
 
@@ -167,7 +172,6 @@ function createStackBootstrap(opts = {}) {
     const modelsDir = opts.modelsDir || nodePath.join(home, '.llama-models');
     const userDataRoot = opts.userDataRoot || nodePath.join(home, '.lana-one');
     const repoRoot = opts.repoRoot;
-    if (!repoRoot) throw new Error('bootstrap requires repoRoot (the lana-one backend dir)');
 
     // 1. Stable per-install secrets
     if (!opts.secretStore) throw new Error('bootstrap requires a secretStore');
@@ -189,9 +193,19 @@ function createStackBootstrap(opts = {}) {
       || (typeof process !== 'undefined' ? process.resourcesPath : undefined);
     const packaged = opts.packaged === true
       || (opts.packaged !== false && isBundledResourcesPath(resourcesPath, io.fs));
-    const paths = opts.paths || (packaged
-      ? { ...resolveBundledPaths({ resourcesPath, home, fs: io.fs }), node: opts.node || 'node', backendCwd: repoRoot }
-      : resolveDevPaths({ home, repoRoot, modelsDir, fs: io.fs }));
+    let paths;
+    if (opts.paths) {
+      paths = opts.paths;
+    } else if (packaged) {
+      // Packaged: backend + node runtime are bundled (resolveBundledPaths); an
+      // explicit opts.repoRoot / opts.node still wins if the caller supplies one.
+      const bundled = resolveBundledPaths({ resourcesPath, home, fs: io.fs });
+      paths = { ...bundled, node: opts.node || bundled.node, backendCwd: repoRoot || bundled.backendCwd };
+    } else {
+      if (!repoRoot) throw new Error('bootstrap requires repoRoot (the lana-one backend dir) in dev mode');
+      paths = resolveDevPaths({ home, repoRoot, modelsDir, fs: io.fs });
+    }
+    if (!paths.backendCwd) throw new Error('bootstrap could not resolve the backend directory');
     let chatModel;
     if (plan.localChat) {
       const f = nodePath.join(modelsDir, plan.chatModelFile);

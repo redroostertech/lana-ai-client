@@ -106,7 +106,7 @@ describe('createStackBootstrap', () => {
       path.join(resourcesPath, 'postgres', 'Cellar', 'postgresql@17', '17.10', 'bin', 'postgres'),
       path.join(resourcesPath, 'minio', 'minio'),
       path.join(resourcesPath, 'llama-server', 'llama-server'),
-      'node',
+      path.join(resourcesPath, 'node', 'node'), // bundled node runs the bundled backend
     ]));
     await boot.stop();
   });
@@ -133,6 +133,8 @@ describe('resolveBundledPaths', () => {
     expect(paths.embedModel).toBe(path.join(resourcesPath, 'models', 'nomic-embed-text-v1.5.f16.gguf'));
     expect(paths.doclingCmd).toBe(path.join(resourcesPath, 'python', 'docling', 'venv', 'bin', 'docling-serve'));
     expect(paths.unstructuredUvicorn).toBe(path.join(resourcesPath, 'python', 'unstructured', 'venv', 'bin', 'uvicorn'));
+    expect(paths.node).toBe(path.join(resourcesPath, 'node', 'node'));
+    expect(paths.backendCwd).toBe(path.join(resourcesPath, 'backend'));
   });
 
   it('picks the highest version when multiple postgres Cellar versions are staged', () => {

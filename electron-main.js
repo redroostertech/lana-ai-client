@@ -76,7 +76,23 @@ const { KeychainSecretStore } = require('./electron-keychain-store');
 // + per-launch desktop key it chose. Default off = today's connect-only flow, intact.
 let _stackBootstrap = null;
 async function startSovereignStack() {
-  if (process.env.LANA_ONE_SUPERVISOR !== '1') return;
+  // Enablement: LANA_ONE_SUPERVISOR=0 force-off; =1 force-on (dev). Otherwise ON by
+  // default for a PACKAGED LANA One build whose bundled sovereign resources are
+  // present (postgres + backend staged in Contents/Resources). A plain `electron .`
+  // dev run (not packaged, no env) stays connect-only.
+  const envFlag = process.env.LANA_ONE_SUPERVISOR;
+  if (envFlag === '0') return;
+  const packaged = app.isPackaged;
+  const resourcesPath = process.resourcesPath;
+  let bundledPresent = false;
+  try {
+    const fs = require('fs');
+    bundledPresent = packaged
+      && fs.existsSync(path.join(resourcesPath, 'postgres'))
+      && fs.existsSync(path.join(resourcesPath, 'backend'));
+  } catch (_e) { bundledPresent = false; }
+  if (envFlag !== '1' && !(IS_LANA_ONE && packaged && bundledPresent)) return;
+
   const { createStackBootstrap } = require('./supervisor/bootstrap');
   const supLog = { info: logInfo, warn: logInfo, error: logError };
   const secretStore = new KeychainSecretStore({
@@ -86,11 +102,15 @@ async function startSovereignStack() {
   });
   _stackBootstrap = createStackBootstrap({
     userDataRoot: app.getPath('userData'),
-    repoRoot: process.env.LANA_ONE_BACKEND_DIR,
+    // Packaged: bootstrap resolves the bundled backend + node runtime from
+    // resourcesPath. Dev (env=1): honor LANA_ONE_BACKEND_DIR.
+    packaged,
+    resourcesPath,
+    repoRoot: process.env.LANA_ONE_BACKEND_DIR || undefined,
     secretStore,
     logger: supLog,
   });
-  logInfo('[supervisor] bringing up sovereign stack...');
+  logInfo(`[supervisor] bringing up sovereign stack (packaged=${packaged})...`);
   const result = await _stackBootstrap.start();
   LANA_LOCAL_BACKEND_URL = result.backendUrl;
   LANA_DESKTOP_KEY = result.desktopKey;

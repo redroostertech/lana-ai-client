@@ -99,9 +99,15 @@ EMBED_MODEL_SRC="$HOME/.llama-models/nomic-embed-text-v1.5.f16.gguf"
 DOCLING_VENV_SRC="$HOME/.venv/docling"
 DOCLING_CACHE_SRC="$HOME/.cache/docling/models"
 UNSTRUCTURED_VENV_SRC="$HOME/.venv/unstructured"
+# The lana-one Node backend = the parent of this client submodule (lana-one/).
+BACKEND_SRC="${LANA_ONE_BACKEND_SRC:-$(cd "$CLIENT_DIR/.." && pwd)}"
+# Node runtime bundled to run the backend (ABI matches its node_modules; avoids
+# electron-rebuild). Defaults to the node on PATH.
+NODE_SRC="${LANA_ONE_NODE_SRC:-$(command -v node || true)}"
 
 SKIP_POSTGRES=0
 SKIP_PYTHON=0
+SKIP_BACKEND=0
 FORCE=0
 
 usage() { sed -n '2,60p' "$0" | sed 's/^# \{0,1\}//'; }
@@ -119,6 +125,7 @@ while [[ $# -gt 0 ]]; do
     --unstructured-venv-src) UNSTRUCTURED_VENV_SRC="$2"; shift 2;;
     --skip-postgres) SKIP_POSTGRES=1; shift;;
     --skip-python) SKIP_PYTHON=1; shift;;
+    --skip-backend) SKIP_BACKEND=1; shift;;
     --force) FORCE=1; shift;;
     -h|--help) usage; exit 0;;
     *) err "unknown arg: $1"; usage; exit 2;;
@@ -346,6 +353,60 @@ stage_python_component() {
 # ---------------------------------------------------------------------------
 # Run all stages
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# 7. Node backend — the lana-one Node app (src + scripts + package.json +
+#    node_modules) that the supervisor spawns. Copied verbatim; native modules
+#    are run by the bundled node (stage_node), matching their build ABI.
+# ---------------------------------------------------------------------------
+stage_backend() {
+  local dest="$STAGE_DIR/backend"
+  if [[ "$SKIP_BACKEND" -eq 1 ]]; then
+    log "backend: skipped (--skip-backend)"; add_record "backend" "skipped-by-flag" "$BACKEND_SRC" "$dest" ""; return
+  fi
+  if already_staged "$dest"; then
+    log "backend: already staged at $dest (use --force to re-run)"; add_record "backend" "skipped-existing" "$BACKEND_SRC" "$dest" ""; return
+  fi
+  if [[ ! -d "$BACKEND_SRC/src" ]] || [[ ! -f "$BACKEND_SRC/package.json" ]]; then
+    warn "backend: source not found at $BACKEND_SRC (need src/ + package.json)"; add_record "backend" "missing-dependency" "$BACKEND_SRC" "$dest" "src/ or package.json missing"; return
+  fi
+  log "backend: staging from $BACKEND_SRC (src + scripts + node_modules) ..."
+  mkdir -p "$dest"
+  # Copy the runtime pieces; exclude the client submodule + VCS + logs.
+  rsync -a "$BACKEND_SRC/src" "$dest/" 2>/dev/null
+  [[ -d "$BACKEND_SRC/scripts" ]] && rsync -a "$BACKEND_SRC/scripts" "$dest/" 2>/dev/null
+  [[ -d "$BACKEND_SRC/config" ]] && rsync -a "$BACKEND_SRC/config" "$dest/" 2>/dev/null
+  cp "$BACKEND_SRC/package.json" "$dest/" 2>/dev/null || true
+  cp "$BACKEND_SRC/package-lock.json" "$dest/" 2>/dev/null || true
+  rsync -a --exclude='.cache' "$BACKEND_SRC/node_modules" "$dest/" 2>/dev/null
+  if [[ -d "$dest/node_modules" ]] && [[ -f "$dest/src/index.js" ]]; then
+    add_record "backend" "staged" "$BACKEND_SRC" "$dest" ""
+    log "backend: staged ($(du -sh "$dest" 2>/dev/null | awk '{print $1}'))"
+  else
+    err "backend: staging incomplete"; add_record "backend" "failed" "$BACKEND_SRC" "$dest" "src/index.js or node_modules missing after copy"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# 8. Node runtime — a node binary that runs the backend (ABI-matched to its
+#    node_modules). Relocated so any Homebrew dylib deps are vendored.
+# ---------------------------------------------------------------------------
+stage_node() {
+  local dest_dir="$STAGE_DIR/node" dest_bin="$STAGE_DIR/node/node"
+  if already_staged "$dest_dir"; then
+    log "node: already staged at $dest_dir (use --force to re-run)"; add_record "node" "skipped-existing" "$NODE_SRC" "$dest_dir" ""; return
+  fi
+  if [[ -z "$NODE_SRC" ]] || [[ ! -x "$NODE_SRC" ]]; then
+    warn "node: no node binary found (set LANA_ONE_NODE_SRC)"; add_record "node" "missing-dependency" "$NODE_SRC" "$dest_dir" "node binary not found"; return
+  fi
+  log "node: staging runtime from $NODE_SRC ..."
+  mkdir -p "$dest_dir"
+  cp "$NODE_SRC" "$dest_bin"
+  if [[ -x "$RELOCATE_MACHO" ]]; then "$RELOCATE_MACHO" "$dest_bin" "$dest_dir/lib" >/dev/null 2>&1 || true; fi
+  chmod +x "$dest_bin"
+  add_record "node" "staged" "$NODE_SRC" "$dest_dir" ""
+  log "node: staged ($("$dest_bin" --version 2>/dev/null || echo '?'))"
+}
+
 log "staging into $STAGE_DIR"
 stage_postgres
 stage_minio
@@ -353,6 +414,8 @@ stage_llama_server
 stage_models
 stage_python_component "docling" "$DOCLING_VENV_SRC" "$STAGE_DIR/python/docling" "$DOCLING_CACHE_SRC" "docling-model-cache"
 stage_python_component "unstructured" "$UNSTRUCTURED_VENV_SRC" "$STAGE_DIR/python/unstructured"
+stage_backend
+stage_node
 
 # ---------------------------------------------------------------------------
 # Manifest
