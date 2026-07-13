@@ -2,6 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!-- CSP: blocks injected/remote scripts. script-src = local files ('self') plus a
+       hash allowlist of this page's single inline script block (end of body); if
+       you EDIT that block you MUST recompute its sha256 (base64 of the raw text
+       between the script tags) or it will not run. connect-src stays http:/https:
+       because the client talks to the resolved backend (org server or LANA One
+       local stack). style 'unsafe-inline' is required by Lex/Tailwind runtime
+       styling (accepted tradeoff: style-only). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-V756PF6RFw/OUU+Njw+q1CfAXIjB2P4FvUVDPmCSeo0='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; font-src 'self' data:; connect-src 'self' http: https:; frame-src 'self' blob: data:; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - LANA AI</title>
 

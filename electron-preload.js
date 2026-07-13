@@ -11,6 +11,27 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 /**
+ * Channels reachable through the GENERIC `invoke`/`send` bridges below.
+ *
+ * SECURITY: the generic bridges used to pass ANY channel straight to ipcRenderer,
+ * which let a compromised renderer reach every ipcMain handler. They are now
+ * allowlisted to the channels the renderer actually uses (enumerated from every
+ * `electronAPI.invoke('...')` / `electronAPI.send('...')` call site in
+ * public_html/, src/, and js/). Everything else in this file already goes through
+ * a named, purpose-specific wrapper. If you add a new generic call site, add its
+ * channel here deliberately (or better, add a named wrapper).
+ */
+const GENERIC_INVOKE_CHANNELS = new Set([
+  'open-external-url',          // update-dialog.html, js/data_connectors.js, js/connector-config-renderer.js, integrations/*.html
+  'session-tracker:initialize', // js/api.js
+  'session-tracker:start'       // js/api.js
+]);
+
+const GENERIC_SEND_CHANNELS = new Set([
+  'update-dialog-response'      // update-dialog.html (custom updater dialog)
+]);
+
+/**
  * Expose protected methods that allow the renderer process to use
  * ipcRenderer without exposing the entire object
  */
@@ -139,8 +160,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   /**
    * Generic IPC invoke (for extensibility)
+   *
+   * Allowlisted (see GENERIC_INVOKE_CHANNELS above): unknown channels are
+   * rejected instead of reaching arbitrary ipcMain handlers.
    */
-  invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+  invoke: (channel, ...args) => {
+    if (!GENERIC_INVOKE_CHANNELS.has(channel)) {
+      console.warn(`[preload] Blocked generic invoke on non-allowlisted channel: ${String(channel)}`);
+      return Promise.reject(new Error(`IPC channel not allowed: ${String(channel)}`));
+    }
+    return ipcRenderer.invoke(channel, ...args);
+  },
 
   /**
    * Open a URL in the user's system browser via shell.openExternal.
@@ -154,8 +184,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   /**
    * Generic IPC send (fire-and-forget, for one-way messages to main process)
+   *
+   * Allowlisted (see GENERIC_SEND_CHANNELS above): unknown channels are dropped.
    */
-  send: (channel, ...args) => ipcRenderer.send(channel, ...args),
+  send: (channel, ...args) => {
+    if (!GENERIC_SEND_CHANNELS.has(channel)) {
+      console.warn(`[preload] Blocked generic send on non-allowlisted channel: ${String(channel)}`);
+      return;
+    }
+    ipcRenderer.send(channel, ...args);
+  },
 
   /**
    * Event listeners (one-way communication from main to renderer)

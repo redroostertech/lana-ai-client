@@ -112,7 +112,12 @@ async function startSovereignStack() {
   if (envFlag !== '1' && !(IS_LANA_ONE && effectivePackaged && bundledPresent)) return;
 
   const { createStackBootstrap } = require('./supervisor/bootstrap');
-  const supLog = { info: logInfo, warn: logInfo, error: logError };
+  // Wrap the supervisor logger so each phase message also drives the boot splash.
+  const supLog = {
+    info: (m, meta) => { logInfo(m, meta); reportSplashProgress(String(m)); },
+    warn: (m, meta) => { logInfo(m, meta); reportSplashProgress(String(m)); },
+    error: logError,
+  };
   const secretStore = new KeychainSecretStore({
     userDataRoot: app.getPath('userData'),
     fileName: 'stack-secrets.enc.json',
@@ -156,6 +161,7 @@ async function startSovereignStack() {
  * @param {Error & {code?:string, keys?:string[]}} initialErr
  */
 async function handleEncryptionKeyUnavailable(initialErr) {
+  closeSplash();
   const recoveryLog = { info: logInfo, warn: logInfo, error: logError };
   let err = initialErr;
   logError(
@@ -480,6 +486,13 @@ function getAppVersion() {
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
 
+// Boot splash window: shown IMMEDIATELY on launch so a branded loading UI is on
+// screen during the 30-60s sovereign-stack boot (a fresh Postgres init is the worst
+// case). Replaced by the real login/main window once the stack is up.
+let splashWindow = null;
+// Mapped splash percents only ever advance forward (never regress on later phases).
+let lastSplashPercent = 0;
+
 // Session tracker instance
 let sessionTracker = null;
 
@@ -506,6 +519,102 @@ function createFileUrl(filePath) {
     protocol: 'file:',
     slashes: true
   });
+}
+
+/**
+ * Create the boot splash window. Frameless, non-resizable, centered, always-on-top.
+ * Loaded from public_html/splash.html and driven by 'splash:progress' IPC messages
+ * emitted from the sovereign-stack logger (see reportSplashProgress). Called at the
+ * very top of app.whenReady() so a window appears instantly, and torn down by
+ * closeSplash() the moment the real login/main window (or recovery dialog) opens.
+ */
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 480,
+    height: 340,
+    frame: false,
+    resizable: false,
+    center: true,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    backgroundColor: '#f3f4f6',
+    show: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'electron-splash-preload.js'),
+      sandbox: false
+    }
+  });
+
+  splashWindow.setMenuBarVisibility(false);
+
+  const splashUrl = createFileUrl(path.join(__dirname, 'public_html/splash.html'));
+  splashWindow.loadURL(splashUrl);
+
+  splashWindow.once('ready-to-show', () => {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.show();
+    }
+  });
+
+  splashWindow.on('closed', () => {
+    splashWindow = null;
+  });
+}
+
+/**
+ * Tear down the boot splash. Idempotent and safe to call on every real-window-open
+ * path (never leaves the splash orphaned).
+ */
+function closeSplash() {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    try {
+      splashWindow.close();
+    } catch (_e) {
+      try { splashWindow.destroy(); } catch (_e2) { /* noop */ }
+    }
+  }
+  splashWindow = null;
+}
+
+/**
+ * Map a supervisor/bootstrap log message to a splash phase and push it to the splash
+ * window. Percents only advance forward (lastSplashPercent guards regressions).
+ * @param {string} message - a log line emitted during stack boot
+ */
+function reportSplashProgress(message) {
+  const text = String(message || '');
+  let mapped = null;
+
+  if (/stack up|sovereign stack ready|backend at/i.test(text)) {
+    mapped = { label: 'Almost ready…', percent: 95 };
+  } else if (/model plan|downloading .*model|llama|embed/i.test(text)) {
+    mapped = { label: 'Loading local model…', percent: 80 };
+  } else if (/minio|storage/i.test(text)) {
+    mapped = { label: 'Starting storage…', percent: 65 };
+  } else if (/migration|migrations|migrate/i.test(text)) {
+    mapped = { label: 'Applying updates…', percent: 50 };
+  } else if (/pg-init|initdb|postgres/i.test(text)) {
+    mapped = { label: 'Preparing secure database…', percent: 30 };
+  } else if (/bringing up sovereign stack/i.test(text)) {
+    mapped = { label: 'Starting local services…', percent: 12 };
+  }
+
+  if (!mapped) return;
+  // Supervisor log lines arrive OUT OF phase order (they interleave). Treat the
+  // phase percent as an ORDER key: only advance — update the label AND bar —
+  // when a message is strictly further along than what's already shown. A late,
+  // earlier-phase line (lower/equal order) is ignored ENTIRELY so the label can
+  // never flip backward.
+  if (mapped.percent <= lastSplashPercent) return;
+  lastSplashPercent = mapped.percent;
+
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    try {
+      splashWindow.webContents.send('splash:progress', mapped);
+    } catch (_e) { /* noop */ }
+  }
 }
 
 // Development mode: Bypass certificate errors for localhost
@@ -611,6 +720,7 @@ function isBackendManagedOAuthState(state) {
  * @param {string} serverUrl - Server URL to connect to
  */
 function createWindow(serverUrl = null) {
+  closeSplash();
   logInfo(`Creating main window with server: ${serverUrl || 'none'}`);
 
   // Create the browser window
@@ -702,6 +812,7 @@ function createWindow(serverUrl = null) {
  * With hosted discovery, we go straight to login - org resolution happens there
  */
 function createLoginWindow() {
+  closeSplash();
   logInfo('Creating login window (hosted discovery mode)');
 
   mainWindow = new BrowserWindow({
@@ -1814,6 +1925,11 @@ if (!gotTheLock) {
 app.whenReady().then(async () => {
   logInfo('App ready, starting thin client initialization...');
 
+  // Show the branded boot splash IMMEDIATELY (before the dock-icon block and before
+  // the long startSovereignStack() boot) so a window is on screen instantly. It is
+  // closed by createLoginWindow()/createWindow()/handleEncryptionKeyUnavailable().
+  createSplashWindow();
+
   // macOS dock icon. On packaged builds Electron reads from the .app bundle's
   // Contents/Resources/electron.icns; in dev that path is Electron's default
   // (the lava lamp), so we override at runtime. BrowserWindow.icon is
@@ -1889,7 +2005,31 @@ app.whenReady().then(async () => {
     callback({ requestHeaders: details.requestHeaders });
   });
 
+  // SECURITY: stamp permissive CORS headers ONLY on responses from the app's own
+  // local backend (loopback hosts + the resolved LANA_LOCAL_BACKEND_URL origin),
+  // not on every response globally. The renderer runs from file:// (an opaque
+  // "null" origin), so '*' is the only value that matches it; the scoping is by
+  // TARGET origin instead. Remote org servers must send their own CORS headers
+  // (they are unaffected today because webSecurity is disabled, see createWindow).
+  const isLocalBackendResponse = (rawUrl) => {
+    try {
+      const u = new URL(rawUrl);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+      if (u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]') return true;
+      try {
+        if (new URL(LANA_LOCAL_BACKEND_URL).origin === u.origin) return true;
+      } catch (_e) { /* unparseable backend URL — fall through */ }
+      return false;
+    } catch (_e) {
+      return false;
+    }
+  };
+
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    if (!isLocalBackendResponse(details.url)) {
+      callback({ responseHeaders: details.responseHeaders });
+      return;
+    }
     callback({
       responseHeaders: {
         ...details.responseHeaders,
@@ -1993,6 +2133,22 @@ app.whenReady().then(async () => {
       }
     }
   });
+}).catch((err) => {
+  // Boot-path safety net: if ANYTHING above throws (electron-store construction,
+  // clearAllData(), verifyServer(), window creation, ...), no real window ever
+  // opens and the frameless, always-on-top splash would be orphaned with no way
+  // to close it short of force-quitting. Guarantee the splash comes down, surface
+  // a minimal native error dialog instead, and quit cleanly.
+  const msg = (err && err.message) ? err.message : String(err);
+  logError(`[electron-main] Fatal startup error: ${msg}`, err);
+  closeSplash();
+  try {
+    dialog.showErrorBox(
+      'LANA failed to start',
+      `The app hit an unexpected error while starting up.\n\n${msg}\n\nPlease relaunch the app. If the problem persists, contact support.`
+    );
+  } catch (_e) { /* never let the error surface itself throw */ }
+  app.quit();
 });
 
 // Quit when all windows are closed (except on macOS)

@@ -114,10 +114,12 @@ describe('makePostgresHooks.onReady', () => {
     expect(h.migratedCount()).toBe(1); // empty schema still migrates
   });
 
-  it('preserves a populated database: no extensions, no migrate', async () => {
+  it('preserves a populated database: no extensions, but Core migrate still runs', async () => {
     const h = makeHarness({ dbExists: true, tableCount: 42 });
     await h.hooks.onReady();
     expect(h.execCalls.some((c) => c.args.join(' ').includes('CREATE EXTENSION'))).toBe(false);
-    expect(h.migratedCount()).toBe(0);
+    // Core migrate runs on EVERY boot (idempotent via schema_migrations) so
+    // update launches apply new migrations to existing installs.
+    expect(h.migratedCount()).toBe(1);
   });
 });

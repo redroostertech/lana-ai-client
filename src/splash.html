@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- CSP: fully local page (no network). script-src is a hash allowlist of the
+       single inline script below; if you EDIT that script you MUST recompute its
+       sha256 (base64 of the raw text between the script tags) or it will not run.
+       style 'unsafe-inline' is required for the <style> block + style attributes
+       (accepted tradeoff: style-only, script injection stays blocked). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-s9fQUlK8tcK7Zk/5xcHRQU5A4FLxYO94nq6j6xfMGxY='; style-src 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Starting LANA One</title>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --card: #ffffff;
+      --ink: #111827;
+      --muted: #6b7280;
+      --track: #e5e7eb;
+      --accent: #6366f1;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-user-select: none;
+      user-select: none;
+      overflow: hidden;
+      cursor: default;
+    }
+
+    .splash {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 36px 40px;
+      text-align: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+      min-height: 48px;
+    }
+
+    .brand img {
+      height: 44px;
+      width: auto;
+    }
+
+    /* Fallback wordmark if the logo image fails to load. */
+    .wordmark {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--ink);
+    }
+
+    .status {
+      font-size: 14px;
+      color: var(--muted);
+      margin: 0 0 18px;
+      min-height: 18px;
+      transition: opacity 120ms ease;
+    }
+
+    .bar {
+      position: relative;
+      width: 320px;
+      max-width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--track);
+      overflow: hidden;
+    }
+
+    .bar__fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5%;
+      border-radius: 999px;
+      background: var(--accent);
+      transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Subtle indeterminate shimmer riding on top of the determinate fill. */
+    .bar__fill::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.45) 50%,
+        rgba(255, 255, 255, 0) 100%
+      );
+      transform: translateX(-100%);
+      animation: shimmer 1.6s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      to { transform: translateX(100%); }
+    }
+
+    .hint {
+      margin-top: 22px;
+      font-size: 12px;
+      color: var(--muted);
+      opacity: 0.75;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bar__fill::after { animation: none; }
+      .bar__fill { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="splash">
+    <div class="brand">
+      <!-- Load-failure fallback is wired in the script below (no inline handler,
+           so the CSP script-src hash allowlist covers every script on this page). -->
+      <img id="logo" src="img/logo-dark.png" alt="LANA AI">
+      <span id="wordmark" class="wordmark" style="display:none;">LANA AI</span>
+    </div>
+
+    <p class="status" id="status">Starting…</p>
+
+    <div class="bar" role="progressbar" aria-label="Startup progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="5">
+      <div class="bar__fill" id="fill"></div>
+    </div>
+
+    <p class="hint">Preparing your private, on-device workspace</p>
+  </div>
+
+  <script>
+    (function () {
+      var statusEl = document.getElementById('status');
+      var fillEl = document.getElementById('fill');
+      var barEl = document.querySelector('.bar');
+      var current = 0;
+
+      // Fallback wordmark if the logo image fails to load. Attached here (not as
+      // an inline onerror attribute) so the page works under a strict CSP. The
+      // complete/naturalWidth check covers a failure that fired before this
+      // script ran.
+      var logoEl = document.getElementById('logo');
+      function showWordmark() {
+        if (logoEl) { logoEl.remove(); logoEl = null; }
+        var wordmark = document.getElementById('wordmark');
+        if (wordmark) { wordmark.style.display = 'inline-block'; }
+      }
+      if (logoEl) {
+        if (logoEl.complete && logoEl.naturalWidth === 0) {
+          showWordmark();
+        } else {
+          logoEl.addEventListener('error', showWordmark);
+        }
+      }
+
+      // Forward-only: apply the label AND bar only when a message is strictly
+      // further along than what's already shown. An out-of-order (late,
+      // earlier-phase) update is ignored entirely, so the status text can never
+      // flip backward — even if one slips through the main-process guard.
+      function apply(label, percent) {
+        if (typeof percent !== 'number' || percent <= current) { return; }
+        current = percent;
+        if (typeof label === 'string' && label.length) {
+          statusEl.textContent = label;
+        }
+        var clamped = Math.max(5, Math.min(100, current));
+        fillEl.style.width = clamped + '%';
+        if (barEl) { barEl.setAttribute('aria-valuenow', String(Math.round(clamped))); }
+      }
+
+      // Sensible default until the first real phase message arrives.
+      apply('Starting…', 5);
+
+      if (window.splashAPI && typeof window.splashAPI.onProgress === 'function') {
+        window.splashAPI.onProgress(function (data) {
+          if (!data) { return; }
+          apply(data.label, data.percent);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

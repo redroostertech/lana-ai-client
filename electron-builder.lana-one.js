@@ -37,6 +37,18 @@ module.exports = {
   // extraMetadata is merged into the packaged app's package.json; lanaEdition is
   // what electron-main.js reads to enable the LANA One edition in the shipped app.
   extraMetadata: { ...base.extraMetadata, lanaEdition: 'lana-one' },
+  // DEDICATED update feed for the LANA One edition. The base config publishes to
+  // redroostertech/lana-ai-client (the stock client's releases repo); without this
+  // override both editions would share one feed -- their latest-mac.yml files would
+  // clobber each other and a LANA One install could be served a stock build with no
+  // sovereign stack. electron-updater-custom.js points LANA One builds at this same
+  // repo (edition-aware default), so publish target and update feed stay in lockstep.
+  publish: {
+    provider: 'github',
+    owner: 'redroostertech',
+    repo: 'lana-one-client',
+    releaseType: 'release',
+  },
   protocols: [{ name: 'LANA One', schemes: ['lana-one'] }],
   asar: true,
   // The staged sovereign-stack tree (scripts/stage-sovereign-resources.sh)

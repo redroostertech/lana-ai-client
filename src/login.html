@@ -2,6 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!-- CSP: blocks injected/remote scripts. script-src = local files ('self') plus a
+       hash allowlist of this page's three inline script blocks; if you EDIT an
+       inline block you MUST recompute its sha256 (base64 of the raw text between
+       the script tags) or that block will not run. connect-src stays http:/https:
+       because the client talks to the hosted-discovery endpoint, an org-resolved
+       server URL, and the LANA One local backend. style 'unsafe-inline' is required
+       by Lex/Tailwind runtime styling (accepted tradeoff: style-only). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-AJBSZoTfPCpeF8CbpbQp/1esSyU8RC12LidjYf2iOIs=' 'sha256-+KLHAbWXQrGWIvbGywQp0F3qP6gRor/VPEZtx8K+Hgk=' 'sha256-VrhvQDdpdSosa/l3ULteySRCjESTI6G6mTX+yPWm5Io='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http: https:; frame-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - LanaAI</title>
 

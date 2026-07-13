@@ -7,8 +7,11 @@
  *   onReady()  (after accepting)  -> createdb lana_chef + extensions + migrate
  *
  * Idempotent and data-preserving: a data dir that already has PG_VERSION is not
- * re-initialized, and a database that already has tables (>10) is not re-migrated.
- * Mirrors LANA-AI's deploy-prod-mac.sh sequence but relocatable.
+ * re-initialized, and a database that already has tables (>10) skips the
+ * one-time extensions setup. Core + installed-app migrations run on EVERY boot
+ * (both are idempotent, guarded by schema_migrations) so update launches pick
+ * up new migrations. Mirrors LANA-AI's deploy-prod-mac.sh sequence but
+ * relocatable.
  *
  * All side effects (exec, fs existence, the migrate runner) are injected so the
  * control flow is unit-testable without a real Postgres.
@@ -47,12 +50,27 @@ const REQUIRED_EXTENSIONS = ['vector', 'pg_trgm', 'pgcrypto', '"uuid-ossp"'];
  * @param {string} [deps.backendRoot] - backend root containing scripts/ + @app + infra/.
  * @param {string} [deps.resourcesPath] - Electron process.resourcesPath (bundle).
  * @param {string} [deps.databaseUrl] - connection string for app migrations.
+ * @param {string} [deps.superuserPassword] - the generated POSTGRES_PASSWORD.
+ *        When present, fresh clusters initdb with scram-sha-256 (no trust) and
+ *        every boot re-syncs the superuser password + tightens legacy trust
+ *        pg_hba entries to scram, so loopback connections always authenticate.
  */
 function makePostgresHooks(deps) {
   const { bins, dataDir, port, exec, migrate, fs } = deps;
+  // Force the one-time extensions setup even on an already-populated DB (e.g.
+  // `start.sh --fresh`). Core migrate itself runs on EVERY boot regardless --
+  // it is idempotent (guarded by schema_migrations), so it only fills in gaps.
+  const forceMigrate = deps.forceMigrate === true || process.env.LANA_ONE_FRESH === '1';
   const dbName = deps.dbName || DEFAULT_DB;
   const log = deps.logger || { info() {}, warn() {}, error() {} };
   const conn = ['-h', '127.0.0.1', '-p', String(port), '-U', 'postgres'];
+  // All psql/createdb calls present the superuser password via PGPASSWORD so
+  // they authenticate under BOTH postures: legacy trust clusters (password is
+  // ignored) and hardened scram clusters (password is required).
+  const superuserPassword = deps.superuserPassword || '';
+  const pgExecOpts = superuserPassword
+    ? { env: { ...process.env, PGPASSWORD: superuserPassword } }
+    : undefined;
 
   // Probe the discovered Postgres install for timescaledb. Uses pg_config next
   // to the bundled `initdb` so it resolves the SAME (possibly relocated) tree
@@ -88,10 +106,28 @@ function makePostgresHooks(deps) {
   async function prepare() {
     if (fs.existsSync(path.join(dataDir, 'PG_VERSION'))) {
       log.info('[pg-init] data dir already initialized; skipping initdb');
+    } else if (superuserPassword && fs.writeFileSync && fs.unlinkSync) {
+      // Fresh cluster: scram-sha-256 from the very first byte (never trust), so
+      // no local process can connect as the superuser without the generated
+      // POSTGRES_PASSWORD. The password is handed to initdb via --pwfile (mode
+      // 0600, deleted immediately after) so it never appears in argv.
+      log.info(`[pg-init] initdb into ${dataDir} (auth=scram-sha-256)`);
+      const pwFile = path.join(path.dirname(dataDir), '.lana-pg-pw');
+      fs.writeFileSync(pwFile, `${superuserPassword}\n`, { mode: 0o600 });
+      try {
+        await exec(bins.initdb, [
+          '-D', dataDir, '-U', 'postgres',
+          '--encoding=UTF8', '--locale=en_US.UTF-8',
+          '--auth=scram-sha-256', `--pwfile=${pwFile}`,
+        ]);
+      } finally {
+        try { fs.unlinkSync(pwFile); } catch (_e) { /* best-effort cleanup */ }
+      }
     } else {
-      log.info(`[pg-init] initdb into ${dataDir}`);
-      // --auth=trust: loopback-only, single-user desktop cluster. Password-auth
-      // hardening (scram + pg_hba) is a Phase-C security follow-up.
+      // Degenerate injection only (no password / minimal fs, as in unit tests):
+      // fall back to the legacy trust init. Real boots always inject both, and
+      // hardenAuthSafely() converts any legacy trust cluster on next boot.
+      log.warn('[pg-init] no superuser password / writable fs injected; initdb falling back to --auth=trust');
       await exec(bins.initdb, [
         '-D', dataDir, '-U', 'postgres',
         '--encoding=UTF8', '--locale=en_US.UTF-8', '--auth=trust',
@@ -135,56 +171,110 @@ function makePostgresHooks(deps) {
     }
   }
 
+  // Harden loopback auth on every boot (best-effort, never blocks boot):
+  //   1. re-sync the postgres superuser password to the per-install secret, and
+  //   2. only once the password is confirmed set, tighten any legacy `trust`
+  //      pg_hba entries to scram-sha-256 and reload.
+  // The order is load-bearing: on a pre-hardening trust cluster the password
+  // must be in place BEFORE trust is removed, or we'd lock the backend out.
+  // Fresh clusters initdb'd with scram (prepare) hit only the no-op paths here.
+  async function hardenAuthSafely() {
+    if (!superuserPassword) return;
+    if (!fs.writeFileSync || !fs.unlinkSync || !fs.readFileSync) return; // minimal injected fs (unit tests)
+    let passwordSet = false;
+    try {
+      // ALTER via a 0600 SQL file inside the 0700 data dir so the credential
+      // never appears in argv (visible in the process list); removed right after.
+      const sqlFile = path.join(dataDir, '.lana-superuser.sql');
+      const quoted = superuserPassword.replace(/'/g, "''");
+      fs.writeFileSync(sqlFile, `ALTER USER postgres WITH PASSWORD '${quoted}';\n`, { mode: 0o600 });
+      try {
+        await exec(bins.psql, [...conn, '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-f', sqlFile], pgExecOpts);
+        passwordSet = true;
+      } finally {
+        try { fs.unlinkSync(sqlFile); } catch (_e) { /* best-effort cleanup */ }
+      }
+    } catch (e) {
+      log.warn(`[pg-init] could not set superuser password: ${e.message}`);
+    }
+    if (!passwordSet) return; // never remove trust before the password is confirmed
+    try {
+      const hbaPath = path.join(dataDir, 'pg_hba.conf');
+      if (!fs.existsSync(hbaPath)) return;
+      const cur = fs.readFileSync(hbaPath, 'utf8');
+      const tightened = cur.replace(/^(\s*(?:local|host|hostssl|hostnossl)\s+.*?)\btrust\b/gm, '$1scram-sha-256');
+      if (tightened !== cur) {
+        fs.writeFileSync(hbaPath, tightened);
+        await exec(bins.psql, [...conn, '-d', 'postgres', '-tAc', 'SELECT pg_reload_conf();'], pgExecOpts);
+        log.info('[pg-init] tightened legacy trust pg_hba entries to scram-sha-256 (config reloaded)');
+      }
+    } catch (e) {
+      log.warn(`[pg-init] could not tighten pg_hba to scram: ${e.message}`);
+    }
+  }
+
   async function onReady() {
+    // Auth hardening first, so every later connection (psql here, migrate, the
+    // backend's DSN) runs against the final scram posture.
+    await hardenAuthSafely();
+
     // createdb lana_chef if it doesn't exist yet
-    const exists = await exec(bins.psql, [...conn, '-tAc', `SELECT 1 FROM pg_database WHERE datname='${dbName}'`]);
+    const exists = await exec(bins.psql, [...conn, '-tAc', `SELECT 1 FROM pg_database WHERE datname='${dbName}'`], pgExecOpts);
     if (!String(exists.stdout || '').trim()) {
       log.info(`[pg-init] createdb ${dbName}`);
-      await exec(bins.createdb, [...conn, dbName]);
+      await exec(bins.createdb, [...conn, dbName], pgExecOpts);
     }
 
-    // If the DB already has a populated schema, preserve it: skip extensions+migrate.
+    // The >10-table gate only skips the ONE-TIME extensions setup on an
+    // already-populated DB (forceMigrate / start.sh --fresh re-runs it anyway).
+    // It must NOT gate Core migrate: that runs on every boot below, or new Core
+    // migrations shipped in an update would never reach existing installs.
     const tables = await exec(bins.psql, [
       ...conn, '-d', dbName, '-tAc',
       "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'",
-    ]);
-    if (parseInt(String(tables.stdout || '0').trim(), 10) > 10) {
-      log.info('[pg-init] database already populated; skipping extensions + Core migrate');
-      // Still apply installed-app migrations. They are idempotent (guarded by the
-      // shared schema_migrations table), so they must run on EVERY boot to
-      // retrofit @app tables onto installs that first-booted before app
-      // migrations were wired, and to self-heal any that partially failed
-      // earlier. The >10-table gate only protects Core from re-migrating a
-      // populated DB; it must not also suppress app migrations.
-      await runAppMigrationsSafely();
-      return;
-    }
-
-    // Ensure the hard-required extensions (best-effort; migrations also create them).
-    for (const ext of REQUIRED_EXTENSIONS) {
-      // eslint-disable-next-line no-await-in-loop
-      await exec(bins.psql, [...conn, '-d', dbName, '-c', `CREATE EXTENSION IF NOT EXISTS ${ext};`])
-        .catch((e) => log.warn(`[pg-init] extension ${ext} not created: ${e.message}`));
-    }
-
-    // timescaledb is optional: only create it when its control file is present
-    // (the preload was likewise only enabled in that case). When absent, skip
-    // cleanly — hypertable migrations degrade rather than hard-fail here.
-    const ts = await probeTimescale();
-    if (ts.controlPresent) {
-      await exec(bins.psql, [...conn, '-d', dbName, '-c', 'CREATE EXTENSION IF NOT EXISTS timescaledb;'])
-        .catch((e) => log.warn(`[pg-init] timescaledb extension not created: ${e.message}`));
+    ], pgExecOpts);
+    const populated = parseInt(String(tables.stdout || '0').trim(), 10) > 10;
+    if (populated && !forceMigrate) {
+      log.info('[pg-init] database already populated; skipping one-time extensions setup (Core migrate still runs)');
     } else {
-      log.warn('[pg-init] timescaledb control file absent; skipping CREATE EXTENSION timescaledb (hypertable migrations will degrade)');
+      // Ensure the hard-required extensions (best-effort; migrations also create them).
+      for (const ext of REQUIRED_EXTENSIONS) {
+        // eslint-disable-next-line no-await-in-loop
+        await exec(bins.psql, [...conn, '-d', dbName, '-c', `CREATE EXTENSION IF NOT EXISTS ${ext};`], pgExecOpts)
+          .catch((e) => log.warn(`[pg-init] extension ${ext} not created: ${e.message}`));
+      }
+
+      // timescaledb is optional: only create it when its control file is present
+      // (the preload was likewise only enabled in that case). When absent, skip
+      // cleanly — hypertable migrations degrade rather than hard-fail here.
+      const ts = await probeTimescale();
+      if (ts.controlPresent) {
+        await exec(bins.psql, [...conn, '-d', dbName, '-c', 'CREATE EXTENSION IF NOT EXISTS timescaledb;'], pgExecOpts)
+          .catch((e) => log.warn(`[pg-init] timescaledb extension not created: ${e.message}`));
+      } else {
+        log.warn('[pg-init] timescaledb control file absent; skipping CREATE EXTENSION timescaledb (hypertable migrations will degrade)');
+      }
     }
 
-    log.info('[pg-init] running Core migrations');
-    await migrate();
-    log.info('[pg-init] Core migrations complete');
+    // Core migrate runs on EVERY boot: scripts/migrate.js is idempotent (skips
+    // already-applied migrations via schema_migrations, only bootstraps when
+    // core tables are missing, reconcile is additive-only), so an update launch
+    // on a populated DB applies exactly the new migrations. Best-effort so a
+    // migration failure never blocks or crashes desktop boot (same posture as
+    // runAppMigrationsSafely).
+    try {
+      log.info('[pg-init] running Core migrations');
+      await migrate();
+      log.info('[pg-init] Core migrations complete');
+    } catch (e) {
+      log.warn(`[pg-init] Core migrations failed; continuing boot: ${e.message}`);
+    }
 
     // Parity with the full server: after Core migrations, apply each installed
     // app's migrations in manifest order (infra/lib/commands/migrations.js
-    // runAll). Best-effort and boot-safe — never blocks desktop startup.
+    // runAll). Idempotent (guarded by the shared schema_migrations table), so
+    // they too run on EVERY boot. Best-effort and boot-safe — never blocks
+    // desktop startup.
     await runAppMigrationsSafely();
   }
 

@@ -111,7 +111,10 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
   specs.push({
     name: 'minio',
     command: p.minio,
-    args: ['server', cfg.dataDirs.minio, '--address', `:${ports.minio}`, '--console-address', `:${ports.minioConsole}`],
+    // Loopback-only: a bare `:port` binds 0.0.0.0 and exposes the object store
+    // (and its console) to the LAN. The backend reaches it via MINIO_ENDPOINT
+    // 127.0.0.1, so nothing needs the wildcard bind.
+    args: ['server', cfg.dataDirs.minio, '--address', `127.0.0.1:${ports.minio}`, '--console-address', `127.0.0.1:${ports.minioConsole}`],
     env: { MINIO_ROOT_USER: s.MINIO_ACCESS_KEY, MINIO_ROOT_PASSWORD: s.MINIO_SECRET_KEY },
     readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.minio}/minio/health/live` }),
     critical: true,

@@ -12,6 +12,23 @@ const path = require('path');
 const url = require('url');
 const { logInfo, logError, logWarn } = require('./electron-logger');
 
+// LANA One edition flag — mirrors electron-main.js's IS_LANA_ONE derivation so the
+// update feed is edition-aware. process.env.LANA_ONE_BAKED_EDITION is replaced at
+// bundle time by esbuild's `define` (scripts/bundle-electron.js) for packaged builds;
+// the require('./package.json').lanaEdition fallback + LANA_ONE_EDITION env cover
+// dev/unpackaged runs. A LANA One build must NEVER point at the stock client's
+// releases repo: the two editions publish different artifacts, and a shared feed
+// would let a LANA One install be served a stock build with no sovereign stack.
+let _bakedEdition = '';
+try {
+  _bakedEdition = process.env.LANA_ONE_BAKED_EDITION || require('./package.json').lanaEdition || '';
+} catch (_e) { _bakedEdition = process.env.LANA_ONE_BAKED_EDITION || ''; }
+const IS_LANA_ONE = process.env.LANA_ONE_EDITION === '1' || _bakedEdition === 'lana-one';
+
+// Per-edition GitHub releases repo. Must match the `publish` block of the edition's
+// electron-builder config (electron-builder.lana-one.js / electron-builder.client.json).
+const UPDATE_FEED_REPO = IS_LANA_ONE ? 'lana-one-client' : 'lana-ai-client';
+
 // Update state
 let updateCheckInProgress = false;
 let lastUpdateCheck = null;
@@ -131,7 +148,7 @@ async function checkForUpdates(serverUrl, authToken = null, orgId = null) {
 function configureAutoUpdater(config = {}) {
   const {
     owner = 'redroostertech',
-    repo = 'lana-ai-client',
+    repo = UPDATE_FEED_REPO,
     channel = 'latest'
   } = config;
 

@@ -228,7 +228,9 @@ function createStackBootstrap(opts = {}) {
   };
   const exec = opts.exec || makeExec(io.spawn);
   const log = io.logger;
-  const ports = { pg: 5432, minio: 9000, minioConsole: 9001, llamaEmbed: 8082, llamaChat: 8081, docling: 8085, unstructured: 8000, backend: 8090, ...(opts.ports || {}) };
+  // Full default port set (mirrors service-topology's defaults) so the free-port
+  // isolation below covers EVERY bundled service, not just the core ones.
+  const ports = { pg: 5432, minio: 9000, minioConsole: 9001, llamaEmbed: 8082, llamaChat: 8081, docling: 8085, unstructured: 8000, backend: 8090, vision: 8083, legal: 8084, redactor: 8091, timesfm: 8092, hermes: 8094, ...(opts.ports || {}) };
   let supervisor = null;
 
   async function start() {
@@ -422,6 +424,40 @@ function createStackBootstrap(opts = {}) {
     const dataDirs = { pg: nodePath.join(userDataRoot, 'pgdata'), minio: nodePath.join(userDataRoot, 'minio') };
     io.fs.mkdirSync(dataDirs.minio, { recursive: true });
 
+    // Isolate EVERY bundled service port from whatever is already installed or
+    // running on the box — a dev's Homebrew Postgres on 5432, a MinIO on 9000, a
+    // llama server, etc. For each service we prefer its default port and fall
+    // FORWARD to the next free, not-yet-reserved port, so the bundled stack is
+    // fully self-contained: it never silently attaches to a system service (and
+    // ends up on the wrong, unmigrated data), and is never blocked by one.
+    // Assume a fresh box even if things are already installed. An explicit
+    // opts.ports[key] still wins.
+    {
+      const explicit = opts.ports || {};
+      const reserved = new Set(Object.values(explicit).map(Number).filter(Boolean));
+      const pickFree = async (preferred) => {
+        for (let p = preferred; p < preferred + 100; p += 1) {
+          if (reserved.has(p)) continue;
+          // tcpProbe is a FACTORY returning an async () => boolean (true when
+          // something is listening), so it must be invoked -- awaiting the
+          // factory result itself would always be truthy.
+          // eslint-disable-next-line no-await-in-loop
+          const busy = await io.probes.tcpProbe({ host: '127.0.0.1', port: p, timeoutMs: 500 })();
+          if (!busy) { reserved.add(p); return p; }
+        }
+        return preferred;
+      };
+      for (const key of Object.keys(ports)) {
+        if (explicit[key]) continue; // caller pinned this one
+        // eslint-disable-next-line no-await-in-loop
+        const chosen = await pickFree(ports[key]);
+        if (chosen !== ports[key]) {
+          log.info(`[bootstrap] ${key} -> port ${chosen} (default ${ports[key]} busy/reserved; isolated)`);
+        }
+        ports[key] = chosen;
+      }
+    }
+
     // 5. Postgres first-run hooks (migrate runs the backend's migrate script)
     const databaseUrl = `postgresql://postgres:${secrets.POSTGRES_PASSWORD}@127.0.0.1:${ports.pg}/lana_chef`;
     const migrate = () => exec(paths.node || 'node', ['scripts/migrate.js'], {
@@ -431,6 +467,9 @@ function createStackBootstrap(opts = {}) {
     const pgHooks = makePostgresHooks({
       bins: { initdb: paths.initdb, psql: paths.psql, createdb: paths.createdb },
       dataDir: dataDirs.pg, port: ports.pg, exec, migrate, fs: io.fs, logger: log,
+      // Loopback auth hardening: scram initdb on fresh clusters + per-boot
+      // password sync / pg_hba tightening on legacy trust clusters.
+      superuserPassword: secrets.POSTGRES_PASSWORD,
     });
 
     // 6. Topology + supervisor
