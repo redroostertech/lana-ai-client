@@ -269,8 +269,14 @@ describe('ensureModel', () => {
 });
 
 describe('model-catalog validateCatalogEntry', () => {
-  it('rejects the shipped placeholder sha256 (real release must fill it in)', () => {
-    expect(() => validateCatalogEntry(MODEL_CATALOG.demo.chatModel)).toThrow(/sha256/);
+  it('accepts the pinned real chat models (demo/edge/professional)', () => {
+    for (const tier of ['demo', 'edge', 'professional']) {
+      expect(() => validateCatalogEntry(MODEL_CATALOG[tier].chatModel)).not.toThrow();
+    }
+  });
+
+  it('still rejects the un-pinned enterprise placeholder sha256', () => {
+    expect(() => validateCatalogEntry(MODEL_CATALOG.enterprise.chatModel)).toThrow(/sha256/);
   });
 
   it('accepts a fully-filled-in entry', () => {
