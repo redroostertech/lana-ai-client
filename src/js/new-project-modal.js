@@ -386,7 +386,16 @@ const NewProjectModal = {
 
   createNewMatter() {
     this.close();
-    window.location.href = NavigationHelpers.resolvePath('matters.html') + '?action=create';
+    // Prefer opening the create modal in place when we're already on the
+    // Workspaces page (its create button lives there) — no navigation, no reload.
+    var createBtn = document.getElementById('createMatterBtn');
+    if (createBtn) {
+      createBtn.click();
+      return;
+    }
+    // Otherwise route to the current Workspaces page and let it auto-open the
+    // create modal via ?action=create. (Was matters.html — the legacy page.)
+    window.location.href = NavigationHelpers.resolvePath('workspaces.html') + '?action=create';
   },
 
   // ── Picker-mode chrome (back chevron, no X) ─────────────────────────────

@@ -2466,6 +2466,13 @@
           // Matters are now loaded, open the drawer immediately
           viewMatter(matterId, defaultTab);
         }
+
+        // Auto-open the create-matter modal when arrived via ?action=create
+        // (e.g. from the "New Chat" picker's "Create Workspace" action).
+        if (urlParams.get('action') === 'create') {
+          const _createBtn = document.getElementById('createMatterBtn');
+          if (_createBtn) _createBtn.click();
+        }
       })();
     }
 
