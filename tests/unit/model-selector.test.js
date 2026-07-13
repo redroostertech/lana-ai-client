@@ -3,16 +3,23 @@
 const {
   selectModelPlan,
   estimateTierFit,
+  estimateTierVramFit,
   auxModelsForTier,
   TIER_LADDER,
   RESERVED_OVERHEAD_GB,
   CPU_LOCAL_EXTRA_RESERVE_GB,
+  CUDA_MIN_SYSTEM_RAM_GB,
   NON_METAL_ENV_FLAG,
 } = require('../../supervisor/model-selector');
 
 const gb = (n) => ({ totalmem: () => n * 1e9 });
 const apple = (ramGB) => ({ os: gb(ramGB), platform: 'darwin', arch: 'arm64' });
 const intel = (ramGB) => ({ os: gb(ramGB), platform: 'darwin', arch: 'x64' });
+// A CUDA box: linux/win + an injected nvidia-smi probe reporting `vramGB` total.
+const cuda = (ramGB, vramGB, platform = 'linux') => ({
+  os: gb(ramGB), platform, arch: 'x64',
+  probeNvidiaSmi: () => ({ present: true, vramGB, gpus: [{ name: 'RTX', vramGB }] }),
+});
 
 // The env flag must not leak between tests: default behavior depends on it unset.
 const savedFlag = process.env[NON_METAL_ENV_FLAG];
@@ -204,5 +211,81 @@ describe('non-Apple-Silicon CPU path (LANA_ALLOW_NON_METAL_LOCAL)', () => {
       process.env[NON_METAL_ENV_FLAG] = v;
       expect(selectModelPlan(intel(128)).localChat).toBe(false);
     }
+  });
+});
+
+describe('NVIDIA CUDA path (linux/win + nvidia-smi)', () => {
+  it('enables local chat on a CUDA GPU WITHOUT the non-metal flag (GPU is first-class)', () => {
+    // Flag intentionally left unset (beforeEach clears it).
+    const plan = selectModelPlan(cuda(64, 24));
+    expect(plan.hardware.accel.backend).toBe('cuda');
+    expect(plan.hardware.accel.vramGB).toBe(24);
+    expect(plan.localChat).toBe(true);
+    expect(plan.reason).toMatch(/_cuda$/);
+    expect(plan.model).toMatch(/\.gguf$/);
+  });
+
+  it('picks the largest tier whose weights + KV fit in VRAM (24GB -> edge)', () => {
+    // 24GB VRAM holds edge (weights 5.63 + KV) but not professional (weights 22 + KV).
+    expect(selectModelPlan(cuda(64, 24)).tier).toBe('edge');
+  });
+
+  it('a bigger card hosts a bigger tier (80GB -> professional)', () => {
+    expect(selectModelPlan(cuda(128, 80)).tier).toBe('professional');
+  });
+
+  it('names VRAM (not system RAM) in the CUDA reason string', () => {
+    expect(selectModelPlan(cuda(64, 24)).reason).toBe('selected_edge_for_24gb_cuda');
+  });
+
+  it('works identically on Windows (win32)', () => {
+    const plan = selectModelPlan(cuda(64, 24, 'win32'));
+    expect(plan.hardware.accel.backend).toBe('cuda');
+    expect(plan.localChat).toBe(true);
+    expect(plan.tier).toBe('edge');
+  });
+
+  it('reports insufficient_vram when RAM is ample but no tier fits the card', () => {
+    // 2GB VRAM: after the CUDA reserve there is no room for even the demo weights.
+    const plan = selectModelPlan(cuda(64, 2));
+    expect(plan.localChat).toBe(false);
+    expect(plan.reason).toBe('insufficient_vram');
+  });
+
+  it('reports insufficient_ram_for_any_tier when the box cannot host the redactor stack', () => {
+    // Plenty of VRAM but < CUDA_MIN_SYSTEM_RAM_GB system RAM -> redaction-first denies local.
+    const plan = selectModelPlan(cuda(4, 48));
+    expect(CUDA_MIN_SYSTEM_RAM_GB).toBeGreaterThan(4);
+    expect(plan.localChat).toBe(false);
+    expect(plan.reason).toBe('insufficient_ram_for_any_tier');
+  });
+
+  it('selects legal + vision aux models on the CUDA path too', () => {
+    const roles = selectModelPlan(cuda(64, 24)).auxModels.map((m) => m.role).sort();
+    expect(roles).toEqual(['legal', 'vision']);
+  });
+
+  it('annotates tiers[] by VRAM fit on a CUDA box', () => {
+    const byTier = Object.fromEntries(selectModelPlan(cuda(64, 24)).tiers.map((t) => [t.tier, t.fits]));
+    expect(byTier.demo).toBe(true);
+    expect(byTier.edge).toBe(true);
+    expect(byTier.professional).toBe(false); // 24GB VRAM can't hold the 22GB weights + KV
+    expect(byTier.enterprise).toBe(false);
+  });
+});
+
+describe('estimateTierVramFit (VRAM weights + KV math)', () => {
+  const edge = TIER_LADDER.find((t) => t.tier === 'edge');
+
+  it('fits when VRAM comfortably holds weights + full-context KV', () => {
+    expect(estimateTierVramFit(edge, 32, 24).fits).toBe(true);
+  });
+
+  it('fails when the card is too small for weights + KV, even with huge system RAM', () => {
+    expect(estimateTierVramFit(edge, 512, 6).fits).toBe(false);
+  });
+
+  it('fails when system RAM cannot host the redactor stack, even with a huge card', () => {
+    expect(estimateTierVramFit(edge, 2, 80).fits).toBe(false);
   });
 });

@@ -26,8 +26,18 @@
  * per-tier minMemoryGB is kept as a comfort floor gated ALONGSIDE the fit test.
  *
  * os/arch are injected so selection is unit-testable on any host.
+ *
+ * CROSS-PLATFORM (Phase 1): the local-inference gate is no longer Apple-Silicon-
+ * only. The acceleration backend is detected by hardware-accel.js (Metal on
+ * Apple-Silicon, CUDA on linux/win32 with an NVIDIA GPU, else CPU) and drives
+ * selection: Metal fits against system RAM (unified memory); CUDA fits the model
+ * weights + KV against VRAM (a separate budget) while system RAM still hosts the
+ * redactor stack; CPU stays behind the LANA_ALLOW_NON_METAL_LOCAL opt-in at the
+ * higher RAM bar. Redaction headroom is reserved FIRST on every path.
  */
 'use strict';
+
+const { detectAccelBackend } = require('./hardware-accel');
 
 const BYTES_PER_GB = 2 ** 30;
 
@@ -59,6 +69,23 @@ const MIN_LOCAL_CONTEXT_TOKENS = 8192;
  * Metal-only, canRunLlamaCpp === appleSilicon); tune it as CPU support matures.
  */
 const CPU_LOCAL_EXTRA_RESERVE_GB = 6;
+
+/**
+ * VRAM held back from a CUDA GPU BEFORE fitting model weights + KV cache: CUDA
+ * runtime/context, activation/compute buffers, and the OS/display driver's own
+ * allocation. The KV cache itself is accounted separately (kvBytesPerToken), so
+ * this is only the fixed non-KV GPU overhead. Tune as CUDA support matures.
+ */
+const CUDA_VRAM_RESERVE_GB = 2;
+
+/**
+ * System-RAM floor a CUDA machine must clear regardless of VRAM: the model lives in
+ * VRAM, but the OS + FULL de-id redactor + resident sidecars still run in system
+ * RAM (redaction-first, never sacrificed). Equal to RESERVED_OVERHEAD_GB so a CUDA
+ * box with plenty of VRAM but too little RAM to host the redactor is (correctly)
+ * denied local chat rather than shipping a model at the cost of the moat.
+ */
+const CUDA_MIN_SYSTEM_RAM_GB = RESERVED_OVERHEAD_GB;
 
 /**
  * Env flag that opens the CPU-only (non-Metal) local path. DEFAULT (unset/empty) =
@@ -147,7 +174,16 @@ function detectHardware(io = {}) {
   const platform = io.platform || process.platform;
   const totalRamGB = Math.round(os.totalmem() / 1e9);
   const isAppleSilicon = platform === 'darwin' && arch === 'arm64';
-  return { totalRamGB, isAppleSilicon, platform, arch };
+  // Acceleration backend (metal | cuda | cpu) + VRAM budget. Probes are injectable
+  // via io (probeNvidiaSmi / execFileSync / env) so this stays hermetic in tests.
+  const accel = detectAccelBackend({
+    platform,
+    arch,
+    env: io.env,
+    probeNvidiaSmi: io.probeNvidiaSmi,
+    execFileSync: io.execFileSync,
+  });
+  return { totalRamGB, isAppleSilicon, platform, arch, accel };
 }
 
 /**
@@ -174,6 +210,32 @@ function estimateTierFit(tier, totalRamGB, overheadGb) {
 }
 
 /**
+ * CUDA fit test for a single tier: the model weights + KV cache at the full context
+ * window must fit in VRAM (after CUDA_VRAM_RESERVE_GB), AND system RAM must clear
+ * CUDA_MIN_SYSTEM_RAM_GB so the FULL redactor stack still runs (redaction-first).
+ *
+ * Unlike the Metal/CPU path, the per-tier `minMemoryGB` comfort floor is NOT applied
+ * to system RAM here — on a discrete-GPU box the deciding budget is VRAM, so a
+ * 32GB-RAM machine with 48GB of VRAM can legitimately host a tier whose unified-
+ * memory floor is 96GB. The VRAM math is the exact analogue of estimateTierFit.
+ *
+ * @returns {{ usableVramGb:number, requiredVramGb:number, vramMaxContextTokens:number,
+ *             effectiveContextTokens:number, fits:boolean }}
+ */
+function estimateTierVramFit(tier, totalRamGB, vramGB, opts = {}) {
+  const vramReserveGb = typeof opts.vramReserveGb === 'number' ? opts.vramReserveGb : CUDA_VRAM_RESERVE_GB;
+  const usableVramGb = Math.max(0, (vramGB || 0) - vramReserveGb);
+  const kvBudgetBytes = Math.max(0, (usableVramGb - tier.weightsGb) * BYTES_PER_GB);
+  const vramMaxContextTokens = Math.floor(kvBudgetBytes / tier.kvBytesPerToken);
+  const effectiveContextTokens = Math.min(vramMaxContextTokens, tier.contextWindow);
+  const requiredVramGb = tier.weightsGb + (tier.contextWindow * tier.kvBytesPerToken) / BYTES_PER_GB;
+  const fits = totalRamGB >= CUDA_MIN_SYSTEM_RAM_GB
+    && usableVramGb >= requiredVramGb
+    && effectiveContextTokens >= MIN_LOCAL_CONTEXT_TOKENS;
+  return { usableVramGb, requiredVramGb, vramMaxContextTokens, effectiveContextTokens, fits };
+}
+
+/**
  * @returns {{ localChat: boolean, tier: string|null, model: string|null,
  *             chatModelFile: string|null, contextWindow: number|null,
  *             embedModelFile: string, reason: string, hardware: object,
@@ -195,15 +257,20 @@ function selectModelPlan(io = {}) {
   const base = { embedModelFile: EMBED_MODEL_FILE, hardware, auxModels: [] };
 
   const allowNonMetal = isFlagOn(process.env[NON_METAL_ENV_FLAG]);
-  // Metal path uses the base reserve; the opt-in CPU path uses a strictly higher
-  // bar. tiers[] annotation reflects the machine-appropriate posture so the
-  // endpoint can show what this machine could actually host.
-  const overheadGb = hardware.isAppleSilicon
-    ? RESERVED_OVERHEAD_GB
-    : RESERVED_OVERHEAD_GB + CPU_LOCAL_EXTRA_RESERVE_GB;
+  const backend = (hardware.accel && hardware.accel.backend) || 'cpu';
+  const vramGB = (hardware.accel && hardware.accel.vramGB) || 0;
 
+  // Per-backend fit posture:
+  //   metal -> RAM-fit at the base reserve (unified memory hosts weights + KV).
+  //   cuda  -> VRAM-fit (weights + KV in VRAM) + a system-RAM floor for the redactor.
+  //   cpu   -> RAM-fit at the strictly higher CPU bar (opt-in only, below).
+  // tiers[] reflects the machine-appropriate posture so the endpoint shows what
+  // this machine could actually host.
+  const cpuOverheadGb = RESERVED_OVERHEAD_GB + CPU_LOCAL_EXTRA_RESERVE_GB;
   const tiers = TIER_LADDER.map((t) => {
-    const f = estimateTierFit(t, hardware.totalRamGB, overheadGb);
+    const f = backend === 'cuda'
+      ? estimateTierVramFit(t, hardware.totalRamGB, vramGB)
+      : estimateTierFit(t, hardware.totalRamGB, backend === 'metal' ? RESERVED_OVERHEAD_GB : cpuOverheadGb);
     return {
       tier: t.tier,
       minMemoryGB: t.minMemoryGB,
@@ -219,23 +286,34 @@ function selectModelPlan(io = {}) {
     chatModelFile: null, contextWindow: null, reason, tiers,
   });
 
-  // Local GGUF inference needs Apple-Silicon Metal unless the operator opts into
-  // the CPU-only path. Default (flag unset) is byte-identical to prior behavior.
-  if (!hardware.isAppleSilicon && !allowNonMetal) {
+  // Local GGUF inference runs on a GPU backend (Metal or CUDA) out of the box; the
+  // CPU-only path stays behind the LANA_ALLOW_NON_METAL_LOCAL opt-in. Default (flag
+  // unset) on a non-GPU machine is byte-identical to prior behavior, including the
+  // 'no_apple_silicon_metal' reason string that downstream/UI consumers key on.
+  if (backend === 'cpu' && !allowNonMetal) {
     return noLocal('no_apple_silicon_metal');
   }
 
   // Largest-first ladder -> the first tier that fits is the largest that fits.
   const chosen = tiers.find((t) => t.fits);
   if (!chosen) {
-    // Distinguish "no tier even clears its RAM floor" from "a floor is cleared but
-    // the redactor-reserved budget cannot hold weights + KV at the context window".
+    if (backend === 'cuda') {
+      // Distinguish "system RAM too small for the redactor stack" from "RAM is fine
+      // but no tier's weights + KV fit in VRAM".
+      return noLocal(hardware.totalRamGB >= CUDA_MIN_SYSTEM_RAM_GB
+        ? 'insufficient_vram' : 'insufficient_ram_for_any_tier');
+    }
+    // Metal/CPU: distinguish "no tier even clears its RAM floor" from "a floor is
+    // cleared but the redactor-reserved budget cannot hold weights + KV at ctx".
     const anyFloorCleared = TIER_LADDER.some((t) => hardware.totalRamGB >= t.minMemoryGB);
     return noLocal(anyFloorCleared ? 'insufficient_context' : 'insufficient_ram_for_any_tier');
   }
 
   const spec = TIER_LADDER.find((t) => t.tier === chosen.tier);
-  const posture = hardware.isAppleSilicon ? '' : '_cpu';
+  // posture tags the reason; the "size" that qualified the machine is VRAM on CUDA,
+  // system RAM on Metal/CPU.
+  const posture = backend === 'metal' ? '' : `_${backend}`;
+  const sizeGb = backend === 'cuda' ? vramGB : hardware.totalRamGB;
   return {
     ...base,
     localChat: true,
@@ -249,7 +327,7 @@ function selectModelPlan(io = {}) {
     // lane checks the user's model-setup download state for actual on-disk
     // availability before spawning llamacpp-legal / llamacpp-vision.
     auxModels: auxModelsForTier(spec.tier),
-    reason: `selected_${spec.tier}_for_${hardware.totalRamGB}gb${posture}`,
+    reason: `selected_${spec.tier}_for_${sizeGb}gb${posture}`,
     tiers,
   };
 }
@@ -258,6 +336,7 @@ module.exports = {
   selectModelPlan,
   detectHardware,
   estimateTierFit,
+  estimateTierVramFit,
   auxModelsForTier,
   AUX_MODELS_BY_TIER,
   TIER_LADDER,
@@ -266,5 +345,7 @@ module.exports = {
   REDACTOR_RESERVE_GB,
   MIN_LOCAL_CONTEXT_TOKENS,
   CPU_LOCAL_EXTRA_RESERVE_GB,
+  CUDA_VRAM_RESERVE_GB,
+  CUDA_MIN_SYSTEM_RAM_GB,
   NON_METAL_ENV_FLAG,
 };

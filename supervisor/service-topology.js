@@ -26,6 +26,35 @@ function cleanEnv(obj) {
   return out;
 }
 
+// VRAM (GB) at/above which a CUDA GPU gets FULL offload; below it, a conservative
+// partial offload so llama-server doesn't OOM the card (the rest runs on CPU).
+const CUDA_FULL_OFFLOAD_MIN_VRAM_GB = 12;
+const CUDA_PARTIAL_OFFLOAD_LAYERS = '20';
+
+/**
+ * Choose --n-gpu-layers as a PURE function of the detected acceleration backend,
+ * replacing the old hardcoded '16' (which under-offloaded on Metal and blindly
+ * assumed a GPU on every host). llama.cpp treats 99 as "offload every layer".
+ *   metal -> '99' (full offload; Apple-Silicon unified memory)
+ *   cuda  -> '99' when VRAM is ample, else a conservative partial offload
+ *   cpu   -> '0'  (no GPU layers)
+ * When accel is absent (older callers / tests) we default to full offload, matching
+ * the Apple-Silicon Metal builds that ship today.
+ *
+ * @param {object} [accel] - { backend:'metal'|'cuda'|'cpu', vramGB?:number }
+ * @returns {string} the --n-gpu-layers value
+ */
+function gpuLayersFor(accel) {
+  const backend = accel && accel.backend;
+  if (backend === 'cpu') return '0';
+  if (backend === 'cuda') {
+    const vram = (accel && accel.vramGB) || 0;
+    return vram >= CUDA_FULL_OFFLOAD_MIN_VRAM_GB ? '99' : CUDA_PARTIAL_OFFLOAD_LAYERS;
+  }
+  // 'metal' or unknown/absent -> full offload.
+  return '99';
+}
+
 /**
  * @param {object} cfg
  * @param {object} cfg.paths - { postgres, initdb, psql, createdb, minio, llamaServer, embedModel,
@@ -35,6 +64,9 @@ function cleanEnv(obj) {
  * @param {object} [cfg.ports] - overrides for { pg, minio, minioConsole, llamaEmbed, llamaChat, docling, unstructured, backend }
  * @param {object} cfg.secrets - from SecretManager.ensureSecrets()
  * @param {string} [cfg.tier='demo']
+ * @param {object} [cfg.accel] - detected acceleration capability
+ *   ({ backend:'metal'|'cuda'|'cpu', vramGB? }) from hardware-accel/model-selector;
+ *   drives --n-gpu-layers for every llama-server spec (see gpuLayersFor).
  * @param {object} [cfg.localModelsStatus] - boot-time local-model capability snapshot
  *   (hardware, selected tier/model, localChat availability, tier ladder, routing),
  *   serialized into the backend env as LANA_LOCAL_MODELS_STATUS for
@@ -58,6 +90,10 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
     ...(cfg.ports || {}),
   };
   const specs = [];
+
+  // --n-gpu-layers for every llama-server sidecar, chosen once from the detected
+  // acceleration backend (Metal/CUDA/CPU) instead of the old hardcoded '16'.
+  const nGpuLayers = gpuLayersFor(cfg.accel);
 
   // 1. Postgres (first-run init via injected hooks)
   specs.push({
@@ -87,7 +123,7 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
     command: p.llamaServer,
     args: [
       '--model', p.embedModel, '--port', String(ports.llamaEmbed), '--host', '127.0.0.1',
-      '--embedding', '--n-gpu-layers', '16', '--threads', '-1', '--ctx-size', '2048',
+      '--embedding', '--n-gpu-layers', nGpuLayers, '--threads', '-1', '--ctx-size', '2048',
       '--batch-size', '2048', '--ubatch-size', '2048', '--flash-attn', 'on', '--cont-batching',
     ],
     readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.llamaEmbed}/health` }),
@@ -101,7 +137,7 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
       command: p.llamaServer,
       args: [
         '--model', p.chatModel, '--port', String(ports.llamaChat), '--host', '127.0.0.1',
-        '--n-gpu-layers', '16', '--threads', '-1', '--ctx-size', String(cfg.chatContext || 8192),
+        '--n-gpu-layers', nGpuLayers, '--threads', '-1', '--ctx-size', String(cfg.chatContext || 8192),
         '--batch-size', '128', '--ubatch-size', '256', '--parallel', '1',
         '--flash-attn', 'on', '--cont-batching',
       ],
@@ -145,7 +181,7 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
       command: p.llamaServer,
       args: [
         '--model', p.legalModel, '--port', String(ports.legal), '--host', '127.0.0.1',
-        '--n-gpu-layers', '16', '--threads', '-1', '--ctx-size', String(cfg.chatContext || 8192),
+        '--n-gpu-layers', nGpuLayers, '--threads', '-1', '--ctx-size', String(cfg.chatContext || 8192),
         '--batch-size', '128', '--ubatch-size', '256', '--parallel', '1',
         '--flash-attn', 'on', '--cont-batching',
       ],
@@ -162,7 +198,7 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
       args: [
         '--model', p.visionModel, '--port', String(ports.vision), '--host', '127.0.0.1',
         ...(p.visionMmproj ? ['--mmproj', p.visionMmproj] : []),
-        '--n-gpu-layers', '16', '--threads', '-1', '--ctx-size', String(cfg.chatContext || 8192),
+        '--n-gpu-layers', nGpuLayers, '--threads', '-1', '--ctx-size', String(cfg.chatContext || 8192),
         '--batch-size', '128', '--ubatch-size', '256', '--parallel', '1',
         '--flash-attn', 'on', '--cont-batching',
       ],
@@ -271,4 +307,4 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
   return specs;
 }
 
-module.exports = { buildServiceSpecs };
+module.exports = { buildServiceSpecs, gpuLayersFor };

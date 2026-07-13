@@ -125,6 +125,207 @@ async function startSovereignStack() {
 }
 
 /**
+ * BLOCKING recovery state for a lost encryption key.
+ *
+ * Entered ONLY when startSovereignStack() rejects with an
+ * ENCRYPTION_KEY_UNAVAILABLE fault (an encryption-class secret exists on disk but
+ * cannot be decrypted on this machine — see electron-keychain-store.js). We must
+ * NOT fall through to connect-only here: the local backend would boot against
+ * unreadable at-rest data (or SecretManager would be tempted to re-key and orphan
+ * it) with no user-visible signal. Instead we surface the fault and offer to import
+ * a passphrase-wrapped recovery bundle (supervisor/key-recovery.js), restore the
+ * exact keys, then retry the stack.
+ *
+ * A minimal-but-functional flow: a native message box + file picker + a small
+ * passphrase-prompt window. Loops so a wrong passphrase / incomplete bundle can be
+ * retried; "Quit" exits rather than booting degraded. Once the keys are restored,
+ * only a *different* (non-encryption) start failure falls back to connect-only.
+ *
+ * @param {Error & {code?:string, keys?:string[]}} initialErr
+ */
+async function handleEncryptionKeyUnavailable(initialErr) {
+  const recoveryLog = { info: logInfo, warn: logInfo, error: logError };
+  let err = initialErr;
+  logError(
+    `[supervisor] ENCRYPTION KEY UNAVAILABLE — entering blocking recovery state `
+    + `(keys: ${(err && err.keys ? err.keys : []).join(', ')})`
+  );
+
+  while (err && err.code === 'ENCRYPTION_KEY_UNAVAILABLE') {
+    const affectedKeys = Array.isArray(err.keys) ? err.keys : [];
+    const choice = dialog.showMessageBoxSync({
+      type: 'error',
+      title: 'Encryption key unavailable',
+      message: 'LANA One cannot read your encryption key on this machine.',
+      detail:
+        'Your local data is encrypted with a key held in this computer’s keychain, '
+        + 'and that key is currently unavailable (the keychain may have been reset, or this '
+        + 'may be a new machine). Your encrypted data cannot be read until the key is '
+        + 'restored.\n\n'
+        + 'Import your recovery key to restore it. Generating a new key would permanently '
+        + 'orphan your existing encrypted data, so LANA One will not start until this is '
+        + 'resolved.'
+        + (affectedKeys.length ? `\n\nAffected keys: ${affectedKeys.join(', ')}` : ''),
+      buttons: ['Import recovery key…', 'Quit'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+
+    if (choice !== 0) {
+      logInfo('[supervisor] user chose Quit at the key-recovery prompt');
+      app.quit();
+      return;
+    }
+
+    const picked = dialog.showOpenDialogSync({
+      title: 'Select your LANA One recovery key',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Recovery key', extensions: ['json', 'lanakey'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    if (!picked || picked.length === 0) continue; // no file chosen — back to the prompt
+    const bundlePath = picked[0];
+
+    const passphrase = await promptRecoveryPassphrase(bundlePath);
+    if (passphrase == null) continue; // cancelled the passphrase prompt
+
+    // Parse + restore the bundle into the SAME stack-secrets store the supervisor
+    // uses. restoreInto writes the recovered keys atomically (restore-mode), so the
+    // fault clears; the subsequent startSovereignStack() constructs a fresh store
+    // that now decrypts cleanly.
+    try {
+      // eslint-disable-next-line global-require
+      const { parseBundle, restoreInto } = require('./supervisor/key-recovery');
+      const bundle = parseBundle(fs.readFileSync(bundlePath, 'utf8'));
+      const recoveryStore = new KeychainSecretStore({
+        userDataRoot: app.getPath('userData'),
+        fileName: 'stack-secrets.enc.json',
+        logger: recoveryLog,
+      });
+      const res = await restoreInto(recoveryStore, bundle, passphrase);
+      logInfo(`[supervisor] recovery restored key(s): ${res.restored.join(', ') || '(none)'}`);
+    } catch (recoverErr) {
+      const code = recoverErr && recoverErr.code;
+      let msg;
+      if (code === 'RECOVERY_PASSPHRASE_INVALID') {
+        msg = 'That passphrase is incorrect. Please try again.';
+      } else if (code === 'RECOVERY_BUNDLE_INVALID') {
+        msg = 'That file is not a valid LANA One recovery key.';
+      } else {
+        msg = `Recovery failed: ${(recoverErr && recoverErr.message) || String(recoverErr)}`;
+      }
+      logError(`[supervisor] recovery import failed: ${(recoverErr && recoverErr.message) || recoverErr}`);
+      dialog.showMessageBoxSync({
+        type: 'error', title: 'Recovery failed', message: msg,
+        buttons: ['Try again'], defaultId: 0, noLink: true,
+      });
+      continue; // back to the prompt for another attempt
+    }
+
+    // Keys restored — retry the full stack bring-up.
+    try {
+      await startSovereignStack();
+      logInfo('[supervisor] sovereign stack recovered and started after key import');
+      return;
+    } catch (retryErr) {
+      if (retryErr && retryErr.code === 'ENCRYPTION_KEY_UNAVAILABLE') {
+        // The bundle did not contain every affected key — loop for another import.
+        logError(
+          `[supervisor] still sealed after restore (missing key in bundle?): `
+          + `${(retryErr.keys || []).join(', ')}`
+        );
+        err = retryErr;
+        continue;
+      }
+      // A DIFFERENT start failure now that the keys are healthy: this is an ordinary
+      // start problem, so the standard connect-only fallback is appropriate.
+      logError(
+        `[supervisor] post-recovery start failed; falling back to connect-only: `
+        + `${retryErr && retryErr.message}`
+      );
+      return;
+    }
+  }
+}
+
+/**
+ * Minimal modal passphrase prompt for recovery-key import. Electron's dialog module
+ * cannot collect free text, so we open a tiny local window (data: URL, no network)
+ * whose only job is to return the typed passphrase over IPC. Resolves to the string
+ * on submit, or null on cancel / close / Escape.
+ *
+ * @param {string} bundlePath - shown to the user so they know which file they picked.
+ * @returns {Promise<string|null>}
+ */
+function promptRecoveryPassphrase(bundlePath) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const channel = `recovery-pass:${crypto.randomBytes(8).toString('hex')}`;
+    const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+    const win = new BrowserWindow({
+      width: 480,
+      height: 250,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      title: 'Import recovery key',
+      modal: !!parent,
+      parent,
+      webPreferences: { nodeIntegration: true, contextIsolation: false },
+    });
+    try { win.setMenuBarVisibility(false); } catch (_) { /* noop */ }
+
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      try { ipcMain.removeAllListeners(channel); } catch (_) { /* noop */ }
+      try { if (!win.isDestroyed()) win.close(); } catch (_) { /* noop */ }
+      resolve(value);
+    };
+
+    ipcMain.once(channel, (_e, value) => finish(typeof value === 'string' ? value : null));
+    win.on('closed', () => finish(null));
+
+    // Escape anything that could break out of the <p> text; the path is display-only.
+    const safeName = String(bundlePath).replace(/[&<>"]/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
+    ));
+    const html = `<!doctype html><html><head><meta charset="utf-8">`
+      + `<style>`
+      + `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;`
+      + `padding:18px;background:#1e1e1e;color:#eee}`
+      + `h1{font-size:14px;margin:0 0 6px}`
+      + `p{font-size:11px;color:#9aa0a6;margin:0 0 12px;word-break:break-all}`
+      + `input{width:100%;box-sizing:border-box;padding:9px;font-size:13px;border-radius:6px;`
+      + `border:1px solid #555;background:#2a2a2a;color:#fff}`
+      + `.row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}`
+      + `button{padding:8px 16px;font-size:13px;border-radius:6px;border:0;cursor:pointer}`
+      + `#ok{background:#3b82f6;color:#fff}#cancel{background:#3a3a3a;color:#ddd}`
+      + `</style></head><body>`
+      + `<h1>Enter your recovery passphrase</h1>`
+      + `<p>${safeName}</p>`
+      + `<input id="pass" type="password" placeholder="Recovery passphrase" autofocus />`
+      + `<div class="row"><button id="cancel">Cancel</button><button id="ok">Restore</button></div>`
+      + `<script>`
+      + `const { ipcRenderer } = require('electron');`
+      + `const input = document.getElementById('pass');`
+      + `const send = (v) => ipcRenderer.send(${JSON.stringify(channel)}, v);`
+      + `document.getElementById('ok').onclick = () => send(input.value);`
+      + `document.getElementById('cancel').onclick = () => send(null);`
+      + `input.addEventListener('keydown', (e) => {`
+      + `if (e.key === 'Enter') send(input.value);`
+      + `if (e.key === 'Escape') send(null); });`
+      + `input.focus();`
+      + `</script></body></html>`;
+    win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  });
+}
+
+/**
  * Brainchild MCP bridge — reads the user's local vault over the MCP stdio
  * server (brainchild/bin/brainchild-mcp.js). Spawned lazily on first read and
  * reused; torn down on quit. The link config (install + vault path) is persisted
@@ -800,7 +1001,13 @@ if (IS_LANA_ONE) {
     if (!_cloudAuth) {
       const keychain = new KeychainSecretStore({
         userDataRoot: app.getPath('userData'),
-        logger: cloudLog
+        logger: cloudLog,
+        // This store holds only cloud-auth tokens (cloud-auth.enc.json) — all freely
+        // RE-OBTAINABLE by logging in again. It must NOT inherit the default
+        // encryption-class protected set: if the OS keychain rotates, the right
+        // behavior is to prompt re-auth, not to SEAL login behind a blocking
+        // encryption-key-unavailable fault. Empty protected set = drop-and-reauth.
+        protectedKeys: []
       });
       _cloudAuth = new CloudAuth({
         keychain,
@@ -1613,12 +1820,21 @@ app.whenReady().then(async () => {
   }
 
   // Opt-in: spawn + health-gate the local sovereign stack (backend + Postgres + MinIO
-  // + models) before the login window. On failure we log and fall through to the
-  // connect-only path (against the configured/dev backend), so this is safe to enable.
+  // + models) before the login window. On a GENERIC failure we log and fall through to
+  // the connect-only path (against the configured/dev backend), so this is safe to
+  // enable. The ONE exception is a lost encryption key
+  // (err.code === 'ENCRYPTION_KEY_UNAVAILABLE', raised by SecretManager.ensureSecrets
+  // via the keychain store's loud-fail guard): connect-only there would silently run
+  // degraded with the user's at-rest data unreadable and no signal. Instead we enter a
+  // BLOCKING recovery state (dialog + recovery-key import) — never connect-only.
   try {
     await startSovereignStack();
   } catch (err) {
-    logError(`[supervisor] sovereign stack start failed; falling back to connect-only: ${err && err.message}`);
+    if (err && err.code === 'ENCRYPTION_KEY_UNAVAILABLE') {
+      await handleEncryptionKeyUnavailable(err);
+    } else {
+      logError(`[supervisor] sovereign stack start failed; falling back to connect-only: ${err && err.message}`);
+    }
   }
 
   // Version migration: Clear server config to ensure fresh discovery with correct static_ip

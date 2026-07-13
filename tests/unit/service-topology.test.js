@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildServiceSpecs } = require('../../supervisor/service-topology');
+const { buildServiceSpecs, gpuLayersFor } = require('../../supervisor/service-topology');
 
 // Fake probes: return a tagged sentinel so we can assert wiring without I/O.
 const fakeProbes = {
@@ -91,5 +91,49 @@ describe('buildServiceSpecs', () => {
     expect(e.LLAMACPP_MAIN_URL).toBe('http://127.0.0.1:8081');
     expect(e.DOCLING_API_URL).toBe('http://127.0.0.1:8085');
     expect(e.UNSTRUCTURED_API_URL).toBe('http://127.0.0.1:8000');
+  });
+});
+
+describe('gpuLayersFor (pure fn of the detected backend)', () => {
+  it('full-offloads on Metal', () => {
+    expect(gpuLayersFor({ backend: 'metal' })).toBe('99');
+  });
+  it('full-offloads on ample-VRAM CUDA, partial on a small card', () => {
+    expect(gpuLayersFor({ backend: 'cuda', vramGB: 24 })).toBe('99');
+    expect(gpuLayersFor({ backend: 'cuda', vramGB: 6 })).toBe('20');
+  });
+  it('offloads nothing on CPU', () => {
+    expect(gpuLayersFor({ backend: 'cpu' })).toBe('0');
+  });
+  it('defaults to full offload when accel is absent (Apple-Silicon builds shipping today)', () => {
+    expect(gpuLayersFor(undefined)).toBe('99');
+  });
+});
+
+describe('--n-gpu-layers wiring from cfg.accel', () => {
+  const nGpuOf = (spec) => {
+    const i = spec.args.indexOf('--n-gpu-layers');
+    return i >= 0 ? spec.args[i + 1] : undefined;
+  };
+  const buildWith = (accel) => buildServiceSpecs(baseCfg({
+    accel,
+    paths: { chatModel: '/models/qwen.gguf' },
+  }), fakeProbes);
+
+  it('propagates the backend-chosen value to embed + chat llama servers (CUDA)', () => {
+    const specs = buildWith({ backend: 'cuda', vramGB: 24 });
+    expect(nGpuOf(specs.find((s) => s.name === 'llama-embed'))).toBe('99');
+    expect(nGpuOf(specs.find((s) => s.name === 'llama-chat'))).toBe('99');
+  });
+
+  it('uses 0 GPU layers on the CPU backend', () => {
+    const specs = buildWith({ backend: 'cpu' });
+    expect(nGpuOf(specs.find((s) => s.name === 'llama-embed'))).toBe('0');
+    expect(nGpuOf(specs.find((s) => s.name === 'llama-chat'))).toBe('0');
+  });
+
+  it('uses a partial offload on a small CUDA card', () => {
+    const specs = buildWith({ backend: 'cuda', vramGB: 6 });
+    expect(nGpuOf(specs.find((s) => s.name === 'llama-chat'))).toBe('20');
   });
 });

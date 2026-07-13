@@ -38,23 +38,86 @@ function makeExec(realSpawn) {
   });
 }
 
+// First existing candidate, else a bare fallback (found on PATH at spawn time).
+function firstExisting(fs, candidates, fallback) {
+  for (const c of candidates) {
+    try { if (c && fs.existsSync(c)) return c; } catch (_e) { /* ignore */ }
+  }
+  return fallback;
+}
+
 /**
- * Resolve the DEV binary paths (Homebrew PG/minio, source-built llama-server, the
- * lana-one repo). Phase B replaces these with app-bundle-relative paths.
+ * Resolve the DEV binary paths. Platform-aware (Phase 1 scaffolding): macOS keeps
+ * its exact Homebrew/source behavior; linux/win32 resolve from a small candidate
+ * list, falling back to a bare command name (found on PATH). This is DEV-mode only
+ * scaffolding so the stack can be brought up on a Linux/Windows dev box using
+ * distro/PATH binaries; PACKAGED builds use resolveBundledPaths, and true per-OS
+ * binary BUNDLING is Phase 2 (see docs/specs/CROSS_PLATFORM_BUILD_MATRIX.md).
+ *
+ * @param {string} [platform] - defaults to process.platform (injected for tests)
  */
-function resolveDevPaths({ home, repoRoot, modelsDir, fs }) {
-  const pgPrefix = fs.existsSync('/opt/homebrew/opt/postgresql@17')
-    ? '/opt/homebrew/opt/postgresql@17' : '/usr/local/opt/postgresql@17';
-  const minio = fs.existsSync('/opt/homebrew/bin/minio') ? '/opt/homebrew/bin/minio' : '/usr/local/bin/minio';
+function resolveDevPaths({ home, repoRoot, modelsDir, fs, platform }) {
+  const plat = platform || process.platform;
+  const embedModel = nodePath.join(modelsDir, 'nomic-embed-text-v1.5.f16.gguf');
+
+  // macOS: UNCHANGED (byte-identical to the prior Homebrew/source resolution).
+  if (plat === 'darwin') {
+    const pgPrefix = fs.existsSync('/opt/homebrew/opt/postgresql@17')
+      ? '/opt/homebrew/opt/postgresql@17' : '/usr/local/opt/postgresql@17';
+    const minio = fs.existsSync('/opt/homebrew/bin/minio') ? '/opt/homebrew/bin/minio' : '/usr/local/bin/minio';
+    return {
+      postgres: `${pgPrefix}/bin/postgres`,
+      initdb: `${pgPrefix}/bin/initdb`,
+      psql: `${pgPrefix}/bin/psql`,
+      createdb: `${pgPrefix}/bin/createdb`,
+      minio,
+      llamaServer: nodePath.join(home, 'llama.cpp/build/bin/llama-server'),
+      embedModel,
+      node: 'node',
+      backendCwd: repoRoot,
+    };
+  }
+
+  const exe = plat === 'win32' ? '.exe' : '';
+
+  if (plat === 'linux') {
+    // Distro Postgres 17 keg dirs (Debian/Ubuntu, then RHEL); else PATH.
+    const pgBinDir = firstExisting(fs, [
+      '/usr/lib/postgresql/17/bin',
+      '/usr/pgsql-17/bin',
+    ], null);
+    const pgBin = (name) => (pgBinDir ? nodePath.join(pgBinDir, name) : name);
+    return {
+      postgres: pgBin('postgres'),
+      initdb: pgBin('initdb'),
+      psql: pgBin('psql'),
+      createdb: pgBin('createdb'),
+      minio: firstExisting(fs, ['/usr/local/bin/minio', '/usr/bin/minio'], 'minio'),
+      llamaServer: firstExisting(fs, [
+        nodePath.join(home, 'llama.cpp/build/bin/llama-server'),
+        '/usr/local/bin/llama-server',
+      ], 'llama-server'),
+      embedModel,
+      node: 'node',
+      backendCwd: repoRoot,
+    };
+  }
+
+  // win32 (and any other platform): best-effort PATH/candidate resolution. NOTE:
+  // Windows dev currently requires manually provisioned binaries (no Homebrew) --
+  // Postgres/MinIO/llama-server on PATH, or bundled per CROSS_PLATFORM_BUILD_MATRIX.md
+  // Phase 2. This keeps a Windows dev run from hardcoding darwin-only paths.
   return {
-    postgres: `${pgPrefix}/bin/postgres`,
-    initdb: `${pgPrefix}/bin/initdb`,
-    psql: `${pgPrefix}/bin/psql`,
-    createdb: `${pgPrefix}/bin/createdb`,
-    minio,
-    llamaServer: nodePath.join(home, 'llama.cpp/build/bin/llama-server'),
-    embedModel: nodePath.join(modelsDir, 'nomic-embed-text-v1.5.f16.gguf'),
-    node: 'node',
+    postgres: `postgres${exe}`,
+    initdb: `initdb${exe}`,
+    psql: `psql${exe}`,
+    createdb: `createdb${exe}`,
+    minio: `minio${exe}`,
+    llamaServer: firstExisting(fs, [
+      nodePath.join(home, 'llama.cpp', 'build', 'bin', `llama-server${exe}`),
+    ], `llama-server${exe}`),
+    embedModel,
+    node: `node${exe}`,
     backendCwd: repoRoot,
   };
 }
@@ -161,6 +224,7 @@ function createStackBootstrap(opts = {}) {
     probes: opts.probes || defaultProbes,
     logger: opts.logger || { info() {}, warn() {}, error() {} },
     os: opts.os || require('os'),
+    platform: opts.platform || process.platform,
   };
   const exec = opts.exec || makeExec(io.spawn);
   const log = io.logger;
@@ -203,7 +267,7 @@ function createStackBootstrap(opts = {}) {
       paths = { ...bundled, node: opts.node || bundled.node, backendCwd: repoRoot || bundled.backendCwd };
     } else {
       if (!repoRoot) throw new Error('bootstrap requires repoRoot (the lana-one backend dir) in dev mode');
-      paths = resolveDevPaths({ home, repoRoot, modelsDir, fs: io.fs });
+      paths = resolveDevPaths({ home, repoRoot, modelsDir, fs: io.fs, platform: io.platform });
     }
     if (!paths.backendCwd) throw new Error('bootstrap could not resolve the backend directory');
     // Optional doc parsers may be absent from the bundle (e.g. staged with
@@ -379,6 +443,9 @@ function createStackBootstrap(opts = {}) {
       dataDirs, ports, secrets,
       tier: plan.tier || opts.tier || 'demo',
       chatContext: plan.contextWindow,
+      // Detected acceleration backend (metal|cuda|cpu, + VRAM) -> drives
+      // --n-gpu-layers for every llama-server sidecar (service-topology.gpuLayersFor).
+      accel: plan.hardware && plan.hardware.accel,
       localModelsStatus,
       desktopKey,
       extraEnv: opts.extraEnv,
