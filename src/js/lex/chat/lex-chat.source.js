@@ -497,6 +497,14 @@
         case 'citations':
           return { type: 'citations', citations: data.citations || data.sources || [] };
 
+        // ADDITIVE honesty events. Passed through faithfully; absent on
+        // local/passthrough (receipt) and non-legal (verification) turns.
+        case 'sovereignty_receipt':
+          return { type: 'sovereignty_receipt', receipt: data.receipt || null, redaction: data.redaction || null };
+
+        case 'citation_verification':
+          return { type: 'citation_verification', citations: data.citations || [], summary: data.summary || null };
+
         case 'context_usage':
           return {
             type: 'context_usage',

@@ -12,6 +12,7 @@
   <script src="js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="css/lex-chat.css">
   <link rel="stylesheet" href="css/chat-v2.css">
+  <link rel="stylesheet" href="css/chat-verify-panels.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <style>
     @keyframes cv2-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
@@ -195,6 +196,10 @@
 
   <!-- Services used by chat components -->
   <script src="js/services/document-processing.service.js"></script>
+
+  <!-- Additive verification panels (sovereignty receipt + citation gate). Must
+       load before the chat component chain that consumes window.LanaVerifyPanels. -->
+  <script src="js/chat-verify-panels.js"></script>
 
   <!-- Chat component chain (dependency order) -->
   <script src="js/lex/chat/lex-chat.format.js"></script>

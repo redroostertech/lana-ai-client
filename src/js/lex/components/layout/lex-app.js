@@ -634,6 +634,8 @@
         var routes = {
           admin: 'admin/index.html',
           connectors: 'data-connectors.html',
+          account: 'account.html',
+          billing: 'billing.html',
           settings: 'settings-v2.html',
           help: 'help.html'
         };
@@ -842,6 +844,8 @@
           menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
         }
         menuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' });
+        menuItems.push({ id: 'account', label: 'Account', icon: 'user', href: 'account.html' });
+        menuItems.push({ id: 'billing', label: 'Billing and Plan', icon: 'credit-card', href: 'billing.html' });
         menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings-v2.html' });
         menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
         menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
@@ -853,6 +857,8 @@
           topbarMenuItems.push({ id: 'admin', label: 'Administration', icon: 'users' });
         }
         topbarMenuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug' });
+        topbarMenuItems.push({ id: 'account', label: 'Account', icon: 'user' });
+        topbarMenuItems.push({ id: 'billing', label: 'Billing and Plan', icon: 'credit-card' });
         topbarMenuItems.push({ id: 'settings', label: 'Settings', icon: 'settings' });
         topbarMenuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle' });
         topbarMenuItems.push({ divider: true });

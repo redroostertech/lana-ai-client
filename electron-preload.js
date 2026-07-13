@@ -21,6 +21,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getConfig: () => ipcRenderer.invoke('get-config'),
 
   /**
+   * LANA One individual "Log in with LANA" cloud login (edition-gated).
+   * The underlying IPC handlers exist only in the LANA One edition; these
+   * bridges are inert otherwise. Tokens never cross this boundary — only
+   * token-free {ok, userId, email, entitlement} / {authenticated,...} views.
+   */
+  cloudAuth: {
+    login: () => ipcRenderer.invoke('cloud-auth:login'),
+    passwordLogin: (email, password) => ipcRenderer.invoke('cloud-auth:password-login', email, password),
+    adopt: () => ipcRenderer.invoke('cloud-auth:adopt'),
+    getState: () => ipcRenderer.invoke('cloud-auth:state'),
+    logout: () => ipcRenderer.invoke('cloud-auth:logout'),
+    ensureRelay: () => ipcRenderer.invoke('cloud-auth:ensure-relay'),
+    refreshEntitlement: () => ipcRenderer.invoke('cloud-auth:refresh-entitlement')
+  },
+
+  /**
    * Debug logging - sends logs to main process for export
    */
   logError: (message, error) => ipcRenderer.invoke('renderer-log-error', message, error),

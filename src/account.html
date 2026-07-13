@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account - LANA AI</title>
+
+  <link rel="stylesheet" href="css/lex-tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/settings-v2.css">
+  <link rel="stylesheet" href="css/billing.css">
+  <link rel="stylesheet" href="css/tailwind-output.css">
+  <script src="js/tailwind-loader.js"></script>
+
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="dashboard.html"
+    active-nav-id="account"
+    page-title="Account"
+  ></lex-app>
+
+  <template id="page-content">
+
+    <main class="bl-page">
+
+      <!-- Identity -->
+      <section class="bl-section">
+        <lex-card heading="Profile" subtitle="Your identity on LANA One">
+          <lex-stack direction="horizontal" gap="6" align="center">
+            <div class="sv2-avatar">
+              <span id="ac-avatar-initials" class="sv2-avatar-text">U</span>
+            </div>
+            <lex-stack direction="vertical" gap="1">
+              <lex-text id="ac-name" variant="primary" size="h4" tag="h3">Loading...</lex-text>
+              <lex-text id="ac-email" variant="secondary" size="body-sm" tag="p"></lex-text>
+            </lex-stack>
+          </lex-stack>
+
+          <lex-divider spacing="md"></lex-divider>
+
+          <div class="sv2-kv-grid">
+            <lex-kv id="ac-kv-firstname" label="First Name" value="--"></lex-kv>
+            <lex-kv id="ac-kv-lastname" label="Last Name" value="--"></lex-kv>
+            <lex-kv id="ac-kv-role" label="Role" value="--"></lex-kv>
+            <lex-kv id="ac-kv-org" label="Organization" value="--"></lex-kv>
+          </div>
+
+          <div class="sv2-form-actions" style="margin-top:1rem">
+            <lex-btn id="ac-edit-profile-btn" variant="secondary" size="sm" leading-icon="settings">Edit in Settings</lex-btn>
+          </div>
+        </lex-card>
+      </section>
+
+      <!-- Plan status -->
+      <section class="bl-section">
+        <lex-card heading="Plan" subtitle="Your current LANA One plan">
+          <div class="bl-plan-row">
+            <div class="bl-card-icon" id="ac-plan-icon"></div>
+            <div>
+              <p class="bl-plan-name" id="ac-plan-name">Loading...</p>
+              <p class="bl-plan-meta" id="ac-plan-meta"></p>
+            </div>
+            <div class="bl-plan-actions">
+              <lex-btn id="ac-billing-btn" variant="primary" size="sm" leading-icon="credit-card">Billing and plan</lex-btn>
+            </div>
+          </div>
+        </lex-card>
+      </section>
+
+      <!-- Cloud relay -->
+      <section class="bl-section">
+        <lex-card heading="Cloud relay" subtitle="Connect this device to your LANA account for cloud model access">
+          <lex-stack direction="horizontal" gap="3" align="center">
+            <lex-badge id="cr-status-badge" label="Loading" color="gray"></lex-badge>
+            <lex-text id="cr-status-text" variant="secondary" size="body-sm" tag="p"></lex-text>
+          </lex-stack>
+
+          <!-- Sign-in slot: the "Sign in to LANA" primary action (automated
+               token minting) lands here, above the manual group. -->
+          <div id="cr-signin-slot"></div>
+
+          <lex-divider spacing="md"></lex-divider>
+
+          <lex-text variant="primary" size="body" tag="h4">Configure manually</lex-text>
+          <lex-text variant="secondary" size="body-sm" tag="p">Paste a relay token from your LANA account. The token stays on this device and is used only to reach the relay.</lex-text>
+
+          <lex-stack direction="vertical" gap="3">
+            <lex-input id="cr-base-url" label="Relay URL" placeholder="https://one.lanaai.io/api/v1/relay"></lex-input>
+            <lex-input id="cr-token" label="Relay token" type="password" placeholder="Paste your relay token"></lex-input>
+          </lex-stack>
+
+          <div class="sv2-form-actions" style="margin-top:1rem">
+            <lex-btn id="cr-test-btn" variant="secondary" size="sm" leading-icon="signal">Test connection</lex-btn>
+            <lex-btn id="cr-save-btn" variant="primary" size="sm" leading-icon="save">Save</lex-btn>
+            <lex-btn id="cr-disconnect-btn" variant="danger" size="sm" leading-icon="unlink" style="display:none">Disconnect</lex-btn>
+          </div>
+        </lex-card>
+      </section>
+
+      <!-- Session -->
+      <section class="bl-section">
+        <lex-card heading="Session" subtitle="Sign out of this device">
+          <div class="sv2-form-actions">
+            <lex-btn id="ac-signout-btn" variant="danger" size="sm" leading-icon="log-out">Sign out</lex-btn>
+          </div>
+        </lex-card>
+      </section>
+
+    </main>
+
+  </template>
+
+  <noscript>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
+      Please enable JavaScript to use LANA AI.
+    </div>
+  </noscript>
+
+  <!-- Universal shell scripts -->
+  <script src="js/error-reporter.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/utils/rename-conversation.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/navigation-helpers.js"></script>
+  <script src="js/new-project-modal.js"></script>
+  <script src="js/conversation-menu.js"></script>
+  <script src="js/conversation-search-modal.js"></script>
+  <script src="js/contact-search-modal.js"></script>
+  <script src="js/notifications.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI foundation -->
+  <script src="js/lex/components/foundation/lex-loader.js"></script>
+  <script src="js/lex/components/foundation/lex-toast.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+
+  <!-- Lex UI layout -->
+  <script src="js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="js/lex/components/layout/lex-topbar.js"></script>
+  <script src="js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page-specific Lex components (loaded BEFORE inject) -->
+  <script src="js/lex/components/foundation/lex-card.js"></script>
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-text.js"></script>
+  <script src="js/lex/components/foundation/lex-stack.js"></script>
+  <script src="js/lex/components/foundation/lex-divider.js"></script>
+  <script src="js/lex/components/foundation/lex-kv.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+
+  <!-- Inject page content + hoist modals -->
+  <script src="js/lex/lex-page-init.js"></script>
+
+  <!-- Billing data + API + page controller -->
+  <script src="js/billing/pricing-tiers.js"></script>
+  <script src="js/api/billing-api.client.js"></script>
+  <script src="js/pages/account.js"></script>
+
+  <!-- Cloud relay state + API + section controller -->
+  <script src="js/relay/relay-settings-state.js"></script>
+  <script src="js/api/relay-api.client.js"></script>
+  <script src="js/pages/account-relay.js"></script>
+
+  <!-- Auth guard + loader dismiss (MUST be last) -->
+  <script src="js/auth-guard.js"></script>
+</body>
+</html>

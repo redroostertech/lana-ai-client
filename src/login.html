@@ -36,6 +36,60 @@
     <div class="bg-white rounded-2xl shadow-xl p-8">
       <!-- Step 1: Organization Discovery -->
       <div id="step1" class="step-content">
+        <!-- LANA One: individual "Log in with LANA" (revealed only in the LANA One edition;
+             additive, the org discovery form below is unchanged and stays the fallback). -->
+        <div id="lanaOneLogin" class="hidden mb-2">
+          <div id="lanaOneIndividual">
+          <h2 class="text-2xl font-semibold text-gray-900 mb-6">Log in to LANA One</h2>
+          <form id="lanaOnePwForm" class="space-y-4">
+            <div>
+              <label for="lanaEmail" class="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+              <input type="email" id="lanaEmail" name="lanaEmail" autocomplete="username"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                placeholder="you@example.com">
+            </div>
+            <div>
+              <label for="lanaPassword" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <div class="relative">
+                <input type="password" id="lanaPassword" name="lanaPassword" autocomplete="current-password" minlength="8"
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                  placeholder="Enter your password">
+                <button type="button" id="lanaTogglePassword" aria-label="Show password"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="text-right mt-1">
+                <button type="button" id="lanaForgotLink" class="text-xs text-indigo-600 hover:text-indigo-500 font-medium">Forgot password?</button>
+              </div>
+            </div>
+            <button type="submit" id="lanaPwSignInBtn"
+              class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+              Sign in
+            </button>
+          </form>
+          <p id="lanaLoginStatus" class="text-sm mt-3 text-center" role="status" aria-live="polite"></p>
+          <div class="flex items-center my-5">
+            <div class="flex-1 border-t border-gray-200"></div>
+            <span class="px-3 text-xs text-gray-400 uppercase tracking-wide">or</span>
+            <div class="flex-1 border-t border-gray-200"></div>
+          </div>
+          <button type="button" id="lanaLoginBtn"
+            class="w-full py-3 px-4 bg-white border border-indigo-600 text-indigo-600 hover:bg-indigo-50 font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            Log in with LANA
+          </button>
+          <p class="text-sm text-center text-gray-600 mt-6">
+            New to LANA? <button type="button" id="lanaSignupLink" class="text-indigo-600 hover:text-indigo-500 font-medium">Create account</button>
+          </p>
+          </div>
+          <div class="text-center mt-4">
+            <button type="button" id="lanaOrgToggle" class="text-xs text-gray-400 hover:text-gray-600">Log in to LANA AI (organization workspace)</button>
+          </div>
+        </div>
+
         <h2 class="text-2xl font-semibold text-gray-900 mb-6">Connect to your organization</h2>
 
         <form id="discoveryForm" class="space-y-5">
@@ -583,24 +637,42 @@
       `;
 
       try {
-        // Call hosted discovery to get static_ip and port
-        let serverInfo = await resolveOrganization(orgId, serverUrl);
-
-        // Development mode: Override API URL if provided
         const devApiOverride = devApiOverrideInput.value.trim();
         // Check field visibility (ensures dev mode is on) and that field has value
         const isDevFieldVisible = !devApiOverrideContainer.classList.contains('hidden');
-        if (isDevFieldVisible && devApiOverride) {
-          console.warn('[Login] 🔧 Development mode: Overriding API URL');
-          console.warn('[Login] Original URL:', serverInfo.url);
-          console.warn('[Login] Override URL:', devApiOverride);
 
-          // Parse the override URL to extract components
+        let serverInfo;
+        if (isDevFieldVisible && devApiOverride) {
+          // Local dev: bypass hosted discovery entirely and build the server
+          // descriptor from the override URL + the backend's own
+          // /api/health/discovery metadata. Only reachable when NODE_ENV is
+          // development AND the override field is filled — production is unchanged.
+          console.warn('[Login] 🔧 Development mode: bypassing hosted discovery, using override URL', devApiOverride);
           const overrideUrl = new URL(devApiOverride);
-          serverInfo.url = devApiOverride;
-          serverInfo.staticIp = overrideUrl.hostname;
-          serverInfo.port = overrideUrl.port || (overrideUrl.protocol === 'https:' ? '443' : '80');
-          serverInfo.isSecure = overrideUrl.protocol === 'https:';
+          let meta = {};
+          try {
+            const r = await fetch(`${devApiOverride}/api/health/discovery`, { signal: AbortSignal.timeout(5000) });
+            if (r.ok) meta = await r.json();
+          } catch (_) { /* health is verified separately below */ }
+          const srv = meta.server || {};
+          serverInfo = {
+            url: devApiOverride,
+            orgId: orgId,
+            orgName: srv.org_name || orgId,
+            version: srv.version || 'dev',
+            apiVersion: srv.api_version || srv.apiVersion || 'v1',
+            domain: extractDomain(devApiOverride),
+            staticIp: overrideUrl.hostname,
+            port: overrideUrl.port || (overrideUrl.protocol === 'https:' ? '443' : '80'),
+            isSecure: overrideUrl.protocol === 'https:',
+            vpn: null,
+            tier: 'standard',
+            rateLimit: 100,
+            enabledApps: []
+          };
+        } else {
+          // Call hosted discovery to get static_ip and port
+          serverInfo = await resolveOrganization(orgId, serverUrl);
         }
 
         console.log('[Login] Organization resolved:', {
@@ -773,6 +845,268 @@
         document.addEventListener('DOMContentLoaded', dismiss);
       } else {
         dismiss();
+      }
+    })();
+  </script>
+
+  <!-- LANA One: individual "Log in with LANA" wiring. Isolated + edition-gated:
+       does nothing unless getConfig().isLanaOne is true and electronAPI.cloudAuth
+       is present, so the stock org discovery flow is entirely unaffected. -->
+  <script>
+    (function () {
+      function initLanaOneLogin() {
+        var api = window.electronAPI;
+        if (!api || typeof api.getConfig !== 'function' || !api.cloudAuth) return;
+
+        Promise.resolve(api.getConfig()).then(function (config) {
+          if (!config || !config.isLanaOne) return;
+
+          var container = document.getElementById('lanaOneLogin');
+          var btn = document.getElementById('lanaLoginBtn');
+          var status = document.getElementById('lanaLoginStatus');
+          if (!container || !btn || !status) return;
+          container.classList.remove('hidden');
+
+          function setStatus(text, tone) {
+            status.textContent = text || '';
+            status.className = 'text-sm mt-3 text-center ' +
+              (tone === 'error' ? 'text-red-600' : tone === 'ok' ? 'text-green-600' : 'text-gray-500');
+          }
+
+          var signedIn = false;
+
+          function renderSignedIn(state, hideForm) {
+            var email = state && state.email ? state.email : 'your account';
+            var plan = state && state.entitlement && state.entitlement.plan
+              ? state.entitlement.plan : 'free';
+            setStatus('Signed in as ' + email + ' — plan ' + plan, 'ok');
+            btn.textContent = 'Enter LANA One';
+            btn.disabled = false;
+            signedIn = true;
+            // Keep the email/password form available on load (hideForm falsy) so a
+            // persisted-but-expired cloud session can still re-authenticate; only hide
+            // it after a fresh successful sign-in that is about to enter the app.
+            if (hideForm) hidePwForm();
+          }
+
+          // Adopt the cloud identity into a LOCAL session and enter the app,
+          // mirroring exactly what the org login does on success (localStorage
+          // token/user + saved-server + redirect), just pointed at the local
+          // backend. NOTE: local `api` is electronAPI in this block; the
+          // ApiClient is window.api.
+          function enterViaAdopt() {
+            btn.disabled = true;
+            setStatus('Preparing your LANA One workspace...', 'info');
+            return Promise.resolve(api.cloudAuth.adopt()).then(function (res) {
+              if (res && res.ok && res.token) {
+                var localUrl = (config && config.localBackendUrl) || 'http://localhost:8090';
+                var host = localUrl;
+                var port = '';
+                try {
+                  var u = new URL(localUrl);
+                  host = u.hostname;
+                  port = u.port || (u.protocol === 'https:' ? '443' : '80');
+                } catch (e) { /* keep defaults */ }
+                var savedServer = {
+                  url: localUrl,
+                  orgId: res.user && res.user.organizationId,
+                  orgName: 'LANA One',
+                  host: host,
+                  port: port,
+                  domain: host,
+                  version: 'lana-one',
+                  apiVersion: 'v1',
+                  tier: 'standard',
+                  rateLimit: 100,
+                  enabledApps: []
+                };
+                try {
+                  localStorage.setItem('lana_saved_server', JSON.stringify(savedServer));
+                  localStorage.setItem('token', res.token);
+                  localStorage.setItem('user', JSON.stringify(res.user));
+                } catch (e) { /* storage unavailable */ }
+                if (window.api) {
+                  try { window.api.baseUrl = localUrl; window.api.token = res.token; } catch (e) { /* noop */ }
+                }
+                // Best-effort: mint + deliver the cloud relay token so cloud
+                // inference works. Fire-and-forget; never block app entry on it.
+                try {
+                  if (api.cloudAuth && typeof api.cloudAuth.ensureRelay === 'function') {
+                    api.cloudAuth.ensureRelay();
+                  }
+                } catch (e) { /* noop */ }
+                var go = function () { window.location.href = 'dashboard.html'; };
+                if (typeof api.saveSettings === 'function') {
+                  return Promise.resolve(api.saveSettings(savedServer)).then(go, go);
+                }
+                go();
+                return;
+              }
+              // Signed in to the cloud, but the local session could not be established.
+              btn.disabled = false;
+              btn.textContent = 'Enter LANA One';
+              if (res && (res.error === 'local_backend_unreachable' || res.status === 502)) {
+                setStatus('Signed in to LANA, but the local LANA One service is not reachable. Start it and try again.', 'error');
+              } else if (res && (res.error === 'not_signed_in' || res.error === 'adopt_unverified' || res.status === 401)) {
+                // Expired/invalid cloud session: fall back cleanly to the email/password
+                // form (no dead "Enter LANA One" button, no alarming red error).
+                setStatus('Your LANA session expired. Sign in with your email and password below.', 'info');
+                signedIn = false;
+                btn.textContent = 'Log in with LANA';
+              } else {
+                setStatus('Could not open your local workspace: ' + ((res && res.error) || 'unknown error'), 'error');
+              }
+            }).catch(function (err) {
+              btn.disabled = false;
+              btn.textContent = 'Enter LANA One';
+              setStatus('Could not open your local workspace: ' + (err && err.message ? err.message : 'unexpected error'), 'error');
+            });
+          }
+
+          // Reflect an existing, VALID cloud session (token-free view) on load; the
+          // user clicks "Enter LANA One" to establish the local session and proceed.
+          // An expired token does NOT show the (misleading) green "Signed in" state
+          // or a dead "Enter LANA One" - it falls back to the clean email/password
+          // form with a subtle prompt.
+          Promise.resolve(api.cloudAuth.getState()).then(function (state) {
+            if (state && state.authenticated && !state.expired) {
+              renderSignedIn(state);
+            } else if (state && state.authenticated && state.expired) {
+              setStatus('Your last session expired. Sign in to continue.', 'info');
+            }
+          }).catch(function () { /* no session yet */ });
+
+          btn.addEventListener('click', function () {
+            // Already signed in to the cloud: go straight to adopt + enter.
+            if (signedIn) {
+              enterViaAdopt();
+              return;
+            }
+            btn.disabled = true;
+            setStatus('Opening your browser to sign in to LANA...', 'info');
+            Promise.resolve(api.cloudAuth.login()).then(function (result) {
+              if (result && result.ok) {
+                renderSignedIn(result);
+                // Chain straight into the local session + app entry.
+                return enterViaAdopt();
+              }
+              if (result && result.otherAccount) {
+                setStatus('This machine is already linked to a different LANA account. Log out first to switch.', 'error');
+              } else {
+                setStatus('Sign-in failed: ' + ((result && result.error) || 'unknown error'), 'error');
+              }
+              btn.disabled = false;
+            }).catch(function (err) {
+              setStatus('Sign-in failed: ' + (err && err.message ? err.message : 'unexpected error'), 'error');
+              btn.disabled = false;
+            });
+          });
+
+          // --- Email/password ("same credentials") login + screen restructure ---
+          // Individual login is PRIMARY in the LANA One edition; the org discovery
+          // card is hidden by default (revealed via the toggle). We only toggle
+          // visibility of #step1's org heading + form; their markup/handlers are
+          // untouched (selected without adding ids so the org flow is unchanged).
+          var pwForm = document.getElementById('lanaOnePwForm');
+          var emailInput = document.getElementById('lanaEmail');
+          var pwInput = document.getElementById('lanaPassword');
+          var pwToggle = document.getElementById('lanaTogglePassword');
+          var forgotLink = document.getElementById('lanaForgotLink');
+          var signupLink = document.getElementById('lanaSignupLink');
+          var orgToggle = document.getElementById('lanaOrgToggle');
+          var orgHeading = document.querySelector('#step1 > h2');
+          var orgForm = document.getElementById('discoveryForm');
+
+          function hidePwForm() { if (pwForm) pwForm.style.display = 'none'; }
+
+          // In the LANA One build, the org path is the LANA AI (business/enterprise)
+          // product. Re-label its heading here (edition-gated: only runs when
+          // isLanaOne, so a non-LANA One build keeps "Connect to your organization").
+          if (orgHeading) orgHeading.textContent = 'Log in to LANA AI';
+          function setOrgVisible(v) {
+            // Full view-switch: showing the org (LANA AI) form REPLACES the LANA One
+            // individual form (hides it) rather than appending below it.
+            var individualView = document.getElementById('lanaOneIndividual');
+            if (individualView) individualView.style.display = v ? 'none' : '';
+            if (orgHeading) orgHeading.style.display = v ? '' : 'none';
+            if (orgForm) orgForm.style.display = v ? '' : 'none';
+            if (orgToggle) orgToggle.textContent = v
+              ? 'Back to LANA One sign-in'
+              : 'Log in to LANA AI (organization workspace)';
+          }
+          setOrgVisible(false);
+          // A persisted lana_saved_server (set by adopt) makes the org auto-advance
+          // jump to the org #step2 sign-in and hide #step1 on load. In LANA One,
+          // re-assert the LANA One primary screen: show #step1 (which holds the LANA
+          // One login) and hide the org #step2 so the user never lands on the org
+          // form. (Only runs when isLanaOne; the org build is unaffected.)
+          var step1El = document.getElementById('step1');
+          var step2El = document.getElementById('step2');
+          if (step1El) step1El.classList.remove('hidden');
+          if (step2El) step2El.classList.add('hidden');
+          if (orgToggle) {
+            orgToggle.addEventListener('click', function () {
+              setOrgVisible(!(orgForm && orgForm.style.display !== 'none'));
+            });
+          }
+
+          if (pwToggle && pwInput) {
+            pwToggle.addEventListener('click', function () {
+              pwInput.type = pwInput.type === 'password' ? 'text' : 'password';
+            });
+          }
+
+          function openExternal(u) {
+            try { if (typeof api.openExternal === 'function') api.openExternal(u); } catch (e) { /* noop */ }
+          }
+          if (forgotLink) forgotLink.addEventListener('click', function () { openExternal('https://one.lanaai.io/?gate=login'); });
+          if (signupLink) signupLink.addEventListener('click', function () { openExternal('https://one.lanaai.io/?gate=signup'); });
+
+          // Email/password sign-in: authenticate against the cloud account plane
+          // (their one.lanaai.io credentials), then adopt + enter the app, exactly
+          // like "Log in with LANA". Tokens stay in main; renderer sees no token.
+          if (pwForm) {
+            pwForm.addEventListener('submit', function (e) {
+              e.preventDefault();
+              var email = emailInput ? emailInput.value.trim() : '';
+              var password = pwInput ? pwInput.value : '';
+              if (!email || email.indexOf('@') === -1) { setStatus('Enter a valid email address.', 'error'); return; }
+              if (!password || password.length < 8) { setStatus('Enter your password (at least 8 characters).', 'error'); return; }
+              var submitBtn = document.getElementById('lanaPwSignInBtn');
+              if (submitBtn) submitBtn.disabled = true;
+              setStatus('Signing in...', 'info');
+              Promise.resolve(api.cloudAuth.passwordLogin(email, password)).then(function (result) {
+                if (result && result.ok) {
+                  if (pwInput) pwInput.value = '';
+                  renderSignedIn(result, true);
+                  return enterViaAdopt();
+                }
+                if (submitBtn) submitBtn.disabled = false;
+                if (result && result.otherAccount) {
+                  setStatus('This machine is already linked to a different LANA account. Log out first to switch.', 'error');
+                } else if (result && result.error === 'account_unverified') {
+                  setStatus('Check your email to verify your account, then sign in.', 'error');
+                  openExternal('https://one.lanaai.io/?gate=login');
+                } else if (result && result.error === 'invalid_credentials') {
+                  setStatus('Incorrect email or password.', 'error');
+                } else if (result && result.error === 'cloud_unreachable') {
+                  setStatus('Could not reach LANA. Check your connection and try again.', 'error');
+                } else {
+                  setStatus('Sign-in failed: ' + ((result && result.error) || 'unknown error'), 'error');
+                }
+              }).catch(function (err) {
+                if (submitBtn) submitBtn.disabled = false;
+                setStatus('Sign-in failed: ' + (err && err.message ? err.message : 'unexpected error'), 'error');
+              });
+            });
+          }
+        }).catch(function () { /* getConfig unavailable: stay on org flow */ });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initLanaOneLogin);
+      } else {
+        initLanaOneLogin();
       }
     })();
   </script>

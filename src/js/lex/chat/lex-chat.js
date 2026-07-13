@@ -412,6 +412,8 @@
       this._sendStartTime = Date.now();
       this._planReadyReceived = false;
       this._recoveryNoticeShownForConversation = null;
+      this._pendingSovereigntyReceipt = null;
+      this._pendingCitationVerification = null;
 
       // Add user message to thread
       if (this._threadEl) {
@@ -786,6 +788,19 @@
           this._citations = event.citations || [];
           break;
 
+        case 'sovereignty_receipt':
+          // ADDITIVE honesty receipt. Stash and render into the assistant
+          // message; if the message has not started yet, it is flushed at 'done'.
+          this._pendingSovereigntyReceipt = event;
+          this._renderVerifyPanel('sovereignty_receipt', event);
+          break;
+
+        case 'citation_verification':
+          // ADDITIVE citation gate. Same lifecycle as the receipt above.
+          this._pendingCitationVerification = event;
+          this._renderVerifyPanel('citation_verification', event);
+          break;
+
         case 'context_usage':
           this._updateContextMeter(event.percentUsed, event.percentUntilCompact);
           this.emit('lex-chat-context-usage', {
@@ -909,6 +924,15 @@
               artifacts: this._artifacts.length > 0 ? this._artifacts : undefined,
               grounding: this._groundingContext || undefined
             });
+          }
+
+          // Flush any verification panels that arrived before the assistant
+          // message element existed (best-effort; no-ops when already rendered).
+          if (this._pendingSovereigntyReceipt) {
+            this._renderVerifyPanel('sovereignty_receipt', this._pendingSovereigntyReceipt);
+          }
+          if (this._pendingCitationVerification) {
+            this._renderVerifyPanel('citation_verification', this._pendingCitationVerification);
           }
 
           // Capture conversation ID from done event (fallback)
@@ -1043,6 +1067,39 @@
       }
 
       return el;
+    }
+
+    /**
+     * Render an ADDITIVE verification panel (sovereignty receipt or citation
+     * gate) into the current assistant message. Built by the shared, framework
+     * agnostic LanaVerifyPanels module. Idempotent: a given panel kind is only
+     * attached once per message. No-ops silently when the module or the target
+     * message is unavailable so it never disturbs the chat stream.
+     * @param {'sovereignty_receipt'|'citation_verification'} kind
+     * @param {Object} payload
+     */
+    _renderVerifyPanel(kind, payload) {
+      var LVP = global.LanaVerifyPanels;
+      if (!LVP) return;
+      if (!this._threadEl || typeof this._threadEl.getLastAssistantMessage !== 'function') return;
+
+      var msgEl = this._threadEl.getLastAssistantMessage();
+      if (!msgEl) return; // message not started yet; flushed at 'done'
+
+      var host = msgEl.querySelector('.lex-chat-msg-agent-body') || msgEl;
+      var marker = kind === 'sovereignty_receipt' ? 'lana-vp-receipt' : 'lana-vp-cite';
+      if (host.querySelector('.' + marker)) return; // already rendered
+
+      var panel = null;
+      try {
+        panel = kind === 'sovereignty_receipt'
+          ? LVP.buildSovereigntyReceipt(payload)
+          : LVP.buildCitationVerification(payload);
+      } catch (e) {
+        if (global.console) console.error('[lex-chat] verify panel render failed:', e);
+        return;
+      }
+      if (panel) host.appendChild(panel);
     }
 
     _insertPlanCard(event) {

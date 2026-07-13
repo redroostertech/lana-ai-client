@@ -1489,6 +1489,17 @@ class ApiClient {
       this.user = null;
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      // LANA One: also clear the CLOUD session material from the keychain (access +
+      // refresh + local-session + relay token) so logout is EFFECTIVE. Without this,
+      // the persisted cloud session lets "Enter LANA One" silently re-adopt with no
+      // re-authentication. No-op in the org edition (the cloud-auth IPC is
+      // edition-gated), and best-effort so a failure never blocks the local logout.
+      try {
+        if (typeof window !== 'undefined' && window.electronAPI &&
+            window.electronAPI.cloudAuth && typeof window.electronAPI.cloudAuth.logout === 'function') {
+          await window.electronAPI.cloudAuth.logout();
+        }
+      } catch (e) { /* best-effort: local logout already completed */ }
     }
   }
 

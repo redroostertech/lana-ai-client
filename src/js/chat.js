@@ -865,6 +865,15 @@ class LanaChat {
               } else if (currentEvent === 'citations') {
                 console.log('[SSE] Citations:', data);
                 this.showCitations(data);
+              } else if (currentEvent === 'sovereignty_receipt') {
+                // ADDITIVE: honest data-path receipt. Absent on local/passthrough
+                // turns, so this simply never fires then.
+                console.log('[SSE] Sovereignty receipt:', data);
+                this.showSovereigntyReceipt(data);
+              } else if (currentEvent === 'citation_verification') {
+                // ADDITIVE: citation authority gate. Absent on non-legal turns.
+                console.log('[SSE] Citation verification:', data);
+                this.showCitationVerification(data);
               } else if (currentEvent === 'auto_compact_start') {
                 this.handleAutoCompactStart(data);
               } else if (currentEvent === 'auto_compact_complete') {
@@ -1328,6 +1337,55 @@ class LanaChat {
     });
 
     console.log('[Citations] Stored citation map:', this.currentMessageCitations);
+  }
+
+  // Append an additive verification panel (receipt or citation gate) into the
+  // messages stream, near the current assistant message. Panels are built by
+  // the shared, framework-agnostic LanaVerifyPanels module. Never disturbs
+  // existing chat rendering; simply no-ops if the module or data is missing.
+  appendVerifyPanel(panelEl) {
+    if (!panelEl) { return; }
+    const messagesContainer = this.container.querySelector('#chatMessages');
+    if (!messagesContainer) { return; }
+
+    const wasNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
+
+    // Attach under the last assistant message body when one exists so the panel
+    // reads as part of that turn; otherwise append to the stream.
+    const lastBody = messagesContainer.querySelector('.ai-message:last-child .chat-message-content');
+    if (lastBody && lastBody.parentNode) {
+      lastBody.parentNode.appendChild(panelEl);
+    } else {
+      messagesContainer.appendChild(panelEl);
+    }
+
+    if (wasNearBottom) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+  }
+
+  showSovereigntyReceipt(data) {
+    if (!window.LanaVerifyPanels || typeof window.LanaVerifyPanels.buildSovereigntyReceipt !== 'function') {
+      return;
+    }
+    try {
+      const panel = window.LanaVerifyPanels.buildSovereigntyReceipt(data);
+      this.appendVerifyPanel(panel);
+    } catch (e) {
+      console.error('[SSE] Failed to render sovereignty receipt:', e);
+    }
+  }
+
+  showCitationVerification(data) {
+    if (!window.LanaVerifyPanels || typeof window.LanaVerifyPanels.buildCitationVerification !== 'function') {
+      return;
+    }
+    try {
+      const panel = window.LanaVerifyPanels.buildCitationVerification(data);
+      this.appendVerifyPanel(panel);
+    } catch (e) {
+      console.error('[SSE] Failed to render citation verification:', e);
+    }
   }
 
   formatContent(content) {

@@ -1,0 +1,237 @@
+/*
+ * chat-verify-panels.css
+ *
+ * Styling for the two additive verification panels rendered by
+ * js/chat-verify-panels.js:
+ *   .lana-vp-receipt  the honest sovereignty / data-path receipt
+ *   .lana-vp-cite     the citation-verification gate result
+ *
+ * Uses lex design tokens where available with plain-color fallbacks so the
+ * panels look correct on BOTH chat surfaces (chat.html and chat-v2.html). No
+ * em dashes; icons are inline SVG supplied by the JS (never emoji).
+ */
+
+.lana-vp {
+  box-sizing: border-box;
+  margin: 10px 0 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  border: 1px solid var(--lex-color-gray-200, #e8e5e1);
+  background: var(--lex-color-gray-50, #fafaf8);
+  color: var(--lex-color-gray-800, #2d2b27);
+}
+
+.lana-vp * { box-sizing: border-box; }
+
+.lana-vp-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+.lana-vp-icon--head { width: 18px; height: 18px; }
+.lana-vp-icon--inline { width: 14px; height: 14px; }
+
+.lana-vp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lana-vp-headline {
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.lana-vp-sentence {
+  margin: 8px 0 0;
+  color: var(--lex-color-gray-700, #423f3a);
+}
+
+.lana-vp-caveat {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--lex-color-gray-600, #5a5650);
+}
+
+/* ---- sovereignty receipt --------------------------------------------------- */
+
+.lana-vp-receipt {
+  border-color: var(--lex-color-success-100, #d1fadf);
+  background: var(--lex-color-success-50, #ecfdf3);
+}
+.lana-vp-receipt .lana-vp-icon--head { color: var(--lex-color-success-600, #079455); }
+
+/* Detected identifiers block */
+.lana-vp-detected {
+  margin-top: 10px;
+}
+.lana-vp-detected-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--lex-color-gray-600, #5a5650);
+  margin-bottom: 6px;
+}
+.lana-vp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lana-vp-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--lex-color-gray-100, #f5f3f0);
+  color: var(--lex-color-gray-700, #423f3a);
+  border: 1px solid var(--lex-color-gray-200, #e8e5e1);
+}
+
+/* Egress line */
+.lana-vp-egress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lex-color-gray-700, #423f3a);
+}
+.lana-vp-icon--egress { color: var(--lex-color-warning-600, #dc6803); }
+.lana-vp-icon--local { color: var(--lex-color-success-600, #079455); }
+
+/*
+ * DEGRADED STATE: intentionally LOUD. When on-device detection ran with
+ * reduced accuracy we must never let the panel read like a clean bill of
+ * health. Amber border, amber wash, and a bold caveat banner.
+ */
+.lana-vp-receipt--degraded {
+  border-color: var(--lex-color-warning-500, #f79009);
+  border-width: 2px;
+  background: var(--lex-color-warning-50, #fffaeb);
+}
+.lana-vp-receipt--degraded .lana-vp-icon--head {
+  color: var(--lex-color-warning-700, #b54708);
+}
+.lana-vp-caveat--loud {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--lex-color-warning-100, #fef0c7);
+  border: 1px solid var(--lex-color-warning-500, #f79009);
+  color: var(--lex-color-warning-700, #b54708);
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.lana-vp-caveat--loud .lana-vp-icon--inline { color: var(--lex-color-warning-700, #b54708); }
+
+/* ---- citation verification ------------------------------------------------- */
+
+.lana-vp-cite {
+  border-color: var(--lex-color-gray-200, #e8e5e1);
+  background: var(--lex-color-gray-50, #fafaf8);
+}
+.lana-vp-cite .lana-vp-icon--head { color: var(--lex-color-gray-600, #5a5650); }
+
+.lana-vp-cite-summary {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--lex-color-gray-700, #423f3a);
+}
+.lana-vp-cite-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--lex-color-warning-50, #fffaeb);
+  border: 1px solid var(--lex-color-warning-100, #fef0c7);
+  color: var(--lex-color-warning-700, #b54708);
+  font-weight: 600;
+  font-size: 12px;
+}
+.lana-vp-cite-warn .lana-vp-icon--inline { color: var(--lex-color-warning-700, #b54708); }
+
+.lana-vp-cite-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lana-vp-cite-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--lex-color-gray-200, #e8e5e1);
+  background: #fff;
+}
+
+/* Verdict chip */
+.lana-vp-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* VERIFIED: the only authoritative treatment (green). */
+.lana-vp-verdict--verified {
+  background: var(--lex-color-success-100, #d1fadf);
+  color: var(--lex-color-success-700, #067647);
+}
+.lana-vp-cite-row--verified { border-left: 3px solid var(--lex-color-success-500, #17b26a); }
+
+/*
+ * NOT-FOUND and UNVERIFIED must read as clearly NOT authoritative. Muted,
+ * dashed border, and a distinct verdict color. We never green-light these.
+ */
+.lana-vp-verdict--notfound {
+  background: var(--lex-color-danger-100, #fee4e2);
+  color: var(--lex-color-danger-700, #b42318);
+}
+.lana-vp-verdict--unverified {
+  background: var(--lex-color-gray-200, #e8e5e1);
+  color: var(--lex-color-gray-700, #423f3a);
+}
+.lana-vp-cite-row--nonauthoritative {
+  background: var(--lex-color-gray-50, #fafaf8);
+  border-style: dashed;
+}
+.lana-vp-cite-row--notfound { border-left: 3px solid var(--lex-color-danger-500, #f04438); }
+.lana-vp-cite-row--unverified { border-left: 3px solid var(--lex-color-gray-400, #a9a49d); }
+.lana-vp-cite-row--nonauthoritative .lana-vp-cite-display { color: var(--lex-color-gray-600, #5a5650); }
+
+.lana-vp-cite-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lana-vp-cite-display {
+  font-weight: 600;
+  word-break: break-word;
+}
+.lana-vp-cite-meta {
+  font-size: 11.5px;
+  color: var(--lex-color-gray-500, #7a756d);
+}
+.lana-vp-cite-reason {
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--lex-color-gray-600, #5a5650);
+}

@@ -1,0 +1,218 @@
+/* ==========================================================================
+   Billing and Plan / Account - page-specific styles
+   All values use Lex design tokens from lex-tokens.css. No raw colours.
+   ========================================================================== */
+
+
+/* ── Page Root ────────────────────────────────────────────────────── */
+
+.bl-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--lex-topbar-height, 64px));
+  background: var(--lex-bg-secondary);
+}
+
+.bl-page > main {
+  max-width: 960px;
+  width: 100%;
+}
+
+.bl-hidden {
+  display: none !important;
+}
+
+
+/* ── Section spacing ──────────────────────────────────────────────── */
+
+.bl-section {
+  margin-bottom: 0.75rem;
+}
+
+
+/* ── Current plan header row ──────────────────────────────────────── */
+
+.bl-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.bl-plan-name {
+  font-size: var(--lex-h3-size, 1.5rem);
+  font-weight: var(--lex-weight-bold, 700);
+  color: var(--lex-text-primary);
+  margin: 0;
+}
+
+.bl-plan-meta {
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  margin: 0;
+}
+
+.bl-plan-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+
+/* ── Usage meters ─────────────────────────────────────────────────── */
+
+.bl-usage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.bl-usage-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.bl-usage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.bl-usage-label {
+  font-weight: var(--lex-weight-medium, 500);
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.bl-usage-detail {
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-form-help-size, 0.75rem);
+}
+
+.bl-usage-track {
+  height: 8px;
+  border-radius: var(--lex-radius-full, 9999px);
+  background: var(--lex-bg-tertiary, #e5e7eb);
+  overflow: hidden;
+}
+
+.bl-usage-fill {
+  height: 100%;
+  border-radius: var(--lex-radius-full, 9999px);
+  background: var(--lex-color-info-500, #3b82f6);
+  transition: width 0.3s ease;
+}
+
+.bl-usage-item.bl-warn .bl-usage-fill {
+  background: var(--lex-color-warning-500, #f59e0b);
+}
+
+.bl-usage-warn-icon {
+  color: var(--lex-color-warning-500, #f59e0b);
+  display: inline-flex;
+  align-items: center;
+}
+
+
+/* ── Plan card grid ───────────────────────────────────────────────── */
+
+.bl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.bl-card {
+  border: 1px solid var(--lex-border-primary, #e5e7eb);
+  border-radius: var(--lex-radius-lg, 12px);
+  background: var(--lex-bg-primary, #fff);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bl-card.bl-featured {
+  border-color: var(--lex-color-brand-500, #6366f1);
+  box-shadow: 0 0 0 1px var(--lex-color-brand-500, #6366f1);
+}
+
+.bl-card.bl-current {
+  border-color: var(--lex-color-success-500, #22c55e);
+}
+
+.bl-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bl-card-icon {
+  color: var(--lex-text-accent, #6366f1);
+  display: inline-flex;
+}
+
+.bl-card-name {
+  font-size: var(--lex-h4-size, 1.125rem);
+  font-weight: var(--lex-weight-bold, 700);
+  color: var(--lex-text-primary);
+  margin: 0;
+}
+
+.bl-card-price {
+  font-size: var(--lex-h2-size, 1.75rem);
+  font-weight: var(--lex-weight-bold, 700);
+  color: var(--lex-text-primary);
+}
+
+.bl-card-cadence {
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-form-help-size, 0.75rem);
+  margin-left: 0.25rem;
+}
+
+.bl-card-tagline {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  margin: 0;
+}
+
+.bl-card-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.bl-card-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.bl-card-feature svg {
+  color: var(--lex-color-success-500, #22c55e);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.bl-card-cta {
+  margin-top: 0.25rem;
+}
+
+
+/* ── Info banner (billing-unavailable, etc.) ──────────────────────── */
+
+.bl-note {
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-form-help-size, 0.75rem);
+  margin-top: 0.75rem;
+}

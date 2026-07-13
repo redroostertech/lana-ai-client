@@ -7,7 +7,7 @@
  * This is the THIN CLIENT version - connects to a remote backend server.
  */
 
-const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage, shell } = require('electron');
 const path = require('path');
 const url = require('url');
 const crypto = require('crypto');
@@ -45,6 +45,23 @@ const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-lo
 const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
+
+// LANA One edition flag — enables the individual "Log in with LANA" cloud login.
+// ADDITIVE + EDITION-GATED: false for the stock lana-ai-client, so its org
+// hosted-discovery flow is completely unaffected. See electron-cloud-auth.js.
+const IS_LANA_ONE = process.env.LANA_ONE_EDITION === '1';
+// The LOCAL sovereign backend the desktop adopts its cloud identity into. The
+// packaged shell will set this to the backend it spawns; 8090 is the dev default.
+const LANA_LOCAL_BACKEND_URL = process.env.LANA_LOCAL_BACKEND_URL || 'http://localhost:8090';
+// Desktop capability key: a shared secret between this shell and the local backend
+// so only the LANA One app can reach the gated /adopt + /relay endpoints (not another
+// local process or a browser hitting localhost). In the packaged app the shell
+// GENERATES this per launch and passes it to the backend it spawns; in dev it is
+// shared via env (set the same LANA_DESKTOP_KEY on both). Empty = inert, matching the
+// backend, which only enforces the header when its own LANA_DESKTOP_KEY is set.
+const LANA_DESKTOP_KEY = process.env.LANA_DESKTOP_KEY || '';
+const { CloudAuth } = require('./electron-cloud-auth');
+const { KeychainSecretStore } = require('./electron-keychain-store');
 
 /**
  * Brainchild MCP bridge — reads the user's local vault over the MCP stdio
@@ -699,9 +716,117 @@ ipcMain.handle('get-config', async () => {
     appVersion: getAppVersion(),
     platform: process.platform,
     arch: process.arch,
-    isDevelopment: process.env.NODE_ENV === 'development'
+    isDevelopment: process.env.NODE_ENV === 'development',
+    // LANA One individual edition: login.html reveals "Log in with LANA" when true.
+    isLanaOne: IS_LANA_ONE,
+    // Local sovereign backend URL the cloud-adopt flow points the app at.
+    localBackendUrl: LANA_LOCAL_BACKEND_URL
   };
 });
+
+// ── LANA One: individual "Log in with LANA" cloud login (edition-gated) ─────────
+// Additive; registered ONLY for the LANA One edition so the stock lana-ai-client
+// org hosted-discovery flow is unchanged. Tokens live in main + keychain ONLY and
+// are NEVER returned to the renderer — these handlers return token-free views.
+if (IS_LANA_ONE) {
+  let _cloudAuth = null;
+  const cloudLog = {
+    info: (m, meta) => logInfo(`[cloud-auth] ${m}`, meta),
+    warn: (m, meta) => logInfo(`[cloud-auth] ${m}`, meta),
+    error: (m, meta) => logError(`[cloud-auth] ${m}`, meta)
+  };
+  const getCloudAuth = () => {
+    if (!_cloudAuth) {
+      const keychain = new KeychainSecretStore({
+        userDataRoot: app.getPath('userData'),
+        logger: cloudLog
+      });
+      _cloudAuth = new CloudAuth({
+        keychain,
+        openExternal: (u) => shell.openExternal(u),
+        cloudOrigin: process.env.LANA_CLOUD_ORIGIN || undefined,
+        desktopKey: LANA_DESKTOP_KEY,
+        logger: cloudLog
+      });
+    }
+    return _cloudAuth;
+  };
+
+  ipcMain.handle('cloud-auth:login', async () => {
+    try {
+      return await getCloudAuth().loginWithLana();
+    } catch (error) {
+      logError('[cloud-auth] login failed', error);
+      return { ok: false, error: (error && error.message) || 'login_failed' };
+    }
+  });
+
+  // Email/password ("same credentials") cloud login for LANA One individuals.
+  // The password is forwarded once to the account plane and never logged; only
+  // the token-free view returns to the renderer (tokens stay in main + keychain).
+  ipcMain.handle('cloud-auth:password-login', async (_event, email, password) => {
+    try {
+      return await getCloudAuth().passwordLogin(email, password);
+    } catch (error) {
+      logError('[cloud-auth] password-login failed', { error: error && error.message });
+      return { ok: false, error: (error && error.message) || 'login_failed' };
+    }
+  });
+
+  // Exchange the cloud session for a LOCAL backend session (Phase 2b). The cloud
+  // token stays in main; only the local session { token, user, session } returns.
+  ipcMain.handle('cloud-auth:adopt', async () => {
+    try {
+      return await getCloudAuth().adopt(LANA_LOCAL_BACKEND_URL);
+    } catch (error) {
+      logError('[cloud-auth] adopt failed', error);
+      return { ok: false, error: (error && error.message) || 'adopt_failed', status: 0 };
+    }
+  });
+
+  ipcMain.handle('cloud-auth:state', async () => {
+    try {
+      return await getCloudAuth().getAuthState();
+    } catch (error) {
+      logError('[cloud-auth] state failed', error);
+      return { authenticated: false };
+    }
+  });
+
+  ipcMain.handle('cloud-auth:logout', async () => {
+    try {
+      return await getCloudAuth().logout();
+    } catch (error) {
+      logError('[cloud-auth] logout failed', error);
+      return { ok: false, error: (error && error.message) || 'logout_failed' };
+    }
+  });
+
+  // Phase 3/4: mint + deliver the per-user relay token to the LOCAL backend so
+  // its hybrid router can reach the cloud relay. The relay credential stays in
+  // main; the renderer only ever sees { ok }.
+  ipcMain.handle('cloud-auth:ensure-relay', async () => {
+    try {
+      return await getCloudAuth().deliverRelayToken(LANA_LOCAL_BACKEND_URL);
+    } catch (error) {
+      logError('[cloud-auth] ensure-relay failed', error);
+      return { ok: false, error: (error && error.message) || 'ensure_relay_failed' };
+    }
+  });
+
+  // Phase 5 support: refresh the entitlement from the cloud /me. Returns only a
+  // token-free entitlement view.
+  ipcMain.handle('cloud-auth:refresh-entitlement', async () => {
+    try {
+      return await getCloudAuth().refreshEntitlement();
+    } catch (error) {
+      logError('[cloud-auth] refresh-entitlement failed', error);
+      return { stale: true };
+    }
+  });
+
+  logInfo('[cloud-auth] LANA One edition: cloud-auth IPC handlers registered');
+}
 
 // Handle secure storage operations
 ipcMain.handle('save-settings', async (event, settings) => {
@@ -1532,7 +1657,12 @@ app.whenReady().then(async () => {
   // Check for saved server
   const savedServer = getSavedServer();
 
-  if (savedServer) {
+  // LANA One re-auth is CLOUD-primary: a saved server exists (set by adopt so the
+  // app knows its local backend) but must NOT trigger the org-style "auto-load the
+  // app" shortcut, or an expired local session drops the user onto the org sign-in
+  // form. In LANA One we always show the login window, where the persisted cloud
+  // session renders "Enter LANA One" (one click re-adopts a fresh local session).
+  if (savedServer && !IS_LANA_ONE) {
     logInfo(`Found saved server: ${savedServer.orgName || savedServer.orgId}`);
 
     // Verify server is still reachable
