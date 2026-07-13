@@ -28,6 +28,9 @@ const SECRET_SPECS = Object.freeze({
   JWT_SECRET: () => hex(32),                       // 64 chars (32 bytes)
   MFA_ENCRYPTION_KEY: () => hex(32),               // 64 chars (32 bytes)
   WEBHOOK_SECRET_ENCRYPTION_KEY: () => hex(32),    // 64 chars (32 bytes)
+  FILE_ENCRYPTION_KEY: () => hex(32),              // 64 chars (32 bytes) — document envelope/at-rest encryption
+  CONNECTOR_ENCRYPTION_KEY: () => hex(32),         // 64 chars (32 bytes) — connector OAuth token encryption
+  INTERNAL_SERVICE_SECRET: () => hex(32),          // 64 chars — authenticates the backend->redactor sidecar hop
 });
 
 const SECRET_KEYS = Object.freeze(Object.keys(SECRET_SPECS));

@@ -3,6 +3,7 @@
 const {
   selectModelPlan,
   estimateTierFit,
+  auxModelsForTier,
   TIER_LADDER,
   RESERVED_OVERHEAD_GB,
   CPU_LOCAL_EXTRA_RESERVE_GB,
@@ -109,6 +110,61 @@ describe('tiers[] ladder annotation', () => {
   it('a sub-threshold machine reports all tiers as not-fitting', () => {
     const plan = selectModelPlan(apple(8));
     expect(plan.tiers.every((t) => t.fits === false)).toBe(true);
+  });
+});
+
+describe('auxModels contract (legal + vision selection intent)', () => {
+  const rolesOf = (plan) => plan.auxModels.map((m) => m.role);
+  const byRole = (plan, role) => plan.auxModels.find((m) => m.role === role);
+
+  it('is always an array on the plan (even when relay chat is selected)', () => {
+    expect(Array.isArray(selectModelPlan(apple(8)).auxModels)).toBe(true);
+    expect(Array.isArray(selectModelPlan(intel(128)).auxModels)).toBe(true);
+  });
+
+  it('is empty when there is no local chat tier (relay path)', () => {
+    expect(selectModelPlan(apple(8)).auxModels).toEqual([]);         // below smallest tier
+    expect(selectModelPlan(intel(128)).auxModels).toEqual([]);       // non-Metal default -> relay
+  });
+
+  it('demo selects a legal verifier but NO vision projector', () => {
+    const plan = selectModelPlan(apple(16));
+    expect(plan.tier).toBe('demo');
+    expect(rolesOf(plan)).toEqual(['legal']);
+    expect(byRole(plan, 'legal').model).toBe('SaulLM-7B-Instruct.Q4_K_M.gguf');
+    expect(byRole(plan, 'vision')).toBeUndefined();
+  });
+
+  it('edge selects both a legal verifier and a vision projector', () => {
+    const plan = selectModelPlan(apple(32));
+    expect(plan.tier).toBe('edge');
+    expect(rolesOf(plan).sort()).toEqual(['legal', 'vision']);
+    expect(byRole(plan, 'legal').model).toBe('SaulLM-7B-Instruct.Q4_K_M.gguf');
+    expect(byRole(plan, 'vision').model).toBe('mmproj-Qwen3.5-9B-BF16.gguf');
+  });
+
+  it('professional selects the larger SaulLM-54B verifier + its mmproj', () => {
+    const plan = selectModelPlan(apple(128));
+    expect(plan.tier).toBe('professional');
+    expect(byRole(plan, 'legal').model).toBe('SaulLM-54B-Instruct.Q4_K_M.gguf');
+    expect(byRole(plan, 'vision').model).toBe('mmproj-Qwen3.5-35B-A3B-BF16.gguf');
+  });
+
+  it('every aux entry carries a role, a catalogKey, and a .gguf model filename', () => {
+    for (const t of TIER_LADDER) {
+      for (const m of auxModelsForTier(t.tier)) {
+        expect(['legal', 'vision']).toContain(m.role);
+        expect(typeof m.catalogKey).toBe('string');
+        expect(m.catalogKey.length).toBeGreaterThan(0);
+        expect(m.model).toMatch(/\.gguf$/);
+      }
+    }
+  });
+
+  it('auxModelsForTier returns fresh, mutable copies (caller cannot corrupt source)', () => {
+    const a = auxModelsForTier('edge');
+    a[0].model = 'MUTATED';
+    expect(auxModelsForTier('edge')[0].model).toBe('SaulLM-7B-Instruct.Q4_K_M.gguf');
   });
 });
 

@@ -1,0 +1,72 @@
+# Lana Cloud — Redactor FULL ML image (Presidio + spaCy + scispaCy biomedical
+# NER + de-identification transformer).
+#
+# This is the heavy, top-coverage build used by the desktop sidecar and any
+# deployment that wants PHI (conditions/medications) and the de-id transformer
+# (contextual IDs / addresses / names). The lean `Dockerfile` stays the default
+# for the cloud redactor; this image is opt-in and large (~several GB).
+#
+# Build context MUST be services/redactor. Listen port is env-driven via $PORT.
+#
+# Layers, all verified at build time (fail the build rather than silently
+# degrade — the same guardrail as the lean image):
+#   * en_core_web_lg   (names/orgs/locations)            [base dep]
+#   * en_ner_bc5cdr_md (diagnoses/medications, PHI)       [.[phi]]
+#   * obi/deid_roberta_i2b2 (contextual de-identification)[.[deid] + torch, baked]
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    # This image exists to provide the de-id layer, so enable it by default.
+    # Override at run time with REDACTOR_DEID=0 to fall back to PHI + floor.
+    REDACTOR_DEID=1 \
+    # Pre-baked HF cache lives here so the model loads offline at start.
+    HF_HOME=/app/.hf
+
+WORKDIR /app
+
+# scispaCy pulls nmslib (C++), which builds from source — needs a compiler.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml install-ml.sh ./
+COPY redactor ./redactor
+
+# Install via install-ml.sh — the SAME script local devs use — so the CPU-torch
+# logic has one source of truth. It installs CPU torch from the PyTorch CPU index
+# (this is Linux), installs .[ml], and build-verifies en_core_web_lg +
+# en_ner_bc5cdr_md + torch (fails the build on a silent coverage drop).
+RUN pip install --upgrade pip && PYTHON=python ./install-ml.sh
+
+# Pre-download + cache the de-id transformer into the image so the first request
+# isn't blocked on a ~1.4GB download (and so the container can run offline).
+RUN python -c "from transformers import pipeline; pipeline('token-classification', model='obi/deid_roberta_i2b2', aggregation_strategy='simple'); print('deid_roberta_i2b2 OK')"
+
+ENV PORT=18081
+EXPOSE 18081
+
+# Container HEALTHCHECK (G6/Hazard-2). This image is the SLOW pole: the FastAPI
+# lifespan loads en_core_web_lg + en_ner_bc5cdr_md + the ~1.4GB de-id transformer
+# into RAM BEFORE uvicorn accepts a connection, so /healthz simply cannot answer
+# for the first minute-plus of a cold boot. The generous --start-period means
+# that warm-up window is NOT counted as unhealthy (Docker only begins failing
+# checks after it elapses), so a slow-but-healthy boot is never marked unhealthy —
+# exactly the noise that, with TLS on, would hide a real cert failure. The probe
+# (healthcheck.py) tries https then http so it works whether or not the cert env
+# is set. Railway's own gate is the healthcheckTimeout in railway.json, raised in
+# tandem; this Dockerfile HEALTHCHECK covers local `docker run` and any
+# HEALTHCHECK-aware platform.
+COPY healthcheck.py ./healthcheck.py
+HEALTHCHECK --interval=15s --timeout=10s --start-period=300s --retries=10 \
+  CMD ["python", "healthcheck.py"]
+
+# Serve via the shared entrypoint so this image gets the SAME opt-in TLS path as
+# the lean Dockerfile: env-delivered cert PEMs (REDACTOR_SSL_CERT_PEM /
+# REDACTOR_SSL_KEY_PEM) are materialised to tmp files at boot and uvicorn
+# terminates TLS when both are present. Default (no cert env) = plaintext, so
+# this is byte-identical to the previous inline CMD when TLS is off.
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+CMD ["./entrypoint.sh"]

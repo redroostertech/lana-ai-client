@@ -249,6 +249,66 @@ function createStackBootstrap(opts = {}) {
       }
     }
 
+    // 3b. Aux local models (legal, vision) -- CHECK-IF-PRESENT ONLY. LANA One
+    // downloads GGUFs via a dedicated in-app step on user command; bootstrap
+    // NEVER fetches them here. An absent file simply means the corresponding
+    // sidecar is not started (inert-safe), exactly like the doc parsers.
+    let legalModel;
+    let visionModel;
+    let visionMmproj;
+    for (const aux of (plan.auxModels || [])) {
+      if (!aux || !aux.role) continue;
+      // Tolerate either a catalog-entry object ({ file, url, sha256, ... }) or a
+      // bare filename in aux.model; only the filename is used (no download).
+      const entry = aux.model;
+      const file = entry && typeof entry === 'object' ? entry.file : entry;
+      if (!file || typeof file !== 'string') continue;
+      const resolved = nodePath.join(modelsDir, file);
+      if (!io.fs.existsSync(resolved)) continue; // absent -> sidecar not started
+      if (aux.role === 'legal') {
+        legalModel = resolved;
+      } else if (aux.role === 'vision') {
+        visionModel = resolved;
+        // Optional multimodal projector companion (present-only, never fetched).
+        const mm = (entry && typeof entry === 'object' && entry.mmproj) || aux.mmproj;
+        const mmFile = mm && typeof mm === 'object' ? mm.file : mm;
+        if (mmFile && typeof mmFile === 'string') {
+          const mmPath = nodePath.join(modelsDir, mmFile);
+          if (io.fs.existsSync(mmPath)) visionMmproj = mmPath;
+        }
+      }
+    }
+
+    // 3c. Aux sidecar entrypoints -- present-only gating (mirrors doc-parser
+    // gating). Redactor run.sh ships in the client resources tree; TimesFM +
+    // Hermes live in the bundled backend tree (paths.backendCwd). None is fetched.
+    const redactorCandidates = [
+      opts.redactorRunSh,
+      packaged && resourcesPath ? nodePath.join(resourcesPath, 'redactor', 'run.sh') : undefined,
+      nodePath.join(__dirname, '..', 'resources', 'redactor', 'run.sh'),
+    ].filter(Boolean);
+    // Gate on the redactor being PROVISIONED, not merely vendored. run.sh always
+    // ships in the resources tree, but its Presidio/spaCy venv is installed lazily
+    // (by the in-app setup step). The sentinel is written only after that pip
+    // install succeeds. Enabling redaction on mere source-presence would set
+    // REDACTION_ENABLED against a dead endpoint, and the backend fails CLOSED ->
+    // every relay chat request would break. So redaction stays inert until the
+    // venv is genuinely provisioned. Mirrors the timesfm venv gate below.
+    const redactorProvisioned = io.fs.existsSync(
+      nodePath.join(home, '.venv', 'lana-redactor', '.lana-redactor-provisioned'),
+    );
+    const redactorRunSh = redactorProvisioned
+      ? redactorCandidates.find((c) => io.fs.existsSync(c))
+      : undefined;
+
+    const timesfmRunShPath = nodePath.join(paths.backendCwd, 'sidecar', 'timesfm', 'run.sh');
+    const timesfmVenv = nodePath.join(home, '.venv', 'timesfm');
+    const timesfmRunSh = (io.fs.existsSync(timesfmRunShPath) && io.fs.existsSync(timesfmVenv))
+      ? timesfmRunShPath : undefined;
+
+    const hermesServerPath = nodePath.join(paths.backendCwd, 'sidecar', 'hermes', 'server.mjs');
+    const hermesServer = io.fs.existsSync(hermesServerPath) ? hermesServerPath : undefined;
+
     // Local-model capability snapshot for the backend to expose (workstream
     // "Expose the plan"). buildServiceSpecs serializes this into the backend
     // spawn env as LANA_LOCAL_MODELS_STATUS; the backend reflects it verbatim.
@@ -281,6 +341,16 @@ function createStackBootstrap(opts = {}) {
         chatDestination: localChatAvailable ? 'local' : 'relay',
         reason: localChatAvailable ? `local_${plan.tier}` : (downloadReason || plan.reason),
       },
+      // Additive: aux sovereign capabilities available this boot (present-only;
+      // reflects the user's in-app model-setup + which sidecar assets are staged).
+      aux: {
+        legal: Boolean(legalModel),
+        vision: Boolean(visionModel),
+        visionMmproj: Boolean(visionMmproj),
+        redactor: Boolean(redactorRunSh),
+        timesfm: Boolean(timesfmRunSh),
+        hermes: Boolean(hermesServer),
+      },
     };
 
     // 4. Per-launch desktop capability key + data dirs
@@ -301,7 +371,11 @@ function createStackBootstrap(opts = {}) {
 
     // 6. Topology + supervisor
     const specs = buildServiceSpecs({
-      paths: { ...paths, chatModel },
+      paths: {
+        ...paths, chatModel,
+        legalModel, visionModel, visionMmproj,
+        redactorRunSh, timesfmRunSh, hermesServer,
+      },
       dataDirs, ports, secrets,
       tier: plan.tier || opts.tier || 'demo',
       chatContext: plan.contextWindow,

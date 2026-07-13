@@ -86,6 +86,61 @@ const TIER_LADDER = Object.freeze([
 
 const EMBED_MODEL_FILE = 'nomic-embed-text-v1.5.f16.gguf';
 
+/**
+ * AUXILIARY (non-chat) models that ride ALONGSIDE the selected chat tier:
+ *   - legal:  the SaulLM specialized legal-verifier GGUF (server runs it as the
+ *             llamacpp-legal sidecar). Demo/edge share SaulLM-7B; professional/
+ *             enterprise use SaulLM-54B.
+ *   - vision: the Qwen mmproj projector GGUF (server runs it as llamacpp-vision).
+ *             Demo has NO vision projector (matches download-llamacpp-models.sh:
+ *             the demo section queues no mmproj); edge+ each carry a per-model
+ *             mmproj.
+ *
+ * Filenames + tier mapping mirror scripts/download-llamacpp-models.sh and
+ * infra/lib/storage/models.js TIER_REQUIRED_MODEL_FILES so the three never drift.
+ * `catalogKey` resolves the url/sha256/sizeBytes for the download in
+ * model-catalog.js (AUX_MODEL_CATALOG) — the CONTRACT boundary with the
+ * wiring/download lane.
+ *
+ * AVAILABILITY CONTRACT: this map is SELECTION INTENT only (what the selected
+ * tier wants to run locally). It does NOT assert the files are on disk. LANA One
+ * downloads GGUFs on the user's command via the in-app model-setup step
+ * (Settings > Local Models). The wiring lane MUST consult that step's
+ * downloaded-files state before spawning the legal/vision servers, and fall back
+ * (relay verify / no vision) when a file has not been fetched yet. Nothing here
+ * pre-fetches anything.
+ */
+const AUX_MODELS_BY_TIER = Object.freeze({
+  demo: Object.freeze([
+    Object.freeze({ role: 'legal', catalogKey: 'legal-saullm-7b', model: 'SaulLM-7B-Instruct.Q4_K_M.gguf' }),
+  ]),
+  edge: Object.freeze([
+    Object.freeze({ role: 'legal', catalogKey: 'legal-saullm-7b', model: 'SaulLM-7B-Instruct.Q4_K_M.gguf' }),
+    Object.freeze({ role: 'vision', catalogKey: 'vision-qwen35-9b', model: 'mmproj-Qwen3.5-9B-BF16.gguf' }),
+  ]),
+  professional: Object.freeze([
+    Object.freeze({ role: 'legal', catalogKey: 'legal-saullm-54b', model: 'SaulLM-54B-Instruct.Q4_K_M.gguf' }),
+    Object.freeze({ role: 'vision', catalogKey: 'vision-qwen35-35b', model: 'mmproj-Qwen3.5-35B-A3B-BF16.gguf' }),
+  ]),
+  enterprise: Object.freeze([
+    Object.freeze({ role: 'legal', catalogKey: 'legal-saullm-54b', model: 'SaulLM-54B-Instruct.Q4_K_M.gguf' }),
+    Object.freeze({ role: 'vision', catalogKey: 'vision-qwen35-122b', model: 'mmproj-Qwen3.5-122B-A10B-BF16.gguf' }),
+  ]),
+});
+
+/**
+ * The auxiliary (legal + vision) models the given tier wants alongside its chat
+ * model, as fresh mutable copies (so callers can annotate them, e.g. with an
+ * on-disk availability flag, without mutating the frozen source of truth).
+ *
+ * @param {string|null} tier
+ * @returns {Array<{role: 'legal'|'vision', catalogKey: string, model: string}>}
+ */
+function auxModelsForTier(tier) {
+  const list = AUX_MODELS_BY_TIER[tier] || [];
+  return list.map((m) => ({ role: m.role, catalogKey: m.catalogKey, model: m.model }));
+}
+
 function detectHardware(io = {}) {
   const os = io.os || require('os');
   const arch = io.arch || process.arch;
@@ -122,17 +177,22 @@ function estimateTierFit(tier, totalRamGB, overheadGb) {
  * @returns {{ localChat: boolean, tier: string|null, model: string|null,
  *             chatModelFile: string|null, contextWindow: number|null,
  *             embedModelFile: string, reason: string, hardware: object,
+ *             auxModels: Array<{role:'legal'|'vision', catalogKey:string, model:string}>,
  *             tiers: Array<{tier:string, minMemoryGB:number, model:string,
  *               contextWindow:number, fits:boolean, effectiveContextTokens:number}> }}
  *
  * Field-name contract (consumed downstream by bootstrap.js and the capability
- * endpoint): localChat, reason, tier, model, chatModelFile, contextWindow, and the
- * tiers[] ladder annotation are stable. `model` mirrors `chatModelFile` for the
- * endpoint; bootstrap.js still reads `chatModelFile` + `contextWindow` + `tier`.
+ * endpoint): localChat, reason, tier, model, chatModelFile, contextWindow, the
+ * auxModels[] intent list, and the tiers[] ladder annotation are stable. `model`
+ * mirrors `chatModelFile` for the endpoint; bootstrap.js still reads
+ * `chatModelFile` + `contextWindow` + `tier`. auxModels is [] whenever localChat
+ * is false (relay chat runs no local legal/vision sidecars).
  */
 function selectModelPlan(io = {}) {
   const hardware = detectHardware(io);
-  const base = { embedModelFile: EMBED_MODEL_FILE, hardware };
+  // auxModels defaults to [] (relay chat runs no local legal/vision sidecars);
+  // a selected local tier overrides it below with that tier's intent list.
+  const base = { embedModelFile: EMBED_MODEL_FILE, hardware, auxModels: [] };
 
   const allowNonMetal = isFlagOn(process.env[NON_METAL_ENV_FLAG]);
   // Metal path uses the base reserve; the opt-in CPU path uses a strictly higher
@@ -183,6 +243,12 @@ function selectModelPlan(io = {}) {
     model: spec.chatModelFile,
     chatModelFile: spec.chatModelFile,
     contextWindow: spec.contextWindow,
+    // CONTRACT (auxModels): the legal + vision GGUFs this tier wants running
+    // alongside local chat. Each entry is { role, catalogKey, model }; catalogKey
+    // resolves url/sha in model-catalog.js. This is SELECTION INTENT — the wiring
+    // lane checks the user's model-setup download state for actual on-disk
+    // availability before spawning llamacpp-legal / llamacpp-vision.
+    auxModels: auxModelsForTier(spec.tier),
     reason: `selected_${spec.tier}_for_${hardware.totalRamGB}gb${posture}`,
     tiers,
   };
@@ -192,6 +258,8 @@ module.exports = {
   selectModelPlan,
   detectHardware,
   estimateTierFit,
+  auxModelsForTier,
+  AUX_MODELS_BY_TIER,
   TIER_LADDER,
   EMBED_MODEL_FILE,
   RESERVED_OVERHEAD_GB,

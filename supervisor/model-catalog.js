@@ -17,7 +17,7 @@
  */
 'use strict';
 
-const { TIER_LADDER, EMBED_MODEL_FILE } = require('./model-selector');
+const { TIER_LADDER, EMBED_MODEL_FILE, auxModelsForTier } = require('./model-selector');
 
 const TODO_SHA256 = 'TODO_REAL_RELEASE_SHA256'; // not 64 hex chars -> fails validation on purpose
 const TODO_SIZE = 0; // not a positive integer -> fails validation on purpose
@@ -54,12 +54,89 @@ const EMBED_MODEL_URL = 'https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-G
 const EMBED_MODEL_SHA256 = 'f7af6f66802f4df86eda10fe9bbcfc75c39562bed48ef6ace719a251cf1c2fdb';
 const EMBED_MODEL_SIZE = 274290560;
 
+// ---------------------------------------------------------------------------
+// AUXILIARY (non-chat) MODELS: the SaulLM legal verifier (server: llamacpp-legal)
+// and the Qwen vision mmproj projector (server: llamacpp-vision). Keyed by the
+// stable `catalogKey` that model-selector.js AUX_MODELS_BY_TIER emits on
+// plan.auxModels — that mapping decides WHICH key a tier wants; this table
+// provides the download coordinates for that key.
+//
+// URLs mirror scripts/download-llamacpp-models.sh exactly. sha256 + sizeBytes are
+// REAL, PINNED digests taken from each file's git-LFS pointer `oid sha256:` /
+// `size` on HuggingFace (2026-07-13) — the same method + provenance as the
+// CHAT_MODELS digests above, obtained WITHOUT downloading the weights. Method
+// validated against the already-on-disk SaulLM-7B: its local `shasum -a 256`
+// equals its LFS-pointer oid byte-for-byte.
+//
+// These weights are NOT bundled and NOT pre-fetched; LANA One downloads them on
+// the user's command via the in-app model-setup step (Settings > Local Models),
+// which verifies each file against these digests. Demo has a legal model but no
+// vision projector (matches the demo section of the download script).
+const AUX_MODEL_CATALOG = Object.freeze({
+  'legal-saullm-7b': {
+    role: 'legal',
+    file: 'SaulLM-7B-Instruct.Q4_K_M.gguf',
+    url: 'https://huggingface.co/RSpij/Saul-7B-Instruct-v1-Q4_K_M-GGUF/resolve/main/saul-7b-instruct-v1-q4_k_m.gguf',
+    sha256: '51a5f3330a1d33ac1789735086aaa7828be6942592a6fdb42b115870e6d8a568',
+    sizeBytes: 4368440000,
+  },
+  'legal-saullm-54b': {
+    role: 'legal',
+    file: 'SaulLM-54B-Instruct.Q4_K_M.gguf',
+    url: 'https://huggingface.co/mradermacher/SaulLM-54B-Instruct-GGUF/resolve/main/SaulLM-54B-Instruct.Q4_K_M.gguf',
+    sha256: '434d9bdd756afd6a99a5e52e3207424f29485e8fef8010e687bdd4d76963e9d1',
+    sizeBytes: 28448466848,
+  },
+  'vision-qwen35-9b': {
+    role: 'vision',
+    file: 'mmproj-Qwen3.5-9B-BF16.gguf',
+    url: 'https://huggingface.co/lmstudio-community/Qwen3.5-9B-GGUF/resolve/main/mmproj-Qwen3.5-9B-BF16.gguf',
+    sha256: '330d17547bfdbcd0e7a0cb3f4b06b4ceeac0aaa1e449122d9d66ef957aeb74b3',
+    sizeBytes: 921704480,
+  },
+  'vision-qwen35-35b': {
+    role: 'vision',
+    file: 'mmproj-Qwen3.5-35B-A3B-BF16.gguf',
+    url: 'https://huggingface.co/lmstudio-community/Qwen3.5-35B-A3B-GGUF/resolve/main/mmproj-Qwen3.5-35B-A3B-BF16.gguf',
+    sha256: '20a243da4603e66761c3de4d9e886f8a35b3d17f62ec276a8830325317092d6c',
+    sizeBytes: 902822016,
+  },
+  'vision-qwen35-122b': {
+    role: 'vision',
+    file: 'mmproj-Qwen3.5-122B-A10B-BF16.gguf',
+    url: 'https://huggingface.co/unsloth/Qwen3.5-122B-A10B-GGUF/resolve/main/mmproj-BF16.gguf',
+    sha256: 'c4f22a6b5101ac85930029e0eec321bfaa4c0b16851f569759d3bac3fa31c744',
+    sizeBytes: 912263904,
+  },
+});
+
+// Join the selector's per-tier aux INTENT (role/catalogKey/filename) with this
+// file's download coordinates, into fully-resolved, downloader-ready entries.
+// Shape mirrors chatModel: { role, catalogKey, file, url, sha256, sizeBytes }.
+function auxEntriesForTier(tier) {
+  return auxModelsForTier(tier).map((intent) => {
+    const src = AUX_MODEL_CATALOG[intent.catalogKey]
+      || { url: null, sha256: TODO_SHA256, sizeBytes: TODO_SIZE };
+    return {
+      role: intent.role,
+      catalogKey: intent.catalogKey,
+      file: intent.model,
+      url: src.url,
+      sha256: src.sha256,
+      sizeBytes: src.sizeBytes,
+    };
+  });
+}
+
 function buildCatalog() {
   const catalog = {};
   for (const entry of TIER_LADDER) {
     const src = CHAT_MODELS[entry.tier] || { url: null, sha256: TODO_SHA256, sizeBytes: TODO_SIZE };
     catalog[entry.tier] = {
       chatModel: { file: entry.chatModelFile, url: src.url, sha256: src.sha256, sizeBytes: src.sizeBytes },
+      // Legal + vision GGUFs this tier wants alongside chat. Same download shape
+      // as chatModel so ensureModel()/validateCatalogEntry() treat them uniformly.
+      auxModels: auxEntriesForTier(entry.tier),
     };
   }
   return catalog;
@@ -82,6 +159,35 @@ function resolveChatModel(tier) {
   const entry = MODEL_CATALOG[tier];
   if (!entry) throw new Error(`model-catalog: unknown tier "${tier}"`);
   return entry.chatModel;
+}
+
+/**
+ * Resolve a single auxiliary (legal/vision) model by the catalogKey that
+ * model-selector.js emits on plan.auxModels[].catalogKey. Returns a
+ * downloader-ready entry { role, file, url, sha256, sizeBytes } that
+ * validateCatalogEntry() accepts.
+ *
+ * @param {string} catalogKey
+ * @returns {{role:string, file:string, url:string, sha256:string, sizeBytes:number}}
+ */
+function resolveAuxModel(catalogKey) {
+  const src = AUX_MODEL_CATALOG[catalogKey];
+  if (!src) throw new Error(`model-catalog: unknown aux catalogKey "${catalogKey}"`);
+  return { role: src.role, file: src.file, url: src.url, sha256: src.sha256, sizeBytes: src.sizeBytes };
+}
+
+/**
+ * The fully-resolved auxiliary (legal + vision) download entries for a tier,
+ * in the same shape as resolveChatModel plus { role, catalogKey }. [] for a
+ * tier with no aux models.
+ *
+ * @param {string} tier
+ * @returns {Array<{role:string, catalogKey:string, file:string, url:string, sha256:string, sizeBytes:number}>}
+ */
+function resolveAuxModels(tier) {
+  const entry = MODEL_CATALOG[tier];
+  if (!entry) throw new Error(`model-catalog: unknown tier "${tier}"`);
+  return entry.auxModels.map((m) => ({ ...m }));
 }
 
 const HEX64 = /^[a-f0-9]{64}$/i;
@@ -136,6 +242,9 @@ function validateCatalogEntry(entry) {
 module.exports = {
   MODEL_CATALOG,
   EMBED_MODEL,
+  AUX_MODEL_CATALOG,
   resolveChatModel,
+  resolveAuxModel,
+  resolveAuxModels,
   validateCatalogEntry,
 };

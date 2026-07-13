@@ -1,0 +1,15 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile.full"
+  },
+  "deploy": {
+    "healthcheckPath": "/healthz",
+    "//healthcheckTimeout": "G6/Hazard-2: the FULL image (Dockerfile.full) loads spaCy en_core_web_lg + scispaCy en_ner_bc5cdr_md + the ~1.4GB obi/deid_roberta_i2b2 transformer into RAM during FastAPI lifespan, BEFORE uvicorn accepts its first connection (so /healthz cannot answer until that finishes). Cold boots were taking long enough that the old 300s window marked a slow-but-healthy deploy FAILED while /redact was already serving 200s. Once TLS is added, that FAILED noise would hide a REAL cert failure. 900s gives a heavy cold boot generous headroom; a deploy that truly cannot serve still fails after 15 min.",
+    "healthcheckTimeout": 900,
+    "//restartPolicy": "ON_FAILURE with only a couple of retries: a slow boot is no longer counted as a failure (the wide healthcheck window absorbs it), so a restart here means a genuine crash. Keep retries low to avoid a thrash loop on a real, persistent boot error (e.g. a bad cert) — fail visibly instead of churning.",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 2
+  }
+}

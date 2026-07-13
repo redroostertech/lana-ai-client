@@ -51,7 +51,11 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
   const tier = cfg.tier || 'demo';
   const ports = {
     pg: 5432, minio: 9000, minioConsole: 9001, llamaEmbed: 8082, llamaChat: 8081,
-    docling: 8085, unstructured: 8000, backend: 8090, ...(cfg.ports || {}),
+    docling: 8085, unstructured: 8000, backend: 8090,
+    // Aux sovereign sidecars (all 127.0.0.1, all non-critical). NOTE: timesfm is
+    // 8092, NOT 8090 -- the Node backend owns 8090.
+    vision: 8083, legal: 8084, redactor: 8091, timesfm: 8092, hermes: 8094,
+    ...(cfg.ports || {}),
   };
   const specs = [];
 
@@ -127,6 +131,83 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
     });
   }
 
+  // 5b. Aux inference sidecars (all optional, all critical:false so a missing
+  // asset degrades instead of blocking boot -- exactly like llama-chat/docling).
+  // Each is gated on its resolved asset path (set by bootstrap ONLY when the file
+  // is actually present on disk; bootstrap never fetches them). The backend does
+  // NOT hard-depend on any of these -- when a sidecar is absent its URL env is
+  // left unset and the backend's hybrid/redaction logic degrades to the relay.
+
+  // SaulLM legal verifier (reuses the llama-server chat launch pattern).
+  if (p.legalModel) {
+    specs.push({
+      name: 'llama-legal',
+      command: p.llamaServer,
+      args: [
+        '--model', p.legalModel, '--port', String(ports.legal), '--host', '127.0.0.1',
+        '--n-gpu-layers', '16', '--threads', '-1', '--ctx-size', String(cfg.chatContext || 8192),
+        '--batch-size', '128', '--ubatch-size', '256', '--parallel', '1',
+        '--flash-attn', 'on', '--cont-batching',
+      ],
+      readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.legal}/health` }),
+      critical: false, // legal grounding falls back to LLAMACPP_LEGAL_URL default / relay
+    });
+  }
+
+  // Vision model server (+ mmproj projector when the vision setup staged one).
+  if (p.visionModel) {
+    specs.push({
+      name: 'llama-vision',
+      command: p.llamaServer,
+      args: [
+        '--model', p.visionModel, '--port', String(ports.vision), '--host', '127.0.0.1',
+        ...(p.visionMmproj ? ['--mmproj', p.visionMmproj] : []),
+        '--n-gpu-layers', '16', '--threads', '-1', '--ctx-size', String(cfg.chatContext || 8192),
+        '--batch-size', '128', '--ubatch-size', '256', '--parallel', '1',
+        '--flash-attn', 'on', '--cont-batching',
+      ],
+      readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.vision}/health` }),
+      critical: false, // vision falls back to LLAMACPP_VISION_URL inheritance / relay
+    });
+  }
+
+  // Redactor privacy moat (Presidio/spaCy FastAPI sidecar; run.sh staged by the
+  // model/resource lane). REDACTOR_PORT is the only launch knob (per its wrapper).
+  if (p.redactorRunSh) {
+    specs.push({
+      name: 'redactor',
+      command: p.redactorRunSh,
+      // The redactor enforces INTERNAL_SERVICE_SECRET on /redact; the backend
+      // presents the SAME value (below), so the loopback hop is authenticated.
+      env: { REDACTOR_PORT: String(ports.redactor), INTERNAL_SERVICE_SECRET: s.INTERNAL_SERVICE_SECRET },
+      readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.redactor}/healthz` }),
+      critical: false, // egress gate is inert when REDACTOR_URL / REDACTION_ENABLED are unset
+    });
+  }
+
+  // TimesFM forecasting sidecar (uvicorn wrapper; reads TIMESFM_HOST/TIMESFM_PORT).
+  if (p.timesfmRunSh) {
+    specs.push({
+      name: 'timesfm',
+      command: p.timesfmRunSh,
+      env: { TIMESFM_HOST: '127.0.0.1', TIMESFM_PORT: String(ports.timesfm) },
+      readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.timesfm}/health` }),
+      critical: false,
+    });
+  }
+
+  // Hermes agentic executor sidecar (ESM node server; reads HERMES_SIDECAR_HOST/PORT).
+  if (p.hermesServer) {
+    specs.push({
+      name: 'hermes',
+      command: p.node || 'node',
+      args: [p.hermesServer],
+      env: { HERMES_SIDECAR_HOST: '127.0.0.1', HERMES_SIDECAR_PORT: String(ports.hermes) },
+      readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.hermes}/health` }),
+      critical: false,
+    });
+  }
+
   // 6. Node backend (depends on the required infra)
   const backendEnv = cleanEnv({
     ...(cfg.extraEnv || {}),
@@ -155,6 +236,21 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
     JWT_SECRET: s.JWT_SECRET,
     MFA_ENCRYPTION_KEY: s.MFA_ENCRYPTION_KEY,
     WEBHOOK_SECRET_ENCRYPTION_KEY: s.WEBHOOK_SECRET_ENCRYPTION_KEY,
+    // At-rest encryption keys (document envelope + connector OAuth tokens).
+    FILE_ENCRYPTION_KEY: s.FILE_ENCRYPTION_KEY,
+    CONNECTOR_ENCRYPTION_KEY: s.CONNECTOR_ENCRYPTION_KEY,
+    // Aux sidecar URLs -- each set ONLY when that sidecar actually started (its
+    // asset was present), so the backend's hybrid/redaction logic degrades to
+    // the relay/native path exactly like LLAMACPP_MAIN_URL does today.
+    REDACTION_ENABLED: p.redactorRunSh ? 'true' : undefined,
+    REDACTOR_URL: p.redactorRunSh ? `http://127.0.0.1:${ports.redactor}` : undefined,
+    // Same shared secret the redactor sidecar enforces; only sent when the
+    // redactor is actually running, so an absent moat leaves the hop unset.
+    INTERNAL_SERVICE_SECRET: p.redactorRunSh ? s.INTERNAL_SERVICE_SECRET : undefined,
+    LLAMACPP_LEGAL_URL: p.legalModel ? `http://127.0.0.1:${ports.legal}` : undefined,
+    LLAMACPP_VISION_URL: p.visionModel ? `http://127.0.0.1:${ports.vision}` : undefined,
+    TIMESFM_API_URL: p.timesfmRunSh ? `http://127.0.0.1:${ports.timesfm}` : undefined,
+    HERMES_SIDECAR_URL: p.hermesServer ? `http://127.0.0.1:${ports.hermes}` : undefined,
   });
   specs.push({
     name: 'backend',

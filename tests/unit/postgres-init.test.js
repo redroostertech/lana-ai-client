@@ -40,21 +40,44 @@ describe('makePostgresHooks.prepare', () => {
 });
 
 describe('makePostgresHooks.prepare timescaledb preload', () => {
-  it('writes shared_preload_libraries=timescaledb to postgresql.conf', async () => {
+  it('writes shared_preload_libraries=timescaledb when the library is present', async () => {
     const appended = [];
     const fs = {
-      existsSync: (p) => p.endsWith('.conf'), // conf exists; PG_VERSION does not -> initdb runs
+      // conf exists; pkglibdir + the timescaledb .dylib exist -> libPresent
+      existsSync: (p) => p.endsWith('.conf') || p === '/pg/lib' || p.endsWith('timescaledb.dylib'),
       readFileSync: () => '', // no existing preload line
       appendFileSync: (p, data) => appended.push({ p, data }),
     };
+    const exec = async (cmd, args) => {
+      const j = (args || []).join(' ');
+      if (j.includes('--pkglibdir')) return { stdout: '/pg/lib', code: 0 };
+      if (j.includes('--sharedir')) return { stdout: '/pg/share', code: 0 };
+      return { stdout: '', code: 0 };
+    };
     const hooks = makePostgresHooks({
       bins: { initdb: 'initdb', psql: 'psql', createdb: 'createdb' },
-      dataDir: '/data/pg', port: 5432, exec: async () => ({ stdout: '', code: 0 }),
-      migrate: async () => {}, fs,
+      dataDir: '/data/pg', port: 5432, exec, migrate: async () => {}, fs,
     });
     await hooks.prepare();
     expect(appended.length).toBe(1);
     expect(appended[0].data).toMatch(/shared_preload_libraries\s*=\s*'timescaledb'/);
+  });
+
+  it('does NOT enable the preload when timescaledb is absent/unverifiable (boot-safe)', async () => {
+    const appended = [];
+    const fs = {
+      existsSync: (p) => p.endsWith('.conf'), // conf exists; no pkglibdir, no lib
+      readFileSync: () => '',
+      appendFileSync: (p, data) => appended.push({ p, data }),
+    };
+    const hooks = makePostgresHooks({
+      bins: { initdb: 'initdb', psql: 'psql', createdb: 'createdb' },
+      // pg_config returns nothing -> presence unverifiable; boot-safe path skips.
+      dataDir: '/data/pg', port: 5432, exec: async () => ({ stdout: '', code: 0 }),
+      migrate: async () => {}, fs,
+    });
+    await hooks.prepare();
+    expect(appended.length).toBe(0);
   });
 
   it('does not duplicate the preload when already present', async () => {
