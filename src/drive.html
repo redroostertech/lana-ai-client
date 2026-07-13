@@ -197,15 +197,17 @@
         </table>
       </div>
 
-      <!-- Empty State -->
+      <!-- Empty State — wrapped in a card so it matches the Workspaces empty state -->
       <div id="contentEmpty" class="hidden">
-        <lex-empty
-          message="No matters found"
-          description="Create a new folder to get started"
-          icon="folder"
-          action-label="Create Folder"
-          id="contentEmptyWidget"
-        ></lex-empty>
+        <div class="bg-white rounded-lg shadow-sm border" style="border-color: var(--lex-border-default)">
+          <lex-empty
+            message="No matters found"
+            description="Create a new folder to get started"
+            icon="folder"
+            action-label="Create Folder"
+            id="contentEmptyWidget"
+          ></lex-empty>
+        </div>
       </div>
 
       <!-- Files Section (shown only while searching, when there are file matches) -->
