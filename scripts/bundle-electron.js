@@ -48,6 +48,15 @@ async function bundle() {
         external: ['electron', 'electron-store'], // Keep electron external
         minify: false,
         sourcemap: false,
+        // Bake the edition flag INTO the bundle. esbuild inlines require('./package.json')
+        // at build time (freezing the source package.json, which has no lanaEdition), so
+        // the packaged app can't read it at runtime -- electron-main.js reads this defined
+        // constant instead. 'lana-one' for a LANA One build, '' otherwise.
+        define: {
+          'process.env.LANA_ONE_BAKED_EDITION': JSON.stringify(
+            process.env.LANA_ONE_EDITION_BUILD === '1' ? 'lana-one' : ''
+          ),
+        },
       });
       console.log(`  Bundled: ${entry}`);
     } catch (error) {

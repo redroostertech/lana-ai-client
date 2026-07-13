@@ -54,8 +54,15 @@ const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVault
 // where env vars are not present.
 // ADDITIVE + EDITION-GATED: false for the stock lana-ai-client, so its org
 // hosted-discovery flow is completely unaffected. See electron-cloud-auth.js.
+// process.env.LANA_ONE_BAKED_EDITION is replaced at bundle time by esbuild's `define`
+// (scripts/bundle-electron.js) with the edition string for a packaged build -- the
+// only reliable way to bake it, since esbuild inlines require('./package.json') at
+// build time (freezing the source package.json, which has no lanaEdition). The require
+// fallback + LANA_ONE_EDITION env cover dev/unpackaged runs.
 let _bakedEdition = '';
-try { _bakedEdition = require('./package.json').lanaEdition || ''; } catch (_e) { /* dev / unpackaged */ }
+try {
+  _bakedEdition = process.env.LANA_ONE_BAKED_EDITION || require('./package.json').lanaEdition || '';
+} catch (_e) { _bakedEdition = process.env.LANA_ONE_BAKED_EDITION || ''; }
 const IS_LANA_ONE = process.env.LANA_ONE_EDITION === '1' || _bakedEdition === 'lana-one';
 // The LOCAL sovereign backend the desktop adopts its cloud identity into. The
 // packaged shell will set this to the backend it spawns; 8090 is the dev default.
