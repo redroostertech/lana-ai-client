@@ -501,11 +501,25 @@
     { value: 'user',               label: 'A user with matter access' },
     { value: 'matter_organization', label: 'Everyone with matter access' }
   ];
+  // LANA One is a single-user edition: a task can only be assigned to the
+  // individual user, so the org-level / entire-organization scopes are hidden.
+  var LANA_ONE_TARGET_OPTIONS = [
+    { value: 'user', label: 'Individual User' }
+  ];
+  // Resolved asynchronously from the Electron edition config at init().
+  var IS_LANA_ONE = false;
 
   function applyTargetTypeOptions() {
     var select = el('myTaskTargetType');
     if (!select) return;
-    var nextOptions = state.selectedMatterId ? MATTER_TARGET_OPTIONS : WORKSPACE_TARGET_OPTIONS;
+    var nextOptions;
+    if (state.selectedMatterId) {
+      nextOptions = MATTER_TARGET_OPTIONS;
+    } else if (IS_LANA_ONE) {
+      nextOptions = LANA_ONE_TARGET_OPTIONS;
+    } else {
+      nextOptions = WORKSPACE_TARGET_OPTIONS;
+    }
     select.setAttribute('options', JSON.stringify(nextOptions));
     // Preserve current selection where the value still exists in the new
     // option set; otherwise fall back to 'unassigned'. Both option sets
@@ -515,7 +529,9 @@
     var current = String(select.value || 'unassigned');
     var validValues = nextOptions.map(function (o) { return o.value; });
     if (validValues.indexOf(current) === -1) {
-      select.value = 'unassigned';
+      // Fall back to the first valid option for the active set (in the org sets
+      // that is 'unassigned'; in LANA One it is the individual user).
+      select.value = nextOptions[0] ? nextOptions[0].value : 'unassigned';
     }
     // Re-run visibility sync since the value may have just been reset.
     syncTargetTypeVisibility();
@@ -1093,9 +1109,23 @@
     if (planMatterPickBtn) planMatterPickBtn.addEventListener('click', openPlanMatterPicker);
   }
 
+  // LANA One edition UX: single-user assignee + a general (non-legal) title
+  // placeholder. Resolved from the Electron edition config; inert in the org build.
+  function resolveEdition() {
+    if (!window.electronAPI || typeof window.electronAPI.getConfig !== 'function') return;
+    Promise.resolve(window.electronAPI.getConfig()).then(function (cfg) {
+      if (!cfg || cfg.isLanaOne !== true) return;
+      IS_LANA_ONE = true;
+      var titleInput = el('myTaskTitle');
+      if (titleInput) titleInput.setAttribute('placeholder', 'Review and follow up');
+      applyTargetTypeOptions();
+    }).catch(function () { /* inert on failure */ });
+  }
+
   function init() {
     bindEvents();
     applyTaskPlanRoleGate();
+    resolveEdition();
     loadTasks();
   }
 
