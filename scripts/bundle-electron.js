@@ -68,6 +68,14 @@ async function bundle() {
       'electron-store': pkg.dependencies['electron-store']
     }
   };
+  // The electron-builder `files` config copies THIS package.json into the app,
+  // which overrides electron-builder's extraMetadata.lanaEdition. So when building
+  // the LANA One edition, bake the edition flag here (electron-main.js reads
+  // require('./package.json').lanaEdition to set IS_LANA_ONE in the packaged app).
+  if (process.env.LANA_ONE_EDITION_BUILD === '1') {
+    minPkg.lanaEdition = 'lana-one';
+    console.log('  Baked lanaEdition=lana-one into electron-dist/package.json');
+  }
   fs.writeFileSync(
     path.join(distDir, 'package.json'),
     JSON.stringify(minPkg, null, 2)
