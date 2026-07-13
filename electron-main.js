@@ -59,16 +59,43 @@ try { _bakedEdition = require('./package.json').lanaEdition || ''; } catch (_e) 
 const IS_LANA_ONE = process.env.LANA_ONE_EDITION === '1' || _bakedEdition === 'lana-one';
 // The LOCAL sovereign backend the desktop adopts its cloud identity into. The
 // packaged shell will set this to the backend it spawns; 8090 is the dev default.
-const LANA_LOCAL_BACKEND_URL = process.env.LANA_LOCAL_BACKEND_URL || 'http://localhost:8090';
+let LANA_LOCAL_BACKEND_URL = process.env.LANA_LOCAL_BACKEND_URL || 'http://localhost:8090';
 // Desktop capability key: a shared secret between this shell and the local backend
 // so only the LANA One app can reach the gated /adopt + /relay endpoints (not another
 // local process or a browser hitting localhost). In the packaged app the shell
 // GENERATES this per launch and passes it to the backend it spawns; in dev it is
 // shared via env (set the same LANA_DESKTOP_KEY on both). Empty = inert, matching the
 // backend, which only enforces the header when its own LANA_DESKTOP_KEY is set.
-const LANA_DESKTOP_KEY = process.env.LANA_DESKTOP_KEY || '';
+let LANA_DESKTOP_KEY = process.env.LANA_DESKTOP_KEY || '';
 const { CloudAuth } = require('./electron-cloud-auth');
 const { KeychainSecretStore } = require('./electron-keychain-store');
+
+// Sovereign stack supervisor (opt-in via LANA_ONE_SUPERVISOR=1). When enabled, the
+// app spawns + health-gates the local backend + Postgres + MinIO + models on launch
+// (supervisor/bootstrap.js; docs/specs/LANA_ONE_PACKAGING_PLAN.md) and adopts the URL
+// + per-launch desktop key it chose. Default off = today's connect-only flow, intact.
+let _stackBootstrap = null;
+async function startSovereignStack() {
+  if (process.env.LANA_ONE_SUPERVISOR !== '1') return;
+  const { createStackBootstrap } = require('./supervisor/bootstrap');
+  const supLog = { info: logInfo, warn: logInfo, error: logError };
+  const secretStore = new KeychainSecretStore({
+    userDataRoot: app.getPath('userData'),
+    fileName: 'stack-secrets.enc.json',
+    logger: supLog,
+  });
+  _stackBootstrap = createStackBootstrap({
+    userDataRoot: app.getPath('userData'),
+    repoRoot: process.env.LANA_ONE_BACKEND_DIR,
+    secretStore,
+    logger: supLog,
+  });
+  logInfo('[supervisor] bringing up sovereign stack...');
+  const result = await _stackBootstrap.start();
+  LANA_LOCAL_BACKEND_URL = result.backendUrl;
+  LANA_DESKTOP_KEY = result.desktopKey;
+  logInfo(`[supervisor] sovereign stack ready at ${result.backendUrl} (chat: ${result.plan.localChat ? result.plan.tier : 'relay'})`);
+}
 
 /**
  * Brainchild MCP bridge — reads the user's local vault over the MCP stdio
@@ -1558,6 +1585,15 @@ app.whenReady().then(async () => {
     }
   }
 
+  // Opt-in: spawn + health-gate the local sovereign stack (backend + Postgres + MinIO
+  // + models) before the login window. On failure we log and fall through to the
+  // connect-only path (against the configured/dev backend), so this is safe to enable.
+  try {
+    await startSovereignStack();
+  } catch (err) {
+    logError(`[supervisor] sovereign stack start failed; falling back to connect-only: ${err && err.message}`);
+  }
+
   // Version migration: Clear server config to ensure fresh discovery with correct static_ip
   // This fixes issues where old versions saved incorrect IPs (e.g., link-local addresses)
   const { getAllData, clearSavedServer: clearServerConfig } = require('./electron-storage');
@@ -1715,6 +1751,16 @@ app.on('window-all-closed', () => {
 app.on('before-quit', async () => {
   // Cleanup operations before quitting
   console.log('[electron-main] Application is quitting...');
+
+  // Tear down the sovereign stack (backend + Postgres + MinIO + models), if spawned.
+  if (_stackBootstrap) {
+    try {
+      await _stackBootstrap.stop();
+      logInfo('[supervisor] sovereign stack stopped');
+    } catch (error) {
+      logError('[supervisor] Failed to stop sovereign stack', error);
+    }
+  }
 
   // Stop the PAC bridge HTTP server
   try {
