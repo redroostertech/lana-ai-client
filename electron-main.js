@@ -91,14 +91,25 @@ async function startSovereignStack() {
   if (envFlag === '0') return;
   const packaged = app.isPackaged;
   const resourcesPath = process.resourcesPath;
+  // Dev affordance (see start.sh --force-package): boot the STAGED sovereign
+  // bundle as-if-installed from a plain `electron .` run, without a full
+  // electron-builder package. Gated on !packaged so it can NEVER affect a real
+  // installed app — app.isPackaged always wins there. resourcesPath defaults to
+  // the staged build/sovereign-resources beside the app; override with
+  // LANA_ONE_RESOURCES_PATH.
+  const forceBundledDev = !packaged && process.env.LANA_ONE_FORCE_PACKAGE === '1';
+  const effectivePackaged = packaged || forceBundledDev;
+  const effectiveResourcesPath = forceBundledDev
+    ? (process.env.LANA_ONE_RESOURCES_PATH || path.join(__dirname, 'build', 'sovereign-resources'))
+    : resourcesPath;
   let bundledPresent = false;
   try {
     const fs = require('fs');
-    bundledPresent = packaged
-      && fs.existsSync(path.join(resourcesPath, 'postgres'))
-      && fs.existsSync(path.join(resourcesPath, 'backend'));
+    bundledPresent = effectivePackaged
+      && fs.existsSync(path.join(effectiveResourcesPath, 'postgres'))
+      && fs.existsSync(path.join(effectiveResourcesPath, 'backend'));
   } catch (_e) { bundledPresent = false; }
-  if (envFlag !== '1' && !(IS_LANA_ONE && packaged && bundledPresent)) return;
+  if (envFlag !== '1' && !(IS_LANA_ONE && effectivePackaged && bundledPresent)) return;
 
   const { createStackBootstrap } = require('./supervisor/bootstrap');
   const supLog = { info: logInfo, warn: logInfo, error: logError };
@@ -110,9 +121,10 @@ async function startSovereignStack() {
   _stackBootstrap = createStackBootstrap({
     userDataRoot: app.getPath('userData'),
     // Packaged: bootstrap resolves the bundled backend + node runtime from
-    // resourcesPath. Dev (env=1): honor LANA_ONE_BACKEND_DIR.
-    packaged,
-    resourcesPath,
+    // resourcesPath. Dev: `--force-package` (start.sh) upgrades a dev run to the
+    // staged bundle via forceBundledDev above; honors LANA_ONE_BACKEND_DIR too.
+    packaged: effectivePackaged,
+    resourcesPath: effectiveResourcesPath,
     repoRoot: process.env.LANA_ONE_BACKEND_DIR || undefined,
     secretStore,
     logger: supLog,
