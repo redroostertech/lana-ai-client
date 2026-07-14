@@ -7,6 +7,10 @@ import {
 import { badge, emptyState, metaGrid, surface } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, normalizeText } from '../shared/utils.js';
 import { connectorCompact, connectorDisplayName, countReadyConnectors } from './connectors.js';
+// Side-effect import: executes the mapper IIFE so window.DesignToBuilderMapper
+// is available for the "Build with Lana" panel below. The mapper module owns the
+// design-response -> builder-state transform; this view only consumes it.
+import '../shared/design-to-builder.mapper.js';
 
 const SCHEDULED_TRIGGER_OPTIONS = TRIGGER_OPTIONS.filter((eventType) => eventType.startsWith('schedule.'));
 const SYSTEM_TRIGGER_OPTIONS = TRIGGER_OPTIONS.filter((eventType) => !eventType.startsWith('schedule.'));
@@ -436,6 +440,10 @@ export function createBuilderState(template, matters = []) {
     dayOfWeek: selectedTemplate.defaults.dayOfWeek,
     customJson: '',
     overdueReminder,
+    designPrompt: '',
+    designLoading: false,
+    designPreview: '',
+    designValidationErrors: [],
     scopeType: selectedTemplate.defaults.scopeType || (selectedTemplate.id === 'connector-sync-watch' ? 'organization' : 'matter'),
     matterId: matters.length ? matterRef(matters[0]) : '',
     matterSearch: '',
@@ -1048,6 +1056,173 @@ function renderActionInsights(insights) {
   `;
 }
 
+/**
+ * "Build with Lana" panel — a natural-language entry point that drafts an
+ * automation for the user. Renders at the top of the builder main column.
+ * Description text lives in state.builder.designPrompt so it survives
+ * re-renders; loading / preview / validation feedback also live on the builder
+ * state. This is additive — the manual builder below stays fully usable.
+ */
+function renderBuildWithLanaPanel(context) {
+  const builder = context.state.builder;
+  const loading = Boolean(builder.designLoading);
+  const prompt = builder.designPrompt || '';
+  const preview = String(builder.designPreview || '');
+  const validationErrors = Array.isArray(builder.designValidationErrors)
+    ? builder.designValidationErrors
+    : [];
+
+  const previewNote = preview
+    ? `
+      <div class="build-with-lana-preview" aria-live="polite">
+        <strong>Lana's draft summary</strong>
+        <p>${escapeHtml(preview)}</p>
+      </div>
+    `
+    : '';
+
+  const validationNotice = validationErrors.length
+    ? `
+      <div class="build-with-lana-validation" role="alert">
+        <strong>Lana drafted this, but a few things need your attention:</strong>
+        <ul>
+          ${validationErrors.map((item) => `<li>${escapeHtml(typeof item === 'string' ? item : (item?.message || JSON.stringify(item)))}</li>`).join('')}
+        </ul>
+      </div>
+    `
+    : '';
+
+  return `
+    <article class="build-with-lana-card">
+      <div class="build-with-lana-head">
+        <div class="build-with-lana-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+        </div>
+        <div class="build-with-lana-copy">
+          <strong>Build with Lana</strong>
+          <span>Describe what you want in plain language and Lana will draft the automation for you to edit.</span>
+        </div>
+      </div>
+      <label class="build-with-lana-field">
+        <span>What should this automation do?</span>
+        <textarea
+          class="automation-builder-input"
+          data-design-prompt
+          rows="3"
+          placeholder="e.g., When a document is uploaded, summarize it and email the team."
+          ${loading ? 'disabled' : ''}
+        >${escapeHtml(prompt)}</textarea>
+      </label>
+      ${validationNotice}
+      ${previewNote}
+      <div class="build-with-lana-actions">
+        <lex-btn variant="primary" size="sm" data-design-generate ${loading ? 'disabled' : ''}>
+          ${loading
+            ? '<span class="build-with-lana-spinner" aria-hidden="true"></span> Lana is designing&hellip;'
+            : 'Generate with Lana'}
+        </lex-btn>
+        ${loading ? '<span class="build-with-lana-hint">This can take up to 20 seconds.</span>' : ''}
+      </div>
+    </article>
+  `;
+}
+
+/**
+ * Calls the backend design endpoint with the user's description, maps the
+ * response into a partial builder state, merges it into the live state, and
+ * re-renders the builder so the form reflects the generated draft.
+ *
+ * POST /api/v1/automations/design { description } -> { data: { valid,
+ *   automationName, description, automationConfig, validationErrors, preview } }
+ */
+export async function generateAutomationDesign(context) {
+  const builder = context.state.builder;
+  const description = String(builder.designPrompt || '').trim();
+
+  if (!description) {
+    notifyBuilder(context, 'Describe what you want the automation to do first.', true);
+    return;
+  }
+
+  if (builder.designLoading) return;
+
+  builder.designLoading = true;
+  context.renderCurrentView();
+
+  try {
+    const response = await context.fetchJson('/api/v1/automations/design', {
+      method: 'POST',
+      headers: context.authHeaders(),
+      body: JSON.stringify({ description })
+    });
+
+    const data = response?.data || {};
+    const mapper = window.DesignToBuilderMapper;
+    if (!mapper || typeof mapper.mapDesignToBuilderState !== 'function') {
+      throw new Error('Design mapper is unavailable.');
+    }
+
+    const partial = mapper.mapDesignToBuilderState(data.automationConfig, {
+      automationName: data.automationName,
+      description: data.description
+    });
+
+    const validationErrors = data.valid === false && Array.isArray(data.validationErrors)
+      ? data.validationErrors
+      : [];
+
+    context.state.builder = {
+      ...builder,
+      ...partial,
+      // Preserve the user's typed prompt and clear the loading flag.
+      designPrompt: builder.designPrompt,
+      designLoading: false,
+      designPreview: data.preview ? String(data.preview) : '',
+      designValidationErrors: validationErrors
+    };
+
+    // Keep the raw JSON editor / trigger fields consistent with the merged draft.
+    context.state.builder.triggerMode = context.state.builder.triggerMode
+      || triggerModeFromEvent(context.state.builder.triggerEvent);
+
+    context.renderCurrentView();
+    context.scheduleOnboardingSave();
+
+    if (validationErrors.length) {
+      notifyBuilder(context, 'Lana drafted your automation — review the highlighted items before publishing.', true);
+    } else {
+      notifyBuilder(context, 'Lana drafted your automation. Review and edit the form below.');
+    }
+  } catch (error) {
+    context.state.builder.designLoading = false;
+    context.renderCurrentView();
+
+    if (error?.status === 429) {
+      notifyBuilder(context, 'Please wait a few seconds before asking Lana to design again.', true);
+      return;
+    }
+
+    notifyBuilder(context, error?.message || 'Lana could not design that automation. Try rephrasing.', true);
+  }
+}
+
+/**
+ * Surface feedback through the Lex toast system when available, falling back to
+ * the app's flash banner so the panel still works in any host.
+ */
+function notifyBuilder(context, message, isError = false) {
+  const toast = window.Lex && window.Lex.Toast;
+  if (toast && typeof toast[isError ? 'error' : 'success'] === 'function') {
+    toast[isError ? 'error' : 'success'](message);
+    return;
+  }
+  if (typeof context.flash === 'function') {
+    context.flash(message, isError);
+  }
+}
+
 export function renderBuilder(context) {
   const mount = context.els.viewContent;
   const selectedTemplate = getSelectedTemplate(context);
@@ -1151,6 +1326,7 @@ export function renderBuilder(context) {
 
       <div class="automations-builder-body">
         <div class="automations-builder-main">
+          ${renderBuildWithLanaPanel(context)}
           <article class="automations-intent-card">
             <div class="automations-intent-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
