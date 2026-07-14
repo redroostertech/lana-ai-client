@@ -74,6 +74,41 @@
   }
   checkAuth(3);
 
+  // Forced password change (belt-and-suspenders): a user who already has a
+  // stored token from a prior session — or who refreshes straight into a
+  // protected page — never passes back through login.html's flag check. While
+  // the account requires a password change, the server 403s every data endpoint
+  // with code PASSWORD_CHANGE_REQUIRED. Intercept that at the single API chokepoint
+  // (api.request) and route to the mandatory change-password screen. We re-throw
+  // so existing per-call error handling is unaffected. This only fires on a real
+  // server 403 signal, never on an absent/false flag.
+  function changePasswordPath() {
+    return (typeof getPagePath === 'function') ? getPagePath('change-password.html') : 'change-password.html';
+  }
+  function isPasswordChangeRequired(err) {
+    if (!err) return false;
+    if (err.code === 'PASSWORD_CHANGE_REQUIRED') return true;
+    return err.status === 403 && err.data && err.data.code === 'PASSWORD_CHANGE_REQUIRED';
+  }
+  (function installPasswordChangeGuard() {
+    if (!window.api || typeof api.request !== 'function' || api.__pwChangeGuardInstalled) return;
+    var originalRequest = api.request.bind(api);
+    var redirecting = false;
+    api.request = function () {
+      return originalRequest.apply(api, arguments).catch(function (err) {
+        if (isPasswordChangeRequired(err) && !redirecting) {
+          var path = (window.location.pathname || '').toLowerCase();
+          if (path.indexOf('change-password') === -1 && path.indexOf('login') === -1) {
+            redirecting = true;
+            window.location.href = changePasswordPath();
+          }
+        }
+        throw err;
+      });
+    };
+    api.__pwChangeGuardInstalled = true;
+  })();
+
   // Dismiss branded loader
   var dismissed = false;
   function dismiss() {

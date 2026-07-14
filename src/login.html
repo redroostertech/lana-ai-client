@@ -710,7 +710,14 @@
       `;
 
       try {
-        await api.login(email, password, mfaToken || null);
+        const loginResult = await api.login(email, password, mfaToken || null);
+
+        // Forced password change: if the account requires a password change,
+        // route to the mandatory change-password screen instead of the app.
+        // Strictly gate on === true so accounts without the flag (SSO users,
+        // already-reset users, regular accounts where it's null/undefined/false)
+        // proceed to the dashboard as normal.
+        const mustChangePassword = !!(loginResult && loginResult.user && loginResult.user.mustChangePassword === true);
 
         // Save or clear remembered credentials based on checkbox
         if (rememberMeCheckbox.checked) {
@@ -723,6 +730,23 @@
           localStorage.removeItem('lana_remembered_org_id');
           localStorage.removeItem('lana_remembered_server_url');
           localStorage.removeItem('lana_remembered_is_custom_url');
+        }
+
+        if (mustChangePassword) {
+          // Carry the just-used temp password to the change-password page via a
+          // short-lived sessionStorage key so the user doesn't retype it (the
+          // authenticated change endpoint requires the current password). The
+          // change-password page reads-then-removes it. Never store in localStorage.
+          try {
+            sessionStorage.setItem('lana_fce_cp', password);
+          } catch (e) {
+            console.warn('[Login] Unable to stash temp password for forced change:', e && e.message);
+          }
+          Toast.info('Password change required. Redirecting...');
+          setTimeout(() => {
+            window.location.href = 'change-password.html';
+          }, 500);
+          return;
         }
 
         Toast.success('Login successful! Redirecting...');

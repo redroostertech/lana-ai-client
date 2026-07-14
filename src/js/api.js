@@ -1557,6 +1557,23 @@ class ApiClient {
     return this.post('/api/v1/auth/reset-password', { token, password });
   }
 
+  /**
+   * Change the current (authenticated) user's own password.
+   * Used by the forced password-change flow: while `mustChangePassword` is set
+   * the server 403s every data endpoint except this one, /auth/logout, and
+   * /auth/me. A successful call clears the flag server-side.
+   *
+   * @param {string} currentPassword - The user's current (temp) password
+   * @param {string} newPassword - The new password to set
+   * @returns {Promise<Object>} Server response
+   */
+  async changePasswordSelf(currentPassword, newPassword) {
+    return this.patch('/api/v1/users/me/security/password', {
+      current_password: currentPassword,
+      new_password: newPassword
+    });
+  }
+
   async activateAccount(activationCode, password) {
     return this.post('/api/v1/auth/activate', { activation_code: activationCode, password });
   }
@@ -3343,6 +3360,10 @@ class ApiError extends Error {
     super(message);
     this.status = status;
     this.data = data;
+    // Surface the server's error code so callers/guards can detect specific
+    // conditions (e.g. PASSWORD_CHANGE_REQUIRED). The API returns the code
+    // either at the top level ({ code: ... }) or nested ({ error: { code } }).
+    this.code = (data && (data.code || (data.error && data.error.code))) || null;
   }
 }
 
