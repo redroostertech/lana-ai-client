@@ -42,6 +42,11 @@
   flex: 0 0 240px;
   position: sticky;
   top: 16px;
+  height: fit-content;
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-lg);
+  padding: 8px;
 }
 
 .sv2-nav-item {
@@ -179,6 +184,15 @@
   font-weight: var(--lex-weight-bold);
   color: var(--lex-text-accent);
   line-height: 1;
+}
+
+/* Profile header: lex-text renders inline-flex, so force the name and role onto
+   their own lines (name over role) rather than flowing together on one line. */
+#sv2-profile-name,
+#sv2-profile-role,
+#sv2-profile-name-edit,
+#sv2-profile-role-edit {
+  display: block;
 }
 
 
