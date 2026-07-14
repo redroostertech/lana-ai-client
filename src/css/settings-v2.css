@@ -29,11 +29,17 @@
   max-width: 1000px;
 }
 
+/* The visual treatment below mirrors the Lana Insights "Report Modules"
+   side menu (#moduleMenu in src/admin/reporting.html, items rendered in
+   src/js/admin/reporting.js): a compact 240px rail of text-forward items
+   with radius-md corners, an accent-soft active fill in the brand-600
+   text colour, and no left indicator bar. All values come from lex tokens. */
+
 .sv2-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 0 0 220px;
+  flex: 0 0 240px;
   position: sticky;
   top: 16px;
 }
@@ -41,19 +47,20 @@
 .sv2-nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 8px;
   border: none;
   background: transparent;
-  color: var(--lex-text-secondary);
+  color: var(--lex-text-primary);
   font-family: inherit;
-  font-size: var(--lex-body-sm-size);
-  line-height: 1.2;
+  font-size: var(--lex-label-sm-size);
+  line-height: var(--lex-label-sm-height);
+  font-weight: var(--lex-weight-medium);
   text-align: left;
   border-radius: var(--lex-radius-md);
   cursor: pointer;
-  transition: background var(--lex-transition-normal), color var(--lex-transition-normal);
+  transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
 }
 
 .sv2-nav-item:hover {
@@ -67,7 +74,7 @@
 }
 
 .sv2-nav-item[aria-selected="true"] {
-  background: var(--lex-bg-accent-muted);
+  background: var(--lex-bg-accent-soft);
   color: var(--lex-text-accent);
   font-weight: var(--lex-weight-medium);
 }
@@ -76,14 +83,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
+  color: var(--lex-text-tertiary);
+}
+
+.sv2-nav-item[aria-selected="true"] .sv2-nav-icon {
+  color: var(--lex-text-accent);
 }
 
 .sv2-nav-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .sv2-nav-label {
