@@ -99,6 +99,36 @@
   }
 
   /**
+   * LANA One edition gate for the Zone E pipeline metric tiles.
+   *
+   * Single-tenant LANA One has exactly one user, so the "Team Members" metric
+   * (Zone E tile index 0, data-metric-key="team") is meaningless; hide that
+   * specific tile and reflow the 3-column pipeline grid to 2 columns so the two
+   * remaining tiles (Total Documents, Storage Used) lay out correctly.
+   *
+   * Purely edition-gated via the canonical electronAPI.getConfig() pattern: in
+   * the browser / org edition there is no window.electronAPI (or isLanaOne is
+   * not true), so this is a COMPLETE no-op and the org dashboard is unchanged.
+   * Idempotent, safe to call on every render/refresh. The hidden class is not
+   * touched by renderZoneE's in-place population loop (which only rewrites
+   * label/value/status), so the hide is never undone.
+   */
+  function applyLanaOneMetricGate() {
+    var oneApi = window.electronAPI;
+    if (!oneApi || typeof oneApi.getConfig !== 'function') return;
+    Promise.resolve(oneApi.getConfig()).then(function (cfg) {
+      if (!cfg || cfg.isLanaOne !== true) return;
+      var zoneE = el('ccZoneE');
+      if (!zoneE) return;
+      var teamTile = zoneE.querySelector('lex-metric[data-metric-key="team"]');
+      if (teamTile) hide(teamTile);
+      // Reflow the 3-col pipeline grid to 2 cols now that a tile is hidden, so
+      // the remaining two tiles fill the row instead of leaving an empty column.
+      zoneE.style.gridTemplateColumns = 'repeat(2, 1fr)';
+    }).catch(function () { /* inert on any failure; org edition stays untouched */ });
+  }
+
+  /**
    * @returns {boolean}
    */
   function heartbeatAppEnabled() {
@@ -1539,6 +1569,10 @@
       metrics[m].value  = data[m].value;
       metrics[m].status = data[m].status;
     }
+
+    // LANA One only: hide the meaningless "Team Members" tile + reflow to 2 cols.
+    // Runs after population so the hide is never overwritten; no-op in org build.
+    applyLanaOneMetricGate();
 
     return { matters: mattersCount };
   }

@@ -81,11 +81,11 @@
   }
 
   function boot() {
-    // Edition gate: LANA One only. activate() itself fails safe on a 404.
-    if (!window.electronAPI || typeof window.electronAPI.getConfig !== 'function') return;
-    Promise.resolve(window.electronAPI.getConfig()).then(function (cfg) {
-      if (cfg && cfg.isLanaOne === true) activate();
-    }).catch(function () { /* inert on failure */ });
+    // Available on every edition (LANA-AI has access to all features; monetization
+    // lives only in LANA One). activate() reveals the section only when the backend
+    // personalization endpoint responds, and fails safe (stays hidden) on a 404 /
+    // unavailable endpoint — so this is inert until GET /users/me/personalization ships.
+    activate();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

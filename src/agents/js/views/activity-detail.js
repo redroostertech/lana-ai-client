@@ -30,6 +30,13 @@
     + '</lex-banner>'
     + '<lex-breadcrumb id="atdBreadcrumb" style="margin:12px 0 16px;" items=\'[{"label":"LanaAgents","href":"#catalog"},{"label":"Activity","href":"#activity"},{"label":"Run detail"}]\'></lex-breadcrumb>'
 
+    // Run-level actions. Kept OUTSIDE lex-banner because the banner clones its
+    // action children on render, which would orphan our show/hide + click wiring.
+    + '<div id="atdRunActions" class="atd-run-actions hidden">'
+    +   '<button id="atdExportJson" class="atd-banner-action" type="button">Export JSON</button>'
+    +   '<button id="atdExportHtml" class="atd-banner-action" type="button">Export HTML</button>'
+    + '</div>'
+
     + '<div id="atdRunSummary" class="atd-run-summary hidden"></div>'
 
     + '<div class="atd-tabs" role="tablist" aria-label="Run details">'
@@ -1149,6 +1156,42 @@
   // API interactions
   // =========================================================================
 
+  // Download the full run history (JSON or HTML) via the agent-runs export
+  // endpoint. Authenticated fetch -> blob -> anchor download keeps the JWT in a
+  // header rather than the URL. The backend sets Content-Disposition; we set the
+  // anchor filename to match so the saved file is named predictably. The run id
+  // is the same id the legacy agentic-tasks alias uses, so it targets the
+  // canonical /api/v1/agent-runs/:id/export route directly.
+  function exportRunFile(state, format) {
+    if (!state.taskId) return;
+    var fmt = format === 'html' ? 'html' : 'json';
+    var token = localStorage.getItem('token') || '';
+    var baseUrl = (window.api && window.api.baseUrl) ? window.api.baseUrl : '';
+    var url = baseUrl + '/api/v1/agent-runs/' + encodeURIComponent(state.taskId) + '/export?format=' + fmt;
+    fetch(url, { headers: token ? { Authorization: 'Bearer ' + token } : {} })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.blob();
+      })
+      .then(function (blob) {
+        var objectUrl = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = 'agent-run-' + state.taskId + '.' + fmt;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 1000);
+        if (window.Lex && window.Lex.Toast) window.Lex.Toast.success('Run exported (' + fmt.toUpperCase() + ')');
+      })
+      .catch(function (err) {
+        console.error('[AgenticTaskDetail] export failed:', err);
+        if (window.Lex && window.Lex.Toast) {
+          window.Lex.Toast.error('Export failed: ' + (err && err.message ? err.message : 'unknown error'));
+        }
+      });
+  }
+
   function loadTask(state) {
     if (!window.api || typeof window.api.get !== 'function') {
       var onReady = function () { loadTask(state); };
@@ -1170,6 +1213,10 @@
         } else if (matterEl) {
           matterEl.classList.add('hidden');
         }
+
+        // The run loaded, so it can be exported. Reveal the export actions row.
+        var runActionsEl = el('atdRunActions');
+        if (runActionsEl) runActionsEl.classList.remove('hidden');
 
         var log = el('atdLog');
         if (log) log.innerHTML = '';
@@ -1438,6 +1485,20 @@
       };
       back.addEventListener('click', backHandler);
       state._unbindFns.push(function () { back.removeEventListener('click', backHandler); });
+    }
+
+    var exportJsonBtn = el('atdExportJson');
+    if (exportJsonBtn) {
+      var exportJsonHandler = function () { exportRunFile(state, 'json'); };
+      exportJsonBtn.addEventListener('click', exportJsonHandler);
+      state._unbindFns.push(function () { exportJsonBtn.removeEventListener('click', exportJsonHandler); });
+    }
+
+    var exportHtmlBtn = el('atdExportHtml');
+    if (exportHtmlBtn) {
+      var exportHtmlHandler = function () { exportRunFile(state, 'html'); };
+      exportHtmlBtn.addEventListener('click', exportHtmlHandler);
+      state._unbindFns.push(function () { exportHtmlBtn.removeEventListener('click', exportHtmlHandler); });
     }
 
     var sendBtn = el('atdSendBtn');
