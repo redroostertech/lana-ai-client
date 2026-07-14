@@ -2696,6 +2696,16 @@ class ApiClient {
     return this.request('PATCH', '/api/v1/users/me/profile', data);
   }
 
+  async getPersonalization() {
+    if (!this.user?.id) throw new Error('Not logged in');
+    return this.get('/api/v1/users/me/personalization');
+  }
+
+  async updatePersonalization(updates) {
+    if (!this.user?.id) throw new Error('Not logged in');
+    return this.request('PATCH', '/api/v1/users/me/personalization', updates);
+  }
+
   async getPreferences() {
     if (!this.user?.id) throw new Error('Not logged in');
     return this.get('/api/v1/users/me/preferences');

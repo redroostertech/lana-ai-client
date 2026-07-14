@@ -28,6 +28,7 @@ import {
   configIsValid,
   createAutomation,
   createBuilderState,
+  generateAutomationDesign,
   getSelectedTemplate,
   loadAutomationForEdit,
   mergeBuilderDraft,
@@ -1506,6 +1507,11 @@ async function onAppClick(event) {
     return;
   }
 
+  if (event.target.closest('[data-design-generate]')) {
+    await generateAutomationDesign(createContext());
+    return;
+  }
+
   const addActionButton = event.target.closest('[data-add-action-type]');
   if (addActionButton) {
     addBuilderAction(createContext(), addActionButton.dataset.addActionType);
@@ -1585,6 +1591,14 @@ async function showLibraryLoadingState() {
 }
 
 async function onAppInput(event) {
+  // "Build with Lana" description — store without re-rendering so the textarea
+  // keeps focus while typing (re-render wipes and rebuilds the DOM).
+  const designPromptField = event.target.closest('[data-design-prompt]');
+  if (designPromptField) {
+    state.builder.designPrompt = designPromptField.value;
+    return;
+  }
+
   const overdueField = event.target.closest('[data-overdue-field]');
   if (overdueField) {
     updateOverdueReminderField(createContext(), overdueField);

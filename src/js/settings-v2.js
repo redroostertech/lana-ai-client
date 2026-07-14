@@ -47,15 +47,19 @@
     dom.profileView      = document.getElementById('sv2-profile-view');
     dom.profileEdit      = document.getElementById('sv2-profile-edit');
     dom.profileName      = document.getElementById('sv2-profile-name');
-    dom.profileEmail     = document.getElementById('sv2-profile-email');
+    dom.profileRole      = document.getElementById('sv2-profile-role');
     dom.avatarInitials   = document.getElementById('sv2-avatar-initials');
     dom.profileNameEdit  = document.getElementById('sv2-profile-name-edit');
-    dom.profileEmailEdit = document.getElementById('sv2-profile-email-edit');
+    dom.profileRoleEdit  = document.getElementById('sv2-profile-role-edit');
     dom.avatarInitialsEdit = document.getElementById('sv2-avatar-initials-edit');
     dom.kvFirstName      = document.getElementById('sv2-kv-firstname');
     dom.kvLastName       = document.getElementById('sv2-kv-lastname');
-    dom.kvRole           = document.getElementById('sv2-kv-role');
+    dom.kvEmail          = document.getElementById('sv2-kv-email');
     dom.kvOrg            = document.getElementById('sv2-kv-org');
+    dom.kvTitle          = document.getElementById('sv2-kv-title');
+    dom.kvFirm           = document.getElementById('sv2-kv-firm');
+    dom.kvLocation       = document.getElementById('sv2-kv-location');
+    dom.kvPractice       = document.getElementById('sv2-kv-practice');
     dom.cancelEditBtn    = document.getElementById('sv2-cancel-edit-btn');
     dom.profileForm      = document.getElementById('sv2-profile-form');
 
@@ -148,25 +152,41 @@
       var initials = ((firstName.charAt(0) || '') + (lastName.charAt(0) || '')).toUpperCase() ||
                      (user.email ? user.email.charAt(0).toUpperCase() : 'U');
 
+      var roleName = user.role_name || '';
+
       // View mode
       if (dom.profileName) { dom.profileName.textContent = name; dom.profileName.setAttribute('title', name); }
+      if (dom.profileRole) { dom.profileRole.textContent = roleName; dom.profileRole.setAttribute('title', roleName); }
       if (dom.profileEmail) { dom.profileEmail.textContent = user.email || ''; dom.profileEmail.setAttribute('title', user.email || ''); }
       if (dom.avatarInitials) dom.avatarInitials.textContent = initials;
       if (dom.kvFirstName) dom.kvFirstName.setAttribute('value', firstName || '--');
       if (dom.kvLastName) dom.kvLastName.setAttribute('value', lastName || '--');
-      if (dom.kvRole) dom.kvRole.setAttribute('value', user.role_name || '--');
+      if (dom.kvEmail) dom.kvEmail.setAttribute('value', user.email || '--');
       if (dom.kvOrg) dom.kvOrg.setAttribute('value', user.organization_name || '--');
+      if (dom.kvTitle) dom.kvTitle.setAttribute('value', user.title || '--');
+      if (dom.kvFirm) dom.kvFirm.setAttribute('value', user.firm_name || '--');
+      if (dom.kvLocation) dom.kvLocation.setAttribute('value', user.location || '--');
+      if (dom.kvPractice) dom.kvPractice.setAttribute('value', user.practice_area || '--');
 
       // Edit mode pre-fill
       if (dom.profileNameEdit) { dom.profileNameEdit.textContent = name; dom.profileNameEdit.setAttribute('title', name); }
+      if (dom.profileRoleEdit) { dom.profileRoleEdit.textContent = roleName; dom.profileRoleEdit.setAttribute('title', roleName); }
       if (dom.profileEmailEdit) { dom.profileEmailEdit.textContent = user.email || ''; dom.profileEmailEdit.setAttribute('title', user.email || ''); }
       if (dom.avatarInitialsEdit) dom.avatarInitialsEdit.textContent = initials;
 
       if (dom.profileForm) {
         var firstNameInput = dom.profileForm.querySelector('[name="first_name"]');
         var lastNameInput = dom.profileForm.querySelector('[name="last_name"]');
+        var titleInput = dom.profileForm.querySelector('[name="title"]');
+        var firmInput = dom.profileForm.querySelector('[name="firm_name"]');
+        var locationInput = dom.profileForm.querySelector('[name="location"]');
+        var practiceInput = dom.profileForm.querySelector('[name="practice_area"]');
         if (firstNameInput) firstNameInput.value = firstName;
         if (lastNameInput) lastNameInput.value = lastName;
+        if (titleInput) titleInput.value = user.title || '';
+        if (firmInput) firmInput.value = user.firm_name || '';
+        if (locationInput) locationInput.value = user.location || '';
+        if (practiceInput) practiceInput.value = user.practice_area || '';
       }
 
       if (dom.profileView) Lex.Redact.off(dom.profileView);
@@ -189,7 +209,11 @@
 
     api.updateProfile({
       first_name: values.first_name,
-      last_name: values.last_name
+      last_name: values.last_name,
+      title: values.title,
+      firm_name: values.firm_name,
+      location: values.location,
+      practice_area: values.practice_area
     }).then(function () {
       Lex.Toast.success('Profile updated');
       showViewMode();

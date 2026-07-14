@@ -270,7 +270,7 @@ const NewProjectModal = {
   },
 
   renderMatterItem(matter, isPinned) {
-    var clientName = matter.client_name || (matter.client && matter.client.name) || 'Unknown Client';
+    var clientName = matter.client_name || (matter.client && matter.client.name) || '';
     var matterIdString = matter.matter_id;
     var matterName = matter.name || matter.matter_name || 'Untitled Matter';
     var status = matter.status || 'Active';
@@ -302,7 +302,7 @@ const NewProjectModal = {
       + '<span style="font-weight:500;color:var(--lex-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safeName + '</span>'
       + '<span style="font-size:var(--lex-body-xs-size,0.6875rem);padding:1px 8px;border-radius:9999px;white-space:nowrap;' + statusColor + '">' + status + '</span>'
       + '</div>'
-      + '<p style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safeClient + '</p>'
+      + (safeClient ? '<p style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safeClient + '</p>' : '')
       + '<p style="font-size:var(--lex-body-xs-size,0.75rem);color:var(--lex-text-tertiary);margin:2px 0 0">' + safeId + '</p>'
       + '</div>';
   },

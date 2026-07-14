@@ -2527,7 +2527,7 @@
       }
       
       mattersList.innerHTML = matters.map(matter => {
-        const clientName = matter.client_name || matter.client?.name || 'Unknown Client';
+        const clientName = matter.client_name || matter.client?.name || '';
         // IMPORTANT: Always use matter_id (MATT-XXXXX format) for API calls, not the UUID
         // The matter_id is what links conversations to matters in the database
         const matterIdString = matter.matter_id;
@@ -2548,7 +2548,7 @@
                   </svg>
                   <h3 class="text-sm font-semibold text-gray-900 truncate">${matterName}</h3>
                 </div>
-                <p class="text-xs text-gray-600 truncate">${clientName}</p>
+                ${clientName ? `<p class="text-xs text-gray-600 truncate">${clientName}</p>` : ''}
                 <p class="text-xs text-gray-400 mt-1">Matter #${matterIdString}</p>
               </div>
               <span class="px-2 py-1 text-xs font-medium rounded-full ${status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'} flex-shrink-0">
