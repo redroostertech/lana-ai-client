@@ -218,7 +218,12 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
       command: p.redactorRunSh,
       // The redactor enforces INTERNAL_SERVICE_SECRET on /redact; the backend
       // presents the SAME value (below), so the loopback hop is authenticated.
-      env: { REDACTOR_PORT: String(ports.redactor), INTERNAL_SERVICE_SECRET: s.INTERNAL_SERVICE_SECRET },
+      env: {
+        REDACTOR_PORT: String(ports.redactor),
+        INTERNAL_SERVICE_SECRET: s.INTERNAL_SERVICE_SECRET,
+        // Bundled (staged) venv -> run.sh skips provisioning and serves instantly.
+        ...(p.redactorVenv ? { REDACTOR_VENV: p.redactorVenv } : {}),
+      },
       readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.redactor}/healthz` }),
       // First run self-provisions the Presidio/spaCy venv (~hundreds of MB), which
       // can take several minutes; give it a long readiness window so a fresh box

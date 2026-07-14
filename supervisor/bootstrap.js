@@ -363,6 +363,17 @@ function createStackBootstrap(opts = {}) {
     // posture for a privacy moat. First boot pays the one-time provisioning cost;
     // the redactor service carries a long readiness window (see service-topology).
     const redactorRunSh = redactorCandidates.find((c) => io.fs.existsSync(c));
+    // Option C: prefer the BUNDLED (staged) redactor venv so first run is instant +
+    // offline -- no runtime pip. REDACTOR_VENV points run.sh at it; it then skips
+    // provisioning and serves. Absent (unstaged dev box) => run.sh self-provisions
+    // at its default ~/.venv/lana-redactor.
+    const redactorVenvCandidates = [
+      packaged && resourcesPath ? nodePath.join(resourcesPath, 'python', 'redactor', 'venv') : undefined,
+      nodePath.join(__dirname, '..', 'build', 'sovereign-resources', 'python', 'redactor', 'venv'),
+    ].filter(Boolean);
+    const redactorVenv = redactorVenvCandidates.find(
+      (c) => io.fs.existsSync(nodePath.join(c, 'bin', 'python')),
+    );
 
     const timesfmRunShPath = nodePath.join(paths.backendCwd, 'sidecar', 'timesfm', 'run.sh');
     const timesfmVenv = nodePath.join(home, '.venv', 'timesfm');
@@ -483,7 +494,7 @@ function createStackBootstrap(opts = {}) {
       paths: {
         ...paths, chatModel,
         legalModel, visionModel, visionMmproj,
-        redactorRunSh, timesfmRunSh, hermesServer,
+        redactorRunSh, redactorVenv, timesfmRunSh, hermesServer,
       },
       dataDirs, ports, secrets,
       tier: plan.tier || opts.tier || 'demo',

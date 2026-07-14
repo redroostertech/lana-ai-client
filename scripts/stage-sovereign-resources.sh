@@ -99,6 +99,7 @@ EMBED_MODEL_SRC="$HOME/.llama-models/nomic-embed-text-v1.5.f16.gguf"
 DOCLING_VENV_SRC="$HOME/.venv/docling"
 DOCLING_CACHE_SRC="$HOME/.cache/docling/models"
 UNSTRUCTURED_VENV_SRC="$HOME/.venv/unstructured"
+REDACTOR_VENV_SRC="$HOME/.venv/lana-redactor"
 # The lana-one Node backend = the parent of this client submodule (lana-one/).
 BACKEND_SRC="${LANA_ONE_BACKEND_SRC:-$(cd "$CLIENT_DIR/.." && pwd)}"
 # Node runtime bundled to run the backend (ABI matches its node_modules; avoids
@@ -123,6 +124,7 @@ while [[ $# -gt 0 ]]; do
     --docling-venv-src) DOCLING_VENV_SRC="$2"; shift 2;;
     --docling-cache-src) DOCLING_CACHE_SRC="$2"; shift 2;;
     --unstructured-venv-src) UNSTRUCTURED_VENV_SRC="$2"; shift 2;;
+    --redactor-venv-src) REDACTOR_VENV_SRC="$2"; shift 2;;
     --skip-postgres) SKIP_POSTGRES=1; shift;;
     --skip-python) SKIP_PYTHON=1; shift;;
     --skip-backend) SKIP_BACKEND=1; shift;;
@@ -422,6 +424,9 @@ stage_llama_server
 stage_models
 stage_python_component "docling" "$DOCLING_VENV_SRC" "$STAGE_DIR/python/docling" "$DOCLING_CACHE_SRC" "docling-model-cache"
 stage_python_component "unstructured" "$UNSTRUCTURED_VENV_SRC" "$STAGE_DIR/python/unstructured"
+# The redaction MOAT is core: bundle its provisioned Presidio/spaCy venv so first
+# run is instant + offline (no runtime pip), exactly like docling/unstructured.
+stage_python_component "redactor" "$REDACTOR_VENV_SRC" "$STAGE_DIR/python/redactor"
 stage_backend
 stage_node
 
