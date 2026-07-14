@@ -5235,7 +5235,7 @@
 
   function renderLinkMatterItem(matter, isPinned) {
     isPinned = isPinned || false;
-    var clientName = matter.client_name || (matter.client && matter.client.name) || 'Unknown Client';
+    var clientName = matter.client_name || (matter.client && matter.client.name) || '';
     var matterName = matter.name || matter.matter_name || 'Untitled Matter';
     var status = matter.status || 'Active';
     // Escape single quotes in name for onclick attribute: no regex — use split/join
@@ -5255,7 +5255,7 @@
             '<span class="font-medium text-gray-900 text-sm truncate">' + escapeHtml(matterName) + '</span>' +
             '<span class="px-2 py-0.5 text-xs rounded-full ' + statusClass + '">' + escapeHtml(status) + '</span>' +
           '</div>' +
-          '<p class="text-xs text-gray-600 truncate">' + escapeHtml(clientName) + '</p>' +
+          (clientName ? '<p class="text-xs text-gray-600 truncate">' + escapeHtml(clientName) + '</p>' : '') +
           '<p class="text-xs text-gray-500 font-mono mt-0.5">' + escapeHtml(matter.matter_id) + '</p>' +
         '</div>' +
       '</div>' +
