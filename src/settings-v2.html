@@ -36,6 +36,49 @@
 
     <main class="sv2-page">
 
+     <div class="sv2-layout">
+
+      <!-- In-page section navigation (left rail).
+           Icons are injected from Lex.Icons by settings-v2-nav.js. -->
+      <nav class="sv2-nav" role="tablist" aria-orientation="vertical" aria-label="Settings sections">
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-profile"
+          data-section="profile" aria-controls="sv2-panel-profile" aria-selected="true">
+          <span class="sv2-nav-icon" data-icon="user" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Profile</span>
+        </button>
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-general"
+          data-section="general" aria-controls="sv2-panel-general" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="settings" aria-hidden="true"></span>
+          <span class="sv2-nav-label">General</span>
+        </button>
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-personalization"
+          data-section="personalization" aria-controls="sv2-panel-personalization" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="wand-2" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Personalization</span>
+        </button>
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-billing"
+          data-section="billing" aria-controls="sv2-panel-billing" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="sparkles" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Plan &amp; billing</span>
+        </button>
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-usage"
+          data-section="usage" aria-controls="sv2-panel-usage" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="bar-chart-2" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Usage</span>
+        </button>
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-data-controls"
+          data-section="data-controls" aria-controls="sv2-panel-data-controls" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="shield" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Data controls</span>
+        </button>
+      </nav>
+
+      <div class="sv2-panels">
+
+      <!-- ╔═══════════════════════ PROFILE PANEL ═══════════════════════╗ -->
+      <div class="sv2-panel is-active" id="sv2-panel-profile" role="tabpanel"
+        aria-labelledby="sv2-tab-profile" data-section="profile">
+
       <!-- Profile
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-profile" style="margin-bottom:0.5rem">
@@ -94,6 +137,12 @@
       </section>
 
 
+      </div><!-- /sv2-panel-profile -->
+
+      <!-- ╔══════════════════ PERSONALIZATION PANEL ═══════════════════╗ -->
+      <div class="sv2-panel" id="sv2-panel-personalization" role="tabpanel"
+        aria-labelledby="sv2-tab-personalization" data-section="personalization">
+
       <!-- Personalization (LANA One — revealed by JS when the edition supports it)
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-personalization" class="sv2-hidden" style="margin-bottom:0.5rem">
@@ -129,6 +178,14 @@
         </lex-card>
       </section>
 
+
+      </div><!-- /sv2-panel-personalization -->
+
+      <!-- ╔═══════════════════════ GENERAL PANEL ═══════════════════════╗
+           App and account settings: time zone, password + MFA, preferences,
+           active sessions, connected apps, and VPN. -->
+      <div class="sv2-panel" id="sv2-panel-general" role="tabpanel"
+        aria-labelledby="sv2-tab-general" data-section="general">
 
       <!-- Regional
            ══════════════════════════════════════════════════════════════ -->
@@ -258,6 +315,51 @@
         </div>
       </section>
 
+      </div><!-- /sv2-panel-general -->
+
+      <!-- ╔═══════════════════ PLAN & BILLING PANEL ════════════════════╗
+           Account menu deep-links here via settings-v2.html#billing.
+           No billing/subscription endpoints exist in the client yet, so this
+           is a section shell only. -->
+      <div class="sv2-panel" id="sv2-panel-billing" role="tabpanel"
+        aria-labelledby="sv2-tab-billing" data-section="billing">
+        <section id="sv2-section-billing" style="margin-bottom:0.5rem">
+          <lex-card heading="Plan &amp; billing" subtitle="Your LANA One subscription">
+            <lex-text variant="secondary" size="body-sm">Your LANA One plan, payment method, and billing history appear here once billing is connected to your account.</lex-text>
+            <!-- TODO: wire <section id="sv2-section-billing"> to the plan/subscription + checkout endpoints -->
+          </lex-card>
+        </section>
+      </div><!-- /sv2-panel-billing -->
+
+      <!-- ╔═══════════════════════ USAGE PANEL ═════════════════════════╗
+           No account-level usage/metering endpoint exists in the client yet
+           (chat token display is per-conversation only). Section shell only. -->
+      <div class="sv2-panel" id="sv2-panel-usage" role="tabpanel"
+        aria-labelledby="sv2-tab-usage" data-section="usage">
+        <section id="sv2-section-usage" style="margin-bottom:0.5rem">
+          <lex-card heading="Usage" subtitle="Activity across your LANA One workspace">
+            <lex-text variant="secondary" size="body-sm">A breakdown of your usage across chats, documents, and storage appears here once usage reporting is connected to your account.</lex-text>
+            <!-- TODO: wire <section id="sv2-section-usage"> to the usage_events / metering endpoints -->
+          </lex-card>
+        </section>
+      </div><!-- /sv2-panel-usage -->
+
+      <!-- ╔═══════════════════ DATA CONTROLS PANEL ═════════════════════╗
+           No data-export / account-deletion / retention endpoints exist in the
+           client yet. Section shell only. -->
+      <div class="sv2-panel" id="sv2-panel-data-controls" role="tabpanel"
+        aria-labelledby="sv2-tab-data-controls" data-section="data-controls">
+        <section id="sv2-section-data-controls" style="margin-bottom:0.5rem">
+          <lex-card heading="Data controls" subtitle="How your data is stored and handled">
+            <lex-text variant="secondary" size="body-sm">Control your data retention, export a copy of your data, or delete your account here once data controls are connected to your account.</lex-text>
+            <!-- TODO: wire <section id="sv2-section-data-controls"> to export / retention / account-deletion endpoints -->
+          </lex-card>
+        </section>
+      </div><!-- /sv2-panel-data-controls -->
+
+      </div><!-- /sv2-panels -->
+     </div><!-- /sv2-layout -->
+
     </main>
 
   </template>
@@ -337,6 +439,7 @@
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/settings-v2.js"></script>
   <script src="js/pages/settings-personalization.js"></script>
+  <script src="js/pages/settings-v2-nav.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->
   <script src="js/companion-bridge-consent.js"></script>
