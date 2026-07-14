@@ -232,6 +232,10 @@ function createStackBootstrap(opts = {}) {
   // isolation below covers EVERY bundled service, not just the core ones.
   const ports = { pg: 5432, minio: 9000, minioConsole: 9001, llamaEmbed: 8082, llamaChat: 8081, docling: 8085, unstructured: 8000, backend: 8090, vision: 8083, legal: 8084, redactor: 8091, timesfm: 8092, hermes: 8094, ...(opts.ports || {}) };
   let supervisor = null;
+  // Boot context captured at the end of start() so the post-boot activateLocalChat()
+  // can download + hot-swap the llama-chat sidecar without re-running the whole boot.
+  // (ports + supervisor are already closure-level.)
+  let _ctx = null;
 
   async function start() {
     const home = opts.home || io.os.homedir();
@@ -514,7 +518,69 @@ function createStackBootstrap(opts = {}) {
 
     const backendUrl = `http://127.0.0.1:${ports.backend}`;
     log.info(`[bootstrap] stack up; backend at ${backendUrl}`);
+    _ctx = { modelsDir, paths, plan, accel: plan.hardware && plan.hardware.accel };
     return { backendUrl, desktopKey, plan, secrets };
+  }
+
+  /**
+   * Phase 2: activate a local chat model AFTER boot -- download it (if needed) and
+   * hot-swap the llama-chat sidecar to serve it, without a full stack restart. The
+   * router picks it up within one availability-probe TTL (or immediately when the
+   * caller resets the backend cache). Throws on download/activation failure so the
+   * caller can report it; the relay path stays intact.
+   *
+   * @param {object} [args]
+   * @param {string} [args.tier] catalog tier (default: the boot plan's tier)
+   * @param {(p:object)=>void} [args.onProgress] download-progress callback
+   * @param {AbortSignal} [args.signal] cancel the download
+   * @returns {Promise<{ok:true, tier:string, model:string, port:number}>}
+   */
+  async function activateLocalChat({ tier, onProgress, signal } = {}) {
+    if (!_ctx || !supervisor) {
+      throw new Error('stack not started; cannot activate a local chat model');
+    }
+    const { modelsDir, paths, plan, accel } = _ctx;
+    const targetTier = tier || plan.tier || 'demo';
+
+    // eslint-disable-next-line global-require
+    const { resolveChatModel, validateCatalogEntry } = require('./model-catalog');
+    // eslint-disable-next-line global-require
+    const { ensureModel } = require('./model-downloader');
+    // eslint-disable-next-line global-require
+    const { buildChatSpec, gpuLayersFor } = require('./service-topology');
+
+    const entry = resolveChatModel(targetTier);
+    validateCatalogEntry(entry); // throws on placeholder sha / bad url
+    const file = entry.file || decodeURIComponent(String(entry.url).split('/').pop() || '');
+    if (!file) throw new Error(`model-catalog: no file for tier "${targetTier}"`);
+
+    log.info(`[bootstrap] activating local chat model ${file} (${targetTier})...`);
+    const chatModel = await ensureModel({
+      modelsDir, file, url: entry.url,
+      sha256: entry.sha256, sizeBytes: entry.sizeBytes,
+      onProgress: (p) => {
+        if (typeof onProgress === 'function') {
+          try { onProgress(p); } catch (_e) { /* progress is best-effort */ }
+        }
+        log.info(`[bootstrap] model dl: ${p.bytesWritten || 0}/${p.totalBytes || '?'} bytes`);
+      },
+      signal,
+    });
+
+    // Hot-swap the llama-chat sidecar (stop-then-start; readiness must pass before
+    // this resolves). buildChatSpec is the SAME builder boot uses, so the served
+    // model is byte-identical to a boot-time launch.
+    const spec = buildChatSpec({
+      llamaServer: paths.llamaServer,
+      chatModel,
+      port: ports.llamaChat,
+      nGpuLayers: gpuLayersFor(accel),
+      chatContext: plan.contextWindow,
+    }, io.probes);
+    await supervisor.replaceService('llama-chat', spec);
+
+    log.info(`[bootstrap] local chat model active on 127.0.0.1:${ports.llamaChat} (${targetTier})`);
+    return { ok: true, tier: targetTier, model: file, port: ports.llamaChat };
   }
 
   async function stop() {
@@ -522,7 +588,7 @@ function createStackBootstrap(opts = {}) {
     supervisor = null;
   }
 
-  return { start, stop };
+  return { start, stop, activateLocalChat };
 }
 
 module.exports = { createStackBootstrap, resolveDevPaths, resolveBundledPaths, makeExec };
