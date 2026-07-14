@@ -241,6 +241,36 @@ class ProcessSupervisor {
     }
     this._procs.delete(name);
   }
+
+  /**
+   * Start a SINGLE service outside the initial startAll() ordering -- e.g. a
+   * local chat model downloaded/activated after launch. If a spec with this name
+   * is already registered it is replaced; if it is running it is stopped first.
+   * Ad-hoc services default to critical:false so a failed activation never tears
+   * down the running stack. Throws on readiness failure; the caller decides how
+   * to degrade (e.g. leave routing on the relay).
+   */
+  async startService(spec) {
+    if (!spec || !spec.name || !spec.command) {
+      throw new Error('startService requires { name, command }');
+    }
+    if (this._shuttingDown) throw new Error('supervisor is shutting down');
+    if (this.isRunning(spec.name)) {
+      await this._stopOne(spec.name);
+    }
+    const merged = { critical: false, ...spec };
+    this._specs.set(merged.name, merged);
+    await this._startOne(merged);
+    if (!this._startedOrder.includes(merged.name)) {
+      this._startedOrder.push(merged.name);
+    }
+    return merged.name;
+  }
+
+  /** Replace a service's spec + running process (stop-then-start). */
+  async replaceService(name, spec) {
+    return this.startService({ ...spec, name });
+  }
 }
 
 module.exports = { ProcessSupervisor, topoOrder };

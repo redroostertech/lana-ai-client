@@ -220,7 +220,15 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
       // presents the SAME value (below), so the loopback hop is authenticated.
       env: { REDACTOR_PORT: String(ports.redactor), INTERNAL_SERVICE_SECRET: s.INTERNAL_SERVICE_SECRET },
       readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.redactor}/healthz` }),
-      critical: false, // egress gate is inert when REDACTOR_URL / REDACTION_ENABLED are unset
+      // First run self-provisions the Presidio/spaCy venv (~hundreds of MB), which
+      // can take several minutes; give it a long readiness window so a fresh box
+      // does not time out. Already-provisioned boots skip straight to serving.
+      readinessTimeoutMs: 15 * 60 * 1000,
+      // NON-critical so a failed/offline provision does not tear down the stack.
+      // But the moat is now CORE: REDACTION_ENABLED is set whenever run.sh ships,
+      // so until the redactor is healthy the egress gate fails CLOSED (relay chat
+      // is blocked, never leaked) rather than inert.
+      critical: false,
     });
   }
 

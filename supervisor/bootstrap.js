@@ -353,19 +353,16 @@ function createStackBootstrap(opts = {}) {
       packaged && resourcesPath ? nodePath.join(resourcesPath, 'redactor', 'run.sh') : undefined,
       nodePath.join(__dirname, '..', 'resources', 'redactor', 'run.sh'),
     ].filter(Boolean);
-    // Gate on the redactor being PROVISIONED, not merely vendored. run.sh always
-    // ships in the resources tree, but its Presidio/spaCy venv is installed lazily
-    // (by the in-app setup step). The sentinel is written only after that pip
-    // install succeeds. Enabling redaction on mere source-presence would set
-    // REDACTION_ENABLED against a dead endpoint, and the backend fails CLOSED ->
-    // every relay chat request would break. So redaction stays inert until the
-    // venv is genuinely provisioned. Mirrors the timesfm venv gate below.
-    const redactorProvisioned = io.fs.existsSync(
-      nodePath.join(home, '.venv', 'lana-redactor', '.lana-redactor-provisioned'),
-    );
-    const redactorRunSh = redactorProvisioned
-      ? redactorCandidates.find((c) => io.fs.existsSync(c))
-      : undefined;
+    // CORE MOAT: the redactor is ALWAYS started -- it is core, independent of any
+    // local chat model. run.sh self-provisions its Presidio/spaCy venv on first
+    // run (writing the sentinel) and serves thereafter, so we enable it on run.sh
+    // PRESENCE, not on the sentinel. Gating on the sentinel deadlocked a fresh box:
+    // nothing else ran run.sh to write it, so the moat never came up. Because
+    // REDACTION_ENABLED is therefore always set when run.sh ships, cloud egress
+    // fails CLOSED (never leaks) until the redactor is healthy -- the correct
+    // posture for a privacy moat. First boot pays the one-time provisioning cost;
+    // the redactor service carries a long readiness window (see service-topology).
+    const redactorRunSh = redactorCandidates.find((c) => io.fs.existsSync(c));
 
     const timesfmRunShPath = nodePath.join(paths.backendCwd, 'sidecar', 'timesfm', 'run.sh');
     const timesfmVenv = nodePath.join(home, '.venv', 'timesfm');
