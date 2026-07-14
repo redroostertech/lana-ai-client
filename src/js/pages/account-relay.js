@@ -80,17 +80,21 @@
     if (!ca || signinBusy) return;
     signinBusy = true;
     setBusy(document.getElementById('cr-signin-btn'), true);
+    // Surface the outcome INLINE (status text), not just via a toast -- the toast
+    // system is not present on every page that hosts this section.
+    setStatus('Connecting', 'gray', 'Setting up cloud access from your signed-in account...');
     Promise.resolve(ca.ensureRelay(true)).then(function (res) {
       var t = toast();
       if (res && res.ok) {
         if (t) t.success('Cloud relay connected');
         loadSettings();
-      } else if (t) {
-        t.error('Could not connect automatically. Try again or paste a token below.');
+      } else {
+        var err = (res && res.error) || 'unknown_error';
+        setStatus('Not connected', 'red', 'Could not connect: ' + err + '. Try again, or paste a token below.');
+        if (t) t.error('Could not connect: ' + err);
       }
-    }).catch(function () {
-      var t2 = toast();
-      if (t2) t2.error('Could not connect automatically. Try again or paste a token below.');
+    }).catch(function (e) {
+      setStatus('Not connected', 'red', 'Could not connect: ' + ((e && e.message) || 'error') + '.');
     }).finally(function () {
       signinBusy = false;
       setBusy(document.getElementById('cr-signin-btn'), false);
