@@ -187,12 +187,24 @@
 }
 
 /* Profile header: lex-text renders inline-flex, so force the name and role onto
-   their own lines (name over role) rather than flowing together on one line. */
+   their own lines (name over role) rather than flowing together on one line.
+   lex-text emits a block <h3>/<p>, so the visible text follows the inherited
+   text-align; force it to the left so both lines lead at the same left edge. */
 #sv2-profile-name,
 #sv2-profile-role,
 #sv2-profile-name-edit,
 #sv2-profile-role-edit {
   display: block;
+  text-align: left;
+}
+
+/* The inner vertical lex-stack that wraps the name + role: keep its items and
+   text leading-aligned so the two lines start at the same left edge next to the
+   avatar (in both the read-only view and the edit mirror). */
+#sv2-profile-view lex-stack[direction="vertical"],
+#sv2-profile-edit lex-stack[direction="vertical"] {
+  align-items: flex-start;
+  text-align: left;
 }
 
 
