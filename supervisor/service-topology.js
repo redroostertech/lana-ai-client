@@ -220,9 +220,12 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
         ...(p.redactorVenv ? { REDACTOR_VENV: p.redactorVenv } : {}),
       },
       readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.redactor}/healthz` }),
-      // First run self-provisions the Presidio/spaCy venv (~hundreds of MB), which
-      // can take several minutes; give it a long readiness window so a fresh box
-      // does not time out. Already-provisioned boots skip straight to serving.
+      // BACKGROUND: the moat must not block the boot/splash. It starts alongside
+      // everything else and comes up async (Presidio + spaCy load takes a while);
+      // until it is healthy the egress gate fails CLOSED, so cloud chat waits but
+      // nothing leaks. First run may self-provision the venv (~minutes) if it was
+      // not bundled, hence the long readiness window for the background probe.
+      background: true,
       readinessTimeoutMs: 15 * 60 * 1000,
       // NON-critical so a failed/offline provision does not tear down the stack.
       // But the moat is now CORE: REDACTION_ENABLED is set whenever run.sh ships,

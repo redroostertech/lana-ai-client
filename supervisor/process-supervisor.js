@@ -121,6 +121,26 @@ class ProcessSupervisor {
     const child = this._launch(spec);
     const rec = { child, spec, retries: 0, stopping: false, started: false };
     this._procs.set(spec.name, rec);
+
+    // BACKGROUND services (e.g. the redactor moat, whose Presidio/spaCy load takes
+    // a while) must NOT block the boot: launch them, then probe readiness
+    // asynchronously. They are still supervised (auto-restart, stopAll), and their
+    // consumers gate on readiness themselves -- the egress gate fails CLOSED until
+    // the redactor is healthy, so nothing egresses unredacted in the meantime.
+    if (spec.background) {
+      this._awaitReadiness(spec, rec).then(
+        async () => {
+          if (typeof spec.onReady === 'function') {
+            try { await spec.onReady(); } catch (_e) { /* best-effort */ }
+          }
+          rec.started = true;
+          this._log.info(`[supervisor] ${spec.name} ready in background (pid ${child.pid})`);
+        },
+        (e) => this._log.warn(`[supervisor] ${spec.name} background readiness failed: ${e.message}`),
+      );
+      return;
+    }
+
     await this._awaitReadiness(spec, rec);
     // onReady() runs AFTER readiness, BEFORE dependents (e.g. createdb + extensions
     // + migrate once Postgres is accepting connections).
