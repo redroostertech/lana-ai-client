@@ -75,6 +75,9 @@
       items.push({ id: 'admin', label: 'Administration', icon: 'users', href: prefix + 'admin/index.html' });
     }
     items.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: prefix + 'data-connectors.html' });
+    items.push({ id: 'billing', label: 'Plan and billing', icon: 'credit-card', href: prefix + 'settings-v2.html#billing' });
+    items.push({ id: 'personalization', label: 'Personalization', icon: 'sparkles', href: prefix + 'settings-v2.html#personalization' });
+    items.push({ id: 'profile', label: 'Profile', icon: 'user', href: prefix + 'settings-v2.html#profile' });
     items.push({ id: 'settings', label: 'Settings', icon: 'settings', href: prefix + 'settings-v2.html' });
     items.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: prefix + 'help.html' });
     items.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
