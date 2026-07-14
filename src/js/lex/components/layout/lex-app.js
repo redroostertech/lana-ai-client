@@ -808,8 +808,10 @@
         }
       }
 
-      // Build sidebar sections with role-gated admin link
-      const adminRoles = ['system_admin', 'org_admin'];
+      // Build sidebar sections with role-gated admin link.
+      // Accept the full admin-capable role set (backend returns system_admin/admin
+      // plus org_admin variants) so a plain `admin` isn't locked out of Administration.
+      const adminRoles = ['system_admin', 'org_admin', 'organization_admin', 'admin'];
       const userRoles = user ? (user.roles || user.role_names || []) : [];
       const userRoleName = user ? (user.role_name || user.role || '') : '';
       const allRoles = new Set([

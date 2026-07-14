@@ -61,6 +61,24 @@
   line-height: 1;
 }
 
+/* Keep a long name/email from bleeding past the profile card: the identity
+   column must be allowed to shrink, and its lines truncate with an ellipsis
+   (full value remains available via the title attribute set in settings-v2.js). */
+.sv2-profile-identity {
+  min-width: 0;
+}
+
+#sv2-profile-name,
+#sv2-profile-name-edit,
+#sv2-profile-email,
+#sv2-profile-email-edit {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 
 /* ── Profile KV Grid ──────────────────────────────────────────────── */
 

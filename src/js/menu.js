@@ -71,6 +71,17 @@ const UserRoles = {
   VIEWER: 'viewer'
 };
 
+// Admin-capable roles that can see Administration and other admin-gated surfaces.
+// The backend recognizes system_admin/admin (plus org_admin variants); gate on the
+// full set so a plain `admin` role isn't locked out. Mirrors ADMIN_ROLE_NAMES in
+// sidebar-footer-hydrate.js.
+const ADMIN_ROLES = [
+  UserRoles.SYSTEM_ADMIN,
+  UserRoles.ORG_ADMIN,
+  UserRoles.ORGANIZATION_ADMIN,
+  UserRoles.ADMIN
+];
+
 // ============================================================
 // MENU CONFIGURATION
 // ============================================================
@@ -128,7 +139,7 @@ const MenuConfig = {
             label: 'Analytics',
             href: '/admin/analytics.html',
             icon: 'analytics',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
         ]
       },
@@ -160,7 +171,7 @@ const MenuConfig = {
             label: 'Administration',
             href: '/admin/index.html',
             icon: 'users',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
           { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
@@ -175,7 +186,7 @@ const MenuConfig = {
       {
         id: 'admin-main',
         title: null,
-        requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN],
+        requiredRoles: ADMIN_ROLES,
         items: [
           { id: 'admin-dashboard', label: 'Dashboard', href: '/admin/dashboard.html', icon: 'dashboard' },
           { id: 'admin-users', label: 'Users', href: '/admin/users.html', icon: 'users' },
@@ -189,7 +200,7 @@ const MenuConfig = {
             href: '/admin/communications.html',
             icon: 'chat',
             badge: { text: 'Coming soon', class: 'bg-amber-100 text-amber-800' },
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
           { id: 'admin-sessions', label: 'Sessions', href: '/admin/sessions.html', icon: 'sessions' },
           { id: 'admin-audit', label: 'Audit Logs', href: '/admin/audit.html', icon: 'audit' },
@@ -244,7 +255,7 @@ const MenuConfig = {
             label: 'Analytics',
             href: '/admin/analytics.html',
             icon: 'analytics',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
         ]
       },
@@ -275,7 +286,7 @@ const MenuConfig = {
             label: 'Administration',
             href: '/admin/index.html',
             icon: 'users',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
           { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
@@ -309,7 +320,7 @@ const MenuConfig = {
             label: 'Analytics',
             href: '/admin/analytics.html',
             icon: 'analytics',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
         ]
       },
@@ -340,7 +351,7 @@ const MenuConfig = {
             label: 'Administration',
             href: '/admin/index.html',
             icon: 'users',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
           { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
@@ -374,7 +385,7 @@ const MenuConfig = {
             label: 'Analytics',
             href: '/admin/analytics.html',
             icon: 'analytics',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
         ]
       },
@@ -405,7 +416,7 @@ const MenuConfig = {
             label: 'Administration',
             href: '/admin/index.html',
             icon: 'users',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
           { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
@@ -441,7 +452,7 @@ const MenuConfig = {
             label: 'Analytics',
             href: '/admin/analytics.html',
             icon: 'analytics',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
         ]
       },
@@ -473,7 +484,7 @@ const MenuConfig = {
             label: 'Administration',
             href: '/admin/index.html',
             icon: 'users',
-            requiredRoles: [UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]
+            requiredRoles: ADMIN_ROLES
           },
           { id: 'chat-settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
           { id: 'chat-help', label: 'Help & Support', href: '/help.html', icon: 'help' },
@@ -940,7 +951,7 @@ class MenuSystem {
 
     let overlay = document.getElementById('sidebarUserMenuOverlay');
     if (!overlay) {
-      const showAdmin = this.hasRole([UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]);
+      const showAdmin = this.hasRole(ADMIN_ROLES);
       const isAdminPath = (this.currentPath || '').toLowerCase().includes('/admin/');
       const adminHref = this._resolveHref('/admin/index.html');
       const settingsHref = this._resolveHref('/settings.html');
@@ -972,8 +983,8 @@ class MenuSystem {
                 <span class="text-lg font-medium text-white">${initials}</span>
               </div>
               <div class="min-w-0 flex-1">
-                <p class="text-white font-medium text-sm break-words leading-tight min-w-0">${nameEsc}</p>
-                ${handle ? `<p class="text-gray-400 text-sm truncate">${handle}</p>` : ''}
+                <p class="text-white font-medium text-sm break-words leading-tight min-w-0" title="${nameEsc}">${nameEsc}</p>
+                ${handle ? `<p class="text-gray-400 text-sm truncate" title="${handle}">${handle}</p>` : ''}
               </div>
             </div>
           </div>
@@ -1216,7 +1227,7 @@ function renderMenu(containerSelector = '#sidebar nav', options = {}) {
  */
 function isAdmin() {
   const menuSystem = new MenuSystem();
-  return menuSystem.hasRole([UserRoles.SYSTEM_ADMIN, UserRoles.ORG_ADMIN]);
+  return menuSystem.hasRole(ADMIN_ROLES);
 }
 
 /**

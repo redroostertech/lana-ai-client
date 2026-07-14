@@ -898,6 +898,13 @@
         gap: 0.75rem;
       }
 
+      /* Text column must be allowed to shrink so a long email truncates
+         instead of bleeding past the fixed-width panel. */
+      .lex-sidebar-user-panel-text {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
       .lex-sidebar-user-panel-avatar {
         width: 3rem;
         height: 3rem;
@@ -919,12 +926,18 @@
         font-size: var(--lex-body-sm-size, 0.875rem);
         font-weight: var(--lex-weight-semibold);
         color: var(--lex-sidebar-text-active);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .lex-sidebar-user-panel-role {
         font-size: var(--lex-body-xs-size, 0.6875rem);
         color: var(--lex-sidebar-text-muted);
         margin-top: 0.125rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .lex-sidebar-user-panel-nav {
@@ -1513,9 +1526,9 @@
               <div class="lex-sidebar-user-panel-avatar">
                 <span class="lex-sidebar-user-panel-avatar-text">${this.escapeHtml(this.userInitials || '')}</span>
               </div>
-              <div>
-                <div class="lex-sidebar-user-panel-name">${this.escapeHtml(this.userName || '')}</div>
-                ${this.userEmail ? `<div class="lex-sidebar-user-panel-role">${this.escapeHtml(this.userEmail)}</div>` : ''}
+              <div class="lex-sidebar-user-panel-text">
+                <div class="lex-sidebar-user-panel-name" title="${this.escapeHtml(this.userName || '')}">${this.escapeHtml(this.userName || '')}</div>
+                ${this.userEmail ? `<div class="lex-sidebar-user-panel-role" title="${this.escapeHtml(this.userEmail)}">${this.escapeHtml(this.userEmail)}</div>` : ''}
               </div>
             </div>
           </div>

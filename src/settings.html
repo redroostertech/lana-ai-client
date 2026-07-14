@@ -149,12 +149,12 @@
         <!-- Read-only Profile View -->
         <div id="profileView" class="hidden">
           <div class="flex items-center gap-6 mb-6">
-            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center">
+            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
               <span id="profileInitials" class="text-2xl font-bold text-indigo-600">U</span>
             </div>
-            <div>
-              <h3 id="profileName" class="text-xl font-semibold text-gray-900">Loading...</h3>
-              <p id="profileEmail" class="text-gray-500">Loading...</p>
+            <div class="min-w-0 flex-1">
+              <h3 id="profileName" class="text-xl font-semibold text-gray-900 truncate">Loading...</h3>
+              <p id="profileEmail" class="text-gray-500 truncate">Loading...</p>
             </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -180,12 +180,12 @@
         <!-- Edit Profile Form (hidden by default) -->
         <form id="profileForm" class="hidden space-y-4">
           <div class="flex items-center gap-6 mb-6">
-            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center">
+            <div class="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
               <span id="profileInitialsEdit" class="text-2xl font-bold text-indigo-600">U</span>
             </div>
-            <div>
-              <h3 id="profileNameEdit" class="text-xl font-semibold text-gray-900">Loading...</h3>
-              <p id="profileEmailEdit" class="text-gray-500">Loading...</p>
+            <div class="min-w-0 flex-1">
+              <h3 id="profileNameEdit" class="text-xl font-semibold text-gray-900 truncate">Loading...</h3>
+              <p id="profileEmailEdit" class="text-gray-500 truncate">Loading...</p>
             </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -573,7 +573,9 @@
         const initials = (firstName[0] || '') + (lastName[0] || '') || user.email?.[0]?.toUpperCase();
 
         document.getElementById('profileName').textContent = name;
+        document.getElementById('profileName').title = name || '';
         document.getElementById('profileEmail').textContent = user.email || '';
+        document.getElementById('profileEmail').title = user.email || '';
         document.getElementById('profileInitials').textContent = initials;
         document.getElementById('profileFirstName').textContent = firstName || '—';
         document.getElementById('profileLastName').textContent = lastName || '—';
@@ -584,7 +586,9 @@
         document.getElementById('firstName').value = firstName;
         document.getElementById('lastName').value = lastName;
         document.getElementById('profileNameEdit').textContent = name;
+        document.getElementById('profileNameEdit').title = name || '';
         document.getElementById('profileEmailEdit').textContent = user.email || '';
+        document.getElementById('profileEmailEdit').title = user.email || '';
         document.getElementById('profileInitialsEdit').textContent = initials;
         
         // Hide loading, show content

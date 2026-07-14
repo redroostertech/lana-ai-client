@@ -149,8 +149,8 @@
                      (user.email ? user.email.charAt(0).toUpperCase() : 'U');
 
       // View mode
-      if (dom.profileName) dom.profileName.textContent = name;
-      if (dom.profileEmail) dom.profileEmail.textContent = user.email || '';
+      if (dom.profileName) { dom.profileName.textContent = name; dom.profileName.setAttribute('title', name); }
+      if (dom.profileEmail) { dom.profileEmail.textContent = user.email || ''; dom.profileEmail.setAttribute('title', user.email || ''); }
       if (dom.avatarInitials) dom.avatarInitials.textContent = initials;
       if (dom.kvFirstName) dom.kvFirstName.setAttribute('value', firstName || '--');
       if (dom.kvLastName) dom.kvLastName.setAttribute('value', lastName || '--');
@@ -158,8 +158,8 @@
       if (dom.kvOrg) dom.kvOrg.setAttribute('value', user.organization_name || '--');
 
       // Edit mode pre-fill
-      if (dom.profileNameEdit) dom.profileNameEdit.textContent = name;
-      if (dom.profileEmailEdit) dom.profileEmailEdit.textContent = user.email || '';
+      if (dom.profileNameEdit) { dom.profileNameEdit.textContent = name; dom.profileNameEdit.setAttribute('title', name); }
+      if (dom.profileEmailEdit) { dom.profileEmailEdit.textContent = user.email || ''; dom.profileEmailEdit.setAttribute('title', user.email || ''); }
       if (dom.avatarInitialsEdit) dom.avatarInitialsEdit.textContent = initials;
 
       if (dom.profileForm) {
