@@ -64,7 +64,23 @@
 
   function canonicalId(value) {
     var id = String(value || '').trim();
-    return ALIASES[id] || id;
+    if (ALIASES[id]) return ALIASES[id];
+    // Upgrade path for legacy payloads. Control-plane releases up to 2026-07 put
+    // @-prefixed BACKEND PACKAGE ids ('@insights', '@agents') in enabled_apps —
+    // a different namespace from this UI catalog. Those payloads are cached in
+    // electron-storage (see electron-storage.js saveServerConnection), so an
+    // already-installed client can still hold one after the control plane is
+    // fixed. Strip the prefix and re-resolve through the aliases above.
+    //
+    // Backend-only apps (@voice, @automation, @heartbeat, @meet,
+    // @communications) have NO page in this bundle. They intentionally fall
+    // through to an id that misses CATALOG, so normalizeApp rejects them rather
+    // than rendering a tile that navigates nowhere.
+    if (id.charAt(0) === '@') {
+      var stripped = id.slice(1);
+      return ALIASES[stripped] || stripped;
+    }
+    return id;
   }
 
   function normalizeApp(item) {
@@ -73,18 +89,30 @@
       ? item
       : (item.id || item.app_id || item.slug || item.key || '');
     var id = canonicalId(rawId);
-    var base = CATALOG[id] || {};
+    var base = CATALOG[id];
+
+    // FAIL CLOSED. An id that does not resolve to a catalog entry has no page in
+    // this bundle. Previously `base` defaulted to {} and a caller-supplied
+    // label+route was enough to satisfy the guard below, so an unknown app
+    // rendered a clickable tile that navigated to a non-existent file — a blank
+    // page. An app we cannot route is not renderable: drop it.
+    if (!base) return null;
+
+    // `base` LAST for id+route: this catalog is the ONLY source of truth for
+    // routes (bundle-relative files like 'admin/analytics.html'). A legacy
+    // payload may still carry a URL-path route ('/insights') that is not a file
+    // in this bundle; it must never win. label/description/colors stay
+    // caller-overridable so the control plane can still customize presentation.
     var normalized = typeof item === 'string'
-      ? Object.assign({}, base, { id: id })
-      : Object.assign({}, base, item, { id: id });
+      ? Object.assign({}, base)
+      : Object.assign({}, base, item, { id: id, route: base.route });
 
     if (!normalized.id || !normalized.label || !normalized.route) return null;
     if (!Array.isArray(normalized.colors)) normalized.colors = [];
     return normalized;
   }
 
-  function normalizeAppList(items, fallbackItems) {
-    var source = Array.isArray(items) && items.length ? items : (fallbackItems || []);
+  function resolveList(source) {
     var seen = Object.create(null);
     var result = [];
     for (var i = 0; i < source.length; i += 1) {
@@ -92,6 +120,23 @@
       if (!normalized || seen[normalized.id]) continue;
       seen[normalized.id] = true;
       result.push(normalized);
+    }
+    return result;
+  }
+
+  function normalizeAppList(items, fallbackItems) {
+    var hasItems = Array.isArray(items) && items.length;
+    var result = resolveList(hasItems ? items : (fallbackItems || []));
+
+    // A non-empty list where NOTHING resolved means the payload speaks a
+    // namespace this bundle does not understand — e.g. a cached legacy
+    // enabled_apps holding only backend-only ids (@voice, @automation, ...).
+    // Rendering an empty switcher would strand the user with no way back to the
+    // workspace, so fall back to the built-in defaults instead.
+    if (hasItems && !result.length) {
+      result = resolveList(Array.isArray(fallbackItems) && fallbackItems.length
+        ? fallbackItems
+        : defaultApps());
     }
     return result;
   }

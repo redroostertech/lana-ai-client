@@ -1267,13 +1267,50 @@
         brain: 'brainchild',
         knowledge: 'brainchild'
       };
-      const id = aliases[String(rawId).trim()] || String(rawId).trim();
-      const base = catalog[id] || {};
+      const trimmed = String(rawId).trim();
+      // Mirror LanaClientApps.canonicalId: strip the legacy @-prefix used by
+      // older control-plane payloads ('@insights') before alias resolution.
+      const stripped = trimmed.charAt(0) === '@' ? trimmed.slice(1) : trimmed;
+      const id = aliases[trimmed] || aliases[stripped] || stripped;
+      const base = catalog[id];
+      // Fail closed: no catalog entry means no page in this bundle. Do not let a
+      // caller-supplied label+route conjure a tile that navigates into a blank page.
+      if (!base) return null;
       const normalized = typeof item === 'string'
-        ? Object.assign({}, base, { id: id })
-        : Object.assign({}, base, item, { id: id });
+        ? Object.assign({}, base)
+        : Object.assign({}, base, item, { id: id, route: base.route });
       if (!normalized.id || !normalized.label || !normalized.route) return null;
       return normalized;
+    }
+
+    /**
+     * True when `href` points at a surface this bundle can actually render.
+     *
+     * The app switcher may only navigate to routes that came out of the client
+     * app catalog. Anything else — notably a legacy control-plane route like
+     * '/insights', which is a URL path and not a file in this bundle — is
+     * treated as unrenderable so the caller can show a message instead of
+     * navigating into a blank page.
+     */
+    _isRenderableAppHref(href) {
+      const catalog = this._getAppCatalog() || {};
+      const prefix = this._getAppPrefix();
+      return Object.keys(catalog).some((key) => {
+        const route = catalog[key] && catalog[key].route;
+        return route && (prefix + route) === href;
+      });
+    }
+
+    _notifyAppUnavailable(label) {
+      const message = `${label} isn't available in this version of the desktop app. Please update, or contact your administrator.`;
+      if (window.Lex && window.Lex.Toast && typeof window.Lex.Toast.error === 'function') {
+        window.Lex.Toast.error(message);
+        return;
+      }
+      // Toast component not loaded on this page — still fail loudly rather than
+      // silently swallowing the click.
+      try { window.alert(message); } catch (_) { /* non-interactive context */ }
+      if (window.console && console.error) console.error('[lex-sidebar] ' + message);
     }
 
     _getAppItems() {
@@ -1374,7 +1411,7 @@
       const current = this._getCurrentApp();
       const options = this._getAppItems().map((item) => {
         const isActive = item.id === current.id;
-        return `<button type="button" class="lex-sidebar-app-option" data-app-switch="${this.escapeHtml(item.id)}" data-href="${this.escapeHtml(item.href)}" data-active="${isActive}">
+        return `<button type="button" class="lex-sidebar-app-option" data-app-switch="${this.escapeHtml(item.id)}" data-href="${this.escapeHtml(item.href)}" data-app-label="${this.escapeHtml(item.label)}" data-active="${isActive}">
           ${this._renderAppMark(item)}
           <span class="lex-sidebar-app-option-copy">
             <span class="lex-sidebar-app-option-title">${this.escapeHtml(item.label)}</span>
@@ -1601,8 +1638,16 @@
       this.delegate('click', '[data-app-switch]', (e, target) => {
         e.preventDefault();
         const href = target.dataset.href || '';
+        const label = target.dataset.appLabel || 'That app';
         this.appMenuOpen = false;
-        if (!href) return;
+        // Fail loudly, never blank. _getAppItems only emits catalog-resolved
+        // routes, so an unresolvable href should be unreachable — but a stale
+        // cached payload or a future catalog gap must surface as a message the
+        // user can act on, not a white window they cannot navigate out of.
+        if (!href || !this._isRenderableAppHref(href)) {
+          this._notifyAppUnavailable(label);
+          return;
+        }
         if (window.Lex && window.Lex.Nav && !/^(https?:)?\/\//.test(href)) {
           window.Lex.Nav.go(href);
         } else {
