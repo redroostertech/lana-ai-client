@@ -506,8 +506,10 @@ class CloudAuth {
    * token to the main-process caller only, or null when not signed in / mint
    * fails. Cached in the keychain so re-launch reuses it without a re-mint.
    */
-  async ensureRelayToken() {
-    const cached = await this.#kc.get(CLOUD_KEYS.relayToken);
+  async ensureRelayToken(opts = {}) {
+    // force: bypass the keychain cache and re-mint a fresh token. Used by the
+    // manual "Connect" action to self-heal a revoked/rotated relay token.
+    const cached = opts && opts.force ? null : await this.#kc.get(CLOUD_KEYS.relayToken);
     if (cached) return cached;
     const cloudToken = await this.#kc.get(CLOUD_KEYS.accessToken);
     if (!cloudToken) return null;
@@ -548,12 +550,12 @@ class CloudAuth {
    * with the LOCAL session token (Phase 2b). The relay credential flows
    * main -> local backend ONLY; the renderer only ever sees { ok }.
    */
-  async deliverRelayToken(localBackendUrl) {
+  async deliverRelayToken(localBackendUrl, opts = {}) {
     const base = String(localBackendUrl || '').replace(/\/$/, '');
     if (!base) return { ok: false, error: 'no_local_backend' };
     const localSession = await this.#kc.get(CLOUD_KEYS.localSession);
     if (!localSession) return { ok: false, error: 'no_local_session' };
-    const relayToken = await this.ensureRelayToken();
+    const relayToken = await this.ensureRelayToken(opts);
     if (!relayToken) return { ok: false, error: 'relay_unavailable' };
     let resp;
     try {

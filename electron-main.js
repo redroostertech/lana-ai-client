@@ -1196,9 +1196,9 @@ if (IS_LANA_ONE) {
   // Phase 3/4: mint + deliver the per-user relay token to the LOCAL backend so
   // its hybrid router can reach the cloud relay. The relay credential stays in
   // main; the renderer only ever sees { ok }.
-  ipcMain.handle('cloud-auth:ensure-relay', async () => {
+  ipcMain.handle('cloud-auth:ensure-relay', async (_event, force) => {
     try {
-      return await getCloudAuth().deliverRelayToken(LANA_LOCAL_BACKEND_URL);
+      return await getCloudAuth().deliverRelayToken(LANA_LOCAL_BACKEND_URL, { force: !!force });
     } catch (error) {
       logError('[cloud-auth] ensure-relay failed', error);
       return { ok: false, error: (error && error.message) || 'ensure_relay_failed' };

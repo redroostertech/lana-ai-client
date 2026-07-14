@@ -53,7 +53,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     adopt: () => ipcRenderer.invoke('cloud-auth:adopt'),
     getState: () => ipcRenderer.invoke('cloud-auth:state'),
     logout: () => ipcRenderer.invoke('cloud-auth:logout'),
-    ensureRelay: () => ipcRenderer.invoke('cloud-auth:ensure-relay'),
+    ensureRelay: (force) => ipcRenderer.invoke('cloud-auth:ensure-relay', !!force),
     refreshEntitlement: () => ipcRenderer.invoke('cloud-auth:refresh-entitlement')
   },
 

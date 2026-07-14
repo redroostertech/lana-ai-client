@@ -31,6 +31,7 @@
     dom.testBtn       = document.getElementById('cr-test-btn');
     dom.saveBtn       = document.getElementById('cr-save-btn');
     dom.disconnectBtn = document.getElementById('cr-disconnect-btn');
+    dom.signinSlot    = document.getElementById('cr-signin-slot');
   }
 
   function relayState() {
@@ -40,6 +41,17 @@
   function relayApi() {
     return window.LanaRelayApi;
   }
+
+  // The desktop cloud sign-in bridge (LANA One only). Absent in the stock build,
+  // in which case the automated "connect" action is simply not offered.
+  function cloudAuth() {
+    return (window.electronAPI && window.electronAPI.cloudAuth &&
+      typeof window.electronAPI.cloudAuth.ensureRelay === 'function')
+      ? window.electronAPI.cloudAuth
+      : null;
+  }
+
+  var signinBusy = false;
 
   function toast() {
     return (window.Lex && window.Lex.Toast) || null;
@@ -59,9 +71,62 @@
     if (dom.statusText) dom.statusText.textContent = detail || '';
   }
 
+  // Automated relay connect: use the signed-in LANA account to mint + deliver a
+  // relay token via the main process (window.electronAPI.cloudAuth.ensureRelay),
+  // so the user never copies a token. The token NEVER touches the renderer; we
+  // only ever receive { ok }. Reloads the server-side state on success.
+  function doSignInConnect() {
+    var ca = cloudAuth();
+    if (!ca || signinBusy) return;
+    signinBusy = true;
+    setBusy(document.getElementById('cr-signin-btn'), true);
+    Promise.resolve(ca.ensureRelay(true)).then(function (res) {
+      var t = toast();
+      if (res && res.ok) {
+        if (t) t.success('Cloud relay connected');
+        loadSettings();
+      } else if (t) {
+        t.error('Could not connect automatically. Try again or paste a token below.');
+      }
+    }).catch(function () {
+      var t2 = toast();
+      if (t2) t2.error('Could not connect automatically. Try again or paste a token below.');
+    }).finally(function () {
+      signinBusy = false;
+      setBusy(document.getElementById('cr-signin-btn'), false);
+    });
+  }
+
+  // Offer the one-click "connect with your LANA account" action ABOVE the manual
+  // group, but only when the cloud bridge exists AND we are not already connected
+  // via sign-in (the status badge already conveys that state).
+  function renderSigninSlot(view) {
+    var slot = dom.signinSlot;
+    if (!slot) return;
+    var viaSignin = !!(state.settings && state.settings.source === 'cloud_signin' && view.configured);
+    if (!cloudAuth() || viaSignin) {
+      slot.innerHTML = '';
+      return;
+    }
+    slot.innerHTML =
+      '<lex-btn id="cr-signin-btn" variant="primary" size="sm" leading-icon="log-in">' +
+      'Connect with your LANA account</lex-btn>' +
+      '<lex-text variant="secondary" size="body-sm" tag="p" style="margin-top:0.4rem">' +
+      'Sets up cloud access automatically from your signed-in account. No token to copy.' +
+      '</lex-text>';
+    var btn = document.getElementById('cr-signin-btn');
+    if (btn) {
+      btn.addEventListener('click', doSignInConnect);
+      // A competing re-render (lex-refresh / post-connect reload) must not visually
+      // re-enable a button whose mint is still in flight.
+      if (signinBusy) setBusy(btn, true);
+    }
+  }
+
   function render() {
     var view = relayState().deriveView(state.settings);
     setStatus(view.statusLabel, view.statusColor, view.statusDetail);
+    renderSigninSlot(view);
 
     if (dom.baseUrlInput && !inputValue(dom.baseUrlInput)) {
       dom.baseUrlInput.setAttribute('value', view.baseUrl);
