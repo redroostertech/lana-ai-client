@@ -404,8 +404,17 @@ function createStackBootstrap(opts = {}) {
         fits: t.fits,
       })),
       routing: {
-        chatDestination: localChatAvailable ? 'local' : 'relay',
-        reason: localChatAvailable ? `local_${plan.tier}` : (downloadReason || plan.reason),
+        // Local model present AND the redaction moat provisioned => hybrid routing
+        // can actually SELECT local (the redactor-first gate requires a healthy
+        // redactor beside the model), so the destination is per-request 'auto'.
+        // Without the redactor, local is never selectable and cloud egress would be
+        // unredacted, so we honestly report 'relay' -- never claim "on-device" /
+        // "redacted" that the router will not deliver.
+        chatDestination: (localChatAvailable && Boolean(redactorRunSh)) ? 'auto' : 'relay',
+        mode: (localChatAvailable && Boolean(redactorRunSh)) ? 'hybrid' : 'relay',
+        reason: !localChatAvailable
+          ? (downloadReason || plan.reason)
+          : (redactorRunSh ? `hybrid_local_${plan.tier}` : 'redactor_not_provisioned'),
       },
       // Additive: aux sovereign capabilities available this boot (present-only;
       // reflects the user's in-app model-setup + which sidecar assets are staged).

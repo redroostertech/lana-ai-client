@@ -266,6 +266,20 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
     LLAMACPP_EMBEDDING_URL: `http://127.0.0.1:${ports.llamaEmbed}`,
     // Only point chat at a local server when one exists; otherwise unset -> relay.
     LLAMACPP_MAIN_URL: p.chatModel ? `http://127.0.0.1:${ports.llamaChat}` : undefined,
+    // The hybrid router's LOCAL probe/target. MUST be the ISOLATED chat port
+    // (ports.llamaChat may be reassigned off 8081 by bootstrap's port isolation);
+    // the backend default of 127.0.0.1:8081 is wrong on any box where 8081 was
+    // busy at boot, so pin it here explicitly whenever a local chat server exists.
+    LLAMACPP_LOCAL_URL: p.chatModel ? `http://127.0.0.1:${ports.llamaChat}` : undefined,
+    // Per-request local<->relay routing: DESKTOP edition only, and only when a
+    // local chat server exists (otherwise byte-identical relay-default). The stock
+    // lana-ai server env (infra/.../env-generator.js) never sets this, so hybrid
+    // routing stays OFF there. cleanEnv drops the undefined on no-local machines.
+    HYBRID_ROUTING_ENABLED: p.chatModel ? 'true' : undefined,
+    // The local model's context window (same value llama-chat is launched with,
+    // --ctx-size), so the router can send a prompt that would overflow the local
+    // window to the relay instead of truncating injected RAG/statute context.
+    LLAMACPP_LOCAL_CTX: p.chatModel ? String(cfg.chatContext || 8192) : undefined,
     // Boot-time local-model capability snapshot (the plan model-selector chose +
     // download outcome), surfaced by the backend at GET /api/v1/system/local-models
     // so the frontend can read this machine's local-model capability + routing.

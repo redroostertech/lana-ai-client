@@ -95,6 +95,9 @@
   // or raw tokens (local / device / relay / cloud).
   function routingLabel(dest) {
     var d = String(dest || '').toLowerCase();
+    if (d === 'auto' || d.indexOf('hybrid') !== -1) {
+      return { label: 'Automatic', onDevice: true };
+    }
     if (d.indexOf('device') !== -1 || d.indexOf('local') !== -1) {
       return { label: 'On this device', onDevice: true };
     }
@@ -276,7 +279,15 @@
       '<lex-text variant="secondary" size="body-sm">Current routing for your chat messages</lex-text>' +
       '<lex-badge label="' + esc(route.label) + '" color="' + routeColor + '" size="sm"></lex-badge>' +
     '</div>';
-    if (routing.reason) {
+    var isAuto = String(routing.chatDestination || '').toLowerCase() === 'auto' ||
+      String(routing.mode || '').toLowerCase() === 'hybrid';
+    if (isAuto) {
+      html += '<lex-text variant="secondary" size="body-sm" style="display:block;">' +
+        'Chats run on this device by default, including your matter work. The secure ' +
+        'Cloud relay is used only when a request needs it (tools, a very large request, ' +
+        'or a cloud-only model), and is redacted before it leaves this device.' +
+      '</lex-text>';
+    } else if (routing.reason) {
       html += '<lex-text variant="secondary" size="body-sm" style="display:block;">' + esc(routing.reason) + '</lex-text>';
     }
     if (route.onDevice === false) {
