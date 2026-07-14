@@ -103,6 +103,10 @@
               <lex-kv id="sv2-kv-lastname" label="Last Name" value="--"></lex-kv>
               <lex-kv id="sv2-kv-email" label="Email" value="--"></lex-kv>
               <lex-kv id="sv2-kv-org" label="Organization" value="--"></lex-kv>
+              <lex-kv id="sv2-kv-title" label="Title" value="--"></lex-kv>
+              <lex-kv id="sv2-kv-firm" label="Firm" value="--"></lex-kv>
+              <lex-kv id="sv2-kv-location" label="Location" value="--"></lex-kv>
+              <lex-kv id="sv2-kv-practice" label="Practice area" value="--"></lex-kv>
             </div>
 
           </div>
@@ -125,6 +129,10 @@
               <lex-stack direction="horizontal" gap="4" wrap="true">
                 <lex-input name="first_name" label="First Name" placeholder="Enter first name"></lex-input>
                 <lex-input name="last_name" label="Last Name" placeholder="Enter last name"></lex-input>
+                <lex-input name="title" label="Title" placeholder="e.g. Managing partner"></lex-input>
+                <lex-input name="firm_name" label="Firm" placeholder="Enter firm name"></lex-input>
+                <lex-input name="location" label="Location" placeholder="e.g. Atlanta, GA"></lex-input>
+                <lex-input name="practice_area" label="Practice area" placeholder="e.g. estate planning"></lex-input>
               </lex-stack>
               <div class="sv2-form-actions">
                 <lex-btn type="submit" variant="primary" size="sm">Save Changes</lex-btn>
@@ -325,8 +333,12 @@
         aria-labelledby="sv2-tab-billing" data-section="billing">
         <section id="sv2-section-billing" style="margin-bottom:0.5rem">
           <lex-card heading="Plan &amp; billing" subtitle="Your LANA One subscription">
-            <lex-text variant="secondary" size="body-sm">Your LANA One plan, payment method, and billing history appear here once billing is connected to your account.</lex-text>
-            <!-- TODO: wire <section id="sv2-section-billing"> to the plan/subscription + checkout endpoints -->
+            <lex-stack direction="vertical" gap="3">
+              <lex-text variant="secondary" size="body-sm">Billing is managed on the web. Open your account to view or change your plan, payment method, and billing history.</lex-text>
+              <!-- NOTE: confirm the exact billing path on one.lanaai.io; using /settings for now -->
+              <lex-btn id="sv2-manage-billing-btn" variant="primary" size="sm" icon="external-link"
+                data-billing-url="https://one.lanaai.io/settings">Manage billing</lex-btn>
+            </lex-stack>
           </lex-card>
         </section>
       </div><!-- /sv2-panel-billing -->
@@ -438,6 +450,7 @@
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/settings-v2.js"></script>
+  <script src="js/pages/settings-billing.js"></script>
   <script src="js/pages/settings-personalization.js"></script>
   <script src="js/pages/settings-v2-nav.js"></script>
 
