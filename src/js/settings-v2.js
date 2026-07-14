@@ -47,14 +47,14 @@
     dom.profileView      = document.getElementById('sv2-profile-view');
     dom.profileEdit      = document.getElementById('sv2-profile-edit');
     dom.profileName      = document.getElementById('sv2-profile-name');
-    dom.profileEmail     = document.getElementById('sv2-profile-email');
+    dom.profileRole      = document.getElementById('sv2-profile-role');
     dom.avatarInitials   = document.getElementById('sv2-avatar-initials');
     dom.profileNameEdit  = document.getElementById('sv2-profile-name-edit');
-    dom.profileEmailEdit = document.getElementById('sv2-profile-email-edit');
+    dom.profileRoleEdit  = document.getElementById('sv2-profile-role-edit');
     dom.avatarInitialsEdit = document.getElementById('sv2-avatar-initials-edit');
     dom.kvFirstName      = document.getElementById('sv2-kv-firstname');
     dom.kvLastName       = document.getElementById('sv2-kv-lastname');
-    dom.kvRole           = document.getElementById('sv2-kv-role');
+    dom.kvEmail          = document.getElementById('sv2-kv-email');
     dom.kvOrg            = document.getElementById('sv2-kv-org');
     dom.cancelEditBtn    = document.getElementById('sv2-cancel-edit-btn');
     dom.profileForm      = document.getElementById('sv2-profile-form');
@@ -148,18 +148,20 @@
       var initials = ((firstName.charAt(0) || '') + (lastName.charAt(0) || '')).toUpperCase() ||
                      (user.email ? user.email.charAt(0).toUpperCase() : 'U');
 
+      var roleName = user.role_name || '';
+
       // View mode
       if (dom.profileName) dom.profileName.textContent = name;
-      if (dom.profileEmail) dom.profileEmail.textContent = user.email || '';
+      if (dom.profileRole) dom.profileRole.textContent = roleName;
       if (dom.avatarInitials) dom.avatarInitials.textContent = initials;
       if (dom.kvFirstName) dom.kvFirstName.setAttribute('value', firstName || '--');
       if (dom.kvLastName) dom.kvLastName.setAttribute('value', lastName || '--');
-      if (dom.kvRole) dom.kvRole.setAttribute('value', user.role_name || '--');
+      if (dom.kvEmail) dom.kvEmail.setAttribute('value', user.email || '--');
       if (dom.kvOrg) dom.kvOrg.setAttribute('value', user.organization_name || '--');
 
       // Edit mode pre-fill
       if (dom.profileNameEdit) dom.profileNameEdit.textContent = name;
-      if (dom.profileEmailEdit) dom.profileEmailEdit.textContent = user.email || '';
+      if (dom.profileRoleEdit) dom.profileRoleEdit.textContent = roleName;
       if (dom.avatarInitialsEdit) dom.avatarInitialsEdit.textContent = initials;
 
       if (dom.profileForm) {
