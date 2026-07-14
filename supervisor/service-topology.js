@@ -135,18 +135,13 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
 
   // 4. llama-server chat (hardware-gated; only when a chat model was selected/downloaded)
   if (p.chatModel) {
-    specs.push({
-      name: 'llama-chat',
-      command: p.llamaServer,
-      args: [
-        '--model', p.chatModel, '--port', String(ports.llamaChat), '--host', '127.0.0.1',
-        '--n-gpu-layers', nGpuLayers, '--threads', '-1', '--ctx-size', String(cfg.chatContext || 8192),
-        '--batch-size', '128', '--ubatch-size', '256', '--parallel', '1',
-        '--flash-attn', 'on', '--cont-batching',
-      ],
-      readiness: probes.httpProbe({ url: `http://127.0.0.1:${ports.llamaChat}/health` }),
-      critical: false, // chat falls back to the Forge relay
-    });
+    specs.push(buildChatSpec({
+      llamaServer: p.llamaServer,
+      chatModel: p.chatModel,
+      port: ports.llamaChat,
+      nGpuLayers,
+      chatContext: cfg.chatContext,
+    }, probes));
   }
 
   // 5. Doc parsers (optional; backend degrades to the native parser)
@@ -337,4 +332,24 @@ function buildServiceSpecs(cfg, probes = defaultProbes) {
   return specs;
 }
 
-module.exports = { buildServiceSpecs, gpuLayersFor };
+/**
+ * The llama-server CHAT spec. Extracted so BOOT (buildServiceSpecs) and post-boot
+ * ACTIVATION (bootstrap.activateLocalChat -> supervisor.replaceService) produce a
+ * byte-identical spec (same args, ctx-size, gpu layers, port, readiness).
+ */
+function buildChatSpec({ llamaServer, chatModel, port, nGpuLayers, chatContext }, probes = defaultProbes) {
+  return {
+    name: 'llama-chat',
+    command: llamaServer,
+    args: [
+      '--model', chatModel, '--port', String(port), '--host', '127.0.0.1',
+      '--n-gpu-layers', nGpuLayers, '--threads', '-1', '--ctx-size', String(chatContext || 8192),
+      '--batch-size', '128', '--ubatch-size', '256', '--parallel', '1',
+      '--flash-attn', 'on', '--cont-batching',
+    ],
+    readiness: probes.httpProbe({ url: `http://127.0.0.1:${port}/health` }),
+    critical: false, // chat falls back to the Forge relay
+  };
+}
+
+module.exports = { buildServiceSpecs, buildChatSpec, gpuLayersFor };
