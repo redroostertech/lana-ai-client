@@ -110,6 +110,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Local models (LANA One sovereign stack): download + activate a local chat
+   * model on user command. The raw model + supervisor stay in main; the renderer
+   * only ever gets { ok, tier, model, port } and progress { bytesWritten, totalBytes }.
+   */
+  localModels: {
+    activate: (opts) => ipcRenderer.invoke('local-models:activate', opts || {}),
+    onProgress: (cb) => {
+      if (typeof cb !== 'function') return () => {};
+      const handler = (_e, p) => { try { cb(p); } catch (_err) { /* ignore */ } };
+      ipcRenderer.on('local-models:progress', handler);
+      return () => { try { ipcRenderer.removeListener('local-models:progress', handler); } catch (_e) { /* noop */ } };
+    }
+  },
+
+  /**
    * Session Tracking (time tracking and activity monitoring)
    */
   sessionTracking: {

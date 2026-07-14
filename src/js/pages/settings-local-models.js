@@ -217,6 +217,22 @@
       html += bannerHtml('warn', 'No local model runs on this machine', why);
     }
 
+    // One-click download + activate when a local model would fit but isn't
+    // serving yet (not supported, or a failed download) and the desktop bridge
+    // is present. Activates the plan's tier, else the largest fitting tier.
+    var fitting = tiers.filter(function (t) { return t && t.fits === true; });
+    var activatableTier = (local.tier && String(local.tier)) ||
+      (fitting.length ? String(fitting[fitting.length - 1].tier) : '');
+    var notServing = !supported || String(local.downloadState || '').toLowerCase() === 'error';
+    if (notServing && localModelsBridge() && activatableTier) {
+      html += '<div style="margin-top:10px;">' +
+        '<lex-btn id="lm-activate-btn" variant="primary" size="sm" leading-icon="download" data-tier="' + esc(activatableTier) + '">' +
+          'Download &amp; activate on this device' +
+        '</lex-btn>' +
+        '<lex-text id="lm-activate-progress" variant="secondary" size="body-xs" style="display:block;margin-top:6px;"></lex-text>' +
+      '</div>';
+    }
+
     html += '<lex-divider spacing="md"></lex-divider>';
 
     // ── Embedding model ───────────────────────────────────────────────
@@ -297,6 +313,67 @@
     }
 
     c.innerHTML = html;
+    wireActivateButton();
+  }
+
+  // ── Local-model download + activate (LANA One desktop bridge) ─────────
+
+  function localModelsBridge() {
+    return (window.electronAPI && window.electronAPI.localModels &&
+      typeof window.electronAPI.localModels.activate === 'function')
+      ? window.electronAPI.localModels : null;
+  }
+
+  var activateBusy = false;
+
+  function setBtnBusy(btn, busy) {
+    if (!btn) return;
+    if (busy) { btn.setAttribute('disabled', 'true'); btn.setAttribute('loading', 'true'); }
+    else { btn.removeAttribute('disabled'); btn.removeAttribute('loading'); }
+  }
+
+  function wireActivateButton() {
+    var btn = el('lm-activate-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      doActivate(btn.getAttribute('data-tier') || undefined);
+    });
+    if (activateBusy) setBtnBusy(btn, true); // a re-render mid-download keeps it disabled
+  }
+
+  function doActivate(tier) {
+    var bridge = localModelsBridge();
+    if (!bridge || activateBusy) return;
+    activateBusy = true;
+    setBtnBusy(el('lm-activate-btn'), true);
+    var prog = el('lm-activate-progress');
+    if (prog) prog.textContent = 'Starting download...';
+    var unsub = bridge.onProgress(function (p) {
+      var pr = el('lm-activate-progress');
+      if (!pr) return;
+      var w = (p && p.bytesWritten) || 0;
+      var tot = (p && p.totalBytes) || 0;
+      pr.textContent = tot
+        ? 'Downloading ' + Math.floor((w / tot) * 100) + '%'
+        : 'Downloading ' + Math.round(w / 1e6) + ' MB...';
+    });
+    Promise.resolve(bridge.activate({ tier: tier })).then(function (res) {
+      var pr = el('lm-activate-progress');
+      if (res && res.ok) {
+        if (pr) pr.textContent = 'Activated. The local model now runs on this device.';
+        load(); // re-pull the (now-updated) status; the card flips to Automatic
+      } else if (pr) {
+        pr.textContent = 'Could not activate: ' + ((res && res.error) || 'unknown error') +
+          '. Chat stays on the Cloud relay.';
+      }
+    }).catch(function () {
+      var pr = el('lm-activate-progress');
+      if (pr) pr.textContent = 'Could not activate. Chat stays on the Cloud relay.';
+    }).finally(function () {
+      activateBusy = false;
+      if (typeof unsub === 'function') unsub();
+      setBtnBusy(el('lm-activate-btn'), false);
+    });
   }
 
   // ── Load ─────────────────────────────────────────────────────────────

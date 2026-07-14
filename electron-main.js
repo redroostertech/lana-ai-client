@@ -141,6 +141,46 @@ async function startSovereignStack() {
   logInfo(`[supervisor] sovereign stack ready at ${result.backendUrl} (chat: ${result.plan.localChat ? result.plan.tier : 'relay'})`);
 }
 
+// Phase 2: download + activate a local chat model on user command. Runs the
+// supervisor's activateLocalChat (download + hot-swap llama-chat), streams
+// progress to the renderer, then signals the backend to reset its routing cache
+// so the model is used on the very next turn. Self-guards when the sovereign
+// stack is not running (connect-only) -> { ok:false }.
+ipcMain.handle('local-models:activate', async (_event, opts) => {
+  if (!_stackBootstrap || typeof _stackBootstrap.activateLocalChat !== 'function') {
+    return { ok: false, error: 'stack_not_running' };
+  }
+  const tier = opts && typeof opts.tier === 'string' ? opts.tier : undefined;
+  try {
+    const result = await _stackBootstrap.activateLocalChat({
+      tier,
+      onProgress: (p) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          try { mainWindow.webContents.send('local-models:progress', p); } catch (_e) { /* best-effort */ }
+        }
+      },
+    });
+    // Tell the backend to flip its status snapshot + reset the routing cache so
+    // the model is used immediately (no ~5s TTL wait). Best-effort, non-fatal.
+    try {
+      await fetch(`${LANA_LOCAL_BACKEND_URL}/api/v1/system/local-models/activate`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(LANA_DESKTOP_KEY ? { 'x-lana-desktop-key': LANA_DESKTOP_KEY } : {}),
+        },
+        body: JSON.stringify({ available: true, tier: result.tier, model: result.model }),
+      });
+    } catch (signalErr) {
+      logError('[local-models] backend activate-signal failed (non-fatal)', signalErr);
+    }
+    return result;
+  } catch (err) {
+    logError('[local-models] activate failed', err);
+    return { ok: false, error: (err && err.message) || 'activate_failed' };
+  }
+});
+
 /**
  * BLOCKING recovery state for a lost encryption key.
  *
