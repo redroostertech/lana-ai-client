@@ -8014,7 +8014,7 @@
      * Render a matter item for link dropdown
      */
     function renderLinkMatterItem(matter, isPinned = false) {
-      const clientName = matter.client_name || matter.client?.name || 'Unknown Client';
+      const clientName = matter.client_name || matter.client?.name || '';
       const matterName = matter.name || matter.matter_name || 'Untitled Matter';
       const status = matter.status || 'Active';
       const pinIcon = isPinned ? `
@@ -8036,7 +8036,7 @@
                 <span class="font-medium text-gray-900 text-sm truncate">${matterName}</span>
                 <span class="px-2 py-0.5 text-xs rounded-full ${status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">${status}</span>
               </div>
-              <p class="text-xs text-gray-600 truncate">${clientName}</p>
+              ${clientName ? `<p class="text-xs text-gray-600 truncate">${clientName}</p>` : ''}
               <p class="text-xs text-gray-500 font-mono mt-0.5">${matter.matter_id}</p>
             </div>
           </div>
