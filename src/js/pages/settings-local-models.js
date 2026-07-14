@@ -220,9 +220,16 @@
     // One-click download + activate when a local model would fit but isn't
     // serving yet (not supported, or a failed download) and the desktop bridge
     // is present. Activates the plan's tier, else the largest fitting tier.
-    var fitting = tiers.filter(function (t) { return t && t.fits === true; });
-    var activatableTier = (local.tier && String(local.tier)) ||
-      (fitting.length ? String(fitting[fitting.length - 1].tier) : '');
+    var fitting = tiers.filter(function (t) { return t && t.fits === true; })
+      .sort(function (a, b) { return (b.minMemoryGB || 0) - (a.minMemoryGB || 0); });
+    var planTierFits = local.tier && tiers.some(function (t) {
+      return t && String(t.tier) === String(local.tier) && t.fits === true;
+    });
+    // Prefer the plan's tier only if it actually fits (RAM may have changed); else
+    // the LARGEST fitting tier (sorted by minMemoryGB desc, so [0] is largest --
+    // never trust the incoming array order).
+    var activatableTier = planTierFits ? String(local.tier)
+      : (fitting.length ? String(fitting[0].tier) : '');
     var notServing = !supported || String(local.downloadState || '').toLowerCase() === 'error';
     if (notServing && localModelsBridge() && activatableTier) {
       html += '<div style="margin-top:10px;">' +
@@ -319,9 +326,9 @@
   // ── Local-model download + activate (LANA One desktop bridge) ─────────
 
   function localModelsBridge() {
-    return (window.electronAPI && window.electronAPI.localModels &&
-      typeof window.electronAPI.localModels.activate === 'function')
-      ? window.electronAPI.localModels : null;
+    var lm = window.electronAPI && window.electronAPI.localModels;
+    return (lm && typeof lm.activate === 'function' && typeof lm.onProgress === 'function')
+      ? lm : null;
   }
 
   var activateBusy = false;
@@ -348,32 +355,39 @@
     setBtnBusy(el('lm-activate-btn'), true);
     var prog = el('lm-activate-progress');
     if (prog) prog.textContent = 'Starting download...';
-    var unsub = bridge.onProgress(function (p) {
-      var pr = el('lm-activate-progress');
-      if (!pr) return;
-      var w = (p && p.bytesWritten) || 0;
-      var tot = (p && p.totalBytes) || 0;
-      pr.textContent = tot
-        ? 'Downloading ' + Math.floor((w / tot) * 100) + '%'
-        : 'Downloading ' + Math.round(w / 1e6) + ' MB...';
-    });
-    Promise.resolve(bridge.activate({ tier: tier })).then(function (res) {
-      var pr = el('lm-activate-progress');
-      if (res && res.ok) {
-        if (pr) pr.textContent = 'Activated. The local model now runs on this device.';
-        load(); // re-pull the (now-updated) status; the card flips to Automatic
-      } else if (pr) {
-        pr.textContent = 'Could not activate: ' + ((res && res.error) || 'unknown error') +
-          '. Chat stays on the Cloud relay.';
-      }
-    }).catch(function () {
-      var pr = el('lm-activate-progress');
-      if (pr) pr.textContent = 'Could not activate. Chat stays on the Cloud relay.';
-    }).finally(function () {
+    var unsub = function () {};
+    var reset = function () {
       activateBusy = false;
-      if (typeof unsub === 'function') unsub();
+      if (typeof unsub === 'function') { try { unsub(); } catch (_e) { /* noop */ } }
       setBtnBusy(el('lm-activate-btn'), false);
-    });
+    };
+    try {
+      unsub = bridge.onProgress(function (p) {
+        var pr = el('lm-activate-progress');
+        if (!pr) return;
+        var w = (p && p.bytesWritten) || 0;
+        var tot = (p && p.totalBytes) || 0;
+        pr.textContent = tot
+          ? 'Downloading ' + Math.floor((w / tot) * 100) + '%'
+          : 'Downloading ' + Math.round(w / 1e6) + ' MB...';
+      }) || function () {};
+      Promise.resolve(bridge.activate({ tier: tier })).then(function (res) {
+        var pr = el('lm-activate-progress');
+        if (res && res.ok) {
+          if (pr) pr.textContent = 'Activated. The local model now runs on this device.';
+          load(); // re-pull the (backend already updated) status; card flips to Automatic
+        } else if (pr) {
+          pr.textContent = 'Could not activate: ' + ((res && res.error) || 'unknown error') +
+            '. Chat stays on the Cloud relay.';
+        }
+      }).catch(function () {
+        var pr = el('lm-activate-progress');
+        if (pr) pr.textContent = 'Could not activate. Chat stays on the Cloud relay.';
+      }).finally(reset);
+    } catch (_e) {
+      if (prog) prog.textContent = 'Could not start activation. Chat stays on the Cloud relay.';
+      reset();
+    }
   }
 
   // ── Load ─────────────────────────────────────────────────────────────
@@ -398,8 +412,10 @@
     if (!section) return;
     section.classList.remove('sv2-hidden');
     load();
-    // Honor the topbar refresh button, matching the other settings sections.
-    document.addEventListener('lex-refresh', function () { load(); });
+    // Honor the topbar refresh button, matching the other settings sections. Skip
+    // while a download/activation is in flight so it doesn't blank the card +
+    // reset the progress line (the download continues in main regardless).
+    document.addEventListener('lex-refresh', function () { if (!activateBusy) load(); });
   }
 
   function boot() {

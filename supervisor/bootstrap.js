@@ -236,6 +236,9 @@ function createStackBootstrap(opts = {}) {
   // can download + hot-swap the llama-chat sidecar without re-running the whole boot.
   // (ports + supervisor are already closure-level.)
   let _ctx = null;
+  // Single-flight guard for activateLocalChat (concurrent activations would race
+  // the same .downloading part file and the llama-chat swap).
+  let _activating = false;
 
   async function start() {
     const home = opts.home || io.os.homedir();
@@ -539,6 +542,11 @@ function createStackBootstrap(opts = {}) {
     if (!_ctx || !supervisor) {
       throw new Error('stack not started; cannot activate a local chat model');
     }
+    if (_activating) {
+      throw new Error('a local model activation is already in progress');
+    }
+    _activating = true;
+    try {
     const { modelsDir, paths, plan, accel } = _ctx;
     const targetTier = tier || plan.tier || 'demo';
 
@@ -551,7 +559,7 @@ function createStackBootstrap(opts = {}) {
 
     const entry = resolveChatModel(targetTier);
     validateCatalogEntry(entry); // throws on placeholder sha / bad url
-    const file = entry.file || decodeURIComponent(String(entry.url).split('/').pop() || '');
+    const file = entry.file || decodeURIComponent(String(entry.url).split('?')[0].split('/').pop() || '');
     if (!file) throw new Error(`model-catalog: no file for tier "${targetTier}"`);
 
     log.info(`[bootstrap] activating local chat model ${file} (${targetTier})...`);
@@ -581,6 +589,9 @@ function createStackBootstrap(opts = {}) {
 
     log.info(`[bootstrap] local chat model active on 127.0.0.1:${ports.llamaChat} (${targetTier})`);
     return { ok: true, tier: targetTier, model: file, port: ports.llamaChat };
+    } finally {
+      _activating = false;
+    }
   }
 
   async function stop() {

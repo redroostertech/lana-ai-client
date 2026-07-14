@@ -260,7 +260,14 @@ class ProcessSupervisor {
     }
     const merged = { critical: false, ...spec };
     this._specs.set(merged.name, merged);
-    await this._startOne(merged);
+    try {
+      await this._startOne(merged);
+    } catch (err) {
+      // Readiness failed -> reap the child we just spawned so it can't linger,
+      // flap, or hold the port for a later retry; then surface the failure.
+      await this._stopOne(merged.name);
+      throw err;
+    }
     if (!this._startedOrder.includes(merged.name)) {
       this._startedOrder.push(merged.name);
     }

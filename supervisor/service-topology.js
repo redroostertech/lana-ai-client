@@ -349,6 +349,9 @@ function buildChatSpec({ llamaServer, chatModel, port, nGpuLayers, chatContext }
     ],
     readiness: probes.httpProbe({ url: `http://127.0.0.1:${port}/health` }),
     critical: false, // chat falls back to the Forge relay
+    // No auto-restart loop: a bad/crashing model degrades to the relay (the
+    // availability probe routes around it) instead of flapping a llama-server.
+    restart: false,
   };
 }
 
