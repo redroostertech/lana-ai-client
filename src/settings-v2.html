@@ -335,6 +335,38 @@
         </lex-card>
       </section>
 
+      <!-- Cloud relay (LANA One — connect this device to the cloud relay for
+           cloud model access. Controller reused from account.html:
+           js/pages/account-relay.js targets these cr-* ids and bails safely
+           if absent. ═══════════════════════════════════════════════════════ -->
+      <section id="sv2-section-cloud-relay" style="margin-bottom:0.5rem">
+        <lex-card heading="Cloud relay" subtitle="Connect this device to your LANA account for cloud model access">
+          <lex-stack direction="horizontal" gap="3" align="center">
+            <lex-badge id="cr-status-badge" label="Loading" color="gray"></lex-badge>
+            <lex-text id="cr-status-text" variant="secondary" size="body-sm" tag="p"></lex-text>
+          </lex-stack>
+
+          <!-- Sign-in slot: the "Sign in to LANA" primary action lands here. -->
+          <div id="cr-signin-slot"></div>
+
+          <lex-divider spacing="md"></lex-divider>
+
+          <lex-text variant="primary" size="body" tag="h4">Configure manually</lex-text>
+          <lex-text variant="secondary" size="body-sm" tag="p">Paste a relay token from your LANA account. The token stays on this device and is used only to reach the relay.</lex-text>
+
+          <lex-stack direction="vertical" gap="3">
+            <lex-input id="cr-base-url" label="Relay URL" placeholder="https://one.lanaai.io/api/v1/relay"></lex-input>
+            <lex-input id="cr-token" label="Relay token" type="password" placeholder="Paste your relay token"></lex-input>
+          </lex-stack>
+
+          <div class="sv2-form-actions" style="margin-top:1rem">
+            <lex-btn id="cr-test-btn" variant="secondary" size="sm" leading-icon="signal">Test connection</lex-btn>
+            <lex-btn id="cr-save-btn" variant="primary" size="sm" leading-icon="save">Save</lex-btn>
+            <lex-btn id="cr-disconnect-btn" variant="danger" size="sm" leading-icon="unlink" style="display:none">Disconnect</lex-btn>
+          </div>
+        </lex-card>
+      </section>
+
       </div><!-- /sv2-panel-general -->
 
       <!-- ╔═══════════════════ PLAN & BILLING PANEL ════════════════════╗
@@ -466,6 +498,10 @@
   <script src="js/pages/settings-personalization.js"></script>
   <script src="js/pages/settings-v2-nav.js"></script>
   <script src="js/pages/settings-local-models.js"></script>
+  <!-- Cloud relay: state + API client + section controller (reused from account.html) -->
+  <script src="js/relay/relay-settings-state.js"></script>
+  <script src="js/api/relay-api.client.js"></script>
+  <script src="js/pages/account-relay.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->
   <script src="js/companion-bridge-consent.js"></script>
