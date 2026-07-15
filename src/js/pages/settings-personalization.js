@@ -1,10 +1,13 @@
 /**
  * settings-personalization.js
  *
- * Wires the LANA One "Personalization" section of settings-v2.html to
- * GET/PATCH /api/v1/users/me/personalization. Edition-gated: it only activates
- * in the LANA One edition, and even then fails safe (leaves the section hidden)
- * if the endpoint is unavailable — so this is inert in the stock org build.
+ * Wires the visible "Personalization" section of settings-v2.html to
+ * GET/PATCH /api/v1/users/me/personalization. The form remains available as a
+ * screen when the endpoint has not shipped yet; saved values hydrate when it is
+ * available.
+ *
+ * TODO(personalization-memory): Add the learning toggle and memory-management
+ * UI only after the supporting API and privacy behavior are finalized.
  */
 (function () {
   'use strict';
@@ -64,27 +67,32 @@
     });
   }
 
+  function bindForm() {
+    var form = el('sv2-personalization-form');
+    if (!form || form.getAttribute('data-personalization-bound') === 'true') return;
+    form.setAttribute('data-personalization-bound', 'true');
+    form.addEventListener('lex-submit', save);
+  }
+
   function activate() {
     var section = el('sv2-section-personalization');
     var api = window.api;
-    if (!section || !api || typeof api.getPersonalization !== 'function') return;
+    if (!section) return;
+
+    // Rendering the screen does not depend on backend rollout state.
+    section.classList.remove('sv2-hidden');
+    populate({});
+    bindForm();
+
+    if (!api || typeof api.getPersonalization !== 'function') return;
     api.getPersonalization().then(function (res) {
       populate(res && res.personalization);
-      section.classList.remove('sv2-hidden');
-      // lex-form emits a custom 'lex-submit' event when its type=submit button is
-      // pressed (see settings-v2.js password form). Bind that single handler.
-      var form = el('sv2-personalization-form');
-      if (form) form.addEventListener('lex-submit', save);
     }).catch(function () {
-      // Endpoint unavailable (org edition / not adopted) — leave section hidden.
+      // Endpoint unavailable: keep the blank form visible for the current UI.
     });
   }
 
   function boot() {
-    // Available on every edition (LANA-AI has access to all features; monetization
-    // lives only in LANA One). activate() reveals the section only when the backend
-    // personalization endpoint responds, and fails safe (stays hidden) on a 404 /
-    // unavailable endpoint — so this is inert until GET /users/me/personalization ships.
     activate();
   }
 

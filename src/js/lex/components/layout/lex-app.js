@@ -313,6 +313,8 @@
       this._lastShellKey = undefined;
       this._topMoverItems = [];
       this._topMoversLoaded = false;
+      this._isLanaOne = false;
+      this._editionGateStarted = false;
     }
 
     // -----------------------------------------------------------------------
@@ -389,6 +391,10 @@
       this._topbar = this.$('lex-topbar');
       this._content = this.$('#lex-main-content');
       this._notificationPanel = this.$('lex-notification-panel');
+
+      // Resolve edition-gated shell items. Standard Lana builds fail closed;
+      // LANA-ONE builds expose isLanaOne through electronAPI.getConfig().
+      this._resolveClientEdition();
 
       // Populate sidebar with user data from localStorage
       this._hydrateUser();
@@ -738,6 +744,21 @@
     // Internal — user hydration from localStorage
     // -----------------------------------------------------------------------
 
+    _resolveClientEdition() {
+      if (this._editionGateStarted) return;
+      this._editionGateStarted = true;
+
+      const electronApi = window.electronAPI;
+      if (!electronApi || typeof electronApi.getConfig !== 'function') return;
+
+      Promise.resolve(electronApi.getConfig()).then((config) => {
+        if (!config || config.isLanaOne !== true || this._isLanaOne) return;
+        this._isLanaOne = true;
+        this._hydrateUser();
+        this._initConversationMenu();
+      }).catch(function () { /* Standard client: keep LANA-ONE items hidden. */ });
+    }
+
     _hydrateUser() {
       const sidebar = this._sidebar;
       if (!sidebar) return;
@@ -831,7 +852,8 @@
       const showAdmin = adminRoles.some(function (r) { return allRoles.has(r); });
 
       const appContext = this._getAppContext();
-      const shellKey = (showAdmin ? 'admin' : 'user') + ':' + appContext;
+      const editionKey = this._isLanaOne ? 'lana-one' : 'lana-ai';
+      const shellKey = (showAdmin ? 'admin' : 'user') + ':' + appContext + ':' + editionKey;
 
       // Only rebuild sidebar sections and menus when admin visibility or app context changes.
       // Both setSections() and setUserMenuItems() create new arrays which
@@ -852,9 +874,9 @@
           menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
         }
         menuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' });
-        menuItems.push({ id: 'billing', label: 'Plan and billing', icon: 'credit-card', href: 'settings-v2.html#billing' });
-        menuItems.push({ id: 'personalization', label: 'Personalization', icon: 'sparkles', href: 'settings-v2.html#personalization' });
-        menuItems.push({ id: 'profile', label: 'Profile', icon: 'user', href: 'settings-v2.html#profile' });
+        if (this._isLanaOne) {
+          menuItems.push({ id: 'billing', label: 'Plan and billing', icon: 'credit-card', href: 'settings-v2.html#billing' });
+        }
         menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings-v2.html' });
         menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
         menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });

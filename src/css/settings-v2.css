@@ -18,6 +18,12 @@
   max-width: 760px;
 }
 
+.sv2-banner {
+  width: 100%;
+  max-width: 1000px;
+  margin-bottom: 16px;
+}
+
 
 /* ── Section Layout (left nav rail + panels) ──────────────────────── */
 
@@ -202,6 +208,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
 
 /* Profile header: lex-text renders inline-flex, so force the name and role onto
    their own lines (name over role) rather than flowing together on one line.
@@ -366,6 +373,220 @@
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--lex-border-subtle);
+}
+
+
+/* ── Per-user Usage ──────────────────────────────────────────────── */
+
+.sv2-section-usage {
+  margin-bottom: 8px;
+}
+
+.sv2-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sv2-usage-quota {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sv2-usage-quota-row {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sv2-usage-quota-heading,
+.sv2-usage-feature-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sv2-usage-label,
+.sv2-usage-feature-title,
+.sv2-usage-protect-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-medium);
+}
+
+.sv2-usage-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--lex-text-secondary);
+}
+
+.sv2-usage-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sv2-usage-value,
+.sv2-usage-detail,
+.sv2-usage-intro,
+.sv2-usage-protect p,
+.sv2-usage-status,
+.sv2-usage-unavailable {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-xs-size);
+  line-height: var(--lex-body-xs-height);
+}
+
+.sv2-usage-detail,
+.sv2-usage-intro,
+.sv2-usage-protect p,
+.sv2-usage-status {
+  margin: 0;
+}
+
+.sv2-usage-intro {
+  padding-top: 4px;
+}
+
+.sv2-usage-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sv2-usage-metric {
+  display: flex;
+  flex-direction: column;
+  min-height: 88px;
+  padding: 14px 16px;
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-lg);
+}
+
+.sv2-usage-metric-value {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-h3-size);
+  line-height: var(--lex-h3-height);
+  font-weight: var(--lex-weight-semibold);
+}
+
+.sv2-usage-metric-label {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-xs-size);
+  line-height: var(--lex-body-xs-height);
+}
+
+.sv2-usage-metric-detail {
+  margin-top: auto;
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-caption-size);
+  line-height: var(--lex-caption-height);
+}
+
+.sv2-usage-feature-card {
+  padding: 16px;
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-lg);
+}
+
+.sv2-usage-feature-title {
+  align-items: flex-start;
+}
+
+.sv2-usage-feature-title > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sv2-usage-feature-title strong,
+.sv2-usage-protect-heading strong {
+  color: var(--lex-text-primary);
+}
+
+.sv2-usage-feature-title span span {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-xs-size);
+  line-height: var(--lex-body-xs-height);
+  font-weight: var(--lex-weight-regular);
+}
+
+.sv2-usage-feature-total {
+  color: var(--lex-text-accent);
+  font-size: var(--lex-h3-size);
+  line-height: var(--lex-h3-height);
+}
+
+.sv2-usage-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.sv2-usage-breakdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md);
+  color: var(--lex-text-primary);
+  font-size: var(--lex-caption-size);
+  line-height: var(--lex-caption-height);
+}
+
+.sv2-usage-breakdown-label {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.sv2-usage-protect {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sv2-usage-protect-value {
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-base-size);
+}
+
+.sv2-team-usage-link {
+  align-self: flex-start;
+  color: var(--lex-text-accent);
+  font-size: var(--lex-body-xs-size);
+  text-decoration: none;
+}
+
+.sv2-team-usage-link:hover {
+  text-decoration: underline;
+}
+
+.sv2-usage-status:empty {
+  display: none;
+}
+
+@media (max-width: 540px) {
+  .sv2-usage-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .sv2-usage-feature-heading {
+    flex-direction: column;
+  }
 }
 
 

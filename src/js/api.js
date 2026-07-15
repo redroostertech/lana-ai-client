@@ -2792,8 +2792,23 @@ class ApiClient {
     return this.get(`/api/v1/activity/my?limit=${limit}&offset=${offset}`);
   }
 
-  async getMyProductivity() {
-    return this.get(`/api/v1/activity/my/productivity`);
+  async getMyProductivity(period) {
+    const query = period ? `?period=${encodeURIComponent(period)}` : '';
+    return this.get(`/api/v1/activity/my/productivity${query}`);
+  }
+
+  async getMyConversationUsageSummary() {
+    const params = new URLSearchParams({
+      page: '1',
+      limit: '1',
+      sort: 'updated_at',
+      order: 'desc'
+    });
+    return this.get(`/api/v1/chat/sessions?${params.toString()}`);
+  }
+
+  async getStorageUsage() {
+    return this.get('/api/v1/storage/usage');
   }
 
   async getUserProductivity(userId) {
