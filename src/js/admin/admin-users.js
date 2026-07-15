@@ -7,6 +7,7 @@
  *
  * @requires api.js          - window.api — getUsers, getUser, createUser, updateUser,
  *                              checkEmail, checkUsername, getRoles
+ * @requires admin-users.pagination.js - API pagination response normalization
  * @requires lex.utils.js    - Lex.Utils.escapeHtml, Lex.Utils.formatDate
  * @requires lex-toast.js    - Lex.Toast.success, Lex.Toast.error
  * @requires lex-table.js    - table.setData()
@@ -242,18 +243,9 @@
       .then(function (result) {
         if (gen !== _gen) return; // stale response — discard
 
-        var users = [];
-        var total = 0;
-        if (Array.isArray(result)) {
-          users = result;
-          total = result.length;
-        } else if (result && Array.isArray(result.users)) {
-          users = result.users;
-          total = result.total || result.count || users.length;
-        } else if (result && Array.isArray(result.data)) {
-          users = result.data;
-          total = result.total || result.count || users.length;
-        }
+        var normalized = AdminUsersPagination.normalizeAdminUsersResponse(result);
+        var users = normalized.users;
+        var total = normalized.total;
 
         var rows = users.map(function (u) {
           return {
