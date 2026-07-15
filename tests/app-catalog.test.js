@@ -93,6 +93,101 @@ describe('LanaClientApps.normalizeApp', () => {
   });
 });
 
+describe('embedded route objects (docs/EMBEDDED-APPS-SPEC.md)', () => {
+  const legalNsights = {
+    id: 'legal-nsights',
+    label: 'Legal NSights',
+    description: 'Dashboards, reporting, and firm analytics',
+    route: { type: 'embedded', url: 'https://legal.nsites.tech', meta: { embedContract: 'v1' } },
+    colors: ['#9debd0', '#10b981', '#0f766e', '#111827']
+  };
+
+  test('a valid embedded entry resolves even though its id is not in the catalog', () => {
+    const app = Apps.normalizeApp(legalNsights);
+    expect(app).not.toBeNull();
+    expect(app.id).toBe('legal-nsights');
+    expect(app.label).toBe('Legal NSights');
+    // The tile must route to the generic host with ONLY the id in the query —
+    // never to a payload-chosen file, never carrying the URL.
+    expect(app.route).toBe('embed.html?app=legal-nsights');
+    expect(app.embed.url).toBe('https://legal.nsites.tech');
+    expect(app.embed.meta).toEqual({ embedContract: 'v1' });
+    expect(app.colors).toEqual(legalNsights.colors);
+  });
+
+  test('normalization is idempotent for the representation persisted by login', () => {
+    const once = Apps.normalizeApp(legalNsights);
+    const twice = Apps.normalizeApp(once);
+    expect(twice).toEqual(once);
+    expect(Apps.normalizeAppList([once])).toEqual([once]);
+  });
+
+  test('an embedded-looking string route must exactly match its derived app id', () => {
+    const normalized = Apps.normalizeApp(legalNsights);
+    expect(Apps.normalizeApp(Object.assign({}, normalized, {
+      route: 'embed.html?app=some-other-app'
+    }))).toBeNull();
+  });
+
+  test('the embed host page the route points at EXISTS on disk', () => {
+    expect(fs.existsSync(path.join(SRC, 'embed.html'))).toBe(true);
+    expect(fs.existsSync(path.join(SRC, 'js', 'embed-host.js'))).toBe(true);
+  });
+
+  test('route.type other than "embedded" is rejected', () => {
+    for (const type of ['external', 'iframe', 'EMBEDDED', '', null, undefined]) {
+      expect(Apps.normalizeApp(Object.assign({}, legalNsights, {
+        route: { type, url: 'https://legal.nsites.tech' }
+      }))).toBeNull();
+    }
+  });
+
+  test('non-https and unparseable urls are rejected — every one of them', () => {
+    for (const url of [
+      'http://legal.nsites.tech',
+      'javascript:alert(1)',
+      'data:text/html,<h1>x</h1>',
+      'file:///etc/passwd',
+      '//legal.nsites.tech',
+      'legal.nsites.tech',
+      '',
+      null,
+      undefined
+    ]) {
+      expect(Apps.normalizeApp(Object.assign({}, legalNsights, {
+        route: { type: 'embedded', url }
+      }))).toBeNull();
+    }
+  });
+
+  test('an embedded entry without a label is rejected', () => {
+    expect(Apps.normalizeApp(Object.assign({}, legalNsights, { label: '' }))).toBeNull();
+  });
+
+  test('a STRING route on an unknown app still cannot conjure a tile', () => {
+    // The embedded branch must not have loosened the original guard.
+    expect(Apps.normalizeApp({ id: 'legal-nsights', label: 'Fake', route: 'evil.html' })).toBeNull();
+  });
+
+  test('non-array colors and non-object meta normalize to safe defaults', () => {
+    const app = Apps.normalizeApp(Object.assign({}, legalNsights, {
+      colors: 'teal',
+      route: { type: 'embedded', url: 'https://legal.nsites.tech', meta: 'v1' }
+    }));
+    expect(app.colors).toEqual([]);
+    expect(app.embed.meta).toEqual({});
+  });
+
+  test('embedded entries ride normalizeAppList beside catalog and legacy ids', () => {
+    const list = Apps.normalizeAppList([
+      { id: '@insights', label: 'Insights', route: '/insights' },
+      legalNsights,
+      { id: '@voice', label: 'Voice', route: '/voice' }
+    ]);
+    expect(list.map((a) => a.id)).toEqual(['lana-insights', 'legal-nsights']);
+  });
+});
+
 describe('LanaClientApps.normalizeAppList', () => {
   test('drops unresolvable entries and keeps the resolvable ones', () => {
     const list = Apps.normalizeAppList([

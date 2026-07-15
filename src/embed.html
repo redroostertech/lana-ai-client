@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Embedded App - LANA AI</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111827'/%3E%3Cpath d='M22 16h8v25h15v7H22z' fill='white'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="css/tailwind-output.css">
+    <script src="js/tailwind-loader.js"></script>
+    <link rel="stylesheet" href="css/lex-tokens.css">
+    <!-- Match the universal shell bootstrap used by dashboard.html so the
+         shared sidebar has the same chat data and actions. -->
+    <script src="js/error-reporter.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/mock-data.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/utils/rename-conversation.js"></script>
+    <script src="js/components.js"></script>
+    <script src="js/version.js"></script>
+    <script src="js/menu.js"></script>
+    <script src="js/navigation-helpers.js"></script>
+    <script src="js/new-project-modal.js"></script>
+    <script src="js/conversation-menu.js"></script>
+    <script src="js/conversation-search-modal.js"></script>
+    <script src="js/contact-search-modal.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/app-catalog.js"></script>
+    <script src="js/embed-host.js"></script>
+  </head>
+  <body>
+    <!-- Generic host for embedded partner surfaces (docs/EMBEDDED-APPS-SPEC.md).
+         Which app renders here is decided by embed-host.js from the persisted
+         discovery payload; the ?app=<id> query names the app, never a URL. -->
+    <lex-app
+      id="embed-shell"
+      logo-src="img/logo-light.png"
+      logo-alt="LANA AI"
+      logo-href="dashboard.html"
+      page-title=""
+    ></lex-app>
+    <script>
+      // Seed the dynamic title + collapsed sidebar before Lex components
+      // register and upgrade <lex-app>.
+      window.LanaEmbedHost.primeShell(document.getElementById('embed-shell'));
+    </script>
+
+    <!-- Lex core must exist before any component destructures window.Lex. -->
+    <script src="js/lex/lex.core.js"></script>
+    <script src="js/lex/lex.icons.js"></script>
+    <script src="js/lex/lex.data.js"></script>
+    <script src="js/lex/lex.forms.js"></script>
+    <script src="js/lex/lex.state.js"></script>
+    <script src="js/lex/lex.utils.js"></script>
+    <script src="js/lex/lex.auth.js"></script>
+    <script src="js/lex/lex-nav.js"></script>
+    <script src="js/lex/index.js"></script>
+
+    <script src="js/lex/components/foundation/lex-toast.js"></script>
+    <script src="js/lex/components/layout/lex-sidebar.js"></script>
+    <script src="js/lex/components/layout/lex-topbar.js"></script>
+    <script src="js/lex/components/layout/lex-notification-panel.js"></script>
+    <script src="js/lex/components/layout/lex-app.js"></script>
+    <script src="js/sidebar-footer-hydrate.js"></script>
+    <script>
+      (function () {
+        var shell = document.getElementById('embed-shell');
+        if (!shell || !window.LanaEmbedHost) return;
+        var booted = false;
+        var boot = function () {
+          if (booted) return;
+          booted = true;
+          window.LanaEmbedHost.init(shell);
+        };
+        shell.addEventListener('lex-app-ready', boot, { once: true });
+        // If the shell upgraded before this script ran, the event already
+        // fired; mount as soon as the content element is queryable.
+        if (typeof shell.getContentEl === 'function' && shell.getContentEl()) boot();
+      })();
+    </script>
+  </body>
+</html>

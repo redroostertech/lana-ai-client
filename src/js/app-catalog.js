@@ -83,12 +83,70 @@
     return id;
   }
 
+  // Embedded surfaces may only ever frame remote https origins. javascript:,
+  // data:, http:, file:, and protocol-relative values must all fail here —
+  // this is one of the two gates (the embed host re-checks) that keep a
+  // discovery payload from framing arbitrary content.
+  function isHttpsUrl(value) {
+    if (typeof value !== 'string' || !value) return false;
+    try {
+      var parsed = new URL(value);
+      return parsed.protocol === 'https:' && !!parsed.hostname;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function normalizeApp(item) {
     if (!item) return null;
     var rawId = typeof item === 'string'
       ? item
       : (item.id || item.app_id || item.slug || item.key || '');
     var id = canonicalId(rawId);
+
+    var embeddedRoute = null;
+    if (typeof item === 'object' && item.route && typeof item.route === 'object') {
+      embeddedRoute = item.route;
+    } else if (
+      typeof item === 'object'
+      && item.embed
+      && typeof item.embed === 'object'
+      && item.route === 'embed.html?app=' + encodeURIComponent(id)
+    ) {
+      // Login persists normalized app entries so iframe consumers can use the
+      // same safe representation. Accept that representation on subsequent
+      // normalization passes, but only when its route is the exact generic
+      // host route derived from this id. This makes normalization idempotent
+      // without allowing a payload-selected string route.
+      embeddedRoute = item.embed;
+    }
+
+    // EMBEDDED SURFACES (docs/EMBEDDED-APPS-SPEC.md). A route OBJECT of type
+    // 'embedded' is the one sanctioned way a discovery payload may introduce
+    // an app this bundle does not know about: the tile always routes to the
+    // generic embed host (embed.html) — never to a payload-chosen file — and
+    // the host re-resolves this same payload before framing anything, so the
+    // query string carries only the app id. Bare discovery string routes keep
+    // the catalog-only rule below, unchanged.
+    if (embeddedRoute) {
+      var embedRoute = embeddedRoute;
+      if (embedRoute.type !== 'embedded') return null;
+      if (!isHttpsUrl(embedRoute.url)) return null;
+      if (!id || !item.label) return null;
+      return {
+        id: id,
+        label: item.label,
+        description: item.description || '',
+        colors: Array.isArray(item.colors) ? item.colors : [],
+        route: 'embed.html?app=' + encodeURIComponent(id),
+        embed: {
+          type: 'embedded',
+          url: embedRoute.url,
+          meta: (embedRoute.meta && typeof embedRoute.meta === 'object') ? embedRoute.meta : {}
+        }
+      };
+    }
+
     var base = CATALOG[id];
 
     // FAIL CLOSED. An id that does not resolve to a catalog entry has no page in
@@ -149,6 +207,7 @@
     catalog: CATALOG,
     aliases: ALIASES,
     canonicalId: canonicalId,
+    isHttpsUrl: isHttpsUrl,
     normalizeApp: normalizeApp,
     normalizeAppList: normalizeAppList,
     defaultApps: defaultApps

@@ -1272,6 +1272,45 @@
       // older control-plane payloads ('@insights') before alias resolution.
       const stripped = trimmed.charAt(0) === '@' ? trimmed.slice(1) : trimmed;
       const id = aliases[trimmed] || aliases[stripped] || stripped;
+
+      // Mirror LanaClientApps.normalizeApp's EMBEDDED branch (see
+      // docs/EMBEDDED-APPS-SPEC.md and app-catalog.js — keep in sync). Many
+      // shell pages (dashboard.html, admin/*) run this fallback because they
+      // never load app-catalog.js, so without this branch embedded partner
+      // tiles silently vanish exactly there. Route objects may only be
+      // 'embedded' + https, and the tile routes to the generic embed host
+      // with just the id — never to a payload-chosen target.
+      let embeddedRoute = null;
+      if (item && typeof item === 'object' && item.route && typeof item.route === 'object') {
+        embeddedRoute = item.route;
+      } else if (
+        item && typeof item === 'object' &&
+        item.embed && typeof item.embed === 'object' &&
+        item.route === 'embed.html?app=' + encodeURIComponent(id)
+      ) {
+        // Login persists the normalized form. Accept it on later passes only
+        // when the string route is the exact generic host route for this id.
+        embeddedRoute = item.embed;
+      }
+      if (embeddedRoute) {
+        const embedRoute = embeddedRoute;
+        if (embedRoute.type !== 'embedded') return null;
+        let httpsOk = false;
+        try {
+          const parsed = new URL(embedRoute.url);
+          httpsOk = parsed.protocol === 'https:' && !!parsed.hostname;
+        } catch (_) { httpsOk = false; }
+        if (!httpsOk) return null;
+        if (!id || !item.label) return null;
+        return {
+          id: id,
+          label: item.label,
+          description: item.description || '',
+          colors: Array.isArray(item.colors) ? item.colors : [],
+          route: 'embed.html?app=' + encodeURIComponent(id)
+        };
+      }
+
       const base = catalog[id];
       // Fail closed: no catalog entry means no page in this bundle. Do not let a
       // caller-supplied label+route conjure a tile that navigates into a blank page.
@@ -1286,19 +1325,18 @@
     /**
      * True when `href` points at a surface this bundle can actually render.
      *
-     * The app switcher may only navigate to routes that came out of the client
-     * app catalog. Anything else — notably a legacy control-plane route like
-     * '/insights', which is a URL path and not a file in this bundle — is
-     * treated as unrenderable so the caller can show a message instead of
-     * navigating into a blank page.
+     * The app switcher may only navigate to routes emitted by the fail-closed
+     * normalized item list: built-in catalog files or the generic embedded-app
+     * host. Anything else — notably a legacy control-plane route like
+     * '/insights' — is treated as unrenderable so the caller can show a message
+     * instead of navigating into a blank page.
      */
     _isRenderableAppHref(href) {
-      const catalog = this._getAppCatalog() || {};
-      const prefix = this._getAppPrefix();
-      return Object.keys(catalog).some((key) => {
-        const route = catalog[key] && catalog[key].route;
-        return route && (prefix + route) === href;
-      });
+      // _getAppItems is already the fail-closed boundary: built-in routes come
+      // from the catalog, while embedded routes can only be the generic host
+      // produced by the validated embedded descriptor. Checking that resolved
+      // list keeps the click gate aligned with what the switcher rendered.
+      return this._getAppItems().some((item) => item.href === href);
     }
 
     _notifyAppUnavailable(label) {
@@ -1353,6 +1391,12 @@
         || '';
       const items = this._getAppItems();
       const byId = (id) => items.find((it) => it.id === id);
+      if (path.indexOf('/embed.html') !== -1 || path.indexOf('embed.html') !== -1) {
+        try {
+          const embeddedId = new URLSearchParams(window.location.search || '').get('app');
+          if (embeddedId && byId(embeddedId)) return byId(embeddedId);
+        } catch (_) { /* fall through to the workspace */ }
+      }
       if (path.indexOf('/automation/') !== -1) return byId('lana-automations') || items[0];
       if (
         path.indexOf('/admin/analytics.html') !== -1 ||

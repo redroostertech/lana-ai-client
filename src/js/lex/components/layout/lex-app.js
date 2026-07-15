@@ -294,6 +294,7 @@
         logoHref:     { type: String,  default: 'dashboard.html' },
         loading:      { type: Boolean, default: false },
         sidebarOpen:  { type: Boolean, default: false, reflect: true },
+        sidebarCollapsed: { type: Boolean, default: false, reflect: true },
         chrome:       { type: String,  default: 'full', reflect: true },
         backHref:     { type: String,  default: '' },
         backLabel:    { type: String,  default: 'Back' }
@@ -332,6 +333,7 @@
 
     _buildShell() {
       const embedded = this.chrome === 'embedded';
+      const sidebarCollapsedAttr = this.sidebarCollapsed ? ' collapsed' : '';
       const topbarBackAttrs = embedded
         ? ` show-back back-label="${this.escapeHtml(this.backLabel)}" back-href="${this.escapeHtml(this.backHref)}"`
         : '';
@@ -344,6 +346,7 @@
           logo-alt="${this.escapeHtml(this.logoAlt)}"
           logo-href="${this.escapeHtml(this.logoHref)}"
           active-id="${this.escapeHtml(this.activeNavId)}"
+          ${sidebarCollapsedAttr}
         ></lex-sidebar>
 
         <lex-body>
@@ -510,6 +513,11 @@
       if (changedProps.has('sidebarOpen')) {
         const sidebar = this.$('lex-sidebar');
         if (sidebar) sidebar.open = this.sidebarOpen;
+      }
+
+      if (changedProps.has('sidebarCollapsed')) {
+        const sidebar = this.$('lex-sidebar');
+        if (sidebar) sidebar.collapsed = this.sidebarCollapsed;
       }
 
       if (changedProps.has('loading')) {
