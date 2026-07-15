@@ -1,7 +1,7 @@
 # Embedded Apps — `route` Object Support in the App Catalog
 
 **Status:** Implemented
-**Version:** 2.0
+**Version:** 2.1
 **Last Updated:** 2026-07-15
 **Applies to:** Frontend (lana-client) plus a control-plane schema capable of preserving route objects
 **Driving use case:** Legal NSights analytics (partner surface, single-customer rollout via `enabled_apps`)
@@ -29,9 +29,12 @@ ships in the client. The discovery endpoint already carries app objects, but
 the control-plane Organization schema must preserve an object route (rather
 than casting it as a string) before the client can receive it.
 
-For Legal NSights, the generic host does not frame the discovery URL directly.
-It first asks Lana's authenticated backend for a ten-minute partner session;
-the backend signs the Legal JWT and returns the chrome-less dashboard URL.
+The generic host does not frame the discovery URL directly. It first asks
+Lana's authenticated backend for a short-lived partner session. That backend
+proxies the request with its existing deployment identity to the control-plane
+broker. The broker verifies the app is assigned in the same discovery record,
+mints centrally, and returns the partner URL. Legal NSights is the first
+registered partner, not a hardcoded client or installation-backend case.
 
 ## 2. Non-goals
 
@@ -70,7 +73,7 @@ the backend signs the Legal JWT and returns the chrome-less dashboard URL.
 | `description` | Optional. |
 | `route.type` | Required. v2 recognizes exactly `"embedded"`. Any other value → entry dropped (fail closed, same philosophy as today). |
 | `route.url` | Required. Must parse as a URL with protocol exactly `https:`. Anything else (http:, javascript:, file:, protocol-relative, unparseable) → entry dropped. |
-| `route.meta` | Optional object. `dashboard` selects a documented partner dashboard slug; the backend validates it against its own allowlist. Other keys remain opaque. |
+| `route.meta` | Optional object. `dashboard` selects the requested partner resource; the backend validates it against the organization/app registry allowlist. Other keys remain opaque. |
 | `colors` | Optional array, same handling as today (non-array → `[]`). |
 
 ### 3.3 Normalized output
@@ -163,9 +166,11 @@ One host page shipped with the bundle, serving **all** embedded apps:
    re-validated payload. (This is what keeps `embed.html` from being an open
    redirect/framing primitive.)
 3. Call authenticated Lana API
-   `POST /api/v1/partner-embeds/<app-id>/session` with the dashboard slug. The
-   backend derives `user_id` and `firm_id` from authenticated server context,
-   signs an HS256 JWT with a ten-minute lifetime, and returns the full embed URL.
+   `POST /api/v1/partner-embeds/<app-id>/session` with the dashboard/resource.
+   The backend derives organization and user claims from authenticated server
+   context and calls the control-plane broker with its deployment token. The
+   broker validates the app against discovery and mints with its encrypted,
+   centrally managed credential.
 4. Validate that the returned URL is HTTPS, remains on the exact
    discovery-approved origin, begins with `/embed/`, and contains a token.
 5. Render standard shell chrome (collapsed sidebar, so the user can leave) and mount:
@@ -216,14 +221,18 @@ top-level navigation, so the existing navigation allowlist is unaffected.
    a URL from a discovery payload and load it.
 4. The embed URL must never be string-concatenated into HTML. Set `iframe.src`
    via DOM property assignment.
-5. The signing secret exists only in backend environment configuration. Missing
-   or weak secret configuration returns a fail-closed 503; unsigned JWTs are
-   never minted.
+5. Partner credentials live only in the control plane's encrypted deployment
+   secrets vault. A credential is enrolled once for an app (with an optional
+   per-organization override); it is neither copied to each Lana installation
+   nor represented by per-app environment variables. Missing, corrupt, weak,
+   or scope-mismatched credentials fail closed; unsigned JWTs are never minted.
 6. The renderer supplies neither `firm_id` nor user claims. The backend derives
    them from authenticated Lana context and may apply a deployment-owned firm
    mapping.
-7. JWTs use HS256 with explicit issuer, audience, jti, iat, nbf, and a ten-minute
-   expiry. API responses use `Cache-Control: no-store` and never log the token.
+7. The control plane's first provider adapter uses algorithm-pinned HS256,
+   configurable claim names, optional issuer/audience, jti, iat, nbf, and a
+   maximum 15-minute expiry. API responses use `Cache-Control: no-store` and
+   never log the token.
 8. No long-lived AI credential is included in the signed claims.
 
 ## 6. Compatibility
