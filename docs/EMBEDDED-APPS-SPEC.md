@@ -167,10 +167,11 @@ One host page shipped with the bundle, serving **all** embedded apps:
    redirect/framing primitive.)
 3. Call authenticated Lana API
    `POST /api/v1/partner-embeds/<app-id>/session` with the dashboard/resource.
-   The backend derives organization and user claims from authenticated server
-   context and calls the control-plane broker with its deployment token. The
-   broker validates the app against discovery and mints with its encrypted,
-   centrally managed credential.
+   The backend authenticates the real user locally, keeps that identity in the
+   box audit, and calls the control-plane broker with only the resource and its
+   deployment token. The broker validates the app against discovery, derives
+   the organization, generates an opaque per-session partner user id, and mints
+   with its encrypted centrally managed credential.
 4. Validate that the returned URL is HTTPS, remains on the exact
    discovery-approved origin, begins with `/embed/`, and contains a token.
 5. Render standard shell chrome (collapsed sidebar, so the user can leave) and mount:
@@ -226,9 +227,9 @@ top-level navigation, so the existing navigation allowlist is unaffected.
    per-organization override); it is neither copied to each Lana installation
    nor represented by per-app environment variables. Missing, corrupt, weak,
    or scope-mismatched credentials fail closed; unsigned JWTs are never minted.
-6. The renderer supplies neither `firm_id` nor user claims. The backend derives
-   them from authenticated Lana context and may apply a deployment-owned firm
-   mapping.
+6. The renderer supplies neither `firm_id` nor user claims. The control plane
+   derives `firm_id` from deployment identity and generates an opaque session
+   subject. Real Lana user identity never leaves the box.
 7. The control plane's first provider adapter uses algorithm-pinned HS256,
    configurable claim names, optional issuer/audience, jti, iat, nbf, and a
    maximum 15-minute expiry. API responses use `Cache-Control: no-store` and
