@@ -1466,14 +1466,10 @@ app.whenReady().then(async () => {
     callback({ requestHeaders: details.requestHeaders });
   });
 
+  const { addMissingCorsHeaders } = require('./electron-cors');
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Access-Control-Allow-Origin': ['*'],
-        'Access-Control-Allow-Methods': ['GET, POST, PUT, DELETE, OPTIONS'],
-        'Access-Control-Allow-Headers': ['Content-Type, Authorization']
-      }
+      responseHeaders: addMissingCorsHeaders(details.responseHeaders)
     });
   });
 
