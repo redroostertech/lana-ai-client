@@ -234,7 +234,11 @@ function setCapabilityPreference(server, capabilityId, active) {
 }
 
 function currentCapabilityViewModels(server = getSavedServer()) {
-  return capabilityViewModels(server, getCapabilityPreferences(server), process.platform);
+  return capabilityViewModels(server, getCapabilityPreferences(server), process.platform).map((capability) => (
+    capability.id === SCREEN_DICTION_APP_ID
+      ? { ...capability, openAtLogin: Boolean(screenVoice?.getSettings().openAtLogin) }
+      : capability
+  ));
 }
 
 function syncScreenVoiceEntitlement(server = getSavedServer()) {
@@ -246,6 +250,38 @@ function syncScreenVoiceEntitlement(server = getSavedServer()) {
   );
   if (screenVoice) screenVoice.setEntitlementEnabled(enabled);
   return enabled;
+}
+
+async function syncScreenVoiceAuthentication(window = mainWindow) {
+  if (!screenVoice || !window || window.isDestroyed()) return false;
+  let authenticated = false;
+  try {
+    // Return only a boolean across the process boundary. The bearer token is
+    // never copied into main-process state or logs.
+    authenticated = await window.webContents.executeJavaScript(`(() => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return false;
+        if (token.indexOf('demo-token-') === 0) return true;
+        const parts = token.split('.');
+        if (parts.length !== 3) return false;
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return !payload.exp || payload.exp * 1000 > Date.now();
+      } catch (_) { return false; }
+    })()`, true);
+  } catch (_) {
+    authenticated = false;
+  }
+  if (window === mainWindow && !window.isDestroyed()) {
+    screenVoice.setAuthenticated(authenticated === true);
+  }
+  return authenticated === true;
+}
+
+function watchScreenVoiceAuthentication(window) {
+  window.webContents.on('did-finish-load', () => {
+    syncScreenVoiceAuthentication(window).catch(() => {});
+  });
 }
 
 // Session tracker instance
@@ -400,6 +436,7 @@ function createWindow(serverUrl = null) {
     },
     show: false // Don't show until ready (prevents flash of white screen)
   });
+  watchScreenVoiceAuthentication(mainWindow);
 
   // Load the v2 dashboard as the entry point
   const startUrl = createFileUrl(path.join(__dirname, 'public_html/dashboard.html'));
@@ -491,6 +528,7 @@ function createLoginWindow() {
     frame: true,
     titleBarStyle: 'default'
   });
+  watchScreenVoiceAuthentication(mainWindow);
 
   // Load login page directly
   const loginUrl = createFileUrl(path.join(__dirname, 'public_html/login.html'));
@@ -864,6 +902,24 @@ ipcMain.handle('capabilities:set-active', async (_event, payload) => {
   } catch (error) {
     logError('[Capabilities] Failed to update capability', error);
     return { success: false, error: 'The capability setting could not be saved.' };
+  }
+});
+
+ipcMain.handle('capabilities:set-open-at-login', async (_event, payload) => {
+  try {
+    const server = getSavedServer();
+    const entitled = capabilityItems(server).some((item) => (
+      String(item.id || item.app_id || item.slug || item.key || '').trim() === SCREEN_DICTION_APP_ID
+    ));
+    if (!entitled) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
+    if (!screenVoice || typeof payload?.openAtLogin !== 'boolean') {
+      return { success: false, error: 'Open at Login is not available on this platform.' };
+    }
+    screenVoice.setOpenAtLogin(payload.openAtLogin);
+    return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels(server) };
+  } catch (error) {
+    logError('[Capabilities] Failed to update Open at Login', error);
+    return { success: false, error: 'Open at Login could not be saved.' };
   }
 });
 

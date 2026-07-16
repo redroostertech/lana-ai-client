@@ -58,7 +58,7 @@
     return capability.active ? 'Active on this device' : 'Off on this device';
   }
 
-  function renderCapability(capability, onChange) {
+  function renderCapability(capability, onChange, onOpenAtLoginChange) {
     var row = element('article', 'sv2-capability');
     var heading = element('div', 'sv2-capability-heading');
     var copy = element('div', 'sv2-capability-copy');
@@ -85,6 +85,27 @@
     heading.appendChild(copy);
     heading.appendChild(selectWrap);
     row.appendChild(heading);
+
+    if (capability.id === 'screen-diction') {
+      var startup = element('div', 'sv2-capability-option');
+      var startupCopy = element('div', 'sv2-capability-option-copy');
+      startupCopy.appendChild(element('span', 'sv2-capability-option-name', 'Open at Login'));
+      startupCopy.appendChild(element('span', 'sv2-capability-option-description',
+        'Show Screen Dictation after you sign in. When off, use a configured shortcut to open it.'));
+      var toggleLabel = element('label', 'sv2-capability-toggle');
+      var toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.checked = Boolean(capability.openAtLogin);
+      toggle.disabled = !capability.active || !capability.available;
+      toggle.setAttribute('aria-label', 'Open Screen Dictation at login');
+      toggle.addEventListener('change', function () { onOpenAtLoginChange(capability, toggle); });
+      toggleLabel.appendChild(toggle);
+      toggleLabel.appendChild(element('span', 'sv2-capability-toggle-track'));
+      startup.appendChild(startupCopy);
+      startup.appendChild(toggleLabel);
+      row.appendChild(startup);
+    }
+
     renderHints(row, capability.hints);
     return row;
   }
@@ -109,7 +130,7 @@
         return;
       }
       capabilities.forEach(function (capability) {
-        list.appendChild(renderCapability(capability, update));
+        list.appendChild(renderCapability(capability, update, updateOpenAtLogin));
       });
     }
 
@@ -126,6 +147,23 @@
         select.value = capability.active ? 'active' : 'off';
         select.disabled = capability.required || !capability.available;
         status.textContent = error.message || 'The capability setting could not be saved.';
+        notify('error', status.textContent);
+      });
+    }
+
+    function updateOpenAtLogin(capability, toggle) {
+      var requested = toggle.checked;
+      toggle.disabled = true;
+      status.textContent = 'Saving Open at Login...';
+      window.electronAPI.capabilities.setOpenAtLogin(requested).then(function (result) {
+        if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'Setting could not be saved.');
+        render(Array.isArray(result.capabilities) ? result.capabilities : []);
+        status.textContent = '';
+        notify('success', 'Open at Login ' + (requested ? 'enabled' : 'disabled'));
+      }).catch(function (error) {
+        toggle.checked = Boolean(capability.openAtLogin);
+        toggle.disabled = !capability.active || !capability.available;
+        status.textContent = error.message || 'Open at Login could not be saved.';
         notify('error', status.textContent);
       });
     }

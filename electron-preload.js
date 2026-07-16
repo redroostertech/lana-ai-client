@@ -58,7 +58,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /** Discovery-entitled native/background capabilities. */
   capabilities: {
     list: () => ipcRenderer.invoke('capabilities:list'),
-    setActive: (id, active) => ipcRenderer.invoke('capabilities:set-active', { id, active })
+    setActive: (id, active) => ipcRenderer.invoke('capabilities:set-active', { id, active }),
+    setOpenAtLogin: (openAtLogin) => ipcRenderer.invoke('capabilities:set-open-at-login', { openAtLogin })
   },
 
   /**

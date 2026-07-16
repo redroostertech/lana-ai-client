@@ -96,7 +96,7 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.controller.state).toBe('error');
   });
 
-  test('discovery entitlement controls overlay and global shortcuts at runtime', () => {
+  test('voice remains unavailable until authenticated and Open at Login is opt-in', () => {
     const manager = managerWith({ api: {}, adapter: {} });
     const testOverlay = manager.overlay;
     manager.initialize();
@@ -104,10 +104,17 @@ describe('Electron screen voice orchestration', () => {
     expect(testOverlay.showInactive).not.toHaveBeenCalled();
 
     manager.setEntitlementEnabled(true);
+    expect(globalShortcut.register).not.toHaveBeenCalled();
+    expect(testOverlay.showInactive).not.toHaveBeenCalled();
+
+    manager.setAuthenticated(true);
     expect(globalShortcut.register).toHaveBeenCalledTimes(2);
+    expect(testOverlay.showInactive).not.toHaveBeenCalled();
+
+    manager.setOpenAtLogin(true);
     expect(testOverlay.showInactive).toHaveBeenCalled();
 
-    manager.setEntitlementEnabled(false);
+    manager.setAuthenticated(false);
     expect(globalShortcut.unregister).toHaveBeenCalled();
     expect(testOverlay.destroy).toHaveBeenCalled();
   });
@@ -118,11 +125,28 @@ describe('Electron screen voice orchestration', () => {
       return true;
     });
     const manager = managerWith({ api: {}, adapter: {} });
-    const testOverlay = manager.overlay;
+    manager.setAuthenticated(true);
     expect(() => manager.setEntitlementEnabled(true)).not.toThrow();
     expect(globalShortcut.register).toHaveBeenCalledWith(
       'CommandOrControl+Shift+Space', expect.any(Function)
     );
+  });
+
+  test('with Open at Login off, the authenticated dictation shortcut opens listening', async () => {
+    const manager = managerWith({ api: {}, adapter: {
+      permissionStatus: jest.fn(async () => ({ accessibility: true })),
+      getTarget: jest.fn(async () => context)
+    } });
+    const testOverlay = manager.overlay;
+    manager.setAuthenticated(true);
+    manager.setEntitlementEnabled(true);
+    expect(testOverlay.showInactive).not.toHaveBeenCalled();
+
+    const registration = globalShortcut.register.mock.calls.find((call) => (
+      call[0] === 'CommandOrControl+Shift+Space'
+    ));
+    await registration[1]();
+    expect(manager.controller.state).toBe('listening');
     expect(testOverlay.showInactive).toHaveBeenCalled();
   });
 });

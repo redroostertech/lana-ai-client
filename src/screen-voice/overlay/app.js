@@ -142,6 +142,7 @@
     $('dictationShortcut').value = settings.dictationShortcut || '';
     $('agentShortcut').value = settings.agentShortcut || '';
     $('defaultMode').value = settings.defaultMode || 'dictation';
+    $('openAtLogin').checked = Boolean(settings.openAtLogin);
     $('screenContextEnabled').checked = settings.screenContextEnabled !== false;
     $('voiceOutputEnabled').checked = Boolean(settings.voiceOutputEnabled);
     $('confirmationPolicy').value = settings.confirmationPolicy || 'risk_based';
@@ -167,6 +168,7 @@
     await window.screenVoice.saveSettings({ ...snapshot.settings,
       dictationShortcut: $('dictationShortcut').value.trim(), agentShortcut: $('agentShortcut').value.trim(),
       defaultMode: $('defaultMode').value,
+      openAtLogin: $('openAtLogin').checked,
       screenContextEnabled: $('screenContextEnabled').checked,
       voiceOutputEnabled: $('voiceOutputEnabled').checked,
       confirmationPolicy: $('confirmationPolicy').value });

@@ -55,6 +55,8 @@ string labels and values. The client bounds keys and values before rendering.
 - Settings > Capabilities lists every discovery capability and stores optional
   activation preferences locally per organization and device. A local setting
   can turn an entitlement off; it can never create an entitlement.
+- Screen Dictation also exposes an `Open at Login` device preference. It never
+  opens or registers global shortcuts on the unauthenticated login screen.
 - Startup without the capability creates no overlay and registers no global
   shortcuts. Discovery refreshes enable or disable it without an app restart.
 - Unknown route types and unknown capability ids remain inert.

@@ -54,6 +54,7 @@ describe('screen voice contracts and safety helpers', () => {
 
   test('merges validated defaults for settings', () => {
     expect(parseSettings({ screenContextEnabled: false })).toEqual({ ...DEFAULT_SETTINGS, screenContextEnabled: false });
+    expect(parseSettings({}).openAtLogin).toBe(false);
   });
 
   test('migrates the Electron-incompatible legacy agent accelerator', () => {

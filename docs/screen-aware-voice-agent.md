@@ -74,6 +74,11 @@ If access is denied, the overlay shows an actionable error and performs no mutat
 
 - Dictation shortcut: `CommandOrControl+Shift+Space`.
 - Agent shortcut: `CommandOrControl+Shift+A`.
+- Voice shortcuts and the overlay are unavailable until the main renderer has a
+  valid authenticated session. Signing out cancels active capture, unregisters
+  shortcuts, and destroys the overlay.
+- `Open at Login` defaults off. When enabled, the Ready overlay opens after a
+  successful sign-in; otherwise it stays hidden until a shortcut is pressed.
 - The global shortcuts toggle capture because Electron does not expose a reliable global key-up event. The overlay microphone provides explicit start/stop. A native key-up monitor is intentionally not installed in this release.
 - Escape cancels and discards active audio.
 - Literal dictation into a verified editable field inserts without confirmation.

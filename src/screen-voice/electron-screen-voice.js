@@ -63,6 +63,7 @@ class ElectronScreenVoice {
     this.lastContext = null;
     this.previewDecision = null;
     this.entitlementEnabled = Boolean(options.entitlementEnabled);
+    this.authenticated = Boolean(options.authenticated);
     this.controller.on('state', (snapshot) => this.sendState(snapshot));
   }
 
@@ -151,10 +152,47 @@ class ElectronScreenVoice {
       this.logInfo('[ScreenVoice] Capability is not enabled for this organization');
       return;
     }
-    this.createOverlay();
+    if (!this.authenticated) {
+      this.logInfo('[ScreenVoice] Waiting for an authenticated session');
+      return;
+    }
     this.registerShortcuts();
-    this.showOverlay();
-    this.sendState();
+    if (this.settings.openAtLogin) {
+      this.showOverlay();
+      this.sendState();
+    }
+  }
+
+  setAuthenticated(authenticated) {
+    const next = Boolean(authenticated);
+    if (next === this.authenticated) return { authenticated: next, changed: false };
+    this.authenticated = next;
+
+    if (next) {
+      if (this.entitlementEnabled) {
+        this.registerShortcuts();
+        if (this.settings.openAtLogin) {
+          this.showOverlay();
+          this.sendState();
+        }
+        this.logInfo('[ScreenVoice] Authenticated session available');
+      } else {
+        this.logInfo('[ScreenVoice] Authenticated; capability is not enabled');
+      }
+    } else {
+      this.deactivateHost('signed_out');
+      this.logInfo('[ScreenVoice] Voice controls unavailable while signed out');
+    }
+    return { authenticated: next, changed: true };
+  }
+
+  deactivateHost(reason) {
+    this.send('screen-voice:stop-capture', { discard: true });
+    this.controller.cancel(reason);
+    this.unregisterShortcut(this.settings.dictationShortcut);
+    this.unregisterShortcut(this.settings.agentShortcut);
+    if (this.overlay && !this.overlay.isDestroyed()) this.overlay.destroy();
+    this.overlay = null;
   }
 
   setEntitlementEnabled(enabled) {
@@ -163,18 +201,18 @@ class ElectronScreenVoice {
     this.entitlementEnabled = next;
 
     if (next) {
-      this.createOverlay();
-      this.registerShortcuts();
-      this.showOverlay();
-      this.sendState();
-      this.logInfo('[ScreenVoice] Capability enabled by discovery');
+      if (this.authenticated) {
+        this.registerShortcuts();
+        if (this.settings.openAtLogin) {
+          this.showOverlay();
+          this.sendState();
+        }
+        this.logInfo('[ScreenVoice] Capability enabled by discovery');
+      } else {
+        this.logInfo('[ScreenVoice] Capability enabled; waiting for authentication');
+      }
     } else {
-      this.send('screen-voice:stop-capture', { discard: true });
-      this.controller.cancel('capability_disabled');
-      this.unregisterShortcut(this.settings.dictationShortcut);
-      this.unregisterShortcut(this.settings.agentShortcut);
-      if (this.overlay && !this.overlay.isDestroyed()) this.overlay.destroy();
-      this.overlay = null;
+      this.deactivateHost('capability_disabled');
       this.logInfo('[ScreenVoice] Capability disabled by discovery');
     }
     return { enabled: next, changed: true };
@@ -183,7 +221,7 @@ class ElectronScreenVoice {
   registerShortcuts() {
     this.unregisterShortcut(this.settings.dictationShortcut);
     this.unregisterShortcut(this.settings.agentShortcut);
-    if (!this.entitlementEnabled || !this.settings.enabled) return;
+    if (!this.entitlementEnabled || !this.authenticated || !this.settings.enabled) return;
     const register = (shortcut, mode) => {
       try {
         if (!globalShortcut.register(shortcut, () => this.toggle(mode, 'global_shortcut'))) {
@@ -235,6 +273,9 @@ class ElectronScreenVoice {
     try {
       if (!this.entitlementEnabled) {
         const error = new Error(); error.code = 'FEATURE_NOT_ENABLED'; throw error;
+      }
+      if (!this.authenticated) {
+        const error = new Error(); error.code = 'AUTH_REQUIRED'; throw error;
       }
       const mic = await this.microphonePermission(false);
       if (['denied', 'restricted'].includes(mic.microphoneStatus)) {
@@ -365,8 +406,26 @@ class ElectronScreenVoice {
   saveSettings(value) {
     this.settings = parseSettings(value);
     Object.entries(this.settings).forEach(([key, item]) => this.settingsStore.set(key, item));
-    this.registerShortcuts(); this.sendState();
+    this.registerShortcuts();
+    if (!this.settings.openAtLogin && this.controller.state === 'idle') this.overlay?.hide();
+    this.sendState();
     return { ok: true, settings: this.settings };
+  }
+
+  getSettings() {
+    return { ...this.settings };
+  }
+
+  setOpenAtLogin(enabled) {
+    this.settings = parseSettings({ ...this.settings, openAtLogin: Boolean(enabled) });
+    this.settingsStore.set('openAtLogin', this.settings.openAtLogin);
+    if (this.settings.openAtLogin && this.authenticated && this.entitlementEnabled) {
+      this.showOverlay();
+      this.sendState();
+    } else if (!this.settings.openAtLogin && this.controller.state === 'idle') {
+      this.overlay?.hide();
+    }
+    return { ok: true, openAtLogin: this.settings.openAtLogin };
   }
 
   shutdown() {

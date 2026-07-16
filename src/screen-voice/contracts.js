@@ -99,6 +99,7 @@ const agentDecisionSchema = z.object({
 
 const voiceSettingsSchema = z.object({
   enabled: z.boolean(),
+  openAtLogin: z.boolean(),
   dictationShortcut: z.string().min(1).max(80),
   agentShortcut: z.string().min(1).max(80),
   defaultMode: z.enum(['dictation', 'agent']),
@@ -110,6 +111,7 @@ const voiceSettingsSchema = z.object({
 
 const DEFAULT_SETTINGS = Object.freeze({
   enabled: true,
+  openAtLogin: false,
   dictationShortcut: 'CommandOrControl+Shift+Space',
   agentShortcut: 'CommandOrControl+Shift+A',
   defaultMode: 'dictation',
