@@ -121,8 +121,8 @@ function saveServerConnection(server) {
       url: server.url || `http://${server.host}:${server.port}`,
       host: server.host,
       port: server.port,
-      // Public domain (e.g. "redrooster.lanaai.io"); needed to re-call
-      // hosted discovery on logout for background refresh.
+      // Public domain (e.g. "redrooster.lanaai.io"); needed to refresh hosted
+      // discovery on subsequent launches without requiring another login.
       domain: server.domain || null,
       orgId: server.orgId,
       orgName: server.orgName,

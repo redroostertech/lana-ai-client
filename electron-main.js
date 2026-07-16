@@ -38,7 +38,7 @@ const packageJson = require('./package.json');
 app.setVersion(packageJson.version);
 
 // Import thin client modules
-const { verifyServer } = require('./electron-discovery');
+const { refreshHostedDiscovery, verifyServer } = require('./electron-discovery');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled } = require('./electron-storage');
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
@@ -1717,13 +1717,25 @@ app.whenReady().then(async () => {
   if (savedServer) {
     logInfo(`Found saved server: ${savedServer.orgName || savedServer.orgId}`);
 
-    // Verify server is still reachable
-    const isReachable = await verifyServer(savedServer.url);
+    // Refresh hosted discovery on every launch so enabled_apps, capability
+    // entitlements, tier, and service metadata do not remain stale for users
+    // whose authenticated session bypasses login.html. Run this beside health
+    // verification to avoid adding another serial startup delay.
+    const [isReachable, refreshedServer] = await Promise.all([
+      verifyServer(savedServer.url),
+      refreshHostedDiscovery(savedServer)
+    ]);
+
+    const effectiveServer = refreshedServer || savedServer;
+    if (refreshedServer) {
+      saveServerConnection(refreshedServer);
+      syncScreenVoiceEntitlement(refreshedServer);
+    }
 
     if (isReachable) {
       logInfo('[electron-main] Saved server is reachable, loading main app...');
       updateLastVerified();
-      createWindow(savedServer.url);
+      createWindow(effectiveServer.url);
       return;
     } else {
       logInfo('[electron-main] Saved server is not reachable, clearing saved server and showing login...');
