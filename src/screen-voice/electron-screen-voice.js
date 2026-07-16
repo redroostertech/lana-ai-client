@@ -53,6 +53,13 @@ function publicError(error) {
   return { code, message: messages[code] || error?.message || 'Voice action could not be completed.' };
 }
 
+function fingerprintDifferenceLabels(expected = {}, actual = {}) {
+  const labels = ['processId', 'bundleId', 'processName', 'windowTitle', 'role', 'name']
+    .filter((key) => expected[key] !== actual[key]);
+  if (JSON.stringify(expected.bounds || null) !== JSON.stringify(actual.bounds || null)) labels.push('bounds');
+  return labels.join(',') || 'unknown';
+}
+
 class ElectronScreenVoice {
   constructor(options = {}) {
     this.getMainWindow = options.getMainWindow;
@@ -492,9 +499,20 @@ class ElectronScreenVoice {
       this.lastContext = await this.adapter.getTarget();
       const cached = this.revealTarget;
       const cachedIsFresh = cached && Date.now() - cached.capturedAt < 5 * 60 * 1000;
-      if (this.lastContext?.processId === process.pid && cachedIsFresh && cached.context?.focusedElement?.isEditable) {
+      if (this.lastContext?.processId === process.pid && cachedIsFresh) {
         await this.adapter.activate(cached.context.targetFingerprint);
         this.lastContext = await this.adapter.getTarget();
+      }
+      if (['', 'AXWebArea', 'AXGroup'].includes(this.lastContext.focusedElement?.role || '')) {
+        await this.sleep(120);
+        const refined = await this.adapter.getTarget();
+        const sameApplication = fingerprintsMatch(this.lastContext.targetFingerprint, refined.targetFingerprint, {
+          allowDynamicWindowTitle: true, boundsTolerance: Number.MAX_SAFE_INTEGER
+        }) || Boolean(
+          this.lastContext.processId && refined.processId && this.lastContext.processId === refined.processId
+          && (!this.lastContext.bundleId || !refined.bundleId || this.lastContext.bundleId === refined.bundleId)
+        );
+        if (sameApplication && refined.focusedElement?.role) this.lastContext = refined;
       }
       this.logInfo(`[ScreenVoice] Target role=${this.lastContext.focusedElement?.role || 'unknown'} editable=${Boolean(this.lastContext.focusedElement?.isEditable)}`);
       if (this.lastContext.focusedElement.isPassword) { const error = new Error(); error.code = 'secure_field'; throw error; }
@@ -544,8 +562,12 @@ class ElectronScreenVoice {
 
   async runAgent(instruction) {
     this.controller.transition('gathering_context');
+    await this.adapter.activate(this.controller.session.target);
     let context = await this.adapter.getContext({ maxChars: this.settings.screenContextEnabled ? 12000 : 1000 });
-    if (!fingerprintsMatch(this.controller.session.target, context.targetFingerprint)) {
+    if (!fingerprintsMatch(this.controller.session.target, context.targetFingerprint, {
+      allowDynamicWindowTitle: true, boundsTolerance: 24
+    })) {
+      this.logError(`[ScreenVoice] Target fingerprint changed fields=${fingerprintDifferenceLabels(this.controller.session.target, context.targetFingerprint)}`);
       const error = new Error(); error.code = 'TARGET_CHANGED'; throw error;
     }
     if (!this.settings.screenContextEnabled) context = { ...context,

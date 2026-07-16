@@ -110,6 +110,47 @@ static BOOL AXSettable(AXUIElementRef element, CFStringRef name) {
   return element && AXUIElementIsAttributeSettable(element, name, &settable) == kAXErrorSuccess && settable;
 }
 
+static BOOL AXPotentiallyEditable(AXUIElementRef element) {
+  NSString *role = AXString(element, kAXRoleAttribute);
+  NSSet *roles = [NSSet setWithArray:@[@"AXTextField", @"AXTextArea", @"AXComboBox", @"AXDocument"]];
+  return [roles containsObject:role] || AXSettable(element, kAXSelectedTextAttribute) || AXSettable(element, kAXValueAttribute);
+}
+
+static id AXFindFocusedEditable(id elementObj, NSUInteger depth, NSUInteger *budget) {
+  if (!elementObj || depth > 10 || !budget || *budget == 0) return nil;
+  *budget -= 1;
+  AXUIElementRef element = AXElement(elementObj);
+  id nested = AXGet(element, kAXFocusedUIElementAttribute);
+  if (nested && !CFEqual((__bridge CFTypeRef)nested, (__bridge CFTypeRef)elementObj)) {
+    id found = AXFindFocusedEditable(nested, depth + 1, budget);
+    if (found) return found;
+  }
+  id focused = AXGet(element, kAXFocusedAttribute);
+  if ([focused respondsToSelector:@selector(boolValue)] && [focused boolValue] && AXPotentiallyEditable(element)) {
+    return elementObj;
+  }
+  id children = AXGet(element, kAXChildrenAttribute);
+  if (![children isKindOfClass:NSArray.class]) return nil;
+  for (id child in (NSArray *)children) {
+    id found = AXFindFocusedEditable(child, depth + 1, budget);
+    if (found) return found;
+    if (*budget == 0) break;
+  }
+  return nil;
+}
+
+static id AXResolvedFocusedElement(AXUIElementRef app) {
+  id focused = AXGet(app, kAXFocusedUIElementAttribute);
+  if (!focused) {
+    AXUIElementRef system = AXUIElementCreateSystemWide();
+    focused = AXGet(system, kAXFocusedUIElementAttribute);
+    CFRelease(system);
+  }
+  if (!focused || AXPotentiallyEditable(AXElement(focused))) return focused;
+  NSUInteger budget = 320;
+  return AXFindFocusedEditable(focused, 0, &budget) ?: focused;
+}
+
 static NSString *Digest(NSString *value) {
   if (!value.length) return nil;
   NSData *data = [value dataUsingEncoding:NSUTF8StringEncoding];
@@ -137,13 +178,9 @@ static NSDictionary *CurrentContext(NSString **errorCode, BOOL includeContent) {
   // This is scoped to the active application and lets focused DOM inputs be
   // represented as AXTextField/AXTextArea instead of the surrounding web area.
   AXUIElementSetAttributeValue(app, CFSTR("AXManualAccessibility"), kCFBooleanTrue);
+  AXUIElementSetAttributeValue(app, CFSTR("AXEnhancedUserInterface"), kCFBooleanTrue);
   id windowObj = AXGet(app, kAXFocusedWindowAttribute);
-  id focusedObj = AXGet(app, kAXFocusedUIElementAttribute);
-  if (!focusedObj) {
-    AXUIElementRef system = AXUIElementCreateSystemWide();
-    focusedObj = AXGet(system, kAXFocusedUIElementAttribute);
-    CFRelease(system);
-  }
+  id focusedObj = AXResolvedFocusedElement(app);
   AXUIElementRef window = AXElement(windowObj);
   AXUIElementRef focused = AXElement(focusedObj);
   NSString *role = AXString(focused, kAXRoleAttribute);
@@ -155,9 +192,7 @@ static NSDictionary *CurrentContext(NSString **errorCode, BOOL includeContent) {
   NSString *sensitiveName = [NSString stringWithFormat:@"%@ %@ %@", role, subrole, name];
   BOOL secure = [sensitiveName rangeOfString:@"password|passcode|secure|security code|cvv"
                                      options:NSRegularExpressionSearch | NSCaseInsensitiveSearch].location != NSNotFound;
-  NSSet *editableRoles = [NSSet setWithArray:@[@"AXTextField", @"AXTextArea", @"AXComboBox", @"AXDocument"]];
-  BOOL editable = !secure && ([editableRoles containsObject:role]
-                    || AXSettable(focused, kAXSelectedTextAttribute) || AXSettable(focused, kAXValueAttribute));
+  BOOL editable = !secure && AXPotentiallyEditable(focused);
   NSString *selected = secure ? @"" : Bounded(selectedRaw, 4000);
   NSString *value = secure ? @"" : Bounded(valueRaw, 8000);
   NSString *processName = running.localizedName ?: @"";

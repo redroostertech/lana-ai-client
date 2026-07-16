@@ -88,7 +88,8 @@ describe('Electron screen voice orchestration', () => {
         proposedActions: [{ type: 'replace_selection', arguments: { text: 'Professional draft.' },
           targetFingerprint: selectedContext.targetFingerprint, requiresConfirmation: true }],
         confidence: 0.95, contextUsed: ['selected_text'] })) };
-    const adapter = { getContext: jest.fn(async () => selectedContext), replaceSelection: jest.fn(async () => ({ ok: true })) };
+    const adapter = { activate: jest.fn(async () => {}), getContext: jest.fn(async () => selectedContext),
+      replaceSelection: jest.fn(async () => ({ ok: true })) };
     const manager = managerWith({ api, adapter });
     manager.controller.start('agent'); manager.controller.session.target = fingerprint;
     const sessionId = manager.controller.session.id;
@@ -105,7 +106,7 @@ describe('Electron screen voice orchestration', () => {
   test('changed focus or malformed model output never mutates the target', async () => {
     const api = { transcribe: jest.fn(async () => ({ text: 'Summarize this' })),
       decide: jest.fn(async () => ({ arbitrary: 'output' })) };
-    const adapter = { getContext: jest.fn(async () => ({ ...context, windowTitle: 'Other',
+    const adapter = { activate: jest.fn(async () => {}), getContext: jest.fn(async () => ({ ...context, windowTitle: 'Other',
       targetFingerprint: { ...fingerprint, windowTitle: 'Other' } })), insert: jest.fn(), replaceSelection: jest.fn() };
     const manager = managerWith({ api, adapter });
     manager.controller.start('agent'); manager.controller.session.target = fingerprint;
@@ -113,6 +114,27 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.controller.state).toBe('error');
     expect(api.decide).not.toHaveBeenCalled();
     expect(adapter.insert).not.toHaveBeenCalled();
+  });
+
+  test('agent context tolerates bounded browser title and layout updates', async () => {
+    const initial = { ...fingerprint, processId: 9, bundleId: 'com.browser',
+      bounds: { x: 10, y: 10, width: 400, height: 80 } };
+    const refreshed = { ...initial, windowTitle: 'Document — Updated',
+      bounds: { x: 14, y: 12, width: 400, height: 80 } };
+    const api = { transcribe: jest.fn(async () => ({ text: 'Summarize this' })),
+      decide: jest.fn(async () => ({ intent: 'summarize', spokenResponse: '', displayResponse: 'Summary',
+        proposedActions: [], confidence: 0.9, contextUsed: ['active_application'] })) };
+    const adapter = { activate: jest.fn(async () => {}), getContext: jest.fn(async () => ({ ...context,
+      processId: 9, bundleId: 'com.browser', windowTitle: 'Document — Updated', targetFingerprint: refreshed })) };
+    const manager = managerWith({ api, adapter });
+    manager.controller.start('agent');
+    manager.controller.session.target = initial;
+
+    await manager.handleAudio({ sessionId: manager.controller.session.id, audioBase64: 'AAAA', mimeType: 'audio/webm' });
+
+    expect(adapter.activate).toHaveBeenCalledWith(initial);
+    expect(api.decide).toHaveBeenCalled();
+    expect(manager.controller.state).toBe('previewing');
   });
 
   test('provider failures become safe error state', async () => {
@@ -217,6 +239,8 @@ describe('Electron screen voice orchestration', () => {
   });
 
   test('restores the editor target when overlay interaction owns focus', async () => {
+    const initiallyIncompleteContext = { ...context, processId: 9, bundleId: 'com.editor',
+      focusedElement: { ...context.focusedElement, role: 'AXWebArea', isEditable: false } };
     const externalContext = { ...context, processId: 9, bundleId: 'com.editor' };
     const overlayContext = { ...context, processId: process.pid, bundleId: 'com.lana',
       focusedElement: { ...context.focusedElement, role: 'AXGroup', isEditable: false },
@@ -224,7 +248,7 @@ describe('Electron screen voice orchestration', () => {
     const adapter = {
       permissionStatus: jest.fn(async () => ({ accessibility: true })),
       getTarget: jest.fn()
-        .mockResolvedValueOnce(externalContext)
+        .mockResolvedValueOnce(initiallyIncompleteContext)
         .mockResolvedValueOnce(overlayContext)
         .mockResolvedValueOnce(externalContext),
       activate: jest.fn(async () => {})
@@ -235,7 +259,7 @@ describe('Electron screen voice orchestration', () => {
 
     await manager.handleShortcutDown('dictation');
 
-    expect(adapter.activate).toHaveBeenCalledWith(externalContext.targetFingerprint);
+    expect(adapter.activate).toHaveBeenCalledWith(initiallyIncompleteContext.targetFingerprint);
     expect(manager.controller.state).toBe('listening');
   });
 
