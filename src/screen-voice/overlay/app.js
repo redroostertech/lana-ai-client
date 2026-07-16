@@ -3,11 +3,13 @@
 
   const $ = (id) => document.getElementById(id);
   const els = {
-    shell: document.querySelector('.voice-shell'), mode: $('modeBadge'), mic: $('micButton'),
+    shell: document.querySelector('.voice-shell'), expanded: $('expandedSurface'), expandedStatus: $('expandedStatus'),
+    mode: $('modeBadge'), mic: $('micButton'),
     title: $('statusTitle'), detail: $('statusDetail'), context: $('contextNotice'), meter: $('levelMeter'),
     transcript: $('transcript'), preview: $('preview'), previewText: $('previewText'),
     confirm: $('confirmButton'), copy: $('copyButton'), cancel: $('cancelButton'), idle: $('idleActions'),
-    dictate: $('dictateButton'), agent: $('agentButton'), undo: $('undoButton'), settings: $('settingsPanel')
+    dictate: $('dictateButton'), agent: $('agentButton'), compactAgent: $('agentCompactButton'),
+    undo: $('undoButton'), settings: $('settingsPanel')
   };
   let snapshot = { state: 'idle', session: null, settings: {} };
   let stream = null;
@@ -34,15 +36,28 @@
     error: ['Couldn’t complete that', 'Try again or open settings for permission help.']
   };
 
+  function labelLexButton(element, label) {
+    element.title = label;
+    queueMicrotask(() => element.querySelector('button')?.setAttribute('aria-label', label));
+  }
+
+  function syncExpandedSurface(state = snapshot.state || 'idle') {
+    const settingsOpen = !els.settings.hidden;
+    els.expanded.hidden = !(settingsOpen || state === 'previewing' || state === 'error');
+    els.expandedStatus.hidden = settingsOpen;
+  }
+
   function render(next) {
     snapshot = next || snapshot;
     const state = snapshot.state || 'idle';
     const session = snapshot.session || {};
     const copy = stateCopy[state] || stateCopy.idle;
     els.shell.className = `voice-shell ${state}`;
-    els.mode.textContent = session.mode === 'agent' ? 'Agent' : 'Dictation';
-    els.title.textContent = session.error?.message || copy[0];
-    els.detail.textContent = session.error ? copy[1] : copy[1];
+    const isAgent = session.mode === 'agent';
+    els.mode.label = isAgent ? 'Agent' : 'Dictation';
+    els.mode.color = isAgent ? 'indigo' : 'gray';
+    els.title.textContent = state === 'listening' && !isAgent ? 'Dictating' : copy[0];
+    els.detail.textContent = session.error?.message || copy[1];
     els.context.hidden = state !== 'gathering_context';
     els.transcript.hidden = !session.transcript;
     els.transcript.textContent = session.transcript || '';
@@ -53,10 +68,13 @@
     if (decision?.proposedActions?.[0]?.type === 'replace_selection') els.confirm.textContent = 'Replace';
     else if (decision?.proposedActions?.[0]?.type === 'insert_table') els.confirm.textContent = 'Insert cells';
     else els.confirm.textContent = 'Insert';
-    els.idle.hidden = !['idle', 'error', 'canceled'].includes(state);
+    els.idle.hidden = state !== 'error';
     els.undo.hidden = !session.result?.canUndo;
-    els.mic.setAttribute('aria-label', state === 'listening' ? 'Stop listening' : 'Start dictation');
+    els.mic.leadingIcon = state === 'listening' ? 'square' : 'mic';
+    labelLexButton(els.mic, state === 'listening' ? 'Stop listening' : 'Start dictation');
+    els.meter.color = state === 'listening' ? 'danger' : 'accent';
     if (state !== 'listening') els.meter.value = 0;
+    syncExpandedSurface(state);
   }
 
   function supportedMimeType() {
@@ -96,7 +114,7 @@
       if (!analyser) return;
       analyser.getByteTimeDomainData(values);
       const rms = Math.sqrt(values.reduce((sum, value) => sum + Math.pow((value - 128) / 128, 2), 0) / values.length);
-      els.meter.value = Math.min(1, rms * 4);
+      els.meter.value = Math.round(Math.min(1, rms * 4) * 100);
       animationFrame = requestAnimationFrame(tick);
     };
     tick();
@@ -149,6 +167,7 @@
   }
 
   els.mic.addEventListener('click', () => snapshot.state === 'listening' ? stopCapture(false) : window.screenVoice.activate('dictation'));
+  els.compactAgent.addEventListener('click', () => window.screenVoice.activate('agent'));
   els.dictate.addEventListener('click', () => window.screenVoice.activate('dictation'));
   els.agent.addEventListener('click', () => window.screenVoice.activate('agent'));
   els.undo.addEventListener('click', () => window.screenVoice.undo());
@@ -159,13 +178,15 @@
   $('settingsButton').addEventListener('click', () => {
     populateSettings();
     els.settings.hidden = !els.settings.hidden;
-    if (!els.settings.hidden) window.screenVoice.openSettings();
+    syncExpandedSurface();
+    if (els.settings.hidden) window.screenVoice.closeSettings();
+    else window.screenVoice.openSettings();
   });
   $('accessibilityButton').addEventListener('click', () => window.screenVoice.requestPermission('accessibility'));
   $('microphoneButton').addEventListener('click', () => window.screenVoice.requestPermission('microphone'));
   els.settings.addEventListener('submit', async (event) => {
     event.preventDefault();
-    await window.screenVoice.saveSettings({ ...snapshot.settings,
+    const save = window.screenVoice.saveSettings({ ...snapshot.settings,
       dictationShortcut: $('dictationShortcut').value.trim(), agentShortcut: $('agentShortcut').value.trim(),
       defaultMode: $('defaultMode').value,
       openAtLogin: $('openAtLogin').checked,
@@ -173,6 +194,8 @@
       voiceOutputEnabled: $('voiceOutputEnabled').checked,
       confirmationPolicy: $('confirmationPolicy').value });
     els.settings.hidden = true;
+    syncExpandedSurface();
+    await save;
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') { stopCapture(true); window.screenVoice.cancel(); }
@@ -188,5 +211,9 @@
     playback.play().catch(() => {});
   });
   window.addEventListener('beforeunload', cleanupCapture);
+  labelLexButton(els.compactAgent, 'Ask LANA');
+  labelLexButton(els.undo, 'Undo last voice edit');
+  labelLexButton($('settingsButton'), 'Voice settings');
+  labelLexButton($('dismissButton'), 'Hide voice overlay');
   window.screenVoice.getState().then(render);
 })();

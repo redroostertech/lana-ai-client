@@ -53,6 +53,7 @@ describe('Electron screen voice orchestration', () => {
     expect(adapter.insert).toHaveBeenCalledWith('Literal text', fingerprint);
     expect(api.decide).not.toHaveBeenCalled();
     expect(manager.controller.state).toBe('idle');
+    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(360, 58, false);
   });
 
   test('selected rewrite is previewed, then revalidated replacement executes on confirmation', async () => {
@@ -69,6 +70,7 @@ describe('Electron screen voice orchestration', () => {
     const sessionId = manager.controller.session.id;
     await manager.handleAudio({ sessionId, audioBase64: 'AAAA', mimeType: 'audio/webm' });
     expect(manager.controller.state).toBe('previewing');
+    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(520, 360, false);
     expect(adapter.replaceSelection).not.toHaveBeenCalled();
     await manager.confirm(sessionId);
     expect(adapter.replaceSelection).toHaveBeenCalledWith('Professional draft.', selectedContext.targetFingerprint);

@@ -12,6 +12,10 @@ const { decisionRequiresConfirmation } = require('./confirmation-policy');
 const { actionText, normalizeText } = require('./action-normalizer');
 
 const MAX_AUDIO_BASE64_CHARS = 16 * 1024 * 1024;
+const COMPACT_OVERLAY = Object.freeze({ width: 360, height: 58 });
+const PREVIEW_OVERLAY = Object.freeze({ width: 520, height: 360 });
+const ERROR_OVERLAY = Object.freeze({ width: 460, height: 220 });
+const SETTINGS_OVERLAY = Object.freeze({ width: 520, height: 520 });
 
 function publicError(error) {
   const code = error?.code || 'VOICE_ERROR';
@@ -80,7 +84,8 @@ class ElectronScreenVoice {
   createOverlay() {
     if (this.overlay && !this.overlay.isDestroyed()) return this.overlay;
     this.overlay = new BrowserWindow({
-      width: 500, height: 188, minWidth: 420, minHeight: 132, maxHeight: 560,
+      width: COMPACT_OVERLAY.width, height: COMPACT_OVERLAY.height,
+      minWidth: 320, minHeight: 52, maxWidth: 560, maxHeight: 560,
       frame: false, transparent: true, backgroundColor: '#00000000', alwaysOnTop: true,
       skipTaskbar: true, resizable: true, focusable: false, show: false, hasShadow: true,
       webPreferences: {
@@ -102,12 +107,25 @@ class ElectronScreenVoice {
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     const bounds = this.overlay.getBounds();
     this.overlay.setPosition(Math.round(display.workArea.x + (display.workArea.width - bounds.width) / 2),
-      Math.round(display.workArea.y + display.workArea.height - bounds.height - 24), false);
+      Math.round(display.workArea.y + 14), false);
   }
 
-  showOverlay({ focus = false, height } = {}) {
+  overlayLayout(state = this.controller.state) {
+    if (state === 'previewing') return PREVIEW_OVERLAY;
+    if (state === 'error') return ERROR_OVERLAY;
+    return COMPACT_OVERLAY;
+  }
+
+  resizeOverlay(layout = this.overlayLayout()) {
+    if (!this.overlay || this.overlay.isDestroyed()) return;
+    const width = Math.max(320, Math.min(560, Number(layout.width) || COMPACT_OVERLAY.width));
+    const height = Math.max(52, Math.min(560, Number(layout.height) || COMPACT_OVERLAY.height));
+    this.overlay.setSize(width, height, false);
+  }
+
+  showOverlay({ focus = false, width, height } = {}) {
     const overlay = this.createOverlay();
-    if (height) overlay.setSize(500, Math.max(132, Math.min(560, height)), false);
+    this.resizeOverlay(width || height ? { width, height } : this.overlayLayout());
     this.positionOverlay();
     overlay.setFocusable(Boolean(focus));
     focus ? overlay.show() : overlay.showInactive();
@@ -118,6 +136,8 @@ class ElectronScreenVoice {
   }
 
   sendState(snapshot = this.controller.snapshot()) {
+    this.resizeOverlay(this.overlayLayout(snapshot.state));
+    this.positionOverlay();
     this.send('screen-voice:state', { ...snapshot, settings: this.settings });
   }
 
@@ -142,7 +162,12 @@ class ElectronScreenVoice {
     handle('screen-voice:undo', () => this.undo());
     handle('screen-voice:permission', ({ type }) => this.requestPermission(type));
     handle('screen-voice:save-settings', (settings) => this.saveSettings(settings));
-    handle('screen-voice:open-settings', () => { this.showOverlay({ focus: true, height: 520 }); return { ok: true }; });
+    handle('screen-voice:open-settings', () => { this.showOverlay({ focus: true, ...SETTINGS_OVERLAY }); return { ok: true }; });
+    handle('screen-voice:close-settings', () => {
+      const focus = ['previewing', 'error'].includes(this.controller.state);
+      this.showOverlay({ focus, ...this.overlayLayout() });
+      return { ok: true };
+    });
     handle('screen-voice:dismiss', () => { this.overlay?.hide(); return { ok: true }; });
   }
 
@@ -293,7 +318,7 @@ class ElectronScreenVoice {
       this.previewDecision = null;
       const snapshot = this.controller.start(mode, source);
       this.controller.session.target = this.lastContext.targetFingerprint;
-      this.showOverlay({ height: 188 });
+      this.showOverlay();
       this.send('screen-voice:start-capture', { mode, sessionId: snapshot.session.id, maxDurationMs: 90000 });
       this.logInfo(`[ScreenVoice] Session started (${mode})`);
       return snapshot;
@@ -322,7 +347,7 @@ class ElectronScreenVoice {
     if (!this.controller.claimExecution(`${this.controller.session.id}:dictation`)) return { ok: false, reason: 'duplicate_execution' };
     await this.adapter.insert(transcript, this.controller.session.target);
     this.controller.transition('idle', { result: { inserted: true, text: transcript, canUndo: true } });
-    this.showOverlay({ height: 172 });
+    this.showOverlay();
     return { ok: true };
   }
 
@@ -355,7 +380,7 @@ class ElectronScreenVoice {
     }
     if (!decision.proposedActions.length || decisionRequiresConfirmation(decision, context, this.settings)) {
       this.controller.transition('previewing');
-      this.showOverlay({ focus: true, height: 360 });
+      this.showOverlay({ focus: true, ...PREVIEW_OVERLAY });
       return { ok: true, preview: true };
     }
     return this.executeDecision(decision);
@@ -373,7 +398,7 @@ class ElectronScreenVoice {
     }
     this.controller.transition('idle', { result: { inserted: decision.proposedActions.some((a) => a.type !== 'copy'),
       canUndo: true, text: decision.displayResponse } });
-    this.showOverlay({ height: 190 });
+    this.showOverlay();
     return { ok: true };
   }
 
@@ -398,7 +423,7 @@ class ElectronScreenVoice {
       if (this.controller.state === 'idle') this.controller.start(this.settings.defaultMode, 'error_recovery');
       this.controller.fail(details.code, details.message);
     } catch (_) { /* preserve original safe error */ }
-    this.showOverlay({ focus: true, height: 230 });
+    this.showOverlay({ focus: true, ...ERROR_OVERLAY });
     this.logError(`[ScreenVoice] ${details.code}`);
     return { ok: false, error: details };
   }
@@ -408,6 +433,7 @@ class ElectronScreenVoice {
     Object.entries(this.settings).forEach(([key, item]) => this.settingsStore.set(key, item));
     this.registerShortcuts();
     if (!this.settings.openAtLogin && this.controller.state === 'idle') this.overlay?.hide();
+    else if (this.controller.state === 'idle') this.resizeOverlay(COMPACT_OVERLAY);
     this.sendState();
     return { ok: true, settings: this.settings };
   }

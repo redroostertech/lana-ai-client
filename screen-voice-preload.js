@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('screenVoice', {
   requestPermission: (type) => ipcRenderer.invoke('screen-voice:permission', { type }),
   saveSettings: (settings) => ipcRenderer.invoke('screen-voice:save-settings', settings),
   openSettings: () => ipcRenderer.invoke('screen-voice:open-settings'),
+  closeSettings: () => ipcRenderer.invoke('screen-voice:close-settings'),
   dismiss: () => ipcRenderer.invoke('screen-voice:dismiss'),
   onState: (callback) => on('screen-voice:state', callback),
   onStartCapture: (callback) => on('screen-voice:start-capture', callback),
