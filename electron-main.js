@@ -7,7 +7,7 @@
  * This is the THIN CLIENT version - connects to a remote backend server.
  */
 
-const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage, Notification, shell } = require('electron');
 const path = require('path');
 const url = require('url');
 const crypto = require('crypto');
@@ -326,6 +326,54 @@ function openScreenVoiceSettings() {
   mainWindow.show();
   mainWindow.focus();
   mainWindow.loadURL(settingsUrl);
+  return true;
+}
+
+const SCREEN_VOICE_CLIENT_ROUTES = new Set([
+  'chat.html', 'matters.html', 'workspace-details.html', 'integrations/connectors.html', 'notifications.html'
+]);
+
+async function navigateScreenVoiceClient(input = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  const route = String(input.route || '').trim().replace(/^\/+/, '');
+  if (!SCREEN_VOICE_CLIENT_ROUTES.has(route)) throw new Error('Unsupported LANA destination');
+  const target = new URL(createFileUrl(path.join(__dirname, 'public_html', route)));
+  const matterId = String(input.matterId || '').trim();
+  if (matterId) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,119}$/.test(matterId)) throw new Error('Invalid matter identifier');
+    if (route === 'workspace-details.html') target.searchParams.set('id', matterId);
+    else target.searchParams.set('matter', matterId);
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  await mainWindow.loadURL(target.toString());
+  return true;
+}
+
+async function openScreenVoiceResearchUrl(value) {
+  const target = new URL(String(value || ''));
+  const allowed = (target.hostname === 'www.google.com' && target.pathname === '/search')
+    || (target.hostname === 'www.bing.com' && target.pathname === '/search');
+  if (target.protocol !== 'https:' || !allowed || !target.searchParams.get('q')) {
+    throw new Error('Only confirmed web-search URLs are supported');
+  }
+  await shell.openExternal(target.toString(), { activate: true });
+  return true;
+}
+
+function notifyScreenVoiceInputRequired() {
+  if (!Notification.isSupported()) return false;
+  const notification = new Notification({
+    title: 'LANA needs your input',
+    body: 'Open the voice agent to review and respond.',
+    silent: true
+  });
+  notification.on('click', () => {
+    screenVoice?.showOverlay({ focus: true });
+    screenVoice?.sendState();
+  });
+  notification.show();
   return true;
 }
 
@@ -925,7 +973,7 @@ ipcMain.handle('capabilities:set-active', async (_event, payload) => {
 ipcMain.handle('capabilities:set-open-at-login', async (_event, payload) => {
   try {
     const server = getSavedServer();
-    if (!isScreenDictionEntitled(server)) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
+    if (!isScreenDictionEntitled(server)) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
     if (!screenVoice || typeof payload?.openAtLogin !== 'boolean') {
       return { success: false, error: 'Open at Login is not available on this platform.' };
     }
@@ -938,35 +986,35 @@ ipcMain.handle('capabilities:set-open-at-login', async (_event, payload) => {
 });
 
 ipcMain.handle('capabilities:get-voice-settings', async () => {
-  if (!isScreenDictionEntitled()) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
-  if (!screenVoice) return { success: false, error: 'Screen Dictation is not available on this platform.' };
+  if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+  if (!screenVoice) return { success: false, error: 'The LANA Voice Agent is not available on this platform.' };
   return { success: true, settings: screenVoice.getSettings() };
 });
 
 ipcMain.handle('capabilities:set-voice-settings', async (_event, payload) => {
   try {
-    if (!isScreenDictionEntitled()) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
+    if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
     if (!screenVoice || !payload?.settings || typeof payload.settings !== 'object' || Array.isArray(payload.settings)) {
-      return { success: false, error: 'Invalid Screen Dictation settings.' };
+      return { success: false, error: 'Invalid voice agent settings.' };
     }
     const result = screenVoice.saveSettings(payload.settings);
     return { success: true, settings: result.settings, capabilities: currentCapabilityViewModels() };
   } catch (error) {
-    logError('[Capabilities] Failed to update Screen Dictation settings', error);
-    return { success: false, error: 'Screen Dictation settings could not be saved.' };
+    logError('[Capabilities] Failed to update voice agent settings', error);
+    return { success: false, error: 'Voice agent settings could not be saved.' };
   }
 });
 
 ipcMain.handle('capabilities:get-voice-permissions', async () => {
-  if (!isScreenDictionEntitled()) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
-  if (!screenVoice) return { success: false, error: 'Screen Dictation is not available on this platform.' };
+  if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+  if (!screenVoice) return { success: false, error: 'The LANA Voice Agent is not available on this platform.' };
   try { return { success: true, permissions: await screenVoice.permissionStatus() }; }
   catch (_) { return { success: false, error: 'Permission status is temporarily unavailable.' }; }
 });
 
 ipcMain.handle('capabilities:request-voice-permission', async (_event, payload) => {
   const type = payload?.type;
-  if (!isScreenDictionEntitled()) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
+  if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
   if (!screenVoice || !['microphone', 'accessibility'].includes(type)) {
     return { success: false, error: 'Invalid permission request.' };
   }
@@ -1703,6 +1751,9 @@ app.whenReady().then(async () => {
         getMainWindow: () => mainWindow,
         getSavedServer: () => getSavedServer(),
         openClientSettings: openScreenVoiceSettings,
+        navigateClient: navigateScreenVoiceClient,
+        openExternalUrl: openScreenVoiceResearchUrl,
+        notifyUser: notifyScreenVoiceInputRequired,
         entitlementEnabled: isCapabilityActive(
           getSavedServer(),
           SCREEN_DICTION_APP_ID,

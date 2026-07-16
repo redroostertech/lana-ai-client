@@ -14,17 +14,14 @@
       <img class="voice-mark" src="redrooster-favicon.png" alt="" aria-hidden="true">
       <strong id="statusTitle" class="sr-only">Ready</strong>
       <lex-progress-bar id="levelMeter" class="level-meter no-drag" value="0" color="accent" size="xs" animate="false" aria-label="Microphone level"></lex-progress-bar>
-      <label class="sr-only" for="modeSelect">Voice mode</label>
-      <lex-dropdown-btn id="modeSelect" class="mode-select no-drag" button-label="Dictation" variant="secondary"
-        options='[{"value":"dictation","label":"Dictation"},{"value":"agent","label":"Agent"}]'
-        aria-label="Voice mode"></lex-dropdown-btn>
+      <span id="modeLabel" class="agent-mode-pill no-drag" aria-label="LANA Agent mode">Agent</span>
       <span id="shortcutHint" class="shortcut-hint" title="Use the keyboard shortcut to speak">
         <span id="shortcutVerb">Hold</span> <kbd id="shortcutKeys">⌘⇧Space</kbd> <span id="shortcutAction">to speak</span>
       </span>
       <div class="compact-actions no-drag">
         <lex-btn id="undoButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="rotate-ccw" title="Undo last voice edit" hidden></lex-btn>
         <lex-btn id="infoButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="info" title="Voice details"></lex-btn>
-        <lex-btn id="settingsButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="settings" title="Open Screen Dictation settings"></lex-btn>
+        <lex-btn id="settingsButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="settings" title="Open LANA Voice Agent settings"></lex-btn>
         <lex-btn id="dismissButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="x" title="Hide voice overlay"></lex-btn>
       </div>
     </section>
@@ -36,7 +33,7 @@
           <lex-btn id="hideDetailsButton" class="no-drag" variant="ghost" size="sm" icon="true"
             leading-icon="chevron-up" title="Hide voice details"></lex-btn>
         </div>
-        <p id="statusDetail">Dictate into the focused field or ask LANA about this window.</p>
+        <p id="statusDetail">Ask LANA about your matter, this window, or what you want to do next.</p>
         <div id="contextNotice" class="context-notice" hidden>Using accessible content from the active window.</div>
       </div>
 
@@ -45,7 +42,7 @@
         <label for="previewText">Proposed result</label>
         <textarea id="previewText" readonly></textarea>
         <div class="actions">
-          <button id="confirmButton" class="button primary no-drag" type="button">Insert</button>
+          <button id="confirmButton" class="button primary no-drag" type="button">Approve</button>
           <lex-btn id="copyButton" class="no-drag" variant="secondary" size="sm" leading-icon="copy">Copy</lex-btn>
           <lex-btn id="cancelButton" class="no-drag" variant="ghost" size="sm">Cancel</lex-btn>
         </div>
@@ -59,7 +56,6 @@
   <script src="../../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../../js/lex/components/foundation/lex-progress-bar.js"></script>
   <script src="../../js/lex/components/foundation/lex-text.js"></script>
-  <script src="../../js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

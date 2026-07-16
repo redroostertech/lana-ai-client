@@ -10,7 +10,7 @@ const { DEFAULT_SETTINGS, parseAgentDecision, parseSettings } = require('./contr
 const { fingerprintsMatch } = require('./target-fingerprint');
 const { decisionRequiresConfirmation } = require('./confirmation-policy');
 const { actionText, normalizeText } = require('./action-normalizer');
-const { startShortcutMonitor } = require('./native-helper');
+const { runHelper, startShortcutMonitor } = require('./native-helper');
 
 const MAX_AUDIO_BASE64_CHARS = 16 * 1024 * 1024;
 const NON_SPEECH_TRANSCRIPT = /^[\s([{<]*(?:beep|chime|tone|silence|inaudible|no speech|music)[\s)\]}>.!-]*$/i;
@@ -29,11 +29,11 @@ const EXPECTED_USER_ERRORS = new Set([
 function publicError(error) {
   const code = error?.code || 'VOICE_ERROR';
   const messages = {
-    accessibility_permission_denied: 'Allow Accessibility access in System Settings to use desktop dictation.',
-    PLATFORM_UNSUPPORTED: 'Screen-aware dictation is not yet available on this operating system.',
+    accessibility_permission_denied: 'Allow Accessibility access in System Settings so LANA can understand and safely update the active application.',
+    PLATFORM_UNSUPPORTED: 'The desktop LANA voice agent is not yet available on this operating system.',
     TARGET_CHANGED: 'The active application or text field changed. Nothing was inserted.',
     target_changed: 'The active application or text field changed. Nothing was inserted.',
-    target_not_editable: 'Place the cursor in an editable text field and try again.',
+    target_not_editable: 'LANA can still answer questions here, but this application does not expose an editable target.',
     secure_field: 'Voice insertion is disabled in password and secure fields.',
     AUTH_REQUIRED: 'Sign in to LANA before using voice features.',
     NETWORK_UNAVAILABLE: 'The voice service is unavailable. Check your connection and try again.',
@@ -48,7 +48,7 @@ function publicError(error) {
     INSERTION_FAILED: 'LANA generated the text but could not safely insert it. Use Copy instead.',
     UNDO_FAILED: 'The last voice edit could not be undone in the current application.',
     NO_SPEECH: 'No speech was detected. Try again when you are ready.',
-    FEATURE_NOT_ENABLED: 'Screen Dictation is not enabled for this organization.'
+    FEATURE_NOT_ENABLED: 'The desktop LANA voice agent is not enabled for this organization.'
   };
   return { code, message: messages[code] || error?.message || 'Voice action could not be completed.' };
 }
@@ -65,6 +65,9 @@ class ElectronScreenVoice {
     this.getMainWindow = options.getMainWindow;
     this.getSavedServer = options.getSavedServer;
     this.openClientSettings = options.openClientSettings || (() => false);
+    this.navigateClient = options.navigateClient || (async () => false);
+    this.openExternalUrl = options.openExternalUrl || (async () => false);
+    this.notifyUser = options.notifyUser || (() => {});
     this.logInfo = options.logInfo || (() => {});
     this.logError = options.logError || (() => {});
     this.rootDir = options.rootDir || path.resolve(__dirname, '..', '..');
@@ -83,7 +86,9 @@ class ElectronScreenVoice {
     this.ipcRegistered = false;
     this.lastContext = null;
     this.previewDecision = null;
-    this.pendingMode = this.settings.defaultMode;
+    this.pendingMode = 'agent';
+    this.conversationTurns = [];
+    this.conversationMemory = '';
     this.detailsOpen = true;
     this.revealTarget = null;
     this.shortcutMonitor = null;
@@ -92,6 +97,9 @@ class ElectronScreenVoice {
     this.shortcutStartPromise = null;
     this.pendingShortcutRelease = null;
     this.shortcutMonitorFactory = options.shortcutMonitorFactory || startShortcutMonitor;
+    this.microphoneHardwareStatus = options.microphoneHardwareStatus || (() => (
+      runHelper('microphone-status', {}, { rootDir: this.rootDir })
+    ));
     this.sleep = options.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.entitlementEnabled = Boolean(options.entitlementEnabled);
     this.authenticated = Boolean(options.authenticated);
@@ -189,7 +197,7 @@ class ElectronScreenVoice {
       ...this.controller.snapshot(), settings: this.settings, selectedMode: this.pendingMode
     }));
     handle('screen-voice:get-permissions', () => this.permissionStatus());
-    handle('screen-voice:activate', ({ mode }) => this.toggle(mode || this.settings.defaultMode, 'overlay'));
+    handle('screen-voice:activate', () => this.toggle('agent', 'overlay'));
     handle('screen-voice:audio-complete', (payload) => this.handleAudio(payload));
     handle('screen-voice:capture-error', ({ code }) => this.fail(code || 'MICROPHONE_DENIED'));
     handle('screen-voice:capture-status', ({ status, metadata }) => {
@@ -282,6 +290,10 @@ class ElectronScreenVoice {
     this.stopShortcutMonitor();
     if (this.overlay && !this.overlay.isDestroyed()) this.overlay.destroy();
     this.overlay = null;
+    if (reason === 'signed_out' || reason === 'capability_disabled') {
+      this.conversationTurns = [];
+      this.conversationMemory = '';
+    }
   }
 
   setEntitlementEnabled(enabled) {
@@ -326,8 +338,7 @@ class ElectronScreenVoice {
         return false;
       }
     };
-    register(this.settings.dictationShortcut, 'dictation');
-    register(this.settings.agentShortcut, 'agent');
+    register(this.settings.dictationShortcut, 'agent');
     if (process.platform === 'darwin') {
       try {
         this.shortcutMonitor = this.shortcutMonitorFactory((event) => this.handleShortcutMonitorEvent(event), {
@@ -348,17 +359,18 @@ class ElectronScreenVoice {
   }
 
   handleShortcutMonitorEvent(event = {}) {
+    const eventMode = event.mode === 'dictation' ? 'agent' : event.mode;
     if (event.event === 'ready') {
       this.shortcutMonitorReady = true;
       this.logInfo(`[ScreenVoice] Press-and-hold shortcuts ready (${event.method || 'event_tap'})`);
     } else if (event.event === 'down') {
-      if (this.shortcutHeldMode === event.mode && !this.shortcutStartPromise
+      if (this.shortcutHeldMode === eventMode && !this.shortcutStartPromise
           && !['listening', 'transcribing', 'gathering_context', 'thinking', 'executing'].includes(this.controller.state)) {
         this.shortcutHeldMode = null;
       }
-      this.handleShortcutDown(event.mode).catch((error) => this.logError(`[ScreenVoice] Shortcut start failed: ${error.code || 'unknown'}`));
+      this.handleShortcutDown(eventMode).catch((error) => this.logError(`[ScreenVoice] Shortcut start failed: ${error.code || 'unknown'}`));
     } else if (event.event === 'up') {
-      this.handleShortcutUp(event.mode);
+      this.handleShortcutUp(eventMode);
     } else if (event.event === 'error') {
       this.shortcutMonitorReady = false;
       this.shortcutHeldMode = null;
@@ -375,14 +387,16 @@ class ElectronScreenVoice {
   }
 
   async handleShortcutDown(mode) {
+    mode = 'agent';
     if (this.shortcutMonitor && this.shortcutHeldMode === mode) return this.controller.snapshot();
     this.logInfo(`[ScreenVoice] Shortcut down (${mode}); state=${this.controller.state}`);
     if (this.controller.state === 'listening') {
       if (!this.shortcutMonitorReady) this.send('screen-voice:stop-capture', { reason: 'activation_released' });
       return this.controller.snapshot();
     }
+    if (this.controller.state === 'previewing') this.controller.transition('idle');
     if (this.shortcutStartPromise) return this.shortcutStartPromise;
-    this.pendingMode = mode === 'agent' ? 'agent' : 'dictation';
+    this.pendingMode = 'agent';
     if (this.shortcutMonitor) this.shortcutHeldMode = this.pendingMode;
     this.shortcutStartPromise = (async () => {
       await this.rememberExternalTarget();
@@ -420,6 +434,12 @@ class ElectronScreenVoice {
 
   async microphonePermission(request = false) {
     if (process.platform !== 'darwin') return { microphone: true, microphoneStatus: 'granted' };
+    try {
+      const hardware = await this.microphoneHardwareStatus();
+      if (!hardware.available) {
+        return { microphone: false, microphoneStatus: 'unavailable', microphoneDeviceCount: 0 };
+      }
+    } catch (_) { /* Older helpers fall back to the operating-system permission status. */ }
     let status = systemPreferences.getMediaAccessStatus('microphone');
     if (request && status !== 'granted') {
       const granted = await systemPreferences.askForMediaAccess('microphone');
@@ -466,7 +486,7 @@ class ElectronScreenVoice {
       this.send('screen-voice:stop-capture', { reason: 'activation_released' });
       return this.controller.snapshot();
     }
-    this.pendingMode = mode === 'agent' ? 'agent' : 'dictation';
+    this.pendingMode = 'agent';
     const visible = Boolean(this.overlay && !this.overlay.isDestroyed() && this.overlay.isVisible());
     if (source === 'global_shortcut' && !visible) {
       this.detailsOpen = true;
@@ -480,7 +500,9 @@ class ElectronScreenVoice {
 
   async begin(mode, source) {
     try {
-      this.pendingMode = mode === 'agent' ? 'agent' : 'dictation';
+      mode = 'agent';
+      this.pendingMode = 'agent';
+      if (this.controller.state === 'previewing') this.controller.transition('idle');
       if (!this.entitlementEnabled) {
         const error = new Error(); error.code = 'FEATURE_NOT_ENABLED'; throw error;
       }
@@ -489,7 +511,9 @@ class ElectronScreenVoice {
       }
       const mic = await this.microphonePermission(true);
       if (!mic.microphone) {
-        const error = new Error(); error.code = 'MICROPHONE_DENIED'; throw error;
+        const error = new Error();
+        error.code = mic.microphoneStatus === 'unavailable' ? 'MICROPHONE_UNAVAILABLE' : 'MICROPHONE_DENIED';
+        throw error;
       }
       let permission = await this.adapter.permissionStatus();
       if (!permission.accessibility) permission = await this.adapter.requestPermission();
@@ -516,9 +540,6 @@ class ElectronScreenVoice {
       }
       this.logInfo(`[ScreenVoice] Target role=${this.lastContext.focusedElement?.role || 'unknown'} editable=${Boolean(this.lastContext.focusedElement?.isEditable)}`);
       if (this.lastContext.focusedElement.isPassword) { const error = new Error(); error.code = 'secure_field'; throw error; }
-      if (mode === 'dictation' && !this.lastContext.focusedElement.isEditable) {
-        const error = new Error(); error.code = 'target_not_editable'; throw error;
-      }
       this.previewDecision = null;
       const snapshot = this.controller.start(mode, source);
       this.controller.session.target = this.lastContext.targetFingerprint;
@@ -547,29 +568,25 @@ class ElectronScreenVoice {
       this.controller.session.transcript = transcript;
       this.sendState();
       await this.sleep(500);
-      return await (this.controller.session.mode === 'dictation' ? this.executeLiteral(transcript) : this.runAgent(transcript));
+      this.rememberConversationTurn('user', transcript);
+      return await this.runAgent(transcript);
     } catch (error) { return this.fail(error.code || 'TRANSCRIPTION_FAILED', error); }
-  }
-
-  async executeLiteral(transcript) {
-    this.controller.transition('executing');
-    if (!this.controller.claimExecution(`${this.controller.session.id}:dictation`)) return { ok: false, reason: 'duplicate_execution' };
-    await this.adapter.insert(transcript, this.controller.session.target);
-    this.controller.transition('idle', { result: { inserted: true, text: transcript, canUndo: true } });
-    this.showOverlay();
-    return { ok: true };
   }
 
   async runAgent(instruction) {
     this.controller.transition('gathering_context');
     await this.adapter.activate(this.controller.session.target);
     let context = await this.adapter.getContext({ maxChars: this.settings.screenContextEnabled ? 12000 : 1000 });
-    if (!fingerprintsMatch(this.controller.session.target, context.targetFingerprint, {
-      allowDynamicWindowTitle: true, boundsTolerance: 24
-    })) {
-      this.logError(`[ScreenVoice] Target fingerprint changed fields=${fingerprintDifferenceLabels(this.controller.session.target, context.targetFingerprint)}`);
+    const expected = this.controller.session.target;
+    const sameApplication = Boolean(
+      (expected.processId && context.targetFingerprint.processId && expected.processId === context.targetFingerprint.processId)
+      || (expected.bundleId && context.targetFingerprint.bundleId && expected.bundleId === context.targetFingerprint.bundleId)
+    );
+    if (!sameApplication) {
+      this.logError(`[ScreenVoice] Target application changed fields=${fingerprintDifferenceLabels(expected, context.targetFingerprint)}`);
       const error = new Error(); error.code = 'TARGET_CHANGED'; throw error;
     }
+    this.controller.session.target = context.targetFingerprint;
     if (!this.settings.screenContextEnabled) context = { ...context,
       focusedElement: { ...context.focusedElement, value: '' }, selectedText: '', surroundingText: '',
       accessibleDocumentText: '', nearbyControls: [],
@@ -579,14 +596,16 @@ class ElectronScreenVoice {
     const capabilities = { insertText: context.focusedElement.isEditable,
       replaceSelection: context.focusedElement.isEditable && Boolean(context.selectedText),
       insertTable: context.focusedElement.isEditable, copy: true, undo: true };
-    const allowedActions = ['copy'];
+    const allowedActions = ['copy', 'open_url', 'navigate_client'];
     if (capabilities.insertText) allowedActions.push('insert_text', 'insert_table');
     if (capabilities.replaceSelection) allowedActions.push('replace_selection');
     const { processId: _processId, bundleId: _bundleId, ...agentContext } = context;
     const decision = parseAgentDecision(await this.api.decide({ instruction, interactionMode: 'agent', context: agentContext,
-      capabilities, allowedActions }, this.controller.signal));
+      capabilities, allowedActions, conversation: this.conversationTurns.slice(-25, -1),
+      conversationMemory: this.conversationMemory }, this.controller.signal));
     this.controller.session.decision = decision;
     this.previewDecision = decision;
+    this.rememberConversationTurn('assistant', decision.displayResponse || decision.spokenResponse);
     if (this.settings.voiceOutputEnabled && decision.spokenResponse) {
       this.api.synthesize(decision.spokenResponse, this.controller.signal).then((speech) => {
         if (speech.available && speech.audio?.base64) this.send('screen-voice:play-audio', speech.audio);
@@ -595,9 +614,23 @@ class ElectronScreenVoice {
     if (!decision.proposedActions.length || decisionRequiresConfirmation(decision, context, this.settings)) {
       this.controller.transition('previewing');
       this.showOverlay({ focus: true, ...PREVIEW_OVERLAY });
+      if (decision.intent === 'clarify' || decision.proposedActions.some((action) => action.requiresConfirmation)) {
+        this.notifyUser({ reason: decision.intent === 'clarify' ? 'clarification' : 'approval' });
+      }
       return { ok: true, preview: true };
     }
     return this.executeDecision(decision);
+  }
+
+  rememberConversationTurn(role, value) {
+    const text = normalizeText(value).trim().slice(0, 4000);
+    if (!text) return;
+    this.conversationTurns.push({ role, text });
+    if (this.conversationTurns.length > 24) {
+      const archived = this.conversationTurns.splice(0, this.conversationTurns.length - 24);
+      const archiveText = archived.map((turn) => `${turn.role === 'user' ? 'User' : 'LANA'}: ${turn.text}`).join('\n');
+      this.conversationMemory = `${this.conversationMemory}\n${archiveText}`.trim().slice(-8000);
+    }
   }
 
   async executeDecision(decision) {
@@ -606,12 +639,17 @@ class ElectronScreenVoice {
       const action = decision.proposedActions[index];
       if (!this.controller.claimExecution(`${this.controller.session.id}:${index}:${action.type}`)) continue;
       const text = actionText(action);
-      if (action.type === 'copy') clipboard.writeText(text);
+      if (action.type === 'open_url') await this.openExternalUrl(action.arguments.url);
+      else if (action.type === 'navigate_client') await this.navigateClient(action.arguments);
+      else if (action.type === 'copy') clipboard.writeText(text);
       else if (action.type === 'replace_selection') await this.adapter.replaceSelection(text, action.targetFingerprint);
       else await this.adapter.insert(text, action.targetFingerprint);
     }
-    this.controller.transition('idle', { result: { inserted: decision.proposedActions.some((a) => a.type !== 'copy'),
-      canUndo: true, text: decision.displayResponse } });
+    const desktopMutation = decision.proposedActions.some((action) => (
+      ['insert_text', 'replace_selection', 'insert_table'].includes(action.type)
+    ));
+    this.controller.transition('idle', { result: { inserted: desktopMutation,
+      canUndo: desktopMutation, text: decision.displayResponse } });
     this.showOverlay();
     return { ok: true };
   }

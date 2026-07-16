@@ -1,4 +1,5 @@
 #import <AppKit/AppKit.h>
+#import <AVFoundation/AVFoundation.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <CommonCrypto/CommonDigest.h>
 #include <math.h>
@@ -16,24 +17,22 @@ static void Emit(NSDictionary *payload, int status) {
 }
 
 static BOOL shortcutSpacePressed = NO;
-static BOOL shortcutAgentPressed = NO;
 
 static CGEventRef ShortcutMonitorCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
   (void)proxy; (void)refcon;
   CGKeyCode keyCode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
-  BOOL *pressed = keyCode == 49 ? &shortcutSpacePressed : keyCode == 0 ? &shortcutAgentPressed : NULL;
-  if (!pressed) return event;
-  NSString *mode = keyCode == 49 ? @"dictation" : @"agent";
+  if (keyCode != 49) return event;
+  BOOL *pressed = &shortcutSpacePressed;
   if (type == kCGEventKeyDown) {
     CGEventFlags flags = CGEventGetFlags(event);
     BOOL modifiersDown = (flags & kCGEventFlagMaskCommand) && (flags & kCGEventFlagMaskShift);
     if (modifiersDown && !*pressed) {
       *pressed = YES;
-      WriteJSONLine(@{ @"event": @"down", @"mode": mode });
+      WriteJSONLine(@{ @"event": @"down", @"mode": @"agent" });
     }
   } else if (type == kCGEventKeyUp && *pressed) {
     *pressed = NO;
-    WriteJSONLine(@{ @"event": @"up", @"mode": mode });
+    WriteJSONLine(@{ @"event": @"up", @"mode": @"agent" });
   }
   return event;
 }
@@ -44,19 +43,11 @@ static void PollShortcutStates(void) {
     CGEventFlags flags = CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState);
     BOOL modifiersDown = (flags & kCGEventFlagMaskCommand) && (flags & kCGEventFlagMaskShift);
     BOOL spaceDown = modifiersDown && CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, 49);
-    BOOL agentDown = modifiersDown && CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, 0);
     if (spaceDown && !shortcutSpacePressed) {
       shortcutSpacePressed = YES;
-      WriteJSONLine(@{ @"event": @"down", @"mode": @"dictation" });
+      WriteJSONLine(@{ @"event": @"down", @"mode": @"agent" });
     } else if (!spaceDown && shortcutSpacePressed) {
       shortcutSpacePressed = NO;
-      WriteJSONLine(@{ @"event": @"up", @"mode": @"dictation" });
-    }
-    if (agentDown && !shortcutAgentPressed) {
-      shortcutAgentPressed = YES;
-      WriteJSONLine(@{ @"event": @"down", @"mode": @"agent" });
-    } else if (!agentDown && shortcutAgentPressed) {
-      shortcutAgentPressed = NO;
       WriteJSONLine(@{ @"event": @"up", @"mode": @"agent" });
     }
     usleep(15000);
@@ -299,6 +290,13 @@ int main(int argc, const char *argv[]) {
   @autoreleasepool {
     NSString *command = argc > 1 ? [NSString stringWithUTF8String:argv[1]] : @"";
     if ([command isEqualToString:@"shortcut-monitor"]) { MonitorShortcuts(); return 0; }
+    if ([command isEqualToString:@"microphone-status"]) {
+      AVCaptureDeviceDiscoverySession *session = [AVCaptureDeviceDiscoverySession
+        discoverySessionWithDeviceTypes:@[AVCaptureDeviceTypeMicrophone]
+        mediaType:AVMediaTypeAudio position:AVCaptureDevicePositionUnspecified];
+      NSArray<AVCaptureDevice *> *devices = session.devices;
+      Emit(@{ @"available": @(devices.count > 0), @"deviceCount": @(devices.count), @"platform": @"darwin" }, 0);
+    }
     if ([command isEqualToString:@"permission-status"]) Emit(@{ @"trusted": @(AXIsProcessTrusted()), @"platform": @"darwin" }, 0);
     if ([command isEqualToString:@"request-permission"]) {
       NSDictionary *options = @{ (__bridge NSString *)kAXTrustedCheckOptionPrompt: @YES };

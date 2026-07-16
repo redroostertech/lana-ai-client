@@ -14,6 +14,7 @@ function matrixToTsv(matrix) {
 
 function actionText(action) {
   if (action.type === 'insert_table') return matrixToTsv(action.arguments.matrix);
+  if (action.type === 'open_url' || action.type === 'navigate_client') return '';
   return normalizeText(action.arguments.text);
 }
 

@@ -38,36 +38,7 @@ body { padding: 4px; color: var(--lex-text-primary); }
 .gathering_context .level-meter,
 .executing .level-meter,
 .speaking .level-meter { display: block; opacity: 1; }
-.mode-select {
-  width: 116px;
-  flex: 0 0 116px;
-  --lex-select-dropdown-bg: var(--lex-color-white);
-}
-.voice-shell .mode-select .lex-ddbtn-trigger {
-  width: 116px;
-  min-height: 28px;
-  justify-content: space-between;
-  padding: 5px 9px 5px 12px;
-  border: 1px solid color-mix(in srgb, var(--lex-color-white) 22%, transparent);
-  border-radius: var(--lex-radius-full, 999px);
-  background: var(--lex-color-white);
-  color: var(--lex-color-gray-900);
-  font-size: var(--lex-body-xs-size, 12px);
-}
-.voice-shell .mode-select .lex-ddbtn-trigger:hover {
-  background: var(--lex-color-gray-100);
-}
-.voice-shell .mode-select .lex-ddbtn-dropdown {
-  min-width: 132px;
-  padding: 4px;
-  border-radius: var(--lex-radius-lg, 10px);
-}
-.voice-shell .mode-select .lex-ddbtn-item {
-  border-radius: var(--lex-radius-md, 7px);
-}
-.mode-menu-open .voice-shell {
-  overflow: visible;
-}
+.agent-mode-pill { flex: 0 0 auto; min-width: 64px; padding: 6px 13px; border: 1px solid color-mix(in srgb, var(--lex-color-white) 22%, transparent); border-radius: var(--lex-radius-full, 999px); background: var(--lex-color-white); color: var(--lex-color-gray-900); font-size: var(--lex-body-xs-size, 12px); font-weight: var(--lex-weight-semibold, 600); text-align: center; }
 .shortcut-hint {
   min-width: 0;
   flex: 1 1 auto;

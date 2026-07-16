@@ -53,6 +53,7 @@
   }
 
   function availabilityText(capability) {
+    if (capability.runtimeUnavailable === 'microphone') return 'No microphone detected on this device';
     if (!capability.available) return 'Unavailable on this platform';
     if (capability.required) return 'Required by your organization';
     return capability.active ? 'Active on this device' : 'Off on this device';
@@ -120,7 +121,7 @@
     var copy = element('div', 'sv2-capability-option-copy');
     copy.appendChild(element('span', 'sv2-capability-option-name', labelText));
     copy.appendChild(element('span', 'sv2-capability-option-description',
-      type === 'microphone' ? 'Required to hear your dictation.' : 'Required to identify and update the focused field safely.'));
+      type === 'microphone' ? 'Required to hear your voice requests.' : 'Required to understand and update the active application safely.'));
     var actions = element('div', 'sv2-capability-permission-actions');
     var state = permissionLabel(type, permissions);
     var badge = document.createElement('lex-badge');
@@ -145,33 +146,25 @@
 
   function renderVoiceSettings(parent, capability, onSave, onPermissionRequest) {
     var settings = capability.voiceSettings || {};
-    var disabled = !capability.active || !capability.available;
+    var disabled = !capability.active || !capability.available || capability.runtimeUnavailable === 'microphone';
     var form = element('form', 'sv2-capability-voice-settings');
     form.appendChild(element('h4', 'sv2-capability-subheading', 'Voice settings'));
     var fields = element('div', 'sv2-capability-field-grid');
-    var dictationShortcut = createVoiceField('Dictation shortcut', 'dictationShortcut',
+    var dictationShortcut = createVoiceField('Agent shortcut', 'dictationShortcut',
       settings.dictationShortcut || 'CommandOrControl+Shift+Space');
-    var agentShortcut = createVoiceField('Agent shortcut', 'agentShortcut',
-      settings.agentShortcut || 'CommandOrControl+Shift+A');
     dictationShortcut.querySelector('input').disabled = true;
-    agentShortcut.querySelector('input').disabled = true;
     fields.appendChild(dictationShortcut);
-    fields.appendChild(agentShortcut);
-    fields.appendChild(createVoiceField('Default mode', 'defaultMode', settings.defaultMode || 'dictation', [
-      { label: 'Dictation', value: 'dictation' }, { label: 'Agent', value: 'agent' }
-    ]));
     fields.appendChild(createVoiceField('Confirmation', 'confirmationPolicy', settings.confirmationPolicy || 'risk_based', [
       { label: 'Risk based', value: 'risk_based' }, { label: 'Always preview', value: 'always' },
       { label: 'Skip for safe inserts', value: 'never_safe_only' }
     ]));
     Array.prototype.forEach.call(fields.querySelectorAll('input, select'), function (control) { control.disabled = disabled; });
     dictationShortcut.querySelector('input').disabled = true;
-    agentShortcut.querySelector('input').disabled = true;
     form.appendChild(fields);
     form.appendChild(createToggleOption('Open at Login',
-      'Show Screen Dictation after you sign in. When off, use a configured shortcut to open it.',
+      'Show the LANA voice agent after you sign in. When off, hold the agent shortcut to open it.',
       'openAtLogin', settings.openAtLogin, disabled));
-    form.appendChild(createToggleOption('Use active-window context in Agent mode',
+    form.appendChild(createToggleOption('Use active-window context',
       'Share only scoped accessible content from the active window when an agent request needs it.',
       'screenContextEnabled', settings.screenContextEnabled !== false, disabled));
     form.appendChild(createToggleOption('Speak agent answers',
@@ -196,8 +189,8 @@
         enabled: settings.enabled !== false,
         openAtLogin: form.elements.openAtLogin.checked,
         dictationShortcut: form.elements.dictationShortcut.value.trim(),
-        agentShortcut: form.elements.agentShortcut.value.trim(),
-        defaultMode: form.elements.defaultMode.value,
+        agentShortcut: settings.agentShortcut || 'CommandOrControl+Shift+A',
+        defaultMode: 'agent',
         screenContextEnabled: form.elements.screenContextEnabled.checked,
         voiceOutputEnabled: form.elements.voiceOutputEnabled.checked,
         confirmationPolicy: form.elements.confirmationPolicy.value,
@@ -239,9 +232,10 @@
     select.appendChild(new Option('Activated', 'active'));
     select.appendChild(new Option('Off', 'off'));
     select.value = capability.active ? 'active' : 'off';
-    select.disabled = capability.required || !capability.available;
+    select.disabled = capability.required || !capability.available || capability.runtimeUnavailable === 'microphone';
     if (capability.required) select.title = 'Required by your organization';
     if (!capability.available) select.title = 'Unavailable on this platform';
+    if (capability.runtimeUnavailable === 'microphone') select.title = 'Connect a microphone to use this capability';
     select.addEventListener('change', function () { onChange(capability, select); });
     selectWrap.appendChild(label);
     selectWrap.appendChild(select);
@@ -282,6 +276,7 @@
     var list = document.getElementById('sv2-capabilities-list');
     var status = document.getElementById('sv2-capabilities-status');
     var expandedCapabilities = Object.create(null);
+    var capabilitySnapshot = [];
     var voiceSettings = null;
     var voicePermissions = null;
     var requestedCapability = new URLSearchParams(window.location.search).get('capability');
@@ -291,21 +286,27 @@
     function withVoiceState(capabilities) {
       return capabilities.map(function (capability) {
         return capability.id === 'screen-diction'
-          ? Object.assign({}, capability, { voiceSettings: voiceSettings, voicePermissions: voicePermissions })
+          ? Object.assign({}, capability, {
+            voiceSettings: voiceSettings,
+            voicePermissions: voicePermissions,
+            runtimeUnavailable: voicePermissions && voicePermissions.microphoneStatus === 'unavailable'
+              ? 'microphone' : null
+          })
           : capability;
       });
     }
 
     function render(capabilities) {
+      capabilitySnapshot = Array.isArray(capabilities) ? capabilities : [];
       list.replaceChildren();
-      if (!capabilities.length) {
+      if (!capabilitySnapshot.length) {
         var empty = element('div', 'sv2-capabilities-empty');
         empty.appendChild(element('h3', '', 'No capabilities connected'));
         empty.appendChild(element('p', '', 'Your organization has not enabled any desktop capabilities.'));
         list.appendChild(empty);
         return;
       }
-      withVoiceState(capabilities).forEach(function (capability) {
+      withVoiceState(capabilitySnapshot).forEach(function (capability) {
         list.appendChild(renderCapability(
           capability,
           update,
@@ -336,16 +337,16 @@
 
     function saveVoiceSettings(capability, settings, button) {
       button.disabled = true;
-      status.textContent = 'Saving Screen Dictation settings...';
+      status.textContent = 'Saving voice agent settings...';
       window.electronAPI.capabilities.setVoiceSettings(settings).then(function (result) {
         if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'Settings could not be saved.');
         voiceSettings = result.settings;
         render(Array.isArray(result.capabilities) ? result.capabilities : []);
         status.textContent = '';
-        notify('success', 'Screen Dictation settings saved');
+        notify('success', 'Voice agent settings saved');
       }).catch(function (error) {
         button.disabled = !capability.active || !capability.available;
-        status.textContent = error.message || 'Screen Dictation settings could not be saved.';
+        status.textContent = error.message || 'Voice agent settings could not be saved.';
         notify('error', status.textContent);
       });
     }
@@ -367,7 +368,10 @@
 
     function refreshPermissions() {
       return window.electronAPI.capabilities.getVoicePermissions().then(function (result) {
-        if (result && result.success === true) applyPermissionStatus(result.permissions);
+        if (result && result.success === true) {
+          applyPermissionStatus(result.permissions);
+          render(capabilitySnapshot);
+        }
       }).catch(function () {});
     }
 

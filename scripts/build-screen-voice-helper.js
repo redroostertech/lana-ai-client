@@ -18,7 +18,7 @@ if (process.platform !== 'darwin') {
 fs.mkdirSync(outputDir, { recursive: true });
 const result = spawnSync('/usr/bin/xcrun', [
   'clang', '-fobjc-arc', '-O2', '-arch', 'arm64', '-arch', 'x86_64', source, '-o', output,
-  '-framework', 'AppKit', '-framework', 'ApplicationServices', '-framework', 'Security'
+  '-framework', 'AppKit', '-framework', 'ApplicationServices', '-framework', 'AVFoundation', '-framework', 'Security'
 ], { stdio: 'inherit' });
 if (result.status !== 0) process.exit(result.status || 1);
 fs.chmodSync(output, 0o755);

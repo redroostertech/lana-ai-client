@@ -3,19 +3,16 @@ const { parseAgentDecision } = require('../../src/screen-voice/contracts');
 const { actionText } = require('../../src/screen-voice/action-normalizer');
 
 describe('screen voice vertical workflows', () => {
-  test('final literal transcript bypasses agent and inserts once', async () => {
+  test('a spoken turn remains agent-only and cannot bypass structured actions', () => {
     const controller = new VoiceSessionController();
-    const adapter = { insert: jest.fn(async () => ({ ok: true })) };
-    const agent = jest.fn();
-    controller.start('dictation');
+    controller.start('agent');
     controller.transition('transcribing');
     controller.session.transcript = 'Please send the revised contract Friday.';
-    controller.transition('executing');
-    if (controller.claimExecution(`${controller.session.id}:dictation`)) {
-      await adapter.insert(controller.session.transcript, { processId: 1 });
-    }
-    expect(adapter.insert).toHaveBeenCalledTimes(1);
-    expect(agent).not.toHaveBeenCalled();
+    controller.transition('gathering_context');
+    controller.transition('thinking');
+    controller.transition('previewing');
+    expect(controller.session.mode).toBe('agent');
+    expect(controller.state).toBe('previewing');
   });
 
   test('selected rewrite validates and replaces only the selection', async () => {

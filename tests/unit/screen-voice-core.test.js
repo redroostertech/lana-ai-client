@@ -19,7 +19,7 @@ function context(overrides = {}) {
 describe('screen voice session controller', () => {
   test('enforces transitions and prevents overlapping sessions', () => {
     const controller = new VoiceSessionController({ clock: () => 100 });
-    controller.start('dictation');
+    controller.start('agent');
     expect(controller.state).toBe('listening');
     expect(() => controller.start('agent')).toThrow(expect.objectContaining({ code: 'SESSION_OVERLAP' }));
     controller.transition('transcribing');
@@ -35,12 +35,12 @@ describe('screen voice session controller', () => {
     controller.cancel();
     expect(signal.aborted).toBe(true);
     expect(controller.state).toBe('canceled');
-    expect(() => controller.start('dictation')).not.toThrow();
+    expect(() => controller.start('agent')).not.toThrow();
   });
 
   test('cancellation is safe from an error state during application shutdown', () => {
     const controller = new VoiceSessionController();
-    controller.start('dictation');
+    controller.start('agent');
     controller.fail('TRANSCRIPTION_FAILED', 'Could not transcribe');
     expect(() => controller.cancel('app_quit')).not.toThrow();
     expect(controller.state).toBe('canceled');
@@ -63,6 +63,7 @@ describe('screen voice contracts and safety helpers', () => {
   test('merges validated defaults for settings', () => {
     expect(parseSettings({ screenContextEnabled: false })).toEqual({ ...DEFAULT_SETTINGS, screenContextEnabled: false });
     expect(parseSettings({}).openAtLogin).toBe(false);
+    expect(parseSettings({ defaultMode: 'dictation' }).defaultMode).toBe('agent');
   });
 
   test('migrates the Electron-incompatible legacy agent accelerator', () => {
@@ -109,6 +110,13 @@ describe('screen voice contracts and safety helpers', () => {
       { confirmationPolicy: 'risk_based' })).toBe(true);
     expect(actionRequiresConfirmation({ type: 'replace_selection', requiresConfirmation: false },
       context({ selectedText: 'chosen' }), { confirmationPolicy: 'risk_based' })).toBe(false);
+  });
+
+  test('browser and client navigation always require confirmation', () => {
+    expect(actionRequiresConfirmation({ type: 'open_url', requiresConfirmation: false }, context(),
+      { confirmationPolicy: 'never_safe_only' })).toBe(true);
+    expect(actionRequiresConfirmation({ type: 'navigate_client', requiresConfirmation: false }, context(),
+      { confirmationPolicy: 'never_safe_only' })).toBe(true);
   });
 
   test('normalizes Unicode/newlines and produces deterministic tabular insertion', () => {

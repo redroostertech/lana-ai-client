@@ -4,7 +4,7 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     shell: document.querySelector('.voice-shell'), expanded: $('expandedSurface'), expandedStatus: $('expandedStatus'),
-    mode: $('modeSelect'), info: $('infoButton'), shortcutHint: $('shortcutHint'),
+    mode: $('modeLabel'), info: $('infoButton'), shortcutHint: $('shortcutHint'),
     shortcutVerb: $('shortcutVerb'), shortcutKeys: $('shortcutKeys'), shortcutAction: $('shortcutAction'),
     title: $('statusTitle'), detail: $('statusDetail'), context: $('contextNotice'), meter: $('levelMeter'),
     transcript: $('transcript'), preview: $('preview'), previewText: $('previewText'),
@@ -25,14 +25,11 @@
   let capturePhase = 'idle';
   let playback = null;
   let detailsOpen = true;
-  let modeInitialized = false;
-  let selectedMode = 'dictation';
-  let modeMenuOpen = false;
   let drawerTimer = null;
   let resizeFrame = null;
 
   const stateCopy = {
-    idle: ['Ready', 'Dictate into the focused field or ask LANA about this window.'],
+    idle: ['Ready', 'Ask LANA about your matter, this window, or what to do next.'],
     listening: ['Listening', 'Speak after the start chime, then release the shortcut to process.'],
     transcribing: ['Transcribing', 'Turning your audio into text…'],
     gathering_context: ['Reading this window', 'Collecting only the active, accessible context needed for your request.'],
@@ -62,9 +59,7 @@
     resizeFrame = requestAnimationFrame(() => {
       resizeFrame = null;
       const shellBottom = els.shell.getBoundingClientRect().bottom;
-      const dropdown = modeMenuOpen ? els.mode.querySelector('.lex-ddbtn-dropdown') : null;
-      const dropdownBottom = dropdown?.getBoundingClientRect().bottom || 0;
-      window.screenVoice.setOverlayHeight(Math.ceil(Math.max(shellBottom, dropdownBottom) + 4));
+      window.screenVoice.setOverlayHeight(Math.ceil(shellBottom + 4));
     });
   }
 
@@ -95,20 +90,8 @@
     const session = snapshot.session || {};
     const copy = stateCopy[state] || stateCopy.idle;
     els.shell.className = `voice-shell ${state} capture-${capturePhase}`;
-    const isAgent = session.mode === 'agent';
-    if (!modeInitialized) {
-      selectedMode = snapshot.selectedMode === 'agent' || snapshot.settings?.defaultMode === 'agent' ? 'agent' : 'dictation';
-      modeInitialized = true;
-    }
-    if (!['idle', 'canceled', 'error'].includes(state) && session.mode) selectedMode = session.mode;
-    els.mode.buttonLabel = selectedMode === 'agent' ? 'Agent' : 'Dictation';
-    els.mode.disabled = !['idle', 'canceled', 'error'].includes(state);
-    const activeShortcut = selectedMode === 'agent'
-      ? snapshot.settings?.agentShortcut
-      : snapshot.settings?.dictationShortcut;
-    const shortcutLabel = displayShortcut(activeShortcut || (selectedMode === 'agent'
-      ? 'CommandOrControl+Shift+A'
-      : 'CommandOrControl+Shift+Space'));
+    const activeShortcut = snapshot.settings?.dictationShortcut;
+    const shortcutLabel = displayShortcut(activeShortcut || 'CommandOrControl+Shift+Space');
     const captureReady = state === 'listening' && capturePhase === 'recording';
     const captureStarting = state === 'listening' && ['idle', 'preparing', 'chiming'].includes(capturePhase);
     const captureReleasing = state === 'listening' && capturePhase === 'releasing';
@@ -116,7 +99,7 @@
     els.shortcutVerb.textContent = captureReady ? 'Release' : captureStarting ? 'Keep holding' : captureReleasing ? 'Processing' : 'Hold';
     els.shortcutAction.textContent = captureReady ? 'to process' : captureStarting ? 'until ready' : captureReleasing ? 'audio…' : 'to speak';
     els.shortcutHint.title = `${els.shortcutVerb.textContent} ${els.shortcutKeys.textContent} ${els.shortcutAction.textContent}`.trim();
-    els.title.textContent = state === 'listening' && !isAgent ? 'Dictating' : copy[0];
+    els.title.textContent = copy[0];
     els.shell.setAttribute('aria-label', `${copy[0]}. ${session.error?.message || copy[1]}`);
     els.detail.textContent = session.error?.message || copy[1];
     if (state === 'listening') {
@@ -130,7 +113,7 @@
       els.detail.textContent = captureCopy[1];
     }
     if (state === 'idle') {
-      els.detail.textContent = `Hold ${displayShortcut(snapshot.settings?.dictationShortcut || 'CommandOrControl+Shift+Space')} to dictate, or ${displayShortcut(snapshot.settings?.agentShortcut || 'CommandOrControl+Shift+A')} for Agent mode. Release to process.`;
+      els.detail.textContent = `Hold ${displayShortcut(snapshot.settings?.dictationShortcut || 'CommandOrControl+Shift+Space')} to ask LANA. Release to process.`;
     }
     els.context.hidden = state !== 'gathering_context';
     els.transcript.hidden = !session.transcript;
@@ -139,7 +122,9 @@
     els.preview.hidden = state !== 'previewing';
     els.previewText.value = decision?.displayResponse || '';
     els.confirm.hidden = !decision?.proposedActions?.length;
-    if (decision?.proposedActions?.[0]?.type === 'replace_selection') els.confirm.textContent = 'Replace';
+    if (decision?.proposedActions?.[0]?.type === 'open_url') els.confirm.textContent = 'Open browser';
+    else if (decision?.proposedActions?.[0]?.type === 'navigate_client') els.confirm.textContent = 'Open in LANA';
+    else if (decision?.proposedActions?.[0]?.type === 'replace_selection') els.confirm.textContent = 'Replace';
     else if (decision?.proposedActions?.[0]?.type === 'insert_table') els.confirm.textContent = 'Insert cells';
     else els.confirm.textContent = 'Insert';
     els.undo.hidden = !session.result?.canUndo;
@@ -307,23 +292,6 @@
     stream = null; recorder = null; chunks = [];
   }
 
-  function setModeMenu(open) {
-    modeMenuOpen = Boolean(open);
-    document.body.classList.toggle('mode-menu-open', modeMenuOpen);
-    window.screenVoice.setModeMenuOpen(modeMenuOpen);
-    setTimeout(syncOverlayHeight, 0);
-  }
-  els.mode.addEventListener('click', () => {
-    setTimeout(() => setModeMenu(Boolean(els.mode._open)), 0);
-  });
-  els.mode.addEventListener('lex-select', (event) => {
-    selectedMode = event.detail?.value === 'agent' ? 'agent' : 'dictation';
-    setModeMenu(false);
-    render(snapshot);
-  });
-  document.addEventListener('mousedown', (event) => {
-    if (modeMenuOpen && !els.mode.contains(event.target)) setModeMenu(false);
-  });
   els.undo.addEventListener('click', () => window.screenVoice.undo());
   els.confirm.addEventListener('click', () => window.screenVoice.confirm(snapshot.session?.id));
   els.copy.addEventListener('click', () => window.screenVoice.copy(els.previewText.value));
@@ -343,10 +311,6 @@
   $('settingsButton').addEventListener('click', () => window.screenVoice.openSettings());
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
-    if (modeMenuOpen) {
-      setModeMenu(false);
-      return;
-    }
     if (detailsOpen) {
       detailsOpen = false;
       syncExpandedSurface();
@@ -359,8 +323,7 @@
   window.screenVoice.onState(render);
   window.screenVoice.onStartCapture(startCapture);
   window.screenVoice.onStopCapture(({ discard }) => stopCapture(discard));
-  window.screenVoice.onShowDetails(({ mode } = {}) => {
-    if (mode === 'agent' || mode === 'dictation') selectedMode = mode;
+  window.screenVoice.onShowDetails(() => {
     detailsOpen = true;
     syncExpandedSurface();
     render(snapshot);
@@ -376,7 +339,7 @@
   labelLexButton(els.undo, 'Undo last voice edit');
   labelLexButton(els.info, 'Voice details');
   labelLexButton(els.hideDetails, 'Hide voice details');
-  labelLexButton($('settingsButton'), 'Open Screen Dictation settings');
+  labelLexButton($('settingsButton'), 'Open LANA Voice Agent settings');
   labelLexButton($('dismissButton'), 'Hide voice overlay');
   window.screenVoice.getState().then(render);
 })();

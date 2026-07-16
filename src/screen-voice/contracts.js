@@ -64,12 +64,15 @@ const screenContextSchema = z.object({
   targetFingerprint: targetFingerprintSchema
 }).strict();
 
-const actionTypes = ['insert_text', 'replace_selection', 'insert_table', 'copy'];
+const actionTypes = ['insert_text', 'replace_selection', 'insert_table', 'copy', 'open_url', 'navigate_client'];
 const proposedActionSchema = z.object({
   type: z.enum(actionTypes),
   arguments: z.object({
     text: z.string().max(MAX_ACTION_TEXT_CHARS).optional(),
-    matrix: z.array(z.array(z.string().max(4000)).max(100)).max(100).optional()
+    matrix: z.array(z.array(z.string().max(4000)).max(100)).max(100).optional(),
+    url: z.string().url().max(2048).optional(),
+    route: z.string().max(240).optional(),
+    matterId: z.string().max(240).optional()
   }).strict(),
   targetFingerprint: targetFingerprintSchema.nullable(),
   requiresConfirmation: z.boolean()
@@ -78,13 +81,15 @@ const proposedActionSchema = z.object({
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['arguments', 'matrix'], message: 'matrix is required' });
   }
   if (action.type !== 'insert_table' && typeof action.arguments.text !== 'string') {
+    if (action.type === 'open_url' && action.arguments.url) return;
+    if (action.type === 'navigate_client' && action.arguments.route) return;
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['arguments', 'text'], message: 'text is required' });
   }
 });
 
 const agentDecisionSchema = z.object({
   intent: z.enum([
-    'dictate', 'answer', 'insert', 'replace_selection', 'rewrite', 'summarize',
+    'answer', 'insert', 'replace_selection', 'rewrite', 'summarize',
     'insert_table', 'navigate_focus', 'clarify', 'refuse'
   ]),
   spokenResponse: z.string().max(4000),
@@ -114,7 +119,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   openAtLogin: false,
   dictationShortcut: 'CommandOrControl+Shift+Space',
   agentShortcut: 'CommandOrControl+Shift+A',
-  defaultMode: 'dictation',
+  defaultMode: 'agent',
   screenContextEnabled: true,
   voiceOutputEnabled: false,
   confirmationPolicy: 'risk_based',
@@ -133,6 +138,7 @@ function parseSettings(value) {
   if (migrated.agentShortcut === LEGACY_AGENT_SHORTCUT) {
     migrated.agentShortcut = DEFAULT_SETTINGS.agentShortcut;
   }
+  migrated.defaultMode = 'agent';
   return voiceSettingsSchema.parse(migrated);
 }
 

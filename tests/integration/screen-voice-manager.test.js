@@ -18,6 +18,7 @@ jest.mock('electron', () => ({
 
 const { ElectronScreenVoice } = require('../../src/screen-voice/electron-screen-voice');
 const { globalShortcut, ipcMain, systemPreferences } = require('electron');
+const macTest = process.platform === 'darwin' ? test : test.skip;
 
 const fingerprint = { platform: 'darwin', processId: 9, bundleId: 'com.editor', processName: 'Editor',
   windowTitle: 'Doc', role: 'AXTextArea', name: 'Body', bounds: null, selectionHash: null };
@@ -38,9 +39,11 @@ function overlay() {
     destroy: jest.fn(() => { visible = false; }) };
 }
 
-function managerWith({ api, adapter, openClientSettings, shortcutMonitorFactory }) {
+function managerWith({ api, adapter, openClientSettings, shortcutMonitorFactory, navigateClient, openExternalUrl, notifyUser,
+  microphoneHardwareStatus }) {
   const manager = new ElectronScreenVoice({ api, adapter, getMainWindow: () => null,
-    getSavedServer: () => ({ url: 'http://local' }), openClientSettings,
+    getSavedServer: () => ({ url: 'http://local' }), openClientSettings, navigateClient, openExternalUrl, notifyUser,
+    microphoneHardwareStatus: microphoneHardwareStatus || (async () => ({ available: true, deviceCount: 1 })),
     shortcutMonitorFactory: shortcutMonitorFactory || ((onEvent) => {
       onEvent({ event: 'ready' });
       return { stop: jest.fn() };
@@ -53,24 +56,26 @@ function managerWith({ api, adapter, openClientSettings, shortcutMonitorFactory 
 describe('Electron screen voice orchestration', () => {
   beforeEach(() => { sent.length = 0; jest.clearAllMocks(); });
 
-  test('audio transcript reaches literal insertion without an agent request', async () => {
-    const api = { transcribe: jest.fn(async () => ({ text: 'Literal text' })), decide: jest.fn() };
-    const adapter = { insert: jest.fn(async () => ({ ok: true })) };
+  test('every transcript is handled by the conversational agent', async () => {
+    const api = { transcribe: jest.fn(async () => ({ text: 'Please send the revised contract Friday.' })),
+      decide: jest.fn(async () => ({ intent: 'answer', spokenResponse: 'I can help with that.',
+        displayResponse: 'I can help with that.', proposedActions: [], confidence: 0.9,
+        contextUsed: [] })) };
+    const adapter = { activate: jest.fn(async () => {}), getContext: jest.fn(async () => context), insert: jest.fn() };
     const manager = managerWith({ api, adapter });
-    manager.controller.start('dictation');
+    manager.controller.start('agent');
     manager.controller.session.target = fingerprint;
     await manager.handleAudio({ sessionId: manager.controller.session.id, audioBase64: 'AAAA', mimeType: 'audio/webm' });
-    expect(adapter.insert).toHaveBeenCalledWith('Literal text', fingerprint);
-    expect(api.decide).not.toHaveBeenCalled();
-    expect(manager.controller.state).toBe('idle');
-    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(480, 190, true);
+    expect(api.decide).toHaveBeenCalledWith(expect.objectContaining({ interactionMode: 'agent' }), expect.anything());
+    expect(adapter.insert).not.toHaveBeenCalled();
+    expect(manager.controller.state).toBe('previewing');
   });
 
   test('sound-effect-only transcription is never inserted', async () => {
     const api = { transcribe: jest.fn(async () => ({ text: '(beep)' })) };
     const adapter = { insert: jest.fn() };
     const manager = managerWith({ api, adapter });
-    manager.controller.start('dictation');
+    manager.controller.start('agent');
     manager.controller.session.target = fingerprint;
 
     await manager.handleAudio({ sessionId: manager.controller.session.id, audioBase64: 'AAAA', mimeType: 'audio/webm' });
@@ -103,11 +108,13 @@ describe('Electron screen voice orchestration', () => {
     expect(adapter.replaceSelection).toHaveBeenCalledWith('Professional draft.', selectedContext.targetFingerprint);
   });
 
-  test('changed focus or malformed model output never mutates the target', async () => {
+  test('changed application never reaches the model or mutates the target', async () => {
     const api = { transcribe: jest.fn(async () => ({ text: 'Summarize this' })),
       decide: jest.fn(async () => ({ arbitrary: 'output' })) };
-    const adapter = { activate: jest.fn(async () => {}), getContext: jest.fn(async () => ({ ...context, windowTitle: 'Other',
-      targetFingerprint: { ...fingerprint, windowTitle: 'Other' } })), insert: jest.fn(), replaceSelection: jest.fn() };
+    const adapter = { activate: jest.fn(async () => {}), getContext: jest.fn(async () => ({ ...context,
+      processId: 20, bundleId: 'com.other', windowTitle: 'Other',
+      targetFingerprint: { ...fingerprint, processId: 20, bundleId: 'com.other', windowTitle: 'Other' } })),
+    insert: jest.fn(), replaceSelection: jest.fn() };
     const manager = managerWith({ api, adapter });
     manager.controller.start('agent'); manager.controller.session.target = fingerprint;
     await manager.handleAudio({ sessionId: manager.controller.session.id, audioBase64: 'AAAA', mimeType: 'audio/webm' });
@@ -140,7 +147,7 @@ describe('Electron screen voice orchestration', () => {
   test('provider failures become safe error state', async () => {
     const error = Object.assign(new Error('offline'), { code: 'NETWORK_UNAVAILABLE' });
     const manager = managerWith({ api: { transcribe: jest.fn(async () => { throw error; }) }, adapter: {} });
-    manager.controller.start('dictation'); manager.controller.session.target = fingerprint;
+    manager.controller.start('agent'); manager.controller.session.target = fingerprint;
     const result = await manager.handleAudio({ sessionId: manager.controller.session.id, audioBase64: 'AAAA' });
     expect(result.error.code).toBe('NETWORK_UNAVAILABLE');
     expect(manager.controller.state).toBe('error');
@@ -158,7 +165,7 @@ describe('Electron screen voice orchestration', () => {
     expect(testOverlay.showInactive).not.toHaveBeenCalled();
 
     manager.setAuthenticated(true);
-    expect(globalShortcut.register).toHaveBeenCalledTimes(2);
+    expect(globalShortcut.register).toHaveBeenCalledTimes(1);
     expect(testOverlay.showInactive).not.toHaveBeenCalled();
 
     manager.setOpenAtLogin(true);
@@ -216,7 +223,7 @@ describe('Electron screen voice orchestration', () => {
     expect(sent).toContainEqual(['screen-voice:stop-capture', { reason: 'activation_released' }]);
   });
 
-  test('key repeat during one hold does not create repeated failed sessions', async () => {
+  test('key repeat during one hold does not create overlapping sessions on a non-editable screen', async () => {
     const manager = managerWith({ api: {}, adapter: {
       permissionStatus: jest.fn(async () => ({ accessibility: true })),
       getTarget: jest.fn(async () => ({ ...context,
@@ -226,16 +233,16 @@ describe('Electron screen voice orchestration', () => {
     manager.entitlementEnabled = true;
     manager.shortcutMonitor = { stop: jest.fn() };
     manager.shortcutMonitorReady = true;
-    const fail = jest.spyOn(manager, 'fail');
+    const start = jest.spyOn(manager.controller, 'start');
 
     await manager.handleShortcutDown('dictation');
     await manager.handleShortcutDown('dictation');
     await manager.handleShortcutDown('dictation');
 
-    expect(fail).toHaveBeenCalledTimes(1);
-    manager.handleShortcutUp('dictation');
-    await manager.handleShortcutDown('dictation');
-    expect(fail).toHaveBeenCalledTimes(2);
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(manager.controller.state).toBe('listening');
+    manager.handleShortcutUp('agent');
+    expect(sent).toContainEqual(['screen-voice:stop-capture', { reason: 'activation_released' }]);
   });
 
   test('restores the editor target when overlay interaction owns focus', async () => {
@@ -274,10 +281,63 @@ describe('Electron screen voice orchestration', () => {
     manager.entitlementEnabled = true;
     if (process.platform === 'darwin') systemPreferences.getMediaAccessStatus.mockReturnValueOnce('not-determined');
 
-    await manager.begin('dictation', 'test');
+    await manager.begin('agent', 'test');
 
     if (process.platform === 'darwin') expect(systemPreferences.askForMediaAccess).toHaveBeenCalledWith('microphone');
     expect(adapter.requestPermission).toHaveBeenCalled();
     expect(manager.controller.state).toBe('listening');
+  });
+
+  macTest('a machine without an audio input is reported unavailable before capture starts', async () => {
+    const adapter = { permissionStatus: jest.fn(async () => ({ accessibility: true })), getTarget: jest.fn() };
+    const manager = managerWith({ api: {}, adapter,
+      microphoneHardwareStatus: async () => ({ available: false, deviceCount: 0 }) });
+    manager.authenticated = true;
+    manager.entitlementEnabled = true;
+
+    const permissions = await manager.permissionStatus();
+    const result = await manager.begin('agent', 'test');
+
+    expect(permissions).toEqual(expect.objectContaining({ microphone: false, microphoneStatus: 'unavailable' }));
+    expect(result.error.code).toBe('MICROPHONE_UNAVAILABLE');
+    expect(adapter.getTarget).not.toHaveBeenCalled();
+  });
+
+  test('voice follow-up uses prior turns and approved browser navigation is allowlisted by the host', async () => {
+    const openExternalUrl = jest.fn(async () => true);
+    const api = { transcribe: jest.fn(async () => ({ text: 'Yes, research that on the web.' })),
+      decide: jest.fn(async () => ({ intent: 'answer', spokenResponse: 'I can open that search.',
+        displayResponse: 'Open a web search for the contract issue?',
+        proposedActions: [{ type: 'open_url', arguments: { url: 'https://www.google.com/search?q=contract+issue' },
+          targetFingerprint: null, requiresConfirmation: true }], confidence: 0.95, contextUsed: [] })) };
+    const adapter = { activate: jest.fn(async () => {}), getContext: jest.fn(async () => context) };
+    const manager = managerWith({ api, adapter, openExternalUrl });
+    manager.conversationMemory = 'The user asked about a contract issue.';
+    manager.conversationTurns = [{ role: 'user', text: 'Should we research the contract issue?' },
+      { role: 'assistant', text: 'Would you like me to research it on the web?' }];
+    manager.controller.start('agent');
+    manager.controller.session.target = fingerprint;
+    const sessionId = manager.controller.session.id;
+
+    await manager.handleAudio({ sessionId, audioBase64: 'AAAA', mimeType: 'audio/webm' });
+
+    expect(api.decide.mock.calls[0][0]).toEqual(expect.objectContaining({
+      conversationMemory: expect.stringContaining('contract issue'),
+      conversation: expect.arrayContaining([expect.objectContaining({ role: 'assistant' })])
+    }));
+    expect(openExternalUrl).not.toHaveBeenCalled();
+    await manager.confirm(sessionId);
+    expect(openExternalUrl).toHaveBeenCalledWith('https://www.google.com/search?q=contract+issue');
+  });
+
+  test('older spoken turns roll into bounded conversation memory without screen content', () => {
+    const manager = managerWith({ api: {}, adapter: {} });
+    for (let index = 0; index < 30; index += 1) {
+      manager.rememberConversationTurn(index % 2 ? 'assistant' : 'user', `spoken turn ${index}`);
+    }
+    expect(manager.conversationTurns).toHaveLength(24);
+    expect(manager.conversationMemory).toContain('spoken turn 0');
+    expect(manager.conversationMemory).toContain('spoken turn 5');
+    expect(manager.conversationMemory).not.toContain('screen text');
   });
 });
