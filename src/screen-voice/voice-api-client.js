@@ -17,7 +17,7 @@ class VoiceApiClient {
     this.timeoutMs = options.timeoutMs || 60000;
   }
 
-  async post(pathname, body, signal) {
+  async post(pathname, body, signal, failureCode = 'PROVIDER_ERROR') {
     const serverUrl = await this.getServerUrl();
     const token = await this.getToken();
     if (!serverUrl) throw new VoiceApiError('SERVER_UNAVAILABLE', 'LANA server connection is unavailable.');
@@ -39,7 +39,7 @@ class VoiceApiClient {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const message = payload?.error?.message || payload?.error || payload?.message || 'Voice request failed.';
-      throw new VoiceApiError('PROVIDER_ERROR', String(message), response.status);
+      throw new VoiceApiError(failureCode, String(message), response.status);
     }
     return payload.data ?? payload;
   }
@@ -47,7 +47,7 @@ class VoiceApiClient {
   transcribe({ audioBase64, mimeType, language }, signal) {
     return this.post('/api/v1/voice/transcribe', {
       audio_base64: audioBase64, mime_type: mimeType, language
-    }, signal);
+    }, signal, 'TRANSCRIPTION_FAILED');
   }
 
   decide(input, signal) { return this.post('/api/v1/voice/screen-agent/decide', input, signal); }

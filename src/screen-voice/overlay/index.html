@@ -11,7 +11,7 @@
 <body>
   <main class="voice-shell" aria-label="LANA screen-aware voice assistant">
     <section class="compact-bar" aria-live="polite" aria-atomic="true">
-      <span class="voice-mark" aria-hidden="true">L</span>
+      <img class="voice-mark" src="lana-mark.svg" alt="" aria-hidden="true">
       <strong id="statusTitle" class="status-title">Ready</strong>
       <lex-progress-bar id="levelMeter" class="level-meter no-drag" value="0" color="accent" size="xs" animate="false" aria-label="Microphone level"></lex-progress-bar>
       <lex-badge id="modeBadge" class="mode-badge" label="Dictation" color="gray" size="sm"></lex-badge>
@@ -60,6 +60,11 @@
         <label>Confirmation
           <select id="confirmationPolicy"><option value="risk_based">Risk based</option><option value="always">Always preview</option><option value="never_safe_only">Skip for safe inserts</option></select>
         </label>
+        <div class="permission-summary" aria-live="polite">
+          <div><span>Microphone</span><lex-badge id="microphonePermissionBadge" label="Checking" color="gray" size="sm"></lex-badge></div>
+          <div><span>Accessibility</span><lex-badge id="accessibilityPermissionBadge" label="Checking" color="gray" size="sm"></lex-badge></div>
+          <p id="permissionHelp">Checking system permissions…</p>
+        </div>
         <div class="actions">
           <lex-btn class="no-drag" variant="primary" size="sm" type="submit">Save</lex-btn>
           <lex-btn id="accessibilityButton" class="no-drag" variant="secondary" size="sm">Enable Accessibility</lex-btn>

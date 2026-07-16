@@ -25,15 +25,10 @@ body { padding: 4px; color: var(--lex-text-primary); }
 
 .no-drag, input, textarea, select, button, lex-btn { -webkit-app-region: no-drag; }
 .voice-mark {
-  display: grid;
-  place-items: center;
   width: 24px;
   height: 24px;
   flex: 0 0 24px;
-  border-radius: var(--lex-radius-md, 7px);
-  color: var(--lex-color-gray-900);
-  background: var(--lex-color-white);
-  font: var(--lex-weight-bold, 700) 11px/1 var(--lex-font-serif, Georgia, serif);
+  display: block;
 }
 .status-title {
   min-width: 0;
@@ -86,6 +81,9 @@ body { padding: 4px; color: var(--lex-text-primary); }
 .settings-panel > label { margin: 10px 0; }
 .settings-panel input:not([type=checkbox]), .settings-panel select { width: 100%; min-height: 34px; padding: 6px 8px; border: 1px solid var(--lex-border-default); border-radius: var(--lex-radius-md, 7px); color: inherit; background: var(--lex-bg-primary); }
 .settings-panel .check { display: flex; align-items: center; gap: 8px; }
+.permission-summary { display: grid; gap: 7px; margin-top: 12px; padding: 10px; border-radius: var(--lex-radius-lg); background: var(--lex-bg-secondary); }
+.permission-summary > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--lex-text-secondary); font-size: var(--lex-body-xs-size); font-weight: var(--lex-weight-medium); }
+.permission-summary p { margin: 1px 0 0; color: var(--lex-text-tertiary); font-size: var(--lex-body-xs-size); line-height: var(--lex-body-xs-height); }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media (prefers-contrast: more) { .voice-shell, .button, input, textarea, select { border-width: 2px; } }

@@ -9,7 +9,10 @@
     transcript: $('transcript'), preview: $('preview'), previewText: $('previewText'),
     confirm: $('confirmButton'), copy: $('copyButton'), cancel: $('cancelButton'), idle: $('idleActions'),
     dictate: $('dictateButton'), agent: $('agentButton'), compactAgent: $('agentCompactButton'),
-    undo: $('undoButton'), settings: $('settingsPanel')
+    undo: $('undoButton'), settings: $('settingsPanel'),
+    microphonePermission: $('microphonePermissionBadge'), accessibilityPermission: $('accessibilityPermissionBadge'),
+    permissionHelp: $('permissionHelp'), microphonePermissionButton: $('microphoneButton'),
+    accessibilityPermissionButton: $('accessibilityButton')
   };
   let snapshot = { state: 'idle', session: null, settings: {} };
   let stream = null;
@@ -22,6 +25,7 @@
   let activeSessionId = null;
   let discardRecording = false;
   let playback = null;
+  let permissionTimer = null;
 
   const stateCopy = {
     idle: ['Ready', 'Dictate into the focused field or ask LANA about this window.'],
@@ -166,6 +170,50 @@
     $('confirmationPolicy').value = settings.confirmationPolicy || 'risk_based';
   }
 
+  function permissionBadge(badge, allowed, blocked, unavailable) {
+    badge.label = unavailable ? 'Unavailable' : allowed ? 'Allowed' : blocked ? 'Denied' : 'Required';
+    badge.color = unavailable ? 'gray' : allowed ? 'green' : blocked ? 'red' : 'yellow';
+  }
+
+  function renderPermissions(value = {}) {
+    const microphoneBlocked = ['denied', 'restricted'].includes(value.microphoneStatus);
+    const microphoneUnavailable = value.microphoneStatus === 'unavailable';
+    permissionBadge(els.microphonePermission, value.microphone === true, microphoneBlocked, microphoneUnavailable);
+    permissionBadge(els.accessibilityPermission, value.accessibility === true, false, value.supported === false);
+    els.microphonePermissionButton.disabled = value.microphone === true;
+    els.accessibilityPermissionButton.disabled = value.accessibility === true || value.supported === false;
+    if (value.microphone === true && value.accessibility === true) {
+      els.permissionHelp.textContent = 'Ready for dictation and screen-aware commands.';
+    } else if (microphoneBlocked) {
+      els.permissionHelp.textContent = 'Microphone access is blocked. Enable it in System Settings.';
+    } else if (value.accessibility !== true) {
+      els.permissionHelp.textContent = 'Accessibility access is required to find and safely update the focused field.';
+    } else {
+      els.permissionHelp.textContent = 'Microphone access will be requested when you start dictation.';
+    }
+  }
+
+  function refreshPermissions() {
+    return window.screenVoice.getPermissions().then(renderPermissions).catch(() => {
+      els.permissionHelp.textContent = 'Permission status is temporarily unavailable.';
+    });
+  }
+
+  function monitorPermissions(enabled) {
+    clearInterval(permissionTimer);
+    permissionTimer = null;
+    if (!enabled) return;
+    refreshPermissions();
+    permissionTimer = setInterval(refreshPermissions, 1500);
+  }
+
+  function requestSystemPermission(type) {
+    els.permissionHelp.textContent = `Requesting ${type} access…`;
+    return window.screenVoice.requestPermission(type).then(renderPermissions).catch(() => {
+      els.permissionHelp.textContent = 'The permission request could not be opened. Check System Settings manually.';
+    });
+  }
+
   els.mic.addEventListener('click', () => snapshot.state === 'listening' ? stopCapture(false) : window.screenVoice.activate('dictation'));
   els.compactAgent.addEventListener('click', () => window.screenVoice.activate('agent'));
   els.dictate.addEventListener('click', () => window.screenVoice.activate('dictation'));
@@ -179,11 +227,14 @@
     populateSettings();
     els.settings.hidden = !els.settings.hidden;
     syncExpandedSurface();
+    monitorPermissions(!els.settings.hidden);
     if (els.settings.hidden) window.screenVoice.closeSettings();
-    else window.screenVoice.openSettings();
+    else {
+      window.screenVoice.openSettings();
+    }
   });
-  $('accessibilityButton').addEventListener('click', () => window.screenVoice.requestPermission('accessibility'));
-  $('microphoneButton').addEventListener('click', () => window.screenVoice.requestPermission('microphone'));
+  $('accessibilityButton').addEventListener('click', () => requestSystemPermission('accessibility'));
+  $('microphoneButton').addEventListener('click', () => requestSystemPermission('microphone'));
   els.settings.addEventListener('submit', async (event) => {
     event.preventDefault();
     const save = window.screenVoice.saveSettings({ ...snapshot.settings,
@@ -194,6 +245,7 @@
       voiceOutputEnabled: $('voiceOutputEnabled').checked,
       confirmationPolicy: $('confirmationPolicy').value });
     els.settings.hidden = true;
+    monitorPermissions(false);
     syncExpandedSurface();
     await save;
   });
@@ -204,13 +256,14 @@
   window.screenVoice.onState(render);
   window.screenVoice.onStartCapture(startCapture);
   window.screenVoice.onStopCapture(({ discard }) => stopCapture(discard));
+  window.screenVoice.onPermissions(renderPermissions);
   window.screenVoice.onUndone(() => { els.detail.textContent = 'The last voice edit was undone.'; });
   window.screenVoice.onPlayAudio(({ base64, mime_type: mimeType }) => {
     if (playback) playback.pause();
     playback = new Audio(`data:${mimeType || 'audio/wav'};base64,${base64}`);
     playback.play().catch(() => {});
   });
-  window.addEventListener('beforeunload', cleanupCapture);
+  window.addEventListener('beforeunload', () => { monitorPermissions(false); cleanupCapture(); });
   labelLexButton(els.compactAgent, 'Ask LANA');
   labelLexButton(els.undo, 'Undo last voice edit');
   labelLexButton($('settingsButton'), 'Voice settings');

@@ -12,11 +12,12 @@ jest.mock('electron', () => ({
   ipcMain: { handle: jest.fn() },
   screen: { getCursorScreenPoint: jest.fn(() => ({ x: 0, y: 0 })),
     getDisplayNearestPoint: jest.fn(() => ({ workArea: { x: 0, y: 0, width: 1200, height: 800 } })) },
+  shell: { openExternal: jest.fn(async () => {}) },
   systemPreferences: { getMediaAccessStatus: jest.fn(() => 'granted'), askForMediaAccess: jest.fn(async () => true) }
 }));
 
 const { ElectronScreenVoice } = require('../../src/screen-voice/electron-screen-voice');
-const { globalShortcut } = require('electron');
+const { globalShortcut, systemPreferences } = require('electron');
 
 const fingerprint = { platform: 'darwin', processId: 9, bundleId: 'com.editor', processName: 'Editor',
   windowTitle: 'Doc', role: 'AXTextArea', name: 'Body', bounds: null, selectionHash: null };
@@ -150,5 +151,23 @@ describe('Electron screen voice orchestration', () => {
     await registration[1]();
     expect(manager.controller.state).toBe('listening');
     expect(testOverlay.showInactive).toHaveBeenCalled();
+  });
+
+  test('first activation requests missing permissions before capture', async () => {
+    const adapter = {
+      permissionStatus: jest.fn(async () => ({ accessibility: false, supported: true })),
+      requestPermission: jest.fn(async () => ({ accessibility: true, supported: true })),
+      getTarget: jest.fn(async () => context)
+    };
+    const manager = managerWith({ api: {}, adapter });
+    manager.authenticated = true;
+    manager.entitlementEnabled = true;
+    if (process.platform === 'darwin') systemPreferences.getMediaAccessStatus.mockReturnValueOnce('not-determined');
+
+    await manager.begin('dictation', 'test');
+
+    if (process.platform === 'darwin') expect(systemPreferences.askForMediaAccess).toHaveBeenCalledWith('microphone');
+    expect(adapter.requestPermission).toHaveBeenCalled();
+    expect(manager.controller.state).toBe('listening');
   });
 });

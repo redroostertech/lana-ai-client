@@ -2,7 +2,7 @@
 
 const path = require('path');
 const Store = require('electron-store');
-const { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen, systemPreferences } = require('electron');
+const { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen, shell, systemPreferences } = require('electron');
 const { VoiceSessionController } = require('./voice-session-controller');
 const { createDesktopAdapter } = require('./desktop-adapter');
 const { VoiceApiClient } = require('./voice-api-client');
@@ -16,6 +16,9 @@ const COMPACT_OVERLAY = Object.freeze({ width: 360, height: 58 });
 const PREVIEW_OVERLAY = Object.freeze({ width: 520, height: 360 });
 const ERROR_OVERLAY = Object.freeze({ width: 460, height: 220 });
 const SETTINGS_OVERLAY = Object.freeze({ width: 520, height: 520 });
+const EXPECTED_USER_ERRORS = new Set([
+  'accessibility_permission_denied', 'MICROPHONE_DENIED', 'target_not_editable', 'secure_field', 'NO_SPEECH'
+]);
 
 function publicError(error) {
   const code = error?.code || 'VOICE_ERROR';
@@ -97,6 +100,7 @@ class ElectronScreenVoice {
     this.overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     const rendererRoot = app.isPackaged ? 'public_html' : 'src';
     this.overlay.loadFile(path.join(this.rootDir, rendererRoot, 'screen-voice', 'overlay', 'index.html'));
+    this.overlay.on('focus', () => { this.sendPermissionStatus().catch(() => {}); });
     this.overlay.on('closed', () => { this.overlay = null; });
     this.positionOverlay();
     return this.overlay;
@@ -153,6 +157,7 @@ class ElectronScreenVoice {
       return fn(payload || {});
     });
     handle('screen-voice:get-state', async () => ({ ...this.controller.snapshot(), settings: this.settings }));
+    handle('screen-voice:get-permissions', () => this.permissionStatus());
     handle('screen-voice:activate', ({ mode }) => this.toggle(mode || this.settings.defaultMode, 'overlay'));
     handle('screen-voice:audio-complete', (payload) => this.handleAudio(payload));
     handle('screen-voice:capture-error', ({ code }) => this.fail(code || 'MICROPHONE_DENIED'));
@@ -271,7 +276,7 @@ class ElectronScreenVoice {
   }
 
   async microphonePermission(request = false) {
-    if (process.platform !== 'darwin') return { microphone: true };
+    if (process.platform !== 'darwin') return { microphone: true, microphoneStatus: 'granted' };
     let status = systemPreferences.getMediaAccessStatus('microphone');
     if (request && status !== 'granted') {
       const granted = await systemPreferences.askForMediaAccess('microphone');
@@ -280,8 +285,35 @@ class ElectronScreenVoice {
     return { microphone: status === 'granted', microphoneStatus: status };
   }
 
+  async permissionStatus() {
+    const [microphone, accessibility] = await Promise.allSettled([
+      this.microphonePermission(false), this.adapter.permissionStatus()
+    ]);
+    const microphoneValue = microphone.status === 'fulfilled'
+      ? microphone.value : { microphone: false, microphoneStatus: 'unavailable' };
+    const accessibilityValue = accessibility.status === 'fulfilled'
+      ? accessibility.value : { accessibility: false, supported: false };
+    return { ...microphoneValue, ...accessibilityValue };
+  }
+
+  async sendPermissionStatus() {
+    const result = await this.permissionStatus();
+    this.send('screen-voice:permissions', result);
+    return result;
+  }
+
+  async openPermissionSettings(type) {
+    if (process.platform !== 'darwin') return;
+    const pane = type === 'microphone' ? 'Privacy_Microphone' : 'Privacy_Accessibility';
+    await shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${pane}`).catch(() => {});
+  }
+
   async requestPermission(type) {
-    const result = type === 'microphone' ? await this.microphonePermission(true) : await this.adapter.requestPermission();
+    const attempt = type === 'microphone' ? await this.microphonePermission(true) : await this.adapter.requestPermission();
+    const result = { ...(await this.permissionStatus()), ...attempt };
+    if ((type === 'microphone' && !result.microphone) || (type === 'accessibility' && !result.accessibility)) {
+      await this.openPermissionSettings(type);
+    }
     this.send('screen-voice:permissions', result);
     return result;
   }
@@ -302,11 +334,12 @@ class ElectronScreenVoice {
       if (!this.authenticated) {
         const error = new Error(); error.code = 'AUTH_REQUIRED'; throw error;
       }
-      const mic = await this.microphonePermission(false);
-      if (['denied', 'restricted'].includes(mic.microphoneStatus)) {
+      const mic = await this.microphonePermission(true);
+      if (!mic.microphone) {
         const error = new Error(); error.code = 'MICROPHONE_DENIED'; throw error;
       }
-      const permission = await this.adapter.permissionStatus();
+      let permission = await this.adapter.permissionStatus();
+      if (!permission.accessibility) permission = await this.adapter.requestPermission();
       if (!permission.accessibility) {
         const error = new Error(); error.code = 'accessibility_permission_denied'; throw error;
       }
@@ -424,7 +457,10 @@ class ElectronScreenVoice {
       this.controller.fail(details.code, details.message);
     } catch (_) { /* preserve original safe error */ }
     this.showOverlay({ focus: true, ...ERROR_OVERLAY });
-    this.logError(`[ScreenVoice] ${details.code}`);
+    const status = Number.isInteger(error?.status) ? ` (HTTP ${error.status})` : '';
+    const message = `[ScreenVoice] ${details.code}${status}`;
+    if (EXPECTED_USER_ERRORS.has(details.code)) this.logInfo(message);
+    else this.logError(message);
     return { ok: false, error: details };
   }
 
