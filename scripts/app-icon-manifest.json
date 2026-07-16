@@ -1,5 +1,5 @@
 {
-  "_comment": "Sizes (px) derived from build/icons/icon.png by scripts/generate-app-icons.js. The 16/32/48/64/128/256 PNGs are folded into icon.ico on Windows. Mirrors brainchild/scripts/icon-manifest.json exactly; only the paths differ because this repo's electron-builder is wired against build/icons/.",
+  "_comment": "Sizes (px) derive from build/icons/icon.png by scripts/generate-app-icons.js. The master is the nearest-neighbor 1024px packaging source for RedRoosterTech-Web/public/img/favicon.ico. The 16/32/48/64/128/256 PNGs are folded into icon.ico on Windows.",
   "master": "build/icons/icon.png",
   "outputDir": "build/icons",
   "sizes": [16, 32, 64, 128, 256, 512, 1024],
