@@ -132,6 +132,9 @@ body { padding: 4px; color: var(--lex-text-primary); }
 .transcript { margin: 12px 0 0; padding: 9px 10px; border-radius: var(--lex-radius-md, 8px); background: color-mix(in srgb, var(--lex-color-white) 10%, transparent); color: var(--lex-color-white); font-size: var(--lex-body-xs-size, 12px); font-style: italic; max-height: 62px; overflow: auto; }
 .transcript::before { content: "Captured: "; color: color-mix(in srgb, var(--lex-color-white) 68%, transparent); font-style: normal; }
 .transcribing .level-meter .lex-pb-fill,
+.capture-preparing .level-meter .lex-pb-fill,
+.capture-chiming .level-meter .lex-pb-fill,
+.capture-releasing .level-meter .lex-pb-fill,
 .gathering_context .level-meter .lex-pb-fill,
 .thinking .level-meter .lex-pb-fill,
 .executing .level-meter .lex-pb-fill {

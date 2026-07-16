@@ -132,8 +132,18 @@ static NSDictionary *CurrentContext(NSString **errorCode, BOOL includeContent) {
   NSRunningApplication *running = NSWorkspace.sharedWorkspace.frontmostApplication;
   if (!running) { *errorCode = @"active_application_unavailable"; return nil; }
   AXUIElementRef app = AXUIElementCreateApplication(running.processIdentifier);
+  // Chromium and Electron applications may defer building their web
+  // accessibility tree until an assistive client explicitly requests it.
+  // This is scoped to the active application and lets focused DOM inputs be
+  // represented as AXTextField/AXTextArea instead of the surrounding web area.
+  AXUIElementSetAttributeValue(app, CFSTR("AXManualAccessibility"), kCFBooleanTrue);
   id windowObj = AXGet(app, kAXFocusedWindowAttribute);
   id focusedObj = AXGet(app, kAXFocusedUIElementAttribute);
+  if (!focusedObj) {
+    AXUIElementRef system = AXUIElementCreateSystemWide();
+    focusedObj = AXGet(system, kAXFocusedUIElementAttribute);
+    CFRelease(system);
+  }
   AXUIElementRef window = AXElement(windowObj);
   AXUIElementRef focused = AXElement(focusedObj);
   NSString *role = AXString(focused, kAXRoleAttribute);

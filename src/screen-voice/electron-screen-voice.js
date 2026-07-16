@@ -13,6 +13,11 @@ const { actionText, normalizeText } = require('./action-normalizer');
 const { startShortcutMonitor } = require('./native-helper');
 
 const MAX_AUDIO_BASE64_CHARS = 16 * 1024 * 1024;
+const NON_SPEECH_TRANSCRIPT = /^[\s([{<]*(?:beep|chime|tone|silence|inaudible|no speech|music)[\s)\]}>.!-]*$/i;
+const CAPTURE_STATUSES = new Set([
+  'requesting_microphone', 'microphone_ready', 'start_chime', 'recording_started',
+  'recording_released', 'audio_ready', 'capture_failed'
+]);
 const COMPACT_OVERLAY = Object.freeze({ width: 480, height: 58 });
 const MODE_MENU_OVERLAY = Object.freeze({ width: 480, height: 190 });
 const PREVIEW_OVERLAY = Object.freeze({ width: 520, height: 360 });
@@ -76,13 +81,19 @@ class ElectronScreenVoice {
     this.revealTarget = null;
     this.shortcutMonitor = null;
     this.shortcutMonitorReady = false;
+    this.shortcutHeldMode = null;
     this.shortcutStartPromise = null;
     this.pendingShortcutRelease = null;
     this.shortcutMonitorFactory = options.shortcutMonitorFactory || startShortcutMonitor;
     this.sleep = options.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.entitlementEnabled = Boolean(options.entitlementEnabled);
     this.authenticated = Boolean(options.authenticated);
-    this.controller.on('state', (snapshot) => this.sendState(snapshot));
+    this.controller.on('state', (snapshot) => {
+      const mode = snapshot.session?.mode ? ` mode=${snapshot.session.mode}` : '';
+      const error = snapshot.session?.error?.code ? ` error=${snapshot.session.error.code}` : '';
+      this.logInfo(`[ScreenVoice] State=${snapshot.state}${mode}${error}`);
+      this.sendState(snapshot);
+    });
   }
 
   async getAuthToken() {
@@ -174,6 +185,14 @@ class ElectronScreenVoice {
     handle('screen-voice:activate', ({ mode }) => this.toggle(mode || this.settings.defaultMode, 'overlay'));
     handle('screen-voice:audio-complete', (payload) => this.handleAudio(payload));
     handle('screen-voice:capture-error', ({ code }) => this.fail(code || 'MICROPHONE_DENIED'));
+    handle('screen-voice:capture-status', ({ status, metadata }) => {
+      if (!CAPTURE_STATUSES.has(status)) return { ok: false };
+      const trackCount = Math.max(0, Math.min(8, Number(metadata?.trackCount) || 0));
+      const bytes = Math.max(0, Number(metadata?.bytes) || 0);
+      const detail = trackCount ? ` tracks=${trackCount}` : bytes ? ` bytes=${bytes}` : '';
+      this.logInfo(`[ScreenVoice] Capture ${status}${detail}`);
+      return { ok: true };
+    });
     handle('screen-voice:cancel', () => this.cancel());
     handle('screen-voice:confirm', ({ sessionId }) => this.confirm(sessionId));
     handle('screen-voice:copy', ({ text }) => this.copy(text));
@@ -317,17 +336,25 @@ class ElectronScreenVoice {
     this.shortcutMonitor?.stop?.();
     this.shortcutMonitor = null;
     this.shortcutMonitorReady = false;
+    this.shortcutHeldMode = null;
     this.pendingShortcutRelease = null;
   }
 
   handleShortcutMonitorEvent(event = {}) {
     if (event.event === 'ready') {
       this.shortcutMonitorReady = true;
-      this.logInfo('[ScreenVoice] Press-and-hold shortcuts ready');
+      this.logInfo(`[ScreenVoice] Press-and-hold shortcuts ready (${event.method || 'event_tap'})`);
+    } else if (event.event === 'down') {
+      if (this.shortcutHeldMode === event.mode && !this.shortcutStartPromise
+          && !['listening', 'transcribing', 'gathering_context', 'thinking', 'executing'].includes(this.controller.state)) {
+        this.shortcutHeldMode = null;
+      }
+      this.handleShortcutDown(event.mode).catch((error) => this.logError(`[ScreenVoice] Shortcut start failed: ${error.code || 'unknown'}`));
     } else if (event.event === 'up') {
       this.handleShortcutUp(event.mode);
     } else if (event.event === 'error') {
       this.shortcutMonitorReady = false;
+      this.shortcutHeldMode = null;
       this.logError('[ScreenVoice] Press-and-hold release monitor stopped; shortcuts use toggle mode');
     }
   }
@@ -341,12 +368,15 @@ class ElectronScreenVoice {
   }
 
   async handleShortcutDown(mode) {
+    if (this.shortcutMonitor && this.shortcutHeldMode === mode) return this.controller.snapshot();
+    this.logInfo(`[ScreenVoice] Shortcut down (${mode}); state=${this.controller.state}`);
     if (this.controller.state === 'listening') {
       if (!this.shortcutMonitorReady) this.send('screen-voice:stop-capture', { reason: 'activation_released' });
       return this.controller.snapshot();
     }
     if (this.shortcutStartPromise) return this.shortcutStartPromise;
     this.pendingMode = mode === 'agent' ? 'agent' : 'dictation';
+    if (this.shortcutMonitor) this.shortcutHeldMode = this.pendingMode;
     this.shortcutStartPromise = (async () => {
       await this.rememberExternalTarget();
       this.detailsOpen = true;
@@ -366,6 +396,8 @@ class ElectronScreenVoice {
   }
 
   handleShortcutUp(mode) {
+    this.logInfo(`[ScreenVoice] Shortcut up (${mode}); state=${this.controller.state}`);
+    if (mode === this.shortcutHeldMode) this.shortcutHeldMode = null;
     if (mode !== this.pendingMode) return;
     if (this.shortcutStartPromise) {
       this.pendingShortcutRelease = mode;
@@ -464,6 +496,7 @@ class ElectronScreenVoice {
         await this.adapter.activate(cached.context.targetFingerprint);
         this.lastContext = await this.adapter.getTarget();
       }
+      this.logInfo(`[ScreenVoice] Target role=${this.lastContext.focusedElement?.role || 'unknown'} editable=${Boolean(this.lastContext.focusedElement?.isEditable)}`);
       if (this.lastContext.focusedElement.isPassword) { const error = new Error(); error.code = 'secure_field'; throw error; }
       if (mode === 'dictation' && !this.lastContext.focusedElement.isEditable) {
         const error = new Error(); error.code = 'target_not_editable'; throw error;
@@ -482,13 +515,17 @@ class ElectronScreenVoice {
     if (this.controller.state !== 'listening') return { ok: false, reason: 'session_not_listening' };
     if (payload.sessionId !== this.controller.session?.id) return { ok: false, reason: 'stale_session' };
     const audioBase64 = String(payload.audioBase64 || '');
+    this.logInfo(`[ScreenVoice] Audio received bytes≈${Math.round(audioBase64.length * 0.75)}`);
     if (!audioBase64 || audioBase64.length > MAX_AUDIO_BASE64_CHARS) return this.fail('AUDIO_TOO_LARGE');
     try {
       this.controller.transition('transcribing');
       const result = await this.api.transcribe({ audioBase64,
         mimeType: String(payload.mimeType || 'audio/webm').slice(0, 120), language: this.settings.language }, this.controller.signal);
       const transcript = normalizeText(result.text).trim();
-      if (!transcript) { const error = new Error(); error.code = 'NO_SPEECH'; throw error; }
+      if (!transcript || NON_SPEECH_TRANSCRIPT.test(transcript)) {
+        const error = new Error(); error.code = 'NO_SPEECH'; throw error;
+      }
+      this.logInfo(`[ScreenVoice] Transcript captured characters=${transcript.length}`);
       this.controller.session.transcript = transcript;
       this.sendState();
       await this.sleep(500);

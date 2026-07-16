@@ -66,6 +66,20 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.overlay.setSize).toHaveBeenLastCalledWith(480, 190, true);
   });
 
+  test('sound-effect-only transcription is never inserted', async () => {
+    const api = { transcribe: jest.fn(async () => ({ text: '(beep)' })) };
+    const adapter = { insert: jest.fn() };
+    const manager = managerWith({ api, adapter });
+    manager.controller.start('dictation');
+    manager.controller.session.target = fingerprint;
+
+    await manager.handleAudio({ sessionId: manager.controller.session.id, audioBase64: 'AAAA', mimeType: 'audio/webm' });
+
+    expect(adapter.insert).not.toHaveBeenCalled();
+    expect(manager.controller.state).toBe('error');
+    expect(manager.controller.session.error.code).toBe('NO_SPEECH');
+  });
+
   test('selected rewrite is previewed, then revalidated replacement executes on confirmation', async () => {
     const selectedContext = { ...context, processId: 9, bundleId: 'com.editor', selectedText: 'rough draft',
       targetFingerprint: { ...fingerprint, selectionHash: 'selection' } };
@@ -178,6 +192,28 @@ describe('Electron screen voice orchestration', () => {
 
     manager.handleShortcutMonitorEvent({ event: 'up', mode: 'dictation' });
     expect(sent).toContainEqual(['screen-voice:stop-capture', { reason: 'activation_released' }]);
+  });
+
+  test('key repeat during one hold does not create repeated failed sessions', async () => {
+    const manager = managerWith({ api: {}, adapter: {
+      permissionStatus: jest.fn(async () => ({ accessibility: true })),
+      getTarget: jest.fn(async () => ({ ...context,
+        focusedElement: { ...context.focusedElement, role: 'AXWebArea', isEditable: false } }))
+    } });
+    manager.authenticated = true;
+    manager.entitlementEnabled = true;
+    manager.shortcutMonitor = { stop: jest.fn() };
+    manager.shortcutMonitorReady = true;
+    const fail = jest.spyOn(manager, 'fail');
+
+    await manager.handleShortcutDown('dictation');
+    await manager.handleShortcutDown('dictation');
+    await manager.handleShortcutDown('dictation');
+
+    expect(fail).toHaveBeenCalledTimes(1);
+    manager.handleShortcutUp('dictation');
+    await manager.handleShortcutDown('dictation');
+    expect(fail).toHaveBeenCalledTimes(2);
   });
 
   test('restores the editor target when overlay interaction owns focus', async () => {

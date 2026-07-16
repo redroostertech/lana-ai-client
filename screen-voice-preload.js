@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('screenVoice', {
   activate: (mode) => ipcRenderer.invoke('screen-voice:activate', { mode }),
   audioComplete: (payload) => ipcRenderer.invoke('screen-voice:audio-complete', payload),
   captureError: (code) => ipcRenderer.invoke('screen-voice:capture-error', { code }),
+  captureStatus: (status, metadata = {}) => ipcRenderer.invoke('screen-voice:capture-status', { status, metadata }),
   cancel: () => ipcRenderer.invoke('screen-voice:cancel'),
   confirm: (sessionId) => ipcRenderer.invoke('screen-voice:confirm', { sessionId }),
   copy: (text) => ipcRenderer.invoke('screen-voice:copy', { text }),

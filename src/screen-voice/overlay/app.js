@@ -21,6 +21,8 @@
   let stopTimer = null;
   let activeSessionId = null;
   let discardRecording = false;
+  let captureStopRequested = null;
+  let capturePhase = 'idle';
   let playback = null;
   let detailsOpen = true;
   let modeInitialized = false;
@@ -31,7 +33,7 @@
 
   const stateCopy = {
     idle: ['Ready', 'Dictate into the focused field or ask LANA about this window.'],
-    listening: ['Listening', 'Speak naturally, then release the shortcut to process.'],
+    listening: ['Listening', 'Speak after the start chime, then release the shortcut to process.'],
     transcribing: ['Transcribing', 'Turning your audio into text…'],
     gathering_context: ['Reading this window', 'Collecting only the active, accessible context needed for your request.'],
     thinking: ['Thinking', 'Preparing a constrained response…'],
@@ -92,7 +94,7 @@
     const state = snapshot.state || 'idle';
     const session = snapshot.session || {};
     const copy = stateCopy[state] || stateCopy.idle;
-    els.shell.className = `voice-shell ${state}`;
+    els.shell.className = `voice-shell ${state} capture-${capturePhase}`;
     const isAgent = session.mode === 'agent';
     if (!modeInitialized) {
       selectedMode = snapshot.selectedMode === 'agent' || snapshot.settings?.defaultMode === 'agent' ? 'agent' : 'dictation';
@@ -107,13 +109,26 @@
     const shortcutLabel = displayShortcut(activeShortcut || (selectedMode === 'agent'
       ? 'CommandOrControl+Shift+A'
       : 'CommandOrControl+Shift+Space'));
-    els.shortcutKeys.textContent = shortcutLabel;
-    els.shortcutVerb.textContent = state === 'listening' ? 'Release' : 'Hold';
-    els.shortcutAction.textContent = state === 'listening' ? 'to process' : 'to speak';
-    els.shortcutHint.title = `${state === 'listening' ? 'Release' : 'Hold'} ${shortcutLabel} ${state === 'listening' ? 'to process' : 'to speak'}`;
+    const captureReady = state === 'listening' && capturePhase === 'recording';
+    const captureStarting = state === 'listening' && ['idle', 'preparing', 'chiming'].includes(capturePhase);
+    const captureReleasing = state === 'listening' && capturePhase === 'releasing';
+    els.shortcutKeys.textContent = captureReleasing ? '' : shortcutLabel;
+    els.shortcutVerb.textContent = captureReady ? 'Release' : captureStarting ? 'Keep holding' : captureReleasing ? 'Processing' : 'Hold';
+    els.shortcutAction.textContent = captureReady ? 'to process' : captureStarting ? 'until ready' : captureReleasing ? 'audio…' : 'to speak';
+    els.shortcutHint.title = `${els.shortcutVerb.textContent} ${els.shortcutKeys.textContent} ${els.shortcutAction.textContent}`.trim();
     els.title.textContent = state === 'listening' && !isAgent ? 'Dictating' : copy[0];
     els.shell.setAttribute('aria-label', `${copy[0]}. ${session.error?.message || copy[1]}`);
     els.detail.textContent = session.error?.message || copy[1];
+    if (state === 'listening') {
+      const captureCopy = {
+        preparing: ['Preparing microphone', 'Please wait for the start chime.'],
+        chiming: ['Get ready', 'Recording begins as soon as the chime finishes.'],
+        recording: ['Listening', 'Speak now, then release the shortcut to process.'],
+        releasing: ['Finishing capture', 'Recording has stopped. Preparing your audio…']
+      }[capturePhase] || ['Preparing microphone', 'Please wait for the start chime.'];
+      els.title.textContent = captureCopy[0];
+      els.detail.textContent = captureCopy[1];
+    }
     if (state === 'idle') {
       els.detail.textContent = `Hold ${displayShortcut(snapshot.settings?.dictationShortcut || 'CommandOrControl+Shift+Space')} to dictate, or ${displayShortcut(snapshot.settings?.agentShortcut || 'CommandOrControl+Shift+A')} for Agent mode. Release to process.`;
     }
@@ -138,11 +153,23 @@
     return ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((type) => MediaRecorder.isTypeSupported(type)) || '';
   }
 
+  function reportCaptureStatus(status, metadata) {
+    window.screenVoice.captureStatus(status, metadata).catch(() => {});
+  }
+
+  function setCapturePhase(phase) {
+    capturePhase = phase;
+    render(snapshot);
+  }
+
   async function startCapture({ sessionId, maxDurationMs }) {
     await cleanupCapture();
     activeSessionId = sessionId;
     discardRecording = false;
+    captureStopRequested = null;
+    setCapturePhase('preparing');
     try {
+      reportCaptureStatus('requesting_microphone');
       stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false
       });
@@ -152,13 +179,40 @@
       recorder.ondataavailable = (event) => { if (event.data?.size) chunks.push(event.data); };
       recorder.onerror = () => window.screenVoice.captureError('MICROPHONE_DISCONNECTED');
       recorder.onstop = finalizeCapture;
+      if (!stream.getAudioTracks().some((track) => track.readyState === 'live')) {
+        throw Object.assign(new Error('No live microphone track'), { name: 'NotFoundError' });
+      }
+      reportCaptureStatus('microphone_ready', { trackCount: stream.getAudioTracks().length });
+      if (captureStopRequested) {
+        await cleanupCapture();
+        reportCaptureStatus('capture_failed');
+        window.screenVoice.captureError('NO_SPEECH');
+        return;
+      }
+      setCapturePhase('chiming');
+      reportCaptureStatus('start_chime');
+      await playCue('start');
+      if (captureStopRequested) {
+        const pending = captureStopRequested;
+        await cleanupCapture();
+        if (!pending.discard) playCue('release');
+        if (!pending.discard) {
+          reportCaptureStatus('capture_failed');
+          window.screenVoice.captureError('NO_SPEECH');
+        }
+        return;
+      }
       recorder.start(200);
-      playCue('start');
+      setCapturePhase('recording');
+      reportCaptureStatus('recording_started');
       startMeter(stream);
       stopTimer = setTimeout(() => stopCapture(false), Math.min(90000, Number(maxDurationMs) || 90000));
     } catch (error) {
       await cleanupCapture();
-      window.screenVoice.captureError(error?.name === 'NotAllowedError' ? 'MICROPHONE_DENIED' : 'MICROPHONE_UNAVAILABLE');
+      const code = error?.name === 'NotAllowedError' ? 'MICROPHONE_DENIED' : 'MICROPHONE_UNAVAILABLE';
+      setCapturePhase('idle');
+      reportCaptureStatus('capture_failed');
+      window.screenVoice.captureError(code);
     }
   }
 
@@ -180,15 +234,21 @@
 
   function stopCapture(discard) {
     discardRecording = Boolean(discard);
+    setCapturePhase(discard ? 'idle' : 'releasing');
+    if (!recorder || recorder.state === 'inactive') {
+      captureStopRequested = { discard: discardRecording };
+      return;
+    }
     if (recorder && recorder.state !== 'inactive') {
       recorder.stop();
+      reportCaptureStatus('recording_released');
       if (!discard) playCue('release');
     }
   }
 
   function playCue(type) {
     const CueContext = window.AudioContext || window.webkitAudioContext;
-    if (!CueContext) return;
+    if (!CueContext) return Promise.resolve();
     const cue = new CueContext();
     const oscillator = cue.createOscillator();
     const gain = cue.createGain();
@@ -203,7 +263,16 @@
     oscillator.connect(gain).connect(cue.destination);
     oscillator.start(now);
     oscillator.stop(now + 0.12);
-    oscillator.addEventListener('ended', () => cue.close().catch(() => {}), { once: true });
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        cue.close().catch(() => {}).finally(resolve);
+      };
+      oscillator.addEventListener('ended', finish, { once: true });
+      setTimeout(finish, 180);
+    });
   }
 
   async function finalizeCapture() {
@@ -212,7 +281,9 @@
     const blob = new Blob(chunks, { type: mimeType });
     const discard = discardRecording;
     await cleanupCapture();
+    capturePhase = 'idle';
     if (discard || !blob.size) return;
+    reportCaptureStatus('audio_ready', { bytes: blob.size });
     const audioBase64 = await blobToBase64(blob);
     await window.screenVoice.audioComplete({ sessionId, audioBase64, mimeType });
   }
