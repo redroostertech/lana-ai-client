@@ -2,15 +2,18 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 function discoveryPath({ platform = process.platform, env = process.env, namespace }) {
   if (platform === 'win32') {
     if (!env.LOCALAPPDATA) throw discoveryError();
     return path.join(env.LOCALAPPDATA, 'Lana', namespace, 'relay.json');
   }
-  const base = env.XDG_RUNTIME_DIR || (platform === 'darwin' ? env.TMPDIR : null);
+  const base = platform === 'darwin' ? '/tmp' : env.XDG_RUNTIME_DIR;
   if (!base) throw discoveryError();
-  return path.join(base, namespace, 'relay.json');
+  const user = typeof process.getuid === 'function' ? process.getuid() : 'user';
+  const leaf = `lana-mcp-${user}-${crypto.createHash('sha256').update(namespace).digest('hex').slice(0, 12)}`;
+  return path.join(base, leaf, 'relay.json');
 }
 
 function readDiscovery(options) {
