@@ -132,12 +132,12 @@
     button.id = 'sv2-voice-permission-button-' + type;
     button.setAttribute('variant', 'secondary');
     button.setAttribute('size', 'sm');
-    button.textContent = state.label === 'Allowed' ? 'Enabled' : 'Enable';
+    button.textContent = 'Enable';
     button.dataset.capabilityDisabled = disabled ? 'true' : 'false';
     button.disabled = Boolean(disabled) || state.label === 'Allowed' || state.label === 'Unavailable';
     button.addEventListener('click', function () { onRequest(type, button); });
     actions.appendChild(badge);
-    actions.appendChild(button);
+    if (state.label !== 'Allowed') actions.appendChild(button);
     row.appendChild(copy);
     row.appendChild(actions);
     return row;
@@ -149,8 +149,14 @@
     var form = element('form', 'sv2-capability-voice-settings');
     form.appendChild(element('h4', 'sv2-capability-subheading', 'Voice settings'));
     var fields = element('div', 'sv2-capability-field-grid');
-    fields.appendChild(createVoiceField('Dictation shortcut', 'dictationShortcut', settings.dictationShortcut || 'CommandOrControl+Shift+Space'));
-    fields.appendChild(createVoiceField('Agent shortcut', 'agentShortcut', settings.agentShortcut || 'CommandOrControl+Shift+A'));
+    var dictationShortcut = createVoiceField('Dictation shortcut', 'dictationShortcut',
+      settings.dictationShortcut || 'CommandOrControl+Shift+Space');
+    var agentShortcut = createVoiceField('Agent shortcut', 'agentShortcut',
+      settings.agentShortcut || 'CommandOrControl+Shift+A');
+    dictationShortcut.querySelector('input').disabled = true;
+    agentShortcut.querySelector('input').disabled = true;
+    fields.appendChild(dictationShortcut);
+    fields.appendChild(agentShortcut);
     fields.appendChild(createVoiceField('Default mode', 'defaultMode', settings.defaultMode || 'dictation', [
       { label: 'Dictation', value: 'dictation' }, { label: 'Agent', value: 'agent' }
     ]));
@@ -159,6 +165,8 @@
       { label: 'Skip for safe inserts', value: 'never_safe_only' }
     ]));
     Array.prototype.forEach.call(fields.querySelectorAll('input, select'), function (control) { control.disabled = disabled; });
+    dictationShortcut.querySelector('input').disabled = true;
+    agentShortcut.querySelector('input').disabled = true;
     form.appendChild(fields);
     form.appendChild(createToggleOption('Open at Login',
       'Show Screen Dictation after you sign in. When off, use a configured shortcut to open it.',

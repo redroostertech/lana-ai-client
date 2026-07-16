@@ -12,7 +12,8 @@ const { decisionRequiresConfirmation } = require('./confirmation-policy');
 const { actionText, normalizeText } = require('./action-normalizer');
 
 const MAX_AUDIO_BASE64_CHARS = 16 * 1024 * 1024;
-const COMPACT_OVERLAY = Object.freeze({ width: 360, height: 58 });
+const COMPACT_OVERLAY = Object.freeze({ width: 440, height: 58 });
+const MODE_MENU_OVERLAY = Object.freeze({ width: 440, height: 190 });
 const PREVIEW_OVERLAY = Object.freeze({ width: 520, height: 360 });
 const DETAILS_OVERLAY = Object.freeze({ width: 460, height: 190 });
 const EXPECTED_USER_ERRORS = new Set([
@@ -69,6 +70,8 @@ class ElectronScreenVoice {
     this.ipcRegistered = false;
     this.lastContext = null;
     this.previewDecision = null;
+    this.pendingMode = this.settings.defaultMode;
+    this.detailsOpen = true;
     this.entitlementEnabled = Boolean(options.entitlementEnabled);
     this.authenticated = Boolean(options.authenticated);
     this.controller.on('state', (snapshot) => this.sendState(snapshot));
@@ -88,9 +91,9 @@ class ElectronScreenVoice {
     if (this.overlay && !this.overlay.isDestroyed()) return this.overlay;
     this.overlay = new BrowserWindow({
       width: COMPACT_OVERLAY.width, height: COMPACT_OVERLAY.height,
-      minWidth: 320, minHeight: 52, maxWidth: 560, maxHeight: 560,
+      minWidth: 400, minHeight: 52, maxWidth: 560, maxHeight: 560,
       frame: false, transparent: true, backgroundColor: '#00000000', alwaysOnTop: true,
-      skipTaskbar: true, resizable: true, focusable: false, show: false, hasShadow: true,
+      skipTaskbar: true, resizable: true, focusable: false, show: false, hasShadow: false,
       webPreferences: {
         nodeIntegration: false, contextIsolation: true, sandbox: true,
         preload: path.join(this.rootDir, 'screen-voice-preload.js')
@@ -116,14 +119,15 @@ class ElectronScreenVoice {
 
   overlayLayout(state = this.controller.state) {
     if (state === 'previewing') return PREVIEW_OVERLAY;
+    if (this.detailsOpen) return DETAILS_OVERLAY;
     return COMPACT_OVERLAY;
   }
 
   resizeOverlay(layout = this.overlayLayout()) {
     if (!this.overlay || this.overlay.isDestroyed()) return;
-    const width = Math.max(320, Math.min(560, Number(layout.width) || COMPACT_OVERLAY.width));
+    const width = Math.max(400, Math.min(560, Number(layout.width) || COMPACT_OVERLAY.width));
     const height = Math.max(52, Math.min(560, Number(layout.height) || COMPACT_OVERLAY.height));
-    this.overlay.setSize(width, height, false);
+    this.overlay.setSize(width, height, true);
   }
 
   showOverlay({ focus = false, width, height } = {}) {
@@ -141,7 +145,7 @@ class ElectronScreenVoice {
   sendState(snapshot = this.controller.snapshot()) {
     this.resizeOverlay(this.overlayLayout(snapshot.state));
     this.positionOverlay();
-    this.send('screen-voice:state', { ...snapshot, settings: this.settings });
+    this.send('screen-voice:state', { ...snapshot, settings: this.settings, selectedMode: this.pendingMode });
   }
 
   isOverlaySender(event) {
@@ -155,7 +159,9 @@ class ElectronScreenVoice {
       if (!this.isOverlaySender(event)) throw new Error('Unauthorized screen voice IPC sender');
       return fn(payload || {});
     });
-    handle('screen-voice:get-state', async () => ({ ...this.controller.snapshot(), settings: this.settings }));
+    handle('screen-voice:get-state', async () => ({
+      ...this.controller.snapshot(), settings: this.settings, selectedMode: this.pendingMode
+    }));
     handle('screen-voice:get-permissions', () => this.permissionStatus());
     handle('screen-voice:activate', ({ mode }) => this.toggle(mode || this.settings.defaultMode, 'overlay'));
     handle('screen-voice:audio-complete', (payload) => this.handleAudio(payload));
@@ -170,15 +176,29 @@ class ElectronScreenVoice {
       return { ok: Boolean(opened) };
     });
     handle('screen-voice:open-details', () => {
+      this.detailsOpen = true;
       this.showOverlay({ focus: true, ...DETAILS_OVERLAY });
       return { ok: true };
     });
     handle('screen-voice:close-details', () => {
+      this.detailsOpen = false;
       const focus = this.controller.state === 'previewing';
       this.showOverlay({ focus, ...this.overlayLayout() });
       return { ok: true };
     });
-    handle('screen-voice:dismiss', () => { this.overlay?.hide(); return { ok: true }; });
+    handle('screen-voice:mode-menu', ({ open }) => {
+      const openLayout = this.detailsOpen ? DETAILS_OVERLAY : MODE_MENU_OVERLAY;
+      this.showOverlay({ focus: Boolean(open), ...(open ? openLayout : this.overlayLayout()) });
+      return { ok: true };
+    });
+    handle('screen-voice:resize-overlay', ({ height }) => {
+      const bounds = this.overlay?.getBounds();
+      if (!bounds) return { ok: false };
+      this.resizeOverlay({ width: bounds.width, height });
+      this.positionOverlay();
+      return { ok: true };
+    });
+    handle('screen-voice:dismiss', () => { this.detailsOpen = true; this.overlay?.hide(); return { ok: true }; });
   }
 
   initialize() {
@@ -328,11 +348,21 @@ class ElectronScreenVoice {
       this.send('screen-voice:stop-capture', { reason: 'activation_released' });
       return this.controller.snapshot();
     }
+    this.pendingMode = mode === 'agent' ? 'agent' : 'dictation';
+    const visible = Boolean(this.overlay && !this.overlay.isDestroyed() && this.overlay.isVisible());
+    if (source === 'global_shortcut' && !visible) {
+      this.detailsOpen = true;
+      this.showOverlay({ focus: false, ...DETAILS_OVERLAY });
+      this.sendState();
+      this.send('screen-voice:show-details', { mode: this.pendingMode });
+      return { ...this.controller.snapshot(), shown: true };
+    }
     return this.begin(mode, source);
   }
 
   async begin(mode, source) {
     try {
+      this.pendingMode = mode === 'agent' ? 'agent' : 'dictation';
       if (!this.entitlementEnabled) {
         const error = new Error(); error.code = 'FEATURE_NOT_ENABLED'; throw error;
       }
@@ -474,7 +504,7 @@ class ElectronScreenVoice {
     Object.entries(this.settings).forEach(([key, item]) => this.settingsStore.set(key, item));
     this.registerShortcuts();
     if (!this.settings.openAtLogin && this.controller.state === 'idle') this.overlay?.hide();
-    else if (this.controller.state === 'idle') this.resizeOverlay(COMPACT_OVERLAY);
+    else if (this.controller.state === 'idle') this.resizeOverlay(this.overlayLayout());
     this.sendState();
     return { ok: true, settings: this.settings };
   }

@@ -1,8 +1,8 @@
 {
-  "_comment": "Sizes (px) derive from build/icons/icon.png by scripts/generate-app-icons.js. The master is the nearest-neighbor 1024px packaging source for RedRoosterTech-Web/public/img/favicon.ico. The 16/32/48/64/128/256 PNGs are folded into icon.ico on Windows.",
+  "_comment": "Sizes (px) derive from build/icons/icon.png by scripts/generate-app-icons.js. The master is rendered from build/icons/app-icon.svg, using the RedRooster corner mark with macOS-standard transparent padding and a rounded gradient surface. The 16/32/48/64/128/256 PNGs are folded into icon.ico on Windows.",
   "master": "build/icons/icon.png",
   "outputDir": "build/icons",
-  "sizes": [16, 32, 64, 128, 256, 512, 1024],
+  "sizes": [16, 32, 48, 64, 128, 256, 512, 1024],
   "icoSizes": [16, 32, 48, 64, 128, 256],
   "icnsName": "icon.icns",
   "icoName": "icon.ico"

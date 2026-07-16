@@ -11,14 +11,13 @@
 <body>
   <main class="voice-shell" aria-label="LANA screen-aware voice assistant">
     <section class="compact-bar" aria-live="polite" aria-atomic="true">
-      <img class="voice-mark" src="redrooster-favicon.ico" alt="" aria-hidden="true">
+      <img class="voice-mark" src="redrooster-favicon.png" alt="" aria-hidden="true">
       <strong id="statusTitle" class="sr-only">Ready</strong>
       <lex-progress-bar id="levelMeter" class="level-meter no-drag" value="0" color="accent" size="xs" animate="false" aria-label="Microphone level"></lex-progress-bar>
       <label class="sr-only" for="modeSelect">Voice mode</label>
-      <select id="modeSelect" class="mode-select no-drag" aria-label="Voice mode">
-        <option value="dictation">Dictation</option>
-        <option value="agent">Agent</option>
-      </select>
+      <lex-dropdown-btn id="modeSelect" class="mode-select no-drag" button-label="Dictation" variant="secondary"
+        options='[{"value":"dictation","label":"Dictation"},{"value":"agent","label":"Agent"}]'
+        aria-label="Voice mode"></lex-dropdown-btn>
       <div class="compact-actions no-drag">
         <lex-btn id="undoButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="rotate-ccw" title="Undo last voice edit" hidden></lex-btn>
         <lex-btn id="micButton" class="mic-control" variant="ghost" size="sm" icon="true" leading-icon="mic" title="Start dictation"></lex-btn>
@@ -30,7 +29,11 @@
 
     <section id="expandedSurface" class="expanded-surface" hidden>
       <div id="expandedStatus" class="expanded-status">
-        <lex-text id="expandedHeading" variant="primary" size="label" weight="semibold">Voice details</lex-text>
+        <div class="expanded-heading-row">
+          <lex-text id="expandedHeading" variant="primary" size="label" weight="semibold">Voice details</lex-text>
+          <lex-btn id="hideDetailsButton" class="no-drag" variant="ghost" size="sm" icon="true"
+            leading-icon="chevron-up" title="Hide voice details"></lex-btn>
+        </div>
         <p id="statusDetail">Dictate into the focused field or ask LANA about this window.</p>
         <div id="contextNotice" class="context-notice" hidden>Using accessible content from the active window.</div>
       </div>
@@ -54,6 +57,7 @@
   <script src="../../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../../js/lex/components/foundation/lex-progress-bar.js"></script>
   <script src="../../js/lex/components/foundation/lex-text.js"></script>
+  <script src="../../js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

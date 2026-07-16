@@ -29,9 +29,13 @@ const context = { platform: 'darwin', activeApplication: 'Editor', processName: 
   truncationMetadata: { truncated: false, originalCharacters: 5, retainedCharacters: 5 }, targetFingerprint: fingerprint };
 
 function overlay() {
-  return { isDestroyed: () => false, webContents: { id: 88, send: jest.fn((...args) => sent.push(args)) },
+  let visible = false;
+  return { isDestroyed: () => false, isVisible: () => visible,
+    webContents: { id: 88, send: jest.fn((...args) => sent.push(args)) },
     setSize: jest.fn(), getBounds: jest.fn(() => ({ width: 500, height: 188 })), setPosition: jest.fn(),
-    setFocusable: jest.fn(), show: jest.fn(), showInactive: jest.fn(), hide: jest.fn(), destroy: jest.fn() };
+    setFocusable: jest.fn(), show: jest.fn(() => { visible = true; }),
+    showInactive: jest.fn(() => { visible = true; }), hide: jest.fn(() => { visible = false; }),
+    destroy: jest.fn(() => { visible = false; }) };
 }
 
 function managerWith({ api, adapter }) {
@@ -54,7 +58,7 @@ describe('Electron screen voice orchestration', () => {
     expect(adapter.insert).toHaveBeenCalledWith('Literal text', fingerprint);
     expect(api.decide).not.toHaveBeenCalled();
     expect(manager.controller.state).toBe('idle');
-    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(360, 58, false);
+    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(460, 190, true);
   });
 
   test('selected rewrite is previewed, then revalidated replacement executes on confirmation', async () => {
@@ -71,7 +75,7 @@ describe('Electron screen voice orchestration', () => {
     const sessionId = manager.controller.session.id;
     await manager.handleAudio({ sessionId, audioBase64: 'AAAA', mimeType: 'audio/webm' });
     expect(manager.controller.state).toBe('previewing');
-    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(520, 360, false);
+    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(520, 360, true);
     expect(adapter.replaceSelection).not.toHaveBeenCalled();
     await manager.confirm(sessionId);
     expect(adapter.replaceSelection).toHaveBeenCalledWith('Professional draft.', selectedContext.targetFingerprint);
@@ -135,7 +139,7 @@ describe('Electron screen voice orchestration', () => {
     );
   });
 
-  test('with Open at Login off, the authenticated dictation shortcut opens listening', async () => {
+  test('with Open at Login off, the first shortcut reveals details and the second starts listening', async () => {
     const manager = managerWith({ api: {}, adapter: {
       permissionStatus: jest.fn(async () => ({ accessibility: true })),
       getTarget: jest.fn(async () => context)
@@ -149,8 +153,15 @@ describe('Electron screen voice orchestration', () => {
       call[0] === 'CommandOrControl+Shift+Space'
     ));
     await registration[1]();
-    expect(manager.controller.state).toBe('listening');
+    expect(manager.controller.state).toBe('idle');
     expect(testOverlay.showInactive).toHaveBeenCalled();
+    expect(testOverlay.setSize).toHaveBeenLastCalledWith(460, 190, true);
+
+    await registration[1]();
+    expect(manager.controller.state).toBe('listening');
+
+    await registration[1]();
+    expect(sent).toContainEqual(['screen-voice:stop-capture', { reason: 'activation_released' }]);
   });
 
   test('first activation requests missing permissions before capture', async () => {

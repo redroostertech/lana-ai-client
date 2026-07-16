@@ -21,11 +21,14 @@ contextBridge.exposeInMainWorld('screenVoice', {
   openSettings: () => ipcRenderer.invoke('screen-voice:open-settings'),
   openDetails: () => ipcRenderer.invoke('screen-voice:open-details'),
   closeDetails: () => ipcRenderer.invoke('screen-voice:close-details'),
+  setModeMenuOpen: (open) => ipcRenderer.invoke('screen-voice:mode-menu', { open }),
+  setOverlayHeight: (height) => ipcRenderer.invoke('screen-voice:resize-overlay', { height }),
   dismiss: () => ipcRenderer.invoke('screen-voice:dismiss'),
   onState: (callback) => on('screen-voice:state', callback),
   onStartCapture: (callback) => on('screen-voice:start-capture', callback),
   onStopCapture: (callback) => on('screen-voice:stop-capture', callback),
   onPermissions: (callback) => on('screen-voice:permissions', callback),
+  onShowDetails: (callback) => on('screen-voice:show-details', callback),
   onUndone: (callback) => on('screen-voice:undone', callback),
   onPlayAudio: (callback) => on('screen-voice:play-audio', callback)
 });
