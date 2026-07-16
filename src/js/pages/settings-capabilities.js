@@ -58,13 +58,28 @@
     return capability.active ? 'Active on this device' : 'Off on this device';
   }
 
-  function renderCapability(capability, onChange, onOpenAtLoginChange) {
+  function platformText(platforms) {
+    if (!Array.isArray(platforms) || !platforms.length) return 'All supported platforms';
+    var labels = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
+    return platforms.map(function (platform) { return labels[platform] || platform; }).join(', ');
+  }
+
+  function renderCapability(capability, onChange, onOpenAtLoginChange, isExpanded, onExpandedChange) {
     var row = element('article', 'sv2-capability');
     var heading = element('div', 'sv2-capability-heading');
-    var copy = element('div', 'sv2-capability-copy');
-    copy.appendChild(element('h3', 'sv2-capability-name', capability.label || capability.id));
-    if (capability.description) copy.appendChild(element('p', 'sv2-capability-description', capability.description));
-    copy.appendChild(element('p', 'sv2-capability-availability', availabilityText(capability)));
+    var bodyId = 'sv2-capability-body-' + String(capability.id).replace(/[^a-zA-Z0-9_-]/g, '-');
+    var expand = element('button', 'sv2-capability-expand');
+    expand.type = 'button';
+    expand.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+    expand.setAttribute('aria-controls', bodyId);
+    var chevron = element('span', 'sv2-capability-chevron');
+    chevron.setAttribute('aria-hidden', 'true');
+    var copy = element('span', 'sv2-capability-copy');
+    copy.appendChild(element('span', 'sv2-capability-name', capability.label || capability.id));
+    if (capability.description) copy.appendChild(element('span', 'sv2-capability-description', capability.description));
+    copy.appendChild(element('span', 'sv2-capability-availability', availabilityText(capability)));
+    expand.appendChild(chevron);
+    expand.appendChild(copy);
 
     var selectWrap = element('div', 'sv2-capability-select-wrap');
     var selectId = 'sv2-capability-' + String(capability.id).replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -82,9 +97,24 @@
     select.addEventListener('change', function () { onChange(capability, select); });
     selectWrap.appendChild(label);
     selectWrap.appendChild(select);
-    heading.appendChild(copy);
+    heading.appendChild(expand);
     heading.appendChild(selectWrap);
     row.appendChild(heading);
+
+    var body = element('div', 'sv2-capability-body');
+    body.id = bodyId;
+    body.hidden = !isExpanded;
+    expand.addEventListener('click', function () {
+      var next = expand.getAttribute('aria-expanded') !== 'true';
+      expand.setAttribute('aria-expanded', next ? 'true' : 'false');
+      body.hidden = !next;
+      onExpandedChange(capability.id, next);
+    });
+
+    var platform = element('p', 'sv2-capability-platforms');
+    platform.appendChild(element('strong', '', 'Supported platforms: '));
+    platform.appendChild(document.createTextNode(platformText(capability.platforms)));
+    body.appendChild(platform);
 
     if (capability.id === 'screen-diction') {
       var startup = element('div', 'sv2-capability-option');
@@ -103,10 +133,11 @@
       toggleLabel.appendChild(element('span', 'sv2-capability-toggle-track'));
       startup.appendChild(startupCopy);
       startup.appendChild(toggleLabel);
-      row.appendChild(startup);
+      body.appendChild(startup);
     }
 
-    renderHints(row, capability.hints);
+    renderHints(body, capability.hints);
+    row.appendChild(body);
     return row;
   }
 
@@ -118,6 +149,7 @@
     var section = document.getElementById('sv2-section-capabilities');
     var list = document.getElementById('sv2-capabilities-list');
     var status = document.getElementById('sv2-capabilities-status');
+    var expandedCapabilities = Object.create(null);
     if (!section || !list || !status) return;
 
     function render(capabilities) {
@@ -130,7 +162,13 @@
         return;
       }
       capabilities.forEach(function (capability) {
-        list.appendChild(renderCapability(capability, update, updateOpenAtLogin));
+        list.appendChild(renderCapability(
+          capability,
+          update,
+          updateOpenAtLogin,
+          expandedCapabilities[capability.id] === true,
+          function (id, expanded) { expandedCapabilities[id] = expanded; }
+        ));
       });
     }
 
