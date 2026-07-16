@@ -73,10 +73,10 @@ class RegistrationStore {
 
 class PairingService {
   constructor({ clock = () => Date.now(), ttlMs = 120000 } = {}) { this.clock = clock; this.ttlMs = ttlMs; this.pending = new Map(); }
-  issue() { const code = crypto.randomBytes(16).toString('base64url'); this.pending.set(hash(code), this.clock() + this.ttlMs); return code; }
+  issue(payload = {}) { const code = crypto.randomBytes(16).toString('base64url'); this.pending.set(hash(code), { expiresAt: this.clock() + this.ttlMs, payload }); return code; }
   consume(code) {
-    const key = hash(String(code || '')); const expiry = this.pending.get(key); this.pending.delete(key);
-    return Boolean(expiry && expiry >= this.clock());
+    const key = hash(String(code || '')); const record = this.pending.get(key); this.pending.delete(key);
+    return record && record.expiresAt >= this.clock() ? record.payload : null;
   }
   clear() { this.pending.clear(); }
 }

@@ -15,8 +15,8 @@ describe('relay registration, authentication, and framing', () => {
   it('makes pairing one-use and expires it', () => {
     let now = 100; const pairing = new PairingService({ clock: () => now }); const code = pairing.issue();
     expect(Buffer.from(code, 'base64url')).toHaveLength(16);
-    expect(pairing.consume(code)).toBe(true); expect(pairing.consume(code)).toBe(false);
-    const expired = pairing.issue(); now += 120001; expect(pairing.consume(expired)).toBe(false);
+    expect(pairing.consume(code)).toEqual({}); expect(pairing.consume(code)).toBeNull();
+    const expired = pairing.issue(); now += 120001; expect(pairing.consume(expired)).toBeNull();
   });
 
   it('never includes registration secrets in list records and revokes immediately', () => {
