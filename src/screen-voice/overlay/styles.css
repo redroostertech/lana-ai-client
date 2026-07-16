@@ -92,7 +92,7 @@ body { padding: 4px; color: var(--lex-text-primary); }
   width: 30px;
   height: 30px;
   padding: 0;
-  border-radius: var(--lex-radius-full, 999px);
+  border-radius: var(--lex-btn-radius-sm, 9px);
 }
 .compact-actions lex-btn .lex-btn-inner:focus-visible {
   background: color-mix(in srgb, var(--lex-color-white) 14%, transparent);

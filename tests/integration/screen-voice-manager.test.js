@@ -17,7 +17,7 @@ jest.mock('electron', () => ({
 }));
 
 const { ElectronScreenVoice } = require('../../src/screen-voice/electron-screen-voice');
-const { globalShortcut, systemPreferences } = require('electron');
+const { globalShortcut, ipcMain, systemPreferences } = require('electron');
 
 const fingerprint = { platform: 'darwin', processId: 9, bundleId: 'com.editor', processName: 'Editor',
   windowTitle: 'Doc', role: 'AXTextArea', name: 'Body', bounds: null, selectionHash: null };
@@ -38,9 +38,10 @@ function overlay() {
     destroy: jest.fn(() => { visible = false; }) };
 }
 
-function managerWith({ api, adapter }) {
+function managerWith({ api, adapter, openClientSettings }) {
   const manager = new ElectronScreenVoice({ api, adapter, getMainWindow: () => null,
-    getSavedServer: () => ({ url: 'http://local' }), settingsStore: { store: {}, set: jest.fn() } });
+    getSavedServer: () => ({ url: 'http://local' }), openClientSettings,
+    settingsStore: { store: {}, set: jest.fn() } });
   manager.overlay = overlay();
   return manager;
 }
@@ -58,7 +59,7 @@ describe('Electron screen voice orchestration', () => {
     expect(adapter.insert).toHaveBeenCalledWith('Literal text', fingerprint);
     expect(api.decide).not.toHaveBeenCalled();
     expect(manager.controller.state).toBe('idle');
-    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(440, 190, true);
+    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(480, 190, true);
   });
 
   test('selected rewrite is previewed, then revalidated replacement executes on confirmation', async () => {
@@ -139,6 +140,18 @@ describe('Electron screen voice orchestration', () => {
     );
   });
 
+  test('opening client settings keeps the voice overlay visible', async () => {
+    const openClientSettings = jest.fn(() => true);
+    const manager = managerWith({ api: {}, adapter: {}, openClientSettings });
+    manager.registerIpc();
+    const registration = ipcMain.handle.mock.calls.find((call) => call[0] === 'screen-voice:open-settings');
+
+    await registration[1]({ sender: { id: manager.overlay.webContents.id } }, {});
+
+    expect(openClientSettings).toHaveBeenCalled();
+    expect(manager.overlay.hide).not.toHaveBeenCalled();
+  });
+
   test('with Open at Login off, the first shortcut reveals details and the second starts listening', async () => {
     const manager = managerWith({ api: {}, adapter: {
       permissionStatus: jest.fn(async () => ({ accessibility: true })),
@@ -155,7 +168,7 @@ describe('Electron screen voice orchestration', () => {
     await registration[1]();
     expect(manager.controller.state).toBe('idle');
     expect(testOverlay.showInactive).toHaveBeenCalled();
-    expect(testOverlay.setSize).toHaveBeenLastCalledWith(440, 190, true);
+    expect(testOverlay.setSize).toHaveBeenLastCalledWith(480, 190, true);
 
     await registration[1]();
     expect(manager.controller.state).toBe('listening');

@@ -12,10 +12,10 @@ const { decisionRequiresConfirmation } = require('./confirmation-policy');
 const { actionText, normalizeText } = require('./action-normalizer');
 
 const MAX_AUDIO_BASE64_CHARS = 16 * 1024 * 1024;
-const COMPACT_OVERLAY = Object.freeze({ width: 440, height: 58 });
-const MODE_MENU_OVERLAY = Object.freeze({ width: 440, height: 190 });
+const COMPACT_OVERLAY = Object.freeze({ width: 480, height: 58 });
+const MODE_MENU_OVERLAY = Object.freeze({ width: 480, height: 190 });
 const PREVIEW_OVERLAY = Object.freeze({ width: 520, height: 360 });
-const DETAILS_OVERLAY = Object.freeze({ width: 440, height: 190 });
+const DETAILS_OVERLAY = Object.freeze({ width: 480, height: 190 });
 const EXPECTED_USER_ERRORS = new Set([
   'accessibility_permission_denied', 'MICROPHONE_DENIED', 'target_not_editable', 'secure_field', 'NO_SPEECH'
 ]);
@@ -172,7 +172,6 @@ class ElectronScreenVoice {
     handle('screen-voice:undo', () => this.undo());
     handle('screen-voice:open-settings', () => {
       const opened = this.openClientSettings();
-      if (opened) this.overlay?.hide();
       return { ok: Boolean(opened) };
     });
     handle('screen-voice:open-details', () => {
