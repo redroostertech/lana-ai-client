@@ -58,7 +58,7 @@ describe('Electron screen voice orchestration', () => {
     expect(adapter.insert).toHaveBeenCalledWith('Literal text', fingerprint);
     expect(api.decide).not.toHaveBeenCalled();
     expect(manager.controller.state).toBe('idle');
-    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(460, 190, true);
+    expect(manager.overlay.setSize).toHaveBeenLastCalledWith(440, 190, true);
   });
 
   test('selected rewrite is previewed, then revalidated replacement executes on confirmation', async () => {
@@ -155,7 +155,7 @@ describe('Electron screen voice orchestration', () => {
     await registration[1]();
     expect(manager.controller.state).toBe('idle');
     expect(testOverlay.showInactive).toHaveBeenCalled();
-    expect(testOverlay.setSize).toHaveBeenLastCalledWith(460, 190, true);
+    expect(testOverlay.setSize).toHaveBeenLastCalledWith(440, 190, true);
 
     await registration[1]();
     expect(manager.controller.state).toBe('listening');

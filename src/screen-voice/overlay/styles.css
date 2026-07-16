@@ -31,7 +31,7 @@ body { padding: 4px; color: var(--lex-text-primary); }
   flex: 0 0 24px;
   display: block;
 }
-.level-meter { display: none; width: 54px; flex: 1 1 54px; max-width: 72px; }
+.level-meter { display: none; width: 36px; flex: 1 1 36px; max-width: 48px; }
 .listening .level-meter,
 .transcribing .level-meter,
 .thinking .level-meter,
@@ -68,18 +68,41 @@ body { padding: 4px; color: var(--lex-text-primary); }
 .mode-menu-open .voice-shell {
   overflow: visible;
 }
+.shortcut-hint {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--lex-color-white) 72%, transparent);
+  font-size: 11px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shortcut-hint kbd {
+  color: var(--lex-color-white);
+  font: inherit;
+  font-weight: var(--lex-weight-semibold, 600);
+}
 .compact-actions { display: flex; align-items: center; gap: 1px; margin-left: auto; }
 .compact-actions lex-btn {
   --lex-text-secondary: var(--lex-color-white);
   --lex-color-gray-100: color-mix(in srgb, var(--lex-color-white) 14%, transparent);
+}
+.compact-actions lex-btn .lex-btn-inner {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: var(--lex-radius-full, 999px);
+}
+.compact-actions lex-btn .lex-btn-inner:focus-visible {
+  background: color-mix(in srgb, var(--lex-color-white) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lex-color-white) 45%, transparent);
 }
 .compact-actions .compact-secondary { opacity: .72; pointer-events: auto; transition: opacity .16s ease; }
 .compact-actions .compact-secondary:hover,
 .compact-actions .compact-secondary:focus-within,
 .error .compact-secondary,
 .previewing .compact-secondary { opacity: 1; }
-.compact-actions .mic-control { opacity: 1; }
-.listening .mic-control { --lex-text-secondary: var(--lex-color-danger-400, #f97066); }
 
 .expanded-surface {
   padding: 14px 16px 16px;

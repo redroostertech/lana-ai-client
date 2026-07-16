@@ -4,7 +4,8 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     shell: document.querySelector('.voice-shell'), expanded: $('expandedSurface'), expandedStatus: $('expandedStatus'),
-    mode: $('modeSelect'), mic: $('micButton'), info: $('infoButton'),
+    mode: $('modeSelect'), info: $('infoButton'), shortcutHint: $('shortcutHint'),
+    shortcutKeys: $('shortcutKeys'), shortcutAction: $('shortcutAction'),
     title: $('statusTitle'), detail: $('statusDetail'), context: $('contextNotice'), meter: $('levelMeter'),
     transcript: $('transcript'), preview: $('preview'), previewText: $('previewText'),
     confirm: $('confirmButton'), copy: $('copyButton'), cancel: $('cancelButton'), undo: $('undoButton'),
@@ -44,6 +45,14 @@
   function labelLexButton(element, label) {
     element.title = label;
     queueMicrotask(() => element.querySelector('button')?.setAttribute('aria-label', label));
+  }
+
+  function displayShortcut(shortcut) {
+    const parts = String(shortcut || '').split('+').filter(Boolean);
+    const isMac = /Mac|iPhone|iPad/.test(navigator.platform || '');
+    if (!isMac) return parts.map((part) => part === 'CommandOrControl' ? 'Ctrl' : part).join('+');
+    const symbols = { CommandOrControl: '⌘', Command: '⌘', Control: '⌃', Shift: '⇧', Alt: '⌥', Option: '⌥' };
+    return parts.map((part) => symbols[part] || part).join('');
   }
 
   function syncOverlayHeight() {
@@ -92,11 +101,20 @@
     if (!['idle', 'canceled', 'error'].includes(state) && session.mode) selectedMode = session.mode;
     els.mode.buttonLabel = selectedMode === 'agent' ? 'Agent' : 'Dictation';
     els.mode.disabled = !['idle', 'canceled', 'error'].includes(state);
+    const activeShortcut = selectedMode === 'agent'
+      ? snapshot.settings?.agentShortcut
+      : snapshot.settings?.dictationShortcut;
+    const shortcutLabel = displayShortcut(activeShortcut || (selectedMode === 'agent'
+      ? 'CommandOrControl+Shift+A'
+      : 'CommandOrControl+Shift+Space'));
+    els.shortcutKeys.textContent = shortcutLabel;
+    els.shortcutAction.textContent = state === 'listening' ? 'to stop' : 'to speak';
+    els.shortcutHint.title = `Press ${shortcutLabel} ${state === 'listening' ? 'to stop' : 'to speak'}`;
     els.title.textContent = state === 'listening' && !isAgent ? 'Dictating' : copy[0];
     els.shell.setAttribute('aria-label', `${copy[0]}. ${session.error?.message || copy[1]}`);
     els.detail.textContent = session.error?.message || copy[1];
     if (state === 'idle') {
-      els.detail.textContent = `Press ${snapshot.settings?.dictationShortcut || 'CommandOrControl+Shift+Space'} to start dictation, or ${snapshot.settings?.agentShortcut || 'CommandOrControl+Shift+A'} for Agent mode.`;
+      els.detail.textContent = `Press ${displayShortcut(snapshot.settings?.dictationShortcut || 'CommandOrControl+Shift+Space')} to start dictation, or ${displayShortcut(snapshot.settings?.agentShortcut || 'CommandOrControl+Shift+A')} for Agent mode.`;
     }
     els.context.hidden = state !== 'gathering_context';
     els.transcript.hidden = !session.transcript;
@@ -109,8 +127,6 @@
     else if (decision?.proposedActions?.[0]?.type === 'insert_table') els.confirm.textContent = 'Insert cells';
     else els.confirm.textContent = 'Insert';
     els.undo.hidden = !session.result?.canUndo;
-    els.mic.leadingIcon = state === 'listening' ? 'square' : 'mic';
-    labelLexButton(els.mic, state === 'listening' ? 'Stop listening' : `Start ${selectedMode}`);
     labelLexButton(els.info, state === 'error' ? 'Voice error details' : 'Voice details');
     els.meter.color = state === 'listening' ? 'danger' : 'accent';
     if (state !== 'listening') els.meter.value = 0;
@@ -195,9 +211,6 @@
     stream = null; recorder = null; chunks = [];
   }
 
-  els.mic.addEventListener('click', () => snapshot.state === 'listening'
-    ? stopCapture(false)
-    : window.screenVoice.activate(selectedMode));
   function setModeMenu(open) {
     modeMenuOpen = Boolean(open);
     document.body.classList.toggle('mode-menu-open', modeMenuOpen);

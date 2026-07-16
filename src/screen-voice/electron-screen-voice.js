@@ -15,7 +15,7 @@ const MAX_AUDIO_BASE64_CHARS = 16 * 1024 * 1024;
 const COMPACT_OVERLAY = Object.freeze({ width: 440, height: 58 });
 const MODE_MENU_OVERLAY = Object.freeze({ width: 440, height: 190 });
 const PREVIEW_OVERLAY = Object.freeze({ width: 520, height: 360 });
-const DETAILS_OVERLAY = Object.freeze({ width: 460, height: 190 });
+const DETAILS_OVERLAY = Object.freeze({ width: 440, height: 190 });
 const EXPECTED_USER_ERRORS = new Set([
   'accessibility_permission_denied', 'MICROPHONE_DENIED', 'target_not_editable', 'secure_field', 'NO_SPEECH'
 ]);
