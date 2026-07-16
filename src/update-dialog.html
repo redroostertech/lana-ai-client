@@ -475,7 +475,7 @@
       const url = getDirectDownloadUrl();
       if (window.electronAPI) {
         // Open in system browser which will trigger the download
-        window.electronAPI.invoke('open-external-url', url);
+        window.electronAPI.openExternal(url);
       }
     }
 
@@ -511,7 +511,7 @@
     // Send response back to main process
     function respond(choice) {
       if (window.electronAPI) {
-        window.electronAPI.send('update-dialog-response', choice);
+        window.electronAPI.respondToUpdateDialog(choice);
       }
     }
 

@@ -537,7 +537,7 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
     // Step 4: Open system browser to auth URL
     // Use window.open for web, electronAPI for Electron
     if (window.electronAPI && window.electronAPI.invoke) {
-      await window.electronAPI.invoke('open-external-url', authUrl);
+      await window.electronAPI.openExternal(authUrl);
     } else {
       window.open(authUrl, '_blank');
     }

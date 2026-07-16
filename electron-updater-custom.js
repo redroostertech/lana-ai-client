@@ -275,7 +275,8 @@ function showUpdateDialog(updateInfo, parentWindow, type = 'optional') {
         nodeIntegration: false,
         contextIsolation: true,
         preload: path.join(__dirname, 'electron-preload.js'),
-        sandbox: false
+        sandbox: true,
+        webSecurity: true
       }
     });
 
@@ -298,6 +299,14 @@ function showUpdateDialog(updateInfo, parentWindow, type = 'optional') {
     // Use ipcMain.on (not .handle) so it can receive multiple messages (e.g. retry)
     const responseChannel = 'update-dialog-response';
     const responseHandler = async (event, choice) => {
+      if (!updateDialogWindow || updateDialogWindow.isDestroyed() || event.sender !== updateDialogWindow.webContents) {
+        logError('Rejected update dialog response from an untrusted sender');
+        return;
+      }
+      if (!['update', 'retry', 'later', 'skip'].includes(choice)) {
+        logError('Rejected invalid update dialog response');
+        return;
+      }
       logInfo(`Update dialog response: ${choice}`);
 
       if (choice === 'update') {

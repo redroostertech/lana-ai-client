@@ -350,7 +350,7 @@
         const state = await window.electronAPI.generateOAuthState();
         const redirectUri = `lana-ai://oauth/callback?provider=${connectorId}`;
         const authUrl = Connectors.getOAuthUrl(connectorId, redirectUri) + `&state=${encodeURIComponent(state)}`;
-        await window.electronAPI.invoke('open-external-url', authUrl);
+        await window.electronAPI.openExternal(authUrl);
       } else {
         window.location.href = Connectors.getOAuthUrl(connectorId, window.location.href);
       }

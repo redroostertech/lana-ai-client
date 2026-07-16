@@ -13,6 +13,31 @@ const url = require('url');
 const crypto = require('crypto');
 const fs = require('fs');
 const Store = require('electron-store');
+const { fileURLToPath } = require('url');
+
+const rawIpcHandle = ipcMain.handle.bind(ipcMain);
+
+function registerTrustedIpcHandler(channel, listener) {
+  return rawIpcHandle(channel, async (event, ...args) => {
+    assertTrustedApplicationSender(event);
+    return listener(event, ...args);
+  });
+}
+
+function assertTrustedApplicationSender(event) {
+  const sender = event && event.sender;
+  const frame = event && event.senderFrame;
+  const owner = sender && BrowserWindow.fromWebContents(sender);
+  if (!sender || !frame || !owner || owner.isDestroyed() || frame !== sender.mainFrame) {
+    const error = new Error('Untrusted IPC sender'); error.code = 'UNTRUSTED_IPC_SENDER'; throw error;
+  }
+  let filename;
+  try { filename = fileURLToPath(frame.url); } catch (_) { const error = new Error('Untrusted IPC origin'); error.code = 'UNTRUSTED_IPC_SENDER'; throw error; }
+  const allowedRoot = path.resolve(__dirname, 'public_html') + path.sep;
+  if (!path.resolve(filename).startsWith(allowedRoot)) {
+    const error = new Error('Untrusted IPC origin'); error.code = 'UNTRUSTED_IPC_SENDER'; throw error;
+  }
+}
 
 /**
  * Resolve app icon candidates for the macOS Dock override. In development the
@@ -77,7 +102,6 @@ const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerifi
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 const SessionTracker = require('./js/session/session-tracker');
-const companionBridge = require('./electron-bridge');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
 const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
 const {
@@ -170,7 +194,7 @@ function requestCompanionConsentFromRenderer({ app }) {
   });
 }
 
-ipcMain.handle('companion-bridge:respond-consent', async (_event, payload) => {
+registerTrustedIpcHandler('companion-bridge:respond-consent', async (_event, payload) => {
   const requestId = payload && typeof payload.requestId === 'string' ? payload.requestId : null;
   if (!requestId) return { ok: false, reason: 'missing_request_id' };
 
@@ -528,8 +552,8 @@ function createWindow(serverUrl = null) {
       nodeIntegration: false, // Disable Node.js integration for security
       contextIsolation: true, // Enable context isolation for security
       preload: path.join(__dirname, 'electron-preload.js'), // Preload script for secure IPC
-      sandbox: false, // Disable sandbox to allow file:// navigation
-      webSecurity: false, // Disable for file:// protocol to work with absolute paths
+      sandbox: true,
+      webSecurity: true,
       allowRunningInsecureContent: false,
       experimentalFeatures: false
     },
@@ -585,19 +609,13 @@ function createWindow(serverUrl = null) {
 
   // Handle window open requests
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Allow about:blank, blob:, data:, and empty URLs (for print preview and dynamic content)
-    if (!url || url === '' || url === 'about:blank' || url.startsWith('blob:') || url.startsWith('data:')) {
-      return { action: 'allow' };
-    }
-
     // Open external http/https links in system browser
     if (url.startsWith('http://') || url.startsWith('https://')) {
       require('electron').shell.openExternal(url);
       return { action: 'deny' };
     }
 
-    // Allow all other URLs
-    return { action: 'allow' };
+    return { action: 'deny' };
   });
 }
 
@@ -619,8 +637,8 @@ function createLoginWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'electron-preload.js'),
-      sandbox: false,
-      webSecurity: false
+      sandbox: true,
+      webSecurity: true
     },
     show: false,
     resizable: true,
@@ -881,16 +899,16 @@ function createApplicationMenu() {
  */
 
 // Renderer logging - captures errors from web pages for debug export
-ipcMain.handle('renderer-log-error', async (event, message, error) => {
+registerTrustedIpcHandler('renderer-log-error', async (event, message, error) => {
   logError(`[Renderer] ${message}`, error ? { message: error.message, stack: error.stack } : null);
 });
 
-ipcMain.handle('renderer-log-info', async (event, message) => {
+registerTrustedIpcHandler('renderer-log-info', async (event, message) => {
   logInfo(`[Renderer] ${message}`);
 });
 
 // Handle configuration requests
-ipcMain.handle('get-config', async () => {
+registerTrustedIpcHandler('get-config', async () => {
   return {
     appVersion: getAppVersion(),
     platform: process.platform,
@@ -900,25 +918,25 @@ ipcMain.handle('get-config', async () => {
 });
 
 // Handle secure storage operations
-ipcMain.handle('save-settings', async (event, settings) => {
+registerTrustedIpcHandler('save-settings', async (event, settings) => {
   const { saveServerConnection } = require('./electron-storage');
   const success = saveServerConnection(settings);
   if (success) syncScreenVoiceEntitlement(settings);
   return { success };
 });
 
-ipcMain.handle('load-settings', async () => {
+registerTrustedIpcHandler('load-settings', async () => {
   const { getSavedServer } = require('./electron-storage');
   return getSavedServer();
 });
 
 // Get app version - use centralized version system
-ipcMain.handle('get-version', async () => {
+registerTrustedIpcHandler('get-version', async () => {
   return getAppVersion();
 });
 
 // Connect to server (called after hosted discovery resolves org)
-ipcMain.handle('connect-to-server', async (event, server) => {
+registerTrustedIpcHandler('connect-to-server', async (event, server) => {
   logInfo(`IPC: connect-to-server requested for ${server.orgName || server.orgId}`);
   try {
     // Save server connection
@@ -939,7 +957,7 @@ ipcMain.handle('connect-to-server', async (event, server) => {
 });
 
 // Verify server connection
-ipcMain.handle('verify-server', async (event, serverUrl) => {
+registerTrustedIpcHandler('verify-server', async (event, serverUrl) => {
   logInfo(`IPC: verify-server for ${serverUrl}`);
   try {
     const result = await verifyServer(serverUrl);
@@ -951,7 +969,7 @@ ipcMain.handle('verify-server', async (event, serverUrl) => {
 });
 
 // Get saved server
-ipcMain.handle('get-saved-server', async () => {
+registerTrustedIpcHandler('get-saved-server', async () => {
   try {
     const server = getSavedServer();
     return { success: true, server };
@@ -1057,7 +1075,7 @@ ipcMain.handle('capabilities:request-voice-permission', async (_event, payload) 
 });
 
 // Clear saved server (logout)
-ipcMain.handle('clear-saved-server', async () => {
+registerTrustedIpcHandler('clear-saved-server', async () => {
   try {
     clearSavedServer();
     syncScreenVoiceEntitlement(null);
@@ -1069,29 +1087,16 @@ ipcMain.handle('clear-saved-server', async () => {
 });
 
 
-// Session Tracking IPC Handlers
-// Initialize session tracker with backend URL and auth token
-ipcMain.handle('session-tracker:initialize', async (event, backendUrl, authToken) => {
-  try {
-    if (sessionTracker && backendUrl && authToken) {
-      sessionTracker.initialize(backendUrl, authToken);
-      logInfo('[SessionTracker] Initialized with backend URL');
-      return { success: true };
-    } else {
-      return { success: false, error: 'Missing backend URL or auth token' };
-    }
-  } catch (error) {
-    logError('[SessionTracker] Failed to initialize:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-
 // Check for updates
 // Open URL in system browser (used by update dialog for manual download)
-ipcMain.handle('open-external-url', async (event, url) => {
+registerTrustedIpcHandler('open-external-url', async (event, url) => {
   const { shell } = require('electron');
-  await shell.openExternal(url);
+  const target = new URL(String(url || ''));
+  const isLoopbackHttp = target.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname);
+  if (String(url).length > 2048 || (!['https:', 'brainchild:'].includes(target.protocol) && !isLoopbackHttp)) {
+    const error = new Error('External URL is not allowed'); error.code = 'INVALID_EXTERNAL_URL'; throw error;
+  }
+  await shell.openExternal(target.toString());
   return true;
 });
 
@@ -1100,7 +1105,7 @@ ipcMain.handle('open-external-url', async (event, url) => {
 // ───────────────────────────────────────────────────────────────────────────
 
 // Auto-discover an install + vault from OS defaults. Pure-helper backed.
-ipcMain.handle('brainchild:discover', async () => {
+registerTrustedIpcHandler('brainchild:discover', async () => {
   try {
     return { success: true, ...discover() };
   } catch (error) {
@@ -1111,7 +1116,7 @@ ipcMain.handle('brainchild:discover', async () => {
 
 // Establish + persist the link, then validate. Communicate via MCP only AFTER
 // the link is persisted and verified.
-ipcMain.handle('brainchild:link', async (_event, payload) => {
+registerTrustedIpcHandler('brainchild:link', async (_event, payload) => {
   try {
     const link = {
       installPath: (payload && payload.installPath) || '',
@@ -1157,7 +1162,7 @@ ipcMain.handle('brainchild:link', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('brainchild:status', async () => {
+registerTrustedIpcHandler('brainchild:status', async () => {
   try {
     return { success: true, ...brainchildManager.getStatus() };
   } catch (error) {
@@ -1166,7 +1171,7 @@ ipcMain.handle('brainchild:status', async () => {
   }
 });
 
-ipcMain.handle('brainchild:listNotes', async (_event, payload) => {
+registerTrustedIpcHandler('brainchild:listNotes', async (_event, payload) => {
   try {
     const args = {};
     if (payload && payload.filter) args.filter = String(payload.filter);
@@ -1178,7 +1183,7 @@ ipcMain.handle('brainchild:listNotes', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('brainchild:search', async (_event, payload) => {
+registerTrustedIpcHandler('brainchild:search', async (_event, payload) => {
   try {
     const args = { query: (payload && payload.query) || '' };
     if (payload && payload.limit) args.limit = Number(payload.limit);
@@ -1190,7 +1195,7 @@ ipcMain.handle('brainchild:search', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('brainchild:getNote', async (_event, payload) => {
+registerTrustedIpcHandler('brainchild:getNote', async (_event, payload) => {
   try {
     const notePath = (payload && payload.path) || '';
     if (!notePath) return { success: false, error: 'missing_path' };
@@ -1207,7 +1212,7 @@ ipcMain.handle('brainchild:getNote', async (_event, payload) => {
 // Path entry stays main-chosen (dialog) rather than renderer-passed, so the
 // renderer never supplies an arbitrary install path. Returns the resolved
 // install root for the renderer to pass back to brainchild:link.
-ipcMain.handle('brainchild:pickInstall', async () => {
+registerTrustedIpcHandler('brainchild:pickInstall', async () => {
   try {
     const result = await dialog.showOpenDialog({
       title: 'Choose your Brainchild install folder',
@@ -1234,7 +1239,7 @@ ipcMain.handle('brainchild:pickInstall', async () => {
 
 // Native folder picker for the Brainchild VAULT directory. Returns the chosen
 // path for the renderer to pass to brainchild:link as vaultPath.
-ipcMain.handle('brainchild:pickVault', async () => {
+registerTrustedIpcHandler('brainchild:pickVault', async () => {
   try {
     const result = await dialog.showOpenDialog({
       title: 'Choose your Brainchild vault folder',
@@ -1256,7 +1261,7 @@ ipcMain.handle('brainchild:pickVault', async () => {
 // Unlink: stop the MCP child, forget the persisted link, and suppress auto-bind
 // so discovery does not instantly re-bind the handshake vault. Backed by
 // clearBrainchildLink() + setBrainchildAutoBindDisabled() in electron-storage.
-ipcMain.handle('brainchild:unlink', async () => {
+registerTrustedIpcHandler('brainchild:unlink', async () => {
   try {
     brainchildManager.stop();
     clearBrainchildLink();
@@ -1274,7 +1279,7 @@ ipcMain.handle('brainchild:unlink', async () => {
 // "Open in Brainchild": resolve the vault-relative note path against the linked
 // vault root and show it in Finder/Explorer. The note path is constrained to the
 // linked vault (no traversal outside it) before revealing.
-ipcMain.handle('brainchild:revealNote', async (_event, payload) => {
+registerTrustedIpcHandler('brainchild:revealNote', async (_event, payload) => {
   try {
     const link = getBrainchildLink();
     if (!link || !link.vaultPath) return { success: false, error: 'not_linked' };
@@ -1302,7 +1307,7 @@ ipcMain.handle('brainchild:revealNote', async (_event, payload) => {
   }
 });
 
-ipcMain.handle('generate-oauth-state', async () => {
+registerTrustedIpcHandler('generate-oauth-state', async () => {
   return generateOAuthState();
 });
 
@@ -1310,7 +1315,7 @@ ipcMain.handle('generate-oauth-state', async () => {
  * OAuth State Management - Backend-based
  * Creates state token in backend database for CSRF protection
  */
-ipcMain.handle('create-oauth-state', async (event, { provider, connectorId, matterId }) => {
+registerTrustedIpcHandler('create-oauth-state', async (event, { provider, connectorId, matterId }) => {
   try {
     const savedServer = getSavedServer();
     if (!savedServer || !savedServer.serverUrl) {
@@ -1357,7 +1362,7 @@ ipcMain.handle('create-oauth-state', async (event, { provider, connectorId, matt
  * OAuth Code Exchange - Backend-based
  * Exchanges authorization code for tokens via backend
  */
-ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider, connectorId, redirectUri, realmId }) => {
+registerTrustedIpcHandler('exchange-oauth-code', async (event, { code, state, provider, connectorId, redirectUri, realmId }) => {
   try {
     const savedServer = getSavedServer();
     if (!savedServer || !savedServer.serverUrl) {
@@ -1403,7 +1408,7 @@ ipcMain.handle('exchange-oauth-code', async (event, { code, state, provider, con
   }
 });
 
-ipcMain.handle('check-updates', async (event, serverUrl) => {
+registerTrustedIpcHandler('check-updates', async (event, serverUrl) => {
   try {
     // Get saved server to retrieve orgId
     const savedServer = getSavedServer();
@@ -1418,7 +1423,7 @@ ipcMain.handle('check-updates', async (event, serverUrl) => {
 });
 
 // Download and install update
-ipcMain.handle('install-update', async (event, serverUrl) => {
+registerTrustedIpcHandler('install-update', async (event, serverUrl) => {
   try {
     // Get saved server to retrieve orgId
     const savedServer = getSavedServer();
@@ -1439,7 +1444,7 @@ ipcMain.handle('install-update', async (event, serverUrl) => {
 const vpnStore = new Store({ name: 'vpn-keys', encryptionKey: 'lana-vpn-secure-store' });
 
 // Generate WireGuard keypair using X25519
-ipcMain.handle('vpn-generate-keypair', async () => {
+registerTrustedIpcHandler('vpn-generate-keypair', async () => {
   try {
     // Generate X25519 keypair using Node.js crypto
     const { publicKey, privateKey } = crypto.generateKeyPairSync('x25519', {
@@ -1464,7 +1469,7 @@ ipcMain.handle('vpn-generate-keypair', async () => {
 });
 
 // Save VPN keys to secure storage
-ipcMain.handle('vpn-save-keys', async (event, keys) => {
+registerTrustedIpcHandler('vpn-save-keys', async (event, keys) => {
   try {
     vpnStore.set('keys', keys);
     logInfo('VPN keys saved to secure storage');
@@ -1476,7 +1481,7 @@ ipcMain.handle('vpn-save-keys', async (event, keys) => {
 });
 
 // Load VPN keys from secure storage
-ipcMain.handle('vpn-load-keys', async () => {
+registerTrustedIpcHandler('vpn-load-keys', async () => {
   try {
     const keys = vpnStore.get('keys');
     return keys || null;
@@ -1487,7 +1492,7 @@ ipcMain.handle('vpn-load-keys', async () => {
 });
 
 // Clear VPN keys from secure storage
-ipcMain.handle('vpn-clear-keys', async () => {
+registerTrustedIpcHandler('vpn-clear-keys', async () => {
   try {
     vpnStore.delete('keys');
     vpnStore.delete('deviceId');
@@ -1500,7 +1505,7 @@ ipcMain.handle('vpn-clear-keys', async () => {
 });
 
 // Get or create device ID
-ipcMain.handle('vpn-get-device-id', async () => {
+registerTrustedIpcHandler('vpn-get-device-id', async () => {
   try {
     let deviceId = vpnStore.get('deviceId');
     if (!deviceId) {
@@ -1532,7 +1537,7 @@ const bridgeConsentsStore = new Store({
   defaults: { consents: {} }
 });
 
-ipcMain.handle('settings:list-bridge-consents', async () => {
+registerTrustedIpcHandler('settings:list-bridge-consents', async () => {
   try {
     const consents = bridgeConsentsStore.get('consents', {}) || {};
     return consents;
@@ -1542,7 +1547,7 @@ ipcMain.handle('settings:list-bridge-consents', async () => {
   }
 });
 
-ipcMain.handle('settings:revoke-bridge-consent', async (_event, payload) => {
+registerTrustedIpcHandler('settings:revoke-bridge-consent', async (_event, payload) => {
   const app = payload && typeof payload.app === 'string' ? payload.app.trim() : '';
   if (!app) {
     return { ok: false, message: 'app name is required' };
@@ -1900,13 +1905,6 @@ app.on('window-all-closed', () => {
 app.on('before-quit', async () => {
   // Cleanup operations before quitting
   console.log('[electron-main] Application is quitting...');
-
-  // Stop the PAC bridge HTTP server
-  try {
-    companionBridge.stop();
-  } catch (error) {
-    logError('[electron-main] Failed to stop companion bridge', error);
-  }
 
   // Tear down the brainchild MCP child process (if spawned).
   try {

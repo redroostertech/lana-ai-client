@@ -149,8 +149,7 @@ class ApiClient {
           if (window.electronAPI) {
             this._readyPromise.then(async () => {
               try {
-                await window.electronAPI.invoke('session-tracker:initialize', this.baseUrl, this.token);
-                await window.electronAPI.invoke('session-tracker:start');
+                await window.electronAPI.sessionTracking.start();
                 this.log('Session tracking initialized and started (auto-login)');
               } catch (error) {
                 console.warn('[LanaAPI] Failed to start session tracking (auto-login):', error);
@@ -1462,10 +1461,7 @@ class ApiClient {
     // Start session tracking (Electron client only)
     if (window.electronAPI) {
       try {
-        // First initialize session tracker with backend URL and token
-        await window.electronAPI.invoke('session-tracker:initialize', this.baseUrl, this.token);
-        // Then start the session
-        await window.electronAPI.invoke('session-tracker:start');
+        await window.electronAPI.sessionTracking.start();
         this.log('Session tracking initialized and started');
       } catch (error) {
         console.warn('[LanaAPI] Failed to start session tracking:', error);

@@ -1,0 +1,26 @@
+{
+  "name": "@lana/desktop-mcp-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal stdio MCP adapter for the authenticated Lana desktop relay",
+  "main": "src/cli.js",
+  "bin": {
+    "lana-mcp-adapter": "bin/lana-mcp-adapter.js"
+  },
+  "scripts": {
+    "test": "jest --runInBand",
+    "serve": "node bin/lana-mcp-adapter.js serve",
+    "doctor": "node bin/lana-mcp-adapter.js doctor"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "keytar": "7.9.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "jest": "29.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

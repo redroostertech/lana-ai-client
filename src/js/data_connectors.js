@@ -1943,7 +1943,7 @@
       if (frame && event.source !== frame.contentWindow) return;
 
       if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
-        window.electronAPI.invoke('open-external-url', data.url).catch(function (error) {
+        window.electronAPI.openExternal(data.url).catch(function (error) {
           console.error('Failed to open external URL:', error);
         });
       } else {

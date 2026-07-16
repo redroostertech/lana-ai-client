@@ -133,11 +133,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
-   * Generic IPC invoke (for extensibility)
-   */
-  invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
-
-  /**
    * Open a URL in the user's system browser via shell.openExternal.
    *
    * Used by the Apps section pages (knowledge-base.html, etc.) to launch
@@ -147,10 +142,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   openExternal: (url) => ipcRenderer.invoke('open-external-url', url),
 
-  /**
-   * Generic IPC send (fire-and-forget, for one-way messages to main process)
-   */
-  send: (channel, ...args) => ipcRenderer.send(channel, ...args),
+  respondToUpdateDialog: (choice) => ipcRenderer.send('update-dialog-response', choice),
 
   /**
    * Event listeners (one-way communication from main to renderer)

@@ -13,7 +13,8 @@
   "license": "Proprietary",
   "scripts": {
     "generate-version": "node scripts/generate-version.js",
-    "bundle-electron": "node scripts/build-screen-voice-helper.js && node scripts/bundle-electron.js",
+    "security:mcp:architecture": "node scripts/mcp-security/architecture-lint.js",
+    "bundle-electron": "npm run security:mcp:architecture && node scripts/build-screen-voice-helper.js && node scripts/bundle-electron.js",
     "build:tiptap": "node scripts/build-tiptap.js",
     "prestart": "npm run generate-version",
     "start": "node --max-old-space-size=2048 src/index.js",
@@ -72,6 +73,8 @@
     "@tiptap/extension-underline": "^3.14.0",
     "@tiptap/pm": "^3.14.0",
     "@tiptap/starter-kit": "^3.14.0",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
     "archiver": "^7.0.1",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",

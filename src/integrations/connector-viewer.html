@@ -6737,7 +6737,7 @@
 
     async function openOAuthAuthorizationUrl(authUrl, { sameWindow = false } = {}) {
       if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
-        await window.electronAPI.invoke('open-external-url', authUrl);
+        await window.electronAPI.openExternal(authUrl);
         startAuthorizationStatusPolling();
         return;
       }
