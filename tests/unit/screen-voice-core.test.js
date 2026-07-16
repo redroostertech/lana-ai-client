@@ -71,6 +71,11 @@ describe('screen voice contracts and safety helpers', () => {
       .toBe('CommandOrControl+Shift+A');
   });
 
+  test('migrates the old letter-chord capture shortcut', () => {
+    expect(parseSettings({ captureShortcut: 'Z+X' }).captureShortcut)
+      .toBe('Control+Option');
+  });
+
   test('removes all content from password fields', () => {
     const value = sanitizeContext(context({ selectedText: 'secret', surroundingText: 'private',
       accessibleDocumentText: 'document', focusedElement: { ...context().focusedElement,

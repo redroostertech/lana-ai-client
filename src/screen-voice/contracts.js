@@ -6,6 +6,7 @@ const MAX_INSTRUCTION_CHARS = 4000;
 const MAX_CONTEXT_CHARS = 12000;
 const MAX_ACTION_TEXT_CHARS = 24000;
 const LEGACY_AGENT_SHORTCUT = 'CommandOrControl+Shift+Period';
+const LEGACY_CAPTURE_SHORTCUT = 'Z+X';
 
 const boundsSchema = z.object({
   x: z.number().finite(),
@@ -106,6 +107,7 @@ const voiceSettingsSchema = z.object({
   enabled: z.boolean(),
   openAtLogin: z.boolean(),
   dictationShortcut: z.string().min(1).max(80),
+  captureShortcut: z.string().min(1).max(80),
   agentShortcut: z.string().min(1).max(80),
   defaultMode: z.enum(['dictation', 'agent']),
   screenContextEnabled: z.boolean(),
@@ -118,6 +120,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   enabled: true,
   openAtLogin: false,
   dictationShortcut: 'CommandOrControl+Shift+Space',
+  captureShortcut: 'Control+Option',
   agentShortcut: 'CommandOrControl+Shift+A',
   defaultMode: 'agent',
   screenContextEnabled: true,
@@ -138,6 +141,9 @@ function parseSettings(value) {
   if (migrated.agentShortcut === LEGACY_AGENT_SHORTCUT) {
     migrated.agentShortcut = DEFAULT_SETTINGS.agentShortcut;
   }
+  if (migrated.captureShortcut === LEGACY_CAPTURE_SHORTCUT) {
+    migrated.captureShortcut = DEFAULT_SETTINGS.captureShortcut;
+  }
   migrated.defaultMode = 'agent';
   return voiceSettingsSchema.parse(migrated);
 }
@@ -147,6 +153,7 @@ module.exports = {
   MAX_CONTEXT_CHARS,
   MAX_ACTION_TEXT_CHARS,
   LEGACY_AGENT_SHORTCUT,
+  LEGACY_CAPTURE_SHORTCUT,
   DEFAULT_SETTINGS,
   actionTypes,
   targetFingerprintSchema,

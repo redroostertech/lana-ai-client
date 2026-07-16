@@ -56,6 +56,23 @@ function boundedHints(value) {
   return result;
 }
 
+function capabilityHints(id, item) {
+  if (id === SCREEN_DICTION_APP_ID) {
+    return {
+      'Getting started': [
+        'Press Command+Shift+Space to open the voice agent.',
+        'Hold Control+Option to speak, then release to process.'
+      ],
+      Shortcuts: {
+        Open: 'Command+Shift+Space',
+        Capture: 'Control+Option'
+      },
+      Permissions: 'Microphone and Accessibility access are requested only when used.'
+    };
+  }
+  return boundedHints(item.route.meta?.hints);
+}
+
 function isCapabilityActive(server, capabilityId, preferences = {}, platform = process.platform) {
   const item = capabilityItems(server).find((candidate) => appId(candidate) === capabilityId);
   if (!item || !SUPPORTED_PLATFORMS.includes(platform) || !capabilitySupportsPlatform(item, platform)) return false;
@@ -77,7 +94,7 @@ function capabilityViewModels(server, preferences = {}, platform = process.platf
       active: available && isCapabilityActive(server, id, preferences, platform),
       available,
       platforms: Array.isArray(item.route.meta?.platforms) ? item.route.meta.platforms.slice(0, 3) : [],
-      hints: boundedHints(item.route.meta?.hints)
+      hints: capabilityHints(id, item)
     };
   });
 }

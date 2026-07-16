@@ -16,22 +16,21 @@ static void Emit(NSDictionary *payload, int status) {
   exit(status);
 }
 
-static BOOL shortcutSpacePressed = NO;
+static BOOL captureShortcutPressed = NO;
+
+static BOOL CaptureShortcutDown(CGEventFlags flags) {
+  return (flags & kCGEventFlagMaskControl) && (flags & kCGEventFlagMaskAlternate);
+}
 
 static CGEventRef ShortcutMonitorCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
   (void)proxy; (void)refcon;
-  CGKeyCode keyCode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
-  if (keyCode != 49) return event;
-  BOOL *pressed = &shortcutSpacePressed;
-  if (type == kCGEventKeyDown) {
-    CGEventFlags flags = CGEventGetFlags(event);
-    BOOL modifiersDown = (flags & kCGEventFlagMaskCommand) && (flags & kCGEventFlagMaskShift);
-    if (modifiersDown && !*pressed) {
-      *pressed = YES;
-      WriteJSONLine(@{ @"event": @"down", @"mode": @"agent" });
-    }
-  } else if (type == kCGEventKeyUp && *pressed) {
-    *pressed = NO;
+  (void)type;
+  BOOL isDown = CaptureShortcutDown(CGEventGetFlags(event));
+  if (isDown && !captureShortcutPressed) {
+    captureShortcutPressed = YES;
+    WriteJSONLine(@{ @"event": @"down", @"mode": @"agent" });
+  } else if (!isDown && captureShortcutPressed) {
+    captureShortcutPressed = NO;
     WriteJSONLine(@{ @"event": @"up", @"mode": @"agent" });
   }
   return event;
@@ -40,14 +39,12 @@ static CGEventRef ShortcutMonitorCallback(CGEventTapProxy proxy, CGEventType typ
 static void PollShortcutStates(void) {
   WriteJSONLine(@{ @"event": @"ready", @"method": @"key_state" });
   while (true) {
-    CGEventFlags flags = CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState);
-    BOOL modifiersDown = (flags & kCGEventFlagMaskCommand) && (flags & kCGEventFlagMaskShift);
-    BOOL spaceDown = modifiersDown && CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, 49);
-    if (spaceDown && !shortcutSpacePressed) {
-      shortcutSpacePressed = YES;
+    BOOL shortcutDown = CaptureShortcutDown(CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState));
+    if (shortcutDown && !captureShortcutPressed) {
+      captureShortcutPressed = YES;
       WriteJSONLine(@{ @"event": @"down", @"mode": @"agent" });
-    } else if (!spaceDown && shortcutSpacePressed) {
-      shortcutSpacePressed = NO;
+    } else if (!shortcutDown && captureShortcutPressed) {
+      captureShortcutPressed = NO;
       WriteJSONLine(@{ @"event": @"up", @"mode": @"agent" });
     }
     usleep(15000);
@@ -55,7 +52,7 @@ static void PollShortcutStates(void) {
 }
 
 static void MonitorShortcuts(void) {
-  CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
+  CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp) | CGEventMaskBit(kCGEventFlagsChanged);
   CFMachPortRef tap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap,
     kCGEventTapOptionListenOnly, mask, ShortcutMonitorCallback, NULL);
   if (!tap) { PollShortcutStates(); return; }

@@ -4,7 +4,7 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     shell: document.querySelector('.voice-shell'), expanded: $('expandedSurface'), expandedStatus: $('expandedStatus'),
-    mode: $('modeLabel'), info: $('infoButton'), shortcutHint: $('shortcutHint'),
+    info: $('infoButton'), shortcutHint: $('shortcutHint'),
     shortcutVerb: $('shortcutVerb'), shortcutKeys: $('shortcutKeys'), shortcutAction: $('shortcutAction'),
     title: $('statusTitle'), detail: $('statusDetail'), context: $('contextNotice'), meter: $('levelMeter'),
     transcript: $('transcript'), preview: $('preview'), previewText: $('previewText'),
@@ -27,6 +27,8 @@
   let detailsOpen = true;
   let drawerTimer = null;
   let resizeFrame = null;
+  let captureChordActive = false;
+  const pressedCaptureKeys = new Set();
 
   const stateCopy = {
     idle: ['Ready', 'Ask LANA about your matter, this window, or what to do next.'],
@@ -90,8 +92,8 @@
     const session = snapshot.session || {};
     const copy = stateCopy[state] || stateCopy.idle;
     els.shell.className = `voice-shell ${state} capture-${capturePhase}`;
-    const activeShortcut = snapshot.settings?.dictationShortcut;
-    const shortcutLabel = displayShortcut(activeShortcut || 'CommandOrControl+Shift+Space');
+    const activeShortcut = snapshot.settings?.captureShortcut;
+    const shortcutLabel = displayShortcut(activeShortcut || 'Control+Option');
     const captureReady = state === 'listening' && capturePhase === 'recording';
     const captureStarting = state === 'listening' && ['idle', 'preparing', 'chiming'].includes(capturePhase);
     const captureReleasing = state === 'listening' && capturePhase === 'releasing';
@@ -113,7 +115,7 @@
       els.detail.textContent = captureCopy[1];
     }
     if (state === 'idle') {
-      els.detail.textContent = `Hold ${displayShortcut(snapshot.settings?.dictationShortcut || 'CommandOrControl+Shift+Space')} to ask LANA. Release to process.`;
+      els.detail.textContent = `Hold ${displayShortcut(snapshot.settings?.captureShortcut || 'Control+Option')} to ask LANA. Release to process.`;
     }
     els.context.hidden = state !== 'gathering_context';
     els.transcript.hidden = !session.transcript;
@@ -145,6 +147,27 @@
   function setCapturePhase(phase) {
     capturePhase = phase;
     render(snapshot);
+  }
+
+  function isEditableTarget(target) {
+    const tag = String(target?.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || Boolean(target?.isContentEditable);
+  }
+
+  function captureKey(event) {
+    if (event.key === 'Control' || event.code === 'ControlLeft' || event.code === 'ControlRight') return 'control';
+    if (event.key === 'Alt' || event.key === 'Option' || event.code === 'AltLeft' || event.code === 'AltRight') return 'option';
+    return null;
+  }
+
+  function captureChordDown() {
+    return pressedCaptureKeys.has('control') && pressedCaptureKeys.has('option');
+  }
+
+  function releaseOverlayCapture() {
+    if (!captureChordActive) return;
+    captureChordActive = false;
+    if (capturePhase === 'recording') window.screenVoice.captureRelease().catch(() => {});
   }
 
   async function startCapture({ sessionId, maxDurationMs }) {
@@ -191,6 +214,9 @@
       setCapturePhase('recording');
       reportCaptureStatus('recording_started');
       startMeter(stream);
+      if (!captureChordActive) {
+        setTimeout(() => window.screenVoice.captureRelease().catch(() => {}), 250);
+      }
       stopTimer = setTimeout(() => stopCapture(false), Math.min(90000, Number(maxDurationMs) || 90000));
     } catch (error) {
       await cleanupCapture();
@@ -310,6 +336,16 @@
   });
   $('settingsButton').addEventListener('click', () => window.screenVoice.openSettings());
   document.addEventListener('keydown', (event) => {
+    const key = captureKey(event);
+    if (key && !isEditableTarget(event.target)) {
+      event.preventDefault();
+      pressedCaptureKeys.add(key);
+      if (captureChordDown() && !captureChordActive) {
+        captureChordActive = true;
+        window.screenVoice.captureStart().catch(() => { captureChordActive = false; });
+      }
+      return;
+    }
     if (event.key !== 'Escape') return;
     if (detailsOpen) {
       detailsOpen = false;
@@ -318,6 +354,17 @@
       return;
     }
     stopCapture(true); window.screenVoice.cancel();
+  });
+  document.addEventListener('keyup', (event) => {
+    const key = captureKey(event);
+    if (!key) return;
+    if (!isEditableTarget(event.target)) event.preventDefault();
+    pressedCaptureKeys.delete(key);
+    if (!captureChordDown()) releaseOverlayCapture();
+  });
+  window.addEventListener('blur', () => {
+    pressedCaptureKeys.clear();
+    releaseOverlayCapture();
   });
 
   window.screenVoice.onState(render);

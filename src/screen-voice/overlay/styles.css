@@ -38,7 +38,6 @@ body { padding: 4px; color: var(--lex-text-primary); }
 .gathering_context .level-meter,
 .executing .level-meter,
 .speaking .level-meter { display: block; opacity: 1; }
-.agent-mode-pill { flex: 0 0 auto; min-width: 64px; padding: 6px 13px; border: 1px solid color-mix(in srgb, var(--lex-color-white) 22%, transparent); border-radius: var(--lex-radius-full, 999px); background: var(--lex-color-white); color: var(--lex-color-gray-900); font-size: var(--lex-body-xs-size, 12px); font-weight: var(--lex-weight-semibold, 600); text-align: center; }
 .shortcut-hint {
   min-width: 0;
   flex: 1 1 auto;

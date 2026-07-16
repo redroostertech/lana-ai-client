@@ -23,6 +23,7 @@ const Store = require('electron-store');
  */
 function appIconPath() {
   const candidates = [
+    path.join(__dirname, 'build', 'icons', 'icon.icns'),
     path.join(__dirname, 'build', 'icons', 'icon-1024.png'),
     path.join(__dirname, 'build', 'icons', 'icon-512.png'),
     path.join(__dirname, 'build', 'icons', 'icon.png'),
@@ -35,7 +36,32 @@ function appIconPath() {
 
 // Set app version from package.json (prevents app.getVersion() returning the Electron framework version)
 const packageJson = require('./package.json');
+app.setName(packageJson.productName || 'Lana AI');
 app.setVersion(packageJson.version);
+
+function applyDockIcon() {
+  if (process.platform !== 'darwin' || !app.dock) return false;
+  const iconPath = appIconPath();
+  if (!iconPath) return false;
+  try {
+    const img = nativeImage.createFromPath(iconPath);
+    if (img.isEmpty()) return false;
+    app.dock.setIcon(img);
+    app.dock.show().catch(() => {});
+    return true;
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
+    logError(`[lana-ai-client] dock icon set failed: ${msg}`);
+    return false;
+  }
+}
+
+// Chromium can emit noisy GPU-driver diagnostics to stderr on macOS dev runs
+// (for example repeated EGL "Bad attribute" messages). Keep app logs visible
+// while suppressing Chromium ERROR-level noise.
+if (process.env.NODE_ENV === 'development') {
+  app.commandLine.appendSwitch('log-level', '3');
+}
 
 // Import thin client modules
 const { refreshHostedDiscovery, verifyServer } = require('./electron-discovery');
@@ -1674,18 +1700,7 @@ app.whenReady().then(async () => {
   // Contents/Resources/electron.icns; in dev that path is Electron's default
   // (the lava lamp), so we override at runtime. BrowserWindow.icon is
   // ignored on macOS so this is the only path that works for dev runs.
-  if (process.platform === 'darwin' && app.dock) {
-    const iconPath = appIconPath();
-    if (iconPath) {
-      try {
-        const img = nativeImage.createFromPath(iconPath);
-        if (!img.isEmpty()) app.dock.setIcon(img);
-      } catch (err) {
-        const msg = err && err.message ? err.message : String(err);
-        logError(`[lana-ai-client] dock icon set failed: ${msg}`);
-      }
-    }
-  }
+  applyDockIcon();
 
   // Version migration: Clear server config to ensure fresh discovery with correct static_ip
   // This fixes issues where old versions saved incorrect IPs (e.g., link-local addresses)
@@ -1754,6 +1769,7 @@ app.whenReady().then(async () => {
         navigateClient: navigateScreenVoiceClient,
         openExternalUrl: openScreenVoiceResearchUrl,
         notifyUser: notifyScreenVoiceInputRequired,
+        ensureDockIcon: applyDockIcon,
         entitlementEnabled: isCapabilityActive(
           getSavedServer(),
           SCREEN_DICTION_APP_ID,

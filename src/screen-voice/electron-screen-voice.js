@@ -68,6 +68,7 @@ class ElectronScreenVoice {
     this.navigateClient = options.navigateClient || (async () => false);
     this.openExternalUrl = options.openExternalUrl || (async () => false);
     this.notifyUser = options.notifyUser || (() => {});
+    this.ensureDockIcon = options.ensureDockIcon || (() => false);
     this.logInfo = options.logInfo || (() => {});
     this.logError = options.logError || (() => {});
     this.rootDir = options.rootDir || path.resolve(__dirname, '..', '..');
@@ -77,6 +78,9 @@ class ElectronScreenVoice {
     this.settings = parseSettings(this.settingsStore.store);
     if (this.settingsStore.store.agentShortcut !== this.settings.agentShortcut) {
       this.settingsStore.set('agentShortcut', this.settings.agentShortcut);
+    }
+    if (this.settingsStore.store.captureShortcut !== this.settings.captureShortcut) {
+      this.settingsStore.set('captureShortcut', this.settings.captureShortcut);
     }
     this.api = options.api || new VoiceApiClient({
       getServerUrl: async () => this.getSavedServer()?.url || null,
@@ -95,6 +99,7 @@ class ElectronScreenVoice {
     this.shortcutMonitorReady = false;
     this.shortcutHeldMode = null;
     this.shortcutStartPromise = null;
+    this.shortcutStartSource = null;
     this.pendingShortcutRelease = null;
     this.shortcutMonitorFactory = options.shortcutMonitorFactory || startShortcutMonitor;
     this.microphoneHardwareStatus = options.microphoneHardwareStatus || (() => (
@@ -127,7 +132,7 @@ class ElectronScreenVoice {
       width: COMPACT_OVERLAY.width, height: COMPACT_OVERLAY.height,
       minWidth: 400, minHeight: 52, maxWidth: 560, maxHeight: 560,
       frame: false, transparent: true, backgroundColor: '#00000000', alwaysOnTop: true,
-      skipTaskbar: true, resizable: true, focusable: false, show: false, hasShadow: false,
+      skipTaskbar: process.platform !== 'darwin', resizable: true, focusable: false, show: false, hasShadow: false,
       webPreferences: {
         nodeIntegration: false, contextIsolation: true, sandbox: true,
         preload: path.join(this.rootDir, 'screen-voice-preload.js')
@@ -168,6 +173,8 @@ class ElectronScreenVoice {
     const overlay = this.createOverlay();
     this.resizeOverlay(width || height ? { width, height } : this.overlayLayout());
     this.positionOverlay();
+    this.ensureDockIcon();
+    if (process.platform === 'darwin' && app.dock) app.dock.show().catch(() => {});
     overlay.setFocusable(Boolean(focus));
     focus ? overlay.show() : overlay.showInactive();
   }
@@ -198,6 +205,8 @@ class ElectronScreenVoice {
     }));
     handle('screen-voice:get-permissions', () => this.permissionStatus());
     handle('screen-voice:activate', () => this.toggle('agent', 'overlay'));
+    handle('screen-voice:capture-start', () => this.handleShortcutDown('agent', 'overlay_hold'));
+    handle('screen-voice:capture-release', () => this.handleOverlayCaptureRelease());
     handle('screen-voice:audio-complete', (payload) => this.handleAudio(payload));
     handle('screen-voice:capture-error', ({ code }) => this.fail(code || 'MICROPHONE_DENIED'));
     handle('screen-voice:capture-status', ({ status, metadata }) => {
@@ -324,21 +333,25 @@ class ElectronScreenVoice {
     this.unregisterShortcut(this.settings.dictationShortcut);
     this.unregisterShortcut(this.settings.agentShortcut);
     if (!this.entitlementEnabled || !this.authenticated || !this.settings.enabled) return;
-    const register = (shortcut, mode) => {
+    const register = (shortcut, label, action) => {
       try {
-        if (!globalShortcut.register(shortcut, () => this.handleShortcutDown(mode))) {
-          this.logError(`[ScreenVoice] Shortcut unavailable: ${mode}`);
+        if (!globalShortcut.register(shortcut, action)) {
+          this.logError(`[ScreenVoice] Shortcut unavailable: ${label}`);
           return false;
         }
         return true;
       } catch (_) {
         // A bad persisted accelerator must never prevent the other mode from
         // registering or abort discovery/settings IPC.
-        this.logError(`[ScreenVoice] Shortcut could not be registered: ${mode}`);
+        this.logError(`[ScreenVoice] Shortcut could not be registered: ${label}`);
         return false;
       }
     };
-    register(this.settings.dictationShortcut, 'agent');
+    register(this.settings.dictationShortcut, 'open_overlay', () => {
+      return this.handleOverlayShortcut().catch((error) => (
+        this.logError(`[ScreenVoice] Overlay shortcut failed: ${error.code || 'unknown'}`)
+      ));
+    });
     if (process.platform === 'darwin') {
       try {
         this.shortcutMonitor = this.shortcutMonitorFactory((event) => this.handleShortcutMonitorEvent(event), {
@@ -348,6 +361,17 @@ class ElectronScreenVoice {
         this.logError('[ScreenVoice] Press-and-hold release monitor is unavailable; shortcuts use toggle mode');
       }
     }
+  }
+
+  async handleOverlayShortcut() {
+    this.logInfo(`[ScreenVoice] Overlay shortcut; state=${this.controller.state}`);
+    await this.rememberExternalTarget();
+    this.pendingMode = 'agent';
+    this.detailsOpen = true;
+    this.showOverlay({ focus: true, ...DETAILS_OVERLAY });
+    this.sendState();
+    this.send('screen-voice:show-details', { mode: this.pendingMode });
+    return { ...this.controller.snapshot(), shown: true };
   }
 
   stopShortcutMonitor() {
@@ -368,14 +392,15 @@ class ElectronScreenVoice {
           && !['listening', 'transcribing', 'gathering_context', 'thinking', 'executing'].includes(this.controller.state)) {
         this.shortcutHeldMode = null;
       }
-      this.handleShortcutDown(eventMode).catch((error) => this.logError(`[ScreenVoice] Shortcut start failed: ${error.code || 'unknown'}`));
+      return this.handleShortcutDown(eventMode).catch((error) => this.logError(`[ScreenVoice] Shortcut start failed: ${error.code || 'unknown'}`));
     } else if (event.event === 'up') {
-      this.handleShortcutUp(eventMode);
+      return this.handleShortcutUp(eventMode);
     } else if (event.event === 'error') {
       this.shortcutMonitorReady = false;
       this.shortcutHeldMode = null;
       this.logError('[ScreenVoice] Press-and-hold release monitor stopped; shortcuts use toggle mode');
     }
+    return null;
   }
 
   async rememberExternalTarget() {
@@ -386,7 +411,7 @@ class ElectronScreenVoice {
     } catch (_) { return null; }
   }
 
-  async handleShortcutDown(mode) {
+  async handleShortcutDown(mode, source = 'global_shortcut') {
     mode = 'agent';
     if (this.shortcutMonitor && this.shortcutHeldMode === mode) return this.controller.snapshot();
     this.logInfo(`[ScreenVoice] Shortcut down (${mode}); state=${this.controller.state}`);
@@ -398,22 +423,36 @@ class ElectronScreenVoice {
     if (this.shortcutStartPromise) return this.shortcutStartPromise;
     this.pendingMode = 'agent';
     if (this.shortcutMonitor) this.shortcutHeldMode = this.pendingMode;
+    this.shortcutStartSource = source;
     this.shortcutStartPromise = (async () => {
       await this.rememberExternalTarget();
       this.detailsOpen = true;
       this.showOverlay({ focus: false, ...DETAILS_OVERLAY });
-      return this.begin(this.pendingMode, 'global_shortcut');
+      return this.begin(this.pendingMode, source);
     })();
     try {
       const result = await this.shortcutStartPromise;
-      if (this.pendingShortcutRelease === this.pendingMode && this.controller.state === 'listening') {
+      if (this.shortcutStartSource !== 'overlay_hold'
+          && this.pendingShortcutRelease === this.pendingMode
+          && this.controller.state === 'listening') {
         this.send('screen-voice:stop-capture', { reason: 'activation_released' });
       }
       return result;
     } finally {
       this.shortcutStartPromise = null;
+      this.shortcutStartSource = null;
       this.pendingShortcutRelease = null;
     }
+  }
+
+  handleOverlayCaptureRelease() {
+    if (this.shortcutHeldMode === 'agent') this.shortcutHeldMode = null;
+    if (this.pendingMode === 'agent') this.pendingShortcutRelease = null;
+    if (this.shortcutStartPromise) return this.controller.snapshot();
+    if (this.controller.state === 'listening') {
+      this.send('screen-voice:stop-capture', { reason: 'activation_released' });
+    }
+    return this.controller.snapshot();
   }
 
   handleShortcutUp(mode) {
@@ -543,7 +582,7 @@ class ElectronScreenVoice {
       this.previewDecision = null;
       const snapshot = this.controller.start(mode, source);
       this.controller.session.target = this.lastContext.targetFingerprint;
-      this.showOverlay();
+      this.showOverlay({ focus: source === 'overlay_hold' });
       this.send('screen-voice:start-capture', { mode, sessionId: snapshot.session.id, maxDurationMs: 90000 });
       this.logInfo(`[ScreenVoice] Session started (${mode})`);
       return snapshot;
@@ -670,6 +709,8 @@ class ElectronScreenVoice {
   cancel() { this.send('screen-voice:stop-capture', { discard: true }); this.controller.cancel(); return { ok: true }; }
 
   fail(code, error = {}) {
+    this.shortcutHeldMode = null;
+    this.pendingShortcutRelease = null;
     const details = publicError({ code, message: error?.message });
     try {
       if (this.controller.state === 'idle') this.controller.start(this.settings.defaultMode, 'error_recovery');

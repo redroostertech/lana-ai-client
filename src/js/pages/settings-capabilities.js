@@ -149,20 +149,27 @@
     var disabled = !capability.active || !capability.available || capability.runtimeUnavailable === 'microphone';
     var form = element('form', 'sv2-capability-voice-settings');
     form.appendChild(element('h4', 'sv2-capability-subheading', 'Voice settings'));
+    form.appendChild(element('p', 'sv2-capability-platforms',
+      'These preferences are stored on this desktop. They do not follow your LANA user account to another computer.'));
     var fields = element('div', 'sv2-capability-field-grid');
-    var dictationShortcut = createVoiceField('Agent shortcut', 'dictationShortcut',
+    var dictationShortcut = createVoiceField('Open shortcut', 'dictationShortcut',
       settings.dictationShortcut || 'CommandOrControl+Shift+Space');
     dictationShortcut.querySelector('input').disabled = true;
     fields.appendChild(dictationShortcut);
+    var captureShortcut = createVoiceField('Capture shortcut', 'captureShortcut',
+      settings.captureShortcut || 'Control+Option');
+    captureShortcut.querySelector('input').disabled = true;
+    fields.appendChild(captureShortcut);
     fields.appendChild(createVoiceField('Confirmation', 'confirmationPolicy', settings.confirmationPolicy || 'risk_based', [
       { label: 'Risk based', value: 'risk_based' }, { label: 'Always preview', value: 'always' },
       { label: 'Skip for safe inserts', value: 'never_safe_only' }
     ]));
     Array.prototype.forEach.call(fields.querySelectorAll('input, select'), function (control) { control.disabled = disabled; });
     dictationShortcut.querySelector('input').disabled = true;
+    captureShortcut.querySelector('input').disabled = true;
     form.appendChild(fields);
     form.appendChild(createToggleOption('Open at Login',
-      'Show the LANA voice agent after you sign in. When off, hold the agent shortcut to open it.',
+      'Show the LANA voice agent after you sign in on this desktop. When off, press the open shortcut to show it.',
       'openAtLogin', settings.openAtLogin, disabled));
     form.appendChild(createToggleOption('Use active-window context',
       'Share only scoped accessible content from the active window when an agent request needs it.',
@@ -173,6 +180,8 @@
 
     var permissions = element('section', 'sv2-capability-permissions');
     permissions.appendChild(element('h4', 'sv2-capability-subheading', 'Permissions'));
+    permissions.appendChild(element('p', 'sv2-capability-platforms',
+      'Permission status is checked from macOS on this device each time this page opens or regains focus.'));
     permissions.appendChild(createPermissionRow('microphone', 'Microphone', capability.voicePermissions, onPermissionRequest, disabled));
     permissions.appendChild(createPermissionRow('accessibility', 'Accessibility', capability.voicePermissions, onPermissionRequest, disabled));
     form.appendChild(permissions);
@@ -189,6 +198,7 @@
         enabled: settings.enabled !== false,
         openAtLogin: form.elements.openAtLogin.checked,
         dictationShortcut: form.elements.dictationShortcut.value.trim(),
+        captureShortcut: form.elements.captureShortcut.value.trim(),
         agentShortcut: settings.agentShortcut || 'CommandOrControl+Shift+A',
         defaultMode: 'agent',
         screenContextEnabled: form.elements.screenContextEnabled.checked,

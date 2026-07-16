@@ -176,9 +176,9 @@ describe('Electron screen voice orchestration', () => {
     expect(testOverlay.destroy).toHaveBeenCalled();
   });
 
-  test('one invalid accelerator cannot prevent the other shortcut or overlay', () => {
+  test('an invalid open accelerator cannot prevent initialization', () => {
     globalShortcut.register.mockImplementation((shortcut) => {
-      if (shortcut === 'CommandOrControl+Shift+A') throw new TypeError('conversion failure');
+      if (shortcut === 'CommandOrControl+Shift+Space') throw new TypeError('conversion failure');
       return true;
     });
     const manager = managerWith({ api: {}, adapter: {} });
@@ -201,7 +201,7 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.overlay.hide).not.toHaveBeenCalled();
   });
 
-  test('pressing the authenticated shortcut starts listening and release begins processing', async () => {
+  test('open shortcut reveals overlay and hold monitor controls capture', async () => {
     const manager = managerWith({ api: {}, adapter: {
       permissionStatus: jest.fn(async () => ({ accessibility: true })),
       getTarget: jest.fn(async () => context)
@@ -215,11 +215,37 @@ describe('Electron screen voice orchestration', () => {
       call[0] === 'CommandOrControl+Shift+Space'
     ));
     await registration[1]();
+    expect(manager.controller.state).toBe('idle');
+    expect(testOverlay.show).toHaveBeenCalled();
+
+    await manager.handleShortcutDown('agent', 'overlay_hold');
     expect(manager.controller.state).toBe('listening');
     expect(testOverlay.showInactive).toHaveBeenCalled();
     expect(testOverlay.setSize).toHaveBeenLastCalledWith(480, 190, true);
 
-    manager.handleShortcutMonitorEvent({ event: 'up', mode: 'dictation' });
+    manager.handleOverlayCaptureRelease();
+    expect(manager.shortcutHeldMode).toBeNull();
+    expect(sent).toContainEqual(['screen-voice:stop-capture', { reason: 'activation_released' }]);
+  });
+
+  test('visible overlay still accepts native capture retry after an error', async () => {
+    const manager = managerWith({ api: {}, adapter: {
+      permissionStatus: jest.fn(async () => ({ accessibility: true })),
+      getTarget: jest.fn(async () => context)
+    } });
+    manager.authenticated = true;
+    manager.entitlementEnabled = true;
+    manager.shortcutMonitor = { stop: jest.fn() };
+    manager.shortcutMonitorReady = true;
+    manager.overlay.show();
+    manager.fail('NO_SPEECH');
+
+    await manager.handleShortcutMonitorEvent({ event: 'down', mode: 'agent' });
+
+    expect(manager.controller.state).toBe('listening');
+    expect(manager.shortcutHeldMode).toBe('agent');
+    manager.handleShortcutMonitorEvent({ event: 'up', mode: 'agent' });
+    expect(manager.shortcutHeldMode).toBeNull();
     expect(sent).toContainEqual(['screen-voice:stop-capture', { reason: 'activation_released' }]);
   });
 

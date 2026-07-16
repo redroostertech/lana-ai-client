@@ -22,11 +22,12 @@ functionality without creating a navigation item.
       "hints": {
         "Getting started": [
           "Place the cursor in an editable field.",
-          "Press Command+Shift+Space to dictate."
+          "Press Command+Shift+Space to open the voice agent.",
+          "Hold Control+Option to speak, then release to process."
         ],
         "Shortcuts": {
-          "Dictation": "Command+Shift+Space",
-          "Agent mode": "Command+Shift+A"
+          "Open": "Command+Shift+Space",
+          "Capture": "Control+Option"
         },
         "Permissions": "Microphone and Accessibility access are requested only when used."
       }

@@ -33,6 +33,7 @@
   // ---------------------------------------------------------------------------
 
   const LEX_APP_SCRIPT_SRC = (document.currentScript && document.currentScript.src) || '';
+  const POST_LOGIN_BACK_SUPPRESS_KEY = 'lana:postLoginSuppressDashboardBack';
 
   function docStudioAssetBase() {
     // LEX_APP_SCRIPT_SRC looks like '<base>/js/lex/components/layout/lex-app.js'.
@@ -106,6 +107,17 @@
   }
 
   window.openDocStudioFromMenu = openDocStudioFromMenu;
+
+  function currentPageName() {
+    try {
+      const statePath = window.history && window.history.state && window.history.state.path;
+      const pathname = statePath || (window.location && window.location.pathname) || '';
+      const clean = pathname.split('?')[0].split('#')[0];
+      return clean.substring(clean.lastIndexOf('/') + 1);
+    } catch (e) {
+      return '';
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Style injection (once per document)
@@ -336,6 +348,9 @@
     _buildShell() {
       const embedded = this.chrome === 'embedded';
       const sidebarCollapsedAttr = this.sidebarCollapsed ? ' collapsed' : '';
+      const suppressAutoBackAttr = this._consumePostLoginBackSuppression()
+        ? ' suppress-auto-back'
+        : '';
       const topbarBackAttrs = embedded
         ? ` show-back back-label="${this.escapeHtml(this.backLabel)}" back-href="${this.escapeHtml(this.backHref)}"`
         : '';
@@ -355,7 +370,7 @@
           <lex-header role="banner">
             <lex-topbar
               heading="${this.escapeHtml(this.pageTitle)}"
-              sticky${topbarBackAttrs}
+              sticky${topbarBackAttrs}${suppressAutoBackAttr}
             ></lex-topbar>
           </lex-header>
 
@@ -380,6 +395,17 @@
           <button type="button" id="lex-offline-retry-btn">Retry Now</button>
         </div>
       `;
+    }
+
+    _consumePostLoginBackSuppression() {
+      if (currentPageName() !== 'dashboard.html') return false;
+      try {
+        if (sessionStorage.getItem(POST_LOGIN_BACK_SUPPRESS_KEY) !== 'login.html') return false;
+        sessionStorage.removeItem(POST_LOGIN_BACK_SUPPRESS_KEY);
+        return true;
+      } catch (e) {
+        return false;
+      }
     }
 
     // -----------------------------------------------------------------------
