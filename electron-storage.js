@@ -137,7 +137,8 @@ function saveServerConnection(server) {
       forgeSovereign: server.forgeSovereign || null,
       tier: server.tier || 'standard',
       rateLimit: server.rateLimit || 100,
-      // Sub-apps available to this organization (drives the client app switcher)
+      // Organization app entitlements. Routable entries drive the switcher;
+      // capability entries gate native/background client features.
       enabledApps: Array.isArray(server.enabledApps) ? server.enabledApps : [],
       connectedAt: new Date().toISOString(),
       lastVerified: new Date().toISOString()

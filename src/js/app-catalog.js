@@ -170,6 +170,53 @@
     return normalized;
   }
 
+  // Discovery is also the entitlement manifest for native/background client
+  // capabilities. Capability entries are intentionally preserved in storage
+  // but never returned by normalizeApp()/normalizeAppList(), so they cannot
+  // accidentally become sidebar routes.
+  function normalizeCapability(item) {
+    if (!item || typeof item !== 'object' || !item.route || typeof item.route !== 'object') return null;
+    if (item.route.type !== 'capability') return null;
+    var id = canonicalId(item.id || item.app_id || item.slug || item.key || '');
+    if (!id || !item.label) return null;
+
+    var rawMeta = item.route.meta && typeof item.route.meta === 'object' ? item.route.meta : {};
+    var supportedPlatforms = ['darwin', 'win32', 'linux'];
+    var platforms = Array.isArray(rawMeta.platforms)
+      ? rawMeta.platforms.filter(function (platform, index, source) {
+          return supportedPlatforms.indexOf(platform) !== -1 && source.indexOf(platform) === index;
+        })
+      : [];
+
+    return {
+      id: id,
+      label: item.label,
+      description: item.description || '',
+      colors: Array.isArray(item.colors) ? item.colors : [],
+      route: {
+        type: 'capability',
+        meta: Object.assign({}, rawMeta, { platforms: platforms })
+      }
+    };
+  }
+
+  function normalizeEnabledApp(item) {
+    return normalizeCapability(item) || normalizeApp(item);
+  }
+
+  function normalizeEnabledAppList(items) {
+    if (!Array.isArray(items)) return [];
+    var seen = Object.create(null);
+    var result = [];
+    for (var i = 0; i < items.length; i += 1) {
+      var normalized = normalizeEnabledApp(items[i]);
+      if (!normalized || seen[normalized.id]) continue;
+      seen[normalized.id] = true;
+      result.push(normalized);
+    }
+    return result;
+  }
+
   function resolveList(source) {
     var seen = Object.create(null);
     var result = [];
@@ -210,6 +257,9 @@
     isHttpsUrl: isHttpsUrl,
     normalizeApp: normalizeApp,
     normalizeAppList: normalizeAppList,
+    normalizeCapability: normalizeCapability,
+    normalizeEnabledApp: normalizeEnabledApp,
+    normalizeEnabledAppList: normalizeEnabledAppList,
     defaultApps: defaultApps
   };
 })(window);

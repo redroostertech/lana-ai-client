@@ -1,0 +1,38 @@
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: transparent; font-family: var(--lex-font-sans, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif); }
+body { padding: 8px; color: var(--lex-text-primary, #2e2b27); }
+.voice-shell { overflow: hidden; border: 1px solid var(--lex-border-subtle, #ddd8d1); border-radius: 16px; background: color-mix(in srgb, var(--lex-bg-primary, #fff) 96%, transparent); box-shadow: 0 18px 50px rgb(0 0 0 / .24); backdrop-filter: blur(18px); }
+.voice-header { min-height: 42px; padding: 8px 10px 7px 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--lex-border-subtle, #e7e3dd); -webkit-app-region: drag; }
+.no-drag, input, textarea, select { -webkit-app-region: no-drag; }
+.voice-identity { display: flex; align-items: center; gap: 8px; flex: 1; font-size: 13px; }
+.voice-mark { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; color: white; background: var(--lex-accent, #65584a); font: 700 12px/1 var(--lex-font-serif, Georgia, serif); }
+.mode-badge { padding: 3px 8px; border-radius: 999px; background: var(--lex-bg-secondary, #f2efeb); color: var(--lex-text-secondary, #6c655d); font-size: 11px; font-weight: 650; }
+.icon-button { width: 28px; height: 28px; border: 0; border-radius: 7px; color: inherit; background: transparent; font-size: 16px; cursor: pointer; }
+.icon-button:hover, .icon-button:focus-visible { background: var(--lex-bg-secondary, #f2efeb); }
+.voice-status { display: grid; grid-template-columns: 46px 1fr 54px; gap: 12px; align-items: center; padding: 12px; }
+.mic-button { width: 46px; height: 46px; border: 0; border-radius: 50%; cursor: pointer; color: white; background: var(--lex-accent, #65584a); box-shadow: 0 0 0 0 rgb(101 88 74 / .25); }
+.listening .mic-button { background: #c7473b; animation: pulse 1.6s infinite; }
+.status-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.status-copy strong { font-size: 14px; }
+.status-copy > span, .context-notice { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--lex-text-secondary, #746d64); font-size: 12px; }
+.context-notice { color: var(--lex-accent, #65584a); font-weight: 600; }
+meter { width: 52px; height: 8px; accent-color: #c7473b; }
+.transcript { margin: 0 12px 10px; padding: 8px 10px; border-radius: 8px; background: var(--lex-bg-secondary, #f5f2ee); font-size: 12px; max-height: 58px; overflow: auto; }
+.preview { padding: 0 12px 12px; }
+.preview label, .settings-panel label { display: grid; gap: 5px; color: var(--lex-text-secondary, #746d64); font-size: 12px; font-weight: 600; }
+.preview textarea { width: 100%; min-height: 112px; margin-top: 5px; padding: 10px; resize: vertical; border: 1px solid var(--lex-border-default, #d8d2ca); border-radius: 9px; background: var(--lex-bg-primary, #fff); color: inherit; font: inherit; line-height: 1.45; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+.idle-actions { padding: 0 12px 12px; margin-top: 0; }
+.button { min-height: 32px; padding: 6px 12px; border: 1px solid var(--lex-border-default, #d8d2ca); border-radius: 8px; background: var(--lex-bg-primary, #fff); color: inherit; font: 600 12px/1 inherit; cursor: pointer; }
+.button.primary { border-color: var(--lex-accent, #65584a); color: white; background: var(--lex-accent, #65584a); }
+.button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .mic-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--lex-accent, #65584a) 35%, transparent); outline-offset: 2px; }
+.settings-panel { padding: 2px 12px 14px; max-height: 480px; overflow: auto; }
+.settings-panel h2 { margin: 8px 0 10px; font-size: 15px; }
+.settings-panel > label { margin: 9px 0; }
+.settings-panel input:not([type=checkbox]), .settings-panel select { width: 100%; min-height: 34px; padding: 6px 8px; border: 1px solid var(--lex-border-default, #d8d2ca); border-radius: 7px; color: inherit; background: var(--lex-bg-primary, #fff); }
+.settings-panel .check { display: flex; grid-template-columns: auto 1fr; align-items: center; gap: 8px; }
+.error .mic-button { background: #a93832; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgb(199 71 59 / .28); } 50% { box-shadow: 0 0 0 10px rgb(199 71 59 / 0); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (prefers-contrast: more) { .voice-shell, .button, input, textarea, select { border-width: 2px; } }

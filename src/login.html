@@ -166,6 +166,9 @@
     const HOSTED_DISCOVERY_URL = 'https://www.redroostertec.com/lana-ai/v1/discovery';
 
     function normalizeEnabledApps(enabledApps) {
+      if (window.LanaClientApps && typeof window.LanaClientApps.normalizeEnabledAppList === 'function') {
+        return window.LanaClientApps.normalizeEnabledAppList(enabledApps || []);
+      }
       if (window.LanaClientApps && typeof window.LanaClientApps.normalizeAppList === 'function') {
         return window.LanaClientApps.normalizeAppList(enabledApps || []);
       }

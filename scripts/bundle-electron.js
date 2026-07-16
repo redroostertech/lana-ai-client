@@ -20,6 +20,7 @@ if (!fs.existsSync(distDir)) {
 const entryPoints = [
   'electron-main.js',
   'electron-preload.js',
+  'screen-voice-preload.js',
   'electron-discovery.js',
   'electron-storage.js',
   'electron-updater-custom.js',

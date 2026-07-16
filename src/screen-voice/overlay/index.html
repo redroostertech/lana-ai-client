@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LANA Voice</title>
+  <link rel="stylesheet" href="../../css/lex-tokens.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="voice-shell" aria-label="LANA screen-aware voice assistant">
+    <header class="voice-header">
+      <div class="voice-identity"><span class="voice-mark" aria-hidden="true">L</span><strong>LANA Voice</strong></div>
+      <span id="modeBadge" class="mode-badge">Dictation</span>
+      <button id="settingsButton" class="icon-button no-drag" type="button" aria-label="Voice settings">⚙</button>
+      <button id="dismissButton" class="icon-button no-drag" type="button" aria-label="Hide voice overlay">×</button>
+    </header>
+
+    <section class="voice-status" aria-live="polite" aria-atomic="true">
+      <button id="micButton" class="mic-button no-drag" type="button" aria-label="Start dictation"><span aria-hidden="true">●</span></button>
+      <div class="status-copy">
+        <strong id="statusTitle">Ready</strong>
+        <span id="statusDetail">Dictate into the focused field or ask LANA about this window.</span>
+        <div id="contextNotice" class="context-notice" hidden>Screen context is being read from the active window.</div>
+      </div>
+      <meter id="levelMeter" min="0" max="1" value="0" aria-label="Microphone level"></meter>
+    </section>
+
+    <p id="transcript" class="transcript" hidden></p>
+    <section id="preview" class="preview" hidden>
+      <label for="previewText">Proposed result</label>
+      <textarea id="previewText" readonly></textarea>
+      <div class="actions">
+        <button id="confirmButton" class="button primary no-drag" type="button">Insert</button>
+        <button id="copyButton" class="button no-drag" type="button">Copy</button>
+        <button id="cancelButton" class="button no-drag" type="button">Cancel</button>
+      </div>
+    </section>
+
+    <section id="idleActions" class="actions idle-actions">
+      <button id="dictateButton" class="button primary no-drag" type="button">Dictate</button>
+      <button id="agentButton" class="button no-drag" type="button">Ask agent</button>
+      <button id="undoButton" class="button no-drag" type="button" hidden>Undo</button>
+    </section>
+
+    <form id="settingsPanel" class="settings-panel" hidden>
+      <h2>Voice settings</h2>
+      <label>Dictation shortcut<input id="dictationShortcut" autocomplete="off"></label>
+      <label>Agent shortcut<input id="agentShortcut" autocomplete="off"></label>
+      <label>Default mode
+        <select id="defaultMode"><option value="dictation">Dictation</option><option value="agent">Agent</option></select>
+      </label>
+      <label class="check"><input id="screenContextEnabled" type="checkbox"> Use active-window context in Agent mode</label>
+      <label class="check"><input id="voiceOutputEnabled" type="checkbox"> Speak agent answers</label>
+      <label>Confirmation
+        <select id="confirmationPolicy"><option value="risk_based">Risk based</option><option value="always">Always preview</option><option value="never_safe_only">Skip for safe inserts</option></select>
+      </label>
+      <div class="actions">
+        <button class="button primary no-drag" type="submit">Save</button>
+        <button id="accessibilityButton" class="button no-drag" type="button">Enable Accessibility</button>
+        <button id="microphoneButton" class="button no-drag" type="button">Enable Microphone</button>
+      </div>
+    </form>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

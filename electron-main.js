@@ -45,6 +45,8 @@ const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-lo
 const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
+const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
+const { isScreenDictionEnabled } = require('./src/screen-voice/app-entitlement');
 
 /**
  * Brainchild MCP bridge — reads the user's local vault over the MCP stdio
@@ -188,6 +190,13 @@ function getAppVersion() {
 
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
+let screenVoice = null;
+
+function syncScreenVoiceEntitlement(server = getSavedServer()) {
+  const enabled = isScreenDictionEnabled(server, process.platform);
+  if (screenVoice) screenVoice.setEntitlementEnabled(enabled);
+  return enabled;
+}
 
 // Session tracker instance
 let sessionTracker = null;
@@ -706,7 +715,9 @@ ipcMain.handle('get-config', async () => {
 // Handle secure storage operations
 ipcMain.handle('save-settings', async (event, settings) => {
   const { saveServerConnection } = require('./electron-storage');
-  return { success: saveServerConnection(settings) };
+  const success = saveServerConnection(settings);
+  if (success) syncScreenVoiceEntitlement(settings);
+  return { success };
 });
 
 ipcMain.handle('load-settings', async () => {
@@ -725,6 +736,7 @@ ipcMain.handle('connect-to-server', async (event, server) => {
   try {
     // Save server connection
     saveServerConnection(server);
+    syncScreenVoiceEntitlement(server);
 
     // Resize window for main app view
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -766,6 +778,7 @@ ipcMain.handle('get-saved-server', async () => {
 ipcMain.handle('clear-saved-server', async () => {
   try {
     clearSavedServer();
+    syncScreenVoiceEntitlement(null);
     return { success: true };
   } catch (error) {
     logError('IPC: clear-saved-server failed', error);
@@ -1480,6 +1493,25 @@ app.whenReady().then(async () => {
   });
   logInfo('Session tracker initialized');
 
+  // Screen-aware dictation is owned by the Electron host so the renderer and
+  // model never receive general desktop-control authority. The overlay starts
+  // inert and requests microphone/accessibility only when the user activates it.
+  if (process.platform === 'darwin') {
+    try {
+      screenVoice = new ElectronScreenVoice({
+        rootDir: __dirname,
+        getMainWindow: () => mainWindow,
+        getSavedServer: () => getSavedServer(),
+        entitlementEnabled: isScreenDictionEnabled(getSavedServer(), process.platform),
+        logInfo,
+        logError
+      });
+      screenVoice.initialize();
+    } catch (error) {
+      logError('[electron-main] Failed to initialize screen-aware voice', error);
+    }
+  }
+
   // Start the PAC bridge (loopback HTTP server on 127.0.0.1:7890). Wire
   // identifier is still `lana-companion` for compat with already-granted
   // consents. The bridge reads the renderer's localStorage for the bearer
@@ -1542,6 +1574,7 @@ app.whenReady().then(async () => {
     } else {
       logInfo('[electron-main] Saved server is not reachable, clearing saved server and showing login...');
       clearSavedServer();
+      syncScreenVoiceEntitlement(null);
     }
   } else {
     logInfo('[electron-main] No saved server found, showing login...');
@@ -1552,7 +1585,7 @@ app.whenReady().then(async () => {
 
   // On macOS, re-create window when dock icon is clicked and no windows are open
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
       const savedServer = getSavedServer();
       if (savedServer) {
         createWindow(savedServer.url);
@@ -1587,6 +1620,12 @@ app.on('before-quit', async () => {
     brainchildManager.stop();
   } catch (error) {
     logError('[electron-main] Failed to stop brainchild manager', error);
+  }
+
+  try {
+    screenVoice?.shutdown();
+  } catch (error) {
+    logError('[electron-main] Failed to stop screen-aware voice', error);
   }
 
   // End session tracking

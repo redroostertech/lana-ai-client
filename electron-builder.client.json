@@ -50,7 +50,7 @@
     }
   ],
   "asar": true,
-  "npmRebuild": true,
+  "npmRebuild": false,
   "mac": {
     "category": "public.app-category.business",
     "artifactName": "LanaAI--genesis--${version}-${arch}.${ext}",
@@ -60,7 +60,19 @@
     "gatekeeperAssess": false,
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.plist",
-    "notarize": true
+    "notarize": true,
+    "binaries": [
+      "Contents/Resources/screen-voice/lana-screen-voice"
+    ],
+    "extendInfo": {
+      "NSMicrophoneUsageDescription": "LANA uses the microphone only while you activate dictation or the voice agent."
+    },
+    "extraResources": [
+      {
+        "from": "build/screen-voice/lana-screen-voice",
+        "to": "screen-voice/lana-screen-voice"
+      }
+    ]
   },
   "win": {
     "artifactName": "LanaAI--genesis--${version}.${ext}",
