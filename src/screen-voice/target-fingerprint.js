@@ -37,7 +37,6 @@ function fingerprintsMatch(expected, actual, options = {}) {
   if (expected.processId && actual.processId && expected.processId !== actual.processId) return false;
   if (expected.bundleId && actual.bundleId && expected.bundleId !== actual.bundleId) return false;
   if (expected.processName !== actual.processName) return false;
-  if (expected.windowTitle && actual.windowTitle && expected.windowTitle !== actual.windowTitle) return false;
   if (expected.role !== actual.role || expected.name !== actual.name) return false;
   if (options.requireSelection && expected.selectionHash !== actual.selectionHash) return false;
   const a = expected.bounds;
@@ -45,6 +44,13 @@ function fingerprintsMatch(expected, actual, options = {}) {
   if (a && b) {
     const tolerance = Number(options.boundsTolerance ?? 4);
     if (['x', 'y', 'width', 'height'].some((key) => Math.abs(a[key] - b[key]) > tolerance)) return false;
+  }
+  if (expected.windowTitle && actual.windowTitle && expected.windowTitle !== actual.windowTitle) {
+    const stableApplication = Boolean(
+      (expected.processId && actual.processId && expected.processId === actual.processId)
+      || (expected.bundleId && actual.bundleId && expected.bundleId === actual.bundleId)
+    );
+    if (!options.allowDynamicWindowTitle || !stableApplication || !a || !b) return false;
   }
   return true;
 }

@@ -94,6 +94,16 @@ describe('screen voice contracts and safety helpers', () => {
     expect(fingerprintsMatch(first, changed)).toBe(false);
   });
 
+  test('allows a dynamic window title only when app identity and nearby bounds remain stable', () => {
+    const first = createFingerprint(context());
+    const retitled = createFingerprint(context({ windowTitle: 'Document — Saved' }));
+    const moved = createFingerprint(context({ windowTitle: 'Document — Saved', focusedElement: {
+      ...context().focusedElement, bounds: { x: 200, y: 200, width: 300, height: 100 }
+    } }));
+    expect(fingerprintsMatch(first, retitled, { allowDynamicWindowTitle: true, boundsTolerance: 24 })).toBe(true);
+    expect(fingerprintsMatch(first, moved, { allowDynamicWindowTitle: true, boundsTolerance: 24 })).toBe(false);
+  });
+
   test('risk policy confirms multi-cell changes and allows explicit selection replacement', () => {
     expect(actionRequiresConfirmation({ type: 'insert_table', requiresConfirmation: false }, context(),
       { confirmationPolicy: 'risk_based' })).toBe(true);

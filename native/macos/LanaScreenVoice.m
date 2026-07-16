@@ -1,12 +1,80 @@
 #import <AppKit/AppKit.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <CommonCrypto/CommonDigest.h>
+#include <math.h>
+#include <unistd.h>
 
-static void Emit(NSDictionary *payload, int status) {
+static void WriteJSONLine(NSDictionary *payload) {
   NSData *data = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
   [[NSFileHandle fileHandleWithStandardOutput] writeData:data];
   [[NSFileHandle fileHandleWithStandardOutput] writeData:[@"\n" dataUsingEncoding:NSUTF8StringEncoding]];
+}
+
+static void Emit(NSDictionary *payload, int status) {
+  WriteJSONLine(payload);
   exit(status);
+}
+
+static BOOL shortcutSpacePressed = NO;
+static BOOL shortcutAgentPressed = NO;
+
+static CGEventRef ShortcutMonitorCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
+  (void)proxy; (void)refcon;
+  CGKeyCode keyCode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
+  BOOL *pressed = keyCode == 49 ? &shortcutSpacePressed : keyCode == 0 ? &shortcutAgentPressed : NULL;
+  if (!pressed) return event;
+  NSString *mode = keyCode == 49 ? @"dictation" : @"agent";
+  if (type == kCGEventKeyDown) {
+    CGEventFlags flags = CGEventGetFlags(event);
+    BOOL modifiersDown = (flags & kCGEventFlagMaskCommand) && (flags & kCGEventFlagMaskShift);
+    if (modifiersDown && !*pressed) {
+      *pressed = YES;
+      WriteJSONLine(@{ @"event": @"down", @"mode": mode });
+    }
+  } else if (type == kCGEventKeyUp && *pressed) {
+    *pressed = NO;
+    WriteJSONLine(@{ @"event": @"up", @"mode": mode });
+  }
+  return event;
+}
+
+static void PollShortcutStates(void) {
+  WriteJSONLine(@{ @"event": @"ready", @"method": @"key_state" });
+  while (true) {
+    CGEventFlags flags = CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState);
+    BOOL modifiersDown = (flags & kCGEventFlagMaskCommand) && (flags & kCGEventFlagMaskShift);
+    BOOL spaceDown = modifiersDown && CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, 49);
+    BOOL agentDown = modifiersDown && CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, 0);
+    if (spaceDown && !shortcutSpacePressed) {
+      shortcutSpacePressed = YES;
+      WriteJSONLine(@{ @"event": @"down", @"mode": @"dictation" });
+    } else if (!spaceDown && shortcutSpacePressed) {
+      shortcutSpacePressed = NO;
+      WriteJSONLine(@{ @"event": @"up", @"mode": @"dictation" });
+    }
+    if (agentDown && !shortcutAgentPressed) {
+      shortcutAgentPressed = YES;
+      WriteJSONLine(@{ @"event": @"down", @"mode": @"agent" });
+    } else if (!agentDown && shortcutAgentPressed) {
+      shortcutAgentPressed = NO;
+      WriteJSONLine(@{ @"event": @"up", @"mode": @"agent" });
+    }
+    usleep(15000);
+  }
+}
+
+static void MonitorShortcuts(void) {
+  CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
+  CFMachPortRef tap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap,
+    kCGEventTapOptionListenOnly, mask, ShortcutMonitorCallback, NULL);
+  if (!tap) { PollShortcutStates(); return; }
+  CFRunLoopSourceRef source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0);
+  CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopCommonModes);
+  CGEventTapEnable(tap, true);
+  WriteJSONLine(@{ @"event": @"ready" });
+  CFRunLoopRun();
+  CFRelease(source);
+  CFRelease(tap);
 }
 
 static id AXGet(AXUIElementRef element, CFStringRef name) {
@@ -120,10 +188,29 @@ static NSString *Comparable(id value) {
   return !value || value == NSNull.null ? @"" : [value description];
 }
 
+static BOOL BoundsNear(id leftValue, id rightValue) {
+  if (![leftValue isKindOfClass:NSDictionary.class] || ![rightValue isKindOfClass:NSDictionary.class]) return NO;
+  NSDictionary *left = leftValue, *right = rightValue;
+  for (NSString *key in @[@"x", @"y", @"width", @"height"]) {
+    if (fabs([left[key] doubleValue] - [right[key] doubleValue]) > 24.0) return NO;
+  }
+  return YES;
+}
+
 static BOOL FingerprintsMatch(NSDictionary *expected, NSDictionary *actual, BOOL selection) {
-  for (NSString *key in @[@"processId", @"bundleId", @"processName", @"windowTitle", @"role", @"name"]) {
+  for (NSString *key in @[@"processId", @"bundleId", @"processName", @"role", @"name"]) {
     NSString *left = Comparable(expected[key]), *right = Comparable(actual[key]);
     if (left.length && right.length && ![left isEqualToString:right]) return NO;
+  }
+  if (!BoundsNear(expected[@"bounds"], actual[@"bounds"]) && expected[@"bounds"] && actual[@"bounds"]
+      && expected[@"bounds"] != NSNull.null && actual[@"bounds"] != NSNull.null) return NO;
+  NSString *expectedTitle = Comparable(expected[@"windowTitle"]), *actualTitle = Comparable(actual[@"windowTitle"]);
+  if (expectedTitle.length && actualTitle.length && ![expectedTitle isEqualToString:actualTitle]) {
+    BOOL samePid = [Comparable(expected[@"processId"]) isEqualToString:Comparable(actual[@"processId"])]
+      && Comparable(expected[@"processId"]).length;
+    BOOL sameBundle = [Comparable(expected[@"bundleId"]) isEqualToString:Comparable(actual[@"bundleId"])]
+      && Comparable(expected[@"bundleId"]).length;
+    if (!(samePid || sameBundle) || !BoundsNear(expected[@"bounds"], actual[@"bounds"])) return NO;
   }
   return !selection || [Comparable(expected[@"selectionHash"]) isEqualToString:Comparable(actual[@"selectionHash"])] ;
 }
@@ -166,6 +253,7 @@ static NSDictionary *Mutate(NSString *command, NSString **errorCode) {
 int main(int argc, const char *argv[]) {
   @autoreleasepool {
     NSString *command = argc > 1 ? [NSString stringWithUTF8String:argv[1]] : @"";
+    if ([command isEqualToString:@"shortcut-monitor"]) { MonitorShortcuts(); return 0; }
     if ([command isEqualToString:@"permission-status"]) Emit(@{ @"trusted": @(AXIsProcessTrusted()), @"platform": @"darwin" }, 0);
     if ([command isEqualToString:@"request-permission"]) {
       NSDictionary *options = @{ (__bridge NSString *)kAXTrustedCheckOptionPrompt: @YES };
@@ -188,7 +276,17 @@ int main(int argc, const char *argv[]) {
       if (!result) Emit(@{ @"ok": @NO, @"error": errorCode ?: @"native_bridge_failure" }, 1);
       Emit(result, 0);
     }
-    if ([command isEqualToString:@"paste"]) Emit(@{ @"ok": @(KeyStroke(9)), @"method": @"clipboard_paste" }, 0);
+    if ([command isEqualToString:@"paste"]) {
+      NSDictionary *expected = ReadInput()[@"targetFingerprint"] ?: @{};
+      NSDictionary *context = CurrentContext(&errorCode, YES);
+      if (!context || !FingerprintsMatch(expected, context[@"targetFingerprint"], NO)) {
+        Emit(@{ @"ok": @NO, @"error": @"target_changed" }, 1);
+      }
+      if (![context[@"focusedElement"][@"isEditable"] boolValue]) {
+        Emit(@{ @"ok": @NO, @"error": @"target_not_editable" }, 1);
+      }
+      Emit(@{ @"ok": @(KeyStroke(9)), @"method": @"clipboard_paste" }, 0);
+    }
     if ([command isEqualToString:@"undo"]) {
       NSDictionary *expected = ReadInput()[@"targetFingerprint"] ?: @{};
       NSDictionary *context = CurrentContext(&errorCode, YES);

@@ -5,7 +5,7 @@
   const els = {
     shell: document.querySelector('.voice-shell'), expanded: $('expandedSurface'), expandedStatus: $('expandedStatus'),
     mode: $('modeSelect'), info: $('infoButton'), shortcutHint: $('shortcutHint'),
-    shortcutKeys: $('shortcutKeys'), shortcutAction: $('shortcutAction'),
+    shortcutVerb: $('shortcutVerb'), shortcutKeys: $('shortcutKeys'), shortcutAction: $('shortcutAction'),
     title: $('statusTitle'), detail: $('statusDetail'), context: $('contextNotice'), meter: $('levelMeter'),
     transcript: $('transcript'), preview: $('preview'), previewText: $('previewText'),
     confirm: $('confirmButton'), copy: $('copyButton'), cancel: $('cancelButton'), undo: $('undoButton'),
@@ -31,7 +31,7 @@
 
   const stateCopy = {
     idle: ['Ready', 'Dictate into the focused field or ask LANA about this window.'],
-    listening: ['Listening', 'Speak naturally. Press the microphone or shortcut again to finish.'],
+    listening: ['Listening', 'Speak naturally, then release the shortcut to process.'],
     transcribing: ['Transcribing', 'Turning your audio into text…'],
     gathering_context: ['Reading this window', 'Collecting only the active, accessible context needed for your request.'],
     thinking: ['Thinking', 'Preparing a constrained response…'],
@@ -108,13 +108,14 @@
       ? 'CommandOrControl+Shift+A'
       : 'CommandOrControl+Shift+Space'));
     els.shortcutKeys.textContent = shortcutLabel;
-    els.shortcutAction.textContent = state === 'listening' ? 'to stop' : 'to speak';
-    els.shortcutHint.title = `Press ${shortcutLabel} ${state === 'listening' ? 'to stop' : 'to speak'}`;
+    els.shortcutVerb.textContent = state === 'listening' ? 'Release' : 'Hold';
+    els.shortcutAction.textContent = state === 'listening' ? 'to process' : 'to speak';
+    els.shortcutHint.title = `${state === 'listening' ? 'Release' : 'Hold'} ${shortcutLabel} ${state === 'listening' ? 'to process' : 'to speak'}`;
     els.title.textContent = state === 'listening' && !isAgent ? 'Dictating' : copy[0];
     els.shell.setAttribute('aria-label', `${copy[0]}. ${session.error?.message || copy[1]}`);
     els.detail.textContent = session.error?.message || copy[1];
     if (state === 'idle') {
-      els.detail.textContent = `Press ${displayShortcut(snapshot.settings?.dictationShortcut || 'CommandOrControl+Shift+Space')} to start dictation, or ${displayShortcut(snapshot.settings?.agentShortcut || 'CommandOrControl+Shift+A')} for Agent mode.`;
+      els.detail.textContent = `Hold ${displayShortcut(snapshot.settings?.dictationShortcut || 'CommandOrControl+Shift+Space')} to dictate, or ${displayShortcut(snapshot.settings?.agentShortcut || 'CommandOrControl+Shift+A')} for Agent mode. Release to process.`;
     }
     els.context.hidden = state !== 'gathering_context';
     els.transcript.hidden = !session.transcript;
@@ -152,6 +153,7 @@
       recorder.onerror = () => window.screenVoice.captureError('MICROPHONE_DISCONNECTED');
       recorder.onstop = finalizeCapture;
       recorder.start(200);
+      playCue('start');
       startMeter(stream);
       stopTimer = setTimeout(() => stopCapture(false), Math.min(90000, Number(maxDurationMs) || 90000));
     } catch (error) {
@@ -178,7 +180,30 @@
 
   function stopCapture(discard) {
     discardRecording = Boolean(discard);
-    if (recorder && recorder.state !== 'inactive') recorder.stop();
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop();
+      if (!discard) playCue('release');
+    }
+  }
+
+  function playCue(type) {
+    const CueContext = window.AudioContext || window.webkitAudioContext;
+    if (!CueContext) return;
+    const cue = new CueContext();
+    const oscillator = cue.createOscillator();
+    const gain = cue.createGain();
+    const now = cue.currentTime;
+    const rising = type === 'start';
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(rising ? 520 : 620, now);
+    oscillator.frequency.exponentialRampToValueAtTime(rising ? 760 : 420, now + 0.09);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.065, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+    oscillator.connect(gain).connect(cue.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.12);
+    oscillator.addEventListener('ended', () => cue.close().catch(() => {}), { once: true });
   }
 
   async function finalizeCapture() {

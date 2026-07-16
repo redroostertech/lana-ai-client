@@ -10,6 +10,7 @@ const { DEFAULT_SETTINGS, parseAgentDecision, parseSettings } = require('./contr
 const { fingerprintsMatch } = require('./target-fingerprint');
 const { decisionRequiresConfirmation } = require('./confirmation-policy');
 const { actionText, normalizeText } = require('./action-normalizer');
+const { startShortcutMonitor } = require('./native-helper');
 
 const MAX_AUDIO_BASE64_CHARS = 16 * 1024 * 1024;
 const COMPACT_OVERLAY = Object.freeze({ width: 480, height: 58 });
@@ -72,6 +73,13 @@ class ElectronScreenVoice {
     this.previewDecision = null;
     this.pendingMode = this.settings.defaultMode;
     this.detailsOpen = true;
+    this.revealTarget = null;
+    this.shortcutMonitor = null;
+    this.shortcutMonitorReady = false;
+    this.shortcutStartPromise = null;
+    this.pendingShortcutRelease = null;
+    this.shortcutMonitorFactory = options.shortcutMonitorFactory || startShortcutMonitor;
+    this.sleep = options.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.entitlementEnabled = Boolean(options.entitlementEnabled);
     this.authenticated = Boolean(options.authenticated);
     this.controller.on('state', (snapshot) => this.sendState(snapshot));
@@ -245,6 +253,7 @@ class ElectronScreenVoice {
     this.controller.cancel(reason);
     this.unregisterShortcut(this.settings.dictationShortcut);
     this.unregisterShortcut(this.settings.agentShortcut);
+    this.stopShortcutMonitor();
     if (this.overlay && !this.overlay.isDestroyed()) this.overlay.destroy();
     this.overlay = null;
   }
@@ -273,12 +282,13 @@ class ElectronScreenVoice {
   }
 
   registerShortcuts() {
+    this.stopShortcutMonitor();
     this.unregisterShortcut(this.settings.dictationShortcut);
     this.unregisterShortcut(this.settings.agentShortcut);
     if (!this.entitlementEnabled || !this.authenticated || !this.settings.enabled) return;
     const register = (shortcut, mode) => {
       try {
-        if (!globalShortcut.register(shortcut, () => this.toggle(mode, 'global_shortcut'))) {
+        if (!globalShortcut.register(shortcut, () => this.handleShortcutDown(mode))) {
           this.logError(`[ScreenVoice] Shortcut unavailable: ${mode}`);
           return false;
         }
@@ -292,6 +302,76 @@ class ElectronScreenVoice {
     };
     register(this.settings.dictationShortcut, 'dictation');
     register(this.settings.agentShortcut, 'agent');
+    if (process.platform === 'darwin') {
+      try {
+        this.shortcutMonitor = this.shortcutMonitorFactory((event) => this.handleShortcutMonitorEvent(event), {
+          rootDir: this.rootDir
+        });
+      } catch (_) {
+        this.logError('[ScreenVoice] Press-and-hold release monitor is unavailable; shortcuts use toggle mode');
+      }
+    }
+  }
+
+  stopShortcutMonitor() {
+    this.shortcutMonitor?.stop?.();
+    this.shortcutMonitor = null;
+    this.shortcutMonitorReady = false;
+    this.pendingShortcutRelease = null;
+  }
+
+  handleShortcutMonitorEvent(event = {}) {
+    if (event.event === 'ready') {
+      this.shortcutMonitorReady = true;
+      this.logInfo('[ScreenVoice] Press-and-hold shortcuts ready');
+    } else if (event.event === 'up') {
+      this.handleShortcutUp(event.mode);
+    } else if (event.event === 'error') {
+      this.shortcutMonitorReady = false;
+      this.logError('[ScreenVoice] Press-and-hold release monitor stopped; shortcuts use toggle mode');
+    }
+  }
+
+  async rememberExternalTarget() {
+    try {
+      const context = await this.adapter.getTarget();
+      if (context?.processId !== process.pid) this.revealTarget = { context, capturedAt: Date.now() };
+      return context;
+    } catch (_) { return null; }
+  }
+
+  async handleShortcutDown(mode) {
+    if (this.controller.state === 'listening') {
+      if (!this.shortcutMonitorReady) this.send('screen-voice:stop-capture', { reason: 'activation_released' });
+      return this.controller.snapshot();
+    }
+    if (this.shortcutStartPromise) return this.shortcutStartPromise;
+    this.pendingMode = mode === 'agent' ? 'agent' : 'dictation';
+    this.shortcutStartPromise = (async () => {
+      await this.rememberExternalTarget();
+      this.detailsOpen = true;
+      this.showOverlay({ focus: false, ...DETAILS_OVERLAY });
+      return this.begin(this.pendingMode, 'global_shortcut');
+    })();
+    try {
+      const result = await this.shortcutStartPromise;
+      if (this.pendingShortcutRelease === this.pendingMode && this.controller.state === 'listening') {
+        this.send('screen-voice:stop-capture', { reason: 'activation_released' });
+      }
+      return result;
+    } finally {
+      this.shortcutStartPromise = null;
+      this.pendingShortcutRelease = null;
+    }
+  }
+
+  handleShortcutUp(mode) {
+    if (mode !== this.pendingMode) return;
+    if (this.shortcutStartPromise) {
+      this.pendingShortcutRelease = mode;
+    } else if (this.controller.state === 'listening') {
+      this.send('screen-voice:stop-capture', { reason: 'activation_released' });
+    }
   }
 
   unregisterShortcut(shortcut) {
@@ -378,6 +458,12 @@ class ElectronScreenVoice {
         const error = new Error(); error.code = 'accessibility_permission_denied'; throw error;
       }
       this.lastContext = await this.adapter.getTarget();
+      const cached = this.revealTarget;
+      const cachedIsFresh = cached && Date.now() - cached.capturedAt < 5 * 60 * 1000;
+      if (this.lastContext?.processId === process.pid && cachedIsFresh && cached.context?.focusedElement?.isEditable) {
+        await this.adapter.activate(cached.context.targetFingerprint);
+        this.lastContext = await this.adapter.getTarget();
+      }
       if (this.lastContext.focusedElement.isPassword) { const error = new Error(); error.code = 'secure_field'; throw error; }
       if (mode === 'dictation' && !this.lastContext.focusedElement.isEditable) {
         const error = new Error(); error.code = 'target_not_editable'; throw error;
@@ -405,6 +491,7 @@ class ElectronScreenVoice {
       if (!transcript) { const error = new Error(); error.code = 'NO_SPEECH'; throw error; }
       this.controller.session.transcript = transcript;
       this.sendState();
+      await this.sleep(500);
       return await (this.controller.session.mode === 'dictation' ? this.executeLiteral(transcript) : this.runAgent(transcript));
     } catch (error) { return this.fail(error.code || 'TRANSCRIPTION_FAILED', error); }
   }
@@ -436,7 +523,8 @@ class ElectronScreenVoice {
     const allowedActions = ['copy'];
     if (capabilities.insertText) allowedActions.push('insert_text', 'insert_table');
     if (capabilities.replaceSelection) allowedActions.push('replace_selection');
-    const decision = parseAgentDecision(await this.api.decide({ instruction, interactionMode: 'agent', context,
+    const { processId: _processId, bundleId: _bundleId, ...agentContext } = context;
+    const decision = parseAgentDecision(await this.api.decide({ instruction, interactionMode: 'agent', context: agentContext,
       capabilities, allowedActions }, this.controller.signal));
     this.controller.session.decision = decision;
     this.previewDecision = decision;
@@ -528,6 +616,7 @@ class ElectronScreenVoice {
     this.controller.cancel('app_quit');
     this.unregisterShortcut(this.settings.dictationShortcut);
     this.unregisterShortcut(this.settings.agentShortcut);
+    this.stopShortcutMonitor();
     if (this.overlay && !this.overlay.isDestroyed()) this.overlay.destroy();
   }
 }

@@ -52,7 +52,9 @@ class MacDesktopAdapter {
 
   async assertTarget(fingerprint, requireSelection = false) {
     const context = await this.getContext();
-    if (!fingerprintsMatch(fingerprint, context.targetFingerprint, { requireSelection })) {
+    if (!fingerprintsMatch(fingerprint, context.targetFingerprint, {
+      requireSelection, allowDynamicWindowTitle: true, boundsTolerance: 24
+    })) {
       const error = new Error('The active application or text target changed.');
       error.code = 'TARGET_CHANGED';
       throw error;

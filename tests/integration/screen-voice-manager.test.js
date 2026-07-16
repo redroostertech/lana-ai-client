@@ -38,10 +38,14 @@ function overlay() {
     destroy: jest.fn(() => { visible = false; }) };
 }
 
-function managerWith({ api, adapter, openClientSettings }) {
+function managerWith({ api, adapter, openClientSettings, shortcutMonitorFactory }) {
   const manager = new ElectronScreenVoice({ api, adapter, getMainWindow: () => null,
     getSavedServer: () => ({ url: 'http://local' }), openClientSettings,
-    settingsStore: { store: {}, set: jest.fn() } });
+    shortcutMonitorFactory: shortcutMonitorFactory || ((onEvent) => {
+      onEvent({ event: 'ready' });
+      return { stop: jest.fn() };
+    }),
+    sleep: async () => {}, settingsStore: { store: {}, set: jest.fn() } });
   manager.overlay = overlay();
   return manager;
 }
@@ -63,7 +67,7 @@ describe('Electron screen voice orchestration', () => {
   });
 
   test('selected rewrite is previewed, then revalidated replacement executes on confirmation', async () => {
-    const selectedContext = { ...context, selectedText: 'rough draft',
+    const selectedContext = { ...context, processId: 9, bundleId: 'com.editor', selectedText: 'rough draft',
       targetFingerprint: { ...fingerprint, selectionHash: 'selection' } };
     const api = { transcribe: jest.fn(async () => ({ text: 'Make this professional' })),
       decide: jest.fn(async () => ({ intent: 'rewrite', spokenResponse: '', displayResponse: 'Professional draft.',
@@ -78,6 +82,8 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.controller.state).toBe('previewing');
     expect(manager.overlay.setSize).toHaveBeenLastCalledWith(520, 360, true);
     expect(adapter.replaceSelection).not.toHaveBeenCalled();
+    expect(api.decide.mock.calls[0][0].context).not.toHaveProperty('processId');
+    expect(api.decide.mock.calls[0][0].context).not.toHaveProperty('bundleId');
     await manager.confirm(sessionId);
     expect(adapter.replaceSelection).toHaveBeenCalledWith('Professional draft.', selectedContext.targetFingerprint);
   });
@@ -152,7 +158,7 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.overlay.hide).not.toHaveBeenCalled();
   });
 
-  test('with Open at Login off, the first shortcut reveals details and the second starts listening', async () => {
+  test('pressing the authenticated shortcut starts listening and release begins processing', async () => {
     const manager = managerWith({ api: {}, adapter: {
       permissionStatus: jest.fn(async () => ({ accessibility: true })),
       getTarget: jest.fn(async () => context)
@@ -166,15 +172,35 @@ describe('Electron screen voice orchestration', () => {
       call[0] === 'CommandOrControl+Shift+Space'
     ));
     await registration[1]();
-    expect(manager.controller.state).toBe('idle');
+    expect(manager.controller.state).toBe('listening');
     expect(testOverlay.showInactive).toHaveBeenCalled();
     expect(testOverlay.setSize).toHaveBeenLastCalledWith(480, 190, true);
 
-    await registration[1]();
-    expect(manager.controller.state).toBe('listening');
-
-    await registration[1]();
+    manager.handleShortcutMonitorEvent({ event: 'up', mode: 'dictation' });
     expect(sent).toContainEqual(['screen-voice:stop-capture', { reason: 'activation_released' }]);
+  });
+
+  test('restores the editor target when overlay interaction owns focus', async () => {
+    const externalContext = { ...context, processId: 9, bundleId: 'com.editor' };
+    const overlayContext = { ...context, processId: process.pid, bundleId: 'com.lana',
+      focusedElement: { ...context.focusedElement, role: 'AXGroup', isEditable: false },
+      targetFingerprint: { ...fingerprint, processId: process.pid, bundleId: 'com.lana', role: 'AXGroup' } };
+    const adapter = {
+      permissionStatus: jest.fn(async () => ({ accessibility: true })),
+      getTarget: jest.fn()
+        .mockResolvedValueOnce(externalContext)
+        .mockResolvedValueOnce(overlayContext)
+        .mockResolvedValueOnce(externalContext),
+      activate: jest.fn(async () => {})
+    };
+    const manager = managerWith({ api: {}, adapter });
+    manager.authenticated = true;
+    manager.entitlementEnabled = true;
+
+    await manager.handleShortcutDown('dictation');
+
+    expect(adapter.activate).toHaveBeenCalledWith(externalContext.targetFingerprint);
+    expect(manager.controller.state).toBe('listening');
   });
 
   test('first activation requests missing permissions before capture', async () => {

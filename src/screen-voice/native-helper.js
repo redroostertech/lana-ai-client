@@ -61,4 +61,28 @@ function runHelper(command, payload = {}, options = {}) {
   });
 }
 
-module.exports = { NativeHelperError, helperCandidates, resolveHelper, runHelper };
+function startShortcutMonitor(onEvent, options = {}) {
+  const helper = resolveHelper(options);
+  if (!helper) throw new NativeHelperError('native_helper_unavailable');
+  const child = spawn(helper, ['shortcut-monitor'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  let buffer = '';
+  child.stdout.on('data', (chunk) => {
+    buffer += String(chunk);
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    lines.forEach((line) => {
+      if (!line.trim()) return;
+      try { onEvent(JSON.parse(line)); } catch (_) { /* ignore malformed monitor output */ }
+    });
+  });
+  child.on('error', () => onEvent({ event: 'error', error: 'shortcut_monitor_unavailable' }));
+  child.on('close', (code) => {
+    if (code && code !== 0) onEvent({ event: 'error', error: 'shortcut_monitor_stopped' });
+  });
+  return {
+    stop() { if (!child.killed) child.kill('SIGTERM'); },
+    process: child
+  };
+}
+
+module.exports = { NativeHelperError, helperCandidates, resolveHelper, runHelper, startShortcutMonitor };
