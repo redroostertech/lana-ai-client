@@ -3,6 +3,7 @@
 html, body { margin: 0; min-height: 100%; background: transparent; font-family: var(--lex-font-sans, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif); }
 body { padding: 4px; color: var(--lex-text-primary); }
 [hidden] { display: none !important; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .voice-shell {
   overflow: hidden;
@@ -30,20 +31,19 @@ body { padding: 4px; color: var(--lex-text-primary); }
   flex: 0 0 24px;
   display: block;
 }
-.status-title {
-  min-width: 0;
-  max-width: 92px;
-  flex: 1 1 72px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--lex-color-white);
-  font-size: var(--lex-body-xs-size, 12px);
-  font-weight: var(--lex-weight-semibold, 600);
-}
-.level-meter { width: 42px; flex: 1 1 42px; max-width: 52px; opacity: .45; }
+.level-meter { width: 54px; flex: 1 1 54px; max-width: 72px; opacity: .45; }
 .listening .level-meter, .transcribing .level-meter, .thinking .level-meter, .gathering_context .level-meter { opacity: 1; }
-.mode-badge { flex: 0 0 auto; }
+.mode-select {
+  width: 98px;
+  min-height: 26px;
+  padding: 3px 25px 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--lex-color-white) 20%, transparent);
+  border-radius: var(--lex-radius-full, 999px);
+  color: var(--lex-color-gray-900);
+  background: var(--lex-color-white);
+  font: var(--lex-weight-medium, 500) var(--lex-body-xs-size, 12px)/1 var(--lex-font-sans);
+  cursor: pointer;
+}
 .compact-actions { display: flex; align-items: center; gap: 1px; margin-left: auto; }
 .compact-actions lex-btn {
   --lex-text-secondary: var(--lex-color-white);
@@ -56,34 +56,27 @@ body { padding: 4px; color: var(--lex-text-primary); }
 .previewing .compact-secondary { opacity: .78; pointer-events: auto; }
 .compact-actions .mic-control { opacity: 1; }
 .listening .mic-control { --lex-text-secondary: var(--lex-color-danger-400, #f97066); }
+.compact-actions .needs-attention { opacity: 1; pointer-events: auto; --lex-text-secondary: var(--lex-color-danger-300, #fda29b); }
 
 .expanded-surface {
   max-height: 502px;
   padding: 14px 16px 16px;
   overflow: auto;
-  border-top: 1px solid var(--lex-border-subtle);
-  background: var(--lex-bg-primary);
+  border-top: 1px solid color-mix(in srgb, var(--lex-color-white) 15%, transparent);
+  background: var(--lex-color-gray-900);
+  color: var(--lex-color-white);
 }
 .expanded-status { display: grid; gap: 5px; }
-.expanded-status p { margin: 0; color: var(--lex-text-secondary); font-size: var(--lex-body-sm-size, 13px); line-height: 1.4; }
-.context-notice { color: var(--lex-text-accent); font-size: var(--lex-body-xs-size, 12px); font-weight: var(--lex-weight-semibold, 600); }
-.transcript { margin: 12px 0 0; padding: 9px 10px; border-radius: var(--lex-radius-md, 8px); background: var(--lex-bg-secondary); font-size: var(--lex-body-xs-size, 12px); max-height: 62px; overflow: auto; }
+.expanded-status lex-text { --lex-text-primary: var(--lex-color-white); }
+.expanded-status p { margin: 0; color: color-mix(in srgb, var(--lex-color-white) 75%, transparent); font-size: var(--lex-body-sm-size, 13px); line-height: 1.4; }
+.context-notice { color: var(--lex-color-blue-200, #b2ccff); font-size: var(--lex-body-xs-size, 12px); font-weight: var(--lex-weight-semibold, 600); }
+.transcript { margin: 12px 0 0; padding: 9px 10px; border-radius: var(--lex-radius-md, 8px); background: color-mix(in srgb, var(--lex-color-white) 10%, transparent); color: var(--lex-color-white); font-size: var(--lex-body-xs-size, 12px); max-height: 62px; overflow: auto; }
 .preview { padding-top: 12px; }
-.preview label, .settings-panel label { display: grid; gap: 5px; color: var(--lex-text-secondary); font-size: var(--lex-body-xs-size, 12px); font-weight: var(--lex-weight-semibold, 600); }
-.preview textarea { width: 100%; min-height: 128px; margin-top: 5px; padding: 10px; resize: vertical; border: 1px solid var(--lex-border-default); border-radius: var(--lex-radius-lg, 10px); background: var(--lex-bg-primary); color: inherit; font: inherit; line-height: 1.45; }
+.preview label { display: grid; gap: 5px; color: color-mix(in srgb, var(--lex-color-white) 75%, transparent); font-size: var(--lex-body-xs-size, 12px); font-weight: var(--lex-weight-semibold, 600); }
+.preview textarea { width: 100%; min-height: 128px; margin-top: 5px; padding: 10px; resize: vertical; border: 1px solid color-mix(in srgb, var(--lex-color-white) 20%, transparent); border-radius: var(--lex-radius-lg, 10px); background: color-mix(in srgb, var(--lex-color-white) 8%, transparent); color: var(--lex-color-white); font: inherit; line-height: 1.45; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.recovery-actions { padding-top: 2px; }
 .button { min-height: 30px; padding: 6px 12px; border: 0; border-radius: var(--lex-btn-radius-sm, 9px); background: var(--lex-bg-secondary); color: inherit; font: var(--lex-weight-medium, 500) var(--lex-body-xs-size, 12px)/1 var(--lex-font-sans); cursor: pointer; }
 .button.primary { color: var(--lex-text-on-accent); background: var(--lex-bg-accent); }
 .button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--lex-border-focus); outline-offset: 2px; }
-.settings-panel { max-height: 458px; overflow: auto; }
-.settings-panel h2 { margin: 0 0 12px; }
-.settings-panel > label { margin: 10px 0; }
-.settings-panel input:not([type=checkbox]), .settings-panel select { width: 100%; min-height: 34px; padding: 6px 8px; border: 1px solid var(--lex-border-default); border-radius: var(--lex-radius-md, 7px); color: inherit; background: var(--lex-bg-primary); }
-.settings-panel .check { display: flex; align-items: center; gap: 8px; }
-.permission-summary { display: grid; gap: 7px; margin-top: 12px; padding: 10px; border-radius: var(--lex-radius-lg); background: var(--lex-bg-secondary); }
-.permission-summary > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--lex-text-secondary); font-size: var(--lex-body-xs-size); font-weight: var(--lex-weight-medium); }
-.permission-summary p { margin: 1px 0 0; color: var(--lex-text-tertiary); font-size: var(--lex-body-xs-size); line-height: var(--lex-body-xs-height); }
-
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media (prefers-contrast: more) { .voice-shell, .button, input, textarea, select { border-width: 2px; } }

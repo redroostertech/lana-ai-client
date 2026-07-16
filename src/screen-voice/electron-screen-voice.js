@@ -14,8 +14,7 @@ const { actionText, normalizeText } = require('./action-normalizer');
 const MAX_AUDIO_BASE64_CHARS = 16 * 1024 * 1024;
 const COMPACT_OVERLAY = Object.freeze({ width: 360, height: 58 });
 const PREVIEW_OVERLAY = Object.freeze({ width: 520, height: 360 });
-const ERROR_OVERLAY = Object.freeze({ width: 460, height: 220 });
-const SETTINGS_OVERLAY = Object.freeze({ width: 520, height: 520 });
+const DETAILS_OVERLAY = Object.freeze({ width: 460, height: 190 });
 const EXPECTED_USER_ERRORS = new Set([
   'accessibility_permission_denied', 'MICROPHONE_DENIED', 'target_not_editable', 'secure_field', 'NO_SPEECH'
 ]);
@@ -51,6 +50,7 @@ class ElectronScreenVoice {
   constructor(options = {}) {
     this.getMainWindow = options.getMainWindow;
     this.getSavedServer = options.getSavedServer;
+    this.openClientSettings = options.openClientSettings || (() => false);
     this.logInfo = options.logInfo || (() => {});
     this.logError = options.logError || (() => {});
     this.rootDir = options.rootDir || path.resolve(__dirname, '..', '..');
@@ -116,7 +116,6 @@ class ElectronScreenVoice {
 
   overlayLayout(state = this.controller.state) {
     if (state === 'previewing') return PREVIEW_OVERLAY;
-    if (state === 'error') return ERROR_OVERLAY;
     return COMPACT_OVERLAY;
   }
 
@@ -165,11 +164,17 @@ class ElectronScreenVoice {
     handle('screen-voice:confirm', ({ sessionId }) => this.confirm(sessionId));
     handle('screen-voice:copy', ({ text }) => this.copy(text));
     handle('screen-voice:undo', () => this.undo());
-    handle('screen-voice:permission', ({ type }) => this.requestPermission(type));
-    handle('screen-voice:save-settings', (settings) => this.saveSettings(settings));
-    handle('screen-voice:open-settings', () => { this.showOverlay({ focus: true, ...SETTINGS_OVERLAY }); return { ok: true }; });
-    handle('screen-voice:close-settings', () => {
-      const focus = ['previewing', 'error'].includes(this.controller.state);
+    handle('screen-voice:open-settings', () => {
+      const opened = this.openClientSettings();
+      if (opened) this.overlay?.hide();
+      return { ok: Boolean(opened) };
+    });
+    handle('screen-voice:open-details', () => {
+      this.showOverlay({ focus: true, ...DETAILS_OVERLAY });
+      return { ok: true };
+    });
+    handle('screen-voice:close-details', () => {
+      const focus = this.controller.state === 'previewing';
       this.showOverlay({ focus, ...this.overlayLayout() });
       return { ok: true };
     });
@@ -456,7 +461,7 @@ class ElectronScreenVoice {
       if (this.controller.state === 'idle') this.controller.start(this.settings.defaultMode, 'error_recovery');
       this.controller.fail(details.code, details.message);
     } catch (_) { /* preserve original safe error */ }
-    this.showOverlay({ focus: true, ...ERROR_OVERLAY });
+    this.showOverlay();
     const status = Number.isInteger(error?.status) ? ` (HTTP ${error.status})` : '';
     const message = `[ScreenVoice] ${details.code}${status}`;
     if (EXPECTED_USER_ERRORS.has(details.code)) this.logInfo(message);

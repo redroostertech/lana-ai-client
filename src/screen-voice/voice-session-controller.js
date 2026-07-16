@@ -18,7 +18,7 @@ const TRANSITIONS = Object.freeze({
   executing: new Set(['speaking', 'idle', 'canceled', 'error']),
   speaking: new Set(['idle', 'canceled', 'error']),
   canceled: new Set(['idle', 'listening']),
-  error: new Set(['idle', 'listening'])
+  error: new Set(['idle', 'listening', 'canceled'])
 });
 
 class VoiceSessionController extends EventEmitter {

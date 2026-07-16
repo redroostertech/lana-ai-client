@@ -38,6 +38,14 @@ describe('screen voice session controller', () => {
     expect(() => controller.start('dictation')).not.toThrow();
   });
 
+  test('cancellation is safe from an error state during application shutdown', () => {
+    const controller = new VoiceSessionController();
+    controller.start('dictation');
+    controller.fail('TRANSCRIPTION_FAILED', 'Could not transcribe');
+    expect(() => controller.cancel('app_quit')).not.toThrow();
+    expect(controller.state).toBe('canceled');
+  });
+
   test('execution tokens are idempotent', () => {
     const controller = new VoiceSessionController();
     expect(controller.claimExecution('a')).toBe(true);

@@ -252,6 +252,12 @@ function syncScreenVoiceEntitlement(server = getSavedServer()) {
   return enabled;
 }
 
+function isScreenDictionEntitled(server = getSavedServer()) {
+  return Boolean(server && capabilityItems(server).some((item) => (
+    String(item.id || item.app_id || item.slug || item.key || '').trim() === SCREEN_DICTION_APP_ID
+  )));
+}
+
 async function syncScreenVoiceAuthentication(window = mainWindow) {
   if (!screenVoice || !window || window.isDestroyed()) return false;
   let authenticated = false;
@@ -310,6 +316,17 @@ function createFileUrl(filePath) {
     protocol: 'file:',
     slashes: true
   });
+}
+
+function openScreenVoiceSettings() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  const settingsUrl = createFileUrl(path.join(__dirname, 'public_html/settings-v2.html'))
+    + '?capability=screen-diction#capabilities';
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  mainWindow.loadURL(settingsUrl);
+  return true;
 }
 
 // Development mode: Bypass certificate errors for localhost
@@ -908,10 +925,7 @@ ipcMain.handle('capabilities:set-active', async (_event, payload) => {
 ipcMain.handle('capabilities:set-open-at-login', async (_event, payload) => {
   try {
     const server = getSavedServer();
-    const entitled = capabilityItems(server).some((item) => (
-      String(item.id || item.app_id || item.slug || item.key || '').trim() === SCREEN_DICTION_APP_ID
-    ));
-    if (!entitled) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
+    if (!isScreenDictionEntitled(server)) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
     if (!screenVoice || typeof payload?.openAtLogin !== 'boolean') {
       return { success: false, error: 'Open at Login is not available on this platform.' };
     }
@@ -921,6 +935,43 @@ ipcMain.handle('capabilities:set-open-at-login', async (_event, payload) => {
     logError('[Capabilities] Failed to update Open at Login', error);
     return { success: false, error: 'Open at Login could not be saved.' };
   }
+});
+
+ipcMain.handle('capabilities:get-voice-settings', async () => {
+  if (!isScreenDictionEntitled()) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
+  if (!screenVoice) return { success: false, error: 'Screen Dictation is not available on this platform.' };
+  return { success: true, settings: screenVoice.getSettings() };
+});
+
+ipcMain.handle('capabilities:set-voice-settings', async (_event, payload) => {
+  try {
+    if (!isScreenDictionEntitled()) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
+    if (!screenVoice || !payload?.settings || typeof payload.settings !== 'object' || Array.isArray(payload.settings)) {
+      return { success: false, error: 'Invalid Screen Dictation settings.' };
+    }
+    const result = screenVoice.saveSettings(payload.settings);
+    return { success: true, settings: result.settings, capabilities: currentCapabilityViewModels() };
+  } catch (error) {
+    logError('[Capabilities] Failed to update Screen Dictation settings', error);
+    return { success: false, error: 'Screen Dictation settings could not be saved.' };
+  }
+});
+
+ipcMain.handle('capabilities:get-voice-permissions', async () => {
+  if (!isScreenDictionEntitled()) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
+  if (!screenVoice) return { success: false, error: 'Screen Dictation is not available on this platform.' };
+  try { return { success: true, permissions: await screenVoice.permissionStatus() }; }
+  catch (_) { return { success: false, error: 'Permission status is temporarily unavailable.' }; }
+});
+
+ipcMain.handle('capabilities:request-voice-permission', async (_event, payload) => {
+  const type = payload?.type;
+  if (!isScreenDictionEntitled()) return { success: false, error: 'Screen Dictation is not enabled for your organization.' };
+  if (!screenVoice || !['microphone', 'accessibility'].includes(type)) {
+    return { success: false, error: 'Invalid permission request.' };
+  }
+  try { return { success: true, permissions: await screenVoice.requestPermission(type) }; }
+  catch (_) { return { success: false, error: 'The permission request could not be opened.' }; }
 });
 
 // Clear saved server (logout)
@@ -1651,6 +1702,7 @@ app.whenReady().then(async () => {
         rootDir: __dirname,
         getMainWindow: () => mainWindow,
         getSavedServer: () => getSavedServer(),
+        openClientSettings: openScreenVoiceSettings,
         entitlementEnabled: isCapabilityActive(
           getSavedServer(),
           SCREEN_DICTION_APP_ID,

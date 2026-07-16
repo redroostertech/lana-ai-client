@@ -11,15 +11,19 @@
 <body>
   <main class="voice-shell" aria-label="LANA screen-aware voice assistant">
     <section class="compact-bar" aria-live="polite" aria-atomic="true">
-      <img class="voice-mark" src="lana-mark.svg" alt="" aria-hidden="true">
-      <strong id="statusTitle" class="status-title">Ready</strong>
+      <img class="voice-mark" src="redrooster-favicon.ico" alt="" aria-hidden="true">
+      <strong id="statusTitle" class="sr-only">Ready</strong>
       <lex-progress-bar id="levelMeter" class="level-meter no-drag" value="0" color="accent" size="xs" animate="false" aria-label="Microphone level"></lex-progress-bar>
-      <lex-badge id="modeBadge" class="mode-badge" label="Dictation" color="gray" size="sm"></lex-badge>
+      <label class="sr-only" for="modeSelect">Voice mode</label>
+      <select id="modeSelect" class="mode-select no-drag" aria-label="Voice mode">
+        <option value="dictation">Dictation</option>
+        <option value="agent">Agent</option>
+      </select>
       <div class="compact-actions no-drag">
         <lex-btn id="undoButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="rotate-ccw" title="Undo last voice edit" hidden></lex-btn>
-        <lex-btn id="agentCompactButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="bot" title="Ask LANA"></lex-btn>
         <lex-btn id="micButton" class="mic-control" variant="ghost" size="sm" icon="true" leading-icon="mic" title="Start dictation"></lex-btn>
-        <lex-btn id="settingsButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="settings" title="Voice settings"></lex-btn>
+        <lex-btn id="infoButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="info" title="Voice details"></lex-btn>
+        <lex-btn id="settingsButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="settings" title="Open Screen Dictation settings"></lex-btn>
         <lex-btn id="dismissButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="x" title="Hide voice overlay"></lex-btn>
       </div>
     </section>
@@ -42,35 +46,6 @@
         </div>
       </section>
 
-      <section id="idleActions" class="actions recovery-actions" hidden>
-        <lex-btn id="dictateButton" class="no-drag" variant="primary" size="sm" leading-icon="mic">Try dictation</lex-btn>
-        <lex-btn id="agentButton" class="no-drag" variant="secondary" size="sm" leading-icon="bot">Ask agent</lex-btn>
-      </section>
-
-      <form id="settingsPanel" class="settings-panel" hidden>
-        <lex-text variant="primary" size="h5" weight="semibold" tag="h2">Voice settings</lex-text>
-        <label>Dictation shortcut<input id="dictationShortcut" autocomplete="off"></label>
-        <label>Agent shortcut<input id="agentShortcut" autocomplete="off"></label>
-        <label>Default mode
-          <select id="defaultMode"><option value="dictation">Dictation</option><option value="agent">Agent</option></select>
-        </label>
-        <label class="check"><input id="openAtLogin" type="checkbox"> Open at Login</label>
-        <label class="check"><input id="screenContextEnabled" type="checkbox"> Use active-window context in Agent mode</label>
-        <label class="check"><input id="voiceOutputEnabled" type="checkbox"> Speak agent answers</label>
-        <label>Confirmation
-          <select id="confirmationPolicy"><option value="risk_based">Risk based</option><option value="always">Always preview</option><option value="never_safe_only">Skip for safe inserts</option></select>
-        </label>
-        <div class="permission-summary" aria-live="polite">
-          <div><span>Microphone</span><lex-badge id="microphonePermissionBadge" label="Checking" color="gray" size="sm"></lex-badge></div>
-          <div><span>Accessibility</span><lex-badge id="accessibilityPermissionBadge" label="Checking" color="gray" size="sm"></lex-badge></div>
-          <p id="permissionHelp">Checking system permissions…</p>
-        </div>
-        <div class="actions">
-          <lex-btn class="no-drag" variant="primary" size="sm" type="submit">Save</lex-btn>
-          <lex-btn id="accessibilityButton" class="no-drag" variant="secondary" size="sm">Enable Accessibility</lex-btn>
-          <lex-btn id="microphoneButton" class="no-drag" variant="secondary" size="sm">Enable Microphone</lex-btn>
-        </div>
-      </form>
     </section>
   </main>
   <script src="../../js/lex/lex.core.js"></script>

@@ -64,7 +64,147 @@
     return platforms.map(function (platform) { return labels[platform] || platform; }).join(', ');
   }
 
-  function renderCapability(capability, onChange, onOpenAtLoginChange, isExpanded, onExpandedChange) {
+  function createToggleOption(name, description, field, checked, disabled) {
+    var option = element('div', 'sv2-capability-option');
+    var copy = element('div', 'sv2-capability-option-copy');
+    copy.appendChild(element('span', 'sv2-capability-option-name', name));
+    copy.appendChild(element('span', 'sv2-capability-option-description', description));
+    var toggleLabel = element('label', 'sv2-capability-toggle');
+    var toggle = document.createElement('input');
+    toggle.type = 'checkbox';
+    toggle.name = field;
+    toggle.checked = Boolean(checked);
+    toggle.disabled = Boolean(disabled);
+    toggle.setAttribute('aria-label', name);
+    toggleLabel.appendChild(toggle);
+    toggleLabel.appendChild(element('span', 'sv2-capability-toggle-track'));
+    option.appendChild(copy);
+    option.appendChild(toggleLabel);
+    return option;
+  }
+
+  function createVoiceField(labelText, field, value, options) {
+    var label = element('label', 'sv2-capability-field');
+    label.appendChild(element('span', 'sv2-capability-select-label', labelText));
+    var control;
+    if (Array.isArray(options)) {
+      control = element('select', 'sv2-capability-select');
+      options.forEach(function (option) { control.appendChild(new Option(option.label, option.value)); });
+    } else {
+      control = document.createElement('input');
+      control.className = 'sv2-capability-input';
+      control.type = 'text';
+      control.autocomplete = 'off';
+    }
+    control.name = field;
+    control.value = value || '';
+    label.appendChild(control);
+    return label;
+  }
+
+  function permissionLabel(type, permissions) {
+    if (!permissions) return { label: 'Checking', color: 'gray' };
+    if (type === 'microphone') {
+      if (permissions.microphone === true) return { label: 'Allowed', color: 'green' };
+      if (permissions.microphoneStatus === 'unavailable') return { label: 'Unavailable', color: 'gray' };
+      if (['denied', 'restricted'].indexOf(permissions.microphoneStatus) !== -1) return { label: 'Denied', color: 'red' };
+      return { label: 'Required', color: 'yellow' };
+    }
+    if (permissions.accessibility === true) return { label: 'Allowed', color: 'green' };
+    if (permissions.supported === false) return { label: 'Unavailable', color: 'gray' };
+    return { label: 'Required', color: 'yellow' };
+  }
+
+  function createPermissionRow(type, labelText, permissions, onRequest, disabled) {
+    var row = element('div', 'sv2-capability-permission');
+    var copy = element('div', 'sv2-capability-option-copy');
+    copy.appendChild(element('span', 'sv2-capability-option-name', labelText));
+    copy.appendChild(element('span', 'sv2-capability-option-description',
+      type === 'microphone' ? 'Required to hear your dictation.' : 'Required to identify and update the focused field safely.'));
+    var actions = element('div', 'sv2-capability-permission-actions');
+    var state = permissionLabel(type, permissions);
+    var badge = document.createElement('lex-badge');
+    badge.id = 'sv2-voice-permission-' + type;
+    badge.setAttribute('label', state.label);
+    badge.setAttribute('color', state.color);
+    badge.setAttribute('size', 'sm');
+    var button = document.createElement('lex-btn');
+    button.id = 'sv2-voice-permission-button-' + type;
+    button.setAttribute('variant', 'secondary');
+    button.setAttribute('size', 'sm');
+    button.textContent = state.label === 'Allowed' ? 'Enabled' : 'Enable';
+    button.dataset.capabilityDisabled = disabled ? 'true' : 'false';
+    button.disabled = Boolean(disabled) || state.label === 'Allowed' || state.label === 'Unavailable';
+    button.addEventListener('click', function () { onRequest(type, button); });
+    actions.appendChild(badge);
+    actions.appendChild(button);
+    row.appendChild(copy);
+    row.appendChild(actions);
+    return row;
+  }
+
+  function renderVoiceSettings(parent, capability, onSave, onPermissionRequest) {
+    var settings = capability.voiceSettings || {};
+    var disabled = !capability.active || !capability.available;
+    var form = element('form', 'sv2-capability-voice-settings');
+    form.appendChild(element('h4', 'sv2-capability-subheading', 'Voice settings'));
+    var fields = element('div', 'sv2-capability-field-grid');
+    fields.appendChild(createVoiceField('Dictation shortcut', 'dictationShortcut', settings.dictationShortcut || 'CommandOrControl+Shift+Space'));
+    fields.appendChild(createVoiceField('Agent shortcut', 'agentShortcut', settings.agentShortcut || 'CommandOrControl+Shift+A'));
+    fields.appendChild(createVoiceField('Default mode', 'defaultMode', settings.defaultMode || 'dictation', [
+      { label: 'Dictation', value: 'dictation' }, { label: 'Agent', value: 'agent' }
+    ]));
+    fields.appendChild(createVoiceField('Confirmation', 'confirmationPolicy', settings.confirmationPolicy || 'risk_based', [
+      { label: 'Risk based', value: 'risk_based' }, { label: 'Always preview', value: 'always' },
+      { label: 'Skip for safe inserts', value: 'never_safe_only' }
+    ]));
+    Array.prototype.forEach.call(fields.querySelectorAll('input, select'), function (control) { control.disabled = disabled; });
+    form.appendChild(fields);
+    form.appendChild(createToggleOption('Open at Login',
+      'Show Screen Dictation after you sign in. When off, use a configured shortcut to open it.',
+      'openAtLogin', settings.openAtLogin, disabled));
+    form.appendChild(createToggleOption('Use active-window context in Agent mode',
+      'Share only scoped accessible content from the active window when an agent request needs it.',
+      'screenContextEnabled', settings.screenContextEnabled !== false, disabled));
+    form.appendChild(createToggleOption('Speak agent answers',
+      'Play a spoken response when the voice provider supports it.',
+      'voiceOutputEnabled', settings.voiceOutputEnabled, disabled));
+
+    var permissions = element('section', 'sv2-capability-permissions');
+    permissions.appendChild(element('h4', 'sv2-capability-subheading', 'Permissions'));
+    permissions.appendChild(createPermissionRow('microphone', 'Microphone', capability.voicePermissions, onPermissionRequest, disabled));
+    permissions.appendChild(createPermissionRow('accessibility', 'Accessibility', capability.voicePermissions, onPermissionRequest, disabled));
+    form.appendChild(permissions);
+
+    var save = document.createElement('lex-btn');
+    save.setAttribute('variant', 'primary');
+    save.setAttribute('size', 'sm');
+    save.setAttribute('type', 'submit');
+    save.textContent = 'Save voice settings';
+    save.disabled = disabled;
+    form.appendChild(save);
+    function submitSettings() {
+      onSave(capability, {
+        enabled: settings.enabled !== false,
+        openAtLogin: form.elements.openAtLogin.checked,
+        dictationShortcut: form.elements.dictationShortcut.value.trim(),
+        agentShortcut: form.elements.agentShortcut.value.trim(),
+        defaultMode: form.elements.defaultMode.value,
+        screenContextEnabled: form.elements.screenContextEnabled.checked,
+        voiceOutputEnabled: form.elements.voiceOutputEnabled.checked,
+        confirmationPolicy: form.elements.confirmationPolicy.value,
+        language: settings.language || 'en'
+      }, save);
+    }
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      submitSettings();
+    });
+    save.addEventListener('click', submitSettings);
+    parent.appendChild(form);
+  }
+
+  function renderCapability(capability, onChange, onVoiceSettingsSave, onPermissionRequest, isExpanded, onExpandedChange) {
     var row = element('article', 'sv2-capability');
     var heading = element('div', 'sv2-capability-heading');
     var bodyId = 'sv2-capability-body-' + String(capability.id).replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -117,23 +257,7 @@
     body.appendChild(platform);
 
     if (capability.id === 'screen-diction') {
-      var startup = element('div', 'sv2-capability-option');
-      var startupCopy = element('div', 'sv2-capability-option-copy');
-      startupCopy.appendChild(element('span', 'sv2-capability-option-name', 'Open at Login'));
-      startupCopy.appendChild(element('span', 'sv2-capability-option-description',
-        'Show Screen Dictation after you sign in. When off, use a configured shortcut to open it.'));
-      var toggleLabel = element('label', 'sv2-capability-toggle');
-      var toggle = document.createElement('input');
-      toggle.type = 'checkbox';
-      toggle.checked = Boolean(capability.openAtLogin);
-      toggle.disabled = !capability.active || !capability.available;
-      toggle.setAttribute('aria-label', 'Open Screen Dictation at login');
-      toggle.addEventListener('change', function () { onOpenAtLoginChange(capability, toggle); });
-      toggleLabel.appendChild(toggle);
-      toggleLabel.appendChild(element('span', 'sv2-capability-toggle-track'));
-      startup.appendChild(startupCopy);
-      startup.appendChild(toggleLabel);
-      body.appendChild(startup);
+      renderVoiceSettings(body, capability, onVoiceSettingsSave, onPermissionRequest);
     }
 
     renderHints(body, capability.hints);
@@ -150,7 +274,19 @@
     var list = document.getElementById('sv2-capabilities-list');
     var status = document.getElementById('sv2-capabilities-status');
     var expandedCapabilities = Object.create(null);
+    var voiceSettings = null;
+    var voicePermissions = null;
+    var requestedCapability = new URLSearchParams(window.location.search).get('capability');
+    if (requestedCapability) expandedCapabilities[requestedCapability] = true;
     if (!section || !list || !status) return;
+
+    function withVoiceState(capabilities) {
+      return capabilities.map(function (capability) {
+        return capability.id === 'screen-diction'
+          ? Object.assign({}, capability, { voiceSettings: voiceSettings, voicePermissions: voicePermissions })
+          : capability;
+      });
+    }
 
     function render(capabilities) {
       list.replaceChildren();
@@ -161,11 +297,12 @@
         list.appendChild(empty);
         return;
       }
-      capabilities.forEach(function (capability) {
+      withVoiceState(capabilities).forEach(function (capability) {
         list.appendChild(renderCapability(
           capability,
           update,
-          updateOpenAtLogin,
+          saveVoiceSettings,
+          requestPermission,
           expandedCapabilities[capability.id] === true,
           function (id, expanded) { expandedCapabilities[id] = expanded; }
         ));
@@ -189,19 +326,53 @@
       });
     }
 
-    function updateOpenAtLogin(capability, toggle) {
-      var requested = toggle.checked;
-      toggle.disabled = true;
-      status.textContent = 'Saving Open at Login...';
-      window.electronAPI.capabilities.setOpenAtLogin(requested).then(function (result) {
-        if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'Setting could not be saved.');
+    function saveVoiceSettings(capability, settings, button) {
+      button.disabled = true;
+      status.textContent = 'Saving Screen Dictation settings...';
+      window.electronAPI.capabilities.setVoiceSettings(settings).then(function (result) {
+        if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'Settings could not be saved.');
+        voiceSettings = result.settings;
         render(Array.isArray(result.capabilities) ? result.capabilities : []);
         status.textContent = '';
-        notify('success', 'Open at Login ' + (requested ? 'enabled' : 'disabled'));
+        notify('success', 'Screen Dictation settings saved');
       }).catch(function (error) {
-        toggle.checked = Boolean(capability.openAtLogin);
-        toggle.disabled = !capability.active || !capability.available;
-        status.textContent = error.message || 'Open at Login could not be saved.';
+        button.disabled = !capability.active || !capability.available;
+        status.textContent = error.message || 'Screen Dictation settings could not be saved.';
+        notify('error', status.textContent);
+      });
+    }
+
+    function applyPermissionStatus(permissions) {
+      voicePermissions = permissions || voicePermissions;
+      ['microphone', 'accessibility'].forEach(function (type) {
+        var state = permissionLabel(type, voicePermissions);
+        var badge = document.getElementById('sv2-voice-permission-' + type);
+        var button = document.getElementById('sv2-voice-permission-button-' + type);
+        if (badge) { badge.label = state.label; badge.color = state.color; }
+        if (button) {
+          button.textContent = state.label === 'Allowed' ? 'Enabled' : 'Enable';
+          button.disabled = button.dataset.capabilityDisabled === 'true'
+            || state.label === 'Allowed' || state.label === 'Unavailable';
+        }
+      });
+    }
+
+    function refreshPermissions() {
+      return window.electronAPI.capabilities.getVoicePermissions().then(function (result) {
+        if (result && result.success === true) applyPermissionStatus(result.permissions);
+      }).catch(function () {});
+    }
+
+    function requestPermission(type, button) {
+      button.disabled = true;
+      status.textContent = 'Requesting ' + type + ' permission...';
+      window.electronAPI.capabilities.requestVoicePermission(type).then(function (result) {
+        if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'Permission could not be requested.');
+        applyPermissionStatus(result.permissions);
+        status.textContent = '';
+      }).catch(function (error) {
+        button.disabled = false;
+        status.textContent = error.message || 'Permission could not be requested.';
         notify('error', status.textContent);
       });
     }
@@ -213,8 +384,15 @@
       return;
     }
 
-    window.electronAPI.capabilities.list().then(function (result) {
+    Promise.all([
+      window.electronAPI.capabilities.list(),
+      window.electronAPI.capabilities.getVoiceSettings(),
+      window.electronAPI.capabilities.getVoicePermissions()
+    ]).then(function (results) {
+      var result = results[0];
       if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'Capabilities could not be loaded.');
+      if (results[1] && results[1].success === true) voiceSettings = results[1].settings;
+      if (results[2] && results[2].success === true) voicePermissions = results[2].permissions;
       render(Array.isArray(result.capabilities) ? result.capabilities : []);
       status.textContent = '';
     }).catch(function (error) {
@@ -222,6 +400,11 @@
       status.textContent = error.message || 'Capabilities could not be loaded.';
     }).finally(function () {
       section.setAttribute('aria-busy', 'false');
+    });
+
+    window.addEventListener('focus', refreshPermissions);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) refreshPermissions();
     });
   }
 
