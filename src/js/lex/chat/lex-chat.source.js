@@ -509,10 +509,13 @@
           return {
             type: 'agentic_progress',
             step: data.step,
+            currentStep: data.current_step ?? data.currentStep,
             totalSteps: data.total_steps,
             phase: data.phase,
             message: data.message,
-            status: data.status
+            status: data.status,
+            taskId: data.task_id || data.taskId,
+            heartbeat: data.heartbeat === true
           };
 
         case 'plan_ready':

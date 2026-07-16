@@ -291,6 +291,12 @@
         this.emit('lex-chat-artifact-click', e.detail);
       });
 
+      // Promotion is executed by the page controller so the message remains a
+      // presentation-only component and the page can use the shared API client.
+      this.addEventListener('lex-artifact-promote', (e) => {
+        this.emit('lex-chat-artifact-promote', e.detail);
+      });
+
       // Thread scroll-top for pagination
       this.addEventListener('lex-thread-scroll-top', () => {
         this._loadMoreHistory();
@@ -813,7 +819,9 @@
 
         case 'agentic_complete':
           if (event.artifacts) {
-            this._artifacts.push(...event.artifacts);
+            this._artifacts = Chat.ArtifactPromotion
+              ? Chat.ArtifactPromotion.mergeArtifacts(this._artifacts, event.artifacts)
+              : this._artifacts.concat(event.artifacts);
           }
           this.emit('lex-chat-artifacts', { artifacts: event.artifacts || [] });
           break;
@@ -855,7 +863,9 @@
 
         case 'agentic_artifacts':
           if (event.artifacts) {
-            this._artifacts.push(...event.artifacts);
+            this._artifacts = Chat.ArtifactPromotion
+              ? Chat.ArtifactPromotion.mergeArtifacts(this._artifacts, event.artifacts)
+              : this._artifacts.concat(event.artifacts);
           }
           this.emit('lex-chat-artifacts', { artifacts: event.artifacts || [] });
           break;

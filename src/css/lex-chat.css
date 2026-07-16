@@ -140,6 +140,10 @@
   --lex-chat-artifact-border: var(--lex-color-info-100);
   --lex-chat-artifact-hover:  var(--lex-color-info-100);
 
+  --lex-chat-artifact-draft:   var(--lex-color-info-700);
+  --lex-chat-artifact-success: var(--lex-color-success-700);
+  --lex-chat-artifact-error:   var(--lex-color-danger-700);
+
   /* ── Context Menu ─────────────────────────────────────────── */
   --lex-chat-menu-bg:        var(--lex-chat-bg-elevated);
   --lex-chat-menu-border:    var(--lex-chat-border);
@@ -160,6 +164,97 @@
   /* ── Progress Metric Header ─────────────────────────────── */
   --lex-chat-progress-header: var(--lex-chat-text-muted);
   --lex-chat-progress-value-size: 1.5rem;
+}
+
+/* ── Generated artifact persistence and promotion ─────────────────────── */
+
+.lex-chat-artifact-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--lex-space-3, 12px);
+  width: min(100%, 560px);
+  padding: var(--lex-space-3, 12px);
+  border: 1px solid var(--lex-chat-artifact-border);
+  border-radius: var(--lex-radius-lg, 8px);
+  background: var(--lex-chat-bg-surface);
+}
+
+.lex-chat-artifact-card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.lex-chat-artifact-card-title {
+  overflow: hidden;
+  color: var(--lex-chat-text);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  font-weight: var(--lex-weight-semibold, 600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lex-chat-artifact-persistence {
+  display: flex;
+  align-items: center;
+  gap: var(--lex-space-1, 4px);
+  margin-top: var(--lex-space-1, 4px);
+  color: var(--lex-chat-text-dim);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+}
+
+.lex-chat-artifact-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: var(--lex-radius-full, 9999px);
+  background: currentColor;
+}
+
+.lex-chat-artifact-persistence--draft {
+  color: var(--lex-chat-artifact-draft);
+}
+
+.lex-chat-artifact-persistence--success {
+  color: var(--lex-chat-artifact-success);
+}
+
+.lex-chat-artifact-persistence--error {
+  color: var(--lex-chat-artifact-error);
+}
+
+.lex-chat-artifact-persistence--pending .lex-chat-artifact-status-dot {
+  animation: lex-chat-artifact-pulse 1s ease-in-out infinite;
+}
+
+.lex-chat-artifact-card-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.lex-chat-artifact-type {
+  position: absolute;
+  top: -8px;
+  left: var(--lex-space-3, 12px);
+  padding: 1px var(--lex-space-1, 4px);
+  color: var(--lex-chat-text-dim);
+  background: var(--lex-chat-bg-surface);
+  font-family: var(--lex-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@keyframes lex-chat-artifact-pulse {
+  50% { opacity: 0.35; }
+}
+
+@media (max-width: 620px) {
+  .lex-chat-artifact-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 

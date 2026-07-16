@@ -9,6 +9,7 @@
   'use strict';
 
   const { LexElement, defineLex, ChatFormat } = global.Lex;
+  const ArtifactPromotion = global.Lex.Chat && global.Lex.Chat.ArtifactPromotion;
   if (!LexElement) { console.error('[lex-chat-message] LexElement not loaded'); return; }
 
   // ---------------------------------------------------------------------------
@@ -370,6 +371,34 @@
         });
       });
 
+      this.delegate('click', '.lex-chat-artifact-promote', (e, target) => {
+        var artifactId = target.dataset.artifactId || '';
+        var artifact = this._findArtifact(artifactId);
+        var action = ArtifactPromotion && ArtifactPromotion.getSaveToDocumentsAction(artifact);
+        if (!artifact || !action) return;
+
+        this.emit('lex-artifact-promote', {
+          artifact: artifact,
+          artifactId: artifactId,
+          action: action,
+          messageElement: this
+        });
+      });
+
+      this.delegate('click', '.lex-chat-artifact-open-document', (e, target) => {
+        this.emit('lex-artifact-click', {
+          artifactType: 'download',
+          entityId: target.dataset.documentId || '',
+          entityType: 'document'
+        });
+      });
+
+      // History messages arrive already finalized, so their artifact cards
+      // are rendered during updated() rather than via finalize().
+      if (!this.streaming && this.artifacts && this.artifacts.length > 0) {
+        this._renderArtifactsSection(this.artifacts);
+      }
+
       // Bind mermaid copy buttons
       this.delegate('click', '[data-mermaid-copy]', (e, target) => {
         const wrapper = target.closest('.lex-mermaid-wrapper');
@@ -569,13 +598,129 @@
       const body = this.querySelector('.lex-chat-msg-agent-body');
       if (!body || body.querySelector('.lex-chat-artifacts-section')) return;
 
-      const buttons = artifacts.map(a => {
+      const items = artifacts.map(a => {
+        const persistence = ArtifactPromotion && ArtifactPromotion.getPersistenceView(a);
+        const promotionAction = ArtifactPromotion && ArtifactPromotion.getSaveToDocumentsAction(a);
+        if (persistence || promotionAction) {
+          return this._renderPersistedArtifactCard(a, persistence, promotionAction);
+        }
+
         const type = a.entity_type || a.artifact_type || a.type || 'item';
         const label = a.label || a.name || a.title || type;
         return `<button class="lex-chat-artifact-btn" data-artifact-type="${ChatFormat.escapeHtml(type)}" data-entity-id="${ChatFormat.escapeHtml(a.entity_id || a.id || '')}" data-entity-type="${ChatFormat.escapeHtml(type)}">${ChatFormat.escapeHtml(label)}</button>`;
       }).join('');
 
-      body.insertAdjacentHTML('beforeend', `<div class="lex-chat-artifacts-section">${buttons}</div>`);
+      body.insertAdjacentHTML('beforeend', `<div class="lex-chat-artifacts-section">${items}</div>`);
+    }
+
+    _renderPersistedArtifactCard(artifact, persistence, action) {
+      const artifactId = ArtifactPromotion ? ArtifactPromotion.getArtifactId(artifact) : '';
+      const type = artifact.artifact_type || artifact.type || 'document';
+      const label = artifact.artifact_name || artifact.label || artifact.name || artifact.title || 'Generated document';
+      const status = persistence || {
+        status: 'unknown',
+        tone: 'neutral',
+        message: 'The server did not report whether this draft was saved.'
+      };
+      const canonicalDocument = artifact.document || artifact.canonical_document || null;
+      const canPromote = status.status === 'saved_as_draft' && action && artifactId;
+      let actionButton = canPromote
+        ? `<lex-btn class="lex-chat-artifact-promote" data-artifact-id="${ChatFormat.escapeHtml(artifactId)}" variant="secondary" size="sm">Save to Documents</lex-btn>`
+        : '';
+      if (!actionButton && status.status === 'promoted' && canonicalDocument && canonicalDocument.id) {
+        actionButton = `<lex-btn class="lex-chat-artifact-open-document" data-document-id="${ChatFormat.escapeHtml(canonicalDocument.id)}" variant="secondary" size="sm">Open Document</lex-btn>`;
+      }
+
+      return `
+        <div class="lex-chat-artifact-card" data-artifact-id="${ChatFormat.escapeHtml(artifactId)}">
+          <div class="lex-chat-artifact-card-main">
+            <div class="lex-chat-artifact-card-title">${ChatFormat.escapeHtml(label)}</div>
+            <div class="lex-chat-artifact-persistence lex-chat-artifact-persistence--${ChatFormat.escapeHtml(status.tone)}" data-artifact-persistence role="status" aria-live="polite">
+              <span class="lex-chat-artifact-status-dot" aria-hidden="true"></span>
+              <span data-artifact-status-message>${ChatFormat.escapeHtml(status.message)}</span>
+            </div>
+          </div>
+          <div class="lex-chat-artifact-card-actions" data-artifact-actions>
+            ${actionButton}
+          </div>
+          <span class="lex-chat-artifact-type">${ChatFormat.escapeHtml(type)}</span>
+        </div>`;
+    }
+
+    _findArtifact(artifactId) {
+      var artifacts = this.artifacts || [];
+      for (var i = 0; i < artifacts.length; i += 1) {
+        var currentId = ArtifactPromotion
+          ? ArtifactPromotion.getArtifactId(artifacts[i])
+          : (artifacts[i].artifact_id || artifacts[i].id || '');
+        if (String(currentId) === String(artifactId)) return artifacts[i];
+      }
+      return null;
+    }
+
+    _findArtifactCard(artifactId) {
+      var cards = this.querySelectorAll('.lex-chat-artifact-card');
+      for (var i = 0; i < cards.length; i += 1) {
+        if (String(cards[i].dataset.artifactId || '') === String(artifactId || '')) return cards[i];
+      }
+      return null;
+    }
+
+    updateArtifactPromotion(artifactId, update) {
+      var card = this._findArtifactCard(artifactId);
+      if (!card || !update) return;
+
+      var statusEl = card.querySelector('[data-artifact-persistence]');
+      var messageEl = card.querySelector('[data-artifact-status-message]');
+      var promoteButton = card.querySelector('.lex-chat-artifact-promote');
+      var actionsEl = card.querySelector('[data-artifact-actions]');
+
+      if (messageEl) messageEl.textContent = update.message || '';
+      if (statusEl) {
+        statusEl.classList.remove(
+          'lex-chat-artifact-persistence--draft',
+          'lex-chat-artifact-persistence--success',
+          'lex-chat-artifact-persistence--error',
+          'lex-chat-artifact-persistence--neutral',
+          'lex-chat-artifact-persistence--pending'
+        );
+        statusEl.classList.add('lex-chat-artifact-persistence--' + (update.tone || 'neutral'));
+      }
+
+      if (promoteButton) {
+        promoteButton.loading = update.tone === 'pending';
+        promoteButton.disabled = update.tone === 'pending';
+      }
+
+      if (update.tone === 'success' && actionsEl) {
+        var artifact = this._findArtifact(artifactId);
+        if (artifact) {
+          artifact.persistence = {
+            status: 'promoted',
+            message: update.message || 'Saved to Documents.'
+          };
+          artifact.document = update.document || null;
+          artifact.actions = (artifact.actions || []).filter(function (action) {
+            return !action || action.id !== 'save_to_documents';
+          });
+        }
+
+        actionsEl.innerHTML = '';
+        if (update.document && update.document.id) {
+          var openButton = document.createElement('lex-btn');
+          openButton.className = 'lex-chat-artifact-open-document';
+          openButton.dataset.documentId = update.document.id;
+          openButton.variant = 'secondary';
+          openButton.size = 'sm';
+          openButton.textContent = 'Open Document';
+          actionsEl.appendChild(openButton);
+        }
+      }
+
+      if (update.tone === 'error' && promoteButton) {
+        promoteButton.loading = false;
+        promoteButton.disabled = false;
+      }
     }
 
     /**
