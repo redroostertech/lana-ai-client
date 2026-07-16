@@ -55,6 +55,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSavedServer: () => ipcRenderer.invoke('get-saved-server'),
   clearSavedServer: () => ipcRenderer.invoke('clear-saved-server'),
 
+  /** Discovery-entitled native/background capabilities. */
+  capabilities: {
+    list: () => ipcRenderer.invoke('capabilities:list'),
+    setActive: (id, active) => ipcRenderer.invoke('capabilities:set-active', { id, active })
+  },
+
   /**
    * Updates
    */

@@ -56,6 +56,11 @@ describe('screen voice contracts and safety helpers', () => {
     expect(parseSettings({ screenContextEnabled: false })).toEqual({ ...DEFAULT_SETTINGS, screenContextEnabled: false });
   });
 
+  test('migrates the Electron-incompatible legacy agent accelerator', () => {
+    expect(parseSettings({ agentShortcut: 'CommandOrControl+Shift+Period' }).agentShortcut)
+      .toBe('CommandOrControl+Shift+A');
+  });
+
   test('removes all content from password fields', () => {
     const value = sanitizeContext(context({ selectedText: 'secret', surroundingText: 'private',
       accessibleDocumentText: 'document', focusedElement: { ...context().focusedElement,

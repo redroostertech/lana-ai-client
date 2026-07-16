@@ -1,6 +1,8 @@
 'use strict';
 
 const {
+  capabilityViewModels,
+  isCapabilityActive,
   isCapabilityEnabled,
   isScreenDictionEnabled
 } = require('../../src/screen-voice/app-entitlement');
@@ -31,5 +33,22 @@ describe('screen voice discovery entitlement', () => {
     const macOnly = { ...capability, route: { type: 'capability', meta: { platforms: ['darwin'] } } };
     expect(isCapabilityEnabled(serverWith(macOnly), 'screen-diction', 'darwin')).toBe(true);
     expect(isCapabilityEnabled(serverWith(macOnly), 'screen-diction', 'win32')).toBe(false);
+  });
+
+  test('uses a local preference without weakening the discovery entitlement', () => {
+    const server = serverWith(capability);
+    expect(isCapabilityActive(server, 'screen-diction', {}, 'darwin')).toBe(true);
+    expect(isCapabilityActive(server, 'screen-diction', { 'screen-diction': false }, 'darwin')).toBe(false);
+    expect(isCapabilityActive({ enabledApps: [] }, 'screen-diction', { 'screen-diction': true }, 'darwin')).toBe(false);
+  });
+
+  test('required capabilities stay active and default_enabled can opt in later', () => {
+    const required = { ...capability, route: { type: 'capability', meta: { required: true } } };
+    const defaultOff = { ...capability, route: { type: 'capability', meta: { default_enabled: false } } };
+    expect(isCapabilityActive(serverWith(required), 'screen-diction', { 'screen-diction': false }, 'darwin')).toBe(true);
+    expect(isCapabilityActive(serverWith(defaultOff), 'screen-diction', {}, 'darwin')).toBe(false);
+    expect(capabilityViewModels(serverWith(required), {}, 'darwin')[0]).toMatchObject({
+      id: 'screen-diction', required: true, active: true, available: true
+    });
   });
 });

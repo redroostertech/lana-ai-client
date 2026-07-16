@@ -46,7 +46,12 @@ const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
 const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
-const { isScreenDictionEnabled } = require('./src/screen-voice/app-entitlement');
+const {
+  SCREEN_DICTION_APP_ID,
+  capabilityItems,
+  capabilityViewModels,
+  isCapabilityActive
+} = require('./src/screen-voice/app-entitlement');
 
 /**
  * Brainchild MCP bridge — reads the user's local vault over the MCP stdio
@@ -191,9 +196,54 @@ function getAppVersion() {
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
 let screenVoice = null;
+let capabilityPreferencesStore = null;
+
+function getCapabilityPreferencesStore() {
+  if (!capabilityPreferencesStore) {
+    capabilityPreferencesStore = new Store({
+      name: 'capability-preferences',
+      defaults: { organizations: {} }
+    });
+  }
+  return capabilityPreferencesStore;
+}
+
+function capabilityPreferenceScope(server) {
+  const identity = server?.orgId || server?.url || 'unscoped';
+  return encodeURIComponent(String(identity).slice(0, 500));
+}
+
+function getCapabilityPreferences(server = getSavedServer()) {
+  if (!server) return {};
+  const organizations = getCapabilityPreferencesStore().get('organizations', {});
+  const preferences = organizations && organizations[capabilityPreferenceScope(server)];
+  return preferences && typeof preferences === 'object' && !Array.isArray(preferences) ? preferences : {};
+}
+
+function setCapabilityPreference(server, capabilityId, active) {
+  const store = getCapabilityPreferencesStore();
+  const organizations = store.get('organizations', {});
+  const scope = capabilityPreferenceScope(server);
+  const existing = organizations[scope] && typeof organizations[scope] === 'object'
+    ? organizations[scope]
+    : {};
+  store.set('organizations', {
+    ...organizations,
+    [scope]: { ...existing, [capabilityId]: Boolean(active) }
+  });
+}
+
+function currentCapabilityViewModels(server = getSavedServer()) {
+  return capabilityViewModels(server, getCapabilityPreferences(server), process.platform);
+}
 
 function syncScreenVoiceEntitlement(server = getSavedServer()) {
-  const enabled = isScreenDictionEnabled(server, process.platform);
+  const enabled = isCapabilityActive(
+    server,
+    SCREEN_DICTION_APP_ID,
+    getCapabilityPreferences(server),
+    process.platform
+  );
   if (screenVoice) screenVoice.setEntitlementEnabled(enabled);
   return enabled;
 }
@@ -771,6 +821,49 @@ ipcMain.handle('get-saved-server', async () => {
   } catch (error) {
     logError('IPC: get-saved-server failed', error);
     return { success: false, error: error.message };
+  }
+});
+
+// Capabilities are organization entitlements supplied by discovery. Users may
+// activate/deactivate optional capabilities on this device, but cannot create
+// an entitlement or disable a capability marked required by the server.
+ipcMain.handle('capabilities:list', async () => {
+  try {
+    return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels() };
+  } catch (error) {
+    logError('[Capabilities] Failed to list capabilities', error);
+    return { success: false, error: 'Capabilities could not be loaded.' };
+  }
+});
+
+ipcMain.handle('capabilities:set-active', async (_event, payload) => {
+  try {
+    const server = getSavedServer();
+    const id = typeof payload?.id === 'string' ? payload.id.trim().slice(0, 120) : '';
+    const active = payload?.active;
+    if (!server || !id || !/^[a-z0-9][a-z0-9-]{0,119}$/.test(id) || typeof active !== 'boolean') {
+      return { success: false, error: 'Invalid capability setting.' };
+    }
+
+    const entitled = capabilityItems(server).find((item) => (
+      String(item.id || item.app_id || item.slug || item.key || '').trim() === id
+    ));
+    if (!entitled) return { success: false, error: 'This capability is not enabled for your organization.' };
+    if (entitled.route?.meta?.required === true && active === false) {
+      return { success: false, error: 'This capability is required by your organization.' };
+    }
+
+    const view = currentCapabilityViewModels(server).find((item) => item.id === id);
+    if (!view?.available && active) {
+      return { success: false, error: 'This capability is not available on this platform.' };
+    }
+
+    setCapabilityPreference(server, id, active);
+    syncScreenVoiceEntitlement(server);
+    return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels(server) };
+  } catch (error) {
+    logError('[Capabilities] Failed to update capability', error);
+    return { success: false, error: 'The capability setting could not be saved.' };
   }
 });
 
@@ -1502,7 +1595,12 @@ app.whenReady().then(async () => {
         rootDir: __dirname,
         getMainWindow: () => mainWindow,
         getSavedServer: () => getSavedServer(),
-        entitlementEnabled: isScreenDictionEnabled(getSavedServer(), process.platform),
+        entitlementEnabled: isCapabilityActive(
+          getSavedServer(),
+          SCREEN_DICTION_APP_ID,
+          getCapabilityPreferences(getSavedServer()),
+          process.platform
+        ),
         logInfo,
         logError
       });

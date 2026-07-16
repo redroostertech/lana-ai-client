@@ -51,6 +51,9 @@ class ElectronScreenVoice {
     this.adapter = options.adapter || createDesktopAdapter({ clipboard, rootDir: this.rootDir });
     this.settingsStore = options.settingsStore || new Store({ name: 'screen-voice-settings', defaults: DEFAULT_SETTINGS });
     this.settings = parseSettings(this.settingsStore.store);
+    if (this.settingsStore.store.agentShortcut !== this.settings.agentShortcut) {
+      this.settingsStore.set('agentShortcut', this.settings.agentShortcut);
+    }
     this.api = options.api || new VoiceApiClient({
       getServerUrl: async () => this.getSavedServer()?.url || null,
       getToken: async () => this.getAuthToken()
@@ -168,8 +171,8 @@ class ElectronScreenVoice {
     } else {
       this.send('screen-voice:stop-capture', { discard: true });
       this.controller.cancel('capability_disabled');
-      globalShortcut.unregister(this.settings.dictationShortcut);
-      globalShortcut.unregister(this.settings.agentShortcut);
+      this.unregisterShortcut(this.settings.dictationShortcut);
+      this.unregisterShortcut(this.settings.agentShortcut);
       if (this.overlay && !this.overlay.isDestroyed()) this.overlay.destroy();
       this.overlay = null;
       this.logInfo('[ScreenVoice] Capability disabled by discovery');
@@ -178,16 +181,30 @@ class ElectronScreenVoice {
   }
 
   registerShortcuts() {
-    globalShortcut.unregister(this.settings.dictationShortcut);
-    globalShortcut.unregister(this.settings.agentShortcut);
+    this.unregisterShortcut(this.settings.dictationShortcut);
+    this.unregisterShortcut(this.settings.agentShortcut);
     if (!this.entitlementEnabled || !this.settings.enabled) return;
     const register = (shortcut, mode) => {
-      if (!globalShortcut.register(shortcut, () => this.toggle(mode, 'global_shortcut'))) {
-        this.logError(`[ScreenVoice] Shortcut unavailable: ${mode}`);
+      try {
+        if (!globalShortcut.register(shortcut, () => this.toggle(mode, 'global_shortcut'))) {
+          this.logError(`[ScreenVoice] Shortcut unavailable: ${mode}`);
+          return false;
+        }
+        return true;
+      } catch (_) {
+        // A bad persisted accelerator must never prevent the other mode from
+        // registering or abort discovery/settings IPC.
+        this.logError(`[ScreenVoice] Shortcut could not be registered: ${mode}`);
+        return false;
       }
     };
     register(this.settings.dictationShortcut, 'dictation');
     register(this.settings.agentShortcut, 'agent');
+  }
+
+  unregisterShortcut(shortcut) {
+    try { globalShortcut.unregister(shortcut); }
+    catch (_) { this.logError('[ScreenVoice] Invalid persisted shortcut was ignored'); }
   }
 
   async microphonePermission(request = false) {
@@ -354,8 +371,8 @@ class ElectronScreenVoice {
 
   shutdown() {
     this.controller.cancel('app_quit');
-    globalShortcut.unregister(this.settings.dictationShortcut);
-    globalShortcut.unregister(this.settings.agentShortcut);
+    this.unregisterShortcut(this.settings.dictationShortcut);
+    this.unregisterShortcut(this.settings.agentShortcut);
     if (this.overlay && !this.overlay.isDestroyed()) this.overlay.destroy();
   }
 }

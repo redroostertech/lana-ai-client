@@ -5,6 +5,7 @@ const { z } = require('zod');
 const MAX_INSTRUCTION_CHARS = 4000;
 const MAX_CONTEXT_CHARS = 12000;
 const MAX_ACTION_TEXT_CHARS = 24000;
+const LEGACY_AGENT_SHORTCUT = 'CommandOrControl+Shift+Period';
 
 const boundsSchema = z.object({
   x: z.number().finite(),
@@ -110,7 +111,7 @@ const voiceSettingsSchema = z.object({
 const DEFAULT_SETTINGS = Object.freeze({
   enabled: true,
   dictationShortcut: 'CommandOrControl+Shift+Space',
-  agentShortcut: 'CommandOrControl+Shift+Period',
+  agentShortcut: 'CommandOrControl+Shift+A',
   defaultMode: 'dictation',
   screenContextEnabled: true,
   voiceOutputEnabled: false,
@@ -123,13 +124,21 @@ function parseAgentDecision(value) {
 }
 
 function parseSettings(value) {
-  return voiceSettingsSchema.parse({ ...DEFAULT_SETTINGS, ...(value || {}) });
+  const migrated = { ...DEFAULT_SETTINGS, ...(value || {}) };
+  // Electron accelerator syntax accepts letter keys consistently across the
+  // supported packaged targets. Older builds persisted the word "Period",
+  // which Electron 32 rejects during native argument conversion.
+  if (migrated.agentShortcut === LEGACY_AGENT_SHORTCUT) {
+    migrated.agentShortcut = DEFAULT_SETTINGS.agentShortcut;
+  }
+  return voiceSettingsSchema.parse(migrated);
 }
 
 module.exports = {
   MAX_INSTRUCTION_CHARS,
   MAX_CONTEXT_CHARS,
   MAX_ACTION_TEXT_CHARS,
+  LEGACY_AGENT_SHORTCUT,
   DEFAULT_SETTINGS,
   actionTypes,
   targetFingerprintSchema,

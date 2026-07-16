@@ -73,7 +73,7 @@ If access is denied, the overlay shows an actionable error and performs no mutat
 ## Interaction and confirmation
 
 - Dictation shortcut: `CommandOrControl+Shift+Space`.
-- Agent shortcut: `CommandOrControl+Shift+Period`.
+- Agent shortcut: `CommandOrControl+Shift+A`.
 - The global shortcuts toggle capture because Electron does not expose a reliable global key-up event. The overlay microphone provides explicit start/stop. A native key-up monitor is intentionally not installed in this release.
 - Escape cancels and discards active audio.
 - Literal dictation into a verified editable field inserts without confirmation.

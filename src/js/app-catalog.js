@@ -174,6 +174,39 @@
   // capabilities. Capability entries are intentionally preserved in storage
   // but never returned by normalizeApp()/normalizeAppList(), so they cannot
   // accidentally become sidebar routes.
+  function boundedText(value, maxLength) {
+    return typeof value === 'string' ? value.slice(0, maxLength) : '';
+  }
+
+  // Hints are display-only discovery content. Keep the contract deliberately
+  // small so a malformed control-plane payload cannot create an unbounded
+  // settings page. Supported values are strings, arrays of strings, or one
+  // nested dictionary of strings.
+  function normalizeCapabilityHints(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    var result = {};
+    Object.keys(value).slice(0, 20).forEach(function (rawKey) {
+      var key = boundedText(rawKey, 80);
+      var hint = value[rawKey];
+      if (!key) return;
+      if (typeof hint === 'string') {
+        result[key] = boundedText(hint, 500);
+      } else if (Array.isArray(hint)) {
+        result[key] = hint.filter(function (item) { return typeof item === 'string'; })
+          .slice(0, 10).map(function (item) { return boundedText(item, 500); });
+      } else if (hint && typeof hint === 'object') {
+        var group = {};
+        Object.keys(hint).slice(0, 10).forEach(function (rawGroupKey) {
+          if (typeof hint[rawGroupKey] !== 'string') return;
+          var groupKey = boundedText(rawGroupKey, 80);
+          if (groupKey) group[groupKey] = boundedText(hint[rawGroupKey], 500);
+        });
+        if (Object.keys(group).length) result[key] = group;
+      }
+    });
+    return result;
+  }
+
   function normalizeCapability(item) {
     if (!item || typeof item !== 'object' || !item.route || typeof item.route !== 'object') return null;
     if (item.route.type !== 'capability') return null;
@@ -188,6 +221,13 @@
         })
       : [];
 
+    var meta = Object.assign({}, rawMeta, { platforms: platforms });
+    if (Object.prototype.hasOwnProperty.call(rawMeta, 'hints')) {
+      meta.hints = normalizeCapabilityHints(rawMeta.hints);
+    }
+    if (typeof rawMeta.required !== 'boolean') delete meta.required;
+    if (typeof rawMeta.default_enabled !== 'boolean') delete meta.default_enabled;
+
     return {
       id: id,
       label: item.label,
@@ -195,7 +235,7 @@
       colors: Array.isArray(item.colors) ? item.colors : [],
       route: {
         type: 'capability',
-        meta: Object.assign({}, rawMeta, { platforms: platforms })
+        meta: meta
       }
     };
   }
@@ -258,6 +298,7 @@
     normalizeApp: normalizeApp,
     normalizeAppList: normalizeAppList,
     normalizeCapability: normalizeCapability,
+    normalizeCapabilityHints: normalizeCapabilityHints,
     normalizeEnabledApp: normalizeEnabledApp,
     normalizeEnabledAppList: normalizeEnabledAppList,
     defaultApps: defaultApps

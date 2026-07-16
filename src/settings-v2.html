@@ -63,6 +63,11 @@
           <span class="sv2-nav-icon" data-icon="wand-2" aria-hidden="true"></span>
           <span class="sv2-nav-label">Personalization</span>
         </button>
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-capabilities"
+          data-section="capabilities" aria-controls="sv2-panel-capabilities" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="puzzle" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Capabilities</span>
+        </button>
         <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-billing"
           data-section="billing" aria-controls="sv2-panel-billing" aria-selected="false" tabindex="-1">
           <span class="sv2-nav-icon" data-icon="sparkles" aria-hidden="true"></span>
@@ -206,6 +211,20 @@
 
 
       </div><!-- /sv2-panel-personalization -->
+
+      <!-- ╔════════════════════ CAPABILITIES PANEL ════════════════════╗ -->
+      <div class="sv2-panel" id="sv2-panel-capabilities" role="tabpanel"
+        aria-labelledby="sv2-tab-capabilities" data-section="capabilities">
+        <section id="sv2-section-capabilities" style="margin-bottom:0.5rem" aria-busy="true">
+          <lex-card heading="Capabilities" subtitle="Features connected to your organization">
+            <p class="sv2-capabilities-intro">
+              Choose which optional capabilities are active on this device. Required capabilities are managed by your organization.
+            </p>
+            <div id="sv2-capabilities-list" class="sv2-capabilities-list" aria-live="polite"></div>
+            <p id="sv2-capabilities-status" class="sv2-capabilities-status" role="status">Loading capabilities...</p>
+          </lex-card>
+        </section>
+      </div><!-- /sv2-panel-capabilities -->
 
       <!-- ╔═══════════════════════ GENERAL PANEL ═══════════════════════╗
            App and account settings: time zone, password + MFA, preferences,
@@ -553,6 +572,7 @@
   <script src="js/pages/settings-billing.js"></script>
   <script src="js/pages/settings-personalization.js"></script>
   <script src="js/pages/settings-usage.js"></script>
+  <script src="js/pages/settings-capabilities.js"></script>
   <script src="js/pages/settings-v2-nav.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

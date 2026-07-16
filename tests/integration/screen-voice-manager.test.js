@@ -111,4 +111,18 @@ describe('Electron screen voice orchestration', () => {
     expect(globalShortcut.unregister).toHaveBeenCalled();
     expect(testOverlay.destroy).toHaveBeenCalled();
   });
+
+  test('one invalid accelerator cannot prevent the other shortcut or overlay', () => {
+    globalShortcut.register.mockImplementation((shortcut) => {
+      if (shortcut === 'CommandOrControl+Shift+A') throw new TypeError('conversion failure');
+      return true;
+    });
+    const manager = managerWith({ api: {}, adapter: {} });
+    const testOverlay = manager.overlay;
+    expect(() => manager.setEntitlementEnabled(true)).not.toThrow();
+    expect(globalShortcut.register).toHaveBeenCalledWith(
+      'CommandOrControl+Shift+Space', expect.any(Function)
+    );
+    expect(testOverlay.showInactive).toHaveBeenCalled();
+  });
 });

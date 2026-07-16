@@ -266,4 +266,26 @@ describe('capability entries', () => {
     expect(normalized.route.meta.platforms).toEqual(['darwin']);
     expect(Apps.normalizeEnabledAppList([{ ...screenDiction, route: { type: 'background', meta: {} } }])).toEqual([]);
   });
+
+  test('preserves activation policy and bounds display-only hint dictionaries', () => {
+    const normalized = Apps.normalizeCapability({
+      ...screenDiction,
+      route: { type: 'capability', meta: {
+        platforms: ['darwin'],
+        required: true,
+        default_enabled: false,
+        hints: {
+          'Getting started': ['Place the cursor in a field.', 'Press the shortcut.', 42],
+          Shortcuts: { Dictation: 'Command+Shift+Space', Bad: { nested: 'not allowed' } },
+          Ignored: 42
+        }
+      } }
+    });
+    expect(normalized.route.meta.required).toBe(true);
+    expect(normalized.route.meta.default_enabled).toBe(false);
+    expect(normalized.route.meta.hints).toEqual({
+      'Getting started': ['Place the cursor in a field.', 'Press the shortcut.'],
+      Shortcuts: { Dictation: 'Command+Shift+Space' }
+    });
+  });
 });
