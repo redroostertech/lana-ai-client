@@ -54,6 +54,8 @@
         'js/lex/chat/lex-chat.format.js',
         'js/lex/chat/lex-chat.source.js',
         'js/lex/chat/lex-chat.source-llama.js',
+        'js/lex/chat/lex-chat-artifact-promotion.js',
+        'js/lex/chat/lex-chat-progress-events.js',
         'js/lex/chat/lex-chat.message.js',
         'js/lex/chat/lex-chat.activity.js',
         'js/lex/chat/lex-chat.documents.js',
