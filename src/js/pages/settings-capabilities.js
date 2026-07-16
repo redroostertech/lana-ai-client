@@ -78,8 +78,8 @@
     copy.appendChild(element('span', 'sv2-capability-name', capability.label || capability.id));
     if (capability.description) copy.appendChild(element('span', 'sv2-capability-description', capability.description));
     copy.appendChild(element('span', 'sv2-capability-availability', availabilityText(capability)));
-    expand.appendChild(chevron);
     expand.appendChild(copy);
+    expand.appendChild(chevron);
 
     var selectWrap = element('div', 'sv2-capability-select-wrap');
     var selectId = 'sv2-capability-' + String(capability.id).replace(/[^a-zA-Z0-9_-]/g, '-');

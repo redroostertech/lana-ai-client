@@ -642,6 +642,7 @@
 }
 
 .sv2-capability-chevron {
+  margin-left: auto;
   width: 9px;
   height: 9px;
   flex: 0 0 9px;
