@@ -373,6 +373,7 @@ describe('Electron screen voice orchestration', () => {
     manager.controller.start('agent');
     manager.realtimeActive = true;
     const ids = Array.from({ length: 6 }, (_, index) => `10000000-0000-4000-8000-00000000000${index + 1}`);
+    manager.realtimeConversationId = ids[2];
     const proposalId = ids[0];
     await manager.handleRealtimeEvent({
       protocol_version: 'desktop-voice.v1', event_id: ids[1], event_type: 'desktop.action.proposed',
@@ -394,6 +395,41 @@ describe('Electron screen voice orchestration', () => {
     expect(sent).toContainEqual(['screen-voice:realtime-send', expect.objectContaining({
       type: 'desktop.action.result',
       result: expect.objectContaining({ proposal_id: proposalId, status: 'succeeded' })
+    })]);
+  });
+
+  test('a proposal that expires while awaiting confirmation is rejected without mutation', async () => {
+    const adapter = { replaceSelection: jest.fn(async () => ({ ok: true })) };
+    const manager = managerWith({ api: {}, adapter, notifyUser: jest.fn() });
+    manager.controller.start('agent');
+    manager.realtimeActive = true;
+    const ids = Array.from({ length: 6 }, (_, index) => `15000000-0000-4000-8000-00000000000${index + 1}`);
+    const now = Date.now();
+    manager.realtimeConversationId = ids[2];
+    await manager.handleRealtimeEvent({
+      protocol_version: 'desktop-voice.v1', event_id: ids[1], event_type: 'desktop.action.proposed',
+      sequence: 1, timestamp: new Date(now).toISOString(), conversation_id: ids[2],
+      voice_session_id: ids[3], turn_id: ids[4], run_id: ids[5],
+      payload: {
+        proposal_id: ids[0], action_type: 'replace_selection', payload: { text: 'Expired text' },
+        summary: 'Replace the selected paragraph', target_fingerprint: fingerprint, context_snapshot_id: null,
+        created_at: new Date(now).toISOString(), expires_at: new Date(now + 5000).toISOString(),
+        confirmation_class: 'always', idempotency_key: 'expire-once', conversation_id: ids[2],
+        voice_session_id: ids[3], turn_id: ids[4], run_id: ids[5]
+      }
+    });
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now + 6000);
+    try {
+      await manager.confirm(manager.controller.session.id);
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    expect(adapter.replaceSelection).not.toHaveBeenCalled();
+    expect(manager.pendingProposal).toBeNull();
+    expect(sent).toContainEqual(['screen-voice:realtime-send', expect.objectContaining({
+      type: 'desktop.action.result',
+      result: expect.objectContaining({ proposal_id: ids[0], status: 'stale_target', error_code: 'PROPOSAL_EXPIRED' })
     })]);
   });
 
@@ -421,6 +457,7 @@ describe('Electron screen voice orchestration', () => {
     const first = managerWith({ api: {}, adapter, settingsStore });
     first.controller.start('agent');
     first.realtimeActive = true;
+    first.realtimeConversationId = ids[2];
     await first.handleRealtimeEvent(event);
     await first.confirm(first.controller.session.id);
 
@@ -433,6 +470,75 @@ describe('Electron screen voice orchestration', () => {
     expect(sent).toContainEqual(['screen-voice:realtime-send', expect.objectContaining({
       result: expect.objectContaining({ proposal_id: ids[0], status: 'succeeded', result: { executed: false, duplicate: true } })
     })]);
+  });
+
+  test('rejects events and proposal payloads outside the active durable conversation scope', async () => {
+    const manager = managerWith({ api: {}, adapter: {} });
+    manager.controller.start('agent');
+    manager.realtimeConversationId = '40000000-0000-4000-8000-000000000001';
+    const event = {
+      protocol_version: 'desktop-voice.v1', event_id: '40000000-0000-4000-8000-000000000002',
+      event_type: 'run.status', sequence: 1, timestamp: new Date().toISOString(),
+      conversation_id: '40000000-0000-4000-8000-000000000003',
+      voice_session_id: '40000000-0000-4000-8000-000000000004', turn_id: null, run_id: null,
+      payload: { status: 'connected' }
+    };
+
+    await expect(manager.handleRealtimeEvent(event))
+      .rejects.toMatchObject({ code: 'REALTIME_CONVERSATION_MISMATCH' });
+    expect(manager.realtimeLastSequence).toBe(0);
+  });
+
+  test('rejecting a pending desktop proposal reports the decision without ending the conversation', async () => {
+    const manager = managerWith({ api: {}, adapter: {} });
+    manager.controller.start('agent');
+    manager.realtimeActive = true;
+    const ids = Array.from({ length: 6 }, (_, index) => `50000000-0000-4000-8000-00000000000${index + 1}`);
+    manager.realtimeConversationId = ids[2];
+    await manager.handleRealtimeEvent({
+      protocol_version: 'desktop-voice.v1', event_id: ids[1], event_type: 'desktop.action.proposed',
+      sequence: 1, timestamp: new Date().toISOString(), conversation_id: ids[2],
+      voice_session_id: ids[3], turn_id: ids[4], run_id: ids[5],
+      payload: {
+        proposal_id: ids[0], action_type: 'insert_text', payload: { text: 'Do not insert' },
+        summary: 'Insert text', target_fingerprint: fingerprint, context_snapshot_id: null,
+        created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 60000).toISOString(),
+        confirmation_class: 'client_policy', idempotency_key: 'reject-once',
+        conversation_id: ids[2], voice_session_id: ids[3], turn_id: ids[4], run_id: ids[5]
+      }
+    });
+
+    expect(manager.cancel()).toEqual({ ok: true, proposal: true });
+    expect(manager.realtimeActive).toBe(true);
+    expect(manager.controller.state).toBe('listening');
+    expect(sent).toContainEqual(['screen-voice:realtime-send', expect.objectContaining({
+      result: expect.objectContaining({
+        proposal_id: ids[0], status: 'rejected', idempotency_key: 'reject-once:result'
+      })
+    })]);
+  });
+
+  test('does not advance the replay cursor when proposal correlation validation fails', async () => {
+    const manager = managerWith({ api: {}, adapter: {} });
+    manager.controller.start('agent');
+    const ids = Array.from({ length: 7 }, (_, index) => `60000000-0000-4000-8000-00000000000${index + 1}`);
+    manager.realtimeConversationId = ids[2];
+    const event = {
+      protocol_version: 'desktop-voice.v1', event_id: ids[1], event_type: 'desktop.action.proposed',
+      sequence: 1, timestamp: new Date().toISOString(), conversation_id: ids[2],
+      voice_session_id: ids[3], turn_id: ids[4], run_id: ids[5],
+      payload: {
+        proposal_id: ids[0], action_type: 'insert_text', payload: { text: 'Unsafe mismatch' },
+        summary: 'Insert text', target_fingerprint: fingerprint, context_snapshot_id: null,
+        created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 60000).toISOString(),
+        confirmation_class: 'always', idempotency_key: 'mismatch', conversation_id: ids[2],
+        voice_session_id: ids[3], turn_id: ids[4], run_id: ids[6]
+      }
+    };
+
+    await expect(manager.handleRealtimeEvent(event)).rejects.toMatchObject({ code: 'PROPOSAL_SCOPE_MISMATCH' });
+    expect(manager.realtimeLastSequence).toBe(0);
+    expect(manager.controller.state).not.toBe('previewing');
   });
 });
 

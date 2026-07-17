@@ -17,8 +17,19 @@ const DESKTOP_VOICE_EVENT_TYPES = Object.freeze([
 const MAX_INSTRUCTION_CHARS = 4000;
 const MAX_CONTEXT_CHARS = 12000;
 const MAX_ACTION_TEXT_CHARS = 24000;
+const MAX_REALTIME_EVENT_PAYLOAD_BYTES = 12 * 1024 * 1024;
 const LEGACY_AGENT_SHORTCUT = 'CommandOrControl+Shift+Period';
 const LEGACY_CAPTURE_SHORTCUT = 'Z+X';
+
+const httpsUrlSchema = z.string().url().max(2048).refine((value) => {
+  try { return new URL(value).protocol === 'https:'; }
+  catch (_) { return false; }
+}, 'Only HTTPS URLs are supported');
+
+function jsonSize(value) {
+  try { return Buffer.byteLength(JSON.stringify(value), 'utf8'); }
+  catch (_) { return Number.POSITIVE_INFINITY; }
+}
 
 const boundsSchema = z.object({
   x: z.number().finite(),
@@ -50,6 +61,8 @@ const focusedElementSchema = z.object({
 
 const screenContextSchema = z.object({
   platform: z.string().min(1).max(24),
+  processId: z.number().int().positive().nullable().optional(),
+  bundleId: z.string().max(300).nullable().optional(),
   activeApplication: z.string().max(300),
   processName: z.string().max(300),
   windowTitle: z.string().max(1000),
@@ -83,7 +96,7 @@ const proposedActionSchema = z.object({
   arguments: z.object({
     text: z.string().max(MAX_ACTION_TEXT_CHARS).optional(),
     matrix: z.array(z.array(z.string().max(4000)).max(100)).max(100).optional(),
-    url: z.string().url().max(2048).optional(),
+    url: httpsUrlSchema.optional(),
     route: z.string().max(240).optional(),
     matterId: z.string().max(240).optional()
   }).strict(),
@@ -147,7 +160,7 @@ const desktopProposalSchema = z.object({
   payload: z.object({
     text: z.string().max(MAX_ACTION_TEXT_CHARS).optional(),
     matrix: z.array(z.array(z.string().max(4000)).max(100)).max(100).optional(),
-    url: z.string().url().max(2048).optional(),
+    url: httpsUrlSchema.optional(),
     route: z.string().max(240).optional(),
     matter_id: z.string().max(240).optional()
   }).strict(),
@@ -162,7 +175,22 @@ const desktopProposalSchema = z.object({
   voice_session_id: z.string().uuid(),
   turn_id: z.string().uuid(),
   run_id: z.string().uuid()
-}).strict();
+}).strict().superRefine((proposal, ctx) => {
+  const payload = proposal.payload;
+  if (['insert_text', 'replace_selection', 'copy'].includes(proposal.action_type)
+      && typeof payload.text !== 'string') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['payload', 'text'], message: 'text is required' });
+  }
+  if (proposal.action_type === 'insert_table' && !payload.matrix) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['payload', 'matrix'], message: 'matrix is required' });
+  }
+  if (proposal.action_type === 'open_url' && !payload.url) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['payload', 'url'], message: 'url is required' });
+  }
+  if (proposal.action_type === 'navigate_client' && !payload.route) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['payload', 'route'], message: 'route is required' });
+  }
+});
 
 const desktopEventSchema = z.object({
   protocol_version: z.literal(DESKTOP_VOICE_PROTOCOL_VERSION),
@@ -175,7 +203,17 @@ const desktopEventSchema = z.object({
   turn_id: z.string().uuid().nullable().optional(),
   run_id: z.string().uuid().nullable().optional(),
   payload: z.record(z.any())
-}).strict();
+}).strict().superRefine((event, ctx) => {
+  if (jsonSize(event.payload) > MAX_REALTIME_EVENT_PAYLOAD_BYTES) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['payload'], message: 'event payload is too large' });
+  }
+  if (event.event_type === 'speech.audio') {
+    const audio = event.payload && event.payload.audio;
+    if (!audio || typeof audio.base64 !== 'string' || !audio.base64) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['payload', 'audio'], message: 'speech audio is required' });
+    }
+  }
+});
 
 function contextForRealtime(context, contextSnapshotId) {
   const sanitized = screenContextSchema.parse(context);
@@ -248,6 +286,7 @@ module.exports = {
   MAX_INSTRUCTION_CHARS,
   MAX_CONTEXT_CHARS,
   MAX_ACTION_TEXT_CHARS,
+  MAX_REALTIME_EVENT_PAYLOAD_BYTES,
   LEGACY_AGENT_SHORTCUT,
   LEGACY_CAPTURE_SHORTCUT,
   DEFAULT_SETTINGS,

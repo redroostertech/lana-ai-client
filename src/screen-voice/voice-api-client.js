@@ -62,8 +62,22 @@ class VoiceApiClient {
 
   async realtimeConfig(signal) {
     const serverUrl = await this.getServerUrl();
+    let server;
+    try { server = new URL(serverUrl); }
+    catch (_) {
+      throw new VoiceApiError('REALTIME_UNAVAILABLE', 'The configured LANA server URL is invalid.');
+    }
+    if (!['http:', 'https:'].includes(server.protocol) || server.username || server.password) {
+      throw new VoiceApiError('REALTIME_UNAVAILABLE', 'The configured LANA server URL is not supported.');
+    }
     const token = await this.realtimeToken(signal);
-    const url = new URL(token.realtime_path || '/api/v1/voice/realtime', serverUrl);
+    if (!token || typeof token.token !== 'string' || !token.token || token.token.length > 512) {
+      throw new VoiceApiError('REALTIME_UNAVAILABLE', 'The realtime voice token is invalid.');
+    }
+    const url = new URL(token.realtime_path || '/api/v1/voice/realtime', server);
+    if (url.origin !== server.origin || url.pathname !== '/api/v1/voice/realtime') {
+      throw new VoiceApiError('REALTIME_UNAVAILABLE', 'The realtime voice endpoint is not trusted.');
+    }
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     url.searchParams.set('voice_token', token.token);
     return { ...token, websocket_url: url.toString() };

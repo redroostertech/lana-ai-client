@@ -693,18 +693,15 @@ class ElectronScreenVoice {
   async handleRealtimeEvent(rawEvent) {
     const event = desktopEventSchema.parse(rawEvent);
     if (this.processedRemoteEvents.has(event.event_id)) return { ok: true, duplicate: true, messages: [] };
-    this.processedRemoteEvents.add(event.event_id);
-    if (this.processedRemoteEvents.size > 1000) this.processedRemoteEvents.delete(this.processedRemoteEvents.values().next().value);
-    if (this.realtimeConversationId && this.realtimeConversationId !== event.conversation_id) {
-      this.realtimeLastSequence = 0;
+    if (!this.realtimeConversationId || this.realtimeConversationId !== event.conversation_id) {
+      const error = new Error('Realtime event does not belong to the active conversation');
+      error.code = 'REALTIME_CONVERSATION_MISMATCH';
+      throw error;
     }
-    this.realtimeConversationId = event.conversation_id;
-    this.realtimeVoiceSessionId = event.voice_session_id;
-    this.settingsStore.set('realtimeConversationId', event.conversation_id);
-    if (event.sequence > this.realtimeLastSequence) {
-      this.realtimeLastSequence = event.sequence;
-      this.settingsStore.set('realtimeLastSequence', this.realtimeLastSequence);
+    if (event.sequence <= this.realtimeLastSequence) {
+      return { ok: true, duplicate: true, messages: [] };
     }
+    this.realtimeActive = true;
     const messages = [];
     switch (event.event_type) {
       case 'transcript.partial':
@@ -728,7 +725,7 @@ class ElectronScreenVoice {
         messages.push({ type: 'context.provided', context: await this.createRealtimeContext() });
         break;
       case 'desktop.action.proposed':
-        await this.handleRealtimeProposal(event.payload);
+        await this.handleRealtimeProposal(event.payload, event);
         break;
       case 'clarification.requested':
         this.transitionRemote('previewing', { decision: {
@@ -754,23 +751,40 @@ class ElectronScreenVoice {
       case 'error':
         this.fail(event.payload.code || 'PROVIDER_ERROR', { message: event.payload.message });
         break;
+      case 'run.completed':
+      case 'speech.stopped':
+        if (this.controller.state !== 'previewing') this.transitionRemote('listening');
+        break;
       default:
         break;
     }
+    this.processedRemoteEvents.add(event.event_id);
+    if (this.processedRemoteEvents.size > 1000) this.processedRemoteEvents.delete(this.processedRemoteEvents.values().next().value);
+    this.settingsStore.set('realtimeConversationId', event.conversation_id);
+    this.realtimeLastSequence = event.sequence;
+    this.settingsStore.set('realtimeLastSequence', this.realtimeLastSequence);
     return { ok: true, messages };
   }
 
-  async handleRealtimeProposal(payload) {
+  async handleRealtimeProposal(payload, event = {}) {
     const decision = proposalToDecision(payload);
-    if (this.executedProposalIds.has(decision.proposal.proposal_id)) {
-      this.sendRealtimeActionResult(decision.proposal, 'succeeded', null, { executed: false, duplicate: true });
+    const proposal = decision.proposal;
+    if (proposal.conversation_id !== event.conversation_id
+        || proposal.run_id !== event.run_id
+        || proposal.turn_id !== event.turn_id) {
+      const error = new Error('Desktop proposal correlation does not match its event');
+      error.code = 'PROPOSAL_SCOPE_MISMATCH';
+      throw error;
+    }
+    if (this.executedProposalIds.has(proposal.proposal_id)) {
+      this.sendRealtimeActionResult(proposal, 'succeeded', null, { executed: false, duplicate: true });
       return;
     }
-    if (Date.parse(decision.proposal.expires_at) <= Date.now()) {
-      this.sendRealtimeActionResult(decision.proposal, 'stale_target', 'PROPOSAL_EXPIRED');
+    if (Date.parse(proposal.expires_at) <= Date.now()) {
+      this.sendRealtimeActionResult(proposal, 'stale_target', 'PROPOSAL_EXPIRED');
       return;
     }
-    this.pendingProposal = decision.proposal;
+    this.pendingProposal = proposal;
     this.previewDecision = decision;
     this.controller.session.decision = decision;
     this.transitionRemote('previewing', { decision });
@@ -787,7 +801,7 @@ class ElectronScreenVoice {
         result,
         error_code: errorCode,
         occurred_at: new Date().toISOString(),
-        idempotency_key: `${proposal.idempotency_key}:${status}`
+        idempotency_key: `${proposal.idempotency_key}:result`
       }
     };
     this.send('screen-voice:realtime-send', message);
@@ -890,6 +904,11 @@ class ElectronScreenVoice {
       this.sendRealtimeActionResult(decision.proposal, 'succeeded', null, { executed: false, duplicate: true });
       return { ok: true, duplicate: true };
     }
+    if (decision.proposal && Date.parse(decision.proposal.expires_at) <= Date.now()) {
+      const error = new Error('The desktop proposal expired before it was approved.');
+      error.code = 'PROPOSAL_EXPIRED';
+      throw error;
+    }
     this.controller.transition('executing');
     for (let index = 0; index < decision.proposedActions.length; index += 1) {
       const action = decision.proposedActions[index];
@@ -913,6 +932,8 @@ class ElectronScreenVoice {
       this.executedProposalIds = new Set(retained);
       this.settingsStore.set('executedProposalIds', retained);
       this.sendRealtimeActionResult(decision.proposal, 'succeeded', null, { executed: true });
+      this.pendingProposal = null;
+      this.previewDecision = null;
     }
     this.showOverlay();
     return { ok: true };
@@ -933,8 +954,10 @@ class ElectronScreenVoice {
     try { return await this.executeDecision(this.previewDecision); }
     catch (error) {
       if (this.pendingProposal) {
-        const stale = ['TARGET_CHANGED', 'target_changed'].includes(error.code);
+        const stale = ['TARGET_CHANGED', 'target_changed', 'PROPOSAL_EXPIRED'].includes(error.code);
         this.sendRealtimeActionResult(this.pendingProposal, stale ? 'stale_target' : 'failed', error.code || 'INSERTION_FAILED');
+        this.pendingProposal = null;
+        this.previewDecision = null;
       }
       return this.fail(error.code || 'INSERTION_FAILED', error);
     }
@@ -953,6 +976,13 @@ class ElectronScreenVoice {
       this.pendingApproval = null;
       this.transitionRemote('listening', { serverApproval: null });
       return { ok: true, approval: true };
+    }
+    if (this.pendingProposal) {
+      this.sendRealtimeActionResult(this.pendingProposal, 'rejected', 'USER_REJECTED');
+      this.pendingProposal = null;
+      this.previewDecision = null;
+      this.transitionRemote('listening', { decision: null });
+      return { ok: true, proposal: true };
     }
     this.send('screen-voice:stop-capture', { discard: true });
     this.send('screen-voice:stop-realtime', { reason: 'user_canceled' });

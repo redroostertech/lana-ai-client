@@ -33,6 +33,8 @@
   let realtimeReconnectAttempt = 0;
   let realtimeAudioQueue = [];
   let realtimeAudioPlaying = false;
+  let activeSpeechId = null;
+  let realtimeEventChain = Promise.resolve();
   let realtimeConnected = false;
   let bargeInStartedAt = 0;
   let detailsOpen = true;
@@ -335,6 +337,7 @@
   }
 
   function stopRealtimePlayback(reason = 'stopped') {
+    const interruptedSpeechId = activeSpeechId;
     if (playback) {
       try { playback.pause(); } catch (_) {}
       try { playback.currentTime = 0; } catch (_) {}
@@ -342,8 +345,9 @@
     playback = null;
     realtimeAudioQueue = [];
     realtimeAudioPlaying = false;
-    if (reason === 'barge_in') {
-      sendRealtimeMessage({ type: 'interruption.detected', reason: 'barge_in' });
+    activeSpeechId = null;
+    if (reason === 'barge_in' && interruptedSpeechId) {
+      sendRealtimeMessage({ type: 'interruption.detected', speech_id: interruptedSpeechId, reason: 'barge_in' });
     }
   }
 
@@ -351,10 +355,12 @@
     if (realtimeAudioPlaying || !realtimeAudioQueue.length) return;
     const item = realtimeAudioQueue.shift();
     realtimeAudioPlaying = true;
+    activeSpeechId = item.speech_id || null;
     playback = new Audio(`data:${item.mime_type || 'audio/wav'};base64,${item.base64}`);
     const done = () => {
       playback = null;
       realtimeAudioPlaying = false;
+      if (!realtimeAudioQueue.some((queued) => queued.speech_id === activeSpeechId)) activeSpeechId = null;
       playNextRealtimeAudio();
     };
     playback.addEventListener('ended', done, { once: true });
@@ -379,14 +385,20 @@
   }
 
   async function handleDesktopRealtimeEvent(event) {
+    const result = await window.screenVoice.realtimeEvent(event);
+    if (event.event_type === 'speech.started' && event.payload?.speech_id) {
+      if (activeSpeechId && activeSpeechId !== event.payload.speech_id) {
+        stopRealtimePlayback('server_replaced');
+      }
+      activeSpeechId = event.payload.speech_id;
+    }
     if (event.event_type === 'speech.audio' && event.payload?.audio?.base64) {
-      realtimeAudioQueue.push(event.payload.audio);
+      realtimeAudioQueue.push({ ...event.payload.audio, speech_id: event.payload.speech_id || null });
       playNextRealtimeAudio();
     }
     if (event.event_type === 'speech.stopped' && event.payload?.reason === 'interrupted') {
       stopRealtimePlayback('server_interrupted');
     }
-    const result = await window.screenVoice.realtimeEvent(event);
     for (const message of result?.messages || []) sendRealtimeMessage(message);
   }
 
@@ -402,8 +414,16 @@
     });
     socket.addEventListener('message', (messageEvent) => {
       let message;
-      try { message = JSON.parse(String(messageEvent.data || '{}')); } catch (_) { return; }
-      if (message.event === 'desktop_event' && message.data) handleDesktopRealtimeEvent(message.data).catch(() => {});
+      try { message = JSON.parse(String(messageEvent.data || '{}')); }
+      catch (_) {
+        window.screenVoice.captureError('REALTIME_PROTOCOL_ERROR');
+        return;
+      }
+      if (message.event === 'desktop_event' && message.data) {
+        realtimeEventChain = realtimeEventChain
+          .then(() => handleDesktopRealtimeEvent(message.data))
+          .catch((error) => window.screenVoice.captureError(error?.code || 'REALTIME_EVENT_INVALID'));
+      }
       if (message.event === 'error' && !message.data) window.screenVoice.captureError(message.code || 'PROVIDER_ERROR');
     });
     socket.addEventListener('close', async (event) => {
