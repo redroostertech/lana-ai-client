@@ -20,7 +20,7 @@ const MAX_AUDIO_BASE64_CHARS = 16 * 1024 * 1024;
 const NON_SPEECH_TRANSCRIPT = /^[\s([{<]*(?:beep|chime|tone|silence|inaudible|no speech|music)[\s)\]}>.!-]*$/i;
 const CAPTURE_STATUSES = new Set([
   'requesting_microphone', 'microphone_ready', 'start_chime', 'recording_started',
-  'recording_released', 'audio_ready', 'capture_failed'
+  'recording_released', 'audio_ready', 'audio_streaming', 'capture_failed'
 ]);
 const COMPACT_OVERLAY = Object.freeze({ width: 480, height: 58 });
 const MODE_MENU_OVERLAY = Object.freeze({ width: 480, height: 190 });
@@ -486,7 +486,7 @@ class ElectronScreenVoice {
   }
 
   handleOverlayCaptureRelease() {
-    if (this.realtimeActive) return this.controller.snapshot();
+    if (this.realtimeActive) return this.flushRealtimeTurn();
     if (this.shortcutHeldMode === 'agent') this.shortcutHeldMode = null;
     if (this.pendingMode === 'agent') this.pendingShortcutRelease = null;
     if (this.shortcutStartPromise) return this.controller.snapshot();
@@ -499,13 +499,25 @@ class ElectronScreenVoice {
   handleShortcutUp(mode) {
     this.logInfo(`[ScreenVoice] Shortcut up (${mode}); state=${this.controller.state}`);
     if (mode === this.shortcutHeldMode) this.shortcutHeldMode = null;
-    if (this.realtimeActive) return;
+    if (this.realtimeActive) {
+      if (mode === this.pendingMode) this.flushRealtimeTurn();
+      return;
+    }
     if (mode !== this.pendingMode) return;
     if (this.shortcutStartPromise) {
       this.pendingShortcutRelease = mode;
     } else if (this.controller.state === 'listening') {
       this.send('screen-voice:stop-capture', { reason: 'activation_released' });
     }
+  }
+
+  flushRealtimeTurn() {
+    if (!this.realtimeActive || this.controller.state !== 'listening') {
+      return this.controller.snapshot();
+    }
+    this.send('screen-voice:realtime-send', { type: 'flush' });
+    this.transitionRemote('transcribing');
+    return this.controller.snapshot();
   }
 
   unregisterShortcut(shortcut) {

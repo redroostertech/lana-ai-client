@@ -35,7 +35,10 @@
   let realtimeAudioPlaying = false;
   let activeSpeechId = null;
   let realtimeEventChain = Promise.resolve();
+  let realtimeInputFrameCount = 0;
   let realtimeConnected = false;
+  let realtimeAnalyser = null;
+  let realtimeInputTimer = null;
   let bargeInStartedAt = 0;
   let detailsOpen = true;
   let drawerTimer = null;
@@ -371,6 +374,10 @@
   function handleRealtimeMicrophone(input) {
     if (!realtimeSocket || realtimeSocket.readyState !== WebSocket.OPEN) return;
     const chunk = new Float32Array(input);
+    realtimeInputFrameCount += 1;
+    if (realtimeInputFrameCount === 1) {
+      reportCaptureStatus('audio_streaming', { bytes: chunk.byteLength });
+    }
     let sum = 0;
     for (const value of chunk) sum += value * value;
     const rms = Math.sqrt(sum / Math.max(1, chunk.length));
@@ -382,6 +389,18 @@
       bargeInStartedAt = 0;
     }
     if (!realtimeAudioPlaying) realtimeSocket.send(chunk.buffer);
+  }
+
+  function startRealtimeInputPump() {
+    clearInterval(realtimeInputTimer);
+    realtimeInputTimer = null;
+    if (!realtimeAnalyser) return;
+    const frame = new Float32Array(realtimeAnalyser.fftSize);
+    realtimeInputTimer = setInterval(() => {
+      if (!realtimeAnalyser) return;
+      realtimeAnalyser.getFloatTimeDomainData(frame);
+      handleRealtimeMicrophone(frame);
+    }, 50);
   }
 
   async function handleDesktopRealtimeEvent(event) {
@@ -448,6 +467,7 @@
   async function startRealtime(payload) {
     await stopRealtime({ preserveState: true });
     realtimeIntentionalClose = false;
+    realtimeInputFrameCount = 0;
     realtimeStartPayload = payload;
     setCapturePhase('preparing');
     reportCaptureStatus('requesting_microphone');
@@ -458,11 +478,14 @@
       });
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       audioContext = new AudioContextClass();
+      if (audioContext.state !== 'running') {
+        await audioContext.resume();
+      }
       realtimeSource = audioContext.createMediaStreamSource(stream);
-      realtimeProcessor = audioContext.createScriptProcessor(4096, 1, 1);
-      realtimeProcessor.onaudioprocess = (event) => handleRealtimeMicrophone(event.inputBuffer.getChannelData(0));
-      realtimeSource.connect(realtimeProcessor);
-      realtimeProcessor.connect(audioContext.destination);
+      realtimeAnalyser = audioContext.createAnalyser();
+      realtimeAnalyser.fftSize = 4096;
+      realtimeSource.connect(realtimeAnalyser);
+      startRealtimeInputPump();
       reportCaptureStatus('microphone_ready', { trackCount: stream.getAudioTracks().length });
       bindRealtimeSocket(new WebSocket(payload.websocketUrl), payload);
     } catch (error) {
@@ -488,6 +511,9 @@
     realtimeProcessor = null;
     if (realtimeSource) realtimeSource.disconnect();
     realtimeSource = null;
+    clearInterval(realtimeInputTimer);
+    realtimeInputTimer = null;
+    realtimeAnalyser = null;
     if (stream) stream.getTracks().forEach((track) => track.stop());
     stream = null;
     if (audioContext) await audioContext.close().catch(() => {});

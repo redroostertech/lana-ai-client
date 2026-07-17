@@ -271,6 +271,29 @@ describe('Electron screen voice orchestration', () => {
     expect(sent).toContainEqual(['screen-voice:stop-capture', { reason: 'activation_released' }]);
   });
 
+  test('shortcut release flushes an active realtime turn', () => {
+    const manager = managerWith({ api: {}, adapter: {} });
+    manager.controller.start('agent');
+    manager.pendingMode = 'agent';
+    manager.realtimeActive = true;
+
+    manager.handleShortcutUp('agent');
+
+    expect(sent).toContainEqual(['screen-voice:realtime-send', { type: 'flush' }]);
+    expect(manager.controller.state).toBe('transcribing');
+  });
+
+  test('overlay release flushes an active realtime turn', () => {
+    const manager = managerWith({ api: {}, adapter: {} });
+    manager.controller.start('agent');
+    manager.realtimeActive = true;
+
+    const snapshot = manager.handleOverlayCaptureRelease();
+
+    expect(sent).toContainEqual(['screen-voice:realtime-send', { type: 'flush' }]);
+    expect(snapshot.state).toBe('transcribing');
+  });
+
   test('restores the editor target when overlay interaction owns focus', async () => {
     const initiallyIncompleteContext = { ...context, processId: 9, bundleId: 'com.editor',
       focusedElement: { ...context.focusedElement, role: 'AXWebArea', isEditable: false } };
