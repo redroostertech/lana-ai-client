@@ -1,12 +1,16 @@
 'use strict';
 
 const path = require('path');
+const { randomUUID } = require('node:crypto');
 const Store = require('electron-store');
 const { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen, shell, systemPreferences } = require('electron');
 const { VoiceSessionController } = require('./voice-session-controller');
 const { createDesktopAdapter } = require('./desktop-adapter');
 const { VoiceApiClient } = require('./voice-api-client');
-const { DEFAULT_SETTINGS, parseAgentDecision, parseSettings } = require('./contracts');
+const {
+  DEFAULT_SETTINGS, DESKTOP_VOICE_PROTOCOL_VERSION, parseAgentDecision, parseSettings,
+  desktopEventSchema, contextForRealtime, proposalToDecision
+} = require('./contracts');
 const { fingerprintsMatch } = require('./target-fingerprint');
 const { decisionRequiresConfirmation } = require('./confirmation-policy');
 const { actionText, normalizeText } = require('./action-normalizer');
@@ -93,6 +97,22 @@ class ElectronScreenVoice {
     this.pendingMode = 'agent';
     this.conversationTurns = [];
     this.conversationMemory = '';
+    this.realtimeActive = false;
+    this.realtimeConversationId = (typeof this.settingsStore.get === 'function'
+      ? this.settingsStore.get('realtimeConversationId')
+      : this.settingsStore.store?.realtimeConversationId) || null;
+    this.realtimeLastSequence = Number((typeof this.settingsStore.get === 'function'
+      ? this.settingsStore.get('realtimeLastSequence')
+      : this.settingsStore.store?.realtimeLastSequence) || 0);
+    this.realtimeVoiceSessionId = null;
+    this.pendingProposal = null;
+    this.pendingApproval = null;
+    this.remoteResponseText = '';
+    this.processedRemoteEvents = new Set();
+    const executedProposalIds = typeof this.settingsStore.get === 'function'
+      ? this.settingsStore.get('executedProposalIds', [])
+      : this.settingsStore.store?.executedProposalIds;
+    this.executedProposalIds = new Set(Array.isArray(executedProposalIds) ? executedProposalIds.slice(-200) : []);
     this.detailsOpen = true;
     this.revealTarget = null;
     this.shortcutMonitor = null;
@@ -208,6 +228,25 @@ class ElectronScreenVoice {
     handle('screen-voice:capture-start', () => this.handleShortcutDown('agent', 'overlay_hold'));
     handle('screen-voice:capture-release', () => this.handleOverlayCaptureRelease());
     handle('screen-voice:audio-complete', (payload) => this.handleAudio(payload));
+    handle('screen-voice:realtime-event', (payload) => this.handleRealtimeEvent(payload));
+    handle('screen-voice:realtime-disconnected', ({ code, reason }) => this.handleRealtimeDisconnected(code, reason));
+    handle('screen-voice:realtime-context', () => this.createRealtimeContext());
+    handle('screen-voice:realtime-reconnect', async () => {
+      const realtime = await this.api.realtimeConfig();
+      return {
+        websocketUrl: realtime.websocket_url,
+        start: {
+          type: 'start', domain: 'desktop_hermes', protocol_version: DESKTOP_VOICE_PROTOCOL_VERSION,
+          conversation_id: this.realtimeConversationId,
+          voice_session_id: randomUUID(),
+          language: this.settings.language,
+          voice_output_enabled: this.settings.voiceOutputEnabled,
+          after_sequence: this.realtimeLastSequence,
+          partial_stt: true,
+          context: await this.createRealtimeContext()
+        }
+      };
+    });
     handle('screen-voice:capture-error', ({ code }) => this.fail(code || 'MICROPHONE_DENIED'));
     handle('screen-voice:capture-status', ({ status, metadata }) => {
       if (!CAPTURE_STATUSES.has(status)) return { ok: false };
@@ -294,6 +333,7 @@ class ElectronScreenVoice {
   deactivateHost(reason) {
     this.send('screen-voice:stop-capture', { discard: true });
     this.controller.cancel(reason);
+    this.realtimeActive = false;
     this.unregisterShortcut(this.settings.dictationShortcut);
     this.unregisterShortcut(this.settings.agentShortcut);
     this.stopShortcutMonitor();
@@ -446,6 +486,7 @@ class ElectronScreenVoice {
   }
 
   handleOverlayCaptureRelease() {
+    if (this.realtimeActive) return this.controller.snapshot();
     if (this.shortcutHeldMode === 'agent') this.shortcutHeldMode = null;
     if (this.pendingMode === 'agent') this.pendingShortcutRelease = null;
     if (this.shortcutStartPromise) return this.controller.snapshot();
@@ -458,6 +499,7 @@ class ElectronScreenVoice {
   handleShortcutUp(mode) {
     this.logInfo(`[ScreenVoice] Shortcut up (${mode}); state=${this.controller.state}`);
     if (mode === this.shortcutHeldMode) this.shortcutHeldMode = null;
+    if (this.realtimeActive) return;
     if (mode !== this.pendingMode) return;
     if (this.shortcutStartPromise) {
       this.pendingShortcutRelease = mode;
@@ -583,10 +625,181 @@ class ElectronScreenVoice {
       const snapshot = this.controller.start(mode, source);
       this.controller.session.target = this.lastContext.targetFingerprint;
       this.showOverlay({ focus: source === 'overlay_hold' });
-      this.send('screen-voice:start-capture', { mode, sessionId: snapshot.session.id, maxDurationMs: 90000 });
+      const realtime = typeof this.api.realtimeConfig === 'function'
+        ? await this.api.realtimeConfig(this.controller.signal).catch((error) => {
+        this.logError(`[ScreenVoice] Realtime negotiation failed; using transitional fallback (${error.code || 'unknown'})`);
+        return null;
+        }) : null;
+      if (realtime?.desktop_realtime_hermes_enabled) {
+        if (!this.realtimeConversationId) {
+          this.realtimeConversationId = randomUUID();
+          this.realtimeLastSequence = 0;
+          this.settingsStore.set('realtimeConversationId', this.realtimeConversationId);
+          this.settingsStore.set('realtimeLastSequence', 0);
+        }
+        this.realtimeVoiceSessionId = randomUUID();
+        this.realtimeActive = true;
+        this.send('screen-voice:start-realtime', {
+          websocketUrl: realtime.websocket_url,
+          start: {
+            type: 'start', domain: 'desktop_hermes', protocol_version: DESKTOP_VOICE_PROTOCOL_VERSION,
+            conversation_id: this.realtimeConversationId,
+            voice_session_id: this.realtimeVoiceSessionId,
+            language: this.settings.language,
+            voice_output_enabled: this.settings.voiceOutputEnabled,
+            after_sequence: this.realtimeLastSequence,
+            sample_rate: 16000,
+            partial_stt: true,
+            context: await this.createRealtimeContext(this.lastContext)
+          }
+        });
+      } else {
+        this.send('screen-voice:start-capture', { mode, sessionId: snapshot.session.id, maxDurationMs: 90000 });
+      }
       this.logInfo(`[ScreenVoice] Session started (${mode})`);
       return snapshot;
     } catch (error) { return this.fail(error.code || 'VOICE_START_FAILED', error); }
+  }
+
+  async createRealtimeContext(existing = null) {
+    let context = existing?.accessibleDocumentText !== undefined
+      ? existing
+      : await this.adapter.getContext({ maxChars: this.settings.screenContextEnabled ? 12000 : 1000 });
+    if (!this.settings.screenContextEnabled) {
+      context = { ...context, selectedText: '', surroundingText: '', accessibleDocumentText: '' };
+    }
+    if (context.focusedElement?.isPassword) {
+      context = { ...context, selectedText: '', surroundingText: '', accessibleDocumentText: '' };
+    }
+    this.lastContext = context;
+    return contextForRealtime(context, randomUUID());
+  }
+
+  transitionRemote(next, patch = {}) {
+    if (!this.controller.session) this.controller.start('agent', 'realtime');
+    if (this.controller.state === next) {
+      Object.assign(this.controller.session, patch);
+      this.sendState();
+      return;
+    }
+    try { this.controller.transition(next, patch); }
+    catch (_) {
+      if (this.controller.state !== 'idle') this.controller.transition('idle');
+      this.controller.start('agent', 'realtime');
+      if (next !== 'listening') this.controller.transition(next, patch);
+    }
+  }
+
+  async handleRealtimeEvent(rawEvent) {
+    const event = desktopEventSchema.parse(rawEvent);
+    if (this.processedRemoteEvents.has(event.event_id)) return { ok: true, duplicate: true, messages: [] };
+    this.processedRemoteEvents.add(event.event_id);
+    if (this.processedRemoteEvents.size > 1000) this.processedRemoteEvents.delete(this.processedRemoteEvents.values().next().value);
+    if (this.realtimeConversationId && this.realtimeConversationId !== event.conversation_id) {
+      this.realtimeLastSequence = 0;
+    }
+    this.realtimeConversationId = event.conversation_id;
+    this.realtimeVoiceSessionId = event.voice_session_id;
+    this.settingsStore.set('realtimeConversationId', event.conversation_id);
+    if (event.sequence > this.realtimeLastSequence) {
+      this.realtimeLastSequence = event.sequence;
+      this.settingsStore.set('realtimeLastSequence', this.realtimeLastSequence);
+    }
+    const messages = [];
+    switch (event.event_type) {
+      case 'transcript.partial':
+        if (this.controller.session) this.controller.session.transcript = event.payload.text || '';
+        this.sendState();
+        break;
+      case 'transcript.final':
+        this.transitionRemote('transcribing', { transcript: event.payload.text || '' });
+        this.remoteResponseText = '';
+        break;
+      case 'run.started':
+      case 'run.progress':
+        if (this.controller.state === 'transcribing') this.transitionRemote('gathering_context');
+        this.transitionRemote('thinking', { runId: event.run_id });
+        break;
+      case 'assistant.response.delta':
+        this.remoteResponseText = `${this.remoteResponseText}${this.remoteResponseText ? ' ' : ''}${event.payload.text || ''}`;
+        this.transitionRemote('speaking', { responseText: this.remoteResponseText });
+        break;
+      case 'desktop.context.requested':
+        messages.push({ type: 'context.provided', context: await this.createRealtimeContext() });
+        break;
+      case 'desktop.action.proposed':
+        await this.handleRealtimeProposal(event.payload);
+        break;
+      case 'clarification.requested':
+        this.transitionRemote('previewing', { decision: {
+          displayResponse: event.payload.question || 'LANA needs more information.', proposedActions: []
+        } });
+        this.showOverlay({ focus: true, ...PREVIEW_OVERLAY });
+        this.notifyUser({ reason: 'clarification' });
+        break;
+      case 'approval.requested':
+        this.pendingApproval = { ...event.payload, run_id: event.run_id };
+        this.transitionRemote('previewing', {
+          serverApproval: this.pendingApproval,
+          decision: { displayResponse: event.payload.summary || 'Approve this operation?', proposedActions: [] }
+        });
+        this.showOverlay({ focus: true, ...PREVIEW_OVERLAY });
+        this.notifyUser({ reason: 'approval' });
+        break;
+      case 'approval.resolved':
+        this.pendingApproval = null;
+        if (this.controller.session) this.controller.session.serverApproval = null;
+        break;
+      case 'run.failed':
+      case 'error':
+        this.fail(event.payload.code || 'PROVIDER_ERROR', { message: event.payload.message });
+        break;
+      default:
+        break;
+    }
+    return { ok: true, messages };
+  }
+
+  async handleRealtimeProposal(payload) {
+    const decision = proposalToDecision(payload);
+    if (this.executedProposalIds.has(decision.proposal.proposal_id)) {
+      this.sendRealtimeActionResult(decision.proposal, 'succeeded', null, { executed: false, duplicate: true });
+      return;
+    }
+    if (Date.parse(decision.proposal.expires_at) <= Date.now()) {
+      this.sendRealtimeActionResult(decision.proposal, 'stale_target', 'PROPOSAL_EXPIRED');
+      return;
+    }
+    this.pendingProposal = decision.proposal;
+    this.previewDecision = decision;
+    this.controller.session.decision = decision;
+    this.transitionRemote('previewing', { decision });
+    this.showOverlay({ focus: true, ...PREVIEW_OVERLAY });
+    this.notifyUser({ reason: 'approval' });
+  }
+
+  sendRealtimeActionResult(proposal, status, errorCode = null, result = {}) {
+    const message = {
+      type: 'desktop.action.result',
+      result: {
+        proposal_id: proposal.proposal_id,
+        status,
+        result,
+        error_code: errorCode,
+        occurred_at: new Date().toISOString(),
+        idempotency_key: `${proposal.idempotency_key}:${status}`
+      }
+    };
+    this.send('screen-voice:realtime-send', message);
+    return message;
+  }
+
+  handleRealtimeDisconnected(code, reason) {
+    this.realtimeActive = false;
+    if (code !== 1000 && this.authenticated && this.entitlementEnabled) {
+      this.logError(`[ScreenVoice] Realtime disconnected code=${code || 0} reason=${String(reason || '').slice(0, 120)}`);
+    }
+    return { ok: true };
   }
 
   async handleAudio(payload) {
@@ -673,10 +886,15 @@ class ElectronScreenVoice {
   }
 
   async executeDecision(decision) {
+    if (decision.proposal && this.executedProposalIds.has(decision.proposal.proposal_id)) {
+      this.sendRealtimeActionResult(decision.proposal, 'succeeded', null, { executed: false, duplicate: true });
+      return { ok: true, duplicate: true };
+    }
     this.controller.transition('executing');
     for (let index = 0; index < decision.proposedActions.length; index += 1) {
       const action = decision.proposedActions[index];
-      if (!this.controller.claimExecution(`${this.controller.session.id}:${index}:${action.type}`)) continue;
+      const executionToken = decision.proposal?.idempotency_key || `${this.controller.session.id}:${index}:${action.type}`;
+      if (!this.controller.claimExecution(executionToken)) continue;
       const text = actionText(action);
       if (action.type === 'open_url') await this.openExternalUrl(action.arguments.url);
       else if (action.type === 'navigate_client') await this.navigateClient(action.arguments);
@@ -687,18 +905,39 @@ class ElectronScreenVoice {
     const desktopMutation = decision.proposedActions.some((action) => (
       ['insert_text', 'replace_selection', 'insert_table'].includes(action.type)
     ));
-    this.controller.transition('idle', { result: { inserted: desktopMutation,
+    this.controller.transition(this.realtimeActive ? 'listening' : 'idle', { result: { inserted: desktopMutation,
       canUndo: desktopMutation, text: decision.displayResponse } });
+    if (decision.proposal) {
+      this.executedProposalIds.add(decision.proposal.proposal_id);
+      const retained = Array.from(this.executedProposalIds).slice(-200);
+      this.executedProposalIds = new Set(retained);
+      this.settingsStore.set('executedProposalIds', retained);
+      this.sendRealtimeActionResult(decision.proposal, 'succeeded', null, { executed: true });
+    }
     this.showOverlay();
     return { ok: true };
   }
 
   async confirm(sessionId) {
+    if (this.controller.state === 'previewing' && sessionId === this.controller.session?.id && this.pendingApproval) {
+      this.send('screen-voice:realtime-send', {
+        type: 'approval.resolve', approval_id: this.pendingApproval.approval_id, decision: 'approved'
+      });
+      this.pendingApproval = null;
+      this.transitionRemote('thinking', { serverApproval: null });
+      return { ok: true, approval: true };
+    }
     if (this.controller.state !== 'previewing' || sessionId !== this.controller.session?.id || !this.previewDecision) {
       return { ok: false, reason: 'stale_preview' };
     }
     try { return await this.executeDecision(this.previewDecision); }
-    catch (error) { return this.fail(error.code || 'INSERTION_FAILED', error); }
+    catch (error) {
+      if (this.pendingProposal) {
+        const stale = ['TARGET_CHANGED', 'target_changed'].includes(error.code);
+        this.sendRealtimeActionResult(this.pendingProposal, stale ? 'stale_target' : 'failed', error.code || 'INSERTION_FAILED');
+      }
+      return this.fail(error.code || 'INSERTION_FAILED', error);
+    }
   }
 
   copy(text) { clipboard.writeText(normalizeText(text || this.previewDecision?.displayResponse || '')); return { ok: true }; }
@@ -706,7 +945,21 @@ class ElectronScreenVoice {
     try { await this.adapter.undo(); this.send('screen-voice:undone', {}); return { ok: true }; }
     catch (error) { return this.fail(error.code || 'UNDO_FAILED', error); }
   }
-  cancel() { this.send('screen-voice:stop-capture', { discard: true }); this.controller.cancel(); return { ok: true }; }
+  cancel() {
+    if (this.pendingApproval) {
+      this.send('screen-voice:realtime-send', {
+        type: 'approval.resolve', approval_id: this.pendingApproval.approval_id, decision: 'rejected'
+      });
+      this.pendingApproval = null;
+      this.transitionRemote('listening', { serverApproval: null });
+      return { ok: true, approval: true };
+    }
+    this.send('screen-voice:stop-capture', { discard: true });
+    this.send('screen-voice:stop-realtime', { reason: 'user_canceled' });
+    this.realtimeActive = false;
+    this.controller.cancel();
+    return { ok: true };
+  }
 
   fail(code, error = {}) {
     this.shortcutHeldMode = null;
@@ -751,7 +1004,8 @@ class ElectronScreenVoice {
   }
 
   shutdown() {
-    this.controller.cancel('app_quit');
+    this.send('screen-voice:stop-realtime', { reason: 'app_quit' });
+    if (this.controller.state !== 'idle' && this.controller.state !== 'canceled') this.controller.cancel('app_quit');
     this.unregisterShortcut(this.settings.dictationShortcut);
     this.unregisterShortcut(this.settings.agentShortcut);
     this.stopShortcutMonitor();

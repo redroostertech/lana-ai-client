@@ -9,14 +9,14 @@ const STATES = Object.freeze([
 
 const TRANSITIONS = Object.freeze({
   idle: new Set(['listening']),
-  listening: new Set(['transcribing', 'canceled', 'error']),
+  listening: new Set(['transcribing', 'thinking', 'previewing', 'speaking', 'idle', 'canceled', 'error']),
   transcribing: new Set(['awaiting_command', 'gathering_context', 'executing', 'canceled', 'error']),
   awaiting_command: new Set(['gathering_context', 'canceled', 'error']),
   gathering_context: new Set(['thinking', 'canceled', 'error']),
-  thinking: new Set(['previewing', 'executing', 'speaking', 'idle', 'canceled', 'error']),
+  thinking: new Set(['previewing', 'executing', 'speaking', 'listening', 'idle', 'canceled', 'error']),
   previewing: new Set(['executing', 'speaking', 'idle', 'canceled', 'error']),
-  executing: new Set(['speaking', 'idle', 'canceled', 'error']),
-  speaking: new Set(['idle', 'canceled', 'error']),
+  executing: new Set(['speaking', 'listening', 'idle', 'canceled', 'error']),
+  speaking: new Set(['listening', 'idle', 'canceled', 'error']),
   canceled: new Set(['idle', 'listening']),
   error: new Set(['idle', 'listening', 'canceled'])
 });

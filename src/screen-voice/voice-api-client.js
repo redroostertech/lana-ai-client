@@ -55,6 +55,19 @@ class VoiceApiClient {
   synthesize(text, signal) {
     return this.post('/api/v1/voice/preview', { text: String(text).slice(0, 1000), format: 'wav' }, signal);
   }
+
+  realtimeToken(signal) {
+    return this.post('/api/v1/voice/realtime-token', {}, signal, 'REALTIME_UNAVAILABLE');
+  }
+
+  async realtimeConfig(signal) {
+    const serverUrl = await this.getServerUrl();
+    const token = await this.realtimeToken(signal);
+    const url = new URL(token.realtime_path || '/api/v1/voice/realtime', serverUrl);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    url.searchParams.set('voice_token', token.token);
+    return { ...token, websocket_url: url.toString() };
+  }
 }
 
 module.exports = { VoiceApiError, VoiceApiClient };

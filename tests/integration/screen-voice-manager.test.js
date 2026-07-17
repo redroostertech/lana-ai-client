@@ -40,7 +40,7 @@ function overlay() {
 }
 
 function managerWith({ api, adapter, openClientSettings, shortcutMonitorFactory, navigateClient, openExternalUrl, notifyUser,
-  microphoneHardwareStatus }) {
+  microphoneHardwareStatus, settingsStore }) {
   const manager = new ElectronScreenVoice({ api, adapter, getMainWindow: () => null,
     getSavedServer: () => ({ url: 'http://local' }), openClientSettings, navigateClient, openExternalUrl, notifyUser,
     microphoneHardwareStatus: microphoneHardwareStatus || (async () => ({ available: true, deviceCount: 1 })),
@@ -48,7 +48,7 @@ function managerWith({ api, adapter, openClientSettings, shortcutMonitorFactory,
       onEvent({ event: 'ready' });
       return { stop: jest.fn() };
     }),
-    sleep: async () => {}, settingsStore: { store: {}, set: jest.fn() } });
+    sleep: async () => {}, settingsStore: settingsStore || { store: {}, set: jest.fn() } });
   manager.overlay = overlay();
   return manager;
 }
@@ -366,4 +366,76 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.conversationMemory).toContain('spoken turn 5');
     expect(manager.conversationMemory).not.toContain('screen text');
   });
+
+  test('a realtime proposal is confirmation gated and executes only once', async () => {
+    const adapter = { replaceSelection: jest.fn(async () => ({ ok: true })) };
+    const manager = managerWith({ api: {}, adapter, notifyUser: jest.fn() });
+    manager.controller.start('agent');
+    manager.realtimeActive = true;
+    const ids = Array.from({ length: 6 }, (_, index) => `10000000-0000-4000-8000-00000000000${index + 1}`);
+    const proposalId = ids[0];
+    await manager.handleRealtimeEvent({
+      protocol_version: 'desktop-voice.v1', event_id: ids[1], event_type: 'desktop.action.proposed',
+      sequence: 1, timestamp: new Date().toISOString(), conversation_id: ids[2],
+      voice_session_id: ids[3], turn_id: ids[4], run_id: ids[5],
+      payload: {
+        proposal_id: proposalId, action_type: 'replace_selection', payload: { text: 'Rewritten text' },
+        summary: 'Replace the selected paragraph', target_fingerprint: fingerprint, context_snapshot_id: null,
+        created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 60000).toISOString(),
+        confirmation_class: 'always', idempotency_key: 'replace-once', conversation_id: ids[2],
+        voice_session_id: ids[3], turn_id: ids[4], run_id: ids[5]
+      }
+    });
+    expect(manager.controller.state).toBe('previewing');
+    const sessionId = manager.controller.session.id;
+    await manager.confirm(sessionId);
+    await manager.confirm(sessionId);
+    expect(adapter.replaceSelection).toHaveBeenCalledTimes(1);
+    expect(sent).toContainEqual(['screen-voice:realtime-send', expect.objectContaining({
+      type: 'desktop.action.result',
+      result: expect.objectContaining({ proposal_id: proposalId, status: 'succeeded' })
+    })]);
+  });
+
+  test('a proposal already executed before restart cannot mutate the desktop again', async () => {
+    const persisted = {};
+    const settingsStore = {
+      store: persisted,
+      get: jest.fn((key, fallback) => persisted[key] ?? fallback),
+      set: jest.fn((key, value) => { persisted[key] = value; })
+    };
+    const adapter = { replaceSelection: jest.fn(async () => ({ ok: true })) };
+    const ids = Array.from({ length: 6 }, (_, index) => `20000000-0000-4000-8000-00000000000${index + 1}`);
+    const proposal = {
+      proposal_id: ids[0], action_type: 'replace_selection', payload: { text: 'Once only' },
+      summary: 'Replace the selection once', target_fingerprint: fingerprint, context_snapshot_id: null,
+      created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 60000).toISOString(),
+      confirmation_class: 'always', idempotency_key: 'persistent-once', conversation_id: ids[2],
+      voice_session_id: ids[3], turn_id: ids[4], run_id: ids[5]
+    };
+    const event = {
+      protocol_version: 'desktop-voice.v1', event_id: ids[1], event_type: 'desktop.action.proposed',
+      sequence: 1, timestamp: new Date().toISOString(), conversation_id: ids[2],
+      voice_session_id: ids[3], turn_id: ids[4], run_id: ids[5], payload: proposal
+    };
+    const first = managerWith({ api: {}, adapter, settingsStore });
+    first.controller.start('agent');
+    first.realtimeActive = true;
+    await first.handleRealtimeEvent(event);
+    await first.confirm(first.controller.session.id);
+
+    const restarted = managerWith({ api: {}, adapter, settingsStore });
+    restarted.controller.start('agent');
+    restarted.realtimeActive = true;
+    await restarted.handleRealtimeEvent({ ...event, event_id: randomEventId(), sequence: 2 });
+
+    expect(adapter.replaceSelection).toHaveBeenCalledTimes(1);
+    expect(sent).toContainEqual(['screen-voice:realtime-send', expect.objectContaining({
+      result: expect.objectContaining({ proposal_id: ids[0], status: 'succeeded', result: { executed: false, duplicate: true } })
+    })]);
+  });
 });
+
+function randomEventId() {
+  return '30000000-0000-4000-8000-000000000001';
+}

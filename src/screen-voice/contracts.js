@@ -2,6 +2,18 @@
 
 const { z } = require('zod');
 
+const DESKTOP_VOICE_PROTOCOL_VERSION = 'desktop-voice.v1';
+const DESKTOP_VOICE_EVENT_TYPES = Object.freeze([
+  'transcript.partial', 'transcript.final',
+  'assistant.response.delta', 'assistant.response.completed',
+  'run.started', 'run.progress', 'run.status', 'run.completed', 'run.failed',
+  'clarification.requested', 'approval.requested', 'approval.resolved',
+  'desktop.context.requested', 'desktop.context.provided',
+  'desktop.action.proposed', 'desktop.action.result',
+  'artifact.created', 'speech.started', 'speech.audio', 'speech.stopped',
+  'interruption.detected', 'error'
+]);
+
 const MAX_INSTRUCTION_CHARS = 4000;
 const MAX_CONTEXT_CHARS = 12000;
 const MAX_ACTION_TEXT_CHARS = 24000;
@@ -129,12 +141,96 @@ const DEFAULT_SETTINGS = Object.freeze({
   language: 'en'
 });
 
+const desktopProposalSchema = z.object({
+  proposal_id: z.string().uuid(),
+  action_type: z.enum(actionTypes),
+  payload: z.object({
+    text: z.string().max(MAX_ACTION_TEXT_CHARS).optional(),
+    matrix: z.array(z.array(z.string().max(4000)).max(100)).max(100).optional(),
+    url: z.string().url().max(2048).optional(),
+    route: z.string().max(240).optional(),
+    matter_id: z.string().max(240).optional()
+  }).strict(),
+  summary: z.string().min(1).max(1000),
+  target_fingerprint: targetFingerprintSchema.nullable(),
+  context_snapshot_id: z.string().uuid().nullable().optional(),
+  created_at: z.string().datetime(),
+  expires_at: z.string().datetime(),
+  confirmation_class: z.enum(['client_policy', 'always', 'selection_explicit']),
+  idempotency_key: z.string().min(1).max(200),
+  conversation_id: z.string().uuid(),
+  voice_session_id: z.string().uuid(),
+  turn_id: z.string().uuid(),
+  run_id: z.string().uuid()
+}).strict();
+
+const desktopEventSchema = z.object({
+  protocol_version: z.literal(DESKTOP_VOICE_PROTOCOL_VERSION),
+  event_id: z.string().uuid(),
+  event_type: z.enum(DESKTOP_VOICE_EVENT_TYPES),
+  sequence: z.number().int().nonnegative(),
+  timestamp: z.string().datetime(),
+  conversation_id: z.string().uuid(),
+  voice_session_id: z.string().uuid(),
+  turn_id: z.string().uuid().nullable().optional(),
+  run_id: z.string().uuid().nullable().optional(),
+  payload: z.record(z.any())
+}).strict();
+
+function contextForRealtime(context, contextSnapshotId) {
+  const sanitized = screenContextSchema.parse(context);
+  return {
+    context_snapshot_id: contextSnapshotId,
+    captured_at: new Date().toISOString(),
+    active_application: sanitized.activeApplication,
+    process_name: sanitized.processName,
+    window_title: sanitized.windowTitle,
+    focused_element: {
+      role: sanitized.focusedElement.role,
+      name: sanitized.focusedElement.name,
+      is_editable: sanitized.focusedElement.isEditable,
+      is_password: sanitized.focusedElement.isPassword,
+      bounds: sanitized.focusedElement.bounds
+    },
+    selected_text: sanitized.selectedText,
+    surrounding_text: sanitized.surroundingText,
+    accessible_document_text: sanitized.accessibleDocumentText,
+    target_fingerprint: sanitized.targetFingerprint,
+    collection_method: sanitized.collectionMethod,
+    untrusted: true
+  };
+}
+
+function proposalToDecision(proposal) {
+  const parsed = desktopProposalSchema.parse(proposal);
+  return {
+    intent: parsed.action_type === 'replace_selection' ? 'replace_selection' : 'insert',
+    spokenResponse: '',
+    displayResponse: parsed.summary,
+    proposedActions: [{
+      type: parsed.action_type,
+      arguments: {
+        ...parsed.payload,
+        matterId: parsed.payload.matter_id
+      },
+      targetFingerprint: parsed.target_fingerprint,
+      requiresConfirmation: parsed.confirmation_class === 'always'
+    }],
+    confidence: 1,
+    contextUsed: [],
+    proposal: parsed
+  };
+}
+
 function parseAgentDecision(value) {
   return agentDecisionSchema.parse(value);
 }
 
 function parseSettings(value) {
-  const migrated = { ...DEFAULT_SETTINGS, ...(value || {}) };
+  const source = value && typeof value === 'object' ? value : {};
+  const migrated = Object.fromEntries(Object.entries(DEFAULT_SETTINGS).map(([key, fallback]) => (
+    [key, Object.prototype.hasOwnProperty.call(source, key) ? source[key] : fallback]
+  )));
   // Electron accelerator syntax accepts letter keys consistently across the
   // supported packaged targets. Older builds persisted the word "Period",
   // which Electron 32 rejects during native argument conversion.
@@ -161,5 +257,11 @@ module.exports = {
   agentDecisionSchema,
   voiceSettingsSchema,
   parseAgentDecision,
-  parseSettings
+  parseSettings,
+  DESKTOP_VOICE_PROTOCOL_VERSION,
+  DESKTOP_VOICE_EVENT_TYPES,
+  desktopProposalSchema,
+  desktopEventSchema,
+  contextForRealtime,
+  proposalToDecision
 };

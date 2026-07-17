@@ -24,6 +24,17 @@
   let captureStopRequested = null;
   let capturePhase = 'idle';
   let playback = null;
+  let realtimeSocket = null;
+  let realtimeProcessor = null;
+  let realtimeSource = null;
+  let realtimeIntentionalClose = false;
+  let realtimeStartPayload = null;
+  let realtimeReconnectTimer = null;
+  let realtimeReconnectAttempt = 0;
+  let realtimeAudioQueue = [];
+  let realtimeAudioPlaying = false;
+  let realtimeConnected = false;
+  let bargeInStartedAt = 0;
   let detailsOpen = true;
   let drawerTimer = null;
   let resizeFrame = null;
@@ -98,8 +109,8 @@
     const captureStarting = state === 'listening' && ['idle', 'preparing', 'chiming'].includes(capturePhase);
     const captureReleasing = state === 'listening' && capturePhase === 'releasing';
     els.shortcutKeys.textContent = captureReleasing ? '' : shortcutLabel;
-    els.shortcutVerb.textContent = captureReady ? 'Release' : captureStarting ? 'Keep holding' : captureReleasing ? 'Processing' : 'Hold';
-    els.shortcutAction.textContent = captureReady ? 'to process' : captureStarting ? 'until ready' : captureReleasing ? 'audio…' : 'to speak';
+    els.shortcutVerb.textContent = realtimeConnected ? 'Listening' : captureReady ? 'Release' : captureStarting ? 'Keep holding' : captureReleasing ? 'Processing' : 'Hold';
+    els.shortcutAction.textContent = realtimeConnected ? 'pauses send turns' : captureReady ? 'to process' : captureStarting ? 'until ready' : captureReleasing ? 'audio…' : 'to speak';
     els.shortcutHint.title = `${els.shortcutVerb.textContent} ${els.shortcutKeys.textContent} ${els.shortcutAction.textContent}`.trim();
     els.title.textContent = copy[0];
     els.shell.setAttribute('aria-label', `${copy[0]}. ${session.error?.message || copy[1]}`);
@@ -123,8 +134,9 @@
     const decision = session.decision;
     els.preview.hidden = state !== 'previewing';
     els.previewText.value = decision?.displayResponse || '';
-    els.confirm.hidden = !decision?.proposedActions?.length;
-    if (decision?.proposedActions?.[0]?.type === 'open_url') els.confirm.textContent = 'Open browser';
+    els.confirm.hidden = !decision?.proposedActions?.length && !session.serverApproval;
+    if (session.serverApproval) els.confirm.textContent = 'Approve';
+    else if (decision?.proposedActions?.[0]?.type === 'open_url') els.confirm.textContent = 'Open browser';
     else if (decision?.proposedActions?.[0]?.type === 'navigate_client') els.confirm.textContent = 'Open in LANA';
     else if (decision?.proposedActions?.[0]?.type === 'replace_selection') els.confirm.textContent = 'Replace';
     else if (decision?.proposedActions?.[0]?.type === 'insert_table') els.confirm.textContent = 'Insert cells';
@@ -318,6 +330,151 @@
     stream = null; recorder = null; chunks = [];
   }
 
+  function sendRealtimeMessage(message) {
+    if (realtimeSocket?.readyState === WebSocket.OPEN) realtimeSocket.send(JSON.stringify(message));
+  }
+
+  function stopRealtimePlayback(reason = 'stopped') {
+    if (playback) {
+      try { playback.pause(); } catch (_) {}
+      try { playback.currentTime = 0; } catch (_) {}
+    }
+    playback = null;
+    realtimeAudioQueue = [];
+    realtimeAudioPlaying = false;
+    if (reason === 'barge_in') {
+      sendRealtimeMessage({ type: 'interruption.detected', reason: 'barge_in' });
+    }
+  }
+
+  function playNextRealtimeAudio() {
+    if (realtimeAudioPlaying || !realtimeAudioQueue.length) return;
+    const item = realtimeAudioQueue.shift();
+    realtimeAudioPlaying = true;
+    playback = new Audio(`data:${item.mime_type || 'audio/wav'};base64,${item.base64}`);
+    const done = () => {
+      playback = null;
+      realtimeAudioPlaying = false;
+      playNextRealtimeAudio();
+    };
+    playback.addEventListener('ended', done, { once: true });
+    playback.addEventListener('error', done, { once: true });
+    playback.play().catch(done);
+  }
+
+  function handleRealtimeMicrophone(input) {
+    if (!realtimeSocket || realtimeSocket.readyState !== WebSocket.OPEN) return;
+    const chunk = new Float32Array(input);
+    let sum = 0;
+    for (const value of chunk) sum += value * value;
+    const rms = Math.sqrt(sum / Math.max(1, chunk.length));
+    els.meter.value = Math.round(Math.min(1, rms * 4) * 100);
+    if (realtimeAudioPlaying && rms > 0.055) {
+      bargeInStartedAt = bargeInStartedAt || performance.now();
+      if (performance.now() - bargeInStartedAt > 320) stopRealtimePlayback('barge_in');
+    } else if (!realtimeAudioPlaying || rms <= 0.055) {
+      bargeInStartedAt = 0;
+    }
+    if (!realtimeAudioPlaying) realtimeSocket.send(chunk.buffer);
+  }
+
+  async function handleDesktopRealtimeEvent(event) {
+    if (event.event_type === 'speech.audio' && event.payload?.audio?.base64) {
+      realtimeAudioQueue.push(event.payload.audio);
+      playNextRealtimeAudio();
+    }
+    if (event.event_type === 'speech.stopped' && event.payload?.reason === 'interrupted') {
+      stopRealtimePlayback('server_interrupted');
+    }
+    const result = await window.screenVoice.realtimeEvent(event);
+    for (const message of result?.messages || []) sendRealtimeMessage(message);
+  }
+
+  function bindRealtimeSocket(socket, payload) {
+    realtimeSocket = socket;
+    socket.binaryType = 'arraybuffer';
+    socket.addEventListener('open', () => {
+      realtimeConnected = true;
+      realtimeReconnectAttempt = 0;
+      socket.send(JSON.stringify({ ...payload.start, sample_rate: audioContext?.sampleRate || 16000 }));
+      reportCaptureStatus('recording_started');
+      setCapturePhase('recording');
+    });
+    socket.addEventListener('message', (messageEvent) => {
+      let message;
+      try { message = JSON.parse(String(messageEvent.data || '{}')); } catch (_) { return; }
+      if (message.event === 'desktop_event' && message.data) handleDesktopRealtimeEvent(message.data).catch(() => {});
+      if (message.event === 'error' && !message.data) window.screenVoice.captureError(message.code || 'PROVIDER_ERROR');
+    });
+    socket.addEventListener('close', async (event) => {
+      realtimeConnected = false;
+      if (realtimeSocket === socket) realtimeSocket = null;
+      window.screenVoice.realtimeDisconnected(event.code, event.reason).catch(() => {});
+      if (realtimeIntentionalClose) return;
+      clearTimeout(realtimeReconnectTimer);
+      realtimeReconnectAttempt += 1;
+      realtimeReconnectTimer = setTimeout(async () => {
+        try {
+          const next = await window.screenVoice.realtimeReconnect();
+          realtimeStartPayload = next;
+          bindRealtimeSocket(new WebSocket(next.websocketUrl), next);
+        } catch (_) {
+          window.screenVoice.captureError('NETWORK_UNAVAILABLE');
+        }
+      }, Math.min(10000, 500 * (2 ** realtimeReconnectAttempt)));
+    });
+  }
+
+  async function startRealtime(payload) {
+    await stopRealtime({ preserveState: true });
+    realtimeIntentionalClose = false;
+    realtimeStartPayload = payload;
+    setCapturePhase('preparing');
+    reportCaptureStatus('requesting_microphone');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false
+      });
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioContext = new AudioContextClass();
+      realtimeSource = audioContext.createMediaStreamSource(stream);
+      realtimeProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+      realtimeProcessor.onaudioprocess = (event) => handleRealtimeMicrophone(event.inputBuffer.getChannelData(0));
+      realtimeSource.connect(realtimeProcessor);
+      realtimeProcessor.connect(audioContext.destination);
+      reportCaptureStatus('microphone_ready', { trackCount: stream.getAudioTracks().length });
+      bindRealtimeSocket(new WebSocket(payload.websocketUrl), payload);
+    } catch (error) {
+      await stopRealtime();
+      window.screenVoice.captureError(error?.name === 'NotAllowedError' ? 'MICROPHONE_DENIED' : 'MICROPHONE_UNAVAILABLE');
+    }
+  }
+
+  async function stopRealtime(options = {}) {
+    realtimeIntentionalClose = true;
+    realtimeConnected = false;
+    clearTimeout(realtimeReconnectTimer);
+    realtimeReconnectTimer = null;
+    stopRealtimePlayback('stopped');
+    if (realtimeSocket) {
+      try { realtimeSocket.close(1000, 'client_stopped'); } catch (_) {}
+    }
+    realtimeSocket = null;
+    if (realtimeProcessor) {
+      realtimeProcessor.disconnect();
+      realtimeProcessor.onaudioprocess = null;
+    }
+    realtimeProcessor = null;
+    if (realtimeSource) realtimeSource.disconnect();
+    realtimeSource = null;
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+    stream = null;
+    if (audioContext) await audioContext.close().catch(() => {});
+    audioContext = null;
+    if (!options.preserveState) setCapturePhase('idle');
+  }
+
   els.undo.addEventListener('click', () => window.screenVoice.undo());
   els.confirm.addEventListener('click', () => window.screenVoice.confirm(snapshot.session?.id));
   els.copy.addEventListener('click', () => window.screenVoice.copy(els.previewText.value));
@@ -369,6 +526,9 @@
 
   window.screenVoice.onState(render);
   window.screenVoice.onStartCapture(startCapture);
+  window.screenVoice.onStartRealtime(startRealtime);
+  window.screenVoice.onStopRealtime(() => stopRealtime());
+  window.screenVoice.onRealtimeSend((message) => sendRealtimeMessage(message));
   window.screenVoice.onStopCapture(({ discard }) => stopCapture(discard));
   window.screenVoice.onShowDetails(() => {
     detailsOpen = true;
@@ -381,7 +541,7 @@
     playback = new Audio(`data:${mimeType || 'audio/wav'};base64,${base64}`);
     playback.play().catch(() => {});
   });
-  window.addEventListener('beforeunload', cleanupCapture);
+  window.addEventListener('beforeunload', () => { cleanupCapture(); stopRealtime(); });
   if ('ResizeObserver' in window) new ResizeObserver(syncOverlayHeight).observe(els.shell);
   labelLexButton(els.undo, 'Undo last voice edit');
   labelLexButton(els.info, 'Voice details');

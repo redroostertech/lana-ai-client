@@ -24,4 +24,15 @@ describe('VoiceApiClient error classification', () => {
     await expect(client.decide({ instruction: 'Summarize this' }))
       .rejects.toMatchObject({ code: 'PROVIDER_ERROR', status: 503 });
   });
+
+  test('builds an authenticated realtime websocket URL from a one-time token', async () => {
+    const client = clientWithResponse(201, { data: {
+      token: 'once', realtime_path: '/api/v1/voice/realtime',
+      desktop_realtime_hermes_enabled: true,
+      desktop_protocol_version: 'desktop-voice.v1'
+    } });
+    const config = await client.realtimeConfig();
+    expect(config.websocket_url).toBe('ws://lana.test/api/v1/voice/realtime?voice_token=once');
+    expect(config.desktop_realtime_hermes_enabled).toBe(true);
+  });
 });
