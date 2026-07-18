@@ -427,6 +427,29 @@
     realtimeSocket.send(JSON.stringify({ type: 'flush' }));
   }
 
+  async function stopRealtimeInputCapture() {
+    realtimeCanSendAudio = false;
+    realtimePendingAudio = [];
+    realtimeInputSource = null;
+    clearTimeout(realtimePumpFallbackTimer);
+    realtimePumpFallbackTimer = null;
+    clearInterval(realtimeInputTimer);
+    realtimeInputTimer = null;
+    if (realtimeProcessor) {
+      realtimeProcessor.disconnect();
+      realtimeProcessor.onaudioprocess = null;
+    }
+    realtimeProcessor = null;
+    if (realtimeSource) realtimeSource.disconnect();
+    realtimeSource = null;
+    realtimeAnalyser = null;
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+    stream = null;
+    if (audioContext) await audioContext.close().catch(() => {});
+    audioContext = null;
+    els.meter.value = 0;
+  }
+
   function stopRealtimePlayback(reason = 'stopped') {
     const interruptedSpeechId = activeSpeechId;
     if (playback) {
@@ -569,7 +592,7 @@
         maybeFlushPendingRealtimeTurn();
       }
       if (message.event === 'turn_processing') {
-        realtimeCanSendAudio = false;
+        stopRealtimeInputCapture().catch(() => {});
       }
       if (message.event === 'error' && !message.data) window.screenVoice.captureError(message.code || 'PROVIDER_ERROR');
     });
@@ -657,11 +680,6 @@
     realtimeIntentionalClose = true;
     realtimeConnected = false;
     realtimeReady = false;
-    realtimeCanSendAudio = false;
-    realtimePendingAudio = [];
-    realtimeInputSource = null;
-    clearTimeout(realtimePumpFallbackTimer);
-    realtimePumpFallbackTimer = null;
     clearTimeout(realtimeReconnectTimer);
     realtimeReconnectTimer = null;
     if (!options.preservePlayback) stopRealtimePlayback('stopped');
@@ -669,20 +687,7 @@
       try { realtimeSocket.close(1000, 'client_stopped'); } catch (_) {}
     }
     realtimeSocket = null;
-    if (realtimeProcessor) {
-      realtimeProcessor.disconnect();
-      realtimeProcessor.onaudioprocess = null;
-    }
-    realtimeProcessor = null;
-    if (realtimeSource) realtimeSource.disconnect();
-    realtimeSource = null;
-    clearInterval(realtimeInputTimer);
-    realtimeInputTimer = null;
-    realtimeAnalyser = null;
-    if (stream) stream.getTracks().forEach((track) => track.stop());
-    stream = null;
-    if (audioContext) await audioContext.close().catch(() => {});
-    audioContext = null;
+    await stopRealtimeInputCapture();
     if (!options.preserveState) setCapturePhase('idle');
   }
 
