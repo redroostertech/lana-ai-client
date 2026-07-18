@@ -31,12 +31,27 @@ body { padding: 4px; color: var(--lex-text-primary); }
   flex: 0 0 24px;
   display: block;
 }
-.level-meter { display: none; width: 36px; flex: 1 1 36px; max-width: 48px; }
+.level-meter {
+  display: none;
+  width: 36px;
+  flex: 1 1 36px;
+  max-width: 48px;
+  filter: drop-shadow(0 0 6px rgb(20 184 166 / .22));
+}
 .listening .level-meter,
 .transcribing .level-meter,
 .thinking .level-meter,
 .gathering_context .level-meter,
 .executing .level-meter { display: block; opacity: 1; }
+.level-meter .lex-pb-fill {
+  background: linear-gradient(90deg, #0f766e 0%, #14b8a6 44%, #67e8f9 100%) !important;
+  box-shadow:
+    0 0 8px rgb(20 184 166 / .45),
+    inset 0 1px 0 rgb(255 255 255 / .28);
+}
+.listening .level-meter .lex-pb-fill {
+  background: linear-gradient(90deg, #0d9488 0%, #2dd4bf 48%, #a7f3d0 100%) !important;
+}
 .voice-wave {
   display: none;
   align-items: center;
@@ -50,7 +65,10 @@ body { padding: 4px; color: var(--lex-text-primary); }
   width: 4px;
   height: 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--lex-color-white) 86%, transparent);
+  background: linear-gradient(180deg, #a7f3d0 0%, #2dd4bf 48%, #0f766e 100%);
+  box-shadow:
+    0 0 8px rgb(20 184 166 / .48),
+    inset 0 1px 0 rgb(255 255 255 / .32);
   transform-origin: center;
   animation: voice-wave 860ms ease-in-out infinite;
 }

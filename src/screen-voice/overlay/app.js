@@ -130,7 +130,7 @@
       gathering_context: ['Reading', '', 'this window…'],
       thinking: ['Thinking', '', 'through your request…'],
       executing: ['Applying', '', 'the approved action…'],
-      speaking: ['LANA', '', 'is speaking…'],
+      speaking: ['Speaking', '', ''],
       previewing: ['Review', '', 'the proposed response'],
       canceled: ['Canceled', '', ''],
       error: ['Voice', '', 'needs attention']
