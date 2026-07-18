@@ -43,6 +43,7 @@
 
   let stylesInjected = false;
   const CHAT_SECTION_COLLAPSED_KEY = 'lana:sidebar:chatsCollapsed';
+  const WORKSPACE_SECTION_COLLAPSED_KEY = 'lana:sidebar:workspacesCollapsed';
 
   function injectStyles() {
     if (stylesInjected) return;
@@ -663,7 +664,7 @@
         outline: none;
       }
 
-      .lex-sidebar-section-has-conversations[data-collapsed="true"] .lex-sidebar-section-toggle-icon {
+      .lex-sidebar-collapsible-section[data-collapsed="true"] .lex-sidebar-section-toggle-icon {
         transform: translateY(-50%) rotate(-90deg);
       }
 
@@ -674,7 +675,7 @@
         min-width: 0;
       }
 
-      .lex-sidebar-section-has-conversations[data-collapsed="true"] .lex-sidebar-section-content {
+      .lex-sidebar-collapsible-section[data-collapsed="true"] .lex-sidebar-section-content {
         display: none;
       }
 
@@ -745,13 +746,116 @@
         background: var(--_sb-text-muted);
       }
 
-      /* Conversation list section */
-      .lex-sidebar-section-has-conversations {
+      /* Collapsible dynamic sections */
+      .lex-sidebar-collapsible-section {
         display: flex;
         flex-direction: column;
         margin-top: 0.5rem;
         padding-top: 0.75rem;
         border-top: 1px solid var(--_sb-border);
+      }
+
+      .lex-sidebar-dynamic-list {
+        margin-top: 0.25rem;
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      .lex-sidebar-dynamic-empty,
+      .lex-sidebar-dynamic-error,
+      .lex-sidebar-dynamic-loading {
+        padding: 0.5rem 0.75rem;
+        color: var(--_sb-text-muted);
+        font-size: var(--lex-body-xs-size, 0.75rem);
+        line-height: 1.4;
+      }
+
+      .lex-sidebar-workspace-item {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        width: 100%;
+        min-width: 0;
+        min-height: 2.25rem;
+        padding: 0.375rem 0.75rem;
+        border: 0;
+        border-radius: var(--lex-radius-lg, 8px);
+        background: transparent;
+        color: var(--_sb-text);
+        cursor: pointer;
+        text-align: left;
+        transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-workspace-item:hover,
+      .lex-sidebar-workspace-item:focus-visible {
+        background: var(--_sb-hover-bg);
+        color: var(--_sb-text-active);
+        outline: none;
+      }
+
+      .lex-sidebar-workspace-icon {
+        display: inline-flex;
+        flex: 0 0 auto;
+        color: var(--_sb-text-muted);
+      }
+
+      .lex-sidebar-workspace-copy {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      .lex-sidebar-workspace-name {
+        overflow: hidden;
+        color: currentColor;
+        font-size: var(--lex-body-sm-size, 0.875rem);
+        font-weight: var(--lex-weight-medium, 500);
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lex-sidebar-workspace-meta {
+        overflow: hidden;
+        color: var(--_sb-text-muted);
+        font-size: var(--lex-body-xs-size, 0.75rem);
+        line-height: 1.3;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lex-sidebar-show-more {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 2rem;
+        margin-top: 0.25rem;
+        padding: 0.375rem 0.75rem;
+        border: 1px solid color-mix(in srgb, var(--_sb-text-muted) 24%, transparent);
+        border-radius: var(--lex-radius-lg, 8px);
+        background: transparent;
+        color: var(--_sb-text);
+        cursor: pointer;
+        font-size: var(--lex-body-xs-size, 0.75rem);
+        font-weight: var(--lex-weight-medium, 500);
+        transition: background var(--lex-transition-fast),
+                    border-color var(--lex-transition-fast),
+                    color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-show-more:hover,
+      .lex-sidebar-show-more:focus-visible {
+        background: var(--_sb-hover-bg);
+        border-color: color-mix(in srgb, var(--_sb-text-muted) 44%, transparent);
+        color: var(--_sb-text-active);
+        outline: none;
+      }
+
+      /* Conversation list section */
+      .lex-sidebar-section-has-conversations {
+        display: flex;
+        flex-direction: column;
       }
 
       .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list {
@@ -1703,33 +1807,49 @@
     // -----------------------------------------------------------------------
 
     _renderSection(section) {
-      const sectionClass = section.isConversationList ? 'lex-sidebar-section lex-sidebar-section-has-conversations' : 'lex-sidebar-section';
       const isConversationList = !!section.isConversationList;
-      const contentId = isConversationList ? this._getSectionContentId(section) : '';
-      const isCollapsed = isConversationList ? this._getChatSectionCollapsed() : false;
-      const collapsedAttr = isConversationList ? ` data-collapsed="${isCollapsed}"` : '';
+      const isWorkspaceList = !!section.isWorkspaceList;
+      const isCollapsible = isConversationList || isWorkspaceList;
+      const sectionClass = [
+        'lex-sidebar-section',
+        isCollapsible ? 'lex-sidebar-collapsible-section' : '',
+        isConversationList ? 'lex-sidebar-section-has-conversations' : '',
+        isWorkspaceList ? 'lex-sidebar-section-has-workspaces' : ''
+      ].filter(Boolean).join(' ');
+      const contentId = isCollapsible ? this._getSectionContentId(section) : '';
+      const isCollapsed = isCollapsible ? this._getSectionCollapsed(section) : false;
+      const collapsedAttr = isCollapsible ? ` data-collapsed="${isCollapsed}" data-section-id="${this.escapeHtml(section.id || '')}"` : '';
       let html = `<div class="${sectionClass}"${collapsedAttr}>`;
       if (section.title) {
-        if (isConversationList) {
+        if (isCollapsible) {
+          const action = isWorkspaceList ? 'create-workspace' : 'create-conversation';
+          const actionLabel = isWorkspaceList ? 'New workspace' : 'New chat';
+          const actionIcon = isWorkspaceList
+            ? (icon('plus', 'small') || icon('briefcase', 'small'))
+            : (icon('edit', 'small') || icon('file-plus', 'small') || icon('plus', 'small'));
           html += `<div class="lex-sidebar-section-toggle-row">
-            <button type="button" class="lex-sidebar-section-toggle" data-action="toggle-conversation-section" aria-expanded="${!isCollapsed}" aria-controls="${contentId}">
+            <button type="button" class="lex-sidebar-section-toggle" data-action="toggle-dynamic-section" aria-expanded="${!isCollapsed}" aria-controls="${contentId}">
               <span class="lex-sidebar-section-toggle-label">${this.escapeHtml(section.title)}</span>
               <span class="lex-sidebar-section-toggle-icon">${icon('chevron-down', 'small')}</span>
             </button>
-            <button type="button" class="lex-sidebar-section-create" data-action="create-conversation" aria-label="New chat" title="New chat">
-              ${icon('edit', 'small') || icon('file-plus', 'small') || icon('plus', 'small')}
+            <button type="button" class="lex-sidebar-section-create" data-action="${action}" aria-label="${actionLabel}" title="${actionLabel}">
+              ${actionIcon}
             </button>
           </div>`;
         } else {
           html += `<div class="lex-sidebar-section-title">${this.escapeHtml(section.title)}</div>`;
         }
       }
-      if (isConversationList) {
+      if (isCollapsible) {
         html += `<div class="lex-sidebar-section-content" id="${contentId}">`;
       }
       html += this._renderSectionItems(section.items);
       if (isConversationList) {
         html += `<div class="lex-sidebar-conversation-list" id="lexConversationListContainer"></div>`;
+      } else if (isWorkspaceList) {
+        html += `<div class="lex-sidebar-dynamic-list lex-sidebar-workspace-list" id="lexWorkspaceListContainer"></div>`;
+      }
+      if (isCollapsible) {
         html += `</div>`;
       }
       html += `</div>`;
@@ -1742,25 +1862,33 @@
       return 'lex-sidebar-section-content-' + safeId;
     }
 
-    _getChatSectionCollapsed() {
+    _getSectionCollapsed(section) {
+      const key = section && section.isWorkspaceList ? WORKSPACE_SECTION_COLLAPSED_KEY : CHAT_SECTION_COLLAPSED_KEY;
+      const fallback = section && section.isWorkspaceList ? this._workspaceSectionCollapsed : this._chatSectionCollapsed;
       try {
-        return localStorage.getItem(CHAT_SECTION_COLLAPSED_KEY) === 'true';
+        return localStorage.getItem(key) === 'true';
       } catch (_) {
-        return this._chatSectionCollapsed === true;
+        return fallback === true;
       }
     }
 
-    _setChatSectionCollapsed(collapsed) {
-      this._chatSectionCollapsed = collapsed === true;
+    _setSectionCollapsed(section, collapsed) {
+      const isWorkspaceList = section && section.classList && section.classList.contains('lex-sidebar-section-has-workspaces');
+      const key = isWorkspaceList ? WORKSPACE_SECTION_COLLAPSED_KEY : CHAT_SECTION_COLLAPSED_KEY;
+      if (isWorkspaceList) {
+        this._workspaceSectionCollapsed = collapsed === true;
+      } else {
+        this._chatSectionCollapsed = collapsed === true;
+      }
       try {
-        localStorage.setItem(CHAT_SECTION_COLLAPSED_KEY, String(this._chatSectionCollapsed));
+        localStorage.setItem(key, String(collapsed === true));
       } catch (_) { /* localStorage can be unavailable in restricted contexts */ }
     }
 
-    _syncConversationSectionState(section, collapsed) {
+    _syncDynamicSectionState(section, collapsed) {
       if (!section) return;
       section.dataset.collapsed = String(collapsed);
-      const toggle = section.querySelector('[data-action="toggle-conversation-section"]');
+      const toggle = section.querySelector('[data-action="toggle-dynamic-section"]');
       if (toggle) {
         toggle.setAttribute('aria-expanded', String(!collapsed));
       }
@@ -1890,6 +2018,137 @@
 
 
     // -----------------------------------------------------------------------
+    // Workspace section
+    // -----------------------------------------------------------------------
+
+    _getApiClient() {
+      if (window.api) return window.api;
+      if (typeof api !== 'undefined') return api;
+      return null;
+    }
+
+    async _initWorkspaceList() {
+      const container = this.querySelector('#lexWorkspaceListContainer');
+      if (!container) return;
+
+      if (Array.isArray(this._workspaceItems)) {
+        this._renderWorkspaceList(container);
+        return;
+      }
+
+      if (this._workspaceListLoading) return;
+      this._workspaceListLoading = true;
+      container.innerHTML = '<div class="lex-sidebar-dynamic-loading">Loading workspaces...</div>';
+
+      try {
+        const client = this._getApiClient();
+        if (!client || typeof client.getMatters !== 'function') {
+          throw new Error('Workspace API unavailable');
+        }
+
+        const result = await client.getMatters(1, 11, {
+          status: 'active',
+          sort_by: 'created_at',
+          sort_order: 'desc'
+        });
+        const rows = (result.matters || result.data || result.items || [])
+          .filter(Boolean)
+          .sort((a, b) => {
+            const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
+            const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
+            return bTime - aTime;
+          });
+
+        const total = Number(result.total || result.count || (result.pagination && result.pagination.total) || 0);
+        this._workspaceItems = rows.slice(0, 10);
+        this._workspaceHasMore = total > 10 || rows.length > 10;
+        this._renderWorkspaceList(container);
+      } catch (error) {
+        console.error('[lex-sidebar] Failed to load workspaces:', error);
+        container.innerHTML = '<div class="lex-sidebar-dynamic-error">Could not load workspaces</div>';
+      } finally {
+        this._workspaceListLoading = false;
+        requestAnimationFrame(() => this._updateScrollableFades());
+      }
+    }
+
+    _renderWorkspaceList(container) {
+      const rows = Array.isArray(this._workspaceItems) ? this._workspaceItems : [];
+      if (!rows.length) {
+        container.innerHTML = '<div class="lex-sidebar-dynamic-empty">No workspaces yet</div>';
+        return;
+      }
+
+      const html = rows.map((workspace) => this._renderWorkspaceItem(workspace)).join('');
+      const showMore = this._workspaceHasMore
+        ? '<button type="button" class="lex-sidebar-show-more" data-action="show-more-workspaces">Show More</button>'
+        : '';
+      container.innerHTML = html + showMore;
+    }
+
+    _renderWorkspaceItem(workspace) {
+      const id = workspace.matter_id || workspace.id || '';
+      const name = workspace.name || workspace.matter_name || workspace.title || 'Untitled Workspace';
+      const created = this._formatWorkspaceCreated(workspace.created_at || workspace.updated_at);
+      return `<button type="button" class="lex-sidebar-workspace-item" data-workspace-id="${this.escapeHtml(id)}" title="${this.escapeHtml(name)}">
+        <span class="lex-sidebar-workspace-icon">${icon('briefcase', 'small') || icon('folder', 'small')}</span>
+        <span class="lex-sidebar-workspace-copy">
+          <span class="lex-sidebar-workspace-name">${this.escapeHtml(name)}</span>
+          ${created ? `<span class="lex-sidebar-workspace-meta">${this.escapeHtml(created)}</span>` : ''}
+        </span>
+      </button>`;
+    }
+
+    _formatWorkspaceCreated(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      const now = Date.now();
+      const diffMs = now - date.getTime();
+      const minute = 60 * 1000;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+      if (diffMs >= 0 && diffMs < hour) return 'Created recently';
+      if (diffMs >= 0 && diffMs < day) {
+        const hours = Math.max(1, Math.floor(diffMs / hour));
+        return 'Created ' + hours + 'h ago';
+      }
+      if (diffMs >= 0 && diffMs < day * 7) {
+        const days = Math.max(1, Math.floor(diffMs / day));
+        return 'Created ' + days + 'd ago';
+      }
+      return 'Created ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+
+    _openWorkspace(workspaceId) {
+      if (!workspaceId) return;
+      const href = 'workspace-details.html?id=' + encodeURIComponent(workspaceId);
+      if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
+        window.Lex.Nav.go('workspace-details.html', {
+          params: { id: workspaceId, tab: 'activity' },
+          context: { matterId: workspaceId, tab: 'activity' }
+        });
+      } else {
+        window.location.href = this._getAppPrefix() + href;
+      }
+    }
+
+    _openWorkspacesIndex(options = {}) {
+      const href = 'workspaces.html' + (options.create ? '?action=create' : '');
+      const createBtn = options.create ? document.getElementById('createMatterBtn') : null;
+      if (createBtn) {
+        createBtn.click();
+        return;
+      }
+      if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function' && !options.create) {
+        window.Lex.Nav.go('workspaces.html');
+      } else {
+        window.location.href = this._getAppPrefix() + href;
+      }
+    }
+
+
+    // -----------------------------------------------------------------------
     // Event binding
     // -----------------------------------------------------------------------
 
@@ -1930,14 +2189,14 @@
         }
       });
 
-      this.delegate('click', '[data-action="toggle-conversation-section"]', (e, target) => {
+      this.delegate('click', '[data-action="toggle-dynamic-section"]', (e, target) => {
         e.preventDefault();
         e.stopPropagation();
-        const section = target.closest('.lex-sidebar-section-has-conversations');
+        const section = target.closest('.lex-sidebar-collapsible-section');
         if (!section) return;
         const collapsed = section.dataset.collapsed !== 'true';
-        this._setChatSectionCollapsed(collapsed);
-        this._syncConversationSectionState(section, collapsed);
+        this._setSectionCollapsed(section, collapsed);
+        this._syncDynamicSectionState(section, collapsed);
         requestAnimationFrame(() => this._updateScrollableFades());
       });
 
@@ -1947,6 +2206,23 @@
         if (typeof window.openNewProjectModal === 'function') {
           window.openNewProjectModal();
         }
+      });
+
+      this.delegate('click', '[data-action="create-workspace"]', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._openWorkspacesIndex({ create: true });
+      });
+
+      this.delegate('click', '[data-action="show-more-workspaces"]', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._openWorkspacesIndex();
+      });
+
+      this.delegate('click', '[data-workspace-id]', (e, target) => {
+        e.preventDefault();
+        this._openWorkspace(target.dataset.workspaceId || '');
       });
 
       // Outside-click + Escape dismiss for the app-switcher menu. Bound once
@@ -2093,6 +2369,7 @@
       // _emitCollapsedState() is guarded internally — it is a no-op when the
       // collapsed value has not changed since the last emission.
       this._emitCollapsedState();
+      this._initWorkspaceList();
     }
   }
 

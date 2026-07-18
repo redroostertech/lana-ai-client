@@ -152,6 +152,13 @@ const MenuConfig = {
         ]
       },
       {
+        id: 'workspace-recents',
+        title: 'Workspaces',
+        requiredRoles: [],
+        isWorkspaceList: true,
+        items: []
+      },
+      {
         id: 'projects',
         title: 'Recents',
         requiredRoles: [],
@@ -267,6 +274,13 @@ const MenuConfig = {
         ]
       },
       {
+        id: 'workspace-recents',
+        title: 'Workspaces',
+        requiredRoles: [],
+        isWorkspaceList: true,
+        items: []
+      },
+      {
         id: 'projects',
         title: 'Recents',
         requiredRoles: [],
@@ -329,6 +343,13 @@ const MenuConfig = {
             requiredRoles: ADMIN_ROLES
           },
         ]
+      },
+      {
+        id: 'workspace-recents',
+        title: 'Workspaces',
+        requiredRoles: [],
+        isWorkspaceList: true,
+        items: []
       },
       {
         id: 'projects',
@@ -395,6 +416,13 @@ const MenuConfig = {
         ]
       },
       {
+        id: 'workspace-recents',
+        title: 'Workspaces',
+        requiredRoles: [],
+        isWorkspaceList: true,
+        items: []
+      },
+      {
         id: 'projects',
         title: 'Recents',
         requiredRoles: [],
@@ -459,6 +487,13 @@ const MenuConfig = {
             requiredRoles: ADMIN_ROLES
           },
         ]
+      },
+      {
+        id: 'chat-workspace-recents',
+        title: 'Workspaces',
+        requiredRoles: [],
+        isWorkspaceList: true,
+        items: []
       },
       {
         id: 'chat-projects',

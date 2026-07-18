@@ -963,7 +963,6 @@
             { id: 'new-chat', label: 'New Chat', isButton: true, onClick: 'openNewProjectModal', variant: 'create-chat' },
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
             { id: 'my-tasks', label: 'My Tasks', icon: 'clipboard-check', href: 'my-tasks.html' },
-            { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' },
             { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html', children: [
               { id: 'library-all-sources', label: 'All Sources', href: 'drive.html' },
               { id: 'library-document-studio', label: 'Document Studio', isButton: true, onClick: 'openDocStudioFromMenu' }
@@ -987,6 +986,13 @@
             : [{ id: 'top-movers-empty', label: 'No movement yet', icon: 'bar-chart-2', href: '#' }]
         });
       } else {
+        sections.push({
+          id: 'workspace-recents',
+          title: 'Workspaces',
+          isScrollable: true,
+          isWorkspaceList: true,
+          items: []
+        });
         sections.push({
           id: 'chats',
           title: 'Recents',
