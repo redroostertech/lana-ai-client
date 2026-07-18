@@ -610,20 +610,33 @@ describe('Electron screen voice orchestration', () => {
       payload: { speech_id: 'speech-1' }
     });
 
+    expect(manager.controller.state).toBe('thinking');
+
+    await manager.handleRealtimeEvent({
+      ...baseEvent, event_id: randomEventId(), event_type: 'speech.audio', sequence: 4,
+      payload: { speech_id: 'speech-1', audio: { mime_type: 'audio/wav', base64: 'AAAA', bytes: 3 } }
+    });
+
+    manager.handlePlaybackStatus({ status: 'started', speechId: 'speech-1' });
+
     expect(manager.controller.state).toBe('speaking');
 
     await manager.handleRealtimeEvent({
       ...baseEvent, event_id: '45000000-0000-4000-8000-000000000007',
-      event_type: 'speech.stopped', sequence: 4, payload: { speech_id: 'speech-1' }
+      event_type: 'speech.stopped', sequence: 5, payload: { speech_id: 'speech-1' }
     });
+
+    expect(manager.controller.state).toBe('speaking');
+
+    manager.handlePlaybackStatus({ status: 'stopped', speechId: 'speech-1', reason: 'queue_empty' });
 
     expect(manager.controller.state).toBe('idle');
     expect(manager.realtimeActive).toBe(false);
     expect(manager.captureTransport).toBeNull();
     expect(sent).toContainEqual(['screen-voice:stop-capture', {
-      discard: true, reason: 'speech.stopped', rearmShortcut: true
+      discard: true, reason: 'queue_empty', rearmShortcut: true
     }]);
-    expect(sent).toContainEqual(['screen-voice:stop-realtime', { reason: 'speech.stopped', preservePlayback: true }]);
+    expect(sent).toContainEqual(['screen-voice:stop-realtime', { reason: 'queue_empty', preservePlayback: true }]);
     if (process.platform === 'darwin') {
       expect(stoppedMonitor.stop).toHaveBeenCalled();
       expect(manager.shortcutMonitorFactory).toHaveBeenCalledTimes(1);

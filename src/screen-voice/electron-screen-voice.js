@@ -106,6 +106,9 @@ class ElectronScreenVoice {
       ? this.settingsStore.get('realtimeLastSequence')
       : this.settingsStore.store?.realtimeLastSequence) || 0);
     this.realtimeVoiceSessionId = null;
+    this.realtimeSpeechAudioPending = false;
+    this.realtimePlaybackActive = false;
+    this.realtimeTerminalPending = false;
     this.pendingProposal = null;
     this.pendingApproval = null;
     this.remoteResponseText = '';
@@ -232,6 +235,7 @@ class ElectronScreenVoice {
     handle('screen-voice:realtime-event', (payload) => this.handleRealtimeEvent(payload));
     handle('screen-voice:realtime-disconnected', ({ code, reason }) => this.handleRealtimeDisconnected(code, reason));
     handle('screen-voice:realtime-context', () => this.createRealtimeContext());
+    handle('screen-voice:playback-status', (payload) => this.handlePlaybackStatus(payload));
     handle('screen-voice:realtime-reconnect', async () => {
       const realtime = await this.api.realtimeConfig();
       return {
@@ -767,10 +771,15 @@ class ElectronScreenVoice {
           this.sendState();
         }
         break;
-      case 'speech.started':
       case 'speech.audio':
+        this.realtimeSpeechAudioPending = true;
+        break;
+      case 'speech.started':
         if (this.controller.state !== 'previewing') {
-          this.transitionRemote('speaking', { speechId: event.payload.speech_id || null });
+          if (this.controller.session) {
+            this.controller.session.speechId = event.payload.speech_id || null;
+            this.sendState();
+          }
         }
         break;
       case 'desktop.context.requested':
@@ -806,12 +815,16 @@ class ElectronScreenVoice {
       case 'run.completed':
       case 'speech.stopped':
         if (this.controller.state !== 'previewing') {
-          this._clearCaptureLifecycle(event.event_type, {
-            notifyRenderer: true,
-            resetController: true,
-            preservePlayback: true,
-            rearmShortcutMonitor: true
-          });
+          if (this.realtimeSpeechAudioPending || this.realtimePlaybackActive) {
+            this.realtimeTerminalPending = true;
+          } else {
+            this._clearCaptureLifecycle(event.event_type, {
+              notifyRenderer: true,
+              resetController: true,
+              preservePlayback: true,
+              rearmShortcutMonitor: true
+            });
+          }
         }
         break;
       default:
@@ -823,6 +836,31 @@ class ElectronScreenVoice {
     this.realtimeLastSequence = event.sequence;
     this.settingsStore.set('realtimeLastSequence', this.realtimeLastSequence);
     return { ok: true, messages };
+  }
+
+  handlePlaybackStatus(payload = {}) {
+    if (this.captureTransport !== 'realtime') return { ok: true, ignored: true };
+    if (payload.status === 'started') {
+      this.realtimePlaybackActive = true;
+      this.realtimeSpeechAudioPending = false;
+      if (this.controller.state !== 'previewing') {
+        this.transitionRemote('speaking', { speechId: payload.speechId || null });
+      }
+      return { ok: true };
+    }
+    if (payload.status === 'stopped') {
+      this.realtimePlaybackActive = false;
+      this.realtimeSpeechAudioPending = false;
+      this._clearCaptureLifecycle(payload.reason || 'speech_playback_stopped', {
+        notifyRenderer: true,
+        resetController: true,
+        preservePlayback: true,
+        rearmShortcutMonitor: true
+      });
+      this.realtimeTerminalPending = false;
+      return { ok: true };
+    }
+    return { ok: true, ignored: true };
   }
 
   async handleRealtimeProposal(payload, event = {}) {
@@ -882,6 +920,9 @@ class ElectronScreenVoice {
     this.realtimeActive = false;
     this.captureTransport = null;
     this.realtimeVoiceSessionId = null;
+    this.realtimeSpeechAudioPending = false;
+    this.realtimePlaybackActive = false;
+    this.realtimeTerminalPending = false;
     this.remoteResponseText = '';
     this.shortcutHeldMode = null;
     this.pendingShortcutRelease = null;

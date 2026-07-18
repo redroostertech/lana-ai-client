@@ -491,17 +491,32 @@
   }
 
   function playNextRealtimeAudio() {
-    if (realtimeAudioPlaying || !realtimeAudioQueue.length) return;
+    if (realtimeAudioPlaying) return;
+    if (!realtimeAudioQueue.length) {
+      window.screenVoice.playbackStatus({
+        status: 'stopped',
+        speechId: activeSpeechId,
+        reason: 'queue_empty'
+      }).catch(() => {});
+      return;
+    }
     const item = realtimeAudioQueue.shift();
     realtimeAudioPlaying = true;
     activeSpeechId = item.speech_id || null;
     playback = new Audio(`data:${item.mime_type || 'audio/wav'};base64,${item.base64}`);
+    const started = () => {
+      window.screenVoice.playbackStatus({
+        status: 'started',
+        speechId: item.speech_id || null
+      }).catch(() => {});
+    };
     const done = () => {
       playback = null;
       realtimeAudioPlaying = false;
       if (!realtimeAudioQueue.some((queued) => queued.speech_id === activeSpeechId)) activeSpeechId = null;
       playNextRealtimeAudio();
     };
+    playback.addEventListener('playing', started, { once: true });
     playback.addEventListener('ended', done, { once: true });
     playback.addEventListener('error', done, { once: true });
     playback.play().catch(done);

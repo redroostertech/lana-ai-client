@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('screenVoice', {
   realtimeDisconnected: (code, reason) => ipcRenderer.invoke('screen-voice:realtime-disconnected', { code, reason }),
   realtimeContext: () => ipcRenderer.invoke('screen-voice:realtime-context'),
   realtimeReconnect: () => ipcRenderer.invoke('screen-voice:realtime-reconnect'),
+  playbackStatus: (payload) => ipcRenderer.invoke('screen-voice:playback-status', payload),
   captureError: (code) => ipcRenderer.invoke('screen-voice:capture-error', { code }),
   captureStatus: (status, metadata = {}) => ipcRenderer.invoke('screen-voice:capture-status', { status, metadata }),
   cancel: () => ipcRenderer.invoke('screen-voice:cancel'),
