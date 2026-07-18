@@ -659,7 +659,7 @@
     realtimePumpFallbackTimer = null;
     clearTimeout(realtimeReconnectTimer);
     realtimeReconnectTimer = null;
-    stopRealtimePlayback('stopped');
+    if (!options.preservePlayback) stopRealtimePlayback('stopped');
     if (realtimeSocket) {
       try { realtimeSocket.close(1000, 'client_stopped'); } catch (_) {}
     }
@@ -733,7 +733,7 @@
   window.screenVoice.onState(render);
   window.screenVoice.onStartCapture(startCapture);
   window.screenVoice.onStartRealtime(startRealtime);
-  window.screenVoice.onStopRealtime(() => stopRealtime());
+  window.screenVoice.onStopRealtime((payload = {}) => stopRealtime(payload || {}));
   window.screenVoice.onRealtimeSend((message) => sendRealtimeMessage(message));
   window.screenVoice.onStopCapture(({ discard }) => stopCapture(discard));
   window.screenVoice.onShowDetails(() => {

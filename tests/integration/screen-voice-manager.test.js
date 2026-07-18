@@ -567,6 +567,53 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.realtimeLastSequence).toBe(0);
   });
 
+  test('terminal realtime voice events end press-to-talk capture without cutting playback', async () => {
+    const manager = managerWith({ api: {}, adapter: {} });
+    const ids = Array.from({ length: 6 }, (_, index) => `45000000-0000-4000-8000-00000000000${index + 1}`);
+    const baseEvent = {
+      protocol_version: 'desktop-voice.v1',
+      timestamp: new Date().toISOString(),
+      conversation_id: ids[0],
+      voice_session_id: ids[1],
+      turn_id: ids[2],
+      run_id: ids[3]
+    };
+    manager.controller.start('agent', 'realtime');
+    manager.captureTransport = 'realtime';
+    manager.realtimeActive = true;
+    manager.realtimeConversationId = ids[0];
+    manager.controller.transition('transcribing');
+
+    await manager.handleRealtimeEvent({
+      ...baseEvent, event_id: ids[4], event_type: 'run.started', sequence: 1, payload: { status: 'running' }
+    });
+    await manager.handleRealtimeEvent({
+      ...baseEvent, event_id: ids[5], event_type: 'assistant.response.delta', sequence: 2,
+      payload: { text: 'My name is LANA.' }
+    });
+
+    expect(manager.controller.state).toBe('thinking');
+    expect(manager.controller.session.responseText).toBe('My name is LANA.');
+
+    await manager.handleRealtimeEvent({
+      ...baseEvent, event_id: randomEventId(), event_type: 'speech.started', sequence: 3,
+      payload: { speech_id: 'speech-1' }
+    });
+
+    expect(manager.controller.state).toBe('speaking');
+
+    await manager.handleRealtimeEvent({
+      ...baseEvent, event_id: '45000000-0000-4000-8000-000000000007',
+      event_type: 'speech.stopped', sequence: 4, payload: { speech_id: 'speech-1' }
+    });
+
+    expect(manager.controller.state).toBe('idle');
+    expect(manager.realtimeActive).toBe(false);
+    expect(manager.captureTransport).toBeNull();
+    expect(sent).toContainEqual(['screen-voice:stop-capture', { discard: true, reason: 'speech.stopped' }]);
+    expect(sent).toContainEqual(['screen-voice:stop-realtime', { reason: 'speech.stopped', preservePlayback: true }]);
+  });
+
   test('rejecting a pending desktop proposal reports the decision without ending the conversation', async () => {
     const manager = managerWith({ api: {}, adapter: {} });
     manager.controller.start('agent');

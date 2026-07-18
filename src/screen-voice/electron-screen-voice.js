@@ -760,7 +760,18 @@ class ElectronScreenVoice {
         break;
       case 'assistant.response.delta':
         this.remoteResponseText = `${this.remoteResponseText}${this.remoteResponseText ? ' ' : ''}${event.payload.text || ''}`;
-        this.transitionRemote('speaking', { responseText: this.remoteResponseText });
+        if (this.controller.session) this.controller.session.responseText = this.remoteResponseText;
+        if (!['speaking', 'previewing'].includes(this.controller.state)) {
+          this.transitionRemote('thinking', { responseText: this.remoteResponseText });
+        } else {
+          this.sendState();
+        }
+        break;
+      case 'speech.started':
+      case 'speech.audio':
+        if (this.controller.state !== 'previewing') {
+          this.transitionRemote('speaking', { speechId: event.payload.speech_id || null });
+        }
         break;
       case 'desktop.context.requested':
         messages.push({ type: 'context.provided', context: await this.createRealtimeContext() });
@@ -794,7 +805,13 @@ class ElectronScreenVoice {
         break;
       case 'run.completed':
       case 'speech.stopped':
-        if (this.controller.state !== 'previewing') this.transitionRemote('listening');
+        if (this.controller.state !== 'previewing') {
+          this._clearCaptureLifecycle(event.event_type, {
+            notifyRenderer: true,
+            resetController: true,
+            preservePlayback: true
+          });
+        }
         break;
       default:
         break;
@@ -850,10 +867,11 @@ class ElectronScreenVoice {
   }
 
   _clearCaptureLifecycle(reason = 'stopped', options = {}) {
-    const { notifyRenderer = true, resetController = false } = options;
+    const { notifyRenderer = true, resetController = false, preservePlayback = false } = options;
     if (notifyRenderer) {
       this.send('screen-voice:stop-capture', { discard: true, reason });
-      this.send('screen-voice:stop-realtime', { reason });
+      const realtimePayload = preservePlayback ? { reason, preservePlayback: true } : { reason };
+      this.send('screen-voice:stop-realtime', realtimePayload);
     }
     this.realtimeActive = false;
     this.captureTransport = null;
