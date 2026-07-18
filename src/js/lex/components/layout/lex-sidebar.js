@@ -42,6 +42,7 @@
   const { LexElement, defineLex, Icons } = window.Lex;
 
   let stylesInjected = false;
+  const CHAT_SECTION_COLLAPSED_KEY = 'lana:sidebar:chatsCollapsed';
 
   function injectStyles() {
     if (stylesInjected) return;
@@ -137,6 +138,15 @@
         }
 
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section-title {
+          opacity: 0;
+          height: 0;
+          overflow: hidden;
+          padding: 0;
+          margin: 0;
+          pointer-events: none;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section-toggle {
           opacity: 0;
           height: 0;
           overflow: hidden;
@@ -553,6 +563,121 @@
         margin-top: 0;
       }
 
+      .lex-sidebar-section-toggle-row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        margin-top: 0.5rem;
+        min-width: 0;
+      }
+
+      .lex-sidebar-section-toggle {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.5rem;
+        width: 100%;
+        padding: 0.5rem 0.75rem 0.375rem;
+        padding-right: 4rem;
+        border: 0;
+        border-radius: var(--lex-radius-md, 6px);
+        background: transparent;
+        color: var(--_sb-section-text);
+        cursor: pointer;
+        font-size: var(--lex-body-xs-size, 0.6875rem);
+        font-weight: var(--lex-weight-semibold);
+        letter-spacing: 0.06em;
+        line-height: 1.4;
+        text-align: left;
+        text-transform: uppercase;
+        transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-section-toggle:hover {
+        background: color-mix(in srgb, var(--_sb-hover-bg) 56%, transparent);
+        color: var(--_sb-text-active);
+      }
+
+      .lex-sidebar-section-toggle:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--_sb-text-muted) 36%, transparent);
+      }
+
+      .lex-sidebar-section-toggle-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lex-sidebar-section-toggle-icon {
+        position: absolute;
+        top: 50%;
+        right: 0.75rem;
+        display: inline-flex;
+        color: var(--_sb-text-muted);
+        transform: translateY(-50%) rotate(0deg);
+        transition: transform var(--lex-transition-fast), color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-section-toggle:hover .lex-sidebar-section-toggle-icon {
+        color: var(--_sb-text-active);
+      }
+
+      .lex-sidebar-section-create {
+        position: absolute;
+        top: 50%;
+        right: 2.125rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        padding: 0;
+        border: 0;
+        border-radius: var(--lex-radius-md, 6px);
+        background: transparent;
+        color: var(--_sb-text-muted);
+        cursor: pointer;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-50%) scale(0.92);
+        transition: opacity var(--lex-transition-fast),
+                    transform var(--lex-transition-fast),
+                    background var(--lex-transition-fast),
+                    color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-section-toggle-row:hover .lex-sidebar-section-create,
+      .lex-sidebar-section-toggle-row:focus-within .lex-sidebar-section-create {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(-50%) scale(1);
+      }
+
+      .lex-sidebar-section-create:hover,
+      .lex-sidebar-section-create:focus-visible {
+        background: color-mix(in srgb, var(--_sb-hover-bg) 80%, transparent);
+        color: var(--_sb-text-active);
+        outline: none;
+      }
+
+      .lex-sidebar-section-has-conversations[data-collapsed="true"] .lex-sidebar-section-toggle-icon {
+        transform: translateY(-50%) rotate(-90deg);
+      }
+
+      .lex-sidebar-section-content {
+        display: flex;
+        flex-direction: column;
+        gap: var(--lex-sidebar-item-gap);
+        min-width: 0;
+      }
+
+      .lex-sidebar-section-has-conversations[data-collapsed="true"] .lex-sidebar-section-content {
+        display: none;
+      }
+
       .lex-sidebar-scrollable-wrap {
         flex: 1;
         position: relative;
@@ -624,6 +749,9 @@
       .lex-sidebar-section-has-conversations {
         display: flex;
         flex-direction: column;
+        margin-top: 0.5rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--_sb-border);
       }
 
       .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list {
@@ -674,6 +802,35 @@
 
       .lex-sidebar-nav-item[data-variant="create"]:hover {
         background: color-mix(in srgb, var(--_sb-text-active) 42%, var(--_sb-bg));
+      }
+
+      .lex-sidebar-nav-item[data-variant="create-chat"] {
+        min-height: 2.5rem;
+        margin: 0.25rem 0 0.5rem;
+        padding: 0 0.75rem;
+        gap: 0.625rem;
+        border: 1px solid color-mix(in srgb, var(--_sb-text-muted) 32%, transparent);
+        border-radius: var(--lex-radius-lg, 8px);
+        background: transparent;
+        color: var(--_sb-text-active);
+        font-weight: var(--lex-weight-semibold, 600);
+      }
+
+      .lex-sidebar-nav-item[data-variant="create-chat"]:hover {
+        background: color-mix(in srgb, var(--_sb-hover-bg) 62%, transparent);
+        border-color: color-mix(in srgb, var(--_sb-text-muted) 52%, transparent);
+      }
+
+      .lex-sidebar-create-chat-glyph {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1rem;
+        flex: 0 0 1rem;
+        color: currentColor;
+        font-size: 1.25rem;
+        font-weight: var(--lex-weight-regular, 400);
+        line-height: 1;
       }
 
       .lex-sidebar-nav-item svg {
@@ -737,7 +894,7 @@
       }
 
       .lex-sidebar-nav-group[data-expanded="true"] .lex-sidebar-nav-chevron {
-        transform: rotate(180deg);
+        transform: rotate(90deg);
       }
 
       .lex-sidebar-nav-item[data-child="true"] {
@@ -1547,16 +1704,66 @@
 
     _renderSection(section) {
       const sectionClass = section.isConversationList ? 'lex-sidebar-section lex-sidebar-section-has-conversations' : 'lex-sidebar-section';
-      let html = `<div class="${sectionClass}">`;
+      const isConversationList = !!section.isConversationList;
+      const contentId = isConversationList ? this._getSectionContentId(section) : '';
+      const isCollapsed = isConversationList ? this._getChatSectionCollapsed() : false;
+      const collapsedAttr = isConversationList ? ` data-collapsed="${isCollapsed}"` : '';
+      let html = `<div class="${sectionClass}"${collapsedAttr}>`;
       if (section.title) {
-        html += `<div class="lex-sidebar-section-title">${this.escapeHtml(section.title)}</div>`;
+        if (isConversationList) {
+          html += `<div class="lex-sidebar-section-toggle-row">
+            <button type="button" class="lex-sidebar-section-toggle" data-action="toggle-conversation-section" aria-expanded="${!isCollapsed}" aria-controls="${contentId}">
+              <span class="lex-sidebar-section-toggle-label">${this.escapeHtml(section.title)}</span>
+              <span class="lex-sidebar-section-toggle-icon">${icon('chevron-down', 'small')}</span>
+            </button>
+            <button type="button" class="lex-sidebar-section-create" data-action="create-conversation" aria-label="New chat" title="New chat">
+              ${icon('edit', 'small') || icon('file-plus', 'small') || icon('plus', 'small')}
+            </button>
+          </div>`;
+        } else {
+          html += `<div class="lex-sidebar-section-title">${this.escapeHtml(section.title)}</div>`;
+        }
+      }
+      if (isConversationList) {
+        html += `<div class="lex-sidebar-section-content" id="${contentId}">`;
       }
       html += this._renderSectionItems(section.items);
-      if (section.isConversationList) {
+      if (isConversationList) {
         html += `<div class="lex-sidebar-conversation-list" id="lexConversationListContainer"></div>`;
+        html += `</div>`;
       }
       html += `</div>`;
       return html;
+    }
+
+    _getSectionContentId(section) {
+      const rawId = section && section.id ? String(section.id) : 'conversations';
+      const safeId = rawId.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'conversations';
+      return 'lex-sidebar-section-content-' + safeId;
+    }
+
+    _getChatSectionCollapsed() {
+      try {
+        return localStorage.getItem(CHAT_SECTION_COLLAPSED_KEY) === 'true';
+      } catch (_) {
+        return this._chatSectionCollapsed === true;
+      }
+    }
+
+    _setChatSectionCollapsed(collapsed) {
+      this._chatSectionCollapsed = collapsed === true;
+      try {
+        localStorage.setItem(CHAT_SECTION_COLLAPSED_KEY, String(this._chatSectionCollapsed));
+      } catch (_) { /* localStorage can be unavailable in restricted contexts */ }
+    }
+
+    _syncConversationSectionState(section, collapsed) {
+      if (!section) return;
+      section.dataset.collapsed = String(collapsed);
+      const toggle = section.querySelector('[data-action="toggle-conversation-section"]');
+      if (toggle) {
+        toggle.setAttribute('aria-expanded', String(!collapsed));
+      }
     }
 
     _renderSectionItems(items) {
@@ -1575,7 +1782,7 @@
       if (!isChild && item.children && item.children.length) {
         const childrenHtml = item.children.map((child) => this._renderNavItem(child, true)).join('');
         const iconHtml = item.icon ? icon(item.icon, 'normal') : '';
-        const chevronHtml = `<span class="lex-sidebar-nav-chevron">${icon('chevron-down', 'small')}</span>`;
+        const chevronHtml = `<span class="lex-sidebar-nav-chevron">${icon('chevron-right', 'small')}</span>`;
         return `<div class="lex-sidebar-nav-group" data-expanded="false">
           <button type="button" class="lex-sidebar-nav-item lex-sidebar-nav-group-toggle" data-nav-toggle data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}">
             ${iconHtml}
@@ -1593,7 +1800,10 @@
       const onClickAttr = item.onClick ? ` data-onclick="${this.escapeHtml(item.onClick)}"` : '';
       const hrefDataAttr = item.isButton && item.href ? ` data-href="${this.escapeHtml(item.href)}"` : '';
       const variantAttr = item.variant ? ` data-variant="${this.escapeHtml(item.variant)}"` : '';
-      const iconHtml = item.icon ? icon(item.icon, 'normal') : '';
+      const isCreateChat = item.variant === 'create-chat';
+      const iconHtml = isCreateChat
+        ? '<span class="lex-sidebar-create-chat-glyph" aria-hidden="true">+</span>'
+        : (item.icon ? icon(item.icon, 'normal') : '');
       const badgeHtml = item.badge
         ? `<span class="lex-sidebar-nav-badge">${this.escapeHtml(item.badge)}</span>`
         : '';
@@ -1683,6 +1893,15 @@
     // Event binding
     // -----------------------------------------------------------------------
 
+    _updateScrollableFades() {
+      const scrollable = this.querySelector('.lex-sidebar-scrollable');
+      const scrollWrap = this.querySelector('.lex-sidebar-scrollable-wrap');
+      if (!scrollable || !scrollWrap) return;
+      const { scrollTop, scrollHeight, clientHeight } = scrollable;
+      scrollWrap.dataset.scrollTop = String(scrollTop > 4);
+      scrollWrap.dataset.scrollBottom = String(scrollTop + clientHeight < scrollHeight - 4);
+    }
+
     updated() {
       // Close button (mobile)
       this.delegate('click', '[data-action="close"]', () => {
@@ -1708,6 +1927,25 @@
         } else {
           try { sessionStorage.setItem('lana-open-global-search', '1'); } catch (_err) {}
           window.location.href = this._getAppPrefix() + 'app.html';
+        }
+      });
+
+      this.delegate('click', '[data-action="toggle-conversation-section"]', (e, target) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const section = target.closest('.lex-sidebar-section-has-conversations');
+        if (!section) return;
+        const collapsed = section.dataset.collapsed !== 'true';
+        this._setChatSectionCollapsed(collapsed);
+        this._syncConversationSectionState(section, collapsed);
+        requestAnimationFrame(() => this._updateScrollableFades());
+      });
+
+      this.delegate('click', '[data-action="create-conversation"]', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.openNewProjectModal === 'function') {
+          window.openNewProjectModal();
         }
       });
 
@@ -1813,15 +2051,8 @@
       if (scrollable && !scrollable._lexScrollBound) {
         scrollable._lexScrollBound = true;
 
-        const updateFades = () => {
-          if (!scrollWrap) return;
-          const { scrollTop, scrollHeight, clientHeight } = scrollable;
-          scrollWrap.dataset.scrollTop = String(scrollTop > 4);
-          scrollWrap.dataset.scrollBottom = String(scrollTop + clientHeight < scrollHeight - 4);
-        };
-
         scrollable.addEventListener('scroll', () => {
-          updateFades();
+          this._updateScrollableFades();
 
           // Infinite scroll detection (debounced)
           clearTimeout(scrollable._lexScrollTimeout);
@@ -1834,7 +2065,7 @@
         });
 
         // Initial check after content renders
-        requestAnimationFrame(updateFades);
+        requestAnimationFrame(() => this._updateScrollableFades());
       }
 
       // User menu toggle

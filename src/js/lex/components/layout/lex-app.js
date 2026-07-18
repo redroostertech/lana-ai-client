@@ -960,6 +960,7 @@
             { id: 'billable-hours', label: 'Billable Hours', icon: 'clock', href: 'admin/billable-hours.html' }
           ]
         : [
+            { id: 'new-chat', label: 'New Chat', isButton: true, onClick: 'openNewProjectModal', variant: 'create-chat' },
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
             { id: 'my-tasks', label: 'My Tasks', icon: 'clipboard-check', href: 'my-tasks.html' },
             { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' },
@@ -988,12 +989,10 @@
       } else {
         sections.push({
           id: 'chats',
-          title: 'Your Chats',
+          title: 'Recents',
           isScrollable: true,
           isConversationList: true,
-          items: [
-            { id: 'new-chat', label: 'New Chat', icon: 'plus', isButton: true, onClick: 'openNewProjectModal' }
-          ]
+          items: []
         });
       }
 
@@ -1085,7 +1084,7 @@
 
       return {
         type: 'chat_sessions',
-        title: 'Your Chats'
+        title: 'Recents'
       };
     }
 

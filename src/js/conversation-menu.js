@@ -15,11 +15,11 @@ const ConversationMenu = {
   scrollTimeout: null,
   scope: {
     type: 'chat_sessions',
-    title: 'Your Chats'
+    title: 'Recents'
   },
 
   setScope(scope) {
-    const nextScope = scope || { type: 'chat_sessions', title: 'Your Chats' };
+    const nextScope = scope || { type: 'chat_sessions', title: 'Recents' };
     const currentKey = JSON.stringify(this.scope || {});
     const nextKey = JSON.stringify(nextScope);
     this.scope = nextScope;
