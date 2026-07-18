@@ -1041,6 +1041,7 @@
       // comparison instead of JSON.stringify() on every render cycle.
       this._sectionsGen = 0;
       this._menuItemsGen = 0;
+      this._appCatalogGen = 0;
 
       // Wrap the reactive setters installed by LexElement so that each
       // assignment bumps the corresponding generation counter.
@@ -1067,6 +1068,38 @@
       // Track the last-emitted collapsed value so _emitCollapsedState() is
       // a no-op when the collapsed state has not actually changed.
       this._lastEmittedCollapsed = null;
+    }
+
+    connected() {
+      this._hydrateAppItemsFromElectronStorage();
+    }
+
+    _hydrateAppItemsFromElectronStorage() {
+      if (this._appStorageHydrationStarted) return;
+      this._appStorageHydrationStarted = true;
+      if (!window.electronAPI || typeof window.electronAPI.getSavedServer !== 'function') return;
+
+      window.electronAPI.getSavedServer().then((result) => {
+        const server = result && result.success && result.server ? result.server : null;
+        if (!server || !Array.isArray(server.enabledApps) || !server.enabledApps.length) return;
+
+        let previousApps = [];
+        try {
+          const raw = localStorage.getItem('lana_saved_server');
+          const parsed = raw ? JSON.parse(raw) : {};
+          previousApps = Array.isArray(parsed.enabledApps) ? parsed.enabledApps : [];
+          localStorage.setItem('lana_saved_server', JSON.stringify(Object.assign({}, parsed, server)));
+        } catch (_) {
+          localStorage.setItem('lana_saved_server', JSON.stringify(server));
+        }
+
+        const before = JSON.stringify(previousApps.map((item) => item && (item.id || item.app_id || item.slug || item.key || item)).filter(Boolean));
+        const after = JSON.stringify(server.enabledApps.map((item) => item && (item.id || item.app_id || item.slug || item.key || item)).filter(Boolean));
+        if (before !== after) {
+          this._appCatalogGen += 1;
+          this._scheduleUpdate();
+        }
+      }).catch(() => {});
     }
 
     render() {
@@ -1099,7 +1132,8 @@
             && this._lastUserName === this.userName
             && this._lastUserEmail === this.userEmail
             && this._lastVersion === this.version
-            && this._lastMenuItemsGen === this._menuItemsGen) {
+            && this._lastMenuItemsGen === this._menuItemsGen
+            && this._lastAppCatalogGen === this._appCatalogGen) {
           return null; // Skip innerHTML, preserve conversation list DOM
         }
       }
@@ -1110,6 +1144,7 @@
       this._lastUserEmail = this.userEmail;
       this._lastVersion = this.version;
       this._lastMenuItemsGen = this._menuItemsGen;
+      this._lastAppCatalogGen = this._appCatalogGen;
 
       const sections = this.sections || [];
       const footerSections = sections.filter(s => s.isFooter);
@@ -1209,12 +1244,26 @@
           route: 'admin/analytics.html',
           colors: ['#60a5fa', '#2563eb', '#7c3aed', '#0f172a']
         },
+        'lana-automations': {
+          id: 'lana-automations',
+          label: 'LanaAutomate',
+          description: 'Build, deploy and monitor automated workflows',
+          route: 'automation/index.html',
+          colors: ['#ffd16f', '#f97316', '#7c3aed', '#4c1d95']
+        },
         'doc-studio': {
           id: 'doc-studio',
           label: 'Doc Studio',
           description: 'Generate decks, legal documents, PDFs, and pages',
           route: 'doc-studio/index.html',
           colors: ['#2f6f73', '#b56b45', '#17201f', '#f7f4ef']
+        },
+        'lana-voice': {
+          id: 'lana-voice',
+          label: 'LanaVoice',
+          description: 'Realtime voice agents and call handling',
+          route: 'voice/index.html',
+          colors: ['#fcd34d', '#f59e0b', '#b45309', '#1c1917']
         },
         'brainchild': {
           id: 'brainchild',
@@ -1260,6 +1309,12 @@
         insights: 'lana-insights',
         'business-intelligence': 'lana-insights',
         'lana-insights': 'lana-insights',
+        automation: 'lana-automations',
+        automations: 'lana-automations',
+        'lana-automate': 'lana-automations',
+        'lana-automations': 'lana-automations',
+        voice: 'lana-voice',
+        'lana-voice': 'lana-voice',
         'doc-studio': 'doc-studio',
         'deck-studio': 'doc-studio',
         documents: 'doc-studio',

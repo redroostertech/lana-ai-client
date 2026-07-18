@@ -149,7 +149,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   agentShortcut: 'CommandOrControl+Shift+A',
   defaultMode: 'agent',
   screenContextEnabled: true,
-  voiceOutputEnabled: false,
+  voiceOutputEnabled: true,
   confirmationPolicy: 'risk_based',
   language: 'en'
 });

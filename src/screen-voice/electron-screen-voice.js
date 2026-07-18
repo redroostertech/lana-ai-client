@@ -20,7 +20,7 @@ const MAX_AUDIO_BASE64_CHARS = 16 * 1024 * 1024;
 const NON_SPEECH_TRANSCRIPT = /^[\s([{<]*(?:beep|chime|tone|silence|inaudible|no speech|music)[\s)\]}>.!-]*$/i;
 const CAPTURE_STATUSES = new Set([
   'requesting_microphone', 'microphone_ready', 'start_chime', 'recording_started',
-  'recording_released', 'audio_ready', 'audio_streaming', 'capture_failed'
+  'recording_released', 'audio_ready', 'audio_streaming', 'audio_level', 'capture_failed'
 ]);
 const COMPACT_OVERLAY = Object.freeze({ width: 480, height: 58 });
 const MODE_MENU_OVERLAY = Object.freeze({ width: 480, height: 190 });
@@ -252,7 +252,20 @@ class ElectronScreenVoice {
       if (!CAPTURE_STATUSES.has(status)) return { ok: false };
       const trackCount = Math.max(0, Math.min(8, Number(metadata?.trackCount) || 0));
       const bytes = Math.max(0, Number(metadata?.bytes) || 0);
-      const detail = trackCount ? ` tracks=${trackCount}` : bytes ? ` bytes=${bytes}` : '';
+      const details = [];
+      if (trackCount) details.push(`tracks=${trackCount}`);
+      if (bytes) details.push(`bytes=${bytes}`);
+      if (metadata?.source) details.push(`source=${String(metadata.source).slice(0, 40)}`);
+      if (Number.isFinite(Number(metadata?.rms))) details.push(`rms=${Number(metadata.rms).toFixed(6)}`);
+      if (Number.isFinite(Number(metadata?.peak))) details.push(`peak=${Number(metadata.peak).toFixed(6)}`);
+      if (Number.isFinite(Number(metadata?.maxRms))) details.push(`maxRms=${Number(metadata.maxRms).toFixed(6)}`);
+      if (Number.isFinite(Number(metadata?.maxPeak))) details.push(`maxPeak=${Number(metadata.maxPeak).toFixed(6)}`);
+      if (Number.isFinite(Number(metadata?.frames))) details.push(`frames=${Math.max(0, Number(metadata.frames) || 0)}`);
+      if (metadata?.readyState) details.push(`readyState=${String(metadata.readyState).slice(0, 40)}`);
+      if (metadata?.muted === true) details.push('muted=true');
+      if (metadata?.enabled === false) details.push('enabled=false');
+      if (metadata?.label) details.push(`label=${String(metadata.label).slice(0, 80)}`);
+      const detail = details.length ? ` ${details.join(' ')}` : '';
       this.logInfo(`[ScreenVoice] Capture ${status}${detail}`);
       return { ok: true };
     });

@@ -23,12 +23,26 @@
       route: 'admin/analytics.html',
       colors: ['#60a5fa', '#2563eb', '#7c3aed', '#0f172a']
     },
+    'lana-automations': {
+      id: 'lana-automations',
+      label: 'LanaAutomate',
+      description: 'Build, deploy and monitor automated workflows',
+      route: 'automation/index.html',
+      colors: ['#ffd16f', '#f97316', '#7c3aed', '#4c1d95']
+    },
     'doc-studio': {
       id: 'doc-studio',
       label: 'Doc Studio',
       description: 'Generate decks, legal documents, PDFs, and pages',
       route: 'doc-studio/index.html',
       colors: ['#2f6f73', '#b56b45', '#17201f', '#f7f4ef']
+    },
+    'lana-voice': {
+      id: 'lana-voice',
+      label: 'LanaVoice',
+      description: 'Realtime voice agents and call handling',
+      route: 'voice/index.html',
+      colors: ['#fcd34d', '#f59e0b', '#b45309', '#1c1917']
     },
     'brainchild': {
       id: 'brainchild',
@@ -47,6 +61,12 @@
     insights: 'lana-insights',
     'business-intelligence': 'lana-insights',
     'lana-insights': 'lana-insights',
+    automation: 'lana-automations',
+    automations: 'lana-automations',
+    'lana-automate': 'lana-automations',
+    'lana-automations': 'lana-automations',
+    voice: 'lana-voice',
+    'lana-voice': 'lana-voice',
     'doc-studio': 'doc-studio',
     'deck-studio': 'doc-studio',
     documents: 'doc-studio',
