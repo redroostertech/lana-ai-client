@@ -809,7 +809,8 @@ class ElectronScreenVoice {
           this._clearCaptureLifecycle(event.event_type, {
             notifyRenderer: true,
             resetController: true,
-            preservePlayback: true
+            preservePlayback: true,
+            rearmShortcutMonitor: true
           });
         }
         break;
@@ -867,9 +868,14 @@ class ElectronScreenVoice {
   }
 
   _clearCaptureLifecycle(reason = 'stopped', options = {}) {
-    const { notifyRenderer = true, resetController = false, preservePlayback = false } = options;
+    const {
+      notifyRenderer = true,
+      resetController = false,
+      preservePlayback = false,
+      rearmShortcutMonitor = false
+    } = options;
     if (notifyRenderer) {
-      this.send('screen-voice:stop-capture', { discard: true, reason });
+      this.send('screen-voice:stop-capture', { discard: true, reason, rearmShortcut: true });
       const realtimePayload = preservePlayback ? { reason, preservePlayback: true } : { reason };
       this.send('screen-voice:stop-realtime', realtimePayload);
     }
@@ -879,9 +885,31 @@ class ElectronScreenVoice {
     this.remoteResponseText = '';
     this.shortcutHeldMode = null;
     this.pendingShortcutRelease = null;
+    if (rearmShortcutMonitor) this._rearmShortcutMonitor();
     if (resetController && this.controller.state !== 'idle') {
       try { this.controller.transition('idle'); }
       catch (_) { this.controller.reset(); }
+    }
+  }
+
+  _rearmShortcutMonitor() {
+    if (!this.shortcutMonitor || process.platform !== 'darwin'
+        || !this.entitlementEnabled || !this.authenticated || !this.settings.enabled) {
+      return false;
+    }
+    this.shortcutMonitor?.stop?.();
+    this.shortcutMonitor = null;
+    this.shortcutMonitorReady = false;
+    this.shortcutHeldMode = null;
+    this.pendingShortcutRelease = null;
+    try {
+      this.shortcutMonitor = this.shortcutMonitorFactory((event) => this.handleShortcutMonitorEvent(event), {
+        rootDir: this.rootDir
+      });
+      return true;
+    } catch (_) {
+      this.logError('[ScreenVoice] Press-and-hold release monitor could not be rearmed');
+      return false;
     }
   }
 

@@ -198,6 +198,11 @@
     if (capturePhase === 'recording') window.screenVoice.captureRelease().catch(() => {});
   }
 
+  function resetOverlayCaptureChord() {
+    pressedCaptureKeys.clear();
+    captureChordActive = false;
+  }
+
   async function startCapture({ sessionId, maxDurationMs }) {
     await cleanupCapture();
     activeSessionId = sessionId;
@@ -735,7 +740,10 @@
   window.screenVoice.onStartRealtime(startRealtime);
   window.screenVoice.onStopRealtime((payload = {}) => stopRealtime(payload || {}));
   window.screenVoice.onRealtimeSend((message) => sendRealtimeMessage(message));
-  window.screenVoice.onStopCapture(({ discard }) => stopCapture(discard));
+  window.screenVoice.onStopCapture(({ discard, rearmShortcut }) => {
+    if (rearmShortcut) resetOverlayCaptureChord();
+    stopCapture(discard);
+  });
   window.screenVoice.onShowDetails(() => {
     detailsOpen = true;
     syncExpandedSurface();

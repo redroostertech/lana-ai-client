@@ -583,6 +583,16 @@ describe('Electron screen voice orchestration', () => {
     manager.realtimeActive = true;
     manager.realtimeConversationId = ids[0];
     manager.controller.transition('transcribing');
+    const stoppedMonitor = { stop: jest.fn() };
+    const rearmedMonitor = { stop: jest.fn() };
+    manager.shortcutMonitor = stoppedMonitor;
+    manager.shortcutMonitorReady = true;
+    manager.authenticated = true;
+    manager.entitlementEnabled = true;
+    manager.shortcutMonitorFactory = jest.fn((onEvent) => {
+      onEvent({ event: 'ready' });
+      return rearmedMonitor;
+    });
 
     await manager.handleRealtimeEvent({
       ...baseEvent, event_id: ids[4], event_type: 'run.started', sequence: 1, payload: { status: 'running' }
@@ -610,8 +620,16 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.controller.state).toBe('idle');
     expect(manager.realtimeActive).toBe(false);
     expect(manager.captureTransport).toBeNull();
-    expect(sent).toContainEqual(['screen-voice:stop-capture', { discard: true, reason: 'speech.stopped' }]);
+    expect(sent).toContainEqual(['screen-voice:stop-capture', {
+      discard: true, reason: 'speech.stopped', rearmShortcut: true
+    }]);
     expect(sent).toContainEqual(['screen-voice:stop-realtime', { reason: 'speech.stopped', preservePlayback: true }]);
+    if (process.platform === 'darwin') {
+      expect(stoppedMonitor.stop).toHaveBeenCalled();
+      expect(manager.shortcutMonitorFactory).toHaveBeenCalledTimes(1);
+      expect(manager.shortcutMonitor).toBe(rearmedMonitor);
+      expect(manager.shortcutMonitorReady).toBe(true);
+    }
   });
 
   test('rejecting a pending desktop proposal reports the decision without ending the conversation', async () => {
@@ -656,7 +674,9 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.realtimeActive).toBe(false);
     expect(manager.overlay.hide).toHaveBeenCalled();
     expect(sent).toContainEqual(['screen-voice:stop-realtime', { reason: 'user_canceled' }]);
-    expect(sent).toContainEqual(['screen-voice:stop-capture', { discard: true, reason: 'user_canceled' }]);
+    expect(sent).toContainEqual(['screen-voice:stop-capture', {
+      discard: true, reason: 'user_canceled', rearmShortcut: true
+    }]);
   });
 
   test('does not advance the replay cursor when proposal correlation validation fails', async () => {
