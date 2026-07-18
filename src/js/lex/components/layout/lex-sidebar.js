@@ -43,6 +43,7 @@
 
   let stylesInjected = false;
   const CHAT_SECTION_COLLAPSED_KEY = 'lana:sidebar:chatsCollapsed';
+  const TASK_SECTION_COLLAPSED_KEY = 'lana:sidebar:tasksCollapsed';
   const WORKSPACE_SECTION_COLLAPSED_KEY = 'lana:sidebar:workspacesCollapsed';
 
   function injectStyles() {
@@ -824,6 +825,81 @@
         white-space: nowrap;
       }
 
+      .lex-sidebar-task-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        min-width: 0;
+      }
+
+      .lex-sidebar-task-group + .lex-sidebar-task-group {
+        margin-top: 0.375rem;
+      }
+
+      .lex-sidebar-task-group-title {
+        padding: 0.25rem 0.75rem 0.125rem;
+        color: var(--_sb-section-text);
+        font-size: 0.625rem;
+        font-weight: var(--lex-weight-semibold, 600);
+        letter-spacing: 0.06em;
+        line-height: 1.3;
+        text-transform: uppercase;
+      }
+
+      .lex-sidebar-task-item {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        width: 100%;
+        min-width: 0;
+        min-height: 2.25rem;
+        padding: 0.375rem 0.75rem;
+        border: 0;
+        border-radius: var(--lex-radius-lg, 8px);
+        background: transparent;
+        color: var(--_sb-text);
+        cursor: pointer;
+        text-align: left;
+        transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-task-item:hover,
+      .lex-sidebar-task-item:focus-visible {
+        background: var(--_sb-hover-bg);
+        color: var(--_sb-text-active);
+        outline: none;
+      }
+
+      .lex-sidebar-task-icon {
+        display: inline-flex;
+        flex: 0 0 auto;
+        color: var(--_sb-text-muted);
+      }
+
+      .lex-sidebar-task-copy {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      .lex-sidebar-task-name {
+        overflow: hidden;
+        color: currentColor;
+        font-size: var(--lex-body-sm-size, 0.875rem);
+        font-weight: var(--lex-weight-medium, 500);
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lex-sidebar-task-meta {
+        overflow: hidden;
+        color: var(--_sb-text-muted);
+        font-size: var(--lex-body-xs-size, 0.75rem);
+        line-height: 1.3;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       .lex-sidebar-show-more {
         display: flex;
         align-items: center;
@@ -895,19 +971,7 @@
         color: var(--_sb-text-active);
       }
 
-      .lex-sidebar-nav-item[data-variant="create"] {
-        min-height: 2.75rem;
-        margin-bottom: 0.25rem;
-        border: 1px solid color-mix(in srgb, var(--_sb-text-active) 22%, transparent);
-        background: color-mix(in srgb, var(--_sb-text-active) 34%, var(--_sb-bg));
-        color: var(--_sb-text-active);
-        font-weight: var(--lex-weight-semibold, 600);
-      }
-
-      .lex-sidebar-nav-item[data-variant="create"]:hover {
-        background: color-mix(in srgb, var(--_sb-text-active) 42%, var(--_sb-bg));
-      }
-
+      .lex-sidebar-nav-item[data-variant="create"],
       .lex-sidebar-nav-item[data-variant="create-chat"] {
         min-height: 2.5rem;
         margin: 0.25rem 0 0.5rem;
@@ -920,8 +984,16 @@
         font-weight: var(--lex-weight-semibold, 600);
       }
 
-      .lex-sidebar-nav-item[data-variant="create-chat"]:hover {
-        background: color-mix(in srgb, var(--_sb-hover-bg) 62%, transparent);
+      .lex-sidebar-nav-item[data-variant="create"][data-active="true"],
+      .lex-sidebar-nav-item[data-variant="create-chat"][data-active="true"] {
+        background: transparent;
+      }
+
+      .lex-sidebar-nav-item[data-variant="create"]:hover,
+      .lex-sidebar-nav-item[data-variant="create"]:focus-visible,
+      .lex-sidebar-nav-item[data-variant="create-chat"]:hover,
+      .lex-sidebar-nav-item[data-variant="create-chat"]:focus-visible {
+        background: transparent;
         border-color: color-mix(in srgb, var(--_sb-text-muted) 52%, transparent);
       }
 
@@ -1808,12 +1880,14 @@
 
     _renderSection(section) {
       const isConversationList = !!section.isConversationList;
+      const isTaskList = !!section.isTaskList;
       const isWorkspaceList = !!section.isWorkspaceList;
-      const isCollapsible = isConversationList || isWorkspaceList;
+      const isCollapsible = isConversationList || isTaskList || isWorkspaceList;
       const sectionClass = [
         'lex-sidebar-section',
         isCollapsible ? 'lex-sidebar-collapsible-section' : '',
         isConversationList ? 'lex-sidebar-section-has-conversations' : '',
+        isTaskList ? 'lex-sidebar-section-has-tasks' : '',
         isWorkspaceList ? 'lex-sidebar-section-has-workspaces' : ''
       ].filter(Boolean).join(' ');
       const contentId = isCollapsible ? this._getSectionContentId(section) : '';
@@ -1822,9 +1896,11 @@
       let html = `<div class="${sectionClass}"${collapsedAttr}>`;
       if (section.title) {
         if (isCollapsible) {
-          const action = isWorkspaceList ? 'create-workspace' : 'create-conversation';
-          const actionLabel = isWorkspaceList ? 'New workspace' : 'New chat';
-          const actionIcon = isWorkspaceList
+          const action = isTaskList ? 'create-task' : (isWorkspaceList ? 'create-workspace' : 'create-conversation');
+          const actionLabel = isTaskList ? 'New task' : (isWorkspaceList ? 'New workspace' : 'New chat');
+          const actionIcon = isTaskList
+            ? (icon('plus', 'small') || icon('clipboard-check', 'small'))
+            : isWorkspaceList
             ? (icon('plus', 'small') || icon('briefcase', 'small'))
             : (icon('edit', 'small') || icon('file-plus', 'small') || icon('plus', 'small'));
           html += `<div class="lex-sidebar-section-toggle-row">
@@ -1846,6 +1922,8 @@
       html += this._renderSectionItems(section.items);
       if (isConversationList) {
         html += `<div class="lex-sidebar-conversation-list" id="lexConversationListContainer"></div>`;
+      } else if (isTaskList) {
+        html += `<div class="lex-sidebar-dynamic-list lex-sidebar-task-list" id="lexTaskListContainer"></div>`;
       } else if (isWorkspaceList) {
         html += `<div class="lex-sidebar-dynamic-list lex-sidebar-workspace-list" id="lexWorkspaceListContainer"></div>`;
       }
@@ -1863,8 +1941,10 @@
     }
 
     _getSectionCollapsed(section) {
-      const key = section && section.isWorkspaceList ? WORKSPACE_SECTION_COLLAPSED_KEY : CHAT_SECTION_COLLAPSED_KEY;
-      const fallback = section && section.isWorkspaceList ? this._workspaceSectionCollapsed : this._chatSectionCollapsed;
+      const isTaskList = section && section.isTaskList;
+      const isWorkspaceList = section && section.isWorkspaceList;
+      const key = isTaskList ? TASK_SECTION_COLLAPSED_KEY : (isWorkspaceList ? WORKSPACE_SECTION_COLLAPSED_KEY : CHAT_SECTION_COLLAPSED_KEY);
+      const fallback = isTaskList ? this._taskSectionCollapsed : (isWorkspaceList ? this._workspaceSectionCollapsed : this._chatSectionCollapsed);
       try {
         return localStorage.getItem(key) === 'true';
       } catch (_) {
@@ -1873,9 +1953,12 @@
     }
 
     _setSectionCollapsed(section, collapsed) {
+      const isTaskList = section && section.classList && section.classList.contains('lex-sidebar-section-has-tasks');
       const isWorkspaceList = section && section.classList && section.classList.contains('lex-sidebar-section-has-workspaces');
-      const key = isWorkspaceList ? WORKSPACE_SECTION_COLLAPSED_KEY : CHAT_SECTION_COLLAPSED_KEY;
-      if (isWorkspaceList) {
+      const key = isTaskList ? TASK_SECTION_COLLAPSED_KEY : (isWorkspaceList ? WORKSPACE_SECTION_COLLAPSED_KEY : CHAT_SECTION_COLLAPSED_KEY);
+      if (isTaskList) {
+        this._taskSectionCollapsed = collapsed === true;
+      } else if (isWorkspaceList) {
         this._workspaceSectionCollapsed = collapsed === true;
       } else {
         this._chatSectionCollapsed = collapsed === true;
@@ -2026,6 +2109,193 @@
       if (typeof api !== 'undefined') return api;
       return null;
     }
+
+    // -----------------------------------------------------------------------
+    // Task section
+    // -----------------------------------------------------------------------
+
+    async _initTaskList() {
+      const container = this.querySelector('#lexTaskListContainer');
+      if (!container) return;
+
+      if (Array.isArray(this._taskItems)) {
+        this._renderTaskList(container);
+        return;
+      }
+
+      if (this._taskListLoading) return;
+      this._taskListLoading = true;
+      container.innerHTML = '<div class="lex-sidebar-dynamic-loading">Loading tasks...</div>';
+
+      try {
+        const client = this._getApiClient();
+        if (!client || typeof client.getMyTasks !== 'function') {
+          throw new Error('Task API unavailable');
+        }
+
+        const result = await client.getMyTasks({
+          limit: 11,
+          offset: 0,
+          sort_by: 'updated_at',
+          sort_dir: 'DESC'
+        });
+        const rows = this._normalizeTasks(result)
+          .filter(Boolean)
+          .sort((a, b) => {
+            const aTime = new Date(a.updated_at || a.created_at || a.due_date || 0).getTime();
+            const bTime = new Date(b.updated_at || b.created_at || b.due_date || 0).getTime();
+            return bTime - aTime;
+          });
+
+        const total = Number(result && (result.total || result.count || (result.pagination && result.pagination.total)) || 0);
+        this._taskItems = rows.slice(0, 10);
+        this._taskHasMore = total > 10 || rows.length > 10;
+        this._renderTaskList(container);
+      } catch (error) {
+        console.error('[lex-sidebar] Failed to load tasks:', error);
+        container.innerHTML = '<div class="lex-sidebar-dynamic-error">Could not load tasks</div>';
+      } finally {
+        this._taskListLoading = false;
+        requestAnimationFrame(() => this._updateScrollableFades());
+      }
+    }
+
+    _normalizeTasks(response) {
+      if (!response) return [];
+      if (response.data) return this._normalizeTasks(response.data);
+      if (Array.isArray(response)) return response;
+      if (Array.isArray(response.tasks)) return response.tasks;
+      if (Array.isArray(response.items)) return response.items;
+      return [];
+    }
+
+    _renderTaskList(container) {
+      const rows = Array.isArray(this._taskItems) ? this._taskItems : [];
+      if (!rows.length) {
+        container.innerHTML = '<div class="lex-sidebar-dynamic-empty">No tasks assigned</div>';
+        return;
+      }
+
+      const groups = this._groupTasks(rows);
+      const html = groups.map((group) => {
+        const items = group.items.map((task) => this._renderTaskItem(task)).join('');
+        return `<div class="lex-sidebar-task-group">
+          <div class="lex-sidebar-task-group-title">${this.escapeHtml(group.label)}</div>
+          ${items}
+        </div>`;
+      }).join('');
+      const showMore = this._taskHasMore
+        ? '<button type="button" class="lex-sidebar-show-more" data-action="show-more-tasks">Show More Tasks</button>'
+        : '';
+      container.innerHTML = html + showMore;
+    }
+
+    _groupTasks(tasks) {
+      const order = [];
+      const groups = {};
+      tasks.forEach((task) => {
+        const priority = this._getTaskPriorityLabel(task);
+        const due = this._getTaskDueBucket(task);
+        const key = priority.label + '|' + due.label;
+        if (!groups[key]) {
+          groups[key] = { label: priority.label + ' Priority · ' + due.label, rank: priority.rank + due.rank, items: [] };
+          order.push(key);
+        }
+        groups[key].items.push(task);
+      });
+      return order
+        .map((key) => groups[key])
+        .sort((a, b) => a.rank - b.rank);
+    }
+
+    _getTaskPriorityLabel(task) {
+      const raw = String((task && (task.priority || task.task_priority || task.urgency)) || 'normal').toLowerCase();
+      const normalized = raw === 'urgent' || raw === 'critical'
+        ? 'Urgent'
+        : raw === 'high'
+        ? 'High'
+        : raw === 'low'
+        ? 'Low'
+        : 'Normal';
+      const ranks = { Urgent: 0, High: 10, Normal: 20, Low: 30 };
+      return { label: normalized, rank: ranks[normalized] };
+    }
+
+    _getTaskDueBucket(task) {
+      const value = task && (task.due_date || task.due_at || task.deadline);
+      if (!value) return { label: 'No Due Date', rank: 900 };
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return { label: 'No Due Date', rank: 900 };
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const due = new Date(date);
+      due.setHours(0, 0, 0, 0);
+      const days = Math.round((due.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+
+      if (days < 0) return { label: 'Overdue', rank: 0 };
+      if (days === 0) return { label: 'Due Today', rank: 1 };
+      if (days === 1) return { label: 'Due Tomorrow', rank: 2 };
+      if (days <= 7) return { label: 'Due This Week', rank: 3 };
+      return { label: 'Later', rank: 4 };
+    }
+
+    _renderTaskItem(task) {
+      const id = task.id || task.task_id || '';
+      const title = task.title || task.name || task.task_title || 'Untitled Task';
+      const matter = task.matter_name || task.workspace_name || task.matter_id || 'Organization-level';
+      const due = this._formatTaskDue(task.due_date || task.due_at || task.deadline);
+      const meta = due ? matter + ' · ' + due : matter;
+      return `<button type="button" class="lex-sidebar-task-item" data-task-id="${this.escapeHtml(id)}" title="${this.escapeHtml(title)}">
+        <span class="lex-sidebar-task-icon">${icon('clipboard-check', 'small')}</span>
+        <span class="lex-sidebar-task-copy">
+          <span class="lex-sidebar-task-name">${this.escapeHtml(title)}</span>
+          <span class="lex-sidebar-task-meta">${this.escapeHtml(meta)}</span>
+        </span>
+      </button>`;
+    }
+
+    _formatTaskDue(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return 'Due ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+
+    _openTask(taskId) {
+      const href = 'my-tasks.html' + (taskId ? '?task=' + encodeURIComponent(taskId) : '');
+      const currentPage = ((window.location && window.location.pathname) || '').split('/').pop();
+      if (currentPage === 'my-tasks.html') {
+        window.location.href = this._getAppPrefix() + href;
+        return;
+      }
+      if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
+        window.Lex.Nav.go('my-tasks.html', taskId ? { params: { task: taskId } } : undefined);
+      } else {
+        window.location.href = this._getAppPrefix() + href;
+      }
+    }
+
+    _openTasksIndex(options = {}) {
+      if (options.create) {
+        const createMenuItem = document.querySelector('#myTasksNewMenu [data-new-action="task"]');
+        if (createMenuItem) {
+          createMenuItem.click();
+          return;
+        }
+      }
+
+      const href = 'my-tasks.html' + (options.create ? '?action=create' : '');
+      if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function' && !options.create) {
+        window.Lex.Nav.go('my-tasks.html');
+      } else {
+        window.location.href = this._getAppPrefix() + href;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Workspace section
+    // -----------------------------------------------------------------------
 
     async _initWorkspaceList() {
       const container = this.querySelector('#lexWorkspaceListContainer');
@@ -2208,6 +2478,23 @@
         }
       });
 
+      this.delegate('click', '[data-action="create-task"]', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._openTasksIndex({ create: true });
+      });
+
+      this.delegate('click', '[data-action="show-more-tasks"]', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._openTasksIndex();
+      });
+
+      this.delegate('click', '[data-task-id]', (e, target) => {
+        e.preventDefault();
+        this._openTask(target.dataset.taskId || '');
+      });
+
       this.delegate('click', '[data-action="create-workspace"]', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2369,6 +2656,7 @@
       // _emitCollapsedState() is guarded internally — it is a no-op when the
       // collapsed value has not changed since the last emission.
       this._emitCollapsedState();
+      this._initTaskList();
       this._initWorkspaceList();
     }
   }

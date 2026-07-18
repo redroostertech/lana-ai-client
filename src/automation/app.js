@@ -3086,7 +3086,7 @@ function renderUserChip() {
     {
       id: 'main-actions',
       isStaticTop: true,
-      items: [{ id: 'create', label: 'Create', icon: 'plus', isButton: true, onClick: 'openAutomationBuilder' }]
+      items: [{ id: 'create', label: 'New Automation', icon: 'plus', isButton: true, onClick: 'openAutomationBuilder', variant: 'create-chat' }]
     },
     {
       id: 'navigation',

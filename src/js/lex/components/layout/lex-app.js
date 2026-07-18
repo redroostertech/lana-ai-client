@@ -953,7 +953,7 @@
     _buildSidebarSections(appContext) {
       const mainItems = appContext === 'insights'
         ? [
-            { id: 'insights-create', label: 'Create', icon: 'plus', href: 'admin/dashboard-builder.html', isButton: true, variant: 'create' },
+            { id: 'insights-create', label: 'New Dashboard', icon: 'plus', href: 'admin/dashboard-builder.html', isButton: true, variant: 'create-chat' },
             { id: 'insights-dashboard', label: 'Dashboard', icon: 'home', href: 'admin/analytics.html' },
             { id: 'insights-library', label: 'Library', icon: 'book-open', href: 'admin/dashboard-library.html' },
             { id: 'firm-reporting', label: 'Firm Reporting', icon: 'bar-chart-2', href: 'admin/reporting.html' },
@@ -962,7 +962,6 @@
         : [
             { id: 'new-chat', label: 'New Chat', isButton: true, onClick: 'openNewProjectModal', variant: 'create-chat' },
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
-            { id: 'my-tasks', label: 'My Tasks', icon: 'clipboard-check', href: 'my-tasks.html' },
             { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html', children: [
               { id: 'library-all-sources', label: 'All Sources', href: 'drive.html' },
               { id: 'library-document-studio', label: 'Document Studio', isButton: true, onClick: 'openDocStudioFromMenu' }
@@ -986,6 +985,13 @@
             : [{ id: 'top-movers-empty', label: 'No movement yet', icon: 'bar-chart-2', href: '#' }]
         });
       } else {
+        sections.push({
+          id: 'task-recents',
+          title: 'Tasks',
+          isScrollable: true,
+          isTaskList: true,
+          items: []
+        });
         sections.push({
           id: 'workspace-recents',
           title: 'Workspaces',
