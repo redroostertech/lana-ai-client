@@ -300,7 +300,16 @@ class ElectronScreenVoice {
       this.positionOverlay();
       return { ok: true };
     });
-    handle('screen-voice:dismiss', () => { this.detailsOpen = true; this.overlay?.hide(); return { ok: true }; });
+    handle('screen-voice:dismiss', () => {
+      this.detailsOpen = true;
+      if (this.controller.state !== 'idle' || this.realtimeActive) {
+        const result = this.cancel();
+        this.overlay?.hide();
+        return result;
+      }
+      this.overlay?.hide();
+      return { ok: true };
+    });
   }
 
   initialize() {

@@ -541,6 +541,22 @@ describe('Electron screen voice orchestration', () => {
     })]);
   });
 
+  test('dismissing the overlay stops an active realtime capture instead of hiding a live microphone', async () => {
+    const manager = managerWith({ api: {}, adapter: {} });
+    manager.registerIpc();
+    manager.controller.start('agent', 'realtime');
+    manager.realtimeActive = true;
+
+    const dismissRegistration = ipcMain.handle.mock.calls.find(([channel]) => channel === 'screen-voice:dismiss');
+    const result = await dismissRegistration[1]({ sender: { id: manager.overlay.webContents.id } }, {});
+
+    expect(result).toEqual({ ok: true });
+    expect(manager.realtimeActive).toBe(false);
+    expect(manager.overlay.hide).toHaveBeenCalled();
+    expect(sent).toContainEqual(['screen-voice:stop-realtime', { reason: 'user_canceled' }]);
+    expect(sent).toContainEqual(['screen-voice:stop-capture', { discard: true }]);
+  });
+
   test('does not advance the replay cursor when proposal correlation validation fails', async () => {
     const manager = managerWith({ api: {}, adapter: {} });
     manager.controller.start('agent');
