@@ -36,8 +36,29 @@ body { padding: 4px; color: var(--lex-text-primary); }
 .transcribing .level-meter,
 .thinking .level-meter,
 .gathering_context .level-meter,
-.executing .level-meter,
-.speaking .level-meter { display: block; opacity: 1; }
+.executing .level-meter { display: block; opacity: 1; }
+.voice-wave {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 42px;
+  height: 18px;
+  flex: 0 0 42px;
+}
+.voice-wave span {
+  width: 4px;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lex-color-white) 86%, transparent);
+  transform-origin: center;
+  animation: voice-wave 860ms ease-in-out infinite;
+}
+.voice-wave span:nth-child(2) { animation-delay: 110ms; }
+.voice-wave span:nth-child(3) { animation-delay: 220ms; }
+.voice-wave span:nth-child(4) { animation-delay: 330ms; }
+.speaking .voice-wave { display: inline-flex; }
+.speaking .shortcut-hint { color: var(--lex-color-white); }
 .shortcut-hint {
   min-width: 0;
   flex: 1 1 auto;
@@ -130,6 +151,10 @@ body { padding: 4px; color: var(--lex-text-primary); }
   0% { transform: translateX(-120%); opacity: .45; }
   55% { opacity: 1; }
   100% { transform: translateX(280%); opacity: .55; }
+}
+@keyframes voice-wave {
+  0%, 100% { transform: scaleY(.65); opacity: .55; }
+  45% { transform: scaleY(1.9); opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media (prefers-contrast: more) { .voice-shell, .button, input, textarea, select { border-width: 2px; } }

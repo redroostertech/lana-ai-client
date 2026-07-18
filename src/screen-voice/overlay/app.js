@@ -6,7 +6,7 @@
     shell: document.querySelector('.voice-shell'), expanded: $('expandedSurface'), expandedStatus: $('expandedStatus'),
     info: $('infoButton'), shortcutHint: $('shortcutHint'),
     shortcutVerb: $('shortcutVerb'), shortcutKeys: $('shortcutKeys'), shortcutAction: $('shortcutAction'),
-    title: $('statusTitle'), detail: $('statusDetail'), context: $('contextNotice'), meter: $('levelMeter'),
+    title: $('statusTitle'), detail: $('statusDetail'), context: $('contextNotice'), meter: $('levelMeter'), wave: $('voiceWave'),
     transcript: $('transcript'), preview: $('preview'), previewText: $('previewText'),
     confirm: $('confirmButton'), copy: $('copyButton'), cancel: $('cancelButton'), undo: $('undoButton'),
     hideDetails: $('hideDetailsButton')
@@ -65,7 +65,7 @@
     thinking: ['Thinking', 'Preparing a constrained response…'],
     previewing: ['Review before applying', 'Nothing has been changed yet.'],
     executing: ['Applying', 'Rechecking the target before inserting…'],
-    speaking: ['Speaking', 'Playing LANA’s response…'],
+    speaking: ['Speaking', 'LANA is speaking now.'],
     canceled: ['Canceled', 'No changes were made.'],
     error: ['Couldn’t complete that', 'Try again or open settings for permission help.']
   };
@@ -124,9 +124,34 @@
     const captureReady = state === 'listening' && capturePhase === 'recording';
     const captureStarting = state === 'listening' && ['idle', 'preparing', 'chiming'].includes(capturePhase);
     const captureReleasing = state === 'listening' && capturePhase === 'releasing';
-    els.shortcutKeys.textContent = captureReleasing ? '' : shortcutLabel;
-    els.shortcutVerb.textContent = realtimeConnected ? 'Listening' : captureReady ? 'Release' : captureStarting ? 'Keep holding' : captureReleasing ? 'Processing' : 'Hold';
-    els.shortcutAction.textContent = realtimeConnected ? 'pauses send turns' : captureReady ? 'to process' : captureStarting ? 'until ready' : captureReleasing ? 'audio…' : 'to speak';
+    const compactStatus = {
+      idle: ['Hold', shortcutLabel, 'to speak'],
+      transcribing: ['Transcribing', '', 'your audio…'],
+      gathering_context: ['Reading', '', 'this window…'],
+      thinking: ['Thinking', '', 'through your request…'],
+      executing: ['Applying', '', 'the approved action…'],
+      speaking: ['LANA', '', 'is speaking…'],
+      previewing: ['Review', '', 'the proposed response'],
+      canceled: ['Canceled', '', ''],
+      error: ['Voice', '', 'needs attention']
+    }[state] || ['Hold', shortcutLabel, 'to speak'];
+    if (captureStarting) {
+      compactStatus[0] = 'Getting';
+      compactStatus[1] = '';
+      compactStatus[2] = 'microphone ready…';
+    } else if (captureReady) {
+      compactStatus[0] = 'Listening';
+      compactStatus[1] = shortcutLabel;
+      compactStatus[2] = 'release to send';
+    } else if (captureReleasing) {
+      compactStatus[0] = 'Finishing';
+      compactStatus[1] = '';
+      compactStatus[2] = 'capture…';
+    }
+    els.shortcutVerb.textContent = compactStatus[0];
+    els.shortcutKeys.textContent = compactStatus[1];
+    els.shortcutKeys.hidden = !compactStatus[1];
+    els.shortcutAction.textContent = compactStatus[2];
     els.shortcutHint.title = `${els.shortcutVerb.textContent} ${els.shortcutKeys.textContent} ${els.shortcutAction.textContent}`.trim();
     els.title.textContent = copy[0];
     els.shell.setAttribute('aria-label', `${copy[0]}. ${session.error?.message || copy[1]}`);
