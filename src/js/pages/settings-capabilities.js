@@ -223,6 +223,12 @@
     expand.type = 'button';
     expand.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
     expand.setAttribute('aria-controls', bodyId);
+    expand.setAttribute('aria-label', 'Toggle details for ' + (capability.label || capability.id));
+    var chevronButton = element('button', 'sv2-capability-chevron-button');
+    chevronButton.type = 'button';
+    chevronButton.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+    chevronButton.setAttribute('aria-controls', bodyId);
+    chevronButton.setAttribute('aria-label', 'Toggle details for ' + (capability.label || capability.id));
     var chevron = element('span', 'sv2-capability-chevron');
     chevron.setAttribute('aria-hidden', 'true');
     var copy = element('span', 'sv2-capability-copy');
@@ -230,7 +236,7 @@
     if (capability.description) copy.appendChild(element('span', 'sv2-capability-description', capability.description));
     copy.appendChild(element('span', 'sv2-capability-availability', availabilityText(capability)));
     expand.appendChild(copy);
-    expand.appendChild(chevron);
+    chevronButton.appendChild(chevron);
 
     var selectWrap = element('div', 'sv2-capability-select-wrap');
     var selectId = 'sv2-capability-' + String(capability.id).replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -251,17 +257,21 @@
     selectWrap.appendChild(select);
     heading.appendChild(expand);
     heading.appendChild(selectWrap);
+    heading.appendChild(chevronButton);
     row.appendChild(heading);
 
     var body = element('div', 'sv2-capability-body');
     body.id = bodyId;
     body.hidden = !isExpanded;
-    expand.addEventListener('click', function () {
-      var next = expand.getAttribute('aria-expanded') !== 'true';
+    function toggleExpanded() {
+      var next = chevronButton.getAttribute('aria-expanded') !== 'true';
       expand.setAttribute('aria-expanded', next ? 'true' : 'false');
+      chevronButton.setAttribute('aria-expanded', next ? 'true' : 'false');
       body.hidden = !next;
       onExpandedChange(capability.id, next);
-    });
+    }
+    expand.addEventListener('click', toggleExpanded);
+    chevronButton.addEventListener('click', toggleExpanded);
 
     var platform = element('p', 'sv2-capability-platforms');
     platform.appendChild(element('strong', '', 'Supported platforms: '));
