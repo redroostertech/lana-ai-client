@@ -151,6 +151,8 @@
       this._initialized = false;
       this._contextWarningShown = false;
       this._contextMeterEl = null;
+      this._activeTurnId = null;
+      this._loadConversationSeq = 0;
 
       // Sub-component references
       this._documentsEl = null;
@@ -238,6 +240,17 @@
         const opts = {};
         if (e.detail.attachments) opts.attachments = e.detail.attachments;
         this.send(e.detail.content, opts);
+      });
+
+      this.addEventListener('lex-composer-validation-error', (e) => {
+        const message = e.detail?.message || 'Message could not be sent.';
+        this._showSystemMessage(message);
+        this.emit('lex-chat-error', {
+          error: message,
+          type: 'validation',
+          status: 400,
+          field: e.detail?.field || null
+        });
       });
 
       // Composer stop
@@ -409,6 +422,17 @@
      */
     async send(content, opts = {}) {
       if (!content || !this._source) return;
+      if (this._activeTurnId) {
+        this._showSystemMessage('A response is already in progress.');
+        this.emit('lex-chat-error', {
+          error: 'A response is already in progress.',
+          type: 'concurrent_send'
+        });
+        return;
+      }
+
+      const turnId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      this._activeTurnId = turnId;
 
       // Reset per-message state
       this._citations = [];
@@ -472,29 +496,50 @@
       }
 
       let responseStarted = false;
+      let terminalReceived = false;
+      let streamErrorReceived = false;
       this._agenticBlockedReceived = false;
 
       try {
         // Iterate async generator
         for await (const event of this._source.send(content, sendOpts)) {
+          if (this._activeTurnId !== turnId) {
+            break;
+          }
           this._handleEvent(event, responseStarted);
 
           if (event.type === 'content' && !responseStarted) {
             responseStarted = true;
           }
+          if (event.type === 'done' || event.type === 'stopped' || event.type === 'error' || event.type === 'agentic_error') {
+            terminalReceived = true;
+          }
+          if (event.type === 'error' || event.type === 'agentic_error') {
+            streamErrorReceived = true;
+          }
         }
       } catch (err) {
         console.error('[lex-chat] Send error:', err);
+        streamErrorReceived = true;
+        terminalReceived = true;
         this.emit('lex-chat-error', { error: err.message, type: 'send', status: err.status || null });
       }
 
       // Finalize
-      if (this._activityEl) this._activityEl.hide();
-      if (this._composerEl) this._composerEl.setGenerating(false);
+      if (this._activeTurnId === turnId) {
+        if (this._activityEl) this._activityEl.hide();
+        if (this._composerEl) this._composerEl.setGenerating(false);
+        this._activeTurnId = null;
+      }
 
       // Suppress fallback when the stream intentionally yielded a plan card or
       // blocked-state event instead of streaming content.
-      if (!responseStarted && !this._planReadyReceived && !this._agenticBlockedReceived && this._threadEl) {
+      if (!responseStarted
+        && !terminalReceived
+        && !streamErrorReceived
+        && !this._planReadyReceived
+        && !this._agenticBlockedReceived
+        && this._threadEl) {
         this._threadEl.addMessage('assistant', 'No response received.');
       }
 
@@ -514,19 +559,25 @@
      * Load a conversation by ID.
      */
     async loadConversation(id) {
+      const loadSeq = ++this._loadConversationSeq;
       this._props.conversationId = id;
       this._resetContextMeter();
       this._recoveryNoticeShownForConversation = null;
 
+      const isCurrentLoad = () => this._loadConversationSeq === loadSeq && this.conversationId === id;
+
       if (this._source) {
         await this._source.connect(id);
+        if (!isCurrentLoad() || this._activeTurnId) return;
 
         // Load chat state (document mode)
         const state = await this._source.loadState();
+        if (!isCurrentLoad() || this._activeTurnId) return;
         if (state) this._updateDocumentState(state);
 
         // Load history
         const result = await this._source.loadHistory(1, this.maxHistory);
+        if (!isCurrentLoad() || this._activeTurnId) return;
         if (result && result.messages) {
           let lastPersistedMessage = null;
           if (this._threadEl) {
@@ -602,6 +653,7 @@
         // `lex-chat-generation-active` and render their own banner.
         try {
           const status = await this._source.checkActiveGeneration(id);
+          if (!isCurrentLoad() || this._activeTurnId) return;
           if (status && status.active) {
             this._showPendingGenerationRecovery(lastPersistedMessage, { activeGeneration: true });
             this.dispatchEvent(new CustomEvent('lex-chat-generation-active', {
@@ -631,6 +683,7 @@
      * Clear the conversation.
      */
     clearConversation() {
+      this._loadConversationSeq += 1;
       this._props.conversationId = null;
       this._citations = [];
       this._artifacts = [];
@@ -973,6 +1026,13 @@
             error: event.error,
             type: 'stream',
             status: event.status || null
+          });
+          break;
+
+        case 'protocol_warning':
+          this.emit('lex-chat-protocol-warning', {
+            event: event.event || null,
+            reason: event.reason || 'unknown'
           });
           break;
       }
