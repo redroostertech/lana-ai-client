@@ -98,6 +98,7 @@ class ElectronScreenVoice {
     this.conversationTurns = [];
     this.conversationMemory = '';
     this.realtimeActive = false;
+    this.captureTransport = null; // null | 'realtime' | 'upload'
     this.realtimeConversationId = (typeof this.settingsStore.get === 'function'
       ? this.settingsStore.get('realtimeConversationId')
       : this.settingsStore.store?.realtimeConversationId) || null;
@@ -353,9 +354,8 @@ class ElectronScreenVoice {
   }
 
   deactivateHost(reason) {
-    this.send('screen-voice:stop-capture', { discard: true });
+    this._clearCaptureLifecycle(reason, { notifyRenderer: true });
     this.controller.cancel(reason);
-    this.realtimeActive = false;
     this.unregisterShortcut(this.settings.dictationShortcut);
     this.unregisterShortcut(this.settings.agentShortcut);
     this.stopShortcutMonitor();
@@ -475,11 +475,16 @@ class ElectronScreenVoice {
 
   async handleShortcutDown(mode, source = 'global_shortcut') {
     mode = 'agent';
-    if (this.shortcutMonitor && this.shortcutHeldMode === mode) return this.controller.snapshot();
+    if (this.shortcutMonitor && this.shortcutHeldMode === mode
+        && !this._recoverStaleListening('stale_shortcut_hold')) {
+      return this.controller.snapshot();
+    }
     this.logInfo(`[ScreenVoice] Shortcut down (${mode}); state=${this.controller.state}`);
     if (this.controller.state === 'listening') {
-      if (!this.shortcutMonitorReady) this.send('screen-voice:stop-capture', { reason: 'activation_released' });
-      return this.controller.snapshot();
+      if (!this._recoverStaleListening('stale_listening_shortcut')) {
+        if (!this.shortcutMonitorReady) this.send('screen-voice:stop-capture', { reason: 'activation_released' });
+        return this.controller.snapshot();
+      }
     }
     if (this.controller.state === 'previewing') this.controller.transition('idle');
     if (this.shortcutStartPromise) return this.shortcutStartPromise;
@@ -673,6 +678,7 @@ class ElectronScreenVoice {
         }
         this.realtimeVoiceSessionId = randomUUID();
         this.realtimeActive = true;
+        this.captureTransport = 'realtime';
         this.send('screen-voice:start-realtime', {
           websocketUrl: realtime.websocket_url,
           start: {
@@ -688,6 +694,7 @@ class ElectronScreenVoice {
           }
         });
       } else {
+        this.captureTransport = 'upload';
         this.send('screen-voice:start-capture', { mode, sessionId: snapshot.session.id, maxDurationMs: 90000 });
       }
       this.logInfo(`[ScreenVoice] Session started (${mode})`);
@@ -842,8 +849,39 @@ class ElectronScreenVoice {
     return message;
   }
 
-  handleRealtimeDisconnected(code, reason) {
+  _clearCaptureLifecycle(reason = 'stopped', options = {}) {
+    const { notifyRenderer = true, resetController = false } = options;
+    if (notifyRenderer) {
+      this.send('screen-voice:stop-capture', { discard: true, reason });
+      this.send('screen-voice:stop-realtime', { reason });
+    }
     this.realtimeActive = false;
+    this.captureTransport = null;
+    this.realtimeVoiceSessionId = null;
+    this.remoteResponseText = '';
+    this.shortcutHeldMode = null;
+    this.pendingShortcutRelease = null;
+    if (resetController && this.controller.state !== 'idle') {
+      try { this.controller.transition('idle'); }
+      catch (_) { this.controller.reset(); }
+    }
+  }
+
+  _recoverStaleListening(reason = 'stale_listening') {
+    if (this.controller.state !== 'listening') return false;
+    if (this.captureTransport !== 'realtime' || this.realtimeActive || this.shortcutStartPromise) return false;
+    this.logInfo(`[ScreenVoice] Recovering stale realtime listening state (${reason})`);
+    this._clearCaptureLifecycle(reason, { notifyRenderer: true, resetController: true });
+    return true;
+  }
+
+  handleRealtimeDisconnected(code, reason) {
+    const shouldReset = this.captureTransport === 'realtime'
+      && ['listening', 'transcribing', 'gathering_context', 'thinking', 'speaking'].includes(this.controller.state);
+    this._clearCaptureLifecycle(reason || 'realtime_disconnected', {
+      notifyRenderer: true,
+      resetController: shouldReset
+    });
     if (code !== 1000 && this.authenticated && this.entitlementEnabled) {
       this.logError(`[ScreenVoice] Realtime disconnected code=${code || 0} reason=${String(reason || '').slice(0, 120)}`);
     }
@@ -1018,9 +1056,7 @@ class ElectronScreenVoice {
       this.transitionRemote('listening', { decision: null });
       return { ok: true, proposal: true };
     }
-    this.send('screen-voice:stop-capture', { discard: true });
-    this.send('screen-voice:stop-realtime', { reason: 'user_canceled' });
-    this.realtimeActive = false;
+    this._clearCaptureLifecycle('user_canceled', { notifyRenderer: true });
     this.controller.cancel();
     return { ok: true };
   }
@@ -1068,7 +1104,7 @@ class ElectronScreenVoice {
   }
 
   shutdown() {
-    this.send('screen-voice:stop-realtime', { reason: 'app_quit' });
+    this._clearCaptureLifecycle('app_quit', { notifyRenderer: true });
     if (this.controller.state !== 'idle' && this.controller.state !== 'canceled') this.controller.cancel('app_quit');
     this.unregisterShortcut(this.settings.dictationShortcut);
     this.unregisterShortcut(this.settings.agentShortcut);

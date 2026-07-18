@@ -271,6 +271,61 @@ describe('Electron screen voice orchestration', () => {
     expect(sent).toContainEqual(['screen-voice:stop-capture', { reason: 'activation_released' }]);
   });
 
+  test('realtime disconnect clears capture lifecycle so the next shortcut can start fresh', async () => {
+    const manager = managerWith({ api: {
+      realtimeConfig: jest.fn(async () => ({ desktop_realtime_hermes_enabled: true, websocket_url: 'ws://voice.test' }))
+    }, adapter: {
+      permissionStatus: jest.fn(async () => ({ accessibility: true })),
+      getTarget: jest.fn(async () => context),
+      getContext: jest.fn(async () => context)
+    } });
+    manager.authenticated = true;
+    manager.entitlementEnabled = true;
+
+    await manager.begin('agent', 'test');
+    expect(manager.controller.state).toBe('listening');
+    expect(manager.realtimeActive).toBe(true);
+    expect(manager.captureTransport).toBe('realtime');
+
+    manager.handleRealtimeDisconnected(1006, 'socket closed');
+
+    expect(manager.controller.state).toBe('idle');
+    expect(manager.realtimeActive).toBe(false);
+    expect(manager.captureTransport).toBeNull();
+    expect(sent).toContainEqual(['screen-voice:stop-realtime', { reason: 'socket closed' }]);
+
+    sent.length = 0;
+    await manager.handleShortcutDown('agent');
+    expect(manager.controller.state).toBe('listening');
+    expect(manager.realtimeActive).toBe(true);
+    expect(sent).toContainEqual(['screen-voice:start-realtime', expect.any(Object)]);
+  });
+
+  test('stale realtime listening state self-recovers instead of blocking shortcut activation', async () => {
+    const manager = managerWith({ api: {
+      realtimeConfig: jest.fn(async () => ({ desktop_realtime_hermes_enabled: true, websocket_url: 'ws://voice.test' }))
+    }, adapter: {
+      permissionStatus: jest.fn(async () => ({ accessibility: true })),
+      getTarget: jest.fn(async () => context),
+      getContext: jest.fn(async () => context)
+    } });
+    manager.authenticated = true;
+    manager.entitlementEnabled = true;
+    manager.shortcutMonitor = { stop: jest.fn() };
+    manager.shortcutMonitorReady = true;
+    manager.controller.start('agent', 'realtime');
+    manager.captureTransport = 'realtime';
+    manager.realtimeActive = false;
+    manager.shortcutHeldMode = 'agent';
+
+    await manager.handleShortcutDown('agent');
+
+    expect(manager.controller.state).toBe('listening');
+    expect(manager.realtimeActive).toBe(true);
+    expect(sent).toContainEqual(['screen-voice:stop-realtime', { reason: 'stale_shortcut_hold' }]);
+    expect(sent).toContainEqual(['screen-voice:start-realtime', expect.any(Object)]);
+  });
+
   test('shortcut release flushes an active realtime turn', () => {
     const manager = managerWith({ api: {}, adapter: {} });
     manager.controller.start('agent');
@@ -554,7 +609,7 @@ describe('Electron screen voice orchestration', () => {
     expect(manager.realtimeActive).toBe(false);
     expect(manager.overlay.hide).toHaveBeenCalled();
     expect(sent).toContainEqual(['screen-voice:stop-realtime', { reason: 'user_canceled' }]);
-    expect(sent).toContainEqual(['screen-voice:stop-capture', { discard: true }]);
+    expect(sent).toContainEqual(['screen-voice:stop-capture', { discard: true, reason: 'user_canceled' }]);
   });
 
   test('does not advance the replay cursor when proposal correlation validation fails', async () => {
