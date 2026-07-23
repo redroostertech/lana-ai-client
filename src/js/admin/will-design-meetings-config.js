@@ -367,5 +367,23 @@
     loadStatus(true);
   }
 
+  window.LanaAdmin = window.LanaAdmin || {};
+  window.LanaAdmin.WillDesignMeetingsConfig = {
+    __test: {
+      compactMapping: compactMapping,
+      humanize: humanize,
+      renderTrustCard: renderTrustCard,
+      renderChips: renderChips,
+      renderValidationResult: renderValidationResult,
+      renderReconciliation: renderReconciliation,
+      setState: function (nextState) {
+        state = Object.assign(state, nextState || {});
+      },
+      getState: function () {
+        return state;
+      }
+    }
+  };
+
   init();
 })();
