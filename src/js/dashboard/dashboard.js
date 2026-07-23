@@ -145,6 +145,16 @@
     return { suppressErrorLog: true };
   }
 
+  function showRateLimitPlaceholder(loadingId, contentId) {
+    var loadingEl = el(loadingId);
+    var contentEl = el(contentId);
+    if (loadingEl) hide(loadingEl);
+    if (!contentEl || contentEl.hasChildNodes()) return;
+    contentEl.innerHTML =
+      '<div class="cc-task-empty">Dashboard data is cooling down after too many requests. It will refresh automatically.</div>';
+    show(contentEl);
+  }
+
   /**
    * LANA One edition gate for the Zone E pipeline metric tiles.
    *
@@ -973,7 +983,10 @@
 
   async function renderZoneD() {
     if (_zoneDInFlight) return _zoneDInFlight;
-    if (isDashboardRateLimited()) return Promise.resolve();
+    if (isDashboardRateLimited()) {
+      showRateLimitPlaceholder('ccZoneDLoading', 'ccZoneDContent');
+      return Promise.resolve();
+    }
 
     _zoneDInFlight = renderZoneDInner().finally(function () {
       _zoneDInFlight = null;
@@ -1004,7 +1017,10 @@
             ? result.data.pagination.total
             : tasks.length);
     } catch (err) {
-      if (noteDashboardRateLimit(err)) return;
+      if (noteDashboardRateLimit(err)) {
+        showRateLimitPlaceholder('ccZoneDLoading', 'ccZoneDContent');
+        return;
+      }
       console.warn('[Dashboard Zone D] Could not load my tasks:', err && err.message);
     }
 
@@ -2393,7 +2409,10 @@
 
   async function renderZoneG(silent) {
     if (_zoneGInFlight) return _zoneGInFlight;
-    if (isDashboardRateLimited()) return Promise.resolve();
+    if (isDashboardRateLimited()) {
+      showRateLimitPlaceholder('ccZoneGLoading', 'ccZoneGContent');
+      return Promise.resolve();
+    }
 
     _zoneGInFlight = renderZoneGInner(silent).finally(function () {
       _zoneGInFlight = null;
