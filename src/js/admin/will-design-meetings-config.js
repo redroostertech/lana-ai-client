@@ -34,6 +34,27 @@
     return response && response.data ? response.data : response;
   }
 
+  function normalizeValidation(payload) {
+    if (!payload) return null;
+    var data = payload || {};
+    return data.validation || data;
+  }
+
+  function latestValidation() {
+    return normalizeValidation(state.validation)
+      || ((state.status && state.status.validation) || {});
+  }
+
+  function dataHealthState(dataHealth) {
+    if (typeof dataHealth === 'string') return dataHealth;
+    return dataHealth && dataHealth.state ? dataHealth.state : 'unknown';
+  }
+
+  function dataHealthSync(dataHealth) {
+    if (!dataHealth || typeof dataHealth === 'string') return null;
+    return dataHealth.last_successful_sync || dataHealth.lastSuccessfulSync || null;
+  }
+
   function toast(type, message) {
     if (window.Lex && Lex.Toast && typeof Lex.Toast[type] === 'function') {
       Lex.Toast[type](message);
@@ -110,11 +131,13 @@
     var definition = certification.definition || {};
     var organization = certification.organization || {};
     var dataHealth = certification.data_health || payload.data_health || {};
+    var healthState = dataHealthState(dataHealth);
+    var lastSync = dataHealthSync(dataHealth);
 
     container.innerHTML = [
       renderTrustCard('Definition', humanize(definition.state || 'certified'), definition.version || 'definition', 'good'),
       renderTrustCard('Organization', humanize(organization.state || payload.lifecycle_state || 'configuration_required'), organization.version || mapping.mapping_version || 'mapping', validation.valid ? 'good' : 'warn'),
-      renderTrustCard('Data Health', humanize(dataHealth.state || 'unknown'), dataHealth.last_successful_sync ? formatDate(dataHealth.last_successful_sync) : 'source freshness', dataHealth.state === 'healthy' ? 'good' : 'warn'),
+      renderTrustCard('Data Health', humanize(healthState), lastSync ? formatDate(lastSync) : 'source freshness', healthState === 'healthy' ? 'good' : 'warn'),
       renderTrustCard('Mapping', humanize(mapping.status || payload.lifecycle_state || 'configuration_required'), mapping.mapping_version || 'not configured', validation.valid ? 'good' : 'bad'),
     ].join('');
   }
@@ -135,7 +158,8 @@
     if (!container) return;
     var payload = state.status || {};
     var observed = payload.observed_values || {};
-    var unresolved = payload.validation && payload.validation.unresolved ? payload.validation.unresolved : {};
+    var validation = latestValidation();
+    var unresolved = validation && validation.unresolved ? validation.unresolved : {};
     var sections = [
       ['Service Offering', observed.service_offering, unresolved.service_offering],
       ['Meeting Type', observed.meeting_type, unresolved.meeting_type],
@@ -162,7 +186,7 @@
   function renderValidationResult(result) {
     var panel = el('willDesignValidationPanel');
     if (!panel) return;
-    var validation = result && result.validation ? result.validation : (state.status && state.status.validation) || {};
+    var validation = normalizeValidation(result || state.validation) || (state.status && state.status.validation) || {};
     var errors = validation.errors || [];
     var warnings = validation.warnings || [];
     var unresolved = validation.unresolved || {};
@@ -257,7 +281,7 @@
       state.validation = unwrap(response);
       renderValidationResult(state.validation);
       renderObservedValues();
-      toast(state.validation.validation && state.validation.validation.valid ? 'success' : 'warning', 'Mapping validation complete');
+      toast(normalizeValidation(state.validation).valid ? 'success' : 'warning', 'Mapping validation complete');
       return state.validation;
     } catch (err) {
       toast('error', err && err.message ? err.message : 'Could not validate mapping');
@@ -373,9 +397,14 @@
       compactMapping: compactMapping,
       humanize: humanize,
       renderTrustCard: renderTrustCard,
+      renderTrustCards: renderTrustCards,
       renderChips: renderChips,
+      renderObservedValues: renderObservedValues,
       renderValidationResult: renderValidationResult,
       renderReconciliation: renderReconciliation,
+      dataHealthState: dataHealthState,
+      latestValidation: latestValidation,
+      normalizeValidation: normalizeValidation,
       setState: function (nextState) {
         state = Object.assign(state, nextState || {});
       },

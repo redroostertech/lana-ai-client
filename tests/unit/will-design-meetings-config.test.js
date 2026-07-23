@@ -99,6 +99,58 @@ describe('will-design-meetings-config admin controller', () => {
     expect(nodes.willDesignValidationPanel.innerHTML).toContain('New source value observed');
   });
 
+  test('latest validation drives unmapped observed-value chips', () => {
+    const nodes = {
+      willDesignObservedValues: createNode(),
+    };
+    const testApi = loadController(nodes);
+
+    testApi.setState({
+      status: {
+        observed_values: {
+          service_offering: ['Will-Based Estate Plan'],
+          meeting_type: ['Will Design'],
+          meeting_status: ['Completed', 'Tentative'],
+          attorney_identity: ['attorney-1'],
+        },
+      },
+      validation: {
+        validation: {
+          valid: false,
+          unresolved: {
+            meeting_status: ['Tentative'],
+          },
+        },
+      },
+    });
+    testApi.renderObservedValues();
+
+    expect(nodes.willDesignObservedValues.innerHTML).toContain('Meeting Status');
+    expect(nodes.willDesignObservedValues.innerHTML).toContain('Unmapped');
+    expect(nodes.willDesignObservedValues.innerHTML).toContain('Tentative');
+  });
+
+  test('trust cards support string-shaped data health from backward-compatible API payloads', () => {
+    const nodes = {
+      willDesignTrustCards: createNode(),
+    };
+    const testApi = loadController(nodes);
+
+    testApi.setState({
+      status: {
+        data_health: 'stale',
+        lifecycle_state: 'mapping_validated',
+        mapping: { status: 'validated', mapping_version: 'will-design-meetings-v1' },
+        validation: { valid: true },
+      },
+    });
+    testApi.renderTrustCards();
+
+    expect(nodes.willDesignTrustCards.innerHTML).toContain('Data Health');
+    expect(nodes.willDesignTrustCards.innerHTML).toContain('Stale');
+    expect(nodes.willDesignTrustCards.innerHTML).toContain('source freshness');
+  });
+
   test('reconciliation renderer separates pass and variance evidence', () => {
     const nodes = {
       willDesignReconcilePanel: createNode(),
