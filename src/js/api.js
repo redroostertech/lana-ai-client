@@ -591,7 +591,17 @@ class ApiClient {
         }
 
         // Support both error formats: {error: {message: ...}} and {detail: ...}
-        throw new ApiError(finalErrorMessage, response.status, result);
+        const apiError = new ApiError(finalErrorMessage, response.status, result);
+        const retryAfter = response.headers && response.headers.get
+          ? response.headers.get('Retry-After')
+          : null;
+        if (retryAfter) {
+          const retryAfterSeconds = Number(retryAfter);
+          if (Number.isFinite(retryAfterSeconds)) {
+            apiError.retryAfterSeconds = retryAfterSeconds;
+          }
+        }
+        throw apiError;
       }
 
       this.log(`Response:`, result);
@@ -2158,10 +2168,10 @@ class ApiClient {
     return this.get(`/api/v1/matters/${matterId}/tasks`);
   }
 
-  async getMyTasks(filters = {}) {
+  async getMyTasks(filters = {}, options = {}) {
     const params = new URLSearchParams(filters);
     const query = params.toString();
-    return this.get(`/api/v1/tasks/my${query ? `?${query}` : ''}`);
+    return this.get(`/api/v1/tasks/my${query ? `?${query}` : ''}`, options);
   }
 
   /**
@@ -3229,7 +3239,7 @@ class ApiClient {
    * @param {Object} params - Query parameters (type, limit)
    * @returns {Promise<Object>} Dashboard metric card payload
    */
-  async getDashboardMetricCards(params = {}) {
+  async getDashboardMetricCards(params = {}, options = {}) {
     let url = '/api/v1/modules/dashboard-metric-cards';
     const queryParts = [];
     if (params.type) queryParts.push('type=' + encodeURIComponent(params.type));
@@ -3241,7 +3251,7 @@ class ApiClient {
     if (params.compareMode) queryParts.push('compareMode=' + encodeURIComponent(params.compareMode));
     if (params.periodType) queryParts.push('periodType=' + encodeURIComponent(params.periodType));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
-    return this.get(url);
+    return this.get(url, options);
   }
 
   async getTopMovingMetrics(params = {}) {
@@ -3425,12 +3435,12 @@ class ApiClient {
    * @param {string} [params.matter_id] - UUID to narrow all zones to a single matter
    * @returns {Promise<Object>}
    */
-  async getCommandCenterSummary(params) {
+  async getCommandCenterSummary(params, options = {}) {
     var queryStr = '';
     if (params && params.matter_id) {
       queryStr = '?matter_id=' + encodeURIComponent(params.matter_id);
     }
-    return this.get('/api/v1/command-center/summary' + queryStr);
+    return this.get('/api/v1/command-center/summary' + queryStr, options);
   }
 
   /**
@@ -3447,7 +3457,7 @@ class ApiClient {
    * @param {string} [params.status]        - active|acknowledged|resolved
    * @returns {Promise<Object>}
    */
-  async getCommandCenterCriticalItems(params) {
+  async getCommandCenterCriticalItems(params, options = {}) {
     var p = params || {};
     var parts = [];
     if (p.limit !== undefined)      parts.push('limit='      + encodeURIComponent(p.limit));
@@ -3458,7 +3468,7 @@ class ApiClient {
     if (p.sort_order !== undefined) parts.push('sort_order=' + encodeURIComponent(p.sort_order));
     if (p.status !== undefined)     parts.push('status='     + encodeURIComponent(p.status));
     var queryStr = parts.length > 0 ? '?' + parts.join('&') : '';
-    return this.get('/api/v1/command-center/critical-items' + queryStr);
+    return this.get('/api/v1/command-center/critical-items' + queryStr, options);
   }
 
   /**
@@ -3469,12 +3479,12 @@ class ApiClient {
    * @param {string} [params.matter_id] - UUID to narrow counts to a single matter
    * @returns {Promise<Object>}
    */
-  async getCommandCenterPipelineMetrics(params) {
+  async getCommandCenterPipelineMetrics(params, options = {}) {
     var queryStr = '';
     if (params && params.matter_id) {
       queryStr = '?matter_id=' + encodeURIComponent(params.matter_id);
     }
-    return this.get('/api/v1/command-center/pipeline-metrics' + queryStr);
+    return this.get('/api/v1/command-center/pipeline-metrics' + queryStr, options);
   }
 
   /**
@@ -3490,7 +3500,7 @@ class ApiClient {
    * @param {string} [params.instance] - command_center|dashboard|attorney
    * @returns {Promise<Object>}
    */
-  async getCommandCenterWillDesignMeetings(params) {
+  async getCommandCenterWillDesignMeetings(params, options = {}) {
     var p = params || {};
     var parts = [];
     var add = function (key, value) {
@@ -3513,6 +3523,7 @@ class ApiClient {
     var queryStr = parts.length > 0 ? '?' + parts.join('&') : '';
     try {
       return await this.get('/api/v1/command-center/will-design-meetings' + queryStr, {
+        ...options,
         suppressErrorLog: true
       });
     } catch (error) {

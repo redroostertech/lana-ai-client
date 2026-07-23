@@ -47,6 +47,12 @@
   /** Cache of drilldown payloads keyed by UI ID for the Will Design Meetings lane */
   var _willDesignDrilldowns = {};
 
+  /** Prevent overlapping background refreshes from stampeding rate-limited endpoints */
+  var _zoneDInFlight = null;
+  var _zoneGInFlight = null;
+  var _dashboardRateLimitUntil = 0;
+  var _dashboardTaskCount = null;
+
   // =========================================================================
   // Lifecycle tracking (Finding 7)
   // =========================================================================
@@ -105,6 +111,38 @@
   function hide(target) {
     var elem = typeof target === 'string' ? el(target) : target;
     if (elem) elem.classList.add('hidden');
+  }
+
+  function getApiRetrySeconds(err) {
+    if (!err || err.status !== 429) return 0;
+    if (err.retryAfterSeconds) return err.retryAfterSeconds;
+    var message = String(err.message || '');
+    var marker = 'try again in ';
+    var idx = message.toLowerCase().indexOf(marker);
+    if (idx === -1) return 30;
+    var rest = message.slice(idx + marker.length);
+    var digits = '';
+    for (var i = 0; i < rest.length; i++) {
+      var ch = rest.charAt(i);
+      if (ch < '0' || ch > '9') break;
+      digits += ch;
+    }
+    return digits ? parseInt(digits, 10) : 30;
+  }
+
+  function noteDashboardRateLimit(err) {
+    var retrySeconds = getApiRetrySeconds(err);
+    if (!retrySeconds) return false;
+    _dashboardRateLimitUntil = Math.max(_dashboardRateLimitUntil, Date.now() + retrySeconds * 1000);
+    return true;
+  }
+
+  function isDashboardRateLimited() {
+    return Date.now() < _dashboardRateLimitUntil;
+  }
+
+  function requestQuietOptions() {
+    return { suppressErrorLog: true };
   }
 
   /**
@@ -934,6 +972,16 @@
   }
 
   async function renderZoneD() {
+    if (_zoneDInFlight) return _zoneDInFlight;
+    if (isDashboardRateLimited()) return Promise.resolve();
+
+    _zoneDInFlight = renderZoneDInner().finally(function () {
+      _zoneDInFlight = null;
+    });
+    return _zoneDInFlight;
+  }
+
+  async function renderZoneDInner() {
     var loadingEl = el('ccZoneDLoading');
     var contentEl = el('ccZoneDContent');
     if (!contentEl) return;
@@ -947,9 +995,16 @@
         statuses: 'pending,in_progress,in_review',
         sort_by: 'updated_at',
         sort_dir: 'DESC'
-      });
+      }, requestQuietOptions());
       tasks = (result && result.data && result.data.tasks) || (result && result.tasks) || [];
+      _dashboardTaskCount =
+        result && result.pagination && result.pagination.total !== undefined
+          ? result.pagination.total
+          : (result && result.data && result.data.pagination && result.data.pagination.total !== undefined
+            ? result.data.pagination.total
+            : tasks.length);
     } catch (err) {
+      if (noteDashboardRateLimit(err)) return;
       console.warn('[Dashboard Zone D] Could not load my tasks:', err && err.message);
     }
 
@@ -2337,9 +2392,20 @@
   }
 
   async function renderZoneG(silent) {
+    if (_zoneGInFlight) return _zoneGInFlight;
+    if (isDashboardRateLimited()) return Promise.resolve();
+
+    _zoneGInFlight = renderZoneGInner(silent).finally(function () {
+      _zoneGInFlight = null;
+    });
+    return _zoneGInFlight;
+  }
+
+  async function renderZoneGInner(silent) {
     var loadingEl = el('ccZoneGLoading');
     var contentEl = el('ccZoneGContent');
     if (!contentEl) return;
+    var quietOptions = requestQuietOptions();
 
     if (!silent && !contentEl.hasChildNodes()) {
       if (loadingEl) show(loadingEl);
@@ -2348,27 +2414,33 @@
 
     var results = await Promise.allSettled([
       typeof api.getCommandCenterSummary === 'function'
-        ? api.getCommandCenterSummary()
-        : api.get('/api/v1/command-center/summary'),
+        ? api.getCommandCenterSummary(null, quietOptions)
+        : api.get('/api/v1/command-center/summary', quietOptions),
       typeof api.getCommandCenterCriticalItems === 'function'
-        ? api.getCommandCenterCriticalItems({ limit: 6, status: 'active', sort_by: 'focus_score', sort_order: 'desc' })
-        : api.get('/api/v1/command-center/critical-items?limit=6&status=active&sort_by=focus_score&sort_order=desc'),
+        ? api.getCommandCenterCriticalItems({ limit: 6, status: 'active', sort_by: 'focus_score', sort_order: 'desc' }, quietOptions)
+        : api.get('/api/v1/command-center/critical-items?limit=6&status=active&sort_by=focus_score&sort_order=desc', quietOptions),
       typeof api.getCommandCenterPipelineMetrics === 'function'
-        ? api.getCommandCenterPipelineMetrics()
-        : api.get('/api/v1/command-center/pipeline-metrics'),
-      api.get('/api/v1/billable-hours/drafts?status=draft&limit=1'),
-      typeof api.getMyTasks === 'function'
-        ? api.getMyTasks({ limit: 1, offset: 0, statuses: 'pending,in_progress,in_review' })
-        : Promise.resolve(null),
-      api.get('/api/v1/agentic-tasks?limit=20'),
-      api.get('/api/v1/approvals/inbox/count'),
+        ? api.getCommandCenterPipelineMetrics(null, quietOptions)
+        : api.get('/api/v1/command-center/pipeline-metrics', quietOptions),
+      api.get('/api/v1/billable-hours/drafts?status=draft&limit=1', quietOptions),
+      _dashboardTaskCount === null
+        ? Promise.reject(new Error('Task count not loaded'))
+        : Promise.resolve({ pagination: { total: _dashboardTaskCount } }),
+      api.get('/api/v1/agentic-tasks?limit=20', quietOptions),
+      api.get('/api/v1/approvals/inbox/count', quietOptions),
       typeof api.getDashboardMetricCards === 'function'
-        ? api.getDashboardMetricCards({ type: 'owner', limit: 4, compareToPrevious: true, compareBy: 'monthly', periodType: 'monthly' })
+        ? api.getDashboardMetricCards({ type: 'owner', limit: 4, compareToPrevious: true, compareBy: 'monthly', periodType: 'monthly' }, quietOptions)
         : Promise.resolve(null),
       typeof api.getCommandCenterWillDesignMeetings === 'function'
-        ? api.getCommandCenterWillDesignMeetings({ period: _willDesignPeriod, view: 'owner', instance: 'command_center' })
-        : api.get('/api/v1/command-center/will-design-meetings?period=' + encodeURIComponent(_willDesignPeriod) + '&view=owner&instance=command_center')
+        ? api.getCommandCenterWillDesignMeetings({ period: _willDesignPeriod, view: 'owner', instance: 'command_center' }, quietOptions)
+        : api.get('/api/v1/command-center/will-design-meetings?period=' + encodeURIComponent(_willDesignPeriod) + '&view=owner&instance=command_center', quietOptions)
     ]);
+
+    for (var ri = 0; ri < results.length; ri++) {
+      if (results[ri].status === 'rejected' && noteDashboardRateLimit(results[ri].reason)) {
+        break;
+      }
+    }
 
     var summaryOk = results[0].status === 'fulfilled';
     var criticalOk = results[1].status === 'fulfilled';
