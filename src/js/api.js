@@ -1407,6 +1407,97 @@ class ApiClient {
       return { items: actionQueue.slice(0, 5), total: actionQueue.length };
     }
 
+    if (path === '/api/v1/command-center/will-design-meetings' && method === 'GET') {
+      var now = new Date();
+      var start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      var end = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+      return {
+        section: {
+          id: 'estate-planning-will-design-meetings',
+          title: 'Estate Planning - Will Design Meetings',
+          subtitle: 'Counts, comparisons, attorney breakdown, and record-level lineage from canonical calendar events.'
+        },
+        filter_context: {
+          period: 'this_month',
+          period_start: start,
+          period_end: end,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          attorney_keys: [],
+          attorney_scope_locked: false
+        },
+        card_definition: {
+          id: 'question:will-design-meetings',
+          type: 'metric_family',
+          module_key: 'service-delivery-operations'
+        },
+        card_instances: [
+          { id: 'command-center:will-design-meetings', context: 'command_center', definition_id: 'question:will-design-meetings' },
+          { id: 'dashboard:estate-planning:will-design-meetings', context: 'estate_planning_dashboard', definition_id: 'question:will-design-meetings' }
+        ],
+        period: {
+          key: 'this_month',
+          label: 'This month',
+          start: start,
+          end: end,
+          comparison: { label: 'Last month' }
+        },
+        summary: [
+          {
+            id: 'upcoming',
+            title: 'Upcoming',
+            metric_key: 'legal_firm.estate_planning.upcoming_will_design_meetings',
+            value: 0,
+            drilldown: { module_key: 'service-delivery-operations', metric_key: 'upcoming_will_design_meetings', period_start: start, period_end: end, filters: {}, available: true }
+          },
+          {
+            id: 'completed',
+            title: 'Completed',
+            metric_key: 'legal_firm.estate_planning.completed_will_design_meetings',
+            value: 0,
+            drilldown: { module_key: 'service-delivery-operations', metric_key: 'completed_will_design_meetings', period_start: start, period_end: end, filters: {}, available: true }
+          },
+          {
+            id: 'cancelled',
+            title: 'Cancelled',
+            metric_key: 'legal_firm.estate_planning.cancelled_will_design_meetings',
+            value: 0,
+            drilldown: { module_key: 'service-delivery-operations', metric_key: 'cancelled_will_design_meetings', period_start: start, period_end: end, filters: {}, available: true }
+          },
+          {
+            id: 'no_show',
+            title: 'No-show',
+            metric_key: 'legal_firm.estate_planning.no_show_will_design_meetings',
+            value: 0,
+            drilldown: { module_key: 'service-delivery-operations', metric_key: 'no_show_will_design_meetings', period_start: start, period_end: end, filters: {}, available: true }
+          }
+        ],
+        comparison: {
+          title: 'Completed meetings',
+          current_period: { label: 'This month', value: 0, start: start, end: end },
+          comparison_period: { label: 'Last month', value: 0 },
+          change: { current: 0, prior: 0, delta: 0, percent: null, direction: 'flat' }
+        },
+        ytd_trend: [],
+        attorney_breakdown: [],
+        source: {
+          system: 'canonical_calendar_events',
+          state: 'configuration_required',
+          last_successful_sync: null,
+          warnings: ['Demo mode does not include canonical Will Design Meeting records.']
+        },
+        certification: {
+          state: 'mapped',
+          label: 'Mapped - waiting on event data',
+          certified: false
+        },
+        capabilities: {
+          can_view_all_attorneys: true,
+          can_change_attorney_filter: true,
+          can_drilldown: true
+        }
+      };
+    }
+
     if (path === '/api/v1/command-center/pipeline-metrics' && method === 'GET') {
       return {
         active_matters: matters.filter(m => m.status === 'active').length,
@@ -3377,6 +3468,43 @@ class ApiClient {
       queryStr = '?matter_id=' + encodeURIComponent(params.matter_id);
     }
     return this.get('/api/v1/command-center/pipeline-metrics' + queryStr);
+  }
+
+  /**
+   * Fetch the trusted Will Design Meetings analytical lane.
+   *
+   * @param {Object} [params] - Query parameters
+   * @param {string} [params.period] - this_month|last_month|current_quarter|previous_quarter|ytd|custom
+   * @param {string} [params.date_start] - ISO start for custom ranges
+   * @param {string} [params.date_end] - ISO end for custom ranges
+   * @param {string|string[]} [params.attorney_id] - Attorney scope; backend locks this for attorney views
+   * @param {string|string[]} [params.attorney_ids] - Multi-attorney scope for owner/operator views
+   * @param {string} [params.view] - owner|operator|attorney
+   * @param {string} [params.instance] - command_center|dashboard|attorney
+   * @returns {Promise<Object>}
+   */
+  async getCommandCenterWillDesignMeetings(params) {
+    var p = params || {};
+    var parts = [];
+    var add = function (key, value) {
+      if (value === undefined || value === null || value === '') return;
+      if (Array.isArray(value)) {
+        if (value.length) parts.push(key + '=' + encodeURIComponent(value.join(',')));
+        return;
+      }
+      parts.push(key + '=' + encodeURIComponent(value));
+    };
+
+    add('period', p.period);
+    add('date_start', p.date_start);
+    add('date_end', p.date_end);
+    add('attorney_id', p.attorney_id);
+    add('attorney_ids', p.attorney_ids);
+    add('view', p.view);
+    add('instance', p.instance);
+
+    var queryStr = parts.length > 0 ? '?' + parts.join('&') : '';
+    return this.get('/api/v1/command-center/will-design-meetings' + queryStr);
   }
 }
 

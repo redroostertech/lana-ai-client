@@ -38,6 +38,15 @@
   /** Cache of action queue items keyed by item ID for detail modal lookup */
   var _actionItemsMap = {};
 
+  /** Cache of command-center focus items keyed by item ID for detail drawer lookup */
+  var _commandCenterItemsMap = {};
+
+  /** Current period selection for the Will Design Meetings command-center lane */
+  var _willDesignPeriod = 'this_month';
+
+  /** Cache of drilldown payloads keyed by UI ID for the Will Design Meetings lane */
+  var _willDesignDrilldowns = {};
+
   // =========================================================================
   // Lifecycle tracking (Finding 7)
   // =========================================================================
@@ -1835,6 +1844,722 @@
     }
   }
 
+  // =========================================================================
+  // Zone G — Owner Command Center
+  // =========================================================================
+
+  function unwrapCommandCenterResponse(result) {
+    if (!result) return {};
+    if (result.data && !Array.isArray(result.data)) return result.data;
+    return result;
+  }
+
+  function commandCenterNumber(value, fallback) {
+    if (value === undefined || value === null || value === '') return fallback || 0;
+    var n = Number(value);
+    return isNaN(n) ? (fallback || 0) : n;
+  }
+
+  function commandCenterCountLabel(value) {
+    var n = commandCenterNumber(value, 0);
+    if (window.Utils && typeof Utils.formatCompactCount === 'function') {
+      return Utils.formatCompactCount(n);
+    }
+    return n.toLocaleString();
+  }
+
+  function commandCenterMeta(parts) {
+    var clean = [];
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i] !== undefined && parts[i] !== null && parts[i] !== '') clean.push(String(parts[i]));
+    }
+    return clean.join(' · ');
+  }
+
+  function commandCenterHasValue(value) {
+    if (value === undefined || value === null) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value).length > 0;
+    return String(value).trim() !== '';
+  }
+
+  function commandCenterDisplayText(value) {
+    if (!commandCenterHasValue(value)) return '';
+    if (Array.isArray(value)) {
+      return value.map(commandCenterDisplayText).filter(Boolean).join(', ');
+    }
+    if (typeof value === 'object') {
+      return commandCenterDisplayText(
+        value.label ||
+        value.name ||
+        value.title ||
+        value.display_name ||
+        value.displayName ||
+        value.key ||
+        value.id ||
+        ''
+      );
+    }
+    return String(value);
+  }
+
+  function commandCenterHumanize(value) {
+    return commandCenterDisplayText(value)
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, function (letter) { return letter.toUpperCase(); });
+  }
+
+  function commandCenterMetricValue(metric) {
+    if (!metric) return '-';
+    if (commandCenterHasValue(metric.formatted_value)) return commandCenterDisplayText(metric.formatted_value);
+    if (commandCenterHasValue(metric.formattedValue)) return commandCenterDisplayText(metric.formattedValue);
+
+    var value = metric.value;
+    if (!commandCenterHasValue(value)) value = metric.current;
+    if (!commandCenterHasValue(value)) value = metric.current_value;
+    if (!commandCenterHasValue(value)) value = metric.metric_value;
+    if (!commandCenterHasValue(value)) return '-';
+
+    var rawFormat = metric.format || metric.value_format || metric.type || 'number';
+    if (rawFormat && typeof rawFormat === 'object') rawFormat = rawFormat.type || rawFormat.style;
+    var format = String(rawFormat || 'number').toLowerCase();
+
+    if (Array.isArray(value)) {
+      return value.length.toLocaleString('en-US') + (value.length === 1 ? ' item' : ' items');
+    }
+
+    if (typeof value === 'object') {
+      var candidate = value.value !== undefined ? value.value
+        : (value.metric_value !== undefined ? value.metric_value
+        : (value.total !== undefined ? value.total
+        : (value.count !== undefined ? value.count
+        : (value.amount !== undefined ? value.amount : null))));
+      if (candidate !== null) return commandCenterMetricValue({ value: candidate, format: format });
+      return 'View details';
+    }
+
+    var numericValue = Number(value);
+    if (Number.isFinite(numericValue)) {
+      if (format === 'currency' || format === 'currency_breakdown') {
+        return numericValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+      }
+      if (format === 'percentage' || format === 'percent') {
+        return numericValue.toLocaleString('en-US', { maximumFractionDigits: 1 }) + '%';
+      }
+      if (format === 'days') {
+        return numericValue.toLocaleString('en-US', { maximumFractionDigits: 1 }) + (numericValue === 1 ? ' day' : ' days');
+      }
+      return numericValue.toLocaleString('en-US', { maximumFractionDigits: format === 'integer' || format === 'count' ? 0 : 1 });
+    }
+
+    return commandCenterDisplayText(value);
+  }
+
+  function normalizeDashboardMetricCards(response) {
+    if (!response) return [];
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response.data)) return response.data;
+    if (response.data && Array.isArray(response.data.metrics)) return response.data.metrics;
+    if (Array.isArray(response.metrics)) return response.metrics;
+    if (Array.isArray(response.items)) return response.items;
+    return [];
+  }
+
+  function commandCenterMetricGroup(metric) {
+    var definition = metric && metric.definition && typeof metric.definition === 'object' ? metric.definition : {};
+    var metadata = metric && metric.metadata && typeof metric.metadata === 'object' ? metric.metadata : {};
+    return commandCenterHumanize(
+      metric && (metric.section || metric.dashboard_section || metric.domain || metric.category) ||
+      definition.section ||
+      definition.dashboard_section ||
+      definition.domain ||
+      metadata.section ||
+      metadata.domain ||
+      'Owner metric'
+    );
+  }
+
+  function commandCenterMetricMeta(metric) {
+    var comparison = metric && metric.comparison;
+    var parts = [];
+    var period = metric && (metric.period || metric.period_label || metric.periodLabel);
+    if (period) parts.push(period);
+
+    if (comparison && commandCenterHasValue(comparison.percent_change)) {
+      var percent = Number(comparison.percent_change);
+      if (Number.isFinite(percent)) {
+        var direction = percent > 0 ? '+' : '';
+        parts.push(direction + percent.toLocaleString('en-US', { maximumFractionDigits: 1 }) + '% vs previous');
+      }
+    }
+
+    if (metric && metric.goal && commandCenterHasValue(metric.goal.status_label)) {
+      parts.push(metric.goal.status_label);
+    } else if (metric && metric.goal && commandCenterHasValue(metric.goal.statusLabel)) {
+      parts.push(metric.goal.statusLabel);
+    }
+
+    return commandCenterMeta(parts);
+  }
+
+  function commandCenterMetricTone(metric) {
+    var goal = metric && metric.goal;
+    var status = String(
+      metric && (metric.status_color || metric.statusColor || metric.health || metric.tone) ||
+      goal && (goal.band || goal.status || goal.status_color || goal.statusColor) ||
+      ''
+    ).toLowerCase();
+
+    if (status === 'red' || status === 'critical' || status === 'danger') return 'risk';
+    if (status === 'yellow' || status === 'warning' || status === 'attention') return 'attention';
+    if (status === 'green' || status === 'healthy' || status === 'success') return 'healthy';
+    return 'neutral';
+  }
+
+  function renderCommandCenterMetricCard(metric) {
+    var key = metric.metric_key || metric.key || '';
+    var title = metric.title || metric.name || commandCenterHumanize(key) || 'Metric';
+    var href = 'admin/dashboard-detail.html?type=owner';
+    if (key) href += '&q=' + encodeURIComponent(key);
+
+    return [
+      '<button type="button" class="cc-command-center__metric" data-tone="' + escHtml(commandCenterMetricTone(metric)) + '" data-cc-nav="' + escHtml(href) + '">',
+      '  <span class="cc-command-center__metric-group">' + escHtml(commandCenterMetricGroup(metric)) + '</span>',
+      '  <span class="cc-command-center__metric-title">' + escHtml(title) + '</span>',
+      '  <span class="cc-command-center__metric-value">' + escHtml(commandCenterMetricValue(metric)) + '</span>',
+      '  <span class="cc-command-center__metric-meta">' + escHtml(commandCenterMetricMeta(metric) || 'From metric catalog') + '</span>',
+      '</button>'
+    ].join('');
+  }
+
+  function renderCommandCenterMetricStrip(metrics, catalogOk) {
+    if (!catalogOk) {
+      return '<div class="cc-command-center__empty">Owner metric catalog unavailable</div>';
+    }
+    if (!metrics.length) {
+      return '<div class="cc-command-center__empty">No populated owner metrics</div>';
+    }
+    return '<div class="cc-command-center__metrics">' + metrics.slice(0, 4).map(renderCommandCenterMetricCard).join('') + '</div>';
+  }
+
+  function renderCommandCenterKpi(label, value, meta, tone) {
+    return [
+      '<div class="cc-command-center__kpi" data-tone="' + escHtml(tone || 'neutral') + '">',
+      '  <div class="cc-command-center__kpi-label">' + escHtml(label) + '</div>',
+      '  <div class="cc-command-center__kpi-value">' + escHtml(value) + '</div>',
+      meta ? '  <div class="cc-command-center__kpi-meta">' + escHtml(meta) + '</div>' : '',
+      '</div>'
+    ].join('');
+  }
+
+  function commandCenterFocusMeta(item) {
+    var parts = [];
+    var sev = item.severity || item.priority || '';
+    if (sev) parts.push(severityLabel(sev));
+
+    var matter = item.matter_name || item.matter || '';
+    if (!matter) {
+      var sa = getSuggestedAction(item);
+      if (sa && sa.items && sa.items.length > 0) {
+        var names = [];
+        for (var i = 0; i < sa.items.length; i++) {
+          var name = sa.items[i].matter_name || '';
+          if (name && names.indexOf(name) === -1) names.push(name);
+        }
+        if (names.length === 1) matter = names[0];
+        if (names.length > 1) matter = names.length + ' matters';
+      }
+    }
+    if (matter) parts.push(matter);
+
+    var ts = item.due_date || item.created_at || item.updated_at || '';
+    if (ts) parts.push(timeAgo(ts));
+
+    return commandCenterMeta(parts);
+  }
+
+  function renderCommandCenterFocusItem(item) {
+    var id = String(item.id || item.entity_id || item.title || '');
+    var severity = String(item.severity || item.priority || 'low').toLowerCase();
+    var title = item.title || item.name || item.description || 'Action item';
+    var meta = commandCenterFocusMeta(item);
+
+    if (id) _commandCenterItemsMap[id] = item;
+
+    return [
+      '<button type="button" class="cc-command-center__focus-item" data-command-action-id="' + escHtml(id) + '">',
+      '  <span class="cc-command-center__focus-dot" data-severity="' + escHtml(severity) + '"></span>',
+      '  <span class="cc-command-center__focus-copy">',
+      '    <span class="cc-command-center__focus-title">' + escHtml(title) + '</span>',
+      meta ? '    <span class="cc-command-center__focus-meta">' + escHtml(meta) + '</span>' : '',
+      '  </span>',
+      '  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color:var(--lex-text-tertiary);"><path d="M9 18l6-6-6-6"/></svg>',
+      '</button>'
+    ].join('');
+  }
+
+  function renderCommandCenterLane(title, meta, buttonLabel, target, tone) {
+    return [
+      '<div class="cc-command-center__lane" data-tone="' + escHtml(tone || 'neutral') + '">',
+      '  <div>',
+      '    <div class="cc-command-center__lane-title">' + escHtml(title) + '</div>',
+      meta ? '    <div class="cc-command-center__lane-meta">' + escHtml(meta) + '</div>' : '',
+      '  </div>',
+      '  <lex-btn variant="ghost" size="sm" data-cc-nav="' + escHtml(target) + '">' + escHtml(buttonLabel) + '</lex-btn>',
+      '</div>'
+    ].join('');
+  }
+
+  function willDesignPeriodLabel(key) {
+    var labels = {
+      this_month: 'This month',
+      last_month: 'Last month',
+      current_quarter: 'Current quarter',
+      previous_quarter: 'Previous quarter',
+      ytd: 'YTD'
+    };
+    return labels[key] || 'This month';
+  }
+
+  function renderWillDesignPeriodControls(current) {
+    var periods = ['this_month', 'last_month', 'current_quarter', 'ytd'];
+    return periods.map(function (period) {
+      var active = period === current ? 'true' : 'false';
+      return [
+        '<button type="button" class="cc-command-center__wdm-period" data-wdm-period="' + escHtml(period) + '" aria-pressed="' + escHtml(active) + '">',
+        escHtml(willDesignPeriodLabel(period)),
+        '</button>'
+      ].join('');
+    }).join('');
+  }
+
+  function unwrapWillDesignLane(response) {
+    if (!response) return {};
+    if (response.data && response.data.section) return response.data;
+    if (response.data && response.data.data && response.data.data.section) return response.data.data;
+    return response;
+  }
+
+  function willDesignSourceMeta(lane) {
+    var source = lane && lane.source ? lane.source : {};
+    var certification = lane && lane.certification ? lane.certification : {};
+    var sourceState = commandCenterHumanize(source.state || 'unknown');
+    var freshness = source.last_successful_sync ? 'Synced ' + timeAgo(source.last_successful_sync) : 'No sync timestamp';
+    var certificationLabel = certification.label || commandCenterHumanize(certification.state || 'not certified');
+    return commandCenterMeta([sourceState, freshness, certificationLabel]);
+  }
+
+  function willDesignWarningHtml(lane) {
+    var warnings = lane && lane.source && Array.isArray(lane.source.warnings) ? lane.source.warnings : [];
+    if (!warnings.length) return '';
+    return '<div class="cc-command-center__wdm-warning">' + escHtml(warnings[0]) + '</div>';
+  }
+
+  function willDesignChangeMeta(card, lane) {
+    if (!lane || !lane.comparison || card.id !== 'completed') {
+      return lane && lane.period ? lane.period.label : willDesignPeriodLabel(_willDesignPeriod);
+    }
+
+    var change = lane.comparison.change || {};
+    var prior = lane.comparison.comparison_period || {};
+    var delta = commandCenterNumber(change.delta, 0);
+    var direction = delta > 0 ? '+' : '';
+    var parts = [direction + delta + ' vs ' + (prior.label || 'previous period')];
+    if (change.percent !== null && change.percent !== undefined && Number.isFinite(Number(change.percent))) {
+      parts.push((change.percent > 0 ? '+' : '') + Number(change.percent).toLocaleString('en-US', { maximumFractionDigits: 1 }) + '%');
+    }
+    return commandCenterMeta(parts);
+  }
+
+  function willDesignDrilldownId(prefix, drilldown, period) {
+    if (!drilldown || drilldown.available === false) return '';
+    var id = prefix + ':' + Object.keys(_willDesignDrilldowns).length;
+    _willDesignDrilldowns[id] = {
+      module_key: drilldown.module_key,
+      metric_key: drilldown.metric_key,
+      period_start: drilldown.period_start || (period && period.start),
+      period_end: drilldown.period_end || (period && period.end),
+      filters: drilldown.filters || {}
+    };
+    return id;
+  }
+
+  function renderWillDesignSummaryCard(card, lane) {
+    var id = willDesignDrilldownId(card.id || 'metric', card.drilldown, lane.period);
+    var disabled = id ? '' : ' disabled';
+    return [
+      '<button type="button" class="cc-command-center__wdm-card" data-wdm-drilldown="' + escHtml(id) + '"' + disabled + '>',
+      '  <span class="cc-command-center__wdm-card-label">' + escHtml(card.title || 'Metric') + '</span>',
+      '  <span class="cc-command-center__wdm-card-value">' + escHtml(commandCenterCountLabel(card.value)) + '</span>',
+      '  <span class="cc-command-center__wdm-card-meta">' + escHtml(willDesignChangeMeta(card, lane)) + '</span>',
+      '</button>'
+    ].join('');
+  }
+
+  function renderWillDesignComparison(lane) {
+    var comparison = lane && lane.comparison ? lane.comparison : {};
+    var current = comparison.current_period || {};
+    var prior = comparison.comparison_period || {};
+    var max = Math.max(commandCenterNumber(current.value, 0), commandCenterNumber(prior.value, 0), 1);
+    var currentWidth = Math.max(6, Math.round((commandCenterNumber(current.value, 0) / max) * 100));
+    var priorWidth = Math.max(6, Math.round((commandCenterNumber(prior.value, 0) / max) * 100));
+
+    return [
+      '<div class="cc-command-center__wdm-compare">',
+      '  <div class="cc-command-center__wdm-chart-title">Completed meetings</div>',
+      '  <div class="cc-command-center__wdm-compare-row">',
+      '    <span>' + escHtml(current.label || 'Current period') + '</span>',
+      '    <progress class="cc-command-center__wdm-progress" max="100" value="' + escHtml(currentWidth) + '" aria-label="' + escHtml((current.label || 'Current period') + ' completed meetings') + '"></progress>',
+      '    <strong>' + escHtml(commandCenterCountLabel(current.value)) + '</strong>',
+      '  </div>',
+      '  <div class="cc-command-center__wdm-compare-row">',
+      '    <span>' + escHtml(prior.label || 'Previous period') + '</span>',
+      '    <progress class="cc-command-center__wdm-progress cc-command-center__wdm-progress--muted" max="100" value="' + escHtml(priorWidth) + '" aria-label="' + escHtml((prior.label || 'Previous period') + ' completed meetings') + '"></progress>',
+      '    <strong>' + escHtml(commandCenterCountLabel(prior.value)) + '</strong>',
+      '  </div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWillDesignTrend(lane) {
+    var trend = Array.isArray(lane && lane.ytd_trend) ? lane.ytd_trend : [];
+    if (!trend.length) {
+      return '<div class="cc-command-center__wdm-empty">No completed Will Design Meetings found for the selected year.</div>';
+    }
+
+    var max = trend.reduce(function (acc, row) {
+      return Math.max(acc, commandCenterNumber(row.value, 0));
+    }, 1);
+
+    return [
+      '<div class="cc-command-center__wdm-trend">',
+      '  <div class="cc-command-center__wdm-chart-title">YTD trend</div>',
+      '  <div class="cc-command-center__wdm-trend-bars">',
+      trend.map(function (row) {
+        var month = row.label || (row.month ? String(row.month).slice(5, 7) : '');
+        var height = Math.max(8, Math.round((commandCenterNumber(row.value, 0) / max) * 100));
+        var id = willDesignDrilldownId('trend', row.drilldown, lane.period);
+        return [
+          '<button type="button" class="cc-command-center__wdm-trend-bar" title="' + escHtml(month + ': ' + commandCenterCountLabel(row.value)) + '" data-wdm-drilldown="' + escHtml(id) + '">',
+          '  <progress class="cc-command-center__wdm-trend-progress" max="100" value="' + escHtml(height) + '" aria-label="' + escHtml(month + ' completed meetings') + '"></progress>',
+          '  <span class="cc-command-center__wdm-trend-label">' + escHtml(month) + '</span>',
+          '</button>'
+        ].join('');
+      }).join(''),
+      '  </div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWillDesignAttorneyBreakdown(lane) {
+    var rows = Array.isArray(lane && lane.attorney_breakdown) ? lane.attorney_breakdown : [];
+    if (!rows.length) {
+      return '<div class="cc-command-center__wdm-empty">No attorney breakdown is available for this period.</div>';
+    }
+
+    var max = rows.reduce(function (acc, row) {
+      return Math.max(acc, commandCenterNumber(row.total, 0));
+    }, 1);
+
+    return [
+      '<div class="cc-command-center__wdm-attorneys">',
+      '  <div class="cc-command-center__wdm-chart-title">Attorney breakdown</div>',
+      rows.slice(0, 6).map(function (row) {
+        var id = willDesignDrilldownId('attorney', row.drilldown, lane.period);
+        var width = Math.max(6, Math.round((commandCenterNumber(row.total, 0) / max) * 100));
+        return [
+          '<button type="button" class="cc-command-center__wdm-attorney" data-wdm-drilldown="' + escHtml(id) + '">',
+          '  <span class="cc-command-center__wdm-attorney-name">' + escHtml(row.attorney_name || 'Unassigned') + '</span>',
+          '  <progress class="cc-command-center__wdm-attorney-progress" max="100" value="' + escHtml(width) + '" aria-label="' + escHtml((row.attorney_name || 'Unassigned') + ' Will Design Meetings') + '"></progress>',
+          '  <span class="cc-command-center__wdm-attorney-count">' + escHtml(commandCenterCountLabel(row.total)) + '</span>',
+          '</button>'
+        ].join('');
+      }).join(''),
+      '</div>'
+    ].join('');
+  }
+
+  function renderWillDesignMeetingsLane(response, laneOk) {
+    _willDesignDrilldowns = {};
+
+    if (!laneOk) {
+      return [
+        '<div class="cc-command-center__panel cc-command-center__wdm">',
+        '  <div class="cc-command-center__wdm-header">',
+        '    <div>',
+        '      <div class="cc-command-center__panel-title">Estate Planning - Will Design Meetings</div>',
+        '      <div class="cc-command-center__panel-subtitle">Analytical lane unavailable</div>',
+        '    </div>',
+        '    <div class="cc-command-center__wdm-periods">' + renderWillDesignPeriodControls(_willDesignPeriod) + '</div>',
+        '  </div>',
+        '  <div class="cc-command-center__empty">Will Design Meetings could not be loaded.</div>',
+        '</div>'
+      ].join('');
+    }
+
+    var lane = unwrapWillDesignLane(response);
+    var summary = Array.isArray(lane.summary) ? lane.summary : [];
+
+    return [
+      '<div class="cc-command-center__panel cc-command-center__wdm">',
+      '  <div class="cc-command-center__wdm-header">',
+      '    <div>',
+      '      <div class="cc-command-center__panel-title">' + escHtml((lane.section && lane.section.title) || 'Estate Planning - Will Design Meetings') + '</div>',
+      '      <div class="cc-command-center__panel-subtitle">' + escHtml(willDesignSourceMeta(lane)) + '</div>',
+      '    </div>',
+      '    <div class="cc-command-center__wdm-periods" role="group" aria-label="Will Design Meetings period">' + renderWillDesignPeriodControls((lane.period && lane.period.key) || _willDesignPeriod) + '</div>',
+      '  </div>',
+      willDesignWarningHtml(lane),
+      '  <div class="cc-command-center__wdm-summary">' + summary.map(function (card) { return renderWillDesignSummaryCard(card, lane); }).join('') + '</div>',
+      '  <div class="cc-command-center__wdm-grid">',
+      renderWillDesignComparison(lane),
+      renderWillDesignTrend(lane),
+      renderWillDesignAttorneyBreakdown(lane),
+      '  </div>',
+      '</div>'
+    ].join('');
+  }
+
+  function openWillDesignDrilldown(id) {
+    var payload = id ? _willDesignDrilldowns[id] : null;
+    if (!payload || !payload.module_key || !payload.metric_key || !payload.period_start || !payload.period_end) return;
+    if (!window.drilldownRenderer || typeof window.drilldownRenderer.open !== 'function') {
+      console.warn('[Dashboard] Drilldown renderer is not loaded');
+      return;
+    }
+    window.drilldownRenderer.open(payload.module_key, payload.metric_key, {
+      periodStart: payload.period_start,
+      periodEnd: payload.period_end,
+      filters: payload.filters || {}
+    });
+  }
+
+  async function renderZoneG(silent) {
+    var loadingEl = el('ccZoneGLoading');
+    var contentEl = el('ccZoneGContent');
+    if (!contentEl) return;
+
+    if (!silent && !contentEl.hasChildNodes()) {
+      if (loadingEl) show(loadingEl);
+      hide(contentEl);
+    }
+
+    var results = await Promise.allSettled([
+      typeof api.getCommandCenterSummary === 'function'
+        ? api.getCommandCenterSummary()
+        : api.get('/api/v1/command-center/summary'),
+      typeof api.getCommandCenterCriticalItems === 'function'
+        ? api.getCommandCenterCriticalItems({ limit: 6, status: 'active', sort_by: 'focus_score', sort_order: 'desc' })
+        : api.get('/api/v1/command-center/critical-items?limit=6&status=active&sort_by=focus_score&sort_order=desc'),
+      typeof api.getCommandCenterPipelineMetrics === 'function'
+        ? api.getCommandCenterPipelineMetrics()
+        : api.get('/api/v1/command-center/pipeline-metrics'),
+      api.get('/api/v1/billable-hours/drafts?status=draft&limit=1'),
+      typeof api.getMyTasks === 'function'
+        ? api.getMyTasks({ limit: 1, offset: 0, statuses: 'pending,in_progress,in_review' })
+        : Promise.resolve(null),
+      api.get('/api/v1/agentic-tasks?limit=20'),
+      api.get('/api/v1/approvals/inbox/count'),
+      typeof api.getDashboardMetricCards === 'function'
+        ? api.getDashboardMetricCards({ type: 'owner', limit: 4, compareToPrevious: true, compareBy: 'monthly', periodType: 'monthly' })
+        : Promise.resolve(null),
+      typeof api.getCommandCenterWillDesignMeetings === 'function'
+        ? api.getCommandCenterWillDesignMeetings({ period: _willDesignPeriod, view: 'owner', instance: 'command_center' })
+        : api.get('/api/v1/command-center/will-design-meetings?period=' + encodeURIComponent(_willDesignPeriod) + '&view=owner&instance=command_center')
+    ]);
+
+    var summaryOk = results[0].status === 'fulfilled';
+    var criticalOk = results[1].status === 'fulfilled';
+    var pipelineOk = results[2].status === 'fulfilled';
+    var draftsOk = results[3].status === 'fulfilled';
+    var tasksOk = results[4].status === 'fulfilled';
+    var agenticOk = results[5].status === 'fulfilled';
+    var approvalsOk = results[6].status === 'fulfilled';
+    var catalogOk = results[7].status === 'fulfilled' && results[7].value;
+    var willDesignOk = results[8].status === 'fulfilled';
+
+    var summary = summaryOk ? unwrapCommandCenterResponse(results[0].value) : {};
+    var critical = criticalOk ? unwrapCommandCenterResponse(results[1].value) : {};
+    var pipeline = pipelineOk ? unwrapCommandCenterResponse(results[2].value) : {};
+    var drafts = draftsOk ? unwrapCommandCenterResponse(results[3].value) : {};
+    var tasks = tasksOk ? unwrapCommandCenterResponse(results[4].value) : {};
+    var agentic = agenticOk ? unwrapCommandCenterResponse(results[5].value) : {};
+    var approvals = approvalsOk ? unwrapCommandCenterResponse(results[6].value) : {};
+    var ownerMetricCards = catalogOk ? normalizeDashboardMetricCards(results[7].value) : [];
+    var willDesignLane = willDesignOk ? results[8].value : null;
+
+    var matterPulse = summary.matter_pulse || {};
+    var todayActivity = summary.today_activity || {};
+    var connectorHealth = summary.connector_health || {};
+
+    var activeMatters = commandCenterNumber(
+      pipeline.active_matters !== undefined ? pipeline.active_matters : matterPulse.active,
+      0
+    );
+    var staleMatters = commandCenterNumber(matterPulse.stale, 0);
+    var totalConnectors = commandCenterNumber(connectorHealth.total, 0);
+    var connectedConnectors = commandCenterNumber(connectorHealth.connected, 0);
+    var connectorIssues = Math.max(0, totalConnectors - connectedConnectors);
+    var docsToday = commandCenterNumber(todayActivity.documents, 0);
+    var conversationsToday = commandCenterNumber(todayActivity.conversations, 0);
+
+    var criticalItems = critical.items || critical.actions || critical.data || summary.focus_items || [];
+    var criticalTotal = commandCenterNumber(
+      critical.total !== undefined
+        ? critical.total
+        : (critical.pagination && critical.pagination.total !== undefined ? critical.pagination.total : criticalItems.length),
+      criticalItems.length
+    );
+
+    var draftCount = commandCenterNumber(
+      drafts.pagination && drafts.pagination.total !== undefined
+        ? drafts.pagination.total
+        : (drafts.data && drafts.data.length !== undefined ? drafts.data.length : 0),
+      0
+    );
+
+    var taskCount = commandCenterNumber(
+      tasks.pagination && tasks.pagination.total !== undefined
+        ? tasks.pagination.total
+        : (tasks.data && tasks.data.pagination && tasks.data.pagination.total !== undefined ? tasks.data.pagination.total : 0),
+      0
+    );
+
+    var agenticItems = agentic.items || agentic.tasks || agentic.data || [];
+    var activeAgenticCount = 0;
+    for (var ai = 0; ai < agenticItems.length; ai++) {
+      var agentStatus = String(agenticItems[ai].status || '').toLowerCase();
+      if (agentStatus !== 'completed' && agentStatus !== 'complete' && agentStatus !== 'failed' && agentStatus !== 'cancelled') {
+        activeAgenticCount++;
+      }
+    }
+
+    var approvalCount = commandCenterNumber(
+      approvals.count !== undefined
+        ? approvals.count
+        : (approvals.pending !== undefined ? approvals.pending : 0),
+      0
+    );
+
+    _commandCenterItemsMap = {};
+    var focusHtml = '';
+    for (var i = 0; i < criticalItems.length && i < 5; i++) {
+      focusHtml += renderCommandCenterFocusItem(criticalItems[i]);
+    }
+
+    if (!criticalOk) {
+      focusHtml = '<div class="cc-command-center__empty">Focus items unavailable</div>';
+    } else if (!focusHtml) {
+      focusHtml = '<div class="cc-command-center__empty">No active focus items</div>';
+    }
+
+    var kpisHtml = [
+      renderCommandCenterKpi(
+        'Matter Pulse',
+        (summaryOk || pipelineOk) ? commandCenterCountLabel(activeMatters) : '-',
+        (summaryOk || pipelineOk) ? commandCenterMeta([staleMatters ? staleMatters + ' stale' : 'No stale matters']) : 'Unavailable',
+        staleMatters > 0 ? 'attention' : ((summaryOk || pipelineOk) ? 'healthy' : 'neutral')
+      ),
+      renderCommandCenterKpi(
+        'Focus Items',
+        criticalOk ? commandCenterCountLabel(criticalTotal) : '-',
+        criticalOk ? commandCenterMeta([criticalTotal > 0 ? 'Needs review' : 'Clear']) : 'Unavailable',
+        criticalTotal > 0 ? 'risk' : (criticalOk ? 'healthy' : 'neutral')
+      ),
+      renderCommandCenterKpi(
+        'Lana Activity',
+        agenticOk ? commandCenterCountLabel(activeAgenticCount) : '-',
+        agenticOk ? (activeAgenticCount ? 'Active/queued in recent runs' : 'No active in recent runs') : 'Unavailable',
+        activeAgenticCount > 0 ? 'attention' : (agenticOk ? 'healthy' : 'neutral')
+      ),
+      renderCommandCenterKpi(
+        'Revenue Review',
+        draftsOk ? commandCenterCountLabel(draftCount) : '-',
+        draftsOk ? (draftCount ? 'Drafts pending' : 'No pending drafts') : 'Unavailable',
+        draftCount > 0 ? 'attention' : (draftsOk ? 'healthy' : 'neutral')
+      )
+    ].join('');
+
+    var lanesHtml = [
+      renderCommandCenterLane(
+        'Recent Motion',
+        summaryOk ? commandCenterMeta([docsToday + ' document change' + (docsToday === 1 ? '' : 's'), conversationsToday + ' conversation' + (conversationsToday === 1 ? '' : 's')]) : 'Activity summary unavailable',
+        'View',
+        'activity',
+        'neutral'
+      ),
+      renderCommandCenterLane(
+        'Action Queue',
+        criticalOk ? criticalTotal + ' active item' + (criticalTotal === 1 ? '' : 's') : 'Action queue unavailable',
+        'Open',
+        'action-queue.html',
+        criticalTotal > 0 ? 'risk' : 'neutral'
+      ),
+      renderCommandCenterLane(
+        'Tasks',
+        tasksOk ? (taskCount ? taskCount + ' assigned item' + (taskCount === 1 ? '' : 's') : 'No assigned tasks') : 'Task count unavailable',
+        'Review',
+        'my-tasks.html',
+        'neutral'
+      ),
+      renderCommandCenterLane(
+        'Approvals',
+        approvalsOk ? (approvalCount ? approvalCount + ' pending decision' + (approvalCount === 1 ? '' : 's') : 'No pending approvals') : 'Approval count unavailable',
+        'Review',
+        'approvals.html',
+        approvalCount > 0 ? 'attention' : 'neutral'
+      ),
+      renderCommandCenterLane(
+        'Lana Activity',
+        agenticOk ? (activeAgenticCount ? activeAgenticCount + ' active or queued run' + (activeAgenticCount === 1 ? '' : 's') : 'No active runs in recent results') : 'Lana activity unavailable',
+        'Open',
+        'agents/index.html#activity',
+        activeAgenticCount > 0 ? 'attention' : 'neutral'
+      ),
+      renderCommandCenterLane(
+        'Billable Drafts',
+        draftsOk ? (draftCount ? draftCount + ' pending review' : 'No pending drafts') : 'Draft count unavailable',
+        'Review',
+        'admin/billable-hours.html',
+        draftCount > 0 ? 'attention' : 'neutral'
+      ),
+      renderCommandCenterLane(
+        'Connectors',
+        summaryOk ? (connectorIssues ? connectorIssues + ' needs attention' : 'Syncing normally') : 'Connector summary unavailable',
+        'Manage',
+        'data-connectors.html',
+        connectorIssues > 0 ? 'attention' : 'neutral'
+      )
+    ].join('');
+
+    contentEl.innerHTML = [
+      '<div class="cc-command-center__kpis">' + kpisHtml + '</div>',
+      renderWillDesignMeetingsLane(willDesignLane, willDesignOk),
+      '<div class="cc-command-center__panel cc-command-center__metrics-panel">',
+      '  <div class="cc-command-center__panel-title">Owner metrics</div>',
+      '  <div class="cc-command-center__panel-subtitle">Computed cards from the metric catalog</div>',
+      '  ' + renderCommandCenterMetricStrip(ownerMetricCards, catalogOk),
+      '</div>',
+      '<div class="cc-command-center__body">',
+      '  <div class="cc-command-center__panel">',
+      '    <div class="cc-command-center__panel-title">What needs attention</div>',
+      '    <div class="cc-command-center__panel-subtitle">Priority items already surfaced by Lana</div>',
+      '    <div class="cc-command-center__focus-list">' + focusHtml + '</div>',
+      '  </div>',
+      '  <div class="cc-command-center__panel">',
+      '    <div class="cc-command-center__panel-title">Operating lanes</div>',
+      '    <div class="cc-command-center__panel-subtitle">Queues, money, and data paths</div>',
+      '    <div class="cc-command-center__lanes">' + lanesHtml + '</div>',
+      '  </div>',
+      '</div>'
+    ].join('');
+
+    if (loadingEl) hide(loadingEl);
+    show(contentEl);
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // Zone F Right — Data Pulse
   // ═══════════════════════════════════════════════════════════════
@@ -2661,7 +3386,7 @@
 
   /**
    * Initialize the Command Center dashboard.
-   * Loads user profile first, then fans out to all six zones in parallel
+   * Loads user profile first, then fans out to all zones in parallel
    * using Promise.allSettled for graceful degradation.
    */
   async function initDashboard() {
@@ -2703,7 +3428,8 @@
       loadUserProductivity(null), // 3 — heatmap
       loadActivityForUser(null),  // 4 — activity feed
       renderZoneD(),              // 5 — Lana Tasks status
-      loadBillableHours()         // 6 — billable hours today
+      loadBillableHours(),        // 6 — billable hours today
+      renderZoneG()               // 7 — owner command center
     ]);
 
     // ── 5. Update Zone A matters button once we have the count ─────────────
@@ -3039,6 +3765,62 @@
     if (addWidgetBtn) {
       addWidgetBtn.addEventListener('click', function () {
         Lex.Nav.go('data-connectors.html');
+      });
+    }
+
+    // Zone G — command center refresh + quick actions
+    var commandRefreshBtn = el('commandCenterRefreshBtn');
+    if (commandRefreshBtn) {
+      commandRefreshBtn.addEventListener('click', function () {
+        commandRefreshBtn.loading = true;
+        var commandCenter = el('ccZoneGContent');
+        Lex.Redact.on(commandCenter);
+        renderZoneG(true).finally(function () {
+          commandRefreshBtn.loading = false;
+          Lex.Redact.off(commandCenter);
+        });
+      });
+    }
+
+    var zoneGContent = el('ccZoneGContent');
+    if (zoneGContent) {
+      zoneGContent.addEventListener('click', function (event) {
+        var periodBtn = event.target.closest('[data-wdm-period]');
+        if (periodBtn) {
+          var period = periodBtn.getAttribute('data-wdm-period') || 'this_month';
+          if (period !== _willDesignPeriod) {
+            _willDesignPeriod = period;
+            renderZoneG(true);
+          }
+          return;
+        }
+
+        var willDesignDrilldown = event.target.closest('[data-wdm-drilldown]');
+        if (willDesignDrilldown) {
+          openWillDesignDrilldown(willDesignDrilldown.getAttribute('data-wdm-drilldown'));
+          return;
+        }
+
+        var focusItem = event.target.closest('[data-command-action-id]');
+        if (focusItem) {
+          var itemId = focusItem.getAttribute('data-command-action-id');
+          var cached = itemId ? _commandCenterItemsMap[itemId] : null;
+          if (cached) showActionDetail(cached);
+          return;
+        }
+
+        var navBtn = event.target.closest('[data-cc-nav]');
+        if (!navBtn) return;
+        var target = navBtn.getAttribute('data-cc-nav');
+        if (target === 'activity') {
+          if (typeof ActivityPanel !== 'undefined') ActivityPanel.open();
+          return;
+        }
+        if (target.indexOf('agents/index.html') === 0) {
+          window.location.href = target;
+          return;
+        }
+        if (target) Lex.Nav.go(target);
       });
     }
 
