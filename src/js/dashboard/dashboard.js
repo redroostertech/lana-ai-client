@@ -1966,6 +1966,8 @@
         value.title ||
         value.display_name ||
         value.displayName ||
+        value.state ||
+        value.status ||
         value.key ||
         value.id ||
         ''
