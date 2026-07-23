@@ -494,11 +494,15 @@ class ApiClient {
       }
     }
 
+    const requestOptions = { ...options };
+    const suppressErrorLog = requestOptions.suppressErrorLog === true;
+    delete requestOptions.suppressErrorLog;
+
     const url = `${baseUrl}${endpoint}`;
     const config = {
       method,
       headers: this.getHeaders(),
-      ...options
+      ...requestOptions
     };
 
     // Handle different data types
@@ -574,14 +578,17 @@ class ApiClient {
         // Extract error message with comprehensive fallback chain
         const finalErrorMessage = result.error?.message || result.detail || result.message || 'Request failed';
 
-        // Log the error details for debugging
-        console.error('[LanaAPI] Request failed:', {
-          endpoint,
-          status: response.status,
-          errorCode,
-          errorMessage: finalErrorMessage,
-          fullResponse: result
-        });
+        // Log the error details for debugging unless this is an expected
+        // rollout probe handled by the caller.
+        if (!suppressErrorLog) {
+          console.error('[LanaAPI] Request failed:', {
+            endpoint,
+            status: response.status,
+            errorCode,
+            errorMessage: finalErrorMessage,
+            fullResponse: result
+          });
+        }
 
         // Support both error formats: {error: {message: ...}} and {detail: ...}
         throw new ApiError(finalErrorMessage, response.status, result);
@@ -1519,8 +1526,8 @@ class ApiClient {
   // ============================================================
   // HTTP Methods
   // ============================================================
-  get(endpoint) { return this.request('GET', endpoint); }
-  post(endpoint, data) { return this.request('POST', endpoint, data); }
+  get(endpoint, options) { return this.request('GET', endpoint, null, options); }
+  post(endpoint, data, options) { return this.request('POST', endpoint, data, options); }
   put(endpoint, data) { return this.request('PUT', endpoint, data); }
   patch(endpoint, data) { return this.request('PATCH', endpoint, data); }
   delete(endpoint, data) { return this.request('DELETE', endpoint, data); }
@@ -3504,7 +3511,129 @@ class ApiClient {
     add('instance', p.instance);
 
     var queryStr = parts.length > 0 ? '?' + parts.join('&') : '';
-    return this.get('/api/v1/command-center/will-design-meetings' + queryStr);
+    try {
+      return await this.get('/api/v1/command-center/will-design-meetings' + queryStr, {
+        suppressErrorLog: true
+      });
+    } catch (error) {
+      if (error && error.status === 404) {
+        return this.getCommandCenterWillDesignMeetingsUnavailable(p);
+      }
+      throw error;
+    }
+  }
+
+  getCommandCenterWillDesignMeetingsUnavailable(params) {
+    var p = params || {};
+    var now = new Date();
+    var start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    var end = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+    var period = p.period || 'this_month';
+    var summary = [
+      ['upcoming', 'Upcoming', 'legal_firm.estate_planning.upcoming_will_design_meetings', 'upcoming_will_design_meetings'],
+      ['completed', 'Completed', 'legal_firm.estate_planning.completed_will_design_meetings', 'completed_will_design_meetings'],
+      ['cancelled', 'Cancelled', 'legal_firm.estate_planning.cancelled_will_design_meetings', 'cancelled_will_design_meetings'],
+      ['no_show', 'No-show', 'legal_firm.estate_planning.no_show_will_design_meetings', 'no_show_will_design_meetings']
+    ].map(function (item) {
+      return {
+        id: item[0],
+        title: item[1],
+        metric_key: item[2],
+        module_metric_key: item[3],
+        value: 0,
+        period: period,
+        drilldown: {
+          module_key: 'service-delivery-operations',
+          metric_key: item[3],
+          period_start: start,
+          period_end: end,
+          filters: {},
+          available: false
+        }
+      };
+    });
+
+    return {
+      section: {
+        id: 'estate-planning-will-design-meetings',
+        title: 'Estate Planning - Will Design Meetings',
+        subtitle: 'Counts, comparisons, attorney breakdown, and record-level lineage from canonical calendar events.'
+      },
+      generated_at: now.toISOString(),
+      filter_context: {
+        period: period,
+        period_start: start,
+        period_end: end,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        attorney_keys: [],
+        attorney_scope_locked: false,
+        service_offering: 'will_based',
+        meeting_type: 'will_design'
+      },
+      card_definition: {
+        id: 'question:will-design-meetings',
+        type: 'metric_family',
+        module_key: 'service-delivery-operations',
+        metric_family: 'legal_firm.estate_planning.will_design_meetings',
+        default_visualization: 'metric_grid'
+      },
+      card_instances: [
+        {
+          id: 'command-center:will-design-meetings',
+          context: 'command_center',
+          definition_id: 'question:will-design-meetings',
+          inherits_page_filters: true,
+          locked_filters: []
+        },
+        {
+          id: 'dashboard:estate-planning:will-design-meetings',
+          context: 'estate_planning_dashboard',
+          definition_id: 'question:will-design-meetings',
+          inherits_page_filters: true,
+          local_visualization: 'detail_lane'
+        }
+      ],
+      period: {
+        key: period,
+        label: period.replace(/_/g, ' ').replace(/\b\w/g, function (letter) { return letter.toUpperCase(); }),
+        start: start,
+        end: end,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        comparison: {
+          key: 'previous_period',
+          label: 'Previous equivalent period',
+          start: start,
+          end: start
+        }
+      },
+      summary: summary,
+      comparison: {
+        title: 'Completed meetings',
+        current_period: { label: 'Current period', start: start, end: end, value: 0 },
+        comparison_period: { label: 'Previous period', start: start, end: start, value: 0 },
+        change: { current: 0, prior: 0, delta: 0, percent: null, direction: 'flat' }
+      },
+      ytd_trend: [],
+      attorney_breakdown: [],
+      source: {
+        system: 'canonical_calendar_events',
+        state: 'backend_route_unavailable',
+        last_successful_sync: null,
+        warnings: ['The Will Design Meetings backend route is not available on the connected server yet.']
+      },
+      certification: {
+        state: 'unavailable',
+        label: 'Unavailable - backend route not deployed',
+        certified: false,
+        reason: 'The connected backend does not expose the Will Design Meetings command-center facade.'
+      },
+      capabilities: {
+        can_view_all_attorneys: false,
+        can_change_attorney_filter: false,
+        can_drilldown: false,
+        can_export: false
+      }
+    };
   }
 }
 
