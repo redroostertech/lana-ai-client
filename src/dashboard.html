@@ -324,6 +324,42 @@
 
       </div>
 
+      <!-- ================================================================
+           Zone G — Owner Command Center
+           ================================================================ -->
+      <section id="ccZoneG" class="cc-command-center" aria-labelledby="ccZoneGTitle">
+        <lex-card padding="compact">
+          <div class="cc-section-header cc-command-center__header">
+            <div>
+              <div id="ccZoneGTitle" class="cc-section-title">Command Center</div>
+              <div class="cc-section-subtitle">Focus, risk, momentum, and revenue protection</div>
+            </div>
+            <div class="cc-command-center__header-actions">
+              <lex-btn id="commandCenterRefreshBtn" variant="ghost" size="sm" aria-label="Refresh command center" title="Refresh">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+              </lex-btn>
+            </div>
+          </div>
+
+          <div id="ccZoneGLoading" class="cc-command-center__loading" aria-hidden="true">
+            <div class="cc-command-center__kpis">
+              <div class="cc-command-center__skeleton-card"></div>
+              <div class="cc-command-center__skeleton-card"></div>
+              <div class="cc-command-center__skeleton-card"></div>
+              <div class="cc-command-center__skeleton-card"></div>
+            </div>
+            <div class="cc-command-center__body">
+              <div class="cc-command-center__skeleton-panel"></div>
+              <div class="cc-command-center__skeleton-panel"></div>
+            </div>
+          </div>
+
+          <div id="ccZoneGContent" class="cc-command-center__content hidden"></div>
+        </lex-card>
+      </section>
+
       <!-- Hidden elements — backward-compat with existing JS -->
       <div id="statsLoading" class="hidden" aria-hidden="true"></div>
       <div id="statsContent" class="hidden" aria-hidden="true">
