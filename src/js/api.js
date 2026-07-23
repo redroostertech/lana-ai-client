@@ -3534,6 +3534,14 @@ class ApiClient {
     }
   }
 
+  async getCommandCenterWillDesignMeetingsMapping(options = {}) {
+    return this.get('/api/v1/command-center/will-design-meetings/mapping', options);
+  }
+
+  async reconcileCommandCenterWillDesignMeetings(body = {}, options = {}) {
+    return this.post('/api/v1/command-center/will-design-meetings/reconcile', body, options);
+  }
+
   getCommandCenterWillDesignMeetingsUnavailable(params) {
     var p = params || {};
     var now = new Date();
@@ -3586,7 +3594,10 @@ class ApiClient {
         type: 'metric_family',
         module_key: 'service-delivery-operations',
         metric_family: 'legal_firm.estate_planning.will_design_meetings',
-        default_visualization: 'metric_grid'
+        metric_definition_version: null,
+        default_visualization: 'metric_grid',
+        available_dimensions: ['meeting_status', 'attorney', 'month'],
+        available_filters: ['date_period', 'meeting_status', 'attorney']
       },
       card_instances: [
         {
@@ -3602,6 +3613,14 @@ class ApiClient {
           definition_id: 'question:will-design-meetings',
           inherits_page_filters: true,
           local_visualization: 'detail_lane'
+        },
+        {
+          id: 'attorney:will-design-meetings',
+          context: 'attorney_dashboard',
+          definition_id: 'question:will-design-meetings',
+          inherits_page_filters: true,
+          locked_filters: { attorney: 'authenticated_user' },
+          local_visualization: 'attorney_detail'
         }
       ],
       period: {
@@ -3630,9 +3649,22 @@ class ApiClient {
         system: 'canonical_calendar_events',
         state: 'backend_route_unavailable',
         last_successful_sync: null,
+        data_health_state: 'unknown',
         warnings: ['The Will Design Meetings backend route is not available on the connected server yet.']
       },
       certification: {
+        definition: {
+          state: 'unavailable',
+          version: null,
+          certified: false,
+          label: 'Unavailable'
+        },
+        organization: {
+          state: 'configuration_required',
+          label: 'Backend route unavailable',
+          certified: false
+        },
+        data_health: 'unknown',
         state: 'unavailable',
         label: 'Unavailable - backend route not deployed',
         certified: false,
