@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Will Design Meetings Configuration - LANA AI</title>
+
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <link rel="stylesheet" href="../css/admin/insights-dashboard.css">
+  <script src="../js/tailwind-loader.js"></script>
+</head>
+<body>
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="insights-dashboard"
+    page-title="Will Design Meetings"
+  ></lex-app>
+
+  <template id="page-content">
+    <main>
+      <lex-banner
+        id="willDesignConfigBanner"
+        variant="light"
+        heading="Will Design Meetings Configuration"
+        subtitle="Source mapping, validation, certification health, and reconciliation"
+      >
+        <lex-btn id="refreshWillDesignConfigBtn" variant="secondary" size="sm">Refresh</lex-btn>
+        <lex-btn id="openWillDesignDetailBtn" variant="primary" size="sm">Open Detail</lex-btn>
+      </lex-banner>
+
+      <lex-breadcrumb id="willDesignConfigBreadcrumb"></lex-breadcrumb>
+
+      <section class="insights-section" aria-labelledby="willDesignStatusHeading">
+        <div class="insights-section-header">
+          <div>
+            <div class="insights-section-title" id="willDesignStatusHeading">Trust State</div>
+            <div class="insights-section-subtitle">Definition, deployment, data health, and active mapping status</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4" id="willDesignTrustCards"></div>
+      </section>
+
+      <section class="insights-section" aria-labelledby="willDesignObservedHeading">
+        <div class="insights-section-header">
+          <div>
+            <div class="insights-section-title" id="willDesignObservedHeading">Observed Source Values</div>
+            <div class="insights-section-subtitle">Values currently visible in canonical calendar events</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="willDesignObservedValues"></div>
+      </section>
+
+      <section class="insights-section" aria-labelledby="willDesignMappingHeading">
+        <div class="insights-section-header">
+          <div>
+            <div class="insights-section-title" id="willDesignMappingHeading">Mapping Draft</div>
+            <div class="insights-section-subtitle">Organization-specific accepted values and canonical field references</div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <lex-btn id="validateWillDesignMappingBtn" variant="secondary" size="sm">Validate</lex-btn>
+            <lex-btn id="saveWillDesignDraftBtn" variant="secondary" size="sm">Save Draft</lex-btn>
+            <lex-btn id="saveWillDesignValidatedBtn" variant="primary" size="sm">Save Validated</lex-btn>
+            <lex-btn id="activateWillDesignMappingBtn" variant="secondary" size="sm">Activate</lex-btn>
+          </div>
+        </div>
+        <textarea
+          id="willDesignMappingEditor"
+          class="w-full min-h-[28rem] rounded-lg border border-gray-200 bg-white p-4 font-mono text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          spellcheck="false"
+          aria-label="Will Design Meetings mapping JSON"
+        ></textarea>
+        <div id="willDesignValidationPanel" class="mt-4"></div>
+      </section>
+
+      <section class="insights-section" aria-labelledby="willDesignReconcileHeading">
+        <div class="insights-section-header">
+          <div>
+            <div class="insights-section-title" id="willDesignReconcileHeading">Reconciliation</div>
+            <div class="insights-section-subtitle">Aggregate-to-drilldown evidence for the selected period</div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <select id="willDesignReconcilePeriod" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" aria-label="Reconciliation period">
+              <option value="this_month">This Month</option>
+              <option value="last_month">Last Month</option>
+              <option value="current_quarter">Current Quarter</option>
+              <option value="previous_quarter">Previous Quarter</option>
+              <option value="ytd">Year to Date</option>
+            </select>
+            <lex-btn id="runWillDesignReconcileBtn" variant="primary" size="sm">Run Reconciliation</lex-btn>
+          </div>
+        </div>
+        <div id="willDesignReconcilePanel"></div>
+      </section>
+    </main>
+  </template>
+
+  <noscript><div class="lex-noscript-message">Please enable JavaScript to use LANA AI.</div></noscript>
+
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/new-project-modal.js"></script>
+  <script src="../js/conversation-menu.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-action-card.js"></script>
+  <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/admin/will-design-meetings-config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+</body>
+</html>

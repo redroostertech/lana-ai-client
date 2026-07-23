@@ -3538,6 +3538,18 @@ class ApiClient {
     return this.get('/api/v1/command-center/will-design-meetings/mapping', options);
   }
 
+  async validateCommandCenterWillDesignMeetingsMapping(body = {}, options = {}) {
+    return this.post('/api/v1/command-center/will-design-meetings/mapping/validate', body, options);
+  }
+
+  async saveCommandCenterWillDesignMeetingsMapping(body = {}, options = {}) {
+    return this.put('/api/v1/command-center/will-design-meetings/mapping', body, options);
+  }
+
+  async activateCommandCenterWillDesignMeetingsMapping(body = {}, options = {}) {
+    return this.post('/api/v1/command-center/will-design-meetings/mapping/activate', body, options);
+  }
+
   async reconcileCommandCenterWillDesignMeetings(body = {}, options = {}) {
     return this.post('/api/v1/command-center/will-design-meetings/reconcile', body, options);
   }
