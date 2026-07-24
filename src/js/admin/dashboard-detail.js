@@ -48,6 +48,9 @@
   var currentDashboardId = null;
   var currentDashboardName = '';
   var currentDashboardMetricKeys = null;
+  var currentCardInstanceId = null;
+  var currentPeriodPreset = 'last7days';
+  var willDesignDrilldowns = {};
   var dashboardSwitcherItems = [];
   var dashboardSwitcherLoaded = false;
   var currentPeriod = {
@@ -81,6 +84,10 @@
 
   function getParams() {
     return window.Lex && Lex.Nav && Lex.Nav.getParams ? Lex.Nav.getParams() : new URLSearchParams(window.location.search || '');
+  }
+
+  function isWillDesignCardInstance(instanceId) {
+    return String(instanceId || '').indexOf('will-design-meetings') !== -1;
   }
 
   function setText(id, value) {
@@ -240,6 +247,7 @@
     if (start) start.value = formatDate(startDate);
     if (end) end.value = formatDate(endDate);
     currentPeriodIsPreset = true;
+    currentPeriodPreset = preset;
     updateCompareByOptions(formatDate(startDate), formatDate(endDate), preset);
     readPeriodControls();
     if (reload) reloadDashboardMetricsForCurrentPeriod();
@@ -254,6 +262,8 @@
   function reloadDashboardMetricsForCurrentPeriod() {
     if (currentDashboardId) {
       loadDashboardById(currentDashboardId);
+    } else if (isWillDesignCardInstance(currentCardInstanceId)) {
+      loadWillDesignCardInstance(currentCardInstanceId);
     } else {
       loadMetrics(currentDashboardType || getCurrentType());
     }
@@ -292,6 +302,8 @@
         value.title ||
         value.display_name ||
         value.displayName ||
+        value.state ||
+        value.status ||
         value.key ||
         value.id ||
         ''
@@ -823,6 +835,275 @@
       + '</section>';
   }
 
+  function unwrapWillDesignLane(response) {
+    if (!response) return {};
+    if (response.data && response.data.section) return response.data;
+    if (response.data && response.data.data && response.data.data.section) return response.data.data;
+    return response;
+  }
+
+  function willDesignFacadePeriodParams() {
+    var presetMap = {
+      thisMonth: 'this_month',
+      lastMonth: 'last_month',
+      thisQuarter: 'current_quarter',
+      thisYear: 'ytd',
+    };
+    var params = {
+      view: currentDashboardType === 'attorney' ? 'attorney' : 'owner',
+      instance: currentDashboardType === 'attorney' ? 'attorney' : 'dashboard',
+      card_instance: currentCardInstanceId || 'dashboard:estate-planning:will-design-meetings',
+    };
+    if (currentPeriodIsPreset && presetMap[currentPeriodPreset]) {
+      params.period = presetMap[currentPeriodPreset];
+      return params;
+    }
+
+    var period = readPeriodControls();
+    params.period = 'custom';
+    if (period.start) params.date_start = toPeriodISOString(period.start, false);
+    if (period.end) params.date_end = toPeriodISOString(period.end, true);
+    return params;
+  }
+
+  function willDesignPeriodMeta(lane) {
+    var period = lane && lane.period ? lane.period : {};
+    return period.label || currentPeriod.label || 'Selected period';
+  }
+
+  function willDesignSourceMeta(lane) {
+    var source = lane && lane.source ? lane.source : {};
+    var certification = lane && lane.certification ? lane.certification : {};
+    var definition = certification.definition || {};
+    var organization = certification.organization || {};
+    var health = source.data_health_state || certification.data_health || 'unknown';
+    var lastSync = source.last_successful_sync ? 'Synced ' + new Date(source.last_successful_sync).toLocaleString() : 'No sync timestamp';
+    return [
+      humanize(source.state || 'unknown'),
+      humanize(health),
+      lastSync,
+      definition.label || humanize(definition.state || 'definition pending'),
+      organization.label || humanize(organization.state || 'configuration required')
+    ].filter(Boolean).join(' · ');
+  }
+
+  function willDesignMetricId(prefix, drilldown, period) {
+    if (!drilldown || drilldown.available === false) return '';
+    var id = prefix + ':' + Object.keys(willDesignDrilldowns).length;
+    willDesignDrilldowns[id] = {
+      module_key: drilldown.module_key,
+      metric_key: drilldown.metric_key,
+      period_start: drilldown.period_start || (period && period.start),
+      period_end: drilldown.period_end || (period && period.end),
+      filters: drilldown.filters || {}
+    };
+    return id;
+  }
+
+  function renderWillDesignStatusPill(label, value, tone) {
+    return '<span class="dash-wdm-pill dash-wdm-pill--' + escapeHtml(tone || 'neutral') + '">'
+      + escapeHtml(label) + ': ' + escapeHtml(value || '-')
+      + '</span>';
+  }
+
+  function renderWillDesignSummaryCard(card, lane) {
+    var drilldownId = willDesignMetricId(card.id || 'metric', card.drilldown, lane.period);
+    var buttonAttrs = drilldownId ? ' data-wdm-detail-drilldown="' + escapeHtml(drilldownId) + '"' : ' disabled';
+    return '<button type="button" class="dash-wdm-summary-card"' + buttonAttrs + '>'
+      + '<span class="dash-wdm-summary-card__label">' + escapeHtml(card.title || 'Metric') + '</span>'
+      + '<strong class="dash-wdm-summary-card__value">' + escapeHtml(formatMetricCardValue({ value: card.value, format: 'integer' })) + '</strong>'
+      + '<span class="dash-wdm-summary-card__meta">' + escapeHtml(willDesignPeriodMeta(lane)) + '</span>'
+      + '</button>';
+  }
+
+  function renderWillDesignComparisonDetail(lane) {
+    var comparison = lane && lane.comparison ? lane.comparison : {};
+    var current = comparison.current_period || {};
+    var prior = comparison.comparison_period || {};
+    var max = Math.max(Number(current.value) || 0, Number(prior.value) || 0, 1);
+    var rows = [
+      { label: current.label || 'Current period', value: Number(current.value) || 0, tone: 'current' },
+      { label: prior.label || 'Previous period', value: Number(prior.value) || 0, tone: 'prior' },
+    ];
+    return '<section class="dash-wdm-panel">'
+      + '<div class="dash-wdm-panel__header"><h2>This period vs prior period</h2><span>Completed meetings</span></div>'
+      + '<div class="dash-wdm-bars">'
+      + rows.map(function (row) {
+        var width = Math.max(5, Math.round((row.value / max) * 100));
+        return '<div class="dash-wdm-bars__row">'
+          + '<span>' + escapeHtml(row.label) + '</span>'
+          + '<progress class="dash-wdm-bars__bar dash-wdm-bars__bar--' + escapeHtml(row.tone) + '" max="100" value="' + escapeHtml(width) + '" aria-label="' + escapeHtml(row.label + ' completed meetings') + '"></progress>'
+          + '<strong>' + escapeHtml(formatMetricCardValue({ value: row.value, format: 'integer' })) + '</strong>'
+          + '</div>';
+      }).join('')
+      + '</div>'
+      + '</section>';
+  }
+
+  function renderWillDesignTrendDetail(lane) {
+    var rows = Array.isArray(lane && lane.ytd_trend) ? lane.ytd_trend : [];
+    if (!rows.length) {
+      return '<section class="dash-wdm-panel"><div class="dash-wdm-empty">No YTD completed meeting trend is available for this context.</div></section>';
+    }
+    var max = rows.reduce(function (acc, row) { return Math.max(acc, Number(row.value) || 0); }, 1);
+    return '<section class="dash-wdm-panel">'
+      + '<div class="dash-wdm-panel__header"><h2>YTD trend</h2><span>Click a month for records</span></div>'
+      + '<div class="dash-wdm-trend">'
+      + rows.map(function (row) {
+        var id = willDesignMetricId('trend', row.drilldown, lane.period);
+        var height = Math.max(7, Math.round(((Number(row.value) || 0) / max) * 100));
+        var label = row.label || (row.month ? String(row.month).slice(5, 7) : '');
+        return '<button type="button" class="dash-wdm-trend__item" data-wdm-detail-drilldown="' + escapeHtml(id) + '">'
+          + '<progress class="dash-wdm-trend__bar" max="100" value="' + escapeHtml(height) + '" aria-label="' + escapeHtml(label + ' completed meetings') + '"></progress>'
+          + '<span>' + escapeHtml(label) + '</span>'
+          + '<strong>' + escapeHtml(formatMetricCardValue({ value: row.value, format: 'integer' })) + '</strong>'
+          + '</button>';
+      }).join('')
+      + '</div>'
+      + '</section>';
+  }
+
+  function renderWillDesignAttorneyDetail(lane) {
+    var rows = Array.isArray(lane && lane.attorney_breakdown) ? lane.attorney_breakdown : [];
+    if (!rows.length) {
+      return '<section class="dash-wdm-panel"><div class="dash-wdm-empty">No attorney breakdown is available for this context.</div></section>';
+    }
+    var max = rows.reduce(function (acc, row) { return Math.max(acc, Number(row.total) || 0); }, 1);
+    return '<section class="dash-wdm-panel">'
+      + '<div class="dash-wdm-panel__header"><h2>Attorney breakdown</h2><span>Server-scoped to authorized attorneys</span></div>'
+      + '<div class="dash-wdm-attorneys">'
+      + rows.map(function (row) {
+        var id = willDesignMetricId('attorney', row.drilldown, lane.period);
+        var width = Math.max(5, Math.round(((Number(row.total) || 0) / max) * 100));
+        return '<button type="button" class="dash-wdm-attorneys__row" data-wdm-detail-drilldown="' + escapeHtml(id) + '">'
+          + '<span>' + escapeHtml(row.attorney_name || 'Unmapped Attorney') + '</span>'
+          + '<progress class="dash-wdm-bars__bar" max="100" value="' + escapeHtml(width) + '" aria-label="' + escapeHtml((row.attorney_name || 'Unmapped Attorney') + ' completed meetings') + '"></progress>'
+          + '<strong>' + escapeHtml(formatMetricCardValue({ value: row.total, format: 'integer' })) + '</strong>'
+          + '</button>';
+      }).join('')
+      + '</div>'
+      + '</section>';
+  }
+
+  function renderWillDesignWarnings(lane) {
+    var warnings = lane && lane.source && Array.isArray(lane.source.warnings) ? lane.source.warnings.slice() : [];
+    var mapping = lane && lane.mapping ? lane.mapping : {};
+    var validation = mapping.validation || {};
+    var unresolved = validation.unresolved || {};
+    Object.keys(unresolved).forEach(function (key) {
+      if (Array.isArray(unresolved[key]) && unresolved[key].length) {
+        var sample = unresolved[key].slice(0, 3).map(displayText).filter(Boolean).join(', ');
+        warnings.push(unresolved[key].length + ' unmapped ' + humanize(key).toLowerCase() + ' value' + (unresolved[key].length === 1 ? '' : 's') + (sample ? ': ' + sample : ''));
+      }
+    });
+    if (!warnings.length) return '';
+    return '<div class="dash-wdm-warning">' + warnings.slice(0, 3).map(function (warning) {
+      return '<span>' + escapeHtml(warning) + '</span>';
+    }).join('') + '</div>';
+  }
+
+  function renderWillDesignDetail(lane) {
+    willDesignDrilldowns = {};
+    var summary = Array.isArray(lane && lane.summary) ? lane.summary : [];
+    var certification = lane && lane.certification ? lane.certification : {};
+    var definition = certification.definition || {};
+    var organization = certification.organization || {};
+    var source = lane && lane.source ? lane.source : {};
+    var cardsHtml = summary.length
+      ? summary.map(function (card) { return renderWillDesignSummaryCard(card, lane); }).join('')
+      : '<div class="dash-wdm-empty">No Will Design Meeting summary metrics are available for this context.</div>';
+
+    return '<section class="dash-wdm-detail" aria-label="Will Design Meetings detail">'
+      + '<div class="dash-wdm-hero">'
+      + '<div><div class="dash-view-context__eyebrow">Reusable analytical card</div>'
+      + '<h2>Will Design Meetings</h2>'
+      + '<p>' + escapeHtml(willDesignSourceMeta(lane)) + '</p></div>'
+      + '<div class="dash-wdm-pills">'
+      + renderWillDesignStatusPill('Definition', definition.label || humanize(definition.state || 'unknown'), 'neutral')
+      + renderWillDesignStatusPill('Organization', organization.label || humanize(organization.state || 'configuration required'), 'neutral')
+      + renderWillDesignStatusPill('Source', humanize(source.state || 'unknown'), 'neutral')
+      + '</div>'
+      + '</div>'
+      + renderWillDesignWarnings(lane)
+      + '<div class="dash-wdm-summary">' + cardsHtml + '</div>'
+      + '<div class="dash-wdm-grid">'
+      + renderWillDesignComparisonDetail(lane)
+      + renderWillDesignTrendDetail(lane)
+      + renderWillDesignAttorneyDetail(lane)
+      + '</div>'
+      + '</section>';
+  }
+
+  function showWillDesignOnlyMode() {
+    var rail = document.querySelector('.dash-browser__rail');
+    var browser = document.querySelector('.dash-browser');
+    var context = el('dashboardViewContext');
+    if (rail) rail.hidden = true;
+    if (browser) browser.classList.add('dash-browser--single');
+    if (context) context.innerHTML = '';
+  }
+
+  async function loadWillDesignCardInstance(instanceId) {
+    dashboardLoadToken += 1;
+    var myToken = dashboardLoadToken;
+    currentCardInstanceId = instanceId || 'dashboard:estate-planning:will-design-meetings';
+    currentDashboardId = null;
+    currentDashboardType = getCurrentType();
+    allDashboardMetrics = [];
+    currentSummary = null;
+    metricInfoById = {};
+    showWillDesignOnlyMode();
+    setBanner({
+      title: currentDashboardType === 'attorney' ? 'My Will Design Meetings' : 'Will Design Meetings Detail',
+      subtitle: 'Reusable analytical definition with period comparison, trend, attorney breakdown, and record-level drilldown',
+    });
+    setActiveType(currentDashboardType);
+    renderSummary([], { total: 1, executable: 1, planned: 0 }, [{ key: 'will-design-meetings', label: 'Will Design Meetings', metrics: [] }]);
+    var grid = el('dashboardMetricGrid');
+    var empty = el('dashboardMetricEmpty');
+    if (empty) empty.hidden = true;
+    if (grid) grid.innerHTML = '<section class="dash-wdm-panel"><div class="dash-wdm-empty">Loading Will Design Meetings...</div></section>';
+
+    try {
+      var response = await api.getCommandCenterWillDesignMeetings(willDesignFacadePeriodParams());
+      if (myToken !== dashboardLoadToken) return;
+      var lane = unwrapWillDesignLane(response);
+      if (grid) grid.innerHTML = renderWillDesignDetail(lane);
+      if (window.FeatureTracker && typeof window.FeatureTracker.trackFeature === 'function') {
+        window.FeatureTracker.trackFeature('will_detail_dashboard_opened', {
+          card_instance_id: currentCardInstanceId,
+          period: lane && lane.period ? lane.period.key : (willDesignFacadePeriodParams().period || 'custom'),
+          result_category: Array.isArray(lane.summary) && lane.summary.length ? 'loaded' : 'empty_or_unavailable'
+        });
+      }
+    } catch (err) {
+      if (myToken !== dashboardLoadToken) return;
+      console.error('[DashboardDetail] Failed to load Will Design Meetings instance:', err);
+      if (grid) grid.innerHTML = '<section class="dash-wdm-panel"><div class="dash-wdm-empty">Will Design Meetings could not be loaded for this card instance.</div></section>';
+    }
+  }
+
+  function openWillDesignDetailDrilldown(id) {
+    var payload = id ? willDesignDrilldowns[id] : null;
+    if (!payload || !payload.module_key || !payload.metric_key || !payload.period_start || !payload.period_end) return;
+    if (!window.drilldownRenderer || typeof window.drilldownRenderer.open !== 'function') {
+      console.warn('[DashboardDetail] Drilldown renderer is not loaded');
+      return;
+    }
+    window.drilldownRenderer.open(payload.module_key, payload.metric_key, {
+      periodStart: payload.period_start,
+      periodEnd: payload.period_end,
+      filters: payload.filters || {}
+    });
+    if (window.FeatureTracker && typeof window.FeatureTracker.trackFeature === 'function') {
+      window.FeatureTracker.trackFeature('will_drilldown_opened', {
+        card_instance_id: currentCardInstanceId || 'dashboard',
+        metric_key: payload.metric_key,
+        filter_count: Object.keys(payload.filters || {}).length
+      });
+    }
+  }
+
   function renderMetrics(metrics, summary, type) {
     var grid = el('dashboardMetricGrid');
     var empty = el('dashboardMetricEmpty');
@@ -1029,6 +1310,11 @@
         openMetricModal(infoBtn.getAttribute('data-metric-info'));
       }
 
+      var willDrilldownBtn = event.target.closest('[data-wdm-detail-drilldown]');
+      if (willDrilldownBtn) {
+        openWillDesignDetailDrilldown(willDrilldownBtn.getAttribute('data-wdm-detail-drilldown'));
+      }
+
       if (event.target.closest('[data-dashboard-modal-close]')) {
         closeMetricModal();
       }
@@ -1073,9 +1359,35 @@
 
     var params = getParams();
     var id = params.get('id');
+    var cardInstance = params.get('card_instance');
     if (id) loadDashboardById(id);
+    else if (isWillDesignCardInstance(cardInstance)) {
+      currentCardInstanceId = cardInstance;
+      selectDashboardPeriodPreset('thisMonth', false);
+      loadWillDesignCardInstance(cardInstance);
+    }
     else loadMetrics(getCurrentType());
   }
+
+  window.LanaAdmin = window.LanaAdmin || {};
+  window.LanaAdmin.DashboardDetail = {
+    __test: {
+      isWillDesignCardInstance: isWillDesignCardInstance,
+      unwrapWillDesignLane: unwrapWillDesignLane,
+      renderWillDesignDetail: renderWillDesignDetail,
+      renderWillDesignWarnings: renderWillDesignWarnings,
+      willDesignFacadePeriodParams: willDesignFacadePeriodParams,
+      setState: function (nextState) {
+        nextState = nextState || {};
+        if (Object.prototype.hasOwnProperty.call(nextState, 'currentCardInstanceId')) currentCardInstanceId = nextState.currentCardInstanceId;
+        if (Object.prototype.hasOwnProperty.call(nextState, 'currentDashboardType')) currentDashboardType = nextState.currentDashboardType;
+        if (Object.prototype.hasOwnProperty.call(nextState, 'currentPeriodPreset')) currentPeriodPreset = nextState.currentPeriodPreset;
+        if (Object.prototype.hasOwnProperty.call(nextState, 'currentPeriodIsPreset')) currentPeriodIsPreset = nextState.currentPeriodIsPreset;
+        if (Object.prototype.hasOwnProperty.call(nextState, 'currentPeriod')) currentPeriod = nextState.currentPeriod;
+      },
+      getDrilldowns: function () { return willDesignDrilldowns; }
+    }
+  };
 
   init();
 })();
