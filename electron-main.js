@@ -126,6 +126,29 @@ function generateConsentRequestId() {
   return `cb-${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}`;
 }
 
+function focusMainWindowForCompanionConsent() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    if (typeof mainWindow.isMinimized === 'function' && mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    if (typeof mainWindow.show === 'function') {
+      mainWindow.show();
+    }
+    if (typeof app.focus === 'function') {
+      app.focus({ steal: true });
+    }
+    if (typeof mainWindow.moveTop === 'function') {
+      mainWindow.moveTop();
+    }
+    if (typeof mainWindow.focus === 'function') {
+      mainWindow.focus();
+    }
+  } catch (error) {
+    logError('[electron-main] Failed to focus window for companion consent', error);
+  }
+}
+
 function requestCompanionConsentFromRenderer({ app }) {
   return new Promise((resolve) => {
     if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents) {
@@ -148,6 +171,7 @@ function requestCompanionConsentFromRenderer({ app }) {
 
     try {
       mainWindow.once('closed', cleanupOnClose);
+      focusMainWindowForCompanionConsent();
       mainWindow.webContents.send('companion-bridge:request-consent', {
         requestId,
         app,

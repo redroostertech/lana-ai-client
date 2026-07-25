@@ -51,7 +51,7 @@
 const http = require('node:http');
 const https = require('node:https');
 const Store = require('electron-store');
-const { dialog, BrowserWindow } = require('electron');
+const { app, dialog, BrowserWindow } = require('electron');
 const { logInfo, logError } = require('./electron-logger');
 
 const BRIDGE_HOST = '127.0.0.1';
@@ -70,11 +70,11 @@ const SCOPED_TOKEN_APPS = new Set(['lana-extension']);
 // Human-readable requester names for consent prompts — informed consent requires
 // naming the ACTUAL app (review MEDIUM), not a hardcoded one.
 const APP_LABELS = {
-  'lana-companion': 'PAC (Personal AI Companion)',
+  'lana-companion': 'PAC',
   'lana-brain': 'Lana Brain',
-  'lana-extension': 'the LANA browser extension',
+  'lana-extension': 'LANA Chrome extension',
 };
-function appLabel(appName) { return APP_LABELS[appName] || String(appName || 'A companion app'); }
+function appLabel(appName) { return APP_LABELS[appName] || 'this companion application'; }
 // Max time we'll wait for the renderer to answer the in-app consent modal
 // before treating the request as denied. The modal should give the user
 // enough time to read, but a forgotten/ignored prompt must not pin the HTTP
@@ -219,6 +219,26 @@ function pickRendererWindow() {
   return null;
 }
 
+function focusConsentWindow(win) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    if (typeof win.isMinimized === 'function' && win.isMinimized()) {
+      win.restore();
+    }
+    if (typeof win.show === 'function') {
+      win.show();
+    }
+    if (app && typeof app.focus === 'function') {
+      app.focus({ steal: true });
+    }
+    if (typeof win.focus === 'function') {
+      win.focus();
+    }
+  } catch (error) {
+    logError('[electron-bridge] Failed to focus consent window', error);
+  }
+}
+
 /**
  * Show the in-app Lex consent modal via the renderer. Resolves to:
  *   { allow: boolean, alwaysAllow: boolean }
@@ -320,6 +340,7 @@ async function promptForConsent(appName) {
 
     if (canUseRenderer) {
       try {
+        focusConsentWindow(rendererWindow);
         return await promptForConsentViaRenderer(appName);
       } catch (error) {
         // Fall through to native dialog on renderer failure (modal load
@@ -330,6 +351,7 @@ async function promptForConsent(appName) {
       logInfo('[electron-bridge] No renderer window available; using native consent dialog fallback');
     }
 
+    if (rendererWindow) focusConsentWindow(rendererWindow);
     return promptForConsentViaNativeDialog(appName, rendererWindow);
   })();
 
@@ -516,7 +538,7 @@ async function handleRequestToken(req, res) {
       scoped = await provisionScopedToken(serverPayload.url, token, appName);
     } catch (error) {
       logError('[electron-bridge] scoped token provisioning failed', error);
-      writeJson(res, 502, { error: 'provision_failed' });
+      writeJson(res, 502, { error: error && error.message === 'insecure_server_url' ? 'insecure_server_url' : 'provision_failed' });
       return;
     }
     writeJson(res, 200, {
@@ -654,6 +676,8 @@ module.exports = {
   stop,
   // Exported for tests / debug only — not for normal callers.
   _internals: {
+    appLabel,
+    focusConsentWindow,
     isLoopbackRemote,
     isLoopbackHostHeader,
     BRIDGE_HOST,

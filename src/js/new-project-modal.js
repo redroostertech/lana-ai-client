@@ -1,6 +1,6 @@
 /**
  * New Project Modal
- * Reusable modal for creating new matter-based conversations.
+ * Reusable modal for creating new chat conversations.
  * Uses <lex-modal> and <lex-input> from the Lex UI framework.
  * Works on any page — creates the modal element on first open.
  *
@@ -49,9 +49,12 @@ const NewProjectModal = {
     // Footer
     contentHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid var(--lex-border-subtle,rgba(0,0,0,0.06))">';
     contentHtml += '<p class="npm-footer-hint" style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);line-height:1.5">';
-    contentHtml += 'Select a matter to start a new conversation.';
+    contentHtml += 'Select a matter, or start a general conversation.';
     contentHtml += '</p>';
+    contentHtml += '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">';
+    contentHtml += '<lex-btn id="newProjectGeneralChatBtn" variant="secondary" size="sm">Start General Chat</lex-btn>';
     contentHtml += '<lex-btn id="newProjectCreateBtn" variant="primary" size="sm">+ Create Matter</lex-btn>';
+    contentHtml += '</div>';
     contentHtml += '</div>';
 
     // Create <lex-modal>
@@ -82,6 +85,14 @@ const NewProjectModal = {
       });
     }
 
+    // Wire general chat button
+    var generalChatBtn = modal.querySelector('#newProjectGeneralChatBtn');
+    if (generalChatBtn) {
+      generalChatBtn.addEventListener('click', () => {
+        this.startGeneralChat();
+      });
+    }
+
     // Wire close event — reset search on close
     modal.addEventListener('lex-close', () => {
       this.isOpen = false;
@@ -102,7 +113,7 @@ const NewProjectModal = {
   _onSelect: null,
 
   /**
-   * @type {{ heading?: string, footerHint?: string, hideCreateBtn?: boolean }|null}
+   * @type {{ heading?: string, footerHint?: string, hideCreateBtn?: boolean, hideGeneralChatBtn?: boolean }|null}
    * Per-open UI tweaks. Applied on open(), reset on close().
    */
   _renderOverrides: null,
@@ -118,6 +129,7 @@ const NewProjectModal = {
    * @param {string}  [options.heading] - Custom modal heading.
    * @param {string}  [options.footerHint] - Custom footer hint text.
    * @param {boolean} [options.hideCreateBtn] - Hide "+ Create Matter" button.
+   * @param {boolean} [options.hideGeneralChatBtn] - Hide "Start General Chat" button.
    */
   async open(options) {
     await this.init();
@@ -128,6 +140,7 @@ const NewProjectModal = {
       heading:       opts.heading || null,
       footerHint:    opts.footerHint || null,
       hideCreateBtn: opts.hideCreateBtn === true,
+      hideGeneralChatBtn: opts.hideGeneralChatBtn === true,
     };
 
     // Apply UI overrides without rebuilding the DOM
@@ -139,11 +152,16 @@ const NewProjectModal = {
     var footer = this.modal.querySelector('.npm-footer-hint');
     if (footer) {
       footer.textContent = this._renderOverrides.footerHint
-        || 'Select a matter to start a new conversation.';
+        || 'Select a matter, or start a general conversation.';
     }
+    var isPickerMode = !!this._onSelect;
     var createBtn = this.modal.querySelector('#newProjectCreateBtn');
     if (createBtn) {
       createBtn.style.display = this._renderOverrides.hideCreateBtn ? 'none' : '';
+    }
+    var generalChatBtn = this.modal.querySelector('#newProjectGeneralChatBtn');
+    if (generalChatBtn) {
+      generalChatBtn.style.display = (isPickerMode || this._renderOverrides.hideGeneralChatBtn) ? 'none' : '';
     }
 
     // Picker-mode chrome: when the modal is reused as a generic matter
@@ -151,7 +169,6 @@ const NewProjectModal = {
     // modal. Surface that with a back-chevron leading the title, hide the
     // default X close button, and tag the modal so CSS can adjust. Default
     // "Start New Chat" flow keeps the standard chrome.
-    var isPickerMode = !!this._onSelect;
     this.modal.classList.toggle('npm-picker-mode', isPickerMode);
     // Inject the back-chevron once; reuse on subsequent opens.
     if (isPickerMode) {
@@ -396,6 +413,26 @@ const NewProjectModal = {
     // Otherwise route to the current Workspaces page and let it auto-open the
     // create modal via ?action=create. (Was matters.html — the legacy page.)
     window.location.href = NavigationHelpers.resolvePath('workspaces.html') + '?action=create';
+  },
+
+  startGeneralChat() {
+    this.close();
+
+    if (NavigationHelpers.isOnChatPage() && typeof window.createProjectChat === 'function') {
+      window.createProjectChat(null, '');
+      return;
+    }
+
+    try {
+      sessionStorage.setItem('lana_start_general_chat', '1');
+    } catch (e) { /* ignore */ }
+
+    if (window.Lex && window.Lex.Nav) {
+      window.Lex.Nav.go('chat-v2.html');
+      return;
+    }
+
+    window.location.href = NavigationHelpers.resolveChatPath();
   },
 
   // ── Picker-mode chrome (back chevron, no X) ─────────────────────────────

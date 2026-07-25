@@ -556,6 +556,95 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+
+      /* ── Slash command picker ───────────────────────────────── */
+      .lex-cmp-slashpicker {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        max-width: 400px;
+        background: var(--lex-chat-bg-surface);
+        border: 1px solid var(--lex-chat-border);
+        border-radius: var(--lex-radius-lg, 8px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.16);
+        z-index: 65;
+        opacity: 0;
+        transform: translateY(4px);
+        pointer-events: none;
+        transition: opacity 0.15s ease, transform 0.15s ease;
+      }
+      .lex-cmp-slashpicker--open {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      .lex-cmp-slashpicker-list {
+        max-height: 240px;
+        overflow-y: auto;
+        padding: 6px;
+      }
+      .lex-cmp-slashpicker-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px 16px;
+        color: var(--lex-chat-text-dim);
+        font-size: 13px;
+      }
+      .lex-cmp-slashpicker-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: var(--lex-radius-md, 6px);
+        cursor: pointer;
+        transition: background var(--lex-transition-fast, 0.15s);
+      }
+      .lex-cmp-slashpicker-item:hover,
+      .lex-cmp-slashpicker-item--active {
+        background: var(--lex-chat-bg-elevated);
+      }
+      .lex-cmp-slashpicker-item[aria-disabled="true"] {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .lex-cmp-slashpicker-kind {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 2px 6px;
+        border-radius: 9999px;
+        background: var(--lex-chat-bg-elevated, #eef);
+        color: var(--lex-chat-text-muted, #555);
+        flex-shrink: 0;
+      }
+      .lex-cmp-slashpicker-main {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        min-width: 0;
+        flex: 1;
+      }
+      .lex-cmp-slashpicker-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--lex-chat-text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .lex-cmp-slashpicker-desc {
+        font-size: 11px;
+        line-height: 1.35;
+        color: var(--lex-chat-text-dim);
+        flex-shrink: 0;
+        max-width: 50%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -640,6 +729,8 @@
       this._mentionAbortCtrl = null;
       this._mentionFetchSeq = 0;
       this._selectedMentions = [];
+      this._slashState = { open: false, status: 'idle', items: [], activeIndex: 0 };
+      this._slashFetchSeq = 0;
     }
 
     connected() {
@@ -683,6 +774,11 @@
           <div class="lex-cmp-mentionpicker" data-mentionpicker>
             <div class="lex-cmp-mentionpicker-list" data-mentionpicker-list>
               <div class="lex-cmp-mentionpicker-empty">No matches</div>
+            </div>
+          </div>
+          <div class="lex-cmp-slashpicker" data-slashpicker>
+            <div class="lex-cmp-slashpicker-list" data-slashpicker-list>
+              <div class="lex-cmp-slashpicker-empty">No commands</div>
             </div>
           </div>
           <div class="lex-cmp-doc-badges" data-doc-badges></div>
@@ -742,12 +838,40 @@
       // suppresses normal typing.
       ta.addEventListener('input', () => {
         this._autoResize();
+        this._checkSlashTrigger();
         this._checkHashTrigger();
         this._checkAtTrigger();
       });
 
       // Enter → send, Shift+Enter → newline, Escape → close picker
       ta.addEventListener('keydown', (e) => {
+        // ── @-mention picker priorities (only when open) ──
+        if (this._isSlashOpen()) {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            this._closeSlashPicker();
+            return;
+          }
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this._moveSlashActive(1);
+            return;
+          }
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this._moveSlashActive(-1);
+            return;
+          }
+          if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+            const item = this._slashState.items[this._slashState.activeIndex];
+            if (item) {
+              e.preventDefault();
+              this._selectSlashSuggestion(item);
+              return;
+            }
+          }
+        }
+
         // ── @-mention picker priorities (only when open) ──
         if (this._isMentionOpen()) {
           if (e.key === 'Escape') {
@@ -909,6 +1033,15 @@
           return;
         }
 
+        // Slash command picker selection
+        const slashEl = e.target.closest('[data-slash-select]');
+        if (slashEl) {
+          const idx = Number(slashEl.dataset.slashSelect);
+          const item = this._slashState.items[idx];
+          if (item) this._selectSlashSuggestion(item);
+          return;
+        }
+
         // Suggestion
         const suggEl = e.target.closest('[data-suggestion]');
         if (suggEl) {
@@ -955,6 +1088,9 @@
       if (this._isMentionOpen() && !this.contains(e.target)) {
         this._mentionDispatch({ type: 'DISMISSED' });
         this._refreshMentionPopover();
+      }
+      if (this._isSlashOpen() && !this.contains(e.target)) {
+        this._closeSlashPicker();
       }
     }
 
@@ -1188,6 +1324,140 @@
       }
       this._textarea?.focus();
       this.emit('lex-composer-document-select', { documentId: docId, filename: docName });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Slash command picker (/agents: and /automations:)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    _isSlashOpen() {
+      return !!(this._slashState && this._slashState.open);
+    }
+
+    _checkSlashTrigger() {
+      if (!this._textarea) return;
+      const helper = window.Lex && window.Lex.Chat && window.Lex.Chat.ComposerSlash;
+      if (!helper || typeof helper.detectSlashTrigger !== 'function') return;
+
+      const trigger = helper.detectSlashTrigger(this._textarea.value, this._textarea.selectionStart);
+      if (!trigger) {
+        if (this._isSlashOpen()) this._closeSlashPicker();
+        return;
+      }
+
+      this._slashState.open = true;
+      this._slashState.status = 'pending';
+      this._slashState.items = [];
+      this._slashState.activeIndex = 0;
+      this._closePopovers();
+      if (this._docPickerOpen) this._closeDocPicker();
+      if (this._isMentionOpen()) {
+        this._mentionDispatch({ type: 'DISMISSED' });
+        this._refreshMentionPopover();
+      }
+      this._refreshSlashPopover();
+      this._fetchSlashSuggestions();
+    }
+
+    async _fetchSlashSuggestions() {
+      const helper = window.Lex && window.Lex.Chat && window.Lex.Chat.ComposerSlash;
+      if (!helper || !this._textarea) return;
+      const seq = ++this._slashFetchSeq;
+      try {
+        const apiClient = window.api || null;
+        const catalog = await helper.getCatalog(apiClient);
+        if (seq !== this._slashFetchSeq) return;
+        const items = helper.suggestionsForInput(catalog, this._textarea.value, this._textarea.selectionStart, 8);
+        this._slashState.status = 'ready';
+        this._slashState.items = items || [];
+        this._slashState.activeIndex = 0;
+        this._refreshSlashPopover();
+      } catch (_err) {
+        if (seq !== this._slashFetchSeq) return;
+        this._slashState.status = 'ready';
+        this._slashState.items = [];
+        this._slashState.activeIndex = 0;
+        this._refreshSlashPopover();
+      }
+    }
+
+    _refreshSlashPopover() {
+      const picker = this.querySelector('[data-slashpicker]');
+      const list = this.querySelector('[data-slashpicker-list]');
+      if (!picker || !list) return;
+
+      if (!this._isSlashOpen()) {
+        picker.classList.remove('lex-cmp-slashpicker--open');
+        return;
+      }
+
+      picker.classList.add('lex-cmp-slashpicker--open');
+      const items = this._slashState.items || [];
+      if (items.length === 0) {
+        const hint = this._slashState.status === 'pending' ? 'Loading commands...' : 'No commands';
+        list.innerHTML = `<div class="lex-cmp-slashpicker-empty">${esc(hint)}</div>`;
+        return;
+      }
+
+      list.innerHTML = items.map((item, idx) => {
+        const isActive = idx === this._slashState.activeIndex;
+        const kind = item.namespace === 'automations' ? 'Automation' : (item.namespace === 'agents' ? 'Agent' : 'Command');
+        const label = item.label || item.value || '';
+        const desc = item.description || '';
+        const disabled = item.enabled === false;
+        return `
+          <div class="lex-cmp-slashpicker-item${isActive ? ' lex-cmp-slashpicker-item--active' : ''}"
+               data-slash-select="${idx}"
+               aria-disabled="${disabled ? 'true' : 'false'}">
+            <span class="lex-cmp-slashpicker-kind">${esc(kind)}</span>
+            <span class="lex-cmp-slashpicker-main">
+              <span class="lex-cmp-slashpicker-label">${esc(label)}</span>
+              ${desc ? `<span class="lex-cmp-slashpicker-desc">${esc(desc)}</span>` : ''}
+            </span>
+          </div>`;
+      }).join('');
+    }
+
+    _moveSlashActive(delta) {
+      const items = this._slashState.items || [];
+      if (items.length === 0) return;
+      const next = (this._slashState.activeIndex + delta + items.length) % items.length;
+      this._slashState.activeIndex = next;
+      this._refreshSlashPopover();
+    }
+
+    _closeSlashPicker() {
+      if (!this._slashState) return;
+      this._slashState.open = false;
+      this._slashState.status = 'idle';
+      this._slashState.items = [];
+      this._slashState.activeIndex = 0;
+      this._refreshSlashPopover();
+    }
+
+    _selectSlashSuggestion(item) {
+      if (!item || item.enabled === false || !this._textarea) return;
+      if (item.isNamespace) {
+        this._textarea.value = '/' + item.namespace + ':';
+        this._textarea.selectionStart = this._textarea.selectionEnd = this._textarea.value.length;
+        this._autoResize();
+        this._slashState.open = true;
+        this._slashState.status = 'pending';
+        this._slashState.items = [];
+        this._slashState.activeIndex = 0;
+        this._refreshSlashPopover();
+        this._fetchSlashSuggestions();
+        this._textarea.focus();
+        return;
+      }
+
+      const namespace = item.namespace || (item.type === 'automation' ? 'automations' : 'agents');
+      const label = item.label || item.value || '';
+      this._textarea.value = '/' + namespace + ':' + label + ' ';
+      this._textarea.selectionStart = this._textarea.selectionEnd = this._textarea.value.length;
+      this._autoResize();
+      this._closeSlashPicker();
+      this._textarea.focus();
     }
 
     _refreshDocPickerResults() {

@@ -247,7 +247,7 @@
   // =========================================================================
 
   function setGreeting() {
-    if (dom.greetingSub) dom.greetingSub.textContent = "I'm ready to help. Select a matter to begin.";
+    if (dom.greetingSub) dom.greetingSub.textContent = "I'm ready to help. Select a matter or start a general chat.";
   }
 
   // =========================================================================
@@ -368,7 +368,8 @@
   // =========================================================================
 
   function createConversation(matterId) {
-    api.post('/api/v1/chat/sessions', { matter_id: matterId })
+    var body = matterId ? { matter_id: matterId } : {};
+    api.post('/api/v1/chat/sessions', body)
       .then(function (response) {
         var session = response && response.session;
         var convId = session && (session.id || session.thread_id);
@@ -474,6 +475,52 @@
     var urlUpdate = { session: _conversationId };
     if (_matter && _matter.id) urlUpdate.matter = _matter.id;
     syncUrlParams(urlUpdate);
+  }
+
+  function startGeneralChat() {
+    _matter = null;
+    _conversationId = null;
+    _sessionTitle = null;
+    _enterActiveInvoked = true;
+    _stage = 'ACTIVE';
+
+    if (window.Lex && window.Lex.state) {
+      window.Lex.state.setActiveMatter(null);
+    }
+
+    if (window.Lex && window.Lex.Redact) {
+      window.Lex.Redact.off(dom.cardsWrapper);
+    }
+
+    if (dom.stageCenterEl) {
+      dom.stageCenterEl.classList.add('cv2-hidden');
+    }
+
+    dom.messagesArea.classList.add('cv2-visible');
+    setPageTitle('New Conversation');
+    updateWorkspaceDetailsButton();
+
+    api.post('/api/v1/chat/sessions', {})
+      .then(function (response) {
+        var session = response && response.session;
+        var convId = session && (session.id || session.thread_id);
+        if (!convId) throw new Error('No session ID');
+
+        _conversationId = convId;
+        if (window.Lex && window.Lex.state) {
+          window.Lex.state.setActiveConversation(convId);
+        }
+
+        mountLexChat(convId, null);
+        syncUrlParams({ session: convId, matter: null });
+      })
+      .catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        console.error('[chat_v2] Failed to create general conversation:', err);
+        showErrorToast('Could not start a new conversation. Please try again.');
+        returnToLanding();
+        loadRecentMatters();
+      });
   }
 
   // =========================================================================
@@ -606,8 +653,13 @@
 
     var chatEl = document.createElement('lex-chat');
     chatEl.setAttribute('conversation-id', conversationId);
-    chatEl.setAttribute('matter-id', _matter.matter_id || _matter.id);
-    chatEl.setAttribute('placeholder', 'Ask about this matter...');
+    var matterId = _matter && (_matter.matter_id || _matter.id);
+    if (matterId) {
+      chatEl.setAttribute('matter-id', matterId);
+      chatEl.setAttribute('placeholder', 'Ask about this matter...');
+    } else {
+      chatEl.setAttribute('placeholder', 'Ask Lana anything...');
+    }
 
     // Demo mode support
     if (window.LanaConfig && window.LanaConfig.DEMO_MODE) {
@@ -1457,7 +1509,7 @@
     dom.messagesArea.classList.add('cv2-visible');
 
     // Update page title: prefer session title, fall back to matter name
-    var title = _sessionTitle || (_matter ? _matter.name : null) || 'New Conversation';
+    var title = _sessionTitle || (_matter && _matter.id ? _matter.name : null) || 'New Conversation';
     setPageTitle(title);
     updateWorkspaceDetailsButton();
 
@@ -1531,6 +1583,11 @@
       // Clean up any active conversation before switching matters
       returnToLanding();
 
+      if (!matterId) {
+        startGeneralChat();
+        return;
+      }
+
       // Fetch the full matter and enter welcome flow
       api.get('/api/v1/matters/' + matterId)
         .then(function (response) {
@@ -1568,6 +1625,11 @@
       : new URLSearchParams(window.location.search);
     var deepLinkSessionId = params.get('session') || null;
     var deepLinkMatterId = params.get('matter') || null;
+    var shouldStartGeneralChat = false;
+    try {
+      shouldStartGeneralChat = sessionStorage.getItem('lana_start_general_chat') === '1';
+      sessionStorage.removeItem('lana_start_general_chat');
+    } catch (e) { /* ignore */ }
 
     if (deepLinkSessionId) {
       loadExistingSession(deepLinkSessionId);
@@ -1610,6 +1672,8 @@
         .catch(function () {
           loadRecentMatters();
         });
+    } else if (shouldStartGeneralChat) {
+      startGeneralChat();
     } else {
       loadRecentMatters();
     }

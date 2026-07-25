@@ -237,9 +237,7 @@
 
       // Composer send
       this.addEventListener('lex-composer-send', (e) => {
-        const opts = {};
-        if (e.detail.attachments) opts.attachments = e.detail.attachments;
-        this.send(e.detail.content, opts);
+        this._handleComposerSend(e.detail || {});
       });
 
       this.addEventListener('lex-composer-validation-error', (e) => {
@@ -420,6 +418,88 @@
     /**
      * Send a message through the chat source.
      */
+    async _handleComposerSend(detail = {}) {
+      const content = detail.content || '';
+      const slash = Chat.ComposerSlash;
+      if (slash && slash.isDispatchCommand && slash.isDispatchCommand(content)) {
+        await this._sendSlashCommand(content, detail);
+        return;
+      }
+
+      const opts = {};
+      if (detail.attachments) opts.attachments = detail.attachments;
+      this.send(content, opts);
+    }
+
+    async _sendSlashCommand(content, detail = {}) {
+      const slash = Chat.ComposerSlash;
+      if (!slash) {
+        this._showSystemMessage('Slash commands are not available.');
+        return;
+      }
+      if (!content) return;
+      if (this._activeTurnId) {
+        this._showSystemMessage('A response is already in progress.');
+        this.emit('lex-chat-error', {
+          error: 'A response is already in progress.',
+          type: 'concurrent_send'
+        });
+        return;
+      }
+
+      const turnId = `slash-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      this._activeTurnId = turnId;
+
+      if (this._threadEl) this._threadEl.addMessage('user', content);
+      if (this._composerEl) {
+        this._composerEl.clear();
+        this._composerEl.hideSuggestions();
+        this._composerEl.setGenerating(true);
+      }
+      if (this._activityEl) {
+        this._activityEl.clearReasoning();
+        this._activityEl.show('Running command...');
+      }
+
+      try {
+        const catalog = await slash.getCatalog(global.api);
+        const command = slash.parseCommand(content, catalog);
+        if (!command || !command.valid) {
+          const noun = command && command.namespace === 'automations' ? 'automation' : 'agent';
+          if (this._threadEl) this._threadEl.addMessage('assistant', 'Choose a ' + noun + ' after the command name.');
+          return;
+        }
+
+        const result = await slash.dispatchCommand(global.api, command, {
+          conversationId: this.conversationId || null,
+          matterId: this.matterId || null,
+          attachments: detail.attachments || null
+        });
+        if (this._threadEl) this._threadEl.addMessage('assistant', slash.formatDispatchResult(result));
+        this.emit('lex-chat-composer-command-dispatch', {
+          command: command.type,
+          ref: command.ref,
+          result
+        });
+      } catch (err) {
+        if (this._threadEl) this._threadEl.addMessage('assistant', slash.formatDispatchError(err));
+        this.emit('lex-chat-error', {
+          error: err.message,
+          type: 'composer_command',
+          status: err.status || null
+        });
+      } finally {
+        if (this._activeTurnId === turnId) {
+          if (this._activityEl) this._activityEl.hide();
+          if (this._composerEl) {
+            this._composerEl.setGenerating(false);
+            this._composerEl.focus();
+          }
+          this._activeTurnId = null;
+        }
+      }
+    }
+
     async send(content, opts = {}) {
       if (!content || !this._source) return;
       if (this._activeTurnId) {
