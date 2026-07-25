@@ -698,21 +698,17 @@ button:disabled {
 }
 
 .lex-sidebar-root .lex-sidebar-nav-item[data-id="create"] {
-  background: linear-gradient(135deg, #6e6557 0%, #595246 100%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   color: #fff;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
   font-weight: 700;
+  box-shadow: none;
 }
 
 .lex-sidebar-root .lex-sidebar-nav-item[data-id="create"]:hover {
-  background: linear-gradient(135deg, #7d7465 0%, #655d50 100%);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
-}
-
-.lex-sidebar-root .lex-sidebar-nav-item[data-id="create"] svg {
-  opacity: 0.95;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.42);
+  transform: none;
 }
 
 .flash {

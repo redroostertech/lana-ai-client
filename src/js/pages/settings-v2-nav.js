@@ -3,13 +3,14 @@
  *
  * Left in-page section navigation for settings-v2.html. Turns the single
  * scrolling page into tabbed sections (Profile, General, Personalization,
- * Plan & billing, Usage, Data controls) driven by a vertical nav rail.
+ * Capabilities, Plan & billing, Usage, Data controls) driven by a vertical nav rail.
  *
  * Responsibilities:
  *   - Inject the nav icons from Lex.Icons (never emoji glyphs).
  *   - Activate one panel at a time; keep the others hidden.
  *   - Read location.hash on load and activate the matching section
  *     (the account menu deep-links to #profile / #personalization / #billing).
+ *   - Keep LANA-ONE-only sections fail-closed unless its edition flag is true.
  *   - Update location.hash when the user picks a section, and react to
  *     back/forward hash changes.
  *
@@ -29,17 +30,32 @@
     { id: 'profile',        icon: 'user' },
     { id: 'general',        icon: 'settings' },
     { id: 'personalization', icon: 'wand-2' },
+    { id: 'capabilities',   icon: 'puzzle' },
     { id: 'billing',        icon: 'sparkles' },
     { id: 'usage',          icon: 'bar-chart-2' },
     { id: 'data-controls',  icon: 'shield' }
   ];
 
   var DEFAULT_SECTION = 'profile';
+  var lanaOneEnabled = false;
+  var LANA_ONE_SECTIONS = ['billing', 'data-controls'];
+
+  function sectionEnabled(id) {
+    return LANA_ONE_SECTIONS.indexOf(id) === -1 || lanaOneEnabled;
+  }
+
+  function enabledSections() {
+    var enabled = [];
+    for (var i = 0; i < SECTIONS.length; i++) {
+      if (sectionEnabled(SECTIONS[i].id)) enabled.push(SECTIONS[i]);
+    }
+    return enabled;
+  }
 
   function validSection(id) {
     if (!id) return null;
     for (var i = 0; i < SECTIONS.length; i++) {
-      if (SECTIONS[i].id === id) return id;
+      if (SECTIONS[i].id === id && sectionEnabled(id)) return id;
     }
     return null;
   }
@@ -106,26 +122,48 @@
   // Arrow-key roving focus across the tablist (WAI-ARIA tabs pattern).
   function onTabKeydown(e) {
     var key = e.key;
+    var available = enabledSections();
     var idx = -1;
-    for (var i = 0; i < SECTIONS.length; i++) {
-      if (e.currentTarget === tabEl(SECTIONS[i].id)) { idx = i; break; }
+    for (var i = 0; i < available.length; i++) {
+      if (e.currentTarget === tabEl(available[i].id)) { idx = i; break; }
     }
     if (idx === -1) return;
 
     var next = -1;
-    if (key === 'ArrowDown' || key === 'ArrowRight') next = (idx + 1) % SECTIONS.length;
-    else if (key === 'ArrowUp' || key === 'ArrowLeft') next = (idx - 1 + SECTIONS.length) % SECTIONS.length;
+    if (key === 'ArrowDown' || key === 'ArrowRight') next = (idx + 1) % available.length;
+    else if (key === 'ArrowUp' || key === 'ArrowLeft') next = (idx - 1 + available.length) % available.length;
     else if (key === 'Home') next = 0;
-    else if (key === 'End') next = SECTIONS.length - 1;
+    else if (key === 'End') next = available.length - 1;
     else return;
 
     e.preventDefault();
-    activate(SECTIONS[next].id, { updateHash: true, focusTab: true });
+    activate(available[next].id, { updateHash: true, focusTab: true });
   }
 
   function onHashChange() {
     // External hash change (deep link / back-forward); do not rewrite it.
     activate(sectionFromHash(), { updateHash: false });
+  }
+
+  function resolveEditionGate() {
+    var electronApi = window.electronAPI;
+    if (!electronApi || typeof electronApi.getConfig !== 'function') return;
+
+    Promise.resolve(electronApi.getConfig()).then(function (config) {
+      if (!config || config.isLanaOne !== true) return;
+      lanaOneEnabled = true;
+
+      for (var i = 0; i < LANA_ONE_SECTIONS.length; i++) {
+        var sectionId = LANA_ONE_SECTIONS[i];
+        var gatedTab = tabEl(sectionId);
+        var gatedPanel = panelEl(sectionId);
+        if (gatedTab) gatedTab.classList.remove('sv2-hidden');
+        if (gatedPanel) gatedPanel.classList.remove('sv2-hidden');
+      }
+
+      injectIcons();
+      activate(sectionFromHash(), { updateHash: false });
+    }).catch(function () { /* Standard client: keep LANA-ONE sections hidden. */ });
   }
 
   function boot() {
@@ -145,6 +183,7 @@
 
     // Initial section comes from the hash (account-menu deep links), else Profile.
     activate(sectionFromHash(), { updateHash: false });
+    resolveEditionGate();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

@@ -7,7 +7,7 @@
  * This is the THIN CLIENT version - connects to a remote backend server.
  */
 
-const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, session, nativeImage, Notification, shell } = require('electron');
 const path = require('path');
 const url = require('url');
 const crypto = require('crypto');
@@ -23,6 +23,7 @@ const Store = require('electron-store');
  */
 function appIconPath() {
   const candidates = [
+    path.join(__dirname, 'build', 'icons', 'icon.icns'),
     path.join(__dirname, 'build', 'icons', 'icon-1024.png'),
     path.join(__dirname, 'build', 'icons', 'icon-512.png'),
     path.join(__dirname, 'build', 'icons', 'icon.png'),
@@ -35,16 +36,48 @@ function appIconPath() {
 
 // Set app version from package.json (prevents app.getVersion() returning the Electron framework version)
 const packageJson = require('./package.json');
+app.setName(packageJson.productName || 'Lana AI');
 app.setVersion(packageJson.version);
 
+function applyDockIcon() {
+  if (process.platform !== 'darwin' || !app.dock) return false;
+  const iconPath = appIconPath();
+  if (!iconPath) return false;
+  try {
+    const img = nativeImage.createFromPath(iconPath);
+    if (img.isEmpty()) return false;
+    app.dock.setIcon(img);
+    app.dock.show().catch(() => {});
+    return true;
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
+    logError(`[lana-ai-client] dock icon set failed: ${msg}`);
+    return false;
+  }
+}
+
+// Chromium can emit noisy GPU-driver diagnostics to stderr on macOS dev runs
+// (for example repeated EGL "Bad attribute" messages). Keep app logs visible
+// while suppressing Chromium ERROR-level noise.
+if (process.env.NODE_ENV === 'development') {
+  app.commandLine.appendSwitch('log-level', '3');
+}
+
 // Import thin client modules
-const { verifyServer } = require('./electron-discovery');
+const { refreshHostedDiscovery, verifyServer } = require('./electron-discovery');
 const { getSavedServer, saveServerConnection, clearSavedServer, updateLastVerified, saveBrainchildLink, getBrainchildLink, clearBrainchildLink, setBrainchildAutoBindDisabled, isBrainchildAutoBindDisabled } = require('./electron-storage');
 const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, showForceUpdateDialog, shouldCheckForUpdates, configureAutoUpdater } = require('./electron-updater-custom');
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
+const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
+const {
+  SCREEN_DICTION_APP_ID,
+  capabilityItems,
+  capabilityViewModels,
+  isCapabilityActive
+} = require('./src/screen-voice/app-entitlement');
 
 /**
  * Brainchild MCP bridge — reads the user's local vault over the MCP stdio
@@ -188,6 +221,100 @@ function getAppVersion() {
 
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
+let screenVoice = null;
+let capabilityPreferencesStore = null;
+
+function getCapabilityPreferencesStore() {
+  if (!capabilityPreferencesStore) {
+    capabilityPreferencesStore = new Store({
+      name: 'capability-preferences',
+      defaults: { organizations: {} }
+    });
+  }
+  return capabilityPreferencesStore;
+}
+
+function capabilityPreferenceScope(server) {
+  const identity = server?.orgId || server?.url || 'unscoped';
+  return encodeURIComponent(String(identity).slice(0, 500));
+}
+
+function getCapabilityPreferences(server = getSavedServer()) {
+  if (!server) return {};
+  const organizations = getCapabilityPreferencesStore().get('organizations', {});
+  const preferences = organizations && organizations[capabilityPreferenceScope(server)];
+  return preferences && typeof preferences === 'object' && !Array.isArray(preferences) ? preferences : {};
+}
+
+function setCapabilityPreference(server, capabilityId, active) {
+  const store = getCapabilityPreferencesStore();
+  const organizations = store.get('organizations', {});
+  const scope = capabilityPreferenceScope(server);
+  const existing = organizations[scope] && typeof organizations[scope] === 'object'
+    ? organizations[scope]
+    : {};
+  store.set('organizations', {
+    ...organizations,
+    [scope]: { ...existing, [capabilityId]: Boolean(active) }
+  });
+}
+
+function currentCapabilityViewModels(server = getSavedServer()) {
+  return capabilityViewModels(server, getCapabilityPreferences(server), process.platform).map((capability) => (
+    capability.id === SCREEN_DICTION_APP_ID
+      ? { ...capability, openAtLogin: Boolean(screenVoice?.getSettings().openAtLogin) }
+      : capability
+  ));
+}
+
+function syncScreenVoiceEntitlement(server = getSavedServer()) {
+  const enabled = isCapabilityActive(
+    server,
+    SCREEN_DICTION_APP_ID,
+    getCapabilityPreferences(server),
+    process.platform
+  );
+  if (screenVoice) screenVoice.setEntitlementEnabled(enabled);
+  return enabled;
+}
+
+function isScreenDictionEntitled(server = getSavedServer()) {
+  return Boolean(server && capabilityItems(server).some((item) => (
+    String(item.id || item.app_id || item.slug || item.key || '').trim() === SCREEN_DICTION_APP_ID
+  )));
+}
+
+async function syncScreenVoiceAuthentication(window = mainWindow) {
+  if (!screenVoice || !window || window.isDestroyed()) return false;
+  let authenticated = false;
+  try {
+    // Return only a boolean across the process boundary. The bearer token is
+    // never copied into main-process state or logs.
+    authenticated = await window.webContents.executeJavaScript(`(() => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return false;
+        if (token.indexOf('demo-token-') === 0) return true;
+        const parts = token.split('.');
+        if (parts.length !== 3) return false;
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return !payload.exp || payload.exp * 1000 > Date.now();
+      } catch (_) { return false; }
+    })()`, true);
+  } catch (_) {
+    authenticated = false;
+  }
+  if (window === mainWindow && !window.isDestroyed()) {
+    screenVoice.setAuthenticated(authenticated === true);
+  }
+  return authenticated === true;
+}
+
+function watchScreenVoiceAuthentication(window) {
+  window.webContents.on('did-finish-load', () => {
+    syncScreenVoiceAuthentication(window).catch(() => {});
+  });
+}
 
 // Session tracker instance
 let sessionTracker = null;
@@ -215,6 +342,65 @@ function createFileUrl(filePath) {
     protocol: 'file:',
     slashes: true
   });
+}
+
+function openScreenVoiceSettings() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  const settingsUrl = createFileUrl(path.join(__dirname, 'public_html/settings-v2.html'))
+    + '?capability=screen-diction#capabilities';
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  mainWindow.loadURL(settingsUrl);
+  return true;
+}
+
+const SCREEN_VOICE_CLIENT_ROUTES = new Set([
+  'chat.html', 'matters.html', 'workspace-details.html', 'integrations/connectors.html', 'notifications.html'
+]);
+
+async function navigateScreenVoiceClient(input = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  const route = String(input.route || '').trim().replace(/^\/+/, '');
+  if (!SCREEN_VOICE_CLIENT_ROUTES.has(route)) throw new Error('Unsupported LANA destination');
+  const target = new URL(createFileUrl(path.join(__dirname, 'public_html', route)));
+  const matterId = String(input.matterId || '').trim();
+  if (matterId) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,119}$/.test(matterId)) throw new Error('Invalid matter identifier');
+    if (route === 'workspace-details.html') target.searchParams.set('id', matterId);
+    else target.searchParams.set('matter', matterId);
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  await mainWindow.loadURL(target.toString());
+  return true;
+}
+
+async function openScreenVoiceResearchUrl(value) {
+  const target = new URL(String(value || ''));
+  const allowed = (target.hostname === 'www.google.com' && target.pathname === '/search')
+    || (target.hostname === 'www.bing.com' && target.pathname === '/search');
+  if (target.protocol !== 'https:' || !allowed || !target.searchParams.get('q')) {
+    throw new Error('Only confirmed web-search URLs are supported');
+  }
+  await shell.openExternal(target.toString(), { activate: true });
+  return true;
+}
+
+function notifyScreenVoiceInputRequired() {
+  if (!Notification.isSupported()) return false;
+  const notification = new Notification({
+    title: 'LANA needs your input',
+    body: 'Open the voice agent to review and respond.',
+    silent: true
+  });
+  notification.on('click', () => {
+    screenVoice?.showOverlay({ focus: true });
+    screenVoice?.sendState();
+  });
+  notification.show();
+  return true;
 }
 
 // Development mode: Bypass certificate errors for localhost
@@ -341,6 +527,7 @@ function createWindow(serverUrl = null) {
     },
     show: false // Don't show until ready (prevents flash of white screen)
   });
+  watchScreenVoiceAuthentication(mainWindow);
 
   // Load the v2 dashboard as the entry point
   const startUrl = createFileUrl(path.join(__dirname, 'public_html/dashboard.html'));
@@ -432,6 +619,7 @@ function createLoginWindow() {
     frame: true,
     titleBarStyle: 'default'
   });
+  watchScreenVoiceAuthentication(mainWindow);
 
   // Load login page directly
   const loginUrl = createFileUrl(path.join(__dirname, 'public_html/login.html'));
@@ -706,7 +894,9 @@ ipcMain.handle('get-config', async () => {
 // Handle secure storage operations
 ipcMain.handle('save-settings', async (event, settings) => {
   const { saveServerConnection } = require('./electron-storage');
-  return { success: saveServerConnection(settings) };
+  const success = saveServerConnection(settings);
+  if (success) syncScreenVoiceEntitlement(settings);
+  return { success };
 });
 
 ipcMain.handle('load-settings', async () => {
@@ -725,6 +915,7 @@ ipcMain.handle('connect-to-server', async (event, server) => {
   try {
     // Save server connection
     saveServerConnection(server);
+    syncScreenVoiceEntitlement(server);
 
     // Resize window for main app view
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -762,10 +953,106 @@ ipcMain.handle('get-saved-server', async () => {
   }
 });
 
+// Capabilities are organization entitlements supplied by discovery. Users may
+// activate/deactivate optional capabilities on this device, but cannot create
+// an entitlement or disable a capability marked required by the server.
+ipcMain.handle('capabilities:list', async () => {
+  try {
+    return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels() };
+  } catch (error) {
+    logError('[Capabilities] Failed to list capabilities', error);
+    return { success: false, error: 'Capabilities could not be loaded.' };
+  }
+});
+
+ipcMain.handle('capabilities:set-active', async (_event, payload) => {
+  try {
+    const server = getSavedServer();
+    const id = typeof payload?.id === 'string' ? payload.id.trim().slice(0, 120) : '';
+    const active = payload?.active;
+    if (!server || !id || !/^[a-z0-9][a-z0-9-]{0,119}$/.test(id) || typeof active !== 'boolean') {
+      return { success: false, error: 'Invalid capability setting.' };
+    }
+
+    const entitled = capabilityItems(server).find((item) => (
+      String(item.id || item.app_id || item.slug || item.key || '').trim() === id
+    ));
+    if (!entitled) return { success: false, error: 'This capability is not enabled for your organization.' };
+    if (entitled.route?.meta?.required === true && active === false) {
+      return { success: false, error: 'This capability is required by your organization.' };
+    }
+
+    const view = currentCapabilityViewModels(server).find((item) => item.id === id);
+    if (!view?.available && active) {
+      return { success: false, error: 'This capability is not available on this platform.' };
+    }
+
+    setCapabilityPreference(server, id, active);
+    syncScreenVoiceEntitlement(server);
+    return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels(server) };
+  } catch (error) {
+    logError('[Capabilities] Failed to update capability', error);
+    return { success: false, error: 'The capability setting could not be saved.' };
+  }
+});
+
+ipcMain.handle('capabilities:set-open-at-login', async (_event, payload) => {
+  try {
+    const server = getSavedServer();
+    if (!isScreenDictionEntitled(server)) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+    if (!screenVoice || typeof payload?.openAtLogin !== 'boolean') {
+      return { success: false, error: 'Open at Login is not available on this platform.' };
+    }
+    screenVoice.setOpenAtLogin(payload.openAtLogin);
+    return { success: true, platform: process.platform, capabilities: currentCapabilityViewModels(server) };
+  } catch (error) {
+    logError('[Capabilities] Failed to update Open at Login', error);
+    return { success: false, error: 'Open at Login could not be saved.' };
+  }
+});
+
+ipcMain.handle('capabilities:get-voice-settings', async () => {
+  if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+  if (!screenVoice) return { success: false, error: 'The LANA Voice Agent is not available on this platform.' };
+  return { success: true, settings: screenVoice.getSettings() };
+});
+
+ipcMain.handle('capabilities:set-voice-settings', async (_event, payload) => {
+  try {
+    if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+    if (!screenVoice || !payload?.settings || typeof payload.settings !== 'object' || Array.isArray(payload.settings)) {
+      return { success: false, error: 'Invalid voice agent settings.' };
+    }
+    const result = screenVoice.saveSettings(payload.settings);
+    return { success: true, settings: result.settings, capabilities: currentCapabilityViewModels() };
+  } catch (error) {
+    logError('[Capabilities] Failed to update voice agent settings', error);
+    return { success: false, error: 'Voice agent settings could not be saved.' };
+  }
+});
+
+ipcMain.handle('capabilities:get-voice-permissions', async () => {
+  if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+  if (!screenVoice) return { success: false, error: 'The LANA Voice Agent is not available on this platform.' };
+  try { return { success: true, permissions: await screenVoice.permissionStatus() }; }
+  catch (_) { return { success: false, error: 'Permission status is temporarily unavailable.' }; }
+});
+
+ipcMain.handle('capabilities:request-voice-permission', async (_event, payload) => {
+  const type = payload?.type;
+  if (!isScreenDictionEntitled()) return { success: false, error: 'The LANA Voice Agent is not enabled for your organization.' };
+  if (!screenVoice || !['microphone', 'accessibility'].includes(type)) {
+    return { success: false, error: 'Invalid permission request.' };
+  }
+  try { return { success: true, permissions: await screenVoice.requestPermission(type) }; }
+  catch (_) { return { success: false, error: 'The permission request could not be opened.' }; }
+});
+
 // Clear saved server (logout)
 ipcMain.handle('clear-saved-server', async () => {
   try {
     clearSavedServer();
+    syncScreenVoiceEntitlement(null);
     return { success: true };
   } catch (error) {
     logError('IPC: clear-saved-server failed', error);
@@ -1413,18 +1700,7 @@ app.whenReady().then(async () => {
   // Contents/Resources/electron.icns; in dev that path is Electron's default
   // (the lava lamp), so we override at runtime. BrowserWindow.icon is
   // ignored on macOS so this is the only path that works for dev runs.
-  if (process.platform === 'darwin' && app.dock) {
-    const iconPath = appIconPath();
-    if (iconPath) {
-      try {
-        const img = nativeImage.createFromPath(iconPath);
-        if (!img.isEmpty()) app.dock.setIcon(img);
-      } catch (err) {
-        const msg = err && err.message ? err.message : String(err);
-        logError(`[lana-ai-client] dock icon set failed: ${msg}`);
-      }
-    }
-  }
+  applyDockIcon();
 
   // Version migration: Clear server config to ensure fresh discovery with correct static_ip
   // This fixes issues where old versions saved incorrect IPs (e.g., link-local addresses)
@@ -1480,6 +1756,35 @@ app.whenReady().then(async () => {
   });
   logInfo('Session tracker initialized');
 
+  // Screen-aware dictation is owned by the Electron host so the renderer and
+  // model never receive general desktop-control authority. The overlay starts
+  // inert and requests microphone/accessibility only when the user activates it.
+  if (process.platform === 'darwin') {
+    try {
+      screenVoice = new ElectronScreenVoice({
+        rootDir: __dirname,
+        getMainWindow: () => mainWindow,
+        getSavedServer: () => getSavedServer(),
+        openClientSettings: openScreenVoiceSettings,
+        navigateClient: navigateScreenVoiceClient,
+        openExternalUrl: openScreenVoiceResearchUrl,
+        notifyUser: notifyScreenVoiceInputRequired,
+        ensureDockIcon: applyDockIcon,
+        entitlementEnabled: isCapabilityActive(
+          getSavedServer(),
+          SCREEN_DICTION_APP_ID,
+          getCapabilityPreferences(getSavedServer()),
+          process.platform
+        ),
+        logInfo,
+        logError
+      });
+      screenVoice.initialize();
+    } catch (error) {
+      logError('[electron-main] Failed to initialize screen-aware voice', error);
+    }
+  }
+
   // Start the PAC bridge (loopback HTTP server on 127.0.0.1:7890). Wire
   // identifier is still `lana-companion` for compat with already-granted
   // consents. The bridge reads the renderer's localStorage for the bearer
@@ -1531,17 +1836,30 @@ app.whenReady().then(async () => {
   if (savedServer) {
     logInfo(`Found saved server: ${savedServer.orgName || savedServer.orgId}`);
 
-    // Verify server is still reachable
-    const isReachable = await verifyServer(savedServer.url);
+    // Refresh hosted discovery on every launch so enabled_apps, capability
+    // entitlements, tier, and service metadata do not remain stale for users
+    // whose authenticated session bypasses login.html. Run this beside health
+    // verification to avoid adding another serial startup delay.
+    const [isReachable, refreshedServer] = await Promise.all([
+      verifyServer(savedServer.url),
+      refreshHostedDiscovery(savedServer)
+    ]);
+
+    const effectiveServer = refreshedServer || savedServer;
+    if (refreshedServer) {
+      saveServerConnection(refreshedServer);
+      syncScreenVoiceEntitlement(refreshedServer);
+    }
 
     if (isReachable) {
       logInfo('[electron-main] Saved server is reachable, loading main app...');
       updateLastVerified();
-      createWindow(savedServer.url);
+      createWindow(effectiveServer.url);
       return;
     } else {
       logInfo('[electron-main] Saved server is not reachable, clearing saved server and showing login...');
       clearSavedServer();
+      syncScreenVoiceEntitlement(null);
     }
   } else {
     logInfo('[electron-main] No saved server found, showing login...');
@@ -1552,7 +1870,7 @@ app.whenReady().then(async () => {
 
   // On macOS, re-create window when dock icon is clicked and no windows are open
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
       const savedServer = getSavedServer();
       if (savedServer) {
         createWindow(savedServer.url);
@@ -1587,6 +1905,12 @@ app.on('before-quit', async () => {
     brainchildManager.stop();
   } catch (error) {
     logError('[electron-main] Failed to stop brainchild manager', error);
+  }
+
+  try {
+    screenVoice?.shutdown();
+  } catch (error) {
+    logError('[electron-main] Failed to stop screen-aware voice', error);
   }
 
   // End session tracking

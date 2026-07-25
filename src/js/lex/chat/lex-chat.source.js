@@ -12,6 +12,18 @@
 
   const Lex = global.Lex;
   if (!Lex) { console.error('[Lex ChatSource] Lex core not loaded'); return; }
+  const CHAT_MESSAGE_MAX_CODE_UNITS = 2000;
+
+  function generateClientRequestId() {
+    if (global.crypto && typeof global.crypto.randomUUID === 'function') {
+      return global.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (char) {
+      const value = Math.random() * 16 | 0;
+      const nibble = char === 'x' ? value : (value & 0x3 | 0x8);
+      return nibble.toString(16);
+    });
+  }
 
   // =========================================================================
   // ChatSource — abstract base
@@ -78,7 +90,7 @@
       this._baseUrl = options.endpoint || '';
       this._abortController = null;
       this._conversationId = null;
-      this._sessionId = null;
+      this._generationId = null;
       this._model = null;
     }
 
@@ -184,8 +196,21 @@
     }
 
     async *send(content, options = {}) {
+      if (String(content || '').length > CHAT_MESSAGE_MAX_CODE_UNITS) {
+        yield {
+          type: 'error',
+          error: `Message must be ${CHAT_MESSAGE_MAX_CODE_UNITS} characters or fewer.`,
+          code: 'VALIDATION_ERROR',
+          field: 'message',
+          terminal: true
+        };
+        return;
+      }
+
       this._generating = true;
       this._abortController = new AbortController();
+      this._generationId = null;
+      const clientRequestId = options.clientRequestId || generateClientRequestId();
 
       try {
         const baseUrl = await this._resolveBaseUrl();
@@ -198,6 +223,7 @@
 
         const body = {
           message: content,
+          client_request_id: clientRequestId,
           client_time: new Date().toISOString(),
           client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
@@ -217,51 +243,74 @@
         });
 
         if (!response.ok) {
+          let payload = null;
+          try { payload = await response.json(); } catch (_) { /* ignore */ }
           if (response.status === 401) {
             yield { type: 'error', error: 'Session expired', status: 401 };
             return;
           }
-          throw new Error(`HTTP ${response.status}`);
+          yield {
+            type: 'error',
+            error: payload?.error?.code || payload?.error || `HTTP ${response.status}`,
+            code: payload?.error?.code || null,
+            field: payload?.error?.field || null,
+            details: payload?.error?.details || null,
+            requestId: payload?.request_id || response.headers.get('X-Request-ID') || null,
+            status: response.status,
+            terminal: true
+          };
+          return;
         }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
-        let currentEvent = null;
+        const consumeSSEBlock = function (block) {
+          const lines = block.split('\n');
+          let eventName = null;
+          const dataLines = [];
+
+          for (const rawLine of lines) {
+            const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+            if (line.startsWith('event:')) eventName = line.slice(6).trim();
+            else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+          }
+
+          if (!dataLines.length) return null;
+          let data;
+          try { data = JSON.parse(dataLines.join('\n')); }
+          catch (_) {
+            return { type: 'protocol_warning', event: eventName, reason: 'malformed_json' };
+          }
+          return this._mapEvent(eventName, data);
+        }.bind(this);
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
+          const blocks = buffer.split(/\r?\n\r?\n/);
+          buffer = blocks.pop();
 
-          for (const line of lines) {
-            if (line.startsWith('event:')) {
-              currentEvent = line.slice(6).trim();
-              continue;
-            }
-
-            if (line.startsWith('data:')) {
-              let data;
-              try { data = JSON.parse(line.slice(5).trim()); }
-              catch (_) { continue; }
-
-              const event = this._mapEvent(currentEvent, data);
-              if (event) {
-                // Capture conversation state
-                if (event.type === 'connected') {
-                  if (event.threadId) this._conversationId = event.threadId;
-                  if (event.sessionId) this._sessionId = event.sessionId;
-                  if (event.model) this._model = event.model;
-                }
-                yield event;
+          for (const block of blocks) {
+            const event = consumeSSEBlock(block);
+            if (event) {
+              if (event.type === 'connected') {
+                if (event.threadId) this._conversationId = event.threadId;
+                if (event.generationId) this._generationId = event.generationId;
+                if (event.model) this._model = event.model;
               }
-
-              currentEvent = null;
+              yield event;
             }
           }
+        }
+
+        const tail = decoder.decode();
+        if (tail) buffer += tail;
+        if (buffer.trim()) {
+          const event = consumeSSEBlock(buffer);
+          if (event) yield event;
         }
       } catch (error) {
         if (error.name === 'AbortError') {
@@ -279,17 +328,11 @@
     }
 
     async stop() {
-      // Client-side abort
-      if (this._abortController) {
-        this._abortController.abort();
+      const key = this._generationId;
+      if (!key) {
+        if (this._abortController) this._abortController.abort();
+        return { success: false, reason: 'no-generation' };
       }
-
-      // Server-side stop — key by sessionId if we have one (in-flight stream
-      // this client started), otherwise fall back to conversationId to cover
-      // generations started elsewhere (other tab/device). Backend resolves
-      // either against its connection registry.
-      const key = this._sessionId || this._conversationId;
-      if (!key) return { success: false, reason: 'no-session-or-conversation' };
 
       try {
         const baseUrl = await this._resolveBaseUrl();
@@ -305,6 +348,8 @@
         return await res.json().catch(() => ({ success: true }));
       } catch (err) {
         return { success: false, error: err.message };
+      } finally {
+        if (this._abortController) this._abortController.abort();
       }
     }
 
@@ -323,15 +368,19 @@
       try {
         const baseUrl = await this._resolveBaseUrl();
         const token = this._getToken();
-        const res = await fetch(`${baseUrl}/api/v1/streaming/sessions/${id}/status`, {
+        const res = await fetch(`${baseUrl}/api/v1/streaming/threads/${id}/active-generation`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) return { active: false };
         const data = await res.json();
         if (!data.active) return { active: false };
+        if (data.generation_id || data.session_id) {
+          this._generationId = data.generation_id || data.session_id;
+        }
         return {
           active: true,
-          sessionId: data.session_id || id,
+          sessionId: data.generation_id || data.session_id || null,
+          generationId: data.generation_id || data.session_id || null,
           clientId: data.client_id || null,
           startedAt: data.started_at || null,
           durationSeconds: data.duration_seconds || 0
@@ -404,7 +453,7 @@
           return {
             type: 'connected',
             threadId: data.thread_id || null,
-            sessionId: data.session_id || null,
+            generationId: data.generation_id || data.session_id || null,
             model: data.model || null,
             matterId: data.matter_id || null
           };
@@ -509,10 +558,13 @@
           return {
             type: 'agentic_progress',
             step: data.step,
+            currentStep: data.current_step ?? data.currentStep,
             totalSteps: data.total_steps,
             phase: data.phase,
             message: data.message,
-            status: data.status
+            status: data.status,
+            taskId: data.task_id || data.taskId,
+            heartbeat: data.heartbeat === true
           };
 
         case 'plan_ready':
@@ -535,7 +587,14 @@
           return { type: 'agentic_complete', artifacts: data.artifacts || [] };
 
         case 'agentic_error':
-          return { type: 'agentic_error', error: data.error, message: data.message };
+          return {
+            type: 'agentic_error',
+            error: data.error || data.message || data.reason_code || 'Unknown error',
+            message: data.message,
+            code: data.reason_code || data.code || null,
+            generationId: data.generation_id || data.session_id || null,
+            terminal: true
+          };
 
         case 'agentic_blocked':
           return {
@@ -591,10 +650,20 @@
           return { type: 'thinking', message: data.message, phase: data.phase || 'thinking' };
 
         case 'done':
+          if (!data.message_id) {
+            return {
+              type: 'error',
+              error: 'Response could not be saved.',
+              code: 'INVALID_DONE_MESSAGE_ID',
+              generationId: data.generation_id || data.session_id || null,
+              terminal: true
+            };
+          }
           return {
             type: 'done',
             messageId: data.message_id,
             userMessageId: data.user_message_id,
+            generationId: data.generation_id || data.session_id || null,
             threadId: data.thread_id,
             tokenCount: data.token_count || data.total_tokens || null,
             processingTimeMs: data.processing_time_ms || data.generation_time_ms || null,
@@ -634,10 +703,25 @@
           return { type: eventType, ...data };
 
         case 'error':
-          return { type: 'error', error: data.error || data.message || 'Unknown error', status: data.status || null };
+          return {
+            type: 'error',
+            error: data.error || data.message || data.reason_code || 'Unknown error',
+            code: data.reason_code || data.code || null,
+            status: data.status || null,
+            generationId: data.generation_id || data.session_id || null,
+            terminal: true
+          };
+
+        case 'aborted':
+          return {
+            type: 'stopped',
+            reason: data.reason_code || 'REQUEST_ABORTED',
+            generationId: data.generation_id || data.session_id || null,
+            terminal: true
+          };
 
         default:
-          return null;
+          return { type: 'protocol_warning', event: eventType || null, reason: 'unknown_event' };
       }
     }
   }

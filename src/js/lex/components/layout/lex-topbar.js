@@ -316,6 +316,7 @@
         showNotifications: { type: Boolean, default: true },
         showSettings:      { type: Boolean, default: true },
         showBack:          { type: Boolean, default: false },
+        suppressAutoBack:  { type: Boolean, default: false },
         backLabel:         { type: String,  default: 'Back' },
         backHref:          { type: String,  default: '' },
         menuItems:         { type: Array,   default: [] }
@@ -337,6 +338,7 @@
     // rebuilt on the smart re-render path).
     _canGoBack() {
       try {
+        if (this.suppressAutoBack) return false;
         return typeof window !== 'undefined' && !!window.history && window.history.length > 1;
       } catch (e) {
         return false;

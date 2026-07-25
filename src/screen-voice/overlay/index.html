@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LANA Voice</title>
+  <link rel="stylesheet" href="../../css/lex-tokens.css">
+  <link rel="stylesheet" href="../../css/tailwind-output.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="voice-shell" aria-label="LANA screen-aware voice assistant">
+    <section class="compact-bar" aria-live="polite" aria-atomic="true">
+      <img class="voice-mark" src="redrooster-favicon.png" alt="" aria-hidden="true">
+      <strong id="statusTitle" class="sr-only">Ready</strong>
+      <lex-progress-bar id="levelMeter" class="level-meter no-drag" value="0" color="accent" size="xs" animate="false" aria-label="Microphone level"></lex-progress-bar>
+      <span id="voiceWave" class="voice-wave" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </span>
+      <span id="shortcutHint" class="shortcut-hint" title="Use the keyboard shortcut to speak">
+        <span id="shortcutVerb">Hold</span> <kbd id="shortcutKeys">⌃⌥</kbd> <span id="shortcutAction">to speak</span>
+      </span>
+      <div class="compact-actions no-drag">
+        <lex-btn id="undoButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="rotate-ccw" title="Undo last voice edit" hidden></lex-btn>
+        <lex-btn id="infoButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="info" title="Voice details"></lex-btn>
+        <lex-btn id="settingsButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="settings" title="Open LANA Voice Agent settings"></lex-btn>
+        <lex-btn id="dismissButton" class="compact-secondary" variant="ghost" size="sm" icon="true" leading-icon="x" title="Hide voice overlay"></lex-btn>
+      </div>
+    </section>
+
+    <section id="expandedSurface" class="expanded-surface" hidden>
+      <div id="expandedStatus" class="expanded-status">
+        <div class="expanded-heading-row">
+          <lex-text id="expandedHeading" variant="primary" size="label" weight="semibold">Voice details</lex-text>
+          <lex-btn id="hideDetailsButton" class="no-drag" variant="ghost" size="sm" icon="true"
+            leading-icon="chevron-up" title="Hide voice details"></lex-btn>
+        </div>
+        <p id="statusDetail">Ask LANA about your matter, this window, or what you want to do next.</p>
+        <div id="contextNotice" class="context-notice" hidden>Using accessible content from the active window.</div>
+      </div>
+
+      <p id="transcript" class="transcript" hidden></p>
+      <section id="preview" class="preview" hidden>
+        <label for="previewText">Proposed result</label>
+        <textarea id="previewText" readonly></textarea>
+        <div class="actions">
+          <button id="confirmButton" class="button primary no-drag" type="button">Approve</button>
+          <lex-btn id="copyButton" class="no-drag" variant="secondary" size="sm" leading-icon="copy">Copy</lex-btn>
+          <lex-btn id="cancelButton" class="no-drag" variant="ghost" size="sm">Cancel</lex-btn>
+        </div>
+      </section>
+
+    </section>
+  </main>
+  <script src="../../js/lex/lex.core.js"></script>
+  <script src="../../js/lex/lex.icons.js"></script>
+  <script src="../../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../../js/lex/components/foundation/lex-progress-bar.js"></script>
+  <script src="../../js/lex/components/foundation/lex-text.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

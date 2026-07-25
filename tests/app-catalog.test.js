@@ -227,3 +227,65 @@ describe('LanaClientApps.normalizeAppList', () => {
     }
   });
 });
+
+describe('capability entries', () => {
+  const screenDiction = {
+    id: 'screen-diction',
+    label: 'Screen Dictation',
+    description: 'System-wide dictation and screen-aware voice assistance',
+    colors: ['#60a5fa', '#2563eb', '#7c3aed', '#0f172a'],
+    route: {
+      type: 'capability',
+      meta: { platforms: ['darwin', 'win32', 'linux'] }
+    }
+  };
+
+  test('preserves capabilities in the enabled-app entitlement manifest', () => {
+    expect(Apps.normalizeEnabledAppList([screenDiction])).toEqual([screenDiction]);
+  });
+
+  test('never emits a capability as a navigable app-switcher route', () => {
+    const enabled = Apps.normalizeEnabledAppList([
+      'lana-works',
+      screenDiction,
+      {
+        id: 'legal-nsights',
+        label: 'Legal NSights',
+        route: { type: 'embedded', url: 'https://legal.nsites.tech', meta: {} }
+      }
+    ]);
+    expect(enabled.map((app) => app.id)).toEqual(['lana-works', 'screen-diction', 'legal-nsights']);
+    expect(Apps.normalizeAppList(enabled).map((app) => app.id)).toEqual(['lana-works', 'legal-nsights']);
+  });
+
+  test('filters invalid platforms and rejects unknown route types', () => {
+    const normalized = Apps.normalizeCapability({
+      ...screenDiction,
+      route: { type: 'capability', meta: { platforms: ['darwin', 'browser', 'darwin'] } }
+    });
+    expect(normalized.route.meta.platforms).toEqual(['darwin']);
+    expect(Apps.normalizeEnabledAppList([{ ...screenDiction, route: { type: 'background', meta: {} } }])).toEqual([]);
+  });
+
+  test('preserves activation policy and bounds display-only hint dictionaries', () => {
+    const normalized = Apps.normalizeCapability({
+      ...screenDiction,
+      route: { type: 'capability', meta: {
+        platforms: ['darwin'],
+        required: true,
+        default_enabled: false,
+        hints: {
+          'Getting started': ['Place the cursor in a field.', 'Press the shortcut.', 42],
+          Shortcuts: { Dictation: 'Command+Shift+Space', Bad: { nested: 'not allowed' } },
+          Ignored: 42
+        }
+      } }
+    });
+    expect(normalized.route.meta.required).toBe(true);
+    expect(normalized.route.meta.default_enabled).toBe(false);
+    expect(normalized.route.meta.hints).toEqual({
+      'Getting started': ['Place the cursor in a field.', 'Press the shortcut.'],
+      Shortcuts: { Dictation: 'Command+Shift+Space' }
+    });
+  });
+});

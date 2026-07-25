@@ -33,6 +33,7 @@
   // ---------------------------------------------------------------------------
 
   const LEX_APP_SCRIPT_SRC = (document.currentScript && document.currentScript.src) || '';
+  const POST_LOGIN_BACK_SUPPRESS_KEY = 'lana:postLoginSuppressDashboardBack';
 
   function resolveLoginHref() {
     if (typeof window.getLoginPath === 'function') {
@@ -121,6 +122,17 @@
   }
 
   window.openDocStudioFromMenu = openDocStudioFromMenu;
+
+  function currentPageName() {
+    try {
+      const statePath = window.history && window.history.state && window.history.state.path;
+      const pathname = statePath || (window.location && window.location.pathname) || '';
+      const clean = pathname.split('?')[0].split('#')[0];
+      return clean.substring(clean.lastIndexOf('/') + 1);
+    } catch (e) {
+      return '';
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Style injection (once per document)
@@ -328,6 +340,8 @@
       this._lastShellKey = undefined;
       this._topMoverItems = [];
       this._topMoversLoaded = false;
+      this._isLanaOne = false;
+      this._editionGateStarted = false;
     }
 
     // -----------------------------------------------------------------------
@@ -349,6 +363,9 @@
     _buildShell() {
       const embedded = this.chrome === 'embedded';
       const sidebarCollapsedAttr = this.sidebarCollapsed ? ' collapsed' : '';
+      const suppressAutoBackAttr = this._consumePostLoginBackSuppression()
+        ? ' suppress-auto-back'
+        : '';
       const topbarBackAttrs = embedded
         ? ` show-back back-label="${this.escapeHtml(this.backLabel)}" back-href="${this.escapeHtml(this.backHref)}"`
         : '';
@@ -368,7 +385,7 @@
           <lex-header role="banner">
             <lex-topbar
               heading="${this.escapeHtml(this.pageTitle)}"
-              sticky${topbarBackAttrs}
+              sticky${topbarBackAttrs}${suppressAutoBackAttr}
             ></lex-topbar>
           </lex-header>
 
@@ -395,6 +412,17 @@
       `;
     }
 
+    _consumePostLoginBackSuppression() {
+      if (currentPageName() !== 'dashboard.html') return false;
+      try {
+        if (sessionStorage.getItem(POST_LOGIN_BACK_SUPPRESS_KEY) !== 'login.html') return false;
+        sessionStorage.removeItem(POST_LOGIN_BACK_SUPPRESS_KEY);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
     // -----------------------------------------------------------------------
     // connected — post-first-render setup
     // -----------------------------------------------------------------------
@@ -404,6 +432,10 @@
       this._topbar = this.$('lex-topbar');
       this._content = this.$('#lex-main-content');
       this._notificationPanel = this.$('lex-notification-panel');
+
+      // Resolve edition-gated shell items. Standard Lana builds fail closed;
+      // LANA-ONE builds expose isLanaOne through electronAPI.getConfig().
+      this._resolveClientEdition();
 
       // Populate sidebar with user data from localStorage
       this._hydrateUser();
@@ -753,6 +785,21 @@
     // Internal — user hydration from localStorage
     // -----------------------------------------------------------------------
 
+    _resolveClientEdition() {
+      if (this._editionGateStarted) return;
+      this._editionGateStarted = true;
+
+      const electronApi = window.electronAPI;
+      if (!electronApi || typeof electronApi.getConfig !== 'function') return;
+
+      Promise.resolve(electronApi.getConfig()).then((config) => {
+        if (!config || config.isLanaOne !== true || this._isLanaOne) return;
+        this._isLanaOne = true;
+        this._hydrateUser();
+        this._initConversationMenu();
+      }).catch(function () { /* Standard client: keep LANA-ONE items hidden. */ });
+    }
+
     _hydrateUser() {
       const sidebar = this._sidebar;
       if (!sidebar) return;
@@ -846,7 +893,8 @@
       const showAdmin = adminRoles.some(function (r) { return allRoles.has(r); });
 
       const appContext = this._getAppContext();
-      const shellKey = (showAdmin ? 'admin' : 'user') + ':' + appContext;
+      const editionKey = this._isLanaOne ? 'lana-one' : 'lana-ai';
+      const shellKey = (showAdmin ? 'admin' : 'user') + ':' + appContext + ':' + editionKey;
 
       // Only rebuild sidebar sections and menus when admin visibility or app context changes.
       // Both setSections() and setUserMenuItems() create new arrays which
@@ -867,9 +915,9 @@
           menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
         }
         menuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' });
-        menuItems.push({ id: 'billing', label: 'Plan and billing', icon: 'credit-card', href: 'settings-v2.html#billing' });
-        menuItems.push({ id: 'personalization', label: 'Personalization', icon: 'sparkles', href: 'settings-v2.html#personalization' });
-        menuItems.push({ id: 'profile', label: 'Profile', icon: 'user', href: 'settings-v2.html#profile' });
+        if (this._isLanaOne) {
+          menuItems.push({ id: 'billing', label: 'Plan and billing', icon: 'credit-card', href: 'settings-v2.html#billing' });
+        }
         menuItems.push({ id: 'settings', label: 'Settings', icon: 'settings', href: 'settings-v2.html' });
         menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
         menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
@@ -920,16 +968,15 @@
     _buildSidebarSections(appContext) {
       const mainItems = appContext === 'insights'
         ? [
-            { id: 'insights-create', label: 'Create', icon: 'plus', href: 'admin/dashboard-builder.html', isButton: true, variant: 'create' },
+            { id: 'insights-create', label: 'New Dashboard', icon: 'plus', href: 'admin/dashboard-builder.html', isButton: true, variant: 'create-chat' },
             { id: 'insights-dashboard', label: 'Dashboard', icon: 'home', href: 'admin/analytics.html' },
             { id: 'insights-library', label: 'Library', icon: 'book-open', href: 'admin/dashboard-library.html' },
             { id: 'firm-reporting', label: 'Firm Reporting', icon: 'bar-chart-2', href: 'admin/reporting.html' },
             { id: 'billable-hours', label: 'Billable Hours', icon: 'clock', href: 'admin/billable-hours.html' }
           ]
         : [
+            { id: 'new-chat', label: 'New Chat', isButton: true, onClick: 'openNewProjectModal', variant: 'create-chat' },
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
-            { id: 'my-tasks', label: 'My Tasks', icon: 'clipboard-check', href: 'my-tasks.html' },
-            { id: 'workspaces', label: 'Workspaces', icon: 'briefcase', href: 'workspaces.html' },
             { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html', children: [
               { id: 'library-all-sources', label: 'All Sources', href: 'drive.html' },
               { id: 'library-document-studio', label: 'Document Studio', isButton: true, onClick: 'openDocStudioFromMenu' }
@@ -954,13 +1001,25 @@
         });
       } else {
         sections.push({
+          id: 'task-recents',
+          title: 'Tasks',
+          isScrollable: true,
+          isTaskList: true,
+          items: []
+        });
+        sections.push({
+          id: 'workspace-recents',
+          title: 'Workspaces',
+          isScrollable: true,
+          isWorkspaceList: true,
+          items: []
+        });
+        sections.push({
           id: 'chats',
-          title: 'Your Chats',
+          title: 'Recents',
           isScrollable: true,
           isConversationList: true,
-          items: [
-            { id: 'new-chat', label: 'New Chat', icon: 'plus', isButton: true, onClick: 'openNewProjectModal' }
-          ]
+          items: []
         });
       }
 
@@ -1052,7 +1111,7 @@
 
       return {
         type: 'chat_sessions',
-        title: 'Your Chats'
+        title: 'Recents'
       };
     }
 

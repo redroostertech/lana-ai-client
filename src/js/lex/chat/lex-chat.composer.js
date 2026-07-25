@@ -19,6 +19,7 @@
 
   const { LexElement, ChatFormat } = global.Lex;
   if (!LexElement) { console.error('[lex-chat-composer] LexElement not loaded'); return; }
+  const CHAT_MESSAGE_MAX_CODE_UNITS = 2000;
 
   // Escape helper (safe even if ChatFormat not loaded yet)
   function esc(s) { return ChatFormat ? ChatFormat.escapeHtml(String(s)) : String(s); }
@@ -689,6 +690,7 @@
             class="lex-cmp-textarea"
             placeholder="${esc(this.placeholder)}"
             rows="1"
+            maxlength="${CHAT_MESSAGE_MAX_CODE_UNITS}"
             ${this.disabled ? 'disabled' : ''}
             data-input
           ></textarea>
@@ -1438,6 +1440,14 @@
     _handleSend() {
       const value = this.getValue();
       if (!value) return;
+      if (value.length > CHAT_MESSAGE_MAX_CODE_UNITS) {
+        this.emit('lex-composer-validation-error', {
+          code: 'VALIDATION_ERROR',
+          field: 'message',
+          message: `Message must be ${CHAT_MESSAGE_MAX_CODE_UNITS} characters or fewer.`
+        });
+        return;
+      }
       const docs = this.getAttachedDocuments();
       const detail = { content: value };
       if (docs.length > 0) {

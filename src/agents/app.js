@@ -154,7 +154,7 @@
         // Phase 8: full-screen create flow. The sidebar Create button now
         // routes to the '#create' view; the legacy modal in catalog.js is
         // kept around for reference until that PR-follow-up removes it.
-        items: [{ id: 'create', label: 'Create', icon: 'plus', isButton: true, onClick: 'openAgentCreateModal' }]
+        items: [{ id: 'create', label: 'New Agent', icon: 'plus', isButton: true, onClick: 'openAgentCreateModal', variant: 'create-chat' }]
       },
       {
         id: 'navigation',

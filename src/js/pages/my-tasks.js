@@ -359,11 +359,13 @@
       state.tasks = collected;
       table.setData(collected.map(mapTaskForTable));
       updateTaskCount();
+      return collected;
     } catch (error) {
       Lex.Toast.error(error.message || 'Unable to load tasks');
       state.tasks = [];
       if (typeof table.setData === 'function') table.setData([]);
       updateTaskCount();
+      return [];
     }
   }
 
@@ -900,6 +902,33 @@
     }
   }
 
+  function handleInitialAction() {
+    var params;
+    try {
+      params = new URLSearchParams(window.location.search || '');
+    } catch (_) {
+      return;
+    }
+    if (params.get('action') === 'create') {
+      requestAnimationFrame(openNewTaskModal);
+    }
+  }
+
+  function handleInitialTask(tasks) {
+    var params;
+    try {
+      params = new URLSearchParams(window.location.search || '');
+    } catch (_) {
+      return;
+    }
+    var taskId = params.get('task');
+    if (!taskId || !Array.isArray(tasks)) return;
+    var task = tasks.find(function (item) {
+      return String(item.id || item.task_id || '') === String(taskId);
+    });
+    if (task) requestAnimationFrame(function () { openTaskDetails(task); });
+  }
+
   function bindEvents() {
     var table = el('myTasksTable');
     if (table) {
@@ -1096,7 +1125,8 @@
   function init() {
     bindEvents();
     applyTaskPlanRoleGate();
-    loadTasks();
+    handleInitialAction();
+    loadTasks().then(handleInitialTask);
   }
 
   init();

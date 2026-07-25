@@ -36,6 +36,13 @@
 
     <main class="sv2-page">
 
+     <lex-banner
+       class="sv2-banner"
+       variant="light"
+       heading="Settings"
+       subtitle="Manage your profile, preferences, and account"
+     ></lex-banner>
+
      <div class="sv2-layout">
 
       <!-- In-page section navigation (left rail).
@@ -56,7 +63,12 @@
           <span class="sv2-nav-icon" data-icon="wand-2" aria-hidden="true"></span>
           <span class="sv2-nav-label">Personalization</span>
         </button>
-        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-billing"
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-capabilities"
+          data-section="capabilities" aria-controls="sv2-panel-capabilities" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="puzzle" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Capabilities</span>
+        </button>
+        <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-billing"
           data-section="billing" aria-controls="sv2-panel-billing" aria-selected="false" tabindex="-1">
           <span class="sv2-nav-icon" data-icon="sparkles" aria-hidden="true"></span>
           <span class="sv2-nav-label">Plan &amp; billing</span>
@@ -66,7 +78,7 @@
           <span class="sv2-nav-icon" data-icon="bar-chart-2" aria-hidden="true"></span>
           <span class="sv2-nav-label">Usage</span>
         </button>
-        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-data-controls"
+        <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-data-controls"
           data-section="data-controls" aria-controls="sv2-panel-data-controls" aria-selected="false" tabindex="-1">
           <span class="sv2-nav-icon" data-icon="shield" aria-hidden="true"></span>
           <span class="sv2-nav-label">Data controls</span>
@@ -151,22 +163,27 @@
       <div class="sv2-panel" id="sv2-panel-personalization" role="tabpanel"
         aria-labelledby="sv2-tab-personalization" data-section="personalization">
 
-      <!-- Personalization (LANA One — revealed by JS when the edition supports it)
+      <!-- Personalization — always visible; saved data hydrates when the API is available.
            ══════════════════════════════════════════════════════════════ -->
-      <section id="sv2-section-personalization" class="sv2-hidden" style="margin-bottom:0.5rem">
+      <section id="sv2-section-personalization" style="margin-bottom:0.5rem">
         <lex-card heading="Personalization" subtitle="How LANA tailors its replies to you">
           <lex-form id="sv2-personalization-form">
             <lex-stack direction="vertical" gap="4">
               <lex-select id="sv2-pz-base-style" name="base_style" label="Base style and tone"
+                value="default"
                 options='[{"value":"default","label":"Default"},{"value":"professional","label":"Professional"},{"value":"concise","label":"Concise"},{"value":"friendly","label":"Friendly"}]'></lex-select>
               <lex-input id="sv2-pz-nickname" name="nickname" label="Nickname" placeholder="What should LANA call you?"></lex-input>
               <lex-input id="sv2-pz-occupation" name="occupation" label="Occupation" placeholder="e.g. Litigation associate"></lex-input>
               <lex-textarea id="sv2-pz-custom-instructions" name="custom_instructions" label="Custom instructions" rows="4"
                 placeholder="Tone, formatting, citation style, things to always include or avoid..."></lex-textarea>
+              <lex-text variant="tertiary" size="body-xs" tag="p">Synced to your account and used to personalize LANA AI's replies.</lex-text>
             </lex-stack>
 
             <lex-divider spacing="md"></lex-divider>
-            <lex-text variant="secondary" size="body-sm">About your practice — LANA uses this to tailor every answer to your work.</lex-text>
+            <lex-stack direction="vertical" gap="1">
+              <lex-text variant="primary" size="body-sm" weight="semibold" tag="h3">About your practice</lex-text>
+              <lex-text variant="secondary" size="body-sm" tag="p">LANA uses this to tailor every answer to your area of law.</lex-text>
+            </lex-stack>
 
             <lex-stack direction="vertical" gap="4" style="margin-top:0.75rem">
               <lex-input id="sv2-pz-practice-areas" name="practice_areas" label="Practice areas" placeholder="Comma-separated, e.g. estate planning, personal injury"></lex-input>
@@ -175,7 +192,7 @@
               <lex-input id="sv2-pz-represents" name="represents" label="Who you usually represent" placeholder="e.g. individuals and families"></lex-input>
               <lex-input id="sv2-pz-typical-tasks" name="typical_tasks" label="Typical tasks" placeholder="Comma-separated"></lex-input>
               <lex-textarea id="sv2-pz-goals" name="goals" label="Goals" rows="2"></lex-textarea>
-              <lex-textarea id="sv2-pz-about" name="about" label="About you" rows="3"></lex-textarea>
+              <lex-textarea id="sv2-pz-about" name="about" label="About you (free-form)" rows="3"></lex-textarea>
             </lex-stack>
 
             <div class="sv2-form-actions">
@@ -183,11 +200,31 @@
               <lex-text id="sv2-pz-status" variant="tertiary" size="body-sm"></lex-text>
             </div>
           </lex-form>
+
+          <!-- TODO(personalization-memory): Add the "What LANA AI knows about you"
+               learning toggle and memory-management UI after its API, privacy
+               controls, and product behavior are finalized. Intentionally hidden
+               from the current client. -->
+          <section id="sv2-personalization-memory" hidden aria-hidden="true"></section>
         </lex-card>
       </section>
 
 
       </div><!-- /sv2-panel-personalization -->
+
+      <!-- ╔════════════════════ CAPABILITIES PANEL ════════════════════╗ -->
+      <div class="sv2-panel" id="sv2-panel-capabilities" role="tabpanel"
+        aria-labelledby="sv2-tab-capabilities" data-section="capabilities">
+        <section id="sv2-section-capabilities" style="margin-bottom:0.5rem" aria-busy="true">
+          <lex-card heading="Capabilities" subtitle="Features connected to your organization">
+            <p class="sv2-capabilities-intro">
+              Choose which optional capabilities are active on this device. Required capabilities are managed by your organization.
+            </p>
+            <div id="sv2-capabilities-list" class="sv2-capabilities-list" aria-live="polite"></div>
+            <p id="sv2-capabilities-status" class="sv2-capabilities-status" role="status">Loading capabilities...</p>
+          </lex-card>
+        </section>
+      </div><!-- /sv2-panel-capabilities -->
 
       <!-- ╔═══════════════════════ GENERAL PANEL ═══════════════════════╗
            App and account settings: time zone, password + MFA, preferences,
@@ -329,7 +366,7 @@
            Account menu deep-links here via settings-v2.html#billing.
            No billing/subscription endpoints exist in the client yet, so this
            is a section shell only. -->
-      <div class="sv2-panel" id="sv2-panel-billing" role="tabpanel"
+      <div class="sv2-panel sv2-hidden" id="sv2-panel-billing" role="tabpanel"
         aria-labelledby="sv2-tab-billing" data-section="billing">
         <section id="sv2-section-billing" style="margin-bottom:0.5rem">
           <lex-card heading="Plan &amp; billing" subtitle="Your LANA One subscription">
@@ -343,15 +380,94 @@
         </section>
       </div><!-- /sv2-panel-billing -->
 
-      <!-- ╔═══════════════════════ USAGE PANEL ═════════════════════════╗
-           No account-level usage/metering endpoint exists in the client yet
-           (chat token display is per-conversation only). Section shell only. -->
+      <!-- ╔═══════════════════════ USAGE PANEL ═════════════════════════╗ -->
       <div class="sv2-panel" id="sv2-panel-usage" role="tabpanel"
         aria-labelledby="sv2-tab-usage" data-section="usage">
-        <section id="sv2-section-usage" style="margin-bottom:0.5rem">
-          <lex-card heading="Usage" subtitle="Activity across your LANA One workspace">
-            <lex-text variant="secondary" size="body-sm">A breakdown of your usage across chats, documents, and storage appears here once usage reporting is connected to your account.</lex-text>
-            <!-- TODO: wire <section id="sv2-section-usage"> to the usage_events / metering endpoints -->
+        <section id="sv2-section-usage" class="sv2-section-usage" aria-busy="true">
+          <lex-card heading="Usage">
+            <div class="sv2-usage">
+              <div class="sv2-usage-quota" aria-label="Account usage limits">
+                <div class="sv2-usage-quota-row">
+                  <div class="sv2-usage-quota-heading">
+                    <span class="sv2-usage-label">
+                      <span class="sv2-usage-icon" data-usage-icon="message-square" aria-hidden="true"></span>
+                      Chat usage
+                    </span>
+                    <span id="sv2-chat-usage-percent" class="sv2-usage-value">Not metered</span>
+                  </div>
+                  <lex-progress-bar id="sv2-chat-usage-bar" value="0" size="xs"></lex-progress-bar>
+                  <p id="sv2-chat-usage-detail" class="sv2-usage-detail">Your current plan does not report a chat limit.</p>
+                </div>
+
+                <div class="sv2-usage-quota-row">
+                  <div class="sv2-usage-quota-heading">
+                    <span class="sv2-usage-label">
+                      <span class="sv2-usage-icon" data-usage-icon="file" aria-hidden="true"></span>
+                      Stored files
+                    </span>
+                    <span id="sv2-storage-percent" class="sv2-usage-value">Loading...</span>
+                  </div>
+                  <lex-progress-bar id="sv2-storage-bar" value="0" size="xs"></lex-progress-bar>
+                  <p id="sv2-storage-detail" class="sv2-usage-detail">Loading storage usage...</p>
+                </div>
+              </div>
+
+              <p class="sv2-usage-intro">How are you using LANA AI? Token figures are estimated (~4 characters per token); LANA AI does not store exact token counts.</p>
+
+              <lex-segmented id="sv2-usage-period" name="usage_period" value="30days" size="sm"
+                aria-label="Usage reporting period"
+                options='[{"value":"7days","label":"Last 7 days"},{"value":"30days","label":"Last 30 days"},{"value":"alltime","label":"All time"}]'>
+              </lex-segmented>
+
+              <div class="sv2-usage-metrics" aria-live="polite">
+                <div class="sv2-usage-metric">
+                  <strong id="sv2-estimated-tokens" class="sv2-usage-metric-value">—</strong>
+                  <span class="sv2-usage-metric-label">Estimated tokens</span>
+                  <span id="sv2-token-breakdown" class="sv2-usage-metric-detail">Token detail unavailable</span>
+                </div>
+                <div class="sv2-usage-metric">
+                  <strong id="sv2-message-count" class="sv2-usage-metric-value">—</strong>
+                  <span class="sv2-usage-metric-label">Messages</span>
+                </div>
+                <div class="sv2-usage-metric">
+                  <strong id="sv2-conversation-count" class="sv2-usage-metric-value">—</strong>
+                  <span class="sv2-usage-metric-label">Conversations</span>
+                </div>
+                <div class="sv2-usage-metric">
+                  <strong id="sv2-upload-count" class="sv2-usage-metric-value">—</strong>
+                  <span class="sv2-usage-metric-label">Documents uploaded</span>
+                </div>
+              </div>
+
+              <div id="sv2-redaction-usage" class="sv2-usage-feature-card">
+                <div class="sv2-usage-feature-heading">
+                  <span class="sv2-usage-feature-title">
+                    <span class="sv2-usage-icon" data-usage-icon="shield" aria-hidden="true"></span>
+                    <span>
+                      <strong>Information redacted</strong>
+                      <span>Sensitive data LANA AI detected and removed before your conversation reached the AI model.</span>
+                    </span>
+                  </span>
+                  <strong id="sv2-redaction-total" class="sv2-usage-feature-total">—</strong>
+                </div>
+                <div id="sv2-redaction-breakdown" class="sv2-usage-breakdown">
+                  <span class="sv2-usage-unavailable">Redaction detail is not available for this account.</span>
+                </div>
+              </div>
+
+              <div id="sv2-protect-usage" class="sv2-usage-protect">
+                <div class="sv2-usage-protect-heading">
+                  <span class="sv2-usage-icon" data-usage-icon="shield-check" aria-hidden="true"></span>
+                  <strong>Protect in research</strong>
+                </div>
+                <p>Of your research-mode messages (outside a matter), how often you turned Protect on.</p>
+                <strong id="sv2-protect-percent" class="sv2-usage-protect-value">—</strong>
+                <p id="sv2-protect-detail">Protection detail is not available for this account.</p>
+              </div>
+
+              <a id="sv2-team-usage-link" class="sv2-team-usage-link sv2-hidden" href="dashboard.html">View team usage</a>
+              <p id="sv2-usage-status" class="sv2-usage-status" role="status"></p>
+            </div>
           </lex-card>
         </section>
       </div><!-- /sv2-panel-usage -->
@@ -359,7 +475,7 @@
       <!-- ╔═══════════════════ DATA CONTROLS PANEL ═════════════════════╗
            No data-export / account-deletion / retention endpoints exist in the
            client yet. Section shell only. -->
-      <div class="sv2-panel" id="sv2-panel-data-controls" role="tabpanel"
+      <div class="sv2-panel sv2-hidden" id="sv2-panel-data-controls" role="tabpanel"
         aria-labelledby="sv2-tab-data-controls" data-section="data-controls">
         <section id="sv2-section-data-controls" style="margin-bottom:0.5rem">
           <lex-card heading="Data controls" subtitle="How your data is stored and handled">
@@ -419,6 +535,7 @@
   <script src="js/lex/components/foundation/lex-spinner.js"></script>
   <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
 
   <!-- Lex UI layout -->
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
@@ -435,6 +552,7 @@
   <script src="js/lex/components/foundation/lex-text.js"></script>
   <script src="js/lex/components/foundation/lex-stack.js"></script>
   <script src="js/lex/components/foundation/lex-divider.js"></script>
+  <script src="js/lex/components/foundation/lex-progress-bar.js"></script>
   <script src="js/lex/components/foundation/lex-kv.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
@@ -442,6 +560,7 @@
   <script src="js/lex/components/form/lex-toggle.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
+  <script src="js/lex/components/form/lex-segmented.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
 
@@ -452,6 +571,8 @@
   <script src="js/settings-v2.js"></script>
   <script src="js/pages/settings-billing.js"></script>
   <script src="js/pages/settings-personalization.js"></script>
+  <script src="js/pages/settings-usage.js"></script>
+  <script src="js/pages/settings-capabilities.js"></script>
   <script src="js/pages/settings-v2-nav.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

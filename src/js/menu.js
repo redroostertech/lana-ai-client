@@ -111,7 +111,7 @@ const ADMIN_ROLES = [
  * - external: boolean - if true, opens in new tab
  */
 const MenuConfig = {
-  // Default menu for main portal pages - three sections: static top (4 items), scrollable (Your Chats + conversations), static footer
+  // Default menu for main portal pages - three sections: static top (4 items), scrollable (Recents + conversations), static footer
   portal: {
     sections: [
       // Section 1: Non-scrollable – Dashboard, Matters, Drive
@@ -121,13 +121,21 @@ const MenuConfig = {
         requiredRoles: [],
         isStaticTop: true,
         items: [
+          {
+            id: 'new-matter-chat',
+            label: 'New Chat',
+            href: '#',
+            isButton: true,
+            onClick: 'openNewProjectModal',
+            variant: 'create-chat'
+          },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'my-tasks', label: 'My Tasks', href: '/my-tasks.html', icon: 'tasks' },
         ]
       },
-      // Section 2: Infinite scrolling – Your Chats, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)
+      // Section 2: Infinite scrolling – Recents, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)
       {
         id: 'nav-links',
         title: null,
@@ -144,20 +152,18 @@ const MenuConfig = {
         ]
       },
       {
+        id: 'workspace-recents',
+        title: 'Workspaces',
+        requiredRoles: [],
+        isWorkspaceList: true,
+        items: []
+      },
+      {
         id: 'projects',
-        title: 'Your Chats',
+        title: 'Recents',
         requiredRoles: [],
         isConversationList: true,
-        items: [
-          {
-            id: 'new-matter-chat',
-            label: 'New Chat',
-            href: '#',
-            icon: 'plus',
-            isButton: true,
-            onClick: 'openNewProjectModal'
-          }
-        ]
+        items: []
       },
       // Section 3: Non-scrollable static footer (user block + version rendered separately)
       {
@@ -239,6 +245,14 @@ const MenuConfig = {
         requiredRoles: [],
         isStaticTop: true,
         items: [
+          {
+            id: 'new-matter-chat',
+            label: 'New Chat',
+            href: '#',
+            isButton: true,
+            onClick: 'openNewProjectModal',
+            variant: 'create-chat'
+          },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
@@ -260,20 +274,18 @@ const MenuConfig = {
         ]
       },
       {
+        id: 'workspace-recents',
+        title: 'Workspaces',
+        requiredRoles: [],
+        isWorkspaceList: true,
+        items: []
+      },
+      {
         id: 'projects',
-        title: 'Your Chats',
+        title: 'Recents',
         requiredRoles: [],
         isConversationList: true,
-        items: [
-          {
-            id: 'new-matter-chat',
-            label: 'New Chat',
-            href: '#',
-            icon: 'plus',
-            isButton: true,
-            onClick: 'openNewProjectModal'
-          }
-        ]
+        items: []
       },
       {
         id: 'account',
@@ -304,6 +316,14 @@ const MenuConfig = {
         requiredRoles: [],
         isStaticTop: true,
         items: [
+          {
+            id: 'new-matter-chat',
+            label: 'New Chat',
+            href: '#',
+            isButton: true,
+            onClick: 'openNewProjectModal',
+            variant: 'create-chat'
+          },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
@@ -325,20 +345,18 @@ const MenuConfig = {
         ]
       },
       {
+        id: 'workspace-recents',
+        title: 'Workspaces',
+        requiredRoles: [],
+        isWorkspaceList: true,
+        items: []
+      },
+      {
         id: 'projects',
-        title: 'Your Chats',
+        title: 'Recents',
         requiredRoles: [],
         isConversationList: true,
-        items: [
-          {
-            id: 'new-matter-chat',
-            label: 'New Chat',
-            href: '#',
-            icon: 'plus',
-            isButton: true,
-            onClick: 'openNewProjectModal'
-          }
-        ]
+        items: []
       },
       {
         id: 'account',
@@ -369,6 +387,14 @@ const MenuConfig = {
         requiredRoles: [],
         isStaticTop: true,
         items: [
+          {
+            id: 'new-matter-chat',
+            label: 'New Chat',
+            href: '#',
+            isButton: true,
+            onClick: 'openNewProjectModal',
+            variant: 'create-chat'
+          },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
           { id: 'matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
@@ -390,20 +416,18 @@ const MenuConfig = {
         ]
       },
       {
+        id: 'workspace-recents',
+        title: 'Workspaces',
+        requiredRoles: [],
+        isWorkspaceList: true,
+        items: []
+      },
+      {
         id: 'projects',
-        title: 'Your Chats',
+        title: 'Recents',
         requiredRoles: [],
         isConversationList: true,
-        items: [
-          {
-            id: 'new-matter-chat',
-            label: 'New Chat',
-            href: '#',
-            icon: 'plus',
-            isButton: true,
-            onClick: 'openNewProjectModal'
-          }
-        ]
+        items: []
       },
       {
         id: 'account',
@@ -425,7 +449,7 @@ const MenuConfig = {
     ]
   },
 
-  // Chat page: same three-section structure – Section 1 static (4 items), Section 2 scrollable (Your Chats + conversations), Section 3 footer
+  // Chat page: same three-section structure – Section 1 static (4 items), Section 2 scrollable (Recents + conversations), Section 3 footer
   chat: {
     sections: [
       // Section 1: Non-scrollable – Dashboard, Matters, Drive
@@ -435,12 +459,20 @@ const MenuConfig = {
         requiredRoles: [],
         isStaticTop: true,
         items: [
+          {
+            id: 'chat-new-matter',
+            label: 'New Chat',
+            href: '#',
+            isButton: true,
+            onClick: 'openNewProjectModal',
+            variant: 'create-chat'
+          },
           { id: 'chat-dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
           { id: 'lex-ui', label: 'Lex UI', href: '/lex-test.html', icon: 'lex' },
           { id: 'chat-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
         ]
       },
-      // Section 2: Infinite scrolling – Your Chats, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)
+      // Section 2: Infinite scrolling – Recents, New Chat, {{conversations}} (Data Connectors + Reports scroll with this)
       {
         id: 'chat-nav-links',
         title: null,
@@ -457,20 +489,18 @@ const MenuConfig = {
         ]
       },
       {
+        id: 'chat-workspace-recents',
+        title: 'Workspaces',
+        requiredRoles: [],
+        isWorkspaceList: true,
+        items: []
+      },
+      {
         id: 'chat-projects',
-        title: 'Your Chats',
+        title: 'Recents',
         requiredRoles: [],
         isConversationList: true,
-        items: [
-          {
-            id: 'chat-new-matter',
-            label: 'New Chat',
-            href: '#',
-            icon: 'plus',
-            isButton: true,
-            onClick: 'openNewProjectModal'
-          }
-        ]
+        items: []
       },
       // Section 3: Non-scrollable static footer (user block + version rendered separately)
       {

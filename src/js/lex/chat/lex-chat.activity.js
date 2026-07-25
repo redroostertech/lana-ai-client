@@ -152,6 +152,7 @@
       super();
       this._showTime = 0;
       this._reasoningEntries = [];
+      this._lastReasoningEntry = null;
       this._reasoningCollapsed = true;
       this._hideTimeout = null;
       // Optional secondary line shown ABOVE the main message (e.g.
@@ -279,6 +280,24 @@
      */
     addReasoningEntry(data) {
       const msg = data.message || data.content || JSON.stringify(data);
+      const progressEvents = global.Lex.Chat && global.Lex.Chat.ProgressEvents;
+      const eventKey = progressEvents ? progressEvents.getProgressEventKey(data) : '';
+
+      if (
+        progressEvents
+        && this._lastReasoningEntry
+        && progressEvents.shouldReplaceConsecutive(this._lastReasoningEntry.key, data)
+      ) {
+        this._lastReasoningEntry.updates += 1;
+        this._reasoningEntries[this._reasoningEntries.length - 1] = msg;
+        if (this._lastReasoningEntry.element) {
+          this._lastReasoningEntry.element.textContent = msg;
+          this._lastReasoningEntry.element.title =
+            `Updated ${this._lastReasoningEntry.updates} times by consecutive progress events`;
+        }
+        return;
+      }
+
       this._reasoningEntries.push(msg);
 
       // Show drawer
@@ -293,6 +312,17 @@
         el.textContent = msg;
         entries.appendChild(el);
         entries.scrollTop = entries.scrollHeight;
+        this._lastReasoningEntry = {
+          key: eventKey,
+          updates: 1,
+          element: el
+        };
+      } else {
+        this._lastReasoningEntry = {
+          key: eventKey,
+          updates: 1,
+          element: null
+        };
       }
     }
 
@@ -301,6 +331,7 @@
      */
     clearReasoning() {
       this._reasoningEntries = [];
+      this._lastReasoningEntry = null;
       const entries = this.querySelector('[data-entries]');
       if (entries) entries.innerHTML = '';
       const drawer = this.querySelector('[data-drawer]');

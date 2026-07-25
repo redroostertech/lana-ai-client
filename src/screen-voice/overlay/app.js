@@ -1,0 +1,819 @@
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    shell: document.querySelector('.voice-shell'), expanded: $('expandedSurface'), expandedStatus: $('expandedStatus'),
+    info: $('infoButton'), shortcutHint: $('shortcutHint'),
+    shortcutVerb: $('shortcutVerb'), shortcutKeys: $('shortcutKeys'), shortcutAction: $('shortcutAction'),
+    title: $('statusTitle'), detail: $('statusDetail'), context: $('contextNotice'), meter: $('levelMeter'), wave: $('voiceWave'),
+    transcript: $('transcript'), preview: $('preview'), previewText: $('previewText'),
+    confirm: $('confirmButton'), copy: $('copyButton'), cancel: $('cancelButton'), undo: $('undoButton'),
+    hideDetails: $('hideDetailsButton')
+  };
+  let snapshot = { state: 'idle', session: null, settings: {} };
+  let stream = null;
+  let recorder = null;
+  let chunks = [];
+  let audioContext = null;
+  let analyser = null;
+  let animationFrame = null;
+  let stopTimer = null;
+  let activeSessionId = null;
+  let discardRecording = false;
+  let captureStopRequested = null;
+  let capturePhase = 'idle';
+  let playback = null;
+  let realtimeSocket = null;
+  let realtimeProcessor = null;
+  let realtimeSource = null;
+  let realtimeIntentionalClose = false;
+  let realtimeStartPayload = null;
+  let realtimeReconnectTimer = null;
+  let realtimeReconnectAttempt = 0;
+  let realtimeAudioQueue = [];
+  let realtimeAudioPlaying = false;
+  let activeSpeechId = null;
+  let realtimeEventChain = Promise.resolve();
+  let realtimeInputFrameCount = 0;
+  let realtimeConnected = false;
+  let realtimeReady = false;
+  let realtimeCanSendAudio = false;
+  let realtimeAnalyser = null;
+  let realtimeInputTimer = null;
+  let realtimePumpFallbackTimer = null;
+  let realtimeInputSource = null;
+  let realtimeFlushPending = false;
+  let realtimePendingAudio = [];
+  let realtimeGeneration = 0;
+  let realtimeObservedPeak = 0;
+  let realtimeObservedRms = 0;
+  let realtimeLastLevelReportAt = 0;
+  let bargeInStartedAt = 0;
+  let detailsOpen = true;
+  let drawerTimer = null;
+  let resizeFrame = null;
+  let captureChordActive = false;
+  const pressedCaptureKeys = new Set();
+  const MIN_REALTIME_FRAMES_BEFORE_FLUSH = 3;
+
+  const stateCopy = {
+    idle: ['Ready', 'Ask LANA about your matter, this window, or what to do next.'],
+    listening: ['Listening', 'Speak after the start chime, then release the shortcut to process.'],
+    transcribing: ['Transcribing', 'Turning your audio into text…'],
+    gathering_context: ['Reading this window', 'Collecting only the active, accessible context needed for your request.'],
+    thinking: ['Thinking', 'Preparing a constrained response…'],
+    previewing: ['Review before applying', 'Nothing has been changed yet.'],
+    executing: ['Applying', 'Rechecking the target before inserting…'],
+    speaking: ['Speaking', 'LANA is speaking now.'],
+    canceled: ['Canceled', 'No changes were made.'],
+    error: ['Couldn’t complete that', 'Try again or open settings for permission help.']
+  };
+
+  function labelLexButton(element, label) {
+    element.title = label;
+    queueMicrotask(() => element.querySelector('button')?.setAttribute('aria-label', label));
+  }
+
+  function displayShortcut(shortcut) {
+    const parts = String(shortcut || '').split('+').filter(Boolean);
+    const isMac = /Mac|iPhone|iPad/.test(navigator.platform || '');
+    if (!isMac) return parts.map((part) => part === 'CommandOrControl' ? 'Ctrl' : part).join('+');
+    const symbols = { CommandOrControl: '⌘', Command: '⌘', Control: '⌃', Shift: '⇧', Alt: '⌥', Option: '⌥' };
+    return parts.map((part) => symbols[part] || part).join('');
+  }
+
+  function syncOverlayHeight() {
+    if (resizeFrame) cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = null;
+      const shellBottom = els.shell.getBoundingClientRect().bottom;
+      window.screenVoice.setOverlayHeight(Math.ceil(shellBottom + 4));
+    });
+  }
+
+  function syncExpandedSurface(state = snapshot.state || 'idle') {
+    const previewing = state === 'previewing';
+    const shouldShow = detailsOpen || previewing;
+    clearTimeout(drawerTimer);
+    if (shouldShow) {
+      els.expanded.hidden = false;
+      els.expanded.classList.remove('is-closing');
+    } else if (!els.expanded.hidden) {
+      els.expanded.classList.add('is-closing');
+      drawerTimer = setTimeout(() => {
+        els.expanded.hidden = true;
+        els.expanded.classList.remove('is-closing');
+        syncOverlayHeight();
+      }, 190);
+    }
+    els.expandedStatus.hidden = !detailsOpen;
+    els.expanded.classList.toggle('details-open', detailsOpen);
+    els.info.setAttribute('aria-expanded', detailsOpen ? 'true' : 'false');
+    syncOverlayHeight();
+  }
+
+  function render(next) {
+    snapshot = next || snapshot;
+    const state = snapshot.state || 'idle';
+    const session = snapshot.session || {};
+    const copy = stateCopy[state] || stateCopy.idle;
+    els.shell.className = `voice-shell ${state} capture-${capturePhase}`;
+    const activeShortcut = snapshot.settings?.captureShortcut;
+    const shortcutLabel = displayShortcut(activeShortcut || 'Control+Option');
+    const captureReady = state === 'listening' && capturePhase === 'recording';
+    const captureStarting = state === 'listening' && ['idle', 'preparing', 'chiming'].includes(capturePhase);
+    const captureReleasing = state === 'listening' && capturePhase === 'releasing';
+    const compactStatus = {
+      idle: ['Hold', shortcutLabel, 'to speak'],
+      transcribing: ['Transcribing', '', 'your audio…'],
+      gathering_context: ['Reading', '', 'this window…'],
+      thinking: ['Thinking', '', 'through your request…'],
+      executing: ['Applying', '', 'the approved action…'],
+      speaking: ['Speaking', '', ''],
+      previewing: ['Review', '', 'the proposed response'],
+      canceled: ['Canceled', '', ''],
+      error: ['Voice', '', 'needs attention']
+    }[state] || ['Hold', shortcutLabel, 'to speak'];
+    if (captureStarting) {
+      compactStatus[0] = 'Getting';
+      compactStatus[1] = '';
+      compactStatus[2] = 'microphone ready…';
+    } else if (captureReady) {
+      compactStatus[0] = 'Listening';
+      compactStatus[1] = shortcutLabel;
+      compactStatus[2] = 'release to send';
+    } else if (captureReleasing) {
+      compactStatus[0] = 'Finishing';
+      compactStatus[1] = '';
+      compactStatus[2] = 'capture…';
+    }
+    els.shortcutVerb.textContent = compactStatus[0];
+    els.shortcutKeys.textContent = compactStatus[1];
+    els.shortcutKeys.hidden = !compactStatus[1];
+    els.shortcutAction.textContent = compactStatus[2];
+    els.shortcutHint.title = `${els.shortcutVerb.textContent} ${els.shortcutKeys.textContent} ${els.shortcutAction.textContent}`.trim();
+    els.title.textContent = copy[0];
+    els.shell.setAttribute('aria-label', `${copy[0]}. ${session.error?.message || copy[1]}`);
+    els.detail.textContent = session.error?.message || copy[1];
+    if (state === 'listening') {
+      const captureCopy = {
+        preparing: ['Preparing microphone', 'Please wait for the start chime.'],
+        chiming: ['Get ready', 'Recording begins as soon as the chime finishes.'],
+        recording: ['Listening', 'Speak now, then release the shortcut to process.'],
+        releasing: ['Finishing capture', 'Recording has stopped. Preparing your audio…']
+      }[capturePhase] || ['Preparing microphone', 'Please wait for the start chime.'];
+      els.title.textContent = captureCopy[0];
+      els.detail.textContent = captureCopy[1];
+    }
+    if (state === 'idle') {
+      els.detail.textContent = `Hold ${displayShortcut(snapshot.settings?.captureShortcut || 'Control+Option')} to ask LANA. Release to process.`;
+    }
+    els.context.hidden = state !== 'gathering_context';
+    els.transcript.hidden = !session.transcript;
+    els.transcript.textContent = session.transcript || '';
+    const decision = session.decision;
+    els.preview.hidden = state !== 'previewing';
+    els.previewText.value = decision?.displayResponse || '';
+    els.confirm.hidden = !decision?.proposedActions?.length && !session.serverApproval;
+    if (session.serverApproval) els.confirm.textContent = 'Approve';
+    else if (decision?.proposedActions?.[0]?.type === 'open_url') els.confirm.textContent = 'Open browser';
+    else if (decision?.proposedActions?.[0]?.type === 'navigate_client') els.confirm.textContent = 'Open in LANA';
+    else if (decision?.proposedActions?.[0]?.type === 'replace_selection') els.confirm.textContent = 'Replace';
+    else if (decision?.proposedActions?.[0]?.type === 'insert_table') els.confirm.textContent = 'Insert cells';
+    else els.confirm.textContent = 'Insert';
+    els.undo.hidden = !session.result?.canUndo;
+    labelLexButton(els.info, state === 'error' ? 'Voice error details' : 'Voice details');
+    els.meter.color = state === 'listening' ? 'danger' : 'accent';
+    if (state !== 'listening') els.meter.value = 0;
+    syncExpandedSurface(state);
+  }
+
+  function supportedMimeType() {
+    return ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((type) => MediaRecorder.isTypeSupported(type)) || '';
+  }
+
+  function reportCaptureStatus(status, metadata) {
+    window.screenVoice.captureStatus(status, metadata).catch(() => {});
+  }
+
+  function setCapturePhase(phase) {
+    capturePhase = phase;
+    render(snapshot);
+  }
+
+  function isEditableTarget(target) {
+    const tag = String(target?.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || Boolean(target?.isContentEditable);
+  }
+
+  function captureKey(event) {
+    if (event.key === 'Control' || event.code === 'ControlLeft' || event.code === 'ControlRight') return 'control';
+    if (event.key === 'Alt' || event.key === 'Option' || event.code === 'AltLeft' || event.code === 'AltRight') return 'option';
+    return null;
+  }
+
+  function captureChordDown() {
+    return pressedCaptureKeys.has('control') && pressedCaptureKeys.has('option');
+  }
+
+  function releaseOverlayCapture() {
+    if (!captureChordActive) return;
+    captureChordActive = false;
+    if (capturePhase === 'recording') window.screenVoice.captureRelease().catch(() => {});
+  }
+
+  function resetOverlayCaptureChord() {
+    pressedCaptureKeys.clear();
+    captureChordActive = false;
+  }
+
+  async function startCapture({ sessionId, maxDurationMs }) {
+    await cleanupCapture();
+    activeSessionId = sessionId;
+    discardRecording = false;
+    captureStopRequested = null;
+    setCapturePhase('preparing');
+    try {
+      reportCaptureStatus('requesting_microphone');
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false
+      });
+      chunks = [];
+      const mimeType = supportedMimeType();
+      recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recorder.ondataavailable = (event) => { if (event.data?.size) chunks.push(event.data); };
+      recorder.onerror = () => window.screenVoice.captureError('MICROPHONE_DISCONNECTED');
+      recorder.onstop = finalizeCapture;
+      if (!stream.getAudioTracks().some((track) => track.readyState === 'live')) {
+        throw Object.assign(new Error('No live microphone track'), { name: 'NotFoundError' });
+      }
+      reportCaptureStatus('microphone_ready', { trackCount: stream.getAudioTracks().length });
+      if (captureStopRequested) {
+        await cleanupCapture();
+        reportCaptureStatus('capture_failed');
+        window.screenVoice.captureError('NO_SPEECH');
+        return;
+      }
+      setCapturePhase('chiming');
+      reportCaptureStatus('start_chime');
+      await playCue('start');
+      if (captureStopRequested) {
+        const pending = captureStopRequested;
+        await cleanupCapture();
+        if (!pending.discard) playCue('release');
+        if (!pending.discard) {
+          reportCaptureStatus('capture_failed');
+          window.screenVoice.captureError('NO_SPEECH');
+        }
+        return;
+      }
+      recorder.start(200);
+      setCapturePhase('recording');
+      reportCaptureStatus('recording_started');
+      startMeter(stream);
+      if (!captureChordActive) {
+        setTimeout(() => window.screenVoice.captureRelease().catch(() => {}), 250);
+      }
+      stopTimer = setTimeout(() => stopCapture(false), Math.min(90000, Number(maxDurationMs) || 90000));
+    } catch (error) {
+      await cleanupCapture();
+      const code = error?.name === 'NotAllowedError' ? 'MICROPHONE_DENIED' : 'MICROPHONE_UNAVAILABLE';
+      setCapturePhase('idle');
+      reportCaptureStatus('capture_failed');
+      window.screenVoice.captureError(code);
+    }
+  }
+
+  function startMeter(mediaStream) {
+    audioContext = new AudioContext();
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    audioContext.createMediaStreamSource(mediaStream).connect(analyser);
+    const values = new Uint8Array(analyser.frequencyBinCount);
+    const tick = () => {
+      if (!analyser) return;
+      analyser.getByteTimeDomainData(values);
+      const rms = Math.sqrt(values.reduce((sum, value) => sum + Math.pow((value - 128) / 128, 2), 0) / values.length);
+      els.meter.value = Math.round(Math.min(1, rms * 4) * 100);
+      animationFrame = requestAnimationFrame(tick);
+    };
+    tick();
+  }
+
+  function stopCapture(discard) {
+    discardRecording = Boolean(discard);
+    setCapturePhase(discard ? 'idle' : 'releasing');
+    if (!recorder || recorder.state === 'inactive') {
+      captureStopRequested = { discard: discardRecording };
+      return;
+    }
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop();
+      reportCaptureStatus('recording_released');
+      if (!discard) playCue('release');
+    }
+  }
+
+  function playCue(type) {
+    const CueContext = window.AudioContext || window.webkitAudioContext;
+    if (!CueContext) return Promise.resolve();
+    const cue = new CueContext();
+    const oscillator = cue.createOscillator();
+    const gain = cue.createGain();
+    const now = cue.currentTime;
+    const rising = type === 'start';
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(rising ? 520 : 620, now);
+    oscillator.frequency.exponentialRampToValueAtTime(rising ? 760 : 420, now + 0.09);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.065, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+    oscillator.connect(gain).connect(cue.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.12);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        cue.close().catch(() => {}).finally(resolve);
+      };
+      oscillator.addEventListener('ended', finish, { once: true });
+      setTimeout(finish, 180);
+    });
+  }
+
+  async function finalizeCapture() {
+    const sessionId = activeSessionId;
+    const mimeType = recorder?.mimeType || chunks[0]?.type || 'audio/webm';
+    const blob = new Blob(chunks, { type: mimeType });
+    const discard = discardRecording;
+    await cleanupCapture();
+    capturePhase = 'idle';
+    if (discard || !blob.size) return;
+    reportCaptureStatus('audio_ready', { bytes: blob.size });
+    const audioBase64 = await blobToBase64(blob);
+    await window.screenVoice.audioComplete({ sessionId, audioBase64, mimeType });
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function cleanupCapture() {
+    clearTimeout(stopTimer); stopTimer = null;
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    animationFrame = null; analyser = null;
+    if (audioContext) await audioContext.close().catch(() => {});
+    audioContext = null;
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+    stream = null; recorder = null; chunks = [];
+  }
+
+  function hasLiveAudioTrack(mediaStream) {
+    return Boolean(mediaStream?.getAudioTracks?.().some((track) => track.readyState === 'live'));
+  }
+
+  async function getRealtimeMicrophoneStream() {
+    return navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: false
+    });
+  }
+
+  function prewarmMicrophone() {
+    if (!navigator.mediaDevices?.getUserMedia) return;
+    navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: false
+    }).then((mediaStream) => {
+      mediaStream.getTracks().forEach((track) => track.stop());
+    }).catch(() => {});
+  }
+
+  function sendRealtimeMessage(message) {
+    if (message?.type === 'flush' && realtimeInputFrameCount < MIN_REALTIME_FRAMES_BEFORE_FLUSH) {
+      realtimeFlushPending = true;
+      return;
+    }
+    if (message?.type === 'flush' && !realtimeCanSendAudio) {
+      realtimeFlushPending = true;
+      return;
+    }
+    if (realtimeSocket?.readyState === WebSocket.OPEN) realtimeSocket.send(JSON.stringify(message));
+    else if (message?.type === 'flush') realtimeFlushPending = true;
+  }
+
+  function bufferRealtimeAudioChunk(chunk) {
+    realtimePendingAudio.push(new Float32Array(chunk));
+    const maxSamples = (audioContext?.sampleRate || 16000) * 3;
+    let totalSamples = realtimePendingAudio.reduce((sum, item) => sum + item.length, 0);
+    while (realtimePendingAudio.length > 1 && totalSamples > maxSamples) {
+      const removed = realtimePendingAudio.shift();
+      totalSamples -= removed.length;
+    }
+  }
+
+  function sendRealtimeAudioChunk(chunk) {
+    if (!realtimeCanSendAudio || !realtimeSocket || realtimeSocket.readyState !== WebSocket.OPEN) {
+      bufferRealtimeAudioChunk(chunk);
+      return;
+    }
+    try {
+      realtimeSocket.send(new Float32Array(chunk).buffer);
+    } catch (_) {
+      realtimePendingAudio = [];
+      window.screenVoice.captureError('REALTIME_AUDIO_SEND_FAILED');
+    }
+  }
+
+  function flushRealtimeAudioQueue() {
+    if (!realtimeCanSendAudio || !realtimeSocket || realtimeSocket.readyState !== WebSocket.OPEN
+        || !realtimePendingAudio.length) {
+      return;
+    }
+    const pending = realtimePendingAudio;
+    realtimePendingAudio = [];
+    for (const chunk of pending) sendRealtimeAudioChunk(chunk);
+  }
+
+  function maybeFlushPendingRealtimeTurn() {
+    if (!realtimeFlushPending || realtimeInputFrameCount < MIN_REALTIME_FRAMES_BEFORE_FLUSH) return;
+    if (!realtimeCanSendAudio) return;
+    if (!realtimeSocket || realtimeSocket.readyState !== WebSocket.OPEN) return;
+    flushRealtimeAudioQueue();
+    realtimeFlushPending = false;
+    realtimeSocket.send(JSON.stringify({ type: 'flush' }));
+  }
+
+  async function stopRealtimeInputCapture() {
+    realtimeCanSendAudio = false;
+    realtimePendingAudio = [];
+    realtimeInputSource = null;
+    clearTimeout(realtimePumpFallbackTimer);
+    realtimePumpFallbackTimer = null;
+    clearInterval(realtimeInputTimer);
+    realtimeInputTimer = null;
+    if (realtimeProcessor) {
+      realtimeProcessor.disconnect();
+      realtimeProcessor.onaudioprocess = null;
+    }
+    realtimeProcessor = null;
+    if (realtimeSource) realtimeSource.disconnect();
+    realtimeSource = null;
+    realtimeAnalyser = null;
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+    stream = null;
+    if (audioContext) await audioContext.close().catch(() => {});
+    audioContext = null;
+    els.meter.value = 0;
+  }
+
+  function stopRealtimePlayback(reason = 'stopped') {
+    const interruptedSpeechId = activeSpeechId;
+    if (playback) {
+      try { playback.pause(); } catch (_) {}
+      try { playback.currentTime = 0; } catch (_) {}
+    }
+    playback = null;
+    realtimeAudioQueue = [];
+    realtimeAudioPlaying = false;
+    activeSpeechId = null;
+    if (reason === 'barge_in' && interruptedSpeechId) {
+      sendRealtimeMessage({ type: 'interruption.detected', speech_id: interruptedSpeechId, reason: 'barge_in' });
+    }
+  }
+
+  function playNextRealtimeAudio() {
+    if (realtimeAudioPlaying) return;
+    if (!realtimeAudioQueue.length) {
+      window.screenVoice.playbackStatus({
+        status: 'stopped',
+        speechId: activeSpeechId,
+        reason: 'queue_empty'
+      }).catch(() => {});
+      return;
+    }
+    const item = realtimeAudioQueue.shift();
+    realtimeAudioPlaying = true;
+    activeSpeechId = item.speech_id || null;
+    playback = new Audio(`data:${item.mime_type || 'audio/wav'};base64,${item.base64}`);
+    const started = () => {
+      window.screenVoice.playbackStatus({
+        status: 'started',
+        speechId: item.speech_id || null
+      }).catch(() => {});
+    };
+    const done = () => {
+      playback = null;
+      realtimeAudioPlaying = false;
+      if (!realtimeAudioQueue.some((queued) => queued.speech_id === activeSpeechId)) activeSpeechId = null;
+      playNextRealtimeAudio();
+    };
+    playback.addEventListener('playing', started, { once: true });
+    playback.addEventListener('ended', done, { once: true });
+    playback.addEventListener('error', done, { once: true });
+    playback.play().catch(done);
+  }
+
+  function handleRealtimeMicrophone(input, source = 'processor', generation = realtimeGeneration) {
+    if (generation !== realtimeGeneration) return;
+    if (realtimeInputSource && realtimeInputSource !== source) return;
+    realtimeInputSource = source;
+    if (source === 'processor' && realtimePumpFallbackTimer) {
+      clearTimeout(realtimePumpFallbackTimer);
+      realtimePumpFallbackTimer = null;
+    }
+    const chunk = new Float32Array(input);
+    realtimeInputFrameCount += 1;
+    if (realtimeInputFrameCount === 1) {
+      reportCaptureStatus('audio_streaming', { bytes: chunk.byteLength, source });
+    }
+    let sum = 0;
+    let peak = 0;
+    for (const value of chunk) {
+      sum += value * value;
+      peak = Math.max(peak, Math.abs(value));
+    }
+    const rms = Math.sqrt(sum / Math.max(1, chunk.length));
+    realtimeObservedPeak = Math.max(realtimeObservedPeak, peak);
+    realtimeObservedRms = Math.max(realtimeObservedRms, rms);
+    els.meter.value = Math.round(Math.min(1, rms * 4) * 100);
+    const now = performance.now();
+    if (now - realtimeLastLevelReportAt > 1000) {
+      realtimeLastLevelReportAt = now;
+      reportCaptureStatus('audio_level', {
+        source,
+        rms,
+        peak,
+        maxRms: realtimeObservedRms,
+        maxPeak: realtimeObservedPeak,
+        frames: realtimeInputFrameCount
+      });
+    }
+    if (realtimeAudioPlaying && rms > 0.055) {
+      bargeInStartedAt = bargeInStartedAt || performance.now();
+      if (performance.now() - bargeInStartedAt > 320) stopRealtimePlayback('barge_in');
+    } else if (!realtimeAudioPlaying || rms <= 0.055) {
+      bargeInStartedAt = 0;
+    }
+    if (!realtimeAudioPlaying) sendRealtimeAudioChunk(chunk);
+  }
+
+  function startRealtimeInputPump(generation = realtimeGeneration) {
+    clearInterval(realtimeInputTimer);
+    realtimeInputTimer = null;
+    if (!realtimeAnalyser) return;
+    const frame = new Float32Array(realtimeAnalyser.fftSize);
+    realtimeInputTimer = setInterval(() => {
+      if (generation !== realtimeGeneration) return;
+      if (!realtimeAnalyser) return;
+      realtimeAnalyser.getFloatTimeDomainData(frame);
+      handleRealtimeMicrophone(frame, 'analyser', generation);
+      maybeFlushPendingRealtimeTurn();
+    }, 50);
+  }
+
+  async function handleDesktopRealtimeEvent(event) {
+    const result = await window.screenVoice.realtimeEvent(event);
+    if (event.event_type === 'speech.started' && event.payload?.speech_id) {
+      if (activeSpeechId && activeSpeechId !== event.payload.speech_id) {
+        stopRealtimePlayback('server_replaced');
+      }
+      activeSpeechId = event.payload.speech_id;
+    }
+    if (event.event_type === 'speech.audio' && event.payload?.audio?.base64) {
+      realtimeAudioQueue.push({ ...event.payload.audio, speech_id: event.payload.speech_id || null });
+      playNextRealtimeAudio();
+    }
+    if (event.event_type === 'speech.stopped' && event.payload?.reason === 'interrupted') {
+      stopRealtimePlayback('server_interrupted');
+    }
+    for (const message of result?.messages || []) sendRealtimeMessage(message);
+  }
+
+  function bindRealtimeSocket(socket, payload, generation = realtimeGeneration) {
+    realtimeSocket = socket;
+    socket.binaryType = 'arraybuffer';
+    socket.addEventListener('open', () => {
+      if (generation !== realtimeGeneration) {
+        try { socket.close(1000, 'stale_session'); } catch (_) {}
+        return;
+      }
+      realtimeConnected = true;
+      realtimeReconnectAttempt = 0;
+      socket.send(JSON.stringify({ ...payload.start, sample_rate: audioContext?.sampleRate || 16000 }));
+      reportCaptureStatus('recording_started');
+      setCapturePhase('recording');
+    });
+    socket.addEventListener('message', (messageEvent) => {
+      if (generation !== realtimeGeneration) return;
+      let message;
+      try { message = JSON.parse(String(messageEvent.data || '{}')); }
+      catch (_) {
+        window.screenVoice.captureError('REALTIME_PROTOCOL_ERROR');
+        return;
+      }
+      if (message.event === 'desktop_event' && message.data) {
+        realtimeEventChain = realtimeEventChain
+          .then(() => handleDesktopRealtimeEvent(message.data))
+          .catch((error) => window.screenVoice.captureError(error?.code || 'REALTIME_EVENT_INVALID'));
+      }
+      if (message.event === 'session_started' || message.event === 'listening') {
+        realtimeReady = true;
+        realtimeCanSendAudio = true;
+        flushRealtimeAudioQueue();
+        maybeFlushPendingRealtimeTurn();
+      }
+      if (message.event === 'turn_processing') {
+        stopRealtimeInputCapture().catch(() => {});
+      }
+      if (message.event === 'error' && !message.data) window.screenVoice.captureError(message.code || 'PROVIDER_ERROR');
+    });
+    socket.addEventListener('close', async (event) => {
+      if (generation !== realtimeGeneration) return;
+      realtimeConnected = false;
+      realtimeReady = false;
+      realtimeCanSendAudio = false;
+      if (realtimeSocket === socket) realtimeSocket = null;
+      window.screenVoice.realtimeDisconnected(event.code, event.reason).catch(() => {});
+      if (realtimeIntentionalClose) return;
+      clearTimeout(realtimeReconnectTimer);
+      realtimeReconnectAttempt += 1;
+      realtimeReconnectTimer = setTimeout(async () => {
+        try {
+          const next = await window.screenVoice.realtimeReconnect();
+          realtimeStartPayload = next;
+          bindRealtimeSocket(new WebSocket(next.websocketUrl), next, generation);
+        } catch (_) {
+          window.screenVoice.captureError('NETWORK_UNAVAILABLE');
+        }
+      }, Math.min(10000, 500 * (2 ** realtimeReconnectAttempt)));
+    });
+  }
+
+  async function startRealtime(payload) {
+    const generation = realtimeGeneration + 1;
+    realtimeGeneration = generation;
+    await stopRealtime({ preserveState: true });
+    if (generation !== realtimeGeneration) return;
+    realtimeIntentionalClose = false;
+    realtimeInputFrameCount = 0;
+    realtimeObservedPeak = 0;
+    realtimeObservedRms = 0;
+    realtimeLastLevelReportAt = 0;
+    realtimeFlushPending = false;
+    realtimePendingAudio = [];
+    realtimeReady = false;
+    realtimeCanSendAudio = false;
+    realtimeStartPayload = payload;
+    setCapturePhase('preparing');
+    reportCaptureStatus('requesting_microphone');
+    try {
+      stream = await getRealtimeMicrophoneStream();
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioContext = new AudioContextClass();
+      if (audioContext.state !== 'running') {
+        await audioContext.resume();
+      }
+      realtimeSource = audioContext.createMediaStreamSource(stream);
+      realtimeAnalyser = audioContext.createAnalyser();
+      realtimeAnalyser.fftSize = 4096;
+      realtimeProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+      realtimeProcessor.onaudioprocess = (event) => {
+        handleRealtimeMicrophone(event.inputBuffer.getChannelData(0), 'processor', generation);
+        maybeFlushPendingRealtimeTurn();
+      };
+      realtimeSource.connect(realtimeProcessor);
+      realtimeSource.connect(realtimeAnalyser);
+      realtimeProcessor.connect(audioContext.destination);
+      realtimePumpFallbackTimer = setTimeout(() => {
+        if (generation !== realtimeGeneration) return;
+        if (realtimeInputFrameCount === 0 && realtimeAnalyser) {
+          reportCaptureStatus('processor_fallback');
+          startRealtimeInputPump(generation);
+        }
+      }, 250);
+      const [track] = stream.getAudioTracks();
+      reportCaptureStatus('microphone_ready', {
+        trackCount: stream.getAudioTracks().length,
+        muted: track?.muted === true,
+        enabled: track?.enabled !== false,
+        label: track?.label || '',
+        readyState: track?.readyState || ''
+      });
+      bindRealtimeSocket(new WebSocket(payload.websocketUrl), payload, generation);
+    } catch (error) {
+      await stopRealtime();
+      window.screenVoice.captureError(error?.name === 'NotAllowedError' ? 'MICROPHONE_DENIED' : 'MICROPHONE_UNAVAILABLE');
+    }
+  }
+
+  async function stopRealtime(options = {}) {
+    if (!options.preserveState) realtimeGeneration += 1;
+    realtimeIntentionalClose = true;
+    realtimeConnected = false;
+    realtimeReady = false;
+    clearTimeout(realtimeReconnectTimer);
+    realtimeReconnectTimer = null;
+    if (!options.preservePlayback) stopRealtimePlayback('stopped');
+    if (realtimeSocket) {
+      try { realtimeSocket.close(1000, 'client_stopped'); } catch (_) {}
+    }
+    realtimeSocket = null;
+    await stopRealtimeInputCapture();
+    if (!options.preserveState) setCapturePhase('idle');
+  }
+
+  els.undo.addEventListener('click', () => window.screenVoice.undo());
+  els.confirm.addEventListener('click', () => window.screenVoice.confirm(snapshot.session?.id));
+  els.copy.addEventListener('click', () => window.screenVoice.copy(els.previewText.value));
+  els.cancel.addEventListener('click', () => window.screenVoice.cancel());
+  $('dismissButton').addEventListener('click', () => window.screenVoice.dismiss());
+  els.info.addEventListener('click', async () => {
+    detailsOpen = !detailsOpen;
+    syncExpandedSurface();
+    if (detailsOpen) await window.screenVoice.openDetails();
+    else await window.screenVoice.closeDetails();
+  });
+  els.hideDetails.addEventListener('click', async () => {
+    detailsOpen = false;
+    syncExpandedSurface();
+    await window.screenVoice.closeDetails();
+  });
+  $('settingsButton').addEventListener('click', () => window.screenVoice.openSettings());
+  document.addEventListener('keydown', (event) => {
+    const key = captureKey(event);
+    if (key && !isEditableTarget(event.target)) {
+      event.preventDefault();
+      pressedCaptureKeys.add(key);
+      if (captureChordDown() && !captureChordActive) {
+        captureChordActive = true;
+        window.screenVoice.captureStart().catch(() => { captureChordActive = false; });
+      }
+      return;
+    }
+    if (event.key !== 'Escape') return;
+    if (detailsOpen) {
+      detailsOpen = false;
+      syncExpandedSurface();
+      window.screenVoice.closeDetails();
+      return;
+    }
+    stopCapture(true); window.screenVoice.cancel();
+  });
+  document.addEventListener('keyup', (event) => {
+    const key = captureKey(event);
+    if (!key) return;
+    if (!isEditableTarget(event.target)) event.preventDefault();
+    pressedCaptureKeys.delete(key);
+    if (!captureChordDown()) releaseOverlayCapture();
+  });
+  window.addEventListener('blur', () => {
+    pressedCaptureKeys.clear();
+    releaseOverlayCapture();
+  });
+
+  window.screenVoice.onState(render);
+  window.screenVoice.onStartCapture(startCapture);
+  window.screenVoice.onStartRealtime(startRealtime);
+  window.screenVoice.onStopRealtime((payload = {}) => stopRealtime(payload || {}));
+  window.screenVoice.onRealtimeSend((message) => sendRealtimeMessage(message));
+  window.screenVoice.onStopCapture(({ discard, rearmShortcut }) => {
+    if (rearmShortcut) resetOverlayCaptureChord();
+    stopCapture(discard);
+  });
+  window.screenVoice.onShowDetails(() => {
+    detailsOpen = true;
+    syncExpandedSurface();
+    render(snapshot);
+  });
+  window.screenVoice.onUndone(() => { els.detail.textContent = 'The last voice edit was undone.'; });
+  window.screenVoice.onPlayAudio(({ base64, mime_type: mimeType }) => {
+    if (playback) playback.pause();
+    playback = new Audio(`data:${mimeType || 'audio/wav'};base64,${base64}`);
+    playback.play().catch(() => {});
+  });
+  window.addEventListener('beforeunload', () => {
+    cleanupCapture();
+    stopRealtime();
+    if (warmStream) warmStream.getTracks().forEach((track) => track.stop());
+    warmStream = null;
+  });
+  if ('ResizeObserver' in window) new ResizeObserver(syncOverlayHeight).observe(els.shell);
+  labelLexButton(els.undo, 'Undo last voice edit');
+  labelLexButton(els.info, 'Voice details');
+  labelLexButton(els.hideDetails, 'Hide voice details');
+  labelLexButton($('settingsButton'), 'Open LANA Voice Agent settings');
+  labelLexButton($('dismissButton'), 'Hide voice overlay');
+  window.screenVoice.getState().then((state) => {
+    render(state);
+    prewarmMicrophone();
+  });
+})();

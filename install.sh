@@ -123,15 +123,15 @@ install_cli() {
 }
 
 # ============================================================================
-# Dev-mode lana-ai:// protocol handler
+# lana-ai:// protocol handler (dev + live)
 #
-# When running `npm run electron:dev` (i.e. lana-client run dev), macOS
-# LaunchServices won't reliably route lana-ai:// to the running Electron —
-# it tends to launch a fresh stock Electron with the welcome screen instead.
-#
-# Fix: install a tiny .app bundle whose only job is to forward lana-ai://
-# URLs to the already-running Electron via an Apple Event ("open location"),
-# which fires app.on('open-url', ...) in electron-main.js. No new windows.
+# macOS LaunchServices won't reliably route lana-ai:// to a running Electron:
+# for the dev build it tends to launch a fresh stock Electron with the welcome
+# screen, and when only the packaged app registers the scheme, a dev-only
+# handler dead-ends (and vice-versa). Because this machine frequently runs BOTH
+# the dev build and the live/packaged app, we install one small .app bundle as
+# the single default handler for lana-ai:// that forwards the URL to whichever
+# Lana app is running (Apple Event "open location" -> app.on('open-url', ...)).
 #
 # Skipped on non-macOS. Idempotent.
 # ============================================================================
@@ -160,22 +160,32 @@ install_dev_url_handler() {
         return 0
     fi
 
-    print_step "Installing lana-ai:// URL handler for dev mode…"
+    print_step "Installing lana-ai:// URL handler (dev + live)…"
 
     # Write the AppleScript handler. When macOS opens a lana-ai:// URL, it
     # delivers a "GetURL" Apple Event to the registered .app — this script
-    # catches it and re-emits the same event to the running Electron.
+    # catches it and re-emits the same event to whichever Lana app is running:
+    #   * dev build  -> stock Electron (npm run electron:dev / lana-client run dev)
+    #   * live build -> packaged "Lana AI Client.app" (com.redroostertech.lana-ai-client)
+    # Both re-emit fires app.on('open-url', ...) in electron-main.js. No new windows.
+    #
+    # Tiebreak when BOTH are running: prefer the live/packaged app, since a real
+    # lana-ai:// OAuth code is most often a production connector action. To prefer
+    # the dev build instead, swap the prodRunning / devRunning branches below.
     cat > "${applescript_src}" <<'APPLESCRIPT'
 on open location URL_arg
+    set devId to "com.github.Electron"
+    set prodId to "com.redroostertech.lana-ai-client"
     tell application "System Events"
-        set isRunning to (exists (processes where name is "Electron"))
+        set devRunning to (exists (processes whose bundle identifier is devId))
+        set prodRunning to (exists (processes whose bundle identifier is prodId))
     end tell
-    if isRunning then
-        tell application id "com.github.Electron"
-            open location URL_arg
-        end tell
+    if prodRunning then
+        tell application id prodId to open location URL_arg
+    else if devRunning then
+        tell application id devId to open location URL_arg
     else
-        display alert "Lana AI dev app is not running" message "Start it with: lana-client run dev" buttons {"OK"} default button 1
+        display alert "Lana AI is not running" message "Open the Lana AI desktop app (live build), or start the dev build with: lana-client run dev — then click “Open LANA AI” again." buttons {"OK"} default button 1
     end if
 end open location
 APPLESCRIPT
@@ -200,7 +210,7 @@ APPLESCRIPT
     /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" "${plist}" 2>/dev/null || true
     /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "${plist}"
     /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "${plist}"
-    /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLName string Lana AI Dev" "${plist}"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLName string Lana AI" "${plist}"
     /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "${plist}"
     /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string lana-ai" "${plist}"
 

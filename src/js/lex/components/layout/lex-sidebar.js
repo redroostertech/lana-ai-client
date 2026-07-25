@@ -42,6 +42,9 @@
   const { LexElement, defineLex, Icons } = window.Lex;
 
   let stylesInjected = false;
+  const CHAT_SECTION_COLLAPSED_KEY = 'lana:sidebar:chatsCollapsed';
+  const TASK_SECTION_COLLAPSED_KEY = 'lana:sidebar:tasksCollapsed';
+  const WORKSPACE_SECTION_COLLAPSED_KEY = 'lana:sidebar:workspacesCollapsed';
 
   function injectStyles() {
     if (stylesInjected) return;
@@ -137,6 +140,15 @@
         }
 
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section-title {
+          opacity: 0;
+          height: 0;
+          overflow: hidden;
+          padding: 0;
+          margin: 0;
+          pointer-events: none;
+        }
+
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section-toggle {
           opacity: 0;
           height: 0;
           overflow: hidden;
@@ -553,6 +565,121 @@
         margin-top: 0;
       }
 
+      .lex-sidebar-section-toggle-row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        margin-top: 0.5rem;
+        min-width: 0;
+      }
+
+      .lex-sidebar-section-toggle {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.5rem;
+        width: 100%;
+        padding: 0.5rem 0.75rem 0.375rem;
+        padding-right: 4rem;
+        border: 0;
+        border-radius: var(--lex-radius-md, 6px);
+        background: transparent;
+        color: var(--_sb-section-text);
+        cursor: pointer;
+        font-size: var(--lex-body-xs-size, 0.6875rem);
+        font-weight: var(--lex-weight-semibold);
+        letter-spacing: 0.06em;
+        line-height: 1.4;
+        text-align: left;
+        text-transform: uppercase;
+        transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-section-toggle:hover {
+        background: color-mix(in srgb, var(--_sb-hover-bg) 56%, transparent);
+        color: var(--_sb-text-active);
+      }
+
+      .lex-sidebar-section-toggle:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--_sb-text-muted) 36%, transparent);
+      }
+
+      .lex-sidebar-section-toggle-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lex-sidebar-section-toggle-icon {
+        position: absolute;
+        top: 50%;
+        right: 0.75rem;
+        display: inline-flex;
+        color: var(--_sb-text-muted);
+        transform: translateY(-50%) rotate(0deg);
+        transition: transform var(--lex-transition-fast), color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-section-toggle:hover .lex-sidebar-section-toggle-icon {
+        color: var(--_sb-text-active);
+      }
+
+      .lex-sidebar-section-create {
+        position: absolute;
+        top: 50%;
+        right: 2.125rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        padding: 0;
+        border: 0;
+        border-radius: var(--lex-radius-md, 6px);
+        background: transparent;
+        color: var(--_sb-text-muted);
+        cursor: pointer;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-50%) scale(0.92);
+        transition: opacity var(--lex-transition-fast),
+                    transform var(--lex-transition-fast),
+                    background var(--lex-transition-fast),
+                    color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-section-toggle-row:hover .lex-sidebar-section-create,
+      .lex-sidebar-section-toggle-row:focus-within .lex-sidebar-section-create {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(-50%) scale(1);
+      }
+
+      .lex-sidebar-section-create:hover,
+      .lex-sidebar-section-create:focus-visible {
+        background: color-mix(in srgb, var(--_sb-hover-bg) 80%, transparent);
+        color: var(--_sb-text-active);
+        outline: none;
+      }
+
+      .lex-sidebar-collapsible-section[data-collapsed="true"] .lex-sidebar-section-toggle-icon {
+        transform: translateY(-50%) rotate(-90deg);
+      }
+
+      .lex-sidebar-section-content {
+        display: flex;
+        flex-direction: column;
+        gap: var(--lex-sidebar-item-gap);
+        min-width: 0;
+      }
+
+      .lex-sidebar-collapsible-section[data-collapsed="true"] .lex-sidebar-section-content {
+        display: none;
+      }
+
       .lex-sidebar-scrollable-wrap {
         flex: 1;
         position: relative;
@@ -620,6 +747,187 @@
         background: var(--_sb-text-muted);
       }
 
+      /* Collapsible dynamic sections */
+      .lex-sidebar-collapsible-section {
+        display: flex;
+        flex-direction: column;
+        margin-top: 0.5rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--_sb-border);
+      }
+
+      .lex-sidebar-dynamic-list {
+        margin-top: 0.25rem;
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      .lex-sidebar-dynamic-empty,
+      .lex-sidebar-dynamic-error,
+      .lex-sidebar-dynamic-loading {
+        padding: 0.5rem 0.75rem;
+        color: var(--_sb-text-muted);
+        font-size: var(--lex-body-xs-size, 0.75rem);
+        line-height: 1.4;
+      }
+
+      .lex-sidebar-workspace-item {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        width: 100%;
+        min-width: 0;
+        min-height: 2.25rem;
+        padding: 0.375rem 0.75rem;
+        border: 0;
+        border-radius: var(--lex-radius-lg, 8px);
+        background: transparent;
+        color: var(--_sb-text);
+        cursor: pointer;
+        text-align: left;
+        transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-workspace-item:hover,
+      .lex-sidebar-workspace-item:focus-visible {
+        background: var(--_sb-hover-bg);
+        color: var(--_sb-text-active);
+        outline: none;
+      }
+
+      .lex-sidebar-workspace-icon {
+        display: inline-flex;
+        flex: 0 0 auto;
+        color: var(--_sb-text-muted);
+      }
+
+      .lex-sidebar-workspace-copy {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      .lex-sidebar-workspace-name {
+        overflow: hidden;
+        color: currentColor;
+        font-size: var(--lex-body-sm-size, 0.875rem);
+        font-weight: var(--lex-weight-medium, 500);
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lex-sidebar-workspace-meta {
+        overflow: hidden;
+        color: var(--_sb-text-muted);
+        font-size: var(--lex-body-xs-size, 0.75rem);
+        line-height: 1.3;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lex-sidebar-task-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        min-width: 0;
+      }
+
+      .lex-sidebar-task-group + .lex-sidebar-task-group {
+        margin-top: 0.375rem;
+      }
+
+      .lex-sidebar-task-group-title {
+        padding: 0.25rem 0.75rem 0.125rem;
+        color: var(--_sb-section-text);
+        font-size: 0.625rem;
+        font-weight: var(--lex-weight-semibold, 600);
+        letter-spacing: 0.06em;
+        line-height: 1.3;
+        text-transform: uppercase;
+      }
+
+      .lex-sidebar-task-item {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        width: 100%;
+        min-width: 0;
+        min-height: 2.25rem;
+        padding: 0.375rem 0.75rem;
+        border: 0;
+        border-radius: var(--lex-radius-lg, 8px);
+        background: transparent;
+        color: var(--_sb-text);
+        cursor: pointer;
+        text-align: left;
+        transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-task-item:hover,
+      .lex-sidebar-task-item:focus-visible {
+        background: var(--_sb-hover-bg);
+        color: var(--_sb-text-active);
+        outline: none;
+      }
+
+      .lex-sidebar-task-icon {
+        display: inline-flex;
+        flex: 0 0 auto;
+        color: var(--_sb-text-muted);
+      }
+
+      .lex-sidebar-task-copy {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      .lex-sidebar-task-name {
+        overflow: hidden;
+        color: currentColor;
+        font-size: var(--lex-body-sm-size, 0.875rem);
+        font-weight: var(--lex-weight-medium, 500);
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lex-sidebar-task-meta {
+        overflow: hidden;
+        color: var(--_sb-text-muted);
+        font-size: var(--lex-body-xs-size, 0.75rem);
+        line-height: 1.3;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lex-sidebar-show-more {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 2rem;
+        margin-top: 0.25rem;
+        padding: 0.375rem 0.75rem;
+        border: 1px solid color-mix(in srgb, var(--_sb-text-muted) 24%, transparent);
+        border-radius: var(--lex-radius-lg, 8px);
+        background: transparent;
+        color: var(--_sb-text);
+        cursor: pointer;
+        font-size: var(--lex-body-xs-size, 0.75rem);
+        font-weight: var(--lex-weight-medium, 500);
+        transition: background var(--lex-transition-fast),
+                    border-color var(--lex-transition-fast),
+                    color var(--lex-transition-fast);
+      }
+
+      .lex-sidebar-show-more:hover,
+      .lex-sidebar-show-more:focus-visible {
+        background: var(--_sb-hover-bg);
+        border-color: color-mix(in srgb, var(--_sb-text-muted) 44%, transparent);
+        color: var(--_sb-text-active);
+        outline: none;
+      }
+
       /* Conversation list section */
       .lex-sidebar-section-has-conversations {
         display: flex;
@@ -663,17 +971,42 @@
         color: var(--_sb-text-active);
       }
 
-      .lex-sidebar-nav-item[data-variant="create"] {
-        min-height: 2.75rem;
-        margin-bottom: 0.25rem;
-        border: 1px solid color-mix(in srgb, var(--_sb-text-active) 22%, transparent);
-        background: color-mix(in srgb, var(--_sb-text-active) 34%, var(--_sb-bg));
+      .lex-sidebar-nav-item[data-variant="create"],
+      .lex-sidebar-nav-item[data-variant="create-chat"] {
+        min-height: 2.5rem;
+        margin: 0.25rem 0 0.5rem;
+        padding: 0 0.75rem;
+        gap: 0.625rem;
+        border: 1px solid color-mix(in srgb, var(--_sb-text-muted) 32%, transparent);
+        border-radius: var(--lex-radius-lg, 8px);
+        background: transparent;
         color: var(--_sb-text-active);
         font-weight: var(--lex-weight-semibold, 600);
       }
 
-      .lex-sidebar-nav-item[data-variant="create"]:hover {
-        background: color-mix(in srgb, var(--_sb-text-active) 42%, var(--_sb-bg));
+      .lex-sidebar-nav-item[data-variant="create"][data-active="true"],
+      .lex-sidebar-nav-item[data-variant="create-chat"][data-active="true"] {
+        background: transparent;
+      }
+
+      .lex-sidebar-nav-item[data-variant="create"]:hover,
+      .lex-sidebar-nav-item[data-variant="create"]:focus-visible,
+      .lex-sidebar-nav-item[data-variant="create-chat"]:hover,
+      .lex-sidebar-nav-item[data-variant="create-chat"]:focus-visible {
+        background: transparent;
+        border-color: color-mix(in srgb, var(--_sb-text-muted) 52%, transparent);
+      }
+
+      .lex-sidebar-create-chat-glyph {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1rem;
+        flex: 0 0 1rem;
+        color: currentColor;
+        font-size: 1.25rem;
+        font-weight: var(--lex-weight-regular, 400);
+        line-height: 1;
       }
 
       .lex-sidebar-nav-item svg {
@@ -737,7 +1070,7 @@
       }
 
       .lex-sidebar-nav-group[data-expanded="true"] .lex-sidebar-nav-chevron {
-        transform: rotate(180deg);
+        transform: rotate(90deg);
       }
 
       .lex-sidebar-nav-item[data-child="true"] {
@@ -1041,6 +1374,7 @@
       // comparison instead of JSON.stringify() on every render cycle.
       this._sectionsGen = 0;
       this._menuItemsGen = 0;
+      this._appCatalogGen = 0;
 
       // Wrap the reactive setters installed by LexElement so that each
       // assignment bumps the corresponding generation counter.
@@ -1067,6 +1401,38 @@
       // Track the last-emitted collapsed value so _emitCollapsedState() is
       // a no-op when the collapsed state has not actually changed.
       this._lastEmittedCollapsed = null;
+    }
+
+    connected() {
+      this._hydrateAppItemsFromElectronStorage();
+    }
+
+    _hydrateAppItemsFromElectronStorage() {
+      if (this._appStorageHydrationStarted) return;
+      this._appStorageHydrationStarted = true;
+      if (!window.electronAPI || typeof window.electronAPI.getSavedServer !== 'function') return;
+
+      window.electronAPI.getSavedServer().then((result) => {
+        const server = result && result.success && result.server ? result.server : null;
+        if (!server || !Array.isArray(server.enabledApps) || !server.enabledApps.length) return;
+
+        let previousApps = [];
+        try {
+          const raw = localStorage.getItem('lana_saved_server');
+          const parsed = raw ? JSON.parse(raw) : {};
+          previousApps = Array.isArray(parsed.enabledApps) ? parsed.enabledApps : [];
+          localStorage.setItem('lana_saved_server', JSON.stringify(Object.assign({}, parsed, server)));
+        } catch (_) {
+          localStorage.setItem('lana_saved_server', JSON.stringify(server));
+        }
+
+        const before = JSON.stringify(previousApps.map((item) => item && (item.id || item.app_id || item.slug || item.key || item)).filter(Boolean));
+        const after = JSON.stringify(server.enabledApps.map((item) => item && (item.id || item.app_id || item.slug || item.key || item)).filter(Boolean));
+        if (before !== after) {
+          this._appCatalogGen += 1;
+          this._scheduleUpdate();
+        }
+      }).catch(() => {});
     }
 
     render() {
@@ -1099,7 +1465,8 @@
             && this._lastUserName === this.userName
             && this._lastUserEmail === this.userEmail
             && this._lastVersion === this.version
-            && this._lastMenuItemsGen === this._menuItemsGen) {
+            && this._lastMenuItemsGen === this._menuItemsGen
+            && this._lastAppCatalogGen === this._appCatalogGen) {
           return null; // Skip innerHTML, preserve conversation list DOM
         }
       }
@@ -1110,6 +1477,7 @@
       this._lastUserEmail = this.userEmail;
       this._lastVersion = this.version;
       this._lastMenuItemsGen = this._menuItemsGen;
+      this._lastAppCatalogGen = this._appCatalogGen;
 
       const sections = this.sections || [];
       const footerSections = sections.filter(s => s.isFooter);
@@ -1209,12 +1577,26 @@
           route: 'admin/analytics.html',
           colors: ['#60a5fa', '#2563eb', '#7c3aed', '#0f172a']
         },
+        'lana-automations': {
+          id: 'lana-automations',
+          label: 'LanaAutomate',
+          description: 'Build, deploy and monitor automated workflows',
+          route: 'automation/index.html',
+          colors: ['#ffd16f', '#f97316', '#7c3aed', '#4c1d95']
+        },
         'doc-studio': {
           id: 'doc-studio',
           label: 'Doc Studio',
           description: 'Generate decks, legal documents, PDFs, and pages',
           route: 'doc-studio/index.html',
           colors: ['#2f6f73', '#b56b45', '#17201f', '#f7f4ef']
+        },
+        'lana-voice': {
+          id: 'lana-voice',
+          label: 'LanaVoice',
+          description: 'Realtime voice agents and call handling',
+          route: 'voice/index.html',
+          colors: ['#fcd34d', '#f59e0b', '#b45309', '#1c1917']
         },
         'brainchild': {
           id: 'brainchild',
@@ -1260,6 +1642,12 @@
         insights: 'lana-insights',
         'business-intelligence': 'lana-insights',
         'lana-insights': 'lana-insights',
+        automation: 'lana-automations',
+        automations: 'lana-automations',
+        'lana-automate': 'lana-automations',
+        'lana-automations': 'lana-automations',
+        voice: 'lana-voice',
+        'lana-voice': 'lana-voice',
         'doc-studio': 'doc-studio',
         'deck-studio': 'doc-studio',
         documents: 'doc-studio',
@@ -1491,17 +1879,102 @@
     // -----------------------------------------------------------------------
 
     _renderSection(section) {
-      const sectionClass = section.isConversationList ? 'lex-sidebar-section lex-sidebar-section-has-conversations' : 'lex-sidebar-section';
-      let html = `<div class="${sectionClass}">`;
+      const isConversationList = !!section.isConversationList;
+      const isTaskList = !!section.isTaskList;
+      const isWorkspaceList = !!section.isWorkspaceList;
+      const isCollapsible = isConversationList || isTaskList || isWorkspaceList;
+      const sectionClass = [
+        'lex-sidebar-section',
+        isCollapsible ? 'lex-sidebar-collapsible-section' : '',
+        isConversationList ? 'lex-sidebar-section-has-conversations' : '',
+        isTaskList ? 'lex-sidebar-section-has-tasks' : '',
+        isWorkspaceList ? 'lex-sidebar-section-has-workspaces' : ''
+      ].filter(Boolean).join(' ');
+      const contentId = isCollapsible ? this._getSectionContentId(section) : '';
+      const isCollapsed = isCollapsible ? this._getSectionCollapsed(section) : false;
+      const collapsedAttr = isCollapsible ? ` data-collapsed="${isCollapsed}" data-section-id="${this.escapeHtml(section.id || '')}"` : '';
+      let html = `<div class="${sectionClass}"${collapsedAttr}>`;
       if (section.title) {
-        html += `<div class="lex-sidebar-section-title">${this.escapeHtml(section.title)}</div>`;
+        if (isCollapsible) {
+          const action = isTaskList ? 'create-task' : (isWorkspaceList ? 'create-workspace' : 'create-conversation');
+          const actionLabel = isTaskList ? 'New task' : (isWorkspaceList ? 'New workspace' : 'New chat');
+          const actionIcon = isTaskList
+            ? (icon('plus', 'small') || icon('clipboard-check', 'small'))
+            : isWorkspaceList
+            ? (icon('plus', 'small') || icon('briefcase', 'small'))
+            : (icon('edit', 'small') || icon('file-plus', 'small') || icon('plus', 'small'));
+          html += `<div class="lex-sidebar-section-toggle-row">
+            <button type="button" class="lex-sidebar-section-toggle" data-action="toggle-dynamic-section" aria-expanded="${!isCollapsed}" aria-controls="${contentId}">
+              <span class="lex-sidebar-section-toggle-label">${this.escapeHtml(section.title)}</span>
+              <span class="lex-sidebar-section-toggle-icon">${icon('chevron-down', 'small')}</span>
+            </button>
+            <button type="button" class="lex-sidebar-section-create" data-action="${action}" aria-label="${actionLabel}" title="${actionLabel}">
+              ${actionIcon}
+            </button>
+          </div>`;
+        } else {
+          html += `<div class="lex-sidebar-section-title">${this.escapeHtml(section.title)}</div>`;
+        }
+      }
+      if (isCollapsible) {
+        html += `<div class="lex-sidebar-section-content" id="${contentId}">`;
       }
       html += this._renderSectionItems(section.items);
-      if (section.isConversationList) {
+      if (isConversationList) {
         html += `<div class="lex-sidebar-conversation-list" id="lexConversationListContainer"></div>`;
+      } else if (isTaskList) {
+        html += `<div class="lex-sidebar-dynamic-list lex-sidebar-task-list" id="lexTaskListContainer"></div>`;
+      } else if (isWorkspaceList) {
+        html += `<div class="lex-sidebar-dynamic-list lex-sidebar-workspace-list" id="lexWorkspaceListContainer"></div>`;
+      }
+      if (isCollapsible) {
+        html += `</div>`;
       }
       html += `</div>`;
       return html;
+    }
+
+    _getSectionContentId(section) {
+      const rawId = section && section.id ? String(section.id) : 'conversations';
+      const safeId = rawId.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'conversations';
+      return 'lex-sidebar-section-content-' + safeId;
+    }
+
+    _getSectionCollapsed(section) {
+      const isTaskList = section && section.isTaskList;
+      const isWorkspaceList = section && section.isWorkspaceList;
+      const key = isTaskList ? TASK_SECTION_COLLAPSED_KEY : (isWorkspaceList ? WORKSPACE_SECTION_COLLAPSED_KEY : CHAT_SECTION_COLLAPSED_KEY);
+      const fallback = isTaskList ? this._taskSectionCollapsed : (isWorkspaceList ? this._workspaceSectionCollapsed : this._chatSectionCollapsed);
+      try {
+        return localStorage.getItem(key) === 'true';
+      } catch (_) {
+        return fallback === true;
+      }
+    }
+
+    _setSectionCollapsed(section, collapsed) {
+      const isTaskList = section && section.classList && section.classList.contains('lex-sidebar-section-has-tasks');
+      const isWorkspaceList = section && section.classList && section.classList.contains('lex-sidebar-section-has-workspaces');
+      const key = isTaskList ? TASK_SECTION_COLLAPSED_KEY : (isWorkspaceList ? WORKSPACE_SECTION_COLLAPSED_KEY : CHAT_SECTION_COLLAPSED_KEY);
+      if (isTaskList) {
+        this._taskSectionCollapsed = collapsed === true;
+      } else if (isWorkspaceList) {
+        this._workspaceSectionCollapsed = collapsed === true;
+      } else {
+        this._chatSectionCollapsed = collapsed === true;
+      }
+      try {
+        localStorage.setItem(key, String(collapsed === true));
+      } catch (_) { /* localStorage can be unavailable in restricted contexts */ }
+    }
+
+    _syncDynamicSectionState(section, collapsed) {
+      if (!section) return;
+      section.dataset.collapsed = String(collapsed);
+      const toggle = section.querySelector('[data-action="toggle-dynamic-section"]');
+      if (toggle) {
+        toggle.setAttribute('aria-expanded', String(!collapsed));
+      }
     }
 
     _renderSectionItems(items) {
@@ -1520,7 +1993,7 @@
       if (!isChild && item.children && item.children.length) {
         const childrenHtml = item.children.map((child) => this._renderNavItem(child, true)).join('');
         const iconHtml = item.icon ? icon(item.icon, 'normal') : '';
-        const chevronHtml = `<span class="lex-sidebar-nav-chevron">${icon('chevron-down', 'small')}</span>`;
+        const chevronHtml = `<span class="lex-sidebar-nav-chevron">${icon('chevron-right', 'small')}</span>`;
         return `<div class="lex-sidebar-nav-group" data-expanded="false">
           <button type="button" class="lex-sidebar-nav-item lex-sidebar-nav-group-toggle" data-nav-toggle data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}">
             ${iconHtml}
@@ -1538,7 +2011,10 @@
       const onClickAttr = item.onClick ? ` data-onclick="${this.escapeHtml(item.onClick)}"` : '';
       const hrefDataAttr = item.isButton && item.href ? ` data-href="${this.escapeHtml(item.href)}"` : '';
       const variantAttr = item.variant ? ` data-variant="${this.escapeHtml(item.variant)}"` : '';
-      const iconHtml = item.icon ? icon(item.icon, 'normal') : '';
+      const isCreateChat = item.variant === 'create-chat';
+      const iconHtml = isCreateChat
+        ? '<span class="lex-sidebar-create-chat-glyph" aria-hidden="true">+</span>'
+        : (item.icon ? icon(item.icon, 'normal') : '');
       const badgeHtml = item.badge
         ? `<span class="lex-sidebar-nav-badge">${this.escapeHtml(item.badge)}</span>`
         : '';
@@ -1625,8 +2101,335 @@
 
 
     // -----------------------------------------------------------------------
+    // Workspace section
+    // -----------------------------------------------------------------------
+
+    _getApiClient() {
+      if (window.api) return window.api;
+      if (typeof api !== 'undefined') return api;
+      return null;
+    }
+
+    // -----------------------------------------------------------------------
+    // Task section
+    // -----------------------------------------------------------------------
+
+    async _initTaskList() {
+      const container = this.querySelector('#lexTaskListContainer');
+      if (!container) return;
+
+      if (Array.isArray(this._taskItems)) {
+        this._renderTaskList(container);
+        return;
+      }
+
+      if (this._taskListLoading) return;
+      this._taskListLoading = true;
+      container.innerHTML = '<div class="lex-sidebar-dynamic-loading">Loading tasks...</div>';
+
+      try {
+        const client = this._getApiClient();
+        if (!client || typeof client.getMyTasks !== 'function') {
+          throw new Error('Task API unavailable');
+        }
+
+        const result = await client.getMyTasks({
+          limit: 11,
+          offset: 0,
+          sort_by: 'updated_at',
+          sort_dir: 'DESC'
+        });
+        const rows = this._normalizeTasks(result)
+          .filter(Boolean)
+          .sort((a, b) => {
+            const aTime = new Date(a.updated_at || a.created_at || a.due_date || 0).getTime();
+            const bTime = new Date(b.updated_at || b.created_at || b.due_date || 0).getTime();
+            return bTime - aTime;
+          });
+
+        const total = Number(result && (result.total || result.count || (result.pagination && result.pagination.total)) || 0);
+        this._taskItems = rows.slice(0, 10);
+        this._taskHasMore = total > 10 || rows.length > 10;
+        this._renderTaskList(container);
+      } catch (error) {
+        console.error('[lex-sidebar] Failed to load tasks:', error);
+        container.innerHTML = '<div class="lex-sidebar-dynamic-error">Could not load tasks</div>';
+      } finally {
+        this._taskListLoading = false;
+        requestAnimationFrame(() => this._updateScrollableFades());
+      }
+    }
+
+    _normalizeTasks(response) {
+      if (!response) return [];
+      if (response.data) return this._normalizeTasks(response.data);
+      if (Array.isArray(response)) return response;
+      if (Array.isArray(response.tasks)) return response.tasks;
+      if (Array.isArray(response.items)) return response.items;
+      return [];
+    }
+
+    _renderTaskList(container) {
+      const rows = Array.isArray(this._taskItems) ? this._taskItems : [];
+      if (!rows.length) {
+        container.innerHTML = '<div class="lex-sidebar-dynamic-empty">No tasks assigned</div>';
+        return;
+      }
+
+      const groups = this._groupTasks(rows);
+      const html = groups.map((group) => {
+        const items = group.items.map((task) => this._renderTaskItem(task)).join('');
+        return `<div class="lex-sidebar-task-group">
+          <div class="lex-sidebar-task-group-title">${this.escapeHtml(group.label)}</div>
+          ${items}
+        </div>`;
+      }).join('');
+      const showMore = this._taskHasMore
+        ? '<button type="button" class="lex-sidebar-show-more" data-action="show-more-tasks">Show More Tasks</button>'
+        : '';
+      container.innerHTML = html + showMore;
+    }
+
+    _groupTasks(tasks) {
+      const order = [];
+      const groups = {};
+      tasks.forEach((task) => {
+        const priority = this._getTaskPriorityLabel(task);
+        const due = this._getTaskDueBucket(task);
+        const key = priority.label + '|' + due.label;
+        if (!groups[key]) {
+          groups[key] = { label: priority.label + ' Priority · ' + due.label, rank: priority.rank + due.rank, items: [] };
+          order.push(key);
+        }
+        groups[key].items.push(task);
+      });
+      return order
+        .map((key) => groups[key])
+        .sort((a, b) => a.rank - b.rank);
+    }
+
+    _getTaskPriorityLabel(task) {
+      const raw = String((task && (task.priority || task.task_priority || task.urgency)) || 'normal').toLowerCase();
+      const normalized = raw === 'urgent' || raw === 'critical'
+        ? 'Urgent'
+        : raw === 'high'
+        ? 'High'
+        : raw === 'low'
+        ? 'Low'
+        : 'Normal';
+      const ranks = { Urgent: 0, High: 10, Normal: 20, Low: 30 };
+      return { label: normalized, rank: ranks[normalized] };
+    }
+
+    _getTaskDueBucket(task) {
+      const value = task && (task.due_date || task.due_at || task.deadline);
+      if (!value) return { label: 'No Due Date', rank: 900 };
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return { label: 'No Due Date', rank: 900 };
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const due = new Date(date);
+      due.setHours(0, 0, 0, 0);
+      const days = Math.round((due.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+
+      if (days < 0) return { label: 'Overdue', rank: 0 };
+      if (days === 0) return { label: 'Due Today', rank: 1 };
+      if (days === 1) return { label: 'Due Tomorrow', rank: 2 };
+      if (days <= 7) return { label: 'Due This Week', rank: 3 };
+      return { label: 'Later', rank: 4 };
+    }
+
+    _renderTaskItem(task) {
+      const id = task.id || task.task_id || '';
+      const title = task.title || task.name || task.task_title || 'Untitled Task';
+      const matter = task.matter_name || task.workspace_name || task.matter_id || 'Organization-level';
+      const due = this._formatTaskDue(task.due_date || task.due_at || task.deadline);
+      const meta = due ? matter + ' · ' + due : matter;
+      return `<button type="button" class="lex-sidebar-task-item" data-task-id="${this.escapeHtml(id)}" title="${this.escapeHtml(title)}">
+        <span class="lex-sidebar-task-icon">${icon('clipboard-check', 'small')}</span>
+        <span class="lex-sidebar-task-copy">
+          <span class="lex-sidebar-task-name">${this.escapeHtml(title)}</span>
+          <span class="lex-sidebar-task-meta">${this.escapeHtml(meta)}</span>
+        </span>
+      </button>`;
+    }
+
+    _formatTaskDue(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return 'Due ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+
+    _openTask(taskId) {
+      const href = 'my-tasks.html' + (taskId ? '?task=' + encodeURIComponent(taskId) : '');
+      const currentPage = ((window.location && window.location.pathname) || '').split('/').pop();
+      if (currentPage === 'my-tasks.html') {
+        window.location.href = this._getAppPrefix() + href;
+        return;
+      }
+      if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
+        window.Lex.Nav.go('my-tasks.html', taskId ? { params: { task: taskId } } : undefined);
+      } else {
+        window.location.href = this._getAppPrefix() + href;
+      }
+    }
+
+    _openTasksIndex(options = {}) {
+      if (options.create) {
+        const createMenuItem = document.querySelector('#myTasksNewMenu [data-new-action="task"]');
+        if (createMenuItem) {
+          createMenuItem.click();
+          return;
+        }
+      }
+
+      const href = 'my-tasks.html' + (options.create ? '?action=create' : '');
+      if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function' && !options.create) {
+        window.Lex.Nav.go('my-tasks.html');
+      } else {
+        window.location.href = this._getAppPrefix() + href;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Workspace section
+    // -----------------------------------------------------------------------
+
+    async _initWorkspaceList() {
+      const container = this.querySelector('#lexWorkspaceListContainer');
+      if (!container) return;
+
+      if (Array.isArray(this._workspaceItems)) {
+        this._renderWorkspaceList(container);
+        return;
+      }
+
+      if (this._workspaceListLoading) return;
+      this._workspaceListLoading = true;
+      container.innerHTML = '<div class="lex-sidebar-dynamic-loading">Loading workspaces...</div>';
+
+      try {
+        const client = this._getApiClient();
+        if (!client || typeof client.getMatters !== 'function') {
+          throw new Error('Workspace API unavailable');
+        }
+
+        const result = await client.getMatters(1, 11, {
+          status: 'active',
+          sort_by: 'created_at',
+          sort_order: 'desc'
+        });
+        const rows = (result.matters || result.data || result.items || [])
+          .filter(Boolean)
+          .sort((a, b) => {
+            const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
+            const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
+            return bTime - aTime;
+          });
+
+        const total = Number(result.total || result.count || (result.pagination && result.pagination.total) || 0);
+        this._workspaceItems = rows.slice(0, 10);
+        this._workspaceHasMore = total > 10 || rows.length > 10;
+        this._renderWorkspaceList(container);
+      } catch (error) {
+        console.error('[lex-sidebar] Failed to load workspaces:', error);
+        container.innerHTML = '<div class="lex-sidebar-dynamic-error">Could not load workspaces</div>';
+      } finally {
+        this._workspaceListLoading = false;
+        requestAnimationFrame(() => this._updateScrollableFades());
+      }
+    }
+
+    _renderWorkspaceList(container) {
+      const rows = Array.isArray(this._workspaceItems) ? this._workspaceItems : [];
+      if (!rows.length) {
+        container.innerHTML = '<div class="lex-sidebar-dynamic-empty">No workspaces yet</div>';
+        return;
+      }
+
+      const html = rows.map((workspace) => this._renderWorkspaceItem(workspace)).join('');
+      const showMore = this._workspaceHasMore
+        ? '<button type="button" class="lex-sidebar-show-more" data-action="show-more-workspaces">Show More</button>'
+        : '';
+      container.innerHTML = html + showMore;
+    }
+
+    _renderWorkspaceItem(workspace) {
+      const id = workspace.matter_id || workspace.id || '';
+      const name = workspace.name || workspace.matter_name || workspace.title || 'Untitled Workspace';
+      const created = this._formatWorkspaceCreated(workspace.created_at || workspace.updated_at);
+      return `<button type="button" class="lex-sidebar-workspace-item" data-workspace-id="${this.escapeHtml(id)}" title="${this.escapeHtml(name)}">
+        <span class="lex-sidebar-workspace-icon">${icon('briefcase', 'small') || icon('folder', 'small')}</span>
+        <span class="lex-sidebar-workspace-copy">
+          <span class="lex-sidebar-workspace-name">${this.escapeHtml(name)}</span>
+          ${created ? `<span class="lex-sidebar-workspace-meta">${this.escapeHtml(created)}</span>` : ''}
+        </span>
+      </button>`;
+    }
+
+    _formatWorkspaceCreated(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      const now = Date.now();
+      const diffMs = now - date.getTime();
+      const minute = 60 * 1000;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+      if (diffMs >= 0 && diffMs < hour) return 'Created recently';
+      if (diffMs >= 0 && diffMs < day) {
+        const hours = Math.max(1, Math.floor(diffMs / hour));
+        return 'Created ' + hours + 'h ago';
+      }
+      if (diffMs >= 0 && diffMs < day * 7) {
+        const days = Math.max(1, Math.floor(diffMs / day));
+        return 'Created ' + days + 'd ago';
+      }
+      return 'Created ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+
+    _openWorkspace(workspaceId) {
+      if (!workspaceId) return;
+      const href = 'workspace-details.html?id=' + encodeURIComponent(workspaceId);
+      if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
+        window.Lex.Nav.go('workspace-details.html', {
+          params: { id: workspaceId, tab: 'activity' },
+          context: { matterId: workspaceId, tab: 'activity' }
+        });
+      } else {
+        window.location.href = this._getAppPrefix() + href;
+      }
+    }
+
+    _openWorkspacesIndex(options = {}) {
+      const href = 'workspaces.html' + (options.create ? '?action=create' : '');
+      const createBtn = options.create ? document.getElementById('createMatterBtn') : null;
+      if (createBtn) {
+        createBtn.click();
+        return;
+      }
+      if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function' && !options.create) {
+        window.Lex.Nav.go('workspaces.html');
+      } else {
+        window.location.href = this._getAppPrefix() + href;
+      }
+    }
+
+
+    // -----------------------------------------------------------------------
     // Event binding
     // -----------------------------------------------------------------------
+
+    _updateScrollableFades() {
+      const scrollable = this.querySelector('.lex-sidebar-scrollable');
+      const scrollWrap = this.querySelector('.lex-sidebar-scrollable-wrap');
+      if (!scrollable || !scrollWrap) return;
+      const { scrollTop, scrollHeight, clientHeight } = scrollable;
+      scrollWrap.dataset.scrollTop = String(scrollTop > 4);
+      scrollWrap.dataset.scrollBottom = String(scrollTop + clientHeight < scrollHeight - 4);
+    }
 
     updated() {
       // Close button (mobile)
@@ -1654,6 +2457,59 @@
           try { sessionStorage.setItem('lana-open-global-search', '1'); } catch (_err) {}
           window.location.href = this._getAppPrefix() + 'app.html';
         }
+      });
+
+      this.delegate('click', '[data-action="toggle-dynamic-section"]', (e, target) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const section = target.closest('.lex-sidebar-collapsible-section');
+        if (!section) return;
+        const collapsed = section.dataset.collapsed !== 'true';
+        this._setSectionCollapsed(section, collapsed);
+        this._syncDynamicSectionState(section, collapsed);
+        requestAnimationFrame(() => this._updateScrollableFades());
+      });
+
+      this.delegate('click', '[data-action="create-conversation"]', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.openNewProjectModal === 'function') {
+          window.openNewProjectModal();
+        }
+      });
+
+      this.delegate('click', '[data-action="create-task"]', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._openTasksIndex({ create: true });
+      });
+
+      this.delegate('click', '[data-action="show-more-tasks"]', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._openTasksIndex();
+      });
+
+      this.delegate('click', '[data-task-id]', (e, target) => {
+        e.preventDefault();
+        this._openTask(target.dataset.taskId || '');
+      });
+
+      this.delegate('click', '[data-action="create-workspace"]', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._openWorkspacesIndex({ create: true });
+      });
+
+      this.delegate('click', '[data-action="show-more-workspaces"]', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._openWorkspacesIndex();
+      });
+
+      this.delegate('click', '[data-workspace-id]', (e, target) => {
+        e.preventDefault();
+        this._openWorkspace(target.dataset.workspaceId || '');
       });
 
       // Outside-click + Escape dismiss for the app-switcher menu. Bound once
@@ -1758,15 +2614,8 @@
       if (scrollable && !scrollable._lexScrollBound) {
         scrollable._lexScrollBound = true;
 
-        const updateFades = () => {
-          if (!scrollWrap) return;
-          const { scrollTop, scrollHeight, clientHeight } = scrollable;
-          scrollWrap.dataset.scrollTop = String(scrollTop > 4);
-          scrollWrap.dataset.scrollBottom = String(scrollTop + clientHeight < scrollHeight - 4);
-        };
-
         scrollable.addEventListener('scroll', () => {
-          updateFades();
+          this._updateScrollableFades();
 
           // Infinite scroll detection (debounced)
           clearTimeout(scrollable._lexScrollTimeout);
@@ -1779,7 +2628,7 @@
         });
 
         // Initial check after content renders
-        requestAnimationFrame(updateFades);
+        requestAnimationFrame(() => this._updateScrollableFades());
       }
 
       // User menu toggle
@@ -1807,6 +2656,8 @@
       // _emitCollapsedState() is guarded internally — it is a no-op when the
       // collapsed value has not changed since the last emission.
       this._emitCollapsedState();
+      this._initTaskList();
+      this._initWorkspaceList();
     }
   }
 

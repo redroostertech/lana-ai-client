@@ -692,6 +692,13 @@
       }
     });
 
+    // Draft promotion — the backend-provided action descriptor is the source
+    // of truth for the endpoint and method. The client only confirms intent,
+    // presents progress, and renders the canonical response.
+    listen('lex-chat-artifact-promote', function (e) {
+      requestArtifactPromotion(e.detail || {});
+    });
+
     // Title generated — update page title + sidebar conversation
     listen('lex-chat-title-generated', function (e) {
       var detail = e.detail || {};
@@ -866,6 +873,96 @@
       }
     });
 
+  }
+
+  function requestArtifactPromotion(detail) {
+    var action = detail.action || {};
+    var run = function () { executeArtifactPromotion(detail); };
+
+    if (action.requires_confirmation === true) {
+      if (!window.Lex || !window.Lex.Modal || typeof window.Lex.Modal.confirm !== 'function') {
+        setArtifactPromotionError(detail, 'Confirmation is unavailable. The draft was not promoted.');
+        return;
+      }
+
+      window.Lex.Modal.confirm(
+        'Save to Documents?',
+        'This will promote the generated draft to the matter Documents library and queue it for ingestion.',
+        run,
+        {
+          confirmText: 'Save to Documents',
+          cancelText: 'Keep as Draft'
+        }
+      );
+      return;
+    }
+
+    run();
+  }
+
+  function executeArtifactPromotion(detail) {
+    var action = detail.action || {};
+    var messageElement = detail.messageElement;
+    var artifactId = detail.artifactId || '';
+    var helpers = window.Lex && window.Lex.Chat && window.Lex.Chat.ArtifactPromotion;
+    var promotionRequest;
+
+    if (!helpers || typeof helpers.getPromotionRequest !== 'function' || !window.api || typeof window.api.post !== 'function') {
+      setArtifactPromotionError(detail, 'The save action is unavailable. The draft remains saved as a draft.');
+      return;
+    }
+
+    try {
+      promotionRequest = helpers.getPromotionRequest(action);
+    } catch (error) {
+      setArtifactPromotionError(detail, error.message + ' The draft remains saved as a draft.');
+      return;
+    }
+
+    if (messageElement && typeof messageElement.updateArtifactPromotion === 'function') {
+      messageElement.updateArtifactPromotion(artifactId, {
+        tone: 'pending',
+        message: 'Saving to Documents...'
+      });
+    }
+
+    window.api.post(promotionRequest.endpoint, promotionRequest.body)
+      .then(function (response) {
+        if (typeof helpers.normalizePromotionResponse !== 'function') {
+          throw new Error('The saved-document response could not be verified.');
+        }
+
+        var result = helpers.normalizePromotionResponse(response);
+        var statusMessage = 'Saved to Documents';
+        if (result.ingestion && result.ingestion.status) {
+          statusMessage += ' · Ingestion ' + String(result.ingestion.status).split('_').join(' ');
+        }
+
+        if (messageElement && typeof messageElement.updateArtifactPromotion === 'function') {
+          messageElement.updateArtifactPromotion(artifactId, {
+            tone: 'success',
+            message: statusMessage,
+            document: result.document
+          });
+        }
+        showSuccessToast(result.alreadyPromoted ? 'Document was already saved' : 'Saved to Documents');
+      })
+      .catch(function (error) {
+        console.error('[chat_v2] Failed to promote artifact:', error);
+        var message = error && error.message ? error.message : 'The save request failed.';
+        setArtifactPromotionError(detail, message);
+      });
+  }
+
+  function setArtifactPromotionError(detail, reason) {
+    var messageElement = detail.messageElement;
+    if (messageElement && typeof messageElement.updateArtifactPromotion === 'function') {
+      messageElement.updateArtifactPromotion(detail.artifactId || '', {
+        tone: 'error',
+        message: 'Could not save to Documents. ' + reason
+      });
+    }
+    showErrorToast('Could not save this draft to Documents');
   }
 
   function showVersionHistoryDrawer(versions) {

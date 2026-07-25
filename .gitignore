@@ -6,6 +6,7 @@
 # Node.js
 # =============================================================================
 node_modules/
+/node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -314,3 +315,4 @@ src/js/tiptap-bundle-built.js.map
 # =============================================================================
 # Built by: npm run css:build
 src/css/tailwind-output.css
+build/screen-voice/

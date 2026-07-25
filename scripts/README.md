@@ -2,6 +2,50 @@
 
 This directory contains scripts for building and testing the Lana AI Electron desktop client.
 
+## Sending a release email (`send-release-email.js`)
+
+Sends the release / pre-release email that the CLI's release-email generator
+writes to `dist/release-email-<tag>.txt`. It talks SMTP directly (Node built-in
+`net`/`tls`), so it has **no npm dependencies** and needs no `npm install`.
+
+**Why SMTP, not the Gmail API:** the Google OAuth client was deleted, which
+breaks every Gmail *API* path (the Claude Gmail/Workspace connectors and the
+`lana-mailer` OAuth token). A Gmail **App Password** over SMTP is independent of
+that OAuth client, so it keeps working.
+
+**Credentials** come from env vars, or an `--env-file` that defines them:
+
+| Var | Purpose | Default |
+|-----|---------|---------|
+| `EMAIL_HOST` | SMTP host | `smtp.gmail.com` |
+| `EMAIL_PORT` | `587` (STARTTLS) or `465` (implicit TLS) | `587` |
+| `EMAIL_USER` | sending account (Gmail address) | — (required) |
+| `EMAIL_PASS` | **Gmail App Password** (not the login password) | — (required) |
+| `EMAIL_FROM_NAME` | display name in the `From:` header | `Michael Westbrooks` |
+| `RELEASE_EMAIL_TO` | fallback recipients (comma-separated) | — |
+
+A working credential set already lives in
+`Documents/RedRoosterTech-Web/.env` (the website mailer, sends as
+`michael.westbrooks@redroostertec.com`).
+
+```bash
+# 1) Preview + verify SMTP login (sends nothing — this is the default):
+node scripts/send-release-email.js \
+  --tag v4.1.0-pre.16de7a6 \
+  --env-file /Users/…/Documents/RedRoosterTech-Web/.env
+
+# 2) Actually send (recipients come from the file's "To:" line unless --to given):
+node scripts/send-release-email.js \
+  --tag v4.1.0-pre.16de7a6 \
+  --env-file /Users/…/Documents/RedRoosterTech-Web/.env \
+  --to "ron.vanpelt@redroostertec.com,will.wyatt@redroostertec.com" \
+  --send
+```
+
+Flags: `--tag` / `--file`, `--to`, `--from`, `--subject`, `--env-file`,
+`--send` (omit for dry-run), `--help`. Recipients resolve in order:
+`--to` → the file's `To:` line → `RELEASE_EMAIL_TO`.
+
 ## Version Management
 
 ### Centralized Version System

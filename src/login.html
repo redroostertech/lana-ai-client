@@ -166,6 +166,9 @@
     const HOSTED_DISCOVERY_URL = 'https://www.redroostertec.com/lana-ai/v1/discovery';
 
     function normalizeEnabledApps(enabledApps) {
+      if (window.LanaClientApps && typeof window.LanaClientApps.normalizeEnabledAppList === 'function') {
+        return window.LanaClientApps.normalizeEnabledAppList(enabledApps || []);
+      }
       if (window.LanaClientApps && typeof window.LanaClientApps.normalizeAppList === 'function') {
         return window.LanaClientApps.normalizeAppList(enabledApps || []);
       }
@@ -191,6 +194,30 @@
       console.warn('[Login] 🔧 Development mode enabled (config.js) - API override field is available');
     }
 
+    const POST_LOGIN_BACK_SUPPRESS_KEY = 'lana:postLoginSuppressDashboardBack';
+
+    function goToDashboardAfterLogin(delayMs = 0) {
+      try {
+        sessionStorage.setItem(POST_LOGIN_BACK_SUPPRESS_KEY, 'login.html');
+      } catch (e) {
+        console.warn('[Login] Unable to mark post-login navigation:', e && e.message);
+      }
+
+      const navigate = () => {
+        if (window.location && typeof window.location.replace === 'function') {
+          window.location.replace('dashboard.html');
+        } else {
+          window.location.href = 'dashboard.html';
+        }
+      };
+
+      if (delayMs > 0) {
+        setTimeout(navigate, delayMs);
+      } else {
+        navigate();
+      }
+    }
+
     // Check if already logged in with a valid (non-expired) token
     async function checkExistingAuth() {
       // In Electron mode, verify there's a saved server before auto-redirecting
@@ -213,7 +240,7 @@
       }
 
       if (api.isAuthenticated() && !api.isTokenExpired()) {
-        window.location.href = 'dashboard.html';
+        goToDashboardAfterLogin();
       } else if (api.isAuthenticated() && api.isTokenExpired()) {
         // Token exists but is expired - clear stale auth data and stay on login
         console.log('[Login] Token expired, clearing stale auth data');
@@ -765,9 +792,7 @@
           }
         }
 
-        setTimeout(() => {
-          window.location.href = 'dashboard.html';
-        }, 500);
+        goToDashboardAfterLogin(500);
       } catch (error) {
         if (error.message === 'MFA token required') {
           mfaRequired = true;

@@ -15,11 +15,11 @@ const ConversationMenu = {
   scrollTimeout: null,
   scope: {
     type: 'chat_sessions',
-    title: 'Your Chats'
+    title: 'Recents'
   },
 
   setScope(scope) {
-    const nextScope = scope || { type: 'chat_sessions', title: 'Your Chats' };
+    const nextScope = scope || { type: 'chat_sessions', title: 'Recents' };
     const currentKey = JSON.stringify(this.scope || {});
     const nextKey = JSON.stringify(nextScope);
     this.scope = nextScope;
@@ -386,7 +386,8 @@ const ConversationMenu = {
     const matterLabel = matterName ? `
       <p class="text-xs text-gray-400 truncate flex items-center gap-1 mt-0.5">
         <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 20V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"></path>
+          <rect width="20" height="14" x="2" y="6" rx="2" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></rect>
         </svg>
         <span class="truncate">${safeMatterName}</span>
       </p>
