@@ -52,45 +52,6 @@
     return 'Unknown';
   }
 
-  // Minimal markdown -> HTML (bold, headers, inline code, code blocks, ordered
-  // and unordered lists, paragraphs). Mirrors src/js/article.js markdownToHtml so
-  // release notes render the same way stored articles/help content does.
-  function markdownToHtml(markdown) {
-    var html = String(markdown);
-    html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-    var lines = html.split('\n');
-    var inList = false;
-    var listType = null;
-    var out = [];
-    function closeList() { if (inList) { out.push(listType === 'ul' ? '</ul>' : '</ol>'); inList = false; listType = null; } }
-
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i].trim();
-      if (!line) { closeList(); continue; }
-      if (/^\d+\.\s/.test(line)) {
-        if (!inList) { out.push('<ol>'); inList = true; listType = 'ol'; }
-        else if (listType === 'ul') { out.push('</ul>'); out.push('<ol>'); listType = 'ol'; }
-        out.push('<li>' + line.replace(/^\d+\.\s/, '') + '</li>');
-      } else if (/^[-*]\s/.test(line)) {
-        if (!inList) { out.push('<ul>'); inList = true; listType = 'ul'; }
-        else if (listType === 'ol') { out.push('</ol>'); out.push('<ul>'); listType = 'ul'; }
-        out.push('<li>' + line.replace(/^[-*]\s/, '') + '</li>');
-      } else if (line.startsWith('<h') || line.startsWith('<pre>') || line.startsWith('</pre>')) {
-        closeList(); out.push(line);
-      } else {
-        closeList(); out.push('<p>' + line + '</p>');
-      }
-    }
-    closeList();
-    return out.join('\n');
-  }
-
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
@@ -107,7 +68,7 @@
     var notes = (data.release_notes && String(data.release_notes).trim()) || '';
     var notesEl = document.getElementById('releaseNotes');
     if (notesEl) {
-      if (notes) notesEl.innerHTML = markdownToHtml(notes);
+      if (notes) notesEl.innerHTML = Lex.Markdown.toHtml(notes);
       else notesEl.textContent = 'No release notes available.';
     }
 
