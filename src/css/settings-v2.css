@@ -20,7 +20,6 @@
 
 .sv2-banner {
   width: 100%;
-  max-width: 1000px;
   margin-bottom: 16px;
 }
 
@@ -32,7 +31,6 @@
   align-items: flex-start;
   gap: 32px;
   width: 100%;
-  max-width: 1000px;
 }
 
 /* The visual treatment below mirrors the Lana Insights "Report Modules"
@@ -116,7 +114,6 @@
 .sv2-panels {
   flex: 1 1 auto;
   min-width: 0;
-  max-width: 760px;
 }
 
 .sv2-panel {
