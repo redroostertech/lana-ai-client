@@ -184,6 +184,10 @@
           align-items: center;
         }
 
+        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-section[data-static-top="false"] {
+          display: none;
+        }
+
         .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-item {
           width: auto;
           gap: 0;
@@ -1086,6 +1090,10 @@
         display: none;
       }
 
+      .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-chevron {
+        display: none;
+      }
+
       /* ── Conversation list container ─────────────────────── */
 
       .lex-sidebar-conversation-list {
@@ -1175,6 +1183,93 @@
 
       .lex-sidebar-user-chevron svg {
         display: block;
+      }
+
+      .lex-sidebar-create-choice-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: calc(var(--lex-z-modal) + 3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: rgba(17, 24, 39, 0.42);
+      }
+
+      .lex-sidebar-create-choice-dialog {
+        width: min(22rem, calc(100vw - 2rem));
+        border: 1px solid var(--lex-border, #e5e7eb);
+        border-radius: var(--lex-radius-lg, 8px);
+        background: var(--lex-surface, #fff);
+        box-shadow: var(--lex-shadow-xl, 0 20px 40px rgba(0,0,0,0.22));
+        color: var(--lex-text-strong, #111827);
+        overflow: hidden;
+      }
+
+      .lex-sidebar-create-choice-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 1rem 1rem 0.625rem;
+        border-bottom: 1px solid var(--lex-border, #e5e7eb);
+        font-size: var(--lex-body-sm-size, 0.875rem);
+        font-weight: var(--lex-weight-semibold, 600);
+      }
+
+      .lex-sidebar-create-choice-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border: 0;
+        border-radius: var(--lex-radius-md, 6px);
+        background: transparent;
+        color: var(--lex-text-muted, #6b7280);
+        cursor: pointer;
+      }
+
+      .lex-sidebar-create-choice-actions {
+        display: grid;
+        gap: 0.375rem;
+        padding: 0.75rem;
+      }
+
+      .lex-sidebar-create-choice-action {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        width: 100%;
+        min-height: 2.75rem;
+        border: 0;
+        border-radius: var(--lex-radius-md, 6px);
+        background: transparent;
+        color: var(--lex-text, #374151);
+        cursor: pointer;
+        font: inherit;
+        font-size: var(--lex-body-sm-size, 0.875rem);
+        text-align: left;
+        padding: 0.625rem 0.75rem;
+      }
+
+      .lex-sidebar-create-choice-close:hover,
+      .lex-sidebar-create-choice-close:focus-visible,
+      .lex-sidebar-create-choice-action:hover,
+      .lex-sidebar-create-choice-action:focus-visible {
+        background: var(--lex-surface-muted, #f3f4f6);
+        color: var(--lex-text-strong, #111827);
+        outline: none;
+      }
+
+      .lex-sidebar-create-choice-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: 1.25rem;
+        height: 1.25rem;
+        color: var(--lex-text-muted, #6b7280);
       }
 
       /* ── User menu overlay ──────────────────────────────── */
@@ -1893,7 +1988,7 @@
       const contentId = isCollapsible ? this._getSectionContentId(section) : '';
       const isCollapsed = isCollapsible ? this._getSectionCollapsed(section) : false;
       const collapsedAttr = isCollapsible ? ` data-collapsed="${isCollapsed}" data-section-id="${this.escapeHtml(section.id || '')}"` : '';
-      let html = `<div class="${sectionClass}"${collapsedAttr}>`;
+      let html = `<div class="${sectionClass}" data-static-top="${section.isStaticTop ? 'true' : 'false'}"${collapsedAttr}>`;
       if (section.title) {
         if (isCollapsible) {
           const action = isTaskList ? 'create-task' : (isWorkspaceList ? 'create-workspace' : 'create-conversation');
@@ -1994,8 +2089,10 @@
         const childrenHtml = item.children.map((child) => this._renderNavItem(child, true)).join('');
         const iconHtml = item.icon ? icon(item.icon, 'normal') : '';
         const chevronHtml = `<span class="lex-sidebar-nav-chevron">${icon('chevron-right', 'small')}</span>`;
+        const defaultChild = item.children.find((child) => child && child.href);
+        const defaultHref = item.href || (defaultChild && defaultChild.href) || '';
         return `<div class="lex-sidebar-nav-group" data-expanded="false">
-          <button type="button" class="lex-sidebar-nav-item lex-sidebar-nav-group-toggle" data-nav-toggle data-id="${this.escapeHtml(item.id || '')}" data-tooltip="${this.escapeHtml(item.label || '')}">
+          <button type="button" class="lex-sidebar-nav-item lex-sidebar-nav-group-toggle" data-nav-toggle data-id="${this.escapeHtml(item.id || '')}" data-href="${this.escapeHtml(defaultHref)}" data-tooltip="${this.escapeHtml(item.label || '')}">
             ${iconHtml}
             <span class="lex-sidebar-nav-label">${this.escapeHtml(item.label || '')}</span>
             ${chevronHtml}
@@ -2041,6 +2138,74 @@
         <span class="lex-sidebar-user-name">${this.escapeHtml(this.userName || '')}</span>
         <span class="lex-sidebar-user-chevron">${icon('chevron-down', 'small')}</span>
       </button>`;
+    }
+
+    _openCollapsedCreateChooser() {
+      this._closeCollapsedCreateChooser();
+
+      const overlay = document.createElement('div');
+      overlay.className = 'lex-sidebar-create-choice-overlay';
+      overlay.setAttribute('role', 'presentation');
+      overlay.innerHTML = `<div class="lex-sidebar-create-choice-dialog" role="dialog" aria-modal="true" aria-labelledby="lexSidebarCreateChoiceTitle">
+        <div class="lex-sidebar-create-choice-header">
+          <span id="lexSidebarCreateChoiceTitle">Create</span>
+          <button type="button" class="lex-sidebar-create-choice-close" data-create-choice="close" aria-label="Close">${icon('x', 'small') || '&times;'}</button>
+        </div>
+        <div class="lex-sidebar-create-choice-actions">
+          <button type="button" class="lex-sidebar-create-choice-action" data-create-choice="chat">
+            <span class="lex-sidebar-create-choice-icon">${icon('message-square', 'small') || icon('edit', 'small')}</span>
+            <span>New Chat</span>
+          </button>
+          <button type="button" class="lex-sidebar-create-choice-action" data-create-choice="task">
+            <span class="lex-sidebar-create-choice-icon">${icon('clipboard-check', 'small')}</span>
+            <span>New Task</span>
+          </button>
+          <button type="button" class="lex-sidebar-create-choice-action" data-create-choice="workspace">
+            <span class="lex-sidebar-create-choice-icon">${icon('briefcase', 'small') || icon('folder', 'small')}</span>
+            <span>New Workspace</span>
+          </button>
+        </div>
+      </div>`;
+
+      const close = () => this._closeCollapsedCreateChooser();
+      overlay.addEventListener('click', (event) => {
+        const action = event.target && event.target.closest ? event.target.closest('[data-create-choice]') : null;
+        if (!action) {
+          if (event.target === overlay) close();
+          return;
+        }
+
+        const choice = action.dataset.createChoice;
+        close();
+        if (choice === 'chat') {
+          if (typeof window.openNewProjectModal === 'function') window.openNewProjectModal();
+        } else if (choice === 'task') {
+          this._openTasksIndex({ create: true });
+        } else if (choice === 'workspace') {
+          this._openWorkspacesIndex({ create: true });
+        }
+      });
+
+      this._collapsedCreateKeyHandler = (event) => {
+        if (event.key === 'Escape') close();
+      };
+      document.addEventListener('keydown', this._collapsedCreateKeyHandler);
+      document.body.appendChild(overlay);
+      this._collapsedCreateOverlay = overlay;
+
+      const firstAction = overlay.querySelector('[data-create-choice="chat"]');
+      if (firstAction && typeof firstAction.focus === 'function') firstAction.focus();
+    }
+
+    _closeCollapsedCreateChooser() {
+      if (this._collapsedCreateKeyHandler) {
+        document.removeEventListener('keydown', this._collapsedCreateKeyHandler);
+        this._collapsedCreateKeyHandler = null;
+      }
+      if (this._collapsedCreateOverlay && this._collapsedCreateOverlay.parentNode) {
+        this._collapsedCreateOverlay.parentNode.removeChild(this._collapsedCreateOverlay);
+      }
+      this._collapsedCreateOverlay = null;
     }
 
 
@@ -2559,6 +2724,18 @@
       this.delegate('click', '[data-nav-toggle]', (e, target) => {
         e.preventDefault();
         e.stopPropagation();
+        if (this.collapsed) {
+          const href = target.dataset.href || '';
+          this.emit('sidebar-nav-click', {
+            id: target.dataset.id,
+            label: target.textContent ? target.textContent.trim() : '',
+            href: href,
+            isButton: false
+          });
+          this.open = false;
+          this.emit('sidebar-close');
+          return;
+        }
         const group = target.closest('.lex-sidebar-nav-group');
         if (group) {
           const expanded = group.getAttribute('data-expanded') === 'true';
@@ -2575,6 +2752,13 @@
         const label = target.querySelector('.lex-sidebar-nav-label');
         const href = target.getAttribute('href') || target.dataset.href || '';
         const onClickFn = target.dataset.onclick;
+
+        if (this.collapsed && id === 'new-chat') {
+          e.preventDefault();
+          e.stopPropagation();
+          this._openCollapsedCreateChooser();
+          return;
+        }
 
         // Prevent browser from following <a> tags — the router handles navigation
         if (!isButton && href) {

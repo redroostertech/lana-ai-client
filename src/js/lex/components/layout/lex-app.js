@@ -35,6 +35,21 @@
   const LEX_APP_SCRIPT_SRC = (document.currentScript && document.currentScript.src) || '';
   const POST_LOGIN_BACK_SUPPRESS_KEY = 'lana:postLoginSuppressDashboardBack';
 
+  function resolveLoginHref() {
+    if (typeof window.getLoginPath === 'function') {
+      return window.getLoginPath();
+    }
+
+    var path = window.location && window.location.pathname ? window.location.pathname : '';
+    var nestedPaths = ['/admin/', '/integrations/', '/workflows/', '/insights/', '/automation/', '/voice/'];
+    for (var i = 0; i < nestedPaths.length; i += 1) {
+      if (path.indexOf(nestedPaths[i]) !== -1) {
+        return '../login.html';
+      }
+    }
+    return 'login.html';
+  }
+
   function docStudioAssetBase() {
     // LEX_APP_SCRIPT_SRC looks like '<base>/js/lex/components/layout/lex-app.js'.
     const marker = '/js/';
@@ -1172,12 +1187,13 @@
     }
 
     _performSignOut() {
+      var loginHref = resolveLoginHref();
       if (window.api && typeof window.api.logout === 'function') {
         window.api.logout()
-          .then(function () { window.location.href = 'login.html'; })
-          .catch(function () { window.location.href = 'login.html'; });
+          .then(function () { window.location.href = loginHref; })
+          .catch(function () { window.location.href = loginHref; });
       } else {
-        window.location.href = 'login.html';
+        window.location.href = loginHref;
       }
     }
 
