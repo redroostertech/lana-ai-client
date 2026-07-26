@@ -51,6 +51,12 @@
       description: 'Monitor system status and performance'
     },
     {
+      value: 'admin/updates.html',
+      label: 'Backend Updates',
+      description: 'Review and apply backend updates for this deployment',
+      allowedRoles: ['system_admin', 'org_admin', 'organization_admin']
+    },
+    {
       value: 'admin/traces.html',
       label: 'Chat Traces',
       description: 'Debug and observe AI chat interactions'

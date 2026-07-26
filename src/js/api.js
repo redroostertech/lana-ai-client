@@ -2638,6 +2638,23 @@ class ApiClient {
   }
 
   // ============================================================
+  // Backend updates (admin only)
+  // ============================================================
+  // Is a backend update available for THIS box? Returns
+  // { data: { update_available, current_version, latest_version, mandatory,
+  //           release_notes, delivery_mode, can_apply }, metadata }.
+  async getSystemUpdateStatus() {
+    return this.get('/api/v1/system/update/status');
+  }
+
+  // Trigger the update (system_admin/org_admin). For a cloud box this relays a
+  // re-provision onto the pinned image (the pod restarts); for on-prem it self-
+  // updates. Returns { data: { started, mode, target_version, ... }, metadata }.
+  async applySystemUpdate() {
+    return this.post('/api/v1/system/update/apply', {});
+  }
+
+  // ============================================================
   // Plugins
   // ============================================================
   async getPlugins() {
