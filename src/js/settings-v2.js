@@ -926,7 +926,9 @@
   // identifiers used by the loopback bridge (kept as `lana-companion` for
   // compat with already-granted device consents); values are user-visible.
   var CONNECTED_APP_LABELS = {
-    'lana-companion': 'PAC'
+    'lana-companion': 'PAC',
+    'lana-brain': 'Lana Brain',
+    'lana-extension': 'LANA Chrome extension'
   };
 
   function isConnectedAppsAvailable() {

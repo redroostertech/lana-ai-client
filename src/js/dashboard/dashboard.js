@@ -1966,6 +1966,8 @@
         value.title ||
         value.display_name ||
         value.displayName ||
+        value.state ||
+        value.status ||
         value.key ||
         value.id ||
         ''
@@ -2217,15 +2219,57 @@
     var source = lane && lane.source ? lane.source : {};
     var certification = lane && lane.certification ? lane.certification : {};
     var sourceState = commandCenterHumanize(source.state || 'unknown');
+    var healthState = commandCenterHumanize(source.data_health_state || certification.data_health || 'unknown');
     var freshness = source.last_successful_sync ? 'Synced ' + timeAgo(source.last_successful_sync) : 'No sync timestamp';
-    var certificationLabel = certification.label || commandCenterHumanize(certification.state || 'not certified');
-    return commandCenterMeta([sourceState, freshness, certificationLabel]);
+    var definition = certification.definition || {};
+    var organization = certification.organization || {};
+    var definitionLabel = definition.label || commandCenterHumanize(definition.state || certification.state || 'not certified');
+    var organizationLabel = organization.label || certification.label || commandCenterHumanize(organization.state || 'configuration required');
+    return commandCenterMeta([sourceState, healthState, freshness, definitionLabel, organizationLabel]);
   }
 
   function willDesignWarningHtml(lane) {
     var warnings = lane && lane.source && Array.isArray(lane.source.warnings) ? lane.source.warnings : [];
-    if (!warnings.length) return '';
-    return '<div class="cc-command-center__wdm-warning">' + escHtml(warnings[0]) + '</div>';
+    var mapping = lane && lane.mapping ? lane.mapping : {};
+    var validation = mapping.validation || {};
+    var unresolved = validation.unresolved || {};
+    var extra = [];
+    if (Array.isArray(unresolved.meeting_status) && unresolved.meeting_status.length) {
+      extra.push(unresolved.meeting_status.length + ' unmapped status value' + (unresolved.meeting_status.length === 1 ? '' : 's'));
+    }
+    if (Array.isArray(unresolved.service_offering) && unresolved.service_offering.length) {
+      extra.push(unresolved.service_offering.length + ' unmapped service value' + (unresolved.service_offering.length === 1 ? '' : 's'));
+    }
+    var allWarnings = warnings.concat(extra);
+    if (!allWarnings.length) return '';
+    return '<div class="cc-command-center__wdm-warning">' + escHtml(allWarnings[0]) + '</div>';
+  }
+
+  function trackWillDesignEvent(name, lane, metadata) {
+    if (!window.FeatureTracker || typeof window.FeatureTracker.trackFeature !== 'function') return;
+    var certification = lane && lane.certification ? lane.certification : {};
+    var organization = certification.organization || {};
+    var source = lane && lane.source ? lane.source : {};
+    window.FeatureTracker.trackFeature(name, Object.assign({
+      card_definition_id: lane && lane.card_definition ? lane.card_definition.id : 'question:will-design-meetings',
+      card_instance_id: lane && lane.filter_context ? lane.filter_context.card_instance_id : 'command_center',
+      period: lane && lane.period ? lane.period.key : _willDesignPeriod,
+      organization_certification_state: organization.state || certification.state || 'unknown',
+      data_health_state: source.data_health_state || certification.data_health || 'unknown'
+    }, metadata || {}));
+  }
+
+  function willDesignDetailHref(lane) {
+    var instanceId = 'dashboard:estate-planning:will-design-meetings';
+    if (lane && Array.isArray(lane.card_instances)) {
+      var detail = lane.card_instances.find(function (card) {
+        return card && card.context === 'estate_planning_dashboard';
+      });
+      if (detail && detail.id) instanceId = detail.id;
+    }
+    return 'admin/dashboard-detail.html?type=owner&q=' +
+      encodeURIComponent('will_design_meetings') +
+      '&card_instance=' + encodeURIComponent(instanceId);
   }
 
   function willDesignChangeMeta(card, lane) {
@@ -2372,6 +2416,10 @@
 
     var lane = unwrapWillDesignLane(response);
     var summary = Array.isArray(lane.summary) ? lane.summary : [];
+    trackWillDesignEvent('command_center_will_lane_viewed', lane, {
+      summary_count: summary.length,
+      result_category: summary.length ? 'loaded' : 'empty_or_unavailable'
+    });
 
     return [
       '<div class="cc-command-center__panel cc-command-center__wdm">',
@@ -2381,6 +2429,7 @@
       '      <div class="cc-command-center__panel-subtitle">' + escHtml(willDesignSourceMeta(lane)) + '</div>',
       '    </div>',
       '    <div class="cc-command-center__wdm-periods" role="group" aria-label="Will Design Meetings period">' + renderWillDesignPeriodControls((lane.period && lane.period.key) || _willDesignPeriod) + '</div>',
+      '    <lex-btn variant="ghost" size="sm" data-cc-nav="' + escHtml(willDesignDetailHref(lane)) + '" data-wdm-detail="true">View detail</lex-btn>',
       '  </div>',
       willDesignWarningHtml(lane),
       '  <div class="cc-command-center__wdm-summary">' + summary.map(function (card) { return renderWillDesignSummaryCard(card, lane); }).join('') + '</div>',
@@ -2405,6 +2454,14 @@
       periodEnd: payload.period_end,
       filters: payload.filters || {}
     });
+    if (window.FeatureTracker && typeof window.FeatureTracker.trackFeature === 'function') {
+      window.FeatureTracker.trackFeature('will_drilldown_opened', {
+        metric_key: payload.metric_key,
+        period_start_present: Boolean(payload.period_start),
+        period_end_present: Boolean(payload.period_end),
+        filter_count: Object.keys(payload.filters || {}).length
+      });
+    }
   }
 
   async function renderZoneG(silent) {
@@ -3881,6 +3938,12 @@
           var period = periodBtn.getAttribute('data-wdm-period') || 'this_month';
           if (period !== _willDesignPeriod) {
             _willDesignPeriod = period;
+            if (window.FeatureTracker && typeof window.FeatureTracker.trackFeature === 'function') {
+              window.FeatureTracker.trackFeature('will_period_changed', {
+                period: period,
+                card_instance_id: 'command_center'
+              });
+            }
             renderZoneG(true);
           }
           return;
@@ -3910,6 +3973,13 @@
         if (target.indexOf('agents/index.html') === 0) {
           window.location.href = target;
           return;
+        }
+        if (navBtn.hasAttribute('data-wdm-detail')) {
+          window.FeatureTracker && typeof window.FeatureTracker.trackFeature === 'function' &&
+            window.FeatureTracker.trackFeature('will_detail_dashboard_opened', {
+              card_instance_id: 'dashboard:estate-planning:will-design-meetings',
+              source: 'command_center'
+            });
         }
         if (target) Lex.Nav.go(target);
       });

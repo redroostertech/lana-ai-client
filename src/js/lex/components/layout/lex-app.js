@@ -899,7 +899,6 @@
         if (showAdmin) {
           menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
         }
-        menuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' });
         if (this._isLanaOne) {
           menuItems.push({ id: 'billing', label: 'Plan and billing', icon: 'credit-card', href: 'settings-v2.html#billing' });
         }
@@ -913,7 +912,6 @@
         if (showAdmin) {
           topbarMenuItems.push({ id: 'admin', label: 'Administration', icon: 'users' });
         }
-        topbarMenuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug' });
         topbarMenuItems.push({ id: 'settings', label: 'Settings', icon: 'settings' });
         topbarMenuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle' });
         topbarMenuItems.push({ divider: true });
@@ -962,6 +960,7 @@
         : [
             { id: 'new-chat', label: 'New Chat', isButton: true, onClick: 'openNewProjectModal', variant: 'create-chat' },
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
+            { id: 'connectors', label: 'Connectors', icon: 'plug', href: 'data-connectors.html' },
             { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html', children: [
               { id: 'library-all-sources', label: 'All Sources', href: 'drive.html' },
               { id: 'library-document-studio', label: 'Document Studio', isButton: true, onClick: 'openDocStudioFromMenu' }

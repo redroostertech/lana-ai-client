@@ -4,7 +4,7 @@
  *
  * Listens for `companion-bridge:request-consent` from the main process and
  * shows an in-app Lex modal asking the user to approve or deny a token
- * request from the sibling PAC app. The decision is sent back over IPC via
+ * request from a known companion app. The decision is sent back over IPC via
  * `respondCompanionBridgeConsent`. The IPC channel name and the wire
  * identifier `lana-companion` are preserved for backwards compatibility
  * with already-granted device consents.
@@ -42,6 +42,16 @@
   // burst of stale events can't stack modals).
   let activeRequestId = null;
   let activeModal = null;
+
+  var CONSENT_APP_LABELS = {
+    'lana-companion': 'PAC',
+    'lana-brain': 'Lana Brain',
+    'lana-extension': 'LANA Chrome extension'
+  };
+
+  function companionConsentLabel(appName) {
+    return CONSENT_APP_LABELS[appName] || 'this companion application';
+  }
 
   function logError(message, error) {
     try {
@@ -87,18 +97,18 @@
    * Build the modal body HTML. All user-visible strings live here so they
    * stay in sync with the native dialog copy in electron-bridge.js.
    *
-   * NOTE: The `app` value originates from a localhost POST body. We don't
-   * render it as raw text here; instead we use the constant copy plus a
-   * checkbox controlled by static markup. There is no untrusted HTML.
+   * NOTE: The `app` value originates from a localhost POST body. We only render
+   * trusted labels from CONSENT_APP_LABELS, never the raw app id.
    */
-  function buildBodyHTML() {
+  function buildBodyHTML(appName) {
+    var appLabel = companionConsentLabel(appName);
     return [
       '<div class="lana-bridge-consent">',
       '  <p class="lana-bridge-consent__lede">',
-      '    Allow <strong>PAC</strong> to use your current Lana session for this device?',
+      '    Allow <strong>' + appLabel + '</strong> to use your current Lana session for this device?',
       '  </p>',
       '  <p class="lana-bridge-consent__detail">',
-      '    PAC will receive a short-lived token tied to your signed-in user. ',
+      '    ' + appLabel + ' will receive a short-lived token tied to your signed-in user. ',
       '    You can revoke access from Settings later.',
       '  </p>',
       '  <label class="lana-bridge-consent__checkbox">',
@@ -119,7 +129,7 @@
     }
   }
 
-  function showLexModal(requestId) {
+  function showLexModal(requestId, appName) {
     if (!window.Lex || !window.Lex.Modal || typeof window.Lex.Modal.open !== 'function') {
       logError('[companion-bridge-consent] Lex.Modal is not available; denying consent');
       safeAnswer(requestId, { allow: false, alwaysAllow: false });
@@ -136,8 +146,8 @@
     };
 
     const modal = window.Lex.Modal.open({
-      heading: 'PAC is requesting access',
-      content: buildBodyHTML(),
+      heading: companionConsentLabel(appName) + ' is requesting access',
+      content: buildBodyHTML(appName),
       size: 'sm',
       confirmText: 'Allow',
       cancelText: 'Deny',
@@ -170,6 +180,8 @@
   function handleConsentRequest(payload) {
     const requestId =
       payload && typeof payload.requestId === 'string' ? payload.requestId : null;
+    const appName =
+      payload && typeof payload.app === 'string' ? payload.app : null;
     if (!requestId) {
       logError('[companion-bridge-consent] Received consent request with no requestId');
       return;
@@ -187,7 +199,7 @@
     }
 
     activeRequestId = requestId;
-    showLexModal(requestId);
+    showLexModal(requestId, appName);
   }
 
   let unsubscribe = null;

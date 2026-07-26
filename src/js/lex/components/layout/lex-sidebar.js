@@ -19,7 +19,6 @@
      sidebar.userInitials = 'MW';
      sidebar.version = '4.0.0';
      sidebar.userMenuItems = [
-       { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
        { id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html' },
        { id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true }
      ];
@@ -2052,7 +2051,6 @@
       const menuItems = this.userMenuItems && this.userMenuItems.length > 0
         ? this.userMenuItems
         : [
-            { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
             { id: 'settings', label: 'Settings', icon: 'settings', action: 'settings' },
             { id: 'help', label: 'Help & Support', icon: 'help-circle', action: 'help' },
             { id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true }
