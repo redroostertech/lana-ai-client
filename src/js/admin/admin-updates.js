@@ -70,16 +70,23 @@
 
     if (available && data.mandatory) show('mandatoryBanner'); else hide('mandatoryBanner');
 
+    // The Apply CTA is ALWAYS visible; it's disabled unless an update is
+    // available AND this user can apply it (so an up-to-date box shows a clear,
+    // greyed-out "Apply Update" rather than nothing).
     var applyBtn = document.getElementById('applyBtn');
     if (applyBtn) {
-      if (available && data.can_apply && !_applying) {
-        applyBtn.classList.remove('hidden');
+      var actionable = available && data.can_apply && !_applying;
+      if (actionable) applyBtn.removeAttribute('disabled');
+      else applyBtn.setAttribute('disabled', 'true');
+
+      if (available && data.can_apply) {
         setText('applyHint', data.delivery_mode === 'cloud'
           ? 'The backend will restart; you may be briefly disconnected while it updates.'
           : 'The backend will apply the update and restart briefly.');
+      } else if (available && !data.can_apply) {
+        setText('applyHint', 'A system administrator can apply this update.');
       } else {
-        applyBtn.classList.add('hidden');
-        setText('applyHint', (available && !data.can_apply) ? 'A system administrator can apply this update.' : '');
+        setText('applyHint', 'This deployment is on the latest version.');
       }
     }
   }
@@ -153,7 +160,7 @@
 
         _applying = true;
         var applyBtn = document.getElementById('applyBtn');
-        if (applyBtn) { applyBtn.setAttribute('loading', ''); applyBtn.classList.add('hidden'); }
+        if (applyBtn) { applyBtn.setAttribute('loading', ''); applyBtn.setAttribute('disabled', 'true'); }
         setProgress('working', 'Requesting update…');
 
         api.applySystemUpdate().then(function () {
