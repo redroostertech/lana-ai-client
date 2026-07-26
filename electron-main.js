@@ -15,23 +15,17 @@ const fs = require('fs');
 const Store = require('electron-store');
 
 /**
- * Resolve the best on-disk path for the app icon. Used at runtime to call
- * `app.dock.setIcon()` on macOS so the dock shows the Lana mark even in
- * `npm run dev` (where the .app bundle's electron.icns would otherwise
- * surface the generic Electron lava lamp). Ported from
- * brainchild/electron/main.ts#appIconPath().
+ * Resolve app icon candidates for the macOS Dock override. In development the
+ * process is Electron.app, whose bundle icon is the default Electron mark; use
+ * the PNG master first because nativeImage loads it more reliably than ICNS.
  */
-function appIconPath() {
-  const candidates = [
-    path.join(__dirname, 'build', 'icons', 'icon.icns'),
+function appIconCandidates() {
+  return [
     path.join(__dirname, 'build', 'icons', 'icon-1024.png'),
     path.join(__dirname, 'build', 'icons', 'icon-512.png'),
     path.join(__dirname, 'build', 'icons', 'icon.png'),
+    path.join(__dirname, 'build', 'icons', 'icon.icns'),
   ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  return null;
 }
 
 // Set app version from package.json (prevents app.getVersion() returning the Electron framework version)
@@ -41,19 +35,33 @@ app.setVersion(packageJson.version);
 
 function applyDockIcon() {
   if (process.platform !== 'darwin' || !app.dock) return false;
-  const iconPath = appIconPath();
-  if (!iconPath) return false;
+  let foundCandidate = false;
   try {
-    const img = nativeImage.createFromPath(iconPath);
-    if (img.isEmpty()) return false;
-    app.dock.setIcon(img);
-    app.dock.show().catch(() => {});
-    return true;
+    const candidates = appIconCandidates();
+    for (const iconPath of candidates) {
+      if (!fs.existsSync(iconPath)) continue;
+      foundCandidate = true;
+
+      const img = nativeImage.createFromPath(iconPath);
+      if (img.isEmpty()) {
+        logError(`[lana-ai-client] dock icon candidate could not be loaded: ${iconPath}`);
+        continue;
+      }
+
+      app.dock.setIcon(img);
+      app.dock.show().catch(() => {});
+      logInfo(`[lana-ai-client] dock icon applied: ${iconPath}`);
+      return true;
+    }
   } catch (err) {
     const msg = err && err.message ? err.message : String(err);
     logError(`[lana-ai-client] dock icon set failed: ${msg}`);
-    return false;
   }
+
+  logError(foundCandidate
+    ? '[lana-ai-client] dock icon set failed: all icon candidates were empty'
+    : '[lana-ai-client] dock icon set failed: no icon assets found');
+  return false;
 }
 
 // Chromium can emit noisy GPU-driver diagnostics to stderr on macOS dev runs
