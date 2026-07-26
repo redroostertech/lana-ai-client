@@ -153,6 +153,9 @@
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-kv.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <!-- Required by admin-switcher.js — it renders the admin page dropdown as a
+       <lex-select> and bails silently if this element isn't registered. -->
+  <script src="../js/lex/components/form/lex-select.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="../js/lex/lex-page-init.js"></script>
