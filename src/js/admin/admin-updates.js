@@ -159,9 +159,9 @@
         ? ('This will re-provision the backend onto version ' + target + '. The backend will restart and you may be briefly disconnected while it updates. Continue?')
         : ('This will apply backend version ' + target + '. The backend will restart briefly. Continue?');
 
-      Lex.Modal.confirm({ heading: 'Apply backend update?', body: body, confirmText: 'Apply Update' }).then(function (confirmed) {
-        if (!confirmed) return;
-
+      // Lex.Modal.confirm(title, message, onConfirm, options) — positional; the
+      // apply runs from the onConfirm callback (Cancel simply closes the modal).
+      Lex.Modal.confirm('Apply backend update?', body, function () {
         _applying = true;
         var applyBtn = document.getElementById('applyBtn');
         if (applyBtn) { applyBtn.setAttribute('loading', ''); applyBtn.setAttribute('disabled', 'true'); }
@@ -201,7 +201,7 @@
           _applying = false;
           if (applyBtn) applyBtn.removeAttribute('loading');
         });
-      });
+      }, { confirmText: 'Apply Update' });
     });
   }
 
