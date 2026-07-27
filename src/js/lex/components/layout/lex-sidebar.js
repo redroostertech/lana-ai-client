@@ -775,6 +775,31 @@
         line-height: 1.4;
       }
 
+      .lex-sidebar-workspace-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        min-width: 0;
+      }
+
+      .lex-sidebar-workspace-group + .lex-sidebar-workspace-group {
+        margin-top: 0.375rem;
+      }
+
+      .lex-sidebar-workspace-group-title {
+        padding: 0.25rem 0.75rem 0.125rem;
+        color: var(--_sb-section-text);
+        font-size: 0.625rem;
+        font-weight: var(--lex-weight-semibold, 600);
+        letter-spacing: 0.06em;
+        line-height: 1.3;
+        text-transform: uppercase;
+      }
+
+      .lex-sidebar-workspace-group-title[data-group="pinned"] {
+        color: var(--lex-status-warning, #F79009);
+      }
+
       .lex-sidebar-workspace-item {
         display: flex;
         align-items: center;
@@ -788,6 +813,7 @@
         background: transparent;
         color: var(--_sb-text);
         cursor: pointer;
+        overflow: hidden;
         text-align: left;
         transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
       }
@@ -808,9 +834,11 @@
       .lex-sidebar-workspace-copy {
         min-width: 0;
         flex: 1 1 auto;
+        overflow: hidden;
       }
 
       .lex-sidebar-workspace-name {
+        display: block;
         overflow: hidden;
         color: currentColor;
         font-size: var(--lex-body-sm-size, 0.875rem);
@@ -827,6 +855,12 @@
         line-height: 1.3;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .lex-sidebar-workspace-pin {
+        display: inline-flex;
+        flex: 0 0 auto;
+        color: var(--_sb-text-muted);
       }
 
       .lex-sidebar-task-group {
@@ -850,6 +884,22 @@
         text-transform: uppercase;
       }
 
+      .lex-sidebar-task-group-title[data-priority="urgent"] {
+        color: var(--lex-status-danger, #F04438);
+      }
+
+      .lex-sidebar-task-group-title[data-priority="high"] {
+        color: var(--lex-status-warning, #F79009);
+      }
+
+      .lex-sidebar-task-group-title[data-priority="normal"] {
+        color: var(--lex-status-info, #2E90FA);
+      }
+
+      .lex-sidebar-task-group-title[data-priority="low"] {
+        color: var(--_sb-text-muted);
+      }
+
       .lex-sidebar-task-item {
         display: flex;
         align-items: center;
@@ -863,6 +913,7 @@
         background: transparent;
         color: var(--_sb-text);
         cursor: pointer;
+        overflow: hidden;
         text-align: left;
         transition: background var(--lex-transition-fast), color var(--lex-transition-fast);
       }
@@ -883,9 +934,11 @@
       .lex-sidebar-task-copy {
         min-width: 0;
         flex: 1 1 auto;
+        overflow: hidden;
       }
 
       .lex-sidebar-task-name {
+        display: block;
         overflow: hidden;
         color: currentColor;
         font-size: var(--lex-body-sm-size, 0.875rem);
@@ -896,6 +949,7 @@
       }
 
       .lex-sidebar-task-meta {
+        display: block;
         overflow: hidden;
         color: var(--_sb-text-muted);
         font-size: var(--lex-body-xs-size, 0.75rem);
@@ -2345,7 +2399,7 @@
       const html = groups.map((group) => {
         const items = group.items.map((task) => this._renderTaskItem(task)).join('');
         return `<div class="lex-sidebar-task-group">
-          <div class="lex-sidebar-task-group-title">${this.escapeHtml(group.label)}</div>
+          <div class="lex-sidebar-task-group-title" data-priority="${this.escapeHtml(group.priorityKey)}">${this.escapeHtml(group.label)}</div>
           ${items}
         </div>`;
       }).join('');
@@ -2363,7 +2417,12 @@
         const due = this._getTaskDueBucket(task);
         const key = priority.label + '|' + due.label;
         if (!groups[key]) {
-          groups[key] = { label: priority.label + ' Priority · ' + due.label, rank: priority.rank + due.rank, items: [] };
+          groups[key] = {
+            label: priority.label + ' Priority · ' + due.label,
+            priorityKey: priority.key,
+            rank: priority.rank + due.rank,
+            items: []
+          };
           order.push(key);
         }
         groups[key].items.push(task);
@@ -2383,7 +2442,7 @@
         ? 'Low'
         : 'Normal';
       const ranks = { Urgent: 0, High: 10, Normal: 20, Low: 30 };
-      return { label: normalized, rank: ranks[normalized] };
+      return { label: normalized, key: normalized.toLowerCase(), rank: ranks[normalized] };
     }
 
     _getTaskDueBucket(task) {
@@ -2408,23 +2467,53 @@
     _renderTaskItem(task) {
       const id = task.id || task.task_id || '';
       const title = task.title || task.name || task.task_title || 'Untitled Task';
-      const matter = task.matter_name || task.workspace_name || task.matter_id || 'Organization-level';
-      const due = this._formatTaskDue(task.due_date || task.due_at || task.deadline);
-      const meta = due ? matter + ' · ' + due : matter;
+      const titleParts = this._splitTaskTitle(title);
+      const displayTitle = this._truncateTaskTitle(titleParts.taskTitle);
+      const matter = this._getTaskMatterName(task);
+      const meta = matter || titleParts.matterName;
       return `<button type="button" class="lex-sidebar-task-item" data-task-id="${this.escapeHtml(id)}" title="${this.escapeHtml(title)}">
         <span class="lex-sidebar-task-icon">${icon('clipboard-check', 'small')}</span>
         <span class="lex-sidebar-task-copy">
-          <span class="lex-sidebar-task-name">${this.escapeHtml(title)}</span>
-          <span class="lex-sidebar-task-meta">${this.escapeHtml(meta)}</span>
+          <span class="lex-sidebar-task-name">${this.escapeHtml(displayTitle)}</span>
+          ${meta ? `<span class="lex-sidebar-task-meta">${this.escapeHtml(meta)}</span>` : ''}
         </span>
       </button>`;
     }
 
-    _formatTaskDue(value) {
-      if (!value) return '';
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return '';
-      return 'Due ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    _getTaskMatterName(task) {
+      return (
+        task?.matter_name ||
+        task?.matterName ||
+        task?.client_matter_name ||
+        task?.workspace_name ||
+        task?.workspaceName ||
+        task?.matter?.matter_name ||
+        task?.matter?.name ||
+        task?.workspace?.name ||
+        ''
+      );
+    }
+
+    _splitTaskTitle(title) {
+      const value = String(title || '').trim();
+      const separators = [' — ', ' – ', ' - '];
+      for (const separator of separators) {
+        const index = value.lastIndexOf(separator);
+        if (index > 0 && index < value.length - separator.length) {
+          return {
+            taskTitle: value.slice(0, index).trim(),
+            matterName: value.slice(index + separator.length).trim()
+          };
+        }
+      }
+      return { taskTitle: value, matterName: '' };
+    }
+
+    _truncateTaskTitle(title) {
+      const value = String(title || '').trim();
+      const maxLength = 30;
+      if (value.length <= maxLength) return value;
+      return value.slice(0, maxLength - 1).trimEnd() + '…';
     }
 
     _openTask(taskId) {
@@ -2481,7 +2570,11 @@
           throw new Error('Workspace API unavailable');
         }
 
-        const result = await client.getMatters(1, 11, {
+        const pinnedRows = typeof client.getPinnedMatters === 'function'
+          ? await this._loadPinnedWorkspaces(client)
+          : [];
+
+        const result = await client.getMatters(1, 25, {
           status: 'active',
           sort_by: 'created_at',
           sort_order: 'desc'
@@ -2494,9 +2587,12 @@
             return bTime - aTime;
           });
 
+        const pinnedIds = new Set(pinnedRows.map((workspace) => this._getWorkspaceId(workspace)).filter(Boolean));
+        const recentRows = rows.filter((workspace) => !pinnedIds.has(this._getWorkspaceId(workspace)));
         const total = Number(result.total || result.count || (result.pagination && result.pagination.total) || 0);
-        this._workspaceItems = rows.slice(0, 10);
-        this._workspaceHasMore = total > 10 || rows.length > 10;
+        this._pinnedWorkspaceItems = pinnedRows;
+        this._workspaceItems = recentRows.slice(0, 10);
+        this._workspaceHasMore = total > this._workspaceItems.length + pinnedRows.length || recentRows.length > 10;
         this._renderWorkspaceList(container);
       } catch (error) {
         console.error('[lex-sidebar] Failed to load workspaces:', error);
@@ -2507,52 +2603,77 @@
       }
     }
 
+    async _loadPinnedWorkspaces(client) {
+      const pageSize = 100;
+      const rows = [];
+      let page = 1;
+      let total = 0;
+
+      do {
+        const result = await client.getPinnedMatters(page, pageSize, { status: 'active' });
+        const batch = (result.matters || result.data || result.items || []).filter(Boolean);
+        rows.push(...batch);
+        total = Number(result.total || result.count || (result.pagination && result.pagination.total) || rows.length);
+        if (!batch.length || rows.length >= total) break;
+        page += 1;
+      } while (page <= 10);
+
+      return rows;
+    }
+
     _renderWorkspaceList(container) {
       const rows = Array.isArray(this._workspaceItems) ? this._workspaceItems : [];
-      if (!rows.length) {
+      const pinnedRows = Array.isArray(this._pinnedWorkspaceItems) ? this._pinnedWorkspaceItems : [];
+      if (!pinnedRows.length && !rows.length) {
         container.innerHTML = '<div class="lex-sidebar-dynamic-empty">No workspaces yet</div>';
         return;
       }
 
-      const html = rows.map((workspace) => this._renderWorkspaceItem(workspace)).join('');
+      const sections = [];
+      if (pinnedRows.length) {
+        sections.push(`<div class="lex-sidebar-workspace-group">
+          <div class="lex-sidebar-workspace-group-title" data-group="pinned">Pinned Workspaces</div>
+          ${pinnedRows.map((workspace) => this._renderWorkspaceItem(workspace)).join('')}
+        </div>`);
+      }
+      if (rows.length) {
+        sections.push(`<div class="lex-sidebar-workspace-group">
+          <div class="lex-sidebar-workspace-group-title" data-group="recent">${pinnedRows.length ? 'Recent Workspaces' : 'Recent'}</div>
+          ${rows.map((workspace) => this._renderWorkspaceItem(workspace)).join('')}
+        </div>`);
+      }
       const showMore = this._workspaceHasMore
-        ? '<button type="button" class="lex-sidebar-show-more" data-action="show-more-workspaces">Show More</button>'
+        ? '<button type="button" class="lex-sidebar-show-more" data-action="show-more-workspaces">Show More Workspaces</button>'
         : '';
-      container.innerHTML = html + showMore;
+      container.innerHTML = sections.join('') + showMore;
     }
 
     _renderWorkspaceItem(workspace) {
-      const id = workspace.matter_id || workspace.id || '';
+      const id = this._getWorkspaceId(workspace);
       const name = workspace.name || workspace.matter_name || workspace.title || 'Untitled Workspace';
-      const created = this._formatWorkspaceCreated(workspace.created_at || workspace.updated_at);
+      const displayName = this._truncateWorkspaceTitle(name);
+      const isPinned = !!(workspace.is_pinned || workspace.pinned || workspace.is_favorite);
+      const pinMarkup = isPinned
+        ? `<span class="lex-sidebar-workspace-pin" aria-label="Pinned" title="Pinned">${icon('pin', 'small')}</span>`
+        : '';
       return `<button type="button" class="lex-sidebar-workspace-item" data-workspace-id="${this.escapeHtml(id)}" title="${this.escapeHtml(name)}">
         <span class="lex-sidebar-workspace-icon">${icon('briefcase', 'small') || icon('folder', 'small')}</span>
         <span class="lex-sidebar-workspace-copy">
-          <span class="lex-sidebar-workspace-name">${this.escapeHtml(name)}</span>
-          ${created ? `<span class="lex-sidebar-workspace-meta">${this.escapeHtml(created)}</span>` : ''}
+          <span class="lex-sidebar-workspace-name">${this.escapeHtml(displayName)}</span>
         </span>
+        ${pinMarkup}
       </button>`;
     }
 
-    _formatWorkspaceCreated(value) {
-      if (!value) return '';
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return '';
-      const now = Date.now();
-      const diffMs = now - date.getTime();
-      const minute = 60 * 1000;
-      const hour = 60 * minute;
-      const day = 24 * hour;
-      if (diffMs >= 0 && diffMs < hour) return 'Created recently';
-      if (diffMs >= 0 && diffMs < day) {
-        const hours = Math.max(1, Math.floor(diffMs / hour));
-        return 'Created ' + hours + 'h ago';
-      }
-      if (diffMs >= 0 && diffMs < day * 7) {
-        const days = Math.max(1, Math.floor(diffMs / day));
-        return 'Created ' + days + 'd ago';
-      }
-      return 'Created ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    _getWorkspaceId(workspace) {
+      return (workspace && (workspace.matter_id || workspace.id || workspace.uuid)) || '';
+    }
+
+    _truncateWorkspaceTitle(title) {
+      const value = String(title || '').trim();
+      const maxLength = 28;
+      if (value.length <= maxLength) return value;
+      return value.slice(0, maxLength - 1).trimEnd() + '…';
     }
 
     _openWorkspace(workspaceId) {
