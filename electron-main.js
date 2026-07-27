@@ -687,19 +687,35 @@ function createLoginWindow() {
 /**
  * Check for updates and handle based on policy
  * @param {string} serverUrl - Server URL
+ * @param {{notifyUpToDate?: boolean}} [options] - notifyUpToDate: show a dialog
+ *   when no update exists (manual checks only; startup checks stay silent)
  */
-async function checkAndHandleUpdates(serverUrl) {
+async function checkAndHandleUpdates(serverUrl, options = {}) {
   try {
     logInfo('Checking for updates...');
-    
+
     // Get saved server to retrieve orgId
     const savedServer = getSavedServer();
     const orgId = savedServer?.orgId || null;
-    
+
     const updateInfo = await checkForUpdates(serverUrl, null, orgId);
+
+    // Keep the renderer informed either way — pages (admin Updates, banners)
+    // listen on 'update-available' via electronAPI.onUpdateAvailable.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-available', updateInfo);
+    }
 
     if (!updateInfo.updateAvailable) {
       logInfo('No updates available');
+      if (options.notifyUpToDate) {
+        dialog.showMessageBox(mainWindow || undefined, {
+          type: 'info',
+          title: 'Check for Updates',
+          message: 'You’re up to date',
+          detail: `Lana AI ${getAppVersion()} is the latest version available.`
+        });
+      }
       return;
     }
 
@@ -810,6 +826,13 @@ function createApplicationMenu() {
               message: 'Lana AI Desktop Client',
               detail: `Version: ${getAppVersion()}\nElectron: ${process.versions.electron}\nChrome: ${process.versions.chrome}\nNode: ${process.versions.node}`
             });
+          }
+        },
+        {
+          label: 'Check for Updates…',
+          click: () => {
+            const savedServer = getSavedServer();
+            checkAndHandleUpdates(savedServer ? savedServer.url : null, { notifyUpToDate: true });
           }
         },
         { type: 'separator' },

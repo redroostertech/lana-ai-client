@@ -86,6 +86,22 @@
 
       </div>
 
+      <!-- Client app self-update (desktop app only — revealed by JS when the
+           Electron updates IPC is present; stays hidden in a browser tab) -->
+      <lex-card id="clientAppCard" heading="Client App (this computer)" class="hidden mb-6">
+        <div class="grid grid-cols-2 gap-3">
+          <lex-kv id="kvAppCurrentVersion" label="Installed Version" value="--"></lex-kv>
+          <lex-kv id="kvAppLatestVersion"  label="Latest Version"    value="--"></lex-kv>
+          <lex-kv id="kvAppUpdateStatus"   label="Status"            value="--"></lex-kv>
+          <lex-kv id="kvAppChannel"        label="Channel"           value="--"></lex-kv>
+        </div>
+        <div class="mt-6 flex items-center gap-3" data-slot="footer">
+          <lex-btn id="checkAppUpdateBtn" variant="secondary" leading-icon="refresh-cw">Check for Updates</lex-btn>
+          <lex-btn id="installAppUpdateBtn" variant="success" leading-icon="download" disabled>Download &amp; Install</lex-btn>
+          <span id="appUpdateHint" class="text-xs lex-text-secondary"></span>
+        </div>
+      </lex-card>
+
       <!-- Update progress / result (shown by JS during + after an apply) -->
       <lex-card id="progressCard" heading="Update Progress" class="hidden mb-6">
         <div class="flex items-center gap-3">
@@ -174,6 +190,7 @@
   <script src="../js/lex/lex.markdown.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/admin/client-app-update-state.js"></script>
   <script src="../js/admin/admin-updates.js"></script>
 
   <!-- Auth guard + loader dismiss (MUST be last) -->

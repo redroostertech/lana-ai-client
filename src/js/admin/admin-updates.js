@@ -206,6 +206,126 @@
   }
 
   // -------------------------------------------------------------------------
+  // Client app self-update (Electron only)
+  //
+  // Mirrors the backend card above, but the "server" is the Electron main
+  // process: check via electronAPI.checkUpdates(), install via
+  // electronAPI.installUpdate() (which downloads then quits + relaunches the
+  // app — there is no post-install state to render). View-state derivation
+  // lives in client-app-update-state.js so it stays unit-testable.
+  // -------------------------------------------------------------------------
+  var _appChecking = false;
+  var _appInstalling = false;
+  var _lastAppCheck = null;
+
+  function appUpdatesSupported() {
+    return typeof window !== 'undefined'
+      && window.electronAPI
+      && typeof window.electronAPI.checkUpdates === 'function'
+      && typeof window.electronAPI.installUpdate === 'function';
+  }
+
+  function renderAppState(state, currentVersion) {
+    if (!state.visible) return;
+    show('clientAppCard');
+    setKv('kvAppCurrentVersion', currentVersion || 'Unknown');
+    setKv('kvAppLatestVersion', state.latestVersion || '--');
+    setKv('kvAppUpdateStatus', state.statusLabel);
+    setText('appUpdateHint', state.hint);
+
+    var installBtn = document.getElementById('installAppUpdateBtn');
+    if (installBtn) {
+      if (state.canInstall && !_appInstalling) installBtn.removeAttribute('disabled');
+      else installBtn.setAttribute('disabled', 'true');
+    }
+  }
+
+  function loadAppVersion() {
+    if (typeof window.electronAPI.getVersion !== 'function') return Promise.resolve(null);
+    return window.electronAPI.getVersion().then(function (v) {
+      return v ? String(v).replace(/^v/, '') : null;
+    }).catch(function () { return null; });
+  }
+
+  function onCheckAppUpdates(currentVersion) {
+    if (_appChecking) return;
+    _appChecking = true;
+    var checkBtn = document.getElementById('checkAppUpdateBtn');
+    if (checkBtn) checkBtn.setAttribute('loading', '');
+
+    window.electronAPI.checkUpdates(null).then(function (result) {
+      _lastAppCheck = result;
+      var state = ClientAppUpdateState.fromCheckResult({
+        supported: true, currentVersion: currentVersion, result: result
+      });
+      renderAppState(state, currentVersion);
+      setKv('kvAppChannel', (result && result.updateInfo && result.updateInfo.channel) || '--');
+      if (state.statusLabel === 'Check failed') toast('error', state.hint);
+    }).then(function () {
+      _appChecking = false;
+      if (checkBtn) checkBtn.removeAttribute('loading');
+    });
+  }
+
+  function onInstallAppUpdate(currentVersion) {
+    if (_appInstalling) return;
+    var info = (_lastAppCheck && _lastAppCheck.updateInfo) || {};
+    if (!info.updateAvailable) { toast('info', 'No app update is available.'); return; }
+
+    var target = info.version || 'the latest version';
+    Lex.Modal.confirm(
+      'Install app update?',
+      'The app will download version ' + target + ', then restart to install it. Continue?',
+      function () {
+        _appInstalling = true;
+        var installBtn = document.getElementById('installAppUpdateBtn');
+        if (installBtn) { installBtn.setAttribute('loading', ''); installBtn.setAttribute('disabled', 'true'); }
+        setText('appUpdateHint', 'Downloading update… the app will restart on its own to finish.');
+
+        window.electronAPI.installUpdate(null).then(function (res) {
+          // On success the app quits and relaunches — this code only runs on failure.
+          if (res && res.success === false) {
+            _appInstalling = false;
+            if (installBtn) installBtn.removeAttribute('loading');
+            var state = ClientAppUpdateState.fromCheckResult({
+              supported: true, currentVersion: currentVersion, result: _lastAppCheck
+            });
+            renderAppState(state, currentVersion);
+            toast('error', res.error || 'The update failed to install.');
+          }
+        });
+      },
+      { confirmText: 'Download & Install' }
+    );
+  }
+
+  function initClientAppSection() {
+    if (!appUpdatesSupported()) return; // browser tab — card stays hidden
+
+    loadAppVersion().then(function (currentVersion) {
+      renderAppState(ClientAppUpdateState.fromCheckResult({ supported: true, currentVersion: currentVersion }), currentVersion);
+
+      var checkBtn = document.getElementById('checkAppUpdateBtn');
+      if (checkBtn) checkBtn.addEventListener('click', function () { onCheckAppUpdates(currentVersion); });
+      var installBtn = document.getElementById('installAppUpdateBtn');
+      if (installBtn) installBtn.addEventListener('click', function () { onInstallAppUpdate(currentVersion); });
+
+      // Startup checks in the main process broadcast on this channel; reuse
+      // the result so the card reflects reality without a manual click.
+      if (typeof window.electronAPI.onUpdateAvailable === 'function') {
+        window.electronAPI.onUpdateAvailable(function (updateInfo) {
+          _lastAppCheck = { success: true, updateInfo: updateInfo || {} };
+          var state = ClientAppUpdateState.fromCheckResult({
+            supported: true, currentVersion: currentVersion, result: _lastAppCheck
+          });
+          renderAppState(state, currentVersion);
+          setKv('kvAppChannel', (updateInfo && updateInfo.channel) || '--');
+        });
+      }
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // Wiring + boot
   // -------------------------------------------------------------------------
   function setupButtons() {
@@ -218,6 +338,7 @@
   function init() {
     setupButtons();
     loadStatus();
+    initClientAppSection();
   }
 
   init();
