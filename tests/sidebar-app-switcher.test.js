@@ -34,6 +34,24 @@ function loadSidebar() {
 }
 
 describe('LexSidebar app switcher gates', () => {
+  test('dynamic lists wait for API readiness before first request', async () => {
+    const { Sidebar } = loadSidebar();
+    const events = [];
+    let resolveReady;
+    const client = {
+      _readyPromise: new Promise((resolve) => { resolveReady = resolve; })
+    };
+    const wait = Sidebar.prototype._waitForApiReady.call({}, client).then(() => {
+      events.push('ready');
+    });
+
+    events.push('before');
+    resolveReady();
+    await wait;
+
+    expect(events).toEqual(['before', 'ready']);
+  });
+
   test('the click gate accepts every route emitted by the normalized item list', () => {
     const { Sidebar } = loadSidebar();
     const subject = {

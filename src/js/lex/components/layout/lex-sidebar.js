@@ -1554,6 +1554,15 @@
 
     connected() {
       this._hydrateAppItemsFromElectronStorage();
+      this._bindDynamicListRefreshEvents();
+    }
+
+    disconnected() {
+      if (window.Lex && window.Lex.state && this._dynamicListRefreshHandler) {
+        window.Lex.state.off('auth:changed', this._dynamicListRefreshHandler);
+        window.Lex.state.off('connection:changed', this._dynamicListRefreshHandler);
+      }
+      this._dynamicListRefreshHandler = null;
     }
 
     _hydrateAppItemsFromElectronStorage() {
@@ -2329,6 +2338,33 @@
       return null;
     }
 
+    async _waitForApiReady(client) {
+      if (!client || !client._readyPromise || typeof client._readyPromise.then !== 'function') return;
+      try {
+        await client._readyPromise;
+      } catch (_) {
+        // request() still has its own Electron/localStorage fallback path.
+      }
+    }
+
+    _bindDynamicListRefreshEvents() {
+      if (this._dynamicListRefreshHandler) return;
+      this._dynamicListRefreshHandler = () => {
+        this._taskItems = null;
+        this._taskHasMore = false;
+        this._pinnedWorkspaceItems = null;
+        this._workspaceItems = null;
+        this._workspaceHasMore = false;
+        this._initTaskList();
+        this._initWorkspaceList();
+      };
+
+      if (window.Lex && window.Lex.state) {
+        window.Lex.state.on('auth:changed', this._dynamicListRefreshHandler);
+        window.Lex.state.on('connection:changed', this._dynamicListRefreshHandler);
+      }
+    }
+
     // -----------------------------------------------------------------------
     // Task section
     // -----------------------------------------------------------------------
@@ -2351,6 +2387,7 @@
         if (!client || typeof client.getMyTasks !== 'function') {
           throw new Error('Task API unavailable');
         }
+        await this._waitForApiReady(client);
 
         const result = await client.getMyTasks({
           limit: 11,
@@ -2569,6 +2606,7 @@
         if (!client || typeof client.getMatters !== 'function') {
           throw new Error('Workspace API unavailable');
         }
+        await this._waitForApiReady(client);
 
         const pinnedRows = typeof client.getPinnedMatters === 'function'
           ? await this._loadPinnedWorkspaces(client)
