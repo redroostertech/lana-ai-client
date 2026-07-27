@@ -108,10 +108,38 @@
   }
 
   function taskMatterLabel(task) {
-    var matterName = task.matter_name || '';
-    var matterId = task.matter_id || '';
-    if (matterName && matterId) return matterName + ' (' + matterId + ')';
-    return matterName || matterId || 'Organization-level';
+    return taskMatterName(task) || 'Organization-level';
+  }
+
+  function taskMatterName(task) {
+    if (!task) return '';
+    return (
+      task.matter_name ||
+      task.matterName ||
+      task.client_matter_name ||
+      task.workspace_name ||
+      task.workspaceName ||
+      (task.matter && (task.matter.matter_name || task.matter.name)) ||
+      (task.workspace && task.workspace.name) ||
+      splitTaskTitle(task.title || task.name || task.task_title || '').matterName ||
+      ''
+    );
+  }
+
+  function splitTaskTitle(title) {
+    var value = String(title || '').trim();
+    var separators = [' — ', ' – ', ' - '];
+    for (var i = 0; i < separators.length; i += 1) {
+      var separator = separators[i];
+      var index = value.lastIndexOf(separator);
+      if (index > 0 && index < value.length - separator.length) {
+        return {
+          taskTitle: value.slice(0, index).trim(),
+          matterName: value.slice(index + separator.length).trim()
+        };
+      }
+    }
+    return { taskTitle: value, matterName: '' };
   }
 
   function taskMetadata(task) {
@@ -142,7 +170,7 @@
     if (!task.matter_id) {
       return '<lex-badge label="Org" color="green"></lex-badge>';
     }
-    return '<lex-badge label="Matter" color="blue"></lex-badge>';
+    return '<lex-badge label="Workspace" color="blue"></lex-badge>';
   }
 
   // The matter title rendered as a hyperlink that opens the matter workspace.
@@ -180,7 +208,7 @@
       '  <dl class="my-task-detail__meta">',
       '    <div class="my-task-detail__row"><dt>Status</dt><dd>' + statusSelectHtml(task) + '</dd></div>',
       '    <div class="my-task-detail__row"><dt>Priority</dt><dd>' + esc(priorityLabel(task.priority || 'normal')) + '</dd></div>',
-      '    <div class="my-task-detail__row"><dt>' + (task.matter_id ? 'Matter' : 'Level') + '</dt><dd>' + matterLinkHtml(task) + '</dd></div>',
+      '    <div class="my-task-detail__row"><dt>' + (task.matter_id ? 'Workspace' : 'Level') + '</dt><dd>' + matterLinkHtml(task) + '</dd></div>',
       task.created_by_name ? '    <div class="my-task-detail__row"><dt>Created By</dt><dd>' + esc(task.created_by_name) + '</dd></div>' : '',
       task.created_at ? '    <div class="my-task-detail__row"><dt>Created</dt><dd>' + esc(formatDateTime(task.created_at)) + '</dd></div>' : '',
       task.updated_at ? '    <div class="my-task-detail__row"><dt>Updated</dt><dd>' + esc(formatDateTime(task.updated_at)) + '</dd></div>' : '',
@@ -297,7 +325,7 @@
     return {
       id: task.id,
       title: task.title || 'Untitled task',
-      level: task.matter_id ? 'Matter' : 'Org',
+      workspace_matter: taskMatterLabel(task),
       status: statusLabel(task.status),
       priority: priorityLabel(task.priority || 'normal'),
       due_date: task.due_date || '',
@@ -311,14 +339,15 @@
       title: function (val) {
         return '<div class="my-task-table__title">' + esc(val || '') + '</div>';
       },
-      level: function (val, row) {
+      workspace_matter: function (val, row) {
         var task = row && row._raw;
+        var label = taskMatterLabel(task);
         if (!task || !task.matter_id) {
-          return '<lex-badge label="Org" color="green"></lex-badge>';
+          return '<span class="my-task-workspace-text">' + esc(label) + '</span>';
         }
         return [
-          '<button type="button" class="my-task-level-link" data-matter-id="' + esc(task.matter_id) + '" title="' + esc(taskMatterLabel(task)) + '">',
-          'Matter',
+          '<button type="button" class="my-task-workspace-link" data-matter-id="' + esc(task.matter_id) + '" title="' + esc(label) + '">',
+          esc(label),
           '</button>'
         ].join('');
       },
@@ -668,7 +697,7 @@
       if (dueDate) dueDate.value = task.due_date ? task.due_date.substring(0, 10) : '';
       if (targetType) targetType.value = task.target_type || 'unassigned';
       // Pre-fill matter selection from task.matter_id / matter name.
-      setSelectedMatter(task.matter_id || null, task.matter_name || task.matter_id || null);
+      setSelectedMatter(task.matter_id || null, taskMatterName(task) || null);
       // Pre-fill assignee if this is a user-targeted task.
       setSelectedAssignee(
         task.assigned_to_user_id || null,
@@ -997,7 +1026,7 @@
         });
       }
 
-      // Level-column "Matter" button lives inside the row, so lex-table's
+      // Workspace/Matter button lives inside the row, so lex-table's
       // row-click guard skips it. Catch it here via delegation — re-attached
       // automatically after every lex-table re-render since the listener
       // lives on the host element, not the inner table cells.

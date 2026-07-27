@@ -270,7 +270,7 @@ const ConversationMenu = {
         title: thread.title || thread.metadata?.title || 'Untitled Chat',
         metadata: thread.metadata || {},
         matter_id: thread.matter_id || '',
-        matter_name: thread.metadata?.matter_name || '',
+        matter_name: this.normalizeMatterName(thread.metadata?.matter_name || ''),
         is_pinned: !!thread.is_pinned,
         pinned_at: thread.pinned_at || null,
         created_at: thread.created_at,
@@ -380,7 +380,7 @@ const ConversationMenu = {
     const safePreview = this.escapeHtml(preview);
 
     // Get matter info if available
-    const matterName = conv.matter_name || conv.metadata?.matter_name || '';
+    const matterName = this.normalizeMatterName(conv.matter_name || conv.metadata?.matter_name || '');
     const safeMatterName = this.escapeHtml(matterName);
     const matterId = conv.matter_id || '';
     const matterLabel = matterName ? `
@@ -425,6 +425,12 @@ const ConversationMenu = {
         </div>
       </div>
     `;
+  },
+
+  normalizeMatterName(value) {
+    const name = String(value || '').trim();
+    if (!name || name.toLowerCase() === 'unknown matter') return '';
+    return name;
   },
 
   /**

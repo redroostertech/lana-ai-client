@@ -42,6 +42,7 @@
   let _currentPath = null;
   let _currentView = null;       // { onEnter, onLeave } registered by current page
   let _navigating = false;
+  let _pendingNavigation = null;
   let _app = null;               // <lex-app> element reference
   let _started = false;
 
@@ -465,11 +466,24 @@
   // Navigation
   // ---------------------------------------------------------------------------
 
+  function drainPendingNavigation() {
+    if (!_pendingNavigation || _navigating) return;
+    var next = _pendingNavigation;
+    _pendingNavigation = null;
+    navigate(next.path, next.options || {});
+  }
+
   function navigate(path, options) {
     options = options || {};
     var pushState = options.pushState !== false;
 
-    if (_navigating) return Promise.resolve();
+    if (_navigating) {
+      _pendingNavigation = {
+        path: path,
+        options: Object.assign({}, options)
+      };
+      return Promise.resolve();
+    }
 
     // Same path — skip unless forced
     if (path === _currentPath && !options.force) return Promise.resolve();
@@ -665,6 +679,7 @@
         }
 
         _navigating = false;
+        drainPendingNavigation();
       })
       .catch(function (err) {
         console.error('[LexRouter] Navigation failed:', err);
@@ -694,6 +709,7 @@
         if (window.Lex && window.Lex.Toast) {
           window.Lex.Toast.show('Page could not be loaded. Please try again.', 'error');
         }
+        drainPendingNavigation();
       });
   }
 

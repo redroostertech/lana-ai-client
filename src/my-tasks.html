@@ -33,7 +33,7 @@
       >
         <div class="my-tasks-banner-actions">
           <div class="my-tasks-new-wrapper">
-            <lex-btn id="myTasksNewBtn" variant="primary" leading-icon="plus" aria-haspopup="menu" aria-expanded="false">New</lex-btn>
+            <lex-btn id="myTasksNewBtn" variant="primary" leading-icon="plus" aria-haspopup="menu" aria-expanded="false">New Task</lex-btn>
             <div id="myTasksNewMenu" class="my-tasks-new-menu hidden" role="menu" aria-labelledby="myTasksNewBtn">
               <button type="button" class="my-tasks-new-menu__item" role="menuitem" data-new-action="task">
                 <span class="my-tasks-new-menu__title">New Task</span>
@@ -97,8 +97,8 @@
       <lex-table
         id="myTasksTable"
         class="my-tasks-table lex-table--card"
-        columns="title,level,status,priority,due_date"
-        labels="Task,Level,Status,Priority,Due"
+        columns="title,workspace_matter,status,priority,due_date"
+        labels="Task,Workspace | Matter,Status,Priority,Due"
         column-filters
         sort-by="updated_at"
         sort-dir="desc"

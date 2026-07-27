@@ -9,6 +9,8 @@
 (function () {
   'use strict';
 
+  var OPTIONAL_DASHBOARD_TIMEOUT_MS = 3500;
+
   // ── Helpers ────────────────────────────────────────────────────────
 
   function el(id) { return document.getElementById(id); }
@@ -29,6 +31,16 @@
 
   function dashboards() {
     return Array.isArray(window.LanaInsightsDashboards) ? window.LanaInsightsDashboards : [];
+  }
+
+  function optionalRequestOptions(timeoutMs) {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      return { signal: AbortSignal.timeout(timeoutMs) };
+    }
+    if (typeof AbortController === 'undefined') return {};
+    var controller = new AbortController();
+    setTimeout(function () { controller.abort(); }, timeoutMs);
+    return { signal: controller.signal };
   }
 
   function normalizeDashboardRecord(record, index) {
@@ -57,7 +69,10 @@
     }
 
     try {
-      var response = await window.api.listBIDashboards({ limit: 50, sort: 'updated_at', order: 'desc' });
+      var response = await window.api.listBIDashboards(
+        { limit: 50, sort: 'updated_at', order: 'desc' },
+        optionalRequestOptions(OPTIONAL_DASHBOARD_TIMEOUT_MS)
+      );
       var rows = response && Array.isArray(response.data) ? response.data : [];
       if (!rows.length) return dashboards();
       return rows.map(normalizeDashboardRecord);
@@ -73,12 +88,15 @@
     }
 
     try {
-      var response = await window.api.listBIDashboards({
-        sharedWithMe: true,
-        limit: 6,
-        sort: 'updated_at',
-        order: 'desc',
-      });
+      var response = await window.api.listBIDashboards(
+        {
+          sharedWithMe: true,
+          limit: 6,
+          sort: 'updated_at',
+          order: 'desc',
+        },
+        optionalRequestOptions(OPTIONAL_DASHBOARD_TIMEOUT_MS)
+      );
       var rows = response && Array.isArray(response.data) ? response.data : [];
       return rows.map(normalizeDashboardRecord);
     } catch (err) {
@@ -123,6 +141,26 @@
       + '</article>';
   }
 
+  function renderDashboardLoadingCards(containerId, count) {
+    var container = el(containerId);
+    if (!container) return;
+    var html = '';
+    for (var i = 0; i < count; i += 1) {
+      html += ''
+        + '<article class="insights-dashboard-card insights-dashboard-card--loading" aria-hidden="true">'
+        + '<span class="insights-dashboard-skeleton insights-dashboard-skeleton--eyebrow"></span>'
+        + '<span class="insights-dashboard-skeleton insights-dashboard-skeleton--title"></span>'
+        + '<span class="insights-dashboard-skeleton insights-dashboard-skeleton--description"></span>'
+        + '<span class="insights-dashboard-skeleton insights-dashboard-skeleton--description-short"></span>'
+        + '<div class="insights-dashboard-card__meta">'
+        + '<span class="insights-dashboard-skeleton insights-dashboard-skeleton--pill"></span>'
+        + '<span class="insights-dashboard-skeleton insights-dashboard-skeleton--pill"></span>'
+        + '</div>'
+        + '</article>';
+    }
+    container.innerHTML = html;
+  }
+
   function renderDashboardCollection(containerId, sortKey, limit, metaPrefix, sourceDashboards) {
     var container = el(containerId);
     if (!container) return;
@@ -145,8 +183,17 @@
   }
 
   async function renderDashboardShortcuts() {
-    var sourceDashboards = await loadDashboards();
-    var sharedDashboards = await loadSharedDashboards();
+    var fallbackDashboards = dashboards();
+    renderDashboardCollection('mostUsedDashboards', 'usageRank', 3, 'Most used', fallbackDashboards);
+    renderDashboardCollection('recentDashboards', 'recentRank', 3, 'Recently used', fallbackDashboards);
+    renderDashboardLoadingCards('sharedDashboards', 3);
+
+    var results = await Promise.all([
+      loadDashboards(),
+      loadSharedDashboards()
+    ]);
+    var sourceDashboards = results[0];
+    var sharedDashboards = results[1];
     renderDashboardCollection('mostUsedDashboards', 'usageRank', 3, 'Most used', sourceDashboards);
     renderDashboardCollection('recentDashboards', 'recentRank', 3, 'Recently used', sourceDashboards);
     renderDashboardCollection('sharedDashboards', 'recentRank', 6, 'Shared with me', sharedDashboards);

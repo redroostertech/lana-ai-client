@@ -129,7 +129,6 @@ export const VIEW_DEFINITIONS = {
 };
 
 export const SIDEBAR_NAV_ITEMS = [
-  { id: 'home', label: 'Home', icon: 'home' },
   { id: 'library', label: 'Library', icon: 'book-open' },
   { id: 'runs', label: 'Run History', icon: 'history' },
   { id: 'approvals', label: 'Approvals', icon: 'check-circle' }

@@ -1428,11 +1428,11 @@ class ApiClient {
   // ============================================================
   // HTTP Methods
   // ============================================================
-  get(endpoint) { return this.request('GET', endpoint); }
-  post(endpoint, data) { return this.request('POST', endpoint, data); }
-  put(endpoint, data) { return this.request('PUT', endpoint, data); }
-  patch(endpoint, data) { return this.request('PATCH', endpoint, data); }
-  delete(endpoint, data) { return this.request('DELETE', endpoint, data); }
+  get(endpoint, options = {}) { return this.request('GET', endpoint, null, options); }
+  post(endpoint, data, options = {}) { return this.request('POST', endpoint, data, options); }
+  put(endpoint, data, options = {}) { return this.request('PUT', endpoint, data, options); }
+  patch(endpoint, data, options = {}) { return this.request('PATCH', endpoint, data, options); }
+  delete(endpoint, data, options = {}) { return this.request('DELETE', endpoint, data, options); }
 
   // ============================================================
   // Auth
@@ -1918,6 +1918,12 @@ class ApiClient {
     }
     if (options.notes) {
       formData.append('notes', options.notes);
+    }
+    if (options.folder_id) {
+      formData.append('folder_id', options.folder_id);
+    }
+    if (options.hints) {
+      formData.append('hints', typeof options.hints === 'string' ? options.hints : JSON.stringify(options.hints));
     }
 
     // NEW ENDPOINT
@@ -2893,8 +2899,8 @@ class ApiClient {
     return this.post('/api/v1/notifications/mark-all-read');
   }
 
-  async getUnreadNotificationCount() {
-    return this.get('/api/v1/notifications/unread-count');
+  async getUnreadNotificationCount(options = {}) {
+    return this.get('/api/v1/notifications/unread-count', options);
   }
 
   async createAdminNotification(type, title, body, actionUrl = null) {
@@ -3163,13 +3169,13 @@ class ApiClient {
     return this.get(url);
   }
 
-  async getTopMovingMetrics(params = {}) {
+  async getTopMovingMetrics(params = {}, options = {}) {
     let url = '/api/v1/modules/top-moving-metrics';
     const queryParts = [];
     if (params.window) queryParts.push('window=' + encodeURIComponent(params.window));
     if (params.limit) queryParts.push('limit=' + encodeURIComponent(String(params.limit)));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
-    return this.get(url);
+    return this.get(url, options);
   }
 
   async captureMetricSnapshots(data = {}) {
@@ -3256,7 +3262,7 @@ class ApiClient {
     return this.get(url);
   }
 
-  async listBIDashboards(params = {}) {
+  async listBIDashboards(params = {}, options = {}) {
     let url = '/api/v1/business-intelligence/dashboards';
     const queryParts = [];
     if (params.search) queryParts.push('search=' + encodeURIComponent(params.search));
@@ -3266,7 +3272,7 @@ class ApiClient {
     if (params.order) queryParts.push('order=' + encodeURIComponent(params.order));
     if (params.sharedWithMe !== undefined) queryParts.push('sharedWithMe=' + encodeURIComponent(String(params.sharedWithMe)));
     if (queryParts.length > 0) url += '?' + queryParts.join('&');
-    return this.get(url);
+    return this.get(url, options);
   }
 
   async getBIDashboard(id) {
@@ -3287,8 +3293,8 @@ class ApiClient {
 
   // Dashboard pinning — mirrors pinMatter/unpinMatter/getPinnedMatters.
   // User-specific pins stored server-side in bi_dashboard_pins.
-  async listPinnedBIDashboards() {
-    return this.get('/api/v1/business-intelligence/dashboards/pinned');
+  async listPinnedBIDashboards(options = {}) {
+    return this.get('/api/v1/business-intelligence/dashboards/pinned', options);
   }
 
   async pinBIDashboard(id) {

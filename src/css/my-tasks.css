@@ -296,25 +296,35 @@
   overflow-wrap: anywhere;
 }
 
-.my-task-level-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 1.75rem;
-  padding: 0 var(--lex-spacing-sm, 0.5rem);
-  border: 1px solid var(--lex-border-default);
-  border-radius: var(--lex-radius-full, 999px);
-  background: var(--lex-bg-primary);
-  color: var(--lex-text-primary);
+.my-task-workspace-link,
+.my-task-workspace-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-task-workspace-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--lex-accent, #3b5bdb);
   font: inherit;
-  font-size: var(--lex-body-xs-size, 0.75rem);
   font-weight: var(--lex-weight-semibold, 600);
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
   cursor: pointer;
 }
 
-.my-task-level-link:hover {
-  background: var(--lex-bg-tertiary);
-  border-color: var(--lex-border-strong, var(--lex-border-default));
+.my-task-workspace-link:hover {
+  color: var(--lex-accent-strong, var(--lex-accent, #2f47b3));
+}
+
+.my-task-workspace-text {
+  color: var(--lex-text-secondary);
+  font-weight: var(--lex-weight-medium, 500);
 }
 
 .my-task-details-modal .lex-modal-overlay {
@@ -542,4 +552,3 @@
   font-family: var(--lex-font-sans, system-ui, sans-serif);
   color: var(--lex-text-secondary);
 }
-

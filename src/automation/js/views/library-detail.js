@@ -1911,9 +1911,6 @@ export function renderLibraryDetail(context) {
     <div class="connector-detail-shell" data-ld-root>
       <header class="connector-detail-header">
         <div class="connector-detail-header-lead">
-          <lex-btn variant="ghost" size="sm" data-ld-back>
-            <span aria-hidden="true">&larr;</span> Back to Library
-          </lex-btn>
           <div class="connector-detail-identity">
             <div>
               <h2>${escapeHtml(automation.automation_name || 'Unnamed Automation')}</h2>

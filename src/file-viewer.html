@@ -37,15 +37,9 @@
         variant="light"
         heading="Loading..."
         subtitle=""
-        max-actions="2"
+        max-actions="1"
       >
-        <!-- Visible action 1: Toggle metadata sidebar -->
-        <lex-btn id="toggleSidebarBtn" variant="ghost" icon="true" title="Toggle metadata sidebar" aria-label="Toggle metadata sidebar">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
-          </svg>
-        </lex-btn>
-        <!-- Visible action 2: LANA -->
+        <!-- Visible action: LANA -->
         <lex-ask-lana-btn id="askLanaBtn" panel="fileViewerLana" size="sm"></lex-ask-lana-btn>
         <!-- Overflow action: Open in Doc Studio -->
         <button id="openDocStudioBtn" type="button" class="hidden file-viewer-overflow-item" role="menuitem">

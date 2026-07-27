@@ -150,6 +150,33 @@ function renderLibraryLoadingRows(count = 4) {
   `;
 }
 
+function renderLibraryLoadingTable(count = 6) {
+  const columns = ['Name', 'Category', 'Type', 'Scope', 'Visibility', 'State', 'Last Run', 'Updated'];
+  return `
+    <div class="automation-table-loading" aria-busy="true" aria-live="polite">
+      <div class="automation-table-loading__toolbar">
+        <span class="automation-table-loading__search">&nbsp;</span>
+        <span class="automation-table-loading__count">&nbsp;</span>
+      </div>
+      <div class="automation-table-loading__table" role="table" aria-label="Loading live automations">
+        <div class="automation-table-loading__header" role="row">
+          ${columns.map((column) => `<span role="columnheader">${escapeHtml(column)}</span>`).join('')}
+        </div>
+        ${Array.from({ length: count }, (_, rowIndex) => `
+          <div class="automation-table-loading__row" role="row" aria-hidden="true">
+            ${columns.map((_, columnIndex) => `
+              <span
+                class="automation-table-loading__cell"
+                style="width:${columnIndex === 0 ? (rowIndex % 2 === 0 ? '78%' : '64%') : (columnIndex % 2 === 0 ? '48%' : '58%')};"
+              >&nbsp;</span>
+            `).join('')}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 export async function toggleAutomation(context, automationId, isEnabled) {
   try {
     await context.fetchJson(`/api/automations/${automationId}/${isEnabled ? 'deactivate' : 'activate'}`, {
@@ -199,16 +226,21 @@ export function renderLibrary(context) {
       body: `
         <div class="template-carousel">
           <div class="template-carousel-track">
-            ${templateLibrary.map((template) => `
-            <lex-action-card
-              class="template-carousel-card"
-              title="${escapeAttribute(template.name)}"
-              description="${escapeAttribute(template.description || '')}"
-              tag="${escapeAttribute(template.category || template.trigger || 'Template')}"
-              action="use-template"
-              data-template-id="${escapeAttribute(template.id)}"
-            ></lex-action-card>
-          `).join('')}
+            ${templateLibrary.map((template) => {
+              const type = template.category || template.trigger || 'Template';
+              return `
+                <button
+                  type="button"
+                  class="template-carousel-card"
+                  data-template-id="${escapeAttribute(template.id)}"
+                  aria-label="Use ${escapeAttribute(template.name)} template"
+                >
+                  <span class="template-card-title">${escapeAttribute(template.name)}</span>
+                  <span class="template-card-description">${escapeAttribute(template.description || '')}</span>
+                  <span class="template-card-type">${escapeAttribute(type)}</span>
+                </button>
+              `;
+            }).join('')}
           </div>
         </div>
       `
@@ -221,7 +253,7 @@ export function renderLibrary(context) {
         ${isLoading
           ? `
             <div class="muted" style="margin-bottom:12px;">Updating automation list...</div>
-            ${renderLibraryLoadingRows(4)}
+            ${renderLibraryLoadingTable(6)}
           `
           : lexDataTable({
             id: 'libraryAutomationsTable',

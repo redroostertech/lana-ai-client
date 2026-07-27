@@ -787,18 +787,98 @@
   // =========================================================================
 
   function dashboardTaskPriorityColor(priority) {
+    if (priority === 'urgent' || priority === 'critical') return 'red';
     if (priority === 'high') return 'red';
     if (priority === 'medium' || priority === 'normal') return 'yellow';
     return 'gray';
   }
 
+  function dashboardTaskPriorityLabel(priority) {
+    var value = String(priority || 'normal').toLowerCase();
+    if (value === 'urgent') return 'Urgent';
+    if (value === 'critical') return 'Critical';
+    if (value === 'high') return 'High';
+    if (value === 'medium') return 'Medium';
+    if (value === 'low') return 'Low';
+    return 'Normal';
+  }
+
   function dashboardTaskScope(task) {
-    return task && task.matter_id ? 'Matter' : 'Org';
+    return task && task.matter_id ? 'Workspace' : 'Org';
+  }
+
+  function dashboardTaskMatterName(task) {
+    if (!task) return '';
+    return (
+      task.matter_name ||
+      task.matterName ||
+      task.client_matter_name ||
+      task.workspace_name ||
+      task.workspaceName ||
+      (task.matter && (task.matter.matter_name || task.matter.name)) ||
+      (task.workspace && task.workspace.name) ||
+      splitDashboardTaskTitle(task.title || task.name || task.task_title || '').matterName ||
+      ''
+    );
+  }
+
+  function splitDashboardTaskTitle(title) {
+    var value = String(title || '').trim();
+    var separators = [' — ', ' – ', ' - '];
+    for (var i = 0; i < separators.length; i += 1) {
+      var separator = separators[i];
+      var index = value.lastIndexOf(separator);
+      if (index > 0 && index < value.length - separator.length) {
+        return {
+          taskTitle: value.slice(0, index).trim(),
+          matterName: value.slice(index + separator.length).trim()
+        };
+      }
+    }
+    return { taskTitle: value, matterName: '' };
+  }
+
+  function renderDashboardTaskMatterKv(task, matterName) {
+    if (!matterName) return '';
+    var matterId = task && task.matter_id ? String(task.matter_id) : '';
+    if (!matterId) {
+      return [
+        '<div class="cc-task-detail__row">',
+        '  <dt>Workspace</dt>',
+        '  <dd>' + escHtml(matterName) + '</dd>',
+        '</div>'
+      ].join('');
+    }
+    return [
+      '<div class="cc-task-detail__row">',
+      '  <dt>Workspace</dt>',
+      '  <dd>',
+      '    <button type="button" class="cc-task-matter-link" data-task-matter-link="' + escHtml(matterId) + '">',
+      escHtml(matterName),
+      '    </button>',
+      '  </dd>',
+      '</div>'
+    ].join('');
   }
 
   function dashboardTaskPlanLabel(task) {
     if (!task) return '';
     return task.task_plan_title || (task.task_plan_id ? 'Task group' : '');
+  }
+
+  function dashboardTaskMetadata(task) {
+    if (!task || !task.metadata) return {};
+    if (typeof task.metadata === 'object') return task.metadata;
+    try {
+      return JSON.parse(task.metadata);
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function dashboardTaskChecklistItems(task) {
+    var metadata = dashboardTaskMetadata(task);
+    return Array.isArray(metadata.checklist_items) ? metadata.checklist_items : [];
   }
 
   function isTaskDueToday(task) {
@@ -880,13 +960,28 @@
     ].join('');
   }
 
+  function renderTaskStatusSelect(task) {
+    var current = task.status || 'pending';
+    var options = TASK_STATUSES.map(function (status) {
+      return '<option value="' + escHtml(status) + '"' + (status === current ? ' selected' : '') + '>' + escHtml(taskStatusLabel(status)) + '</option>';
+    }).join('');
+    return [
+      '<span class="cc-task-status-control">',
+      '  <select class="cc-task-status-select" data-task-status-select aria-label="Update status">',
+      options,
+      '  </select>',
+      '</span>'
+    ].join('');
+  }
+
   function renderDashboardTaskRow(task) {
     var taskId = getTaskId(task);
     var title = task.title || 'Untitled task';
-    var scopeLabel = dashboardTaskScope(task);
+    var workspaceName = task && task.matter_id ? dashboardTaskMatterName(task) : '';
     var createdLabel = formatDashboardTaskDate(task.created_at);
     var dueLabel = formatDashboardTaskDate(task.due_date);
-    var metaParts = [scopeLabel];
+    var metaParts = [];
+    if (workspaceName) metaParts.push(workspaceName);
     if (createdLabel) metaParts.push('Created ' + createdLabel);
     if (dueLabel) metaParts.push('Due ' + dueLabel);
     var meta = metaParts.filter(Boolean).join(' · ');
@@ -1234,43 +1329,43 @@
   }
 
   function renderTaskViewBody(task) {
-    var taskId = getTaskId(task);
-    var title = task.title || 'Untitled task';
     var description = task.description || task.notes || '';
-    var matterName = task.matter_name || (task.matter_id ? task.matter_id : '');
-    var assignee = task.assigned_to_name || task.assigned_to_email || '';
-    var createdLabel = formatDashboardTaskDate(task.created_at) || '—';
-    var dueLabel = formatDashboardTaskDate(task.due_date) || '—';
+    var matterName = dashboardTaskMatterName(task);
+    var createdLabel = task.created_at ? formatDateTime(task.created_at) : '';
+    var updatedLabel = task.updated_at ? formatDateTime(task.updated_at) : '';
+    var dueLabel = task.due_date ? formatDashboardTaskDate(task.due_date) : '';
     var priority = task.priority || '';
     var scopeLabel = dashboardTaskScope(task);
-
-    var metaKvs = [
-      '<lex-kv label="Scope" value="' + escHtml(scopeLabel) + '"></lex-kv>',
-      matterName ? '<lex-kv label="Matter" value="' + escHtml(matterName) + '"></lex-kv>' : '',
-      '<lex-kv label="Created" value="' + escHtml(createdLabel) + '"></lex-kv>',
-      '<lex-kv label="Due" value="' + escHtml(dueLabel) + '"></lex-kv>',
-      priority ? '<lex-kv label="Priority" value="' + escHtml(priority) + '"></lex-kv>' : '',
-      assignee ? '<lex-kv label="Assignee" value="' + escHtml(assignee) + '"></lex-kv>' : ''
-    ].filter(Boolean).join('');
+    var createdBy = task.created_by_name || task.created_by_email || '';
+    var planLabel = dashboardTaskPlanLabel(task);
+    var checklist = dashboardTaskChecklistItems(task);
 
     return [
-      '<lex-stack direction="vertical" gap="4" style="padding:16px;" data-task-body="view">',
-      '  <h2 style="margin:0;font-size:1.125rem;font-weight:600;line-height:1.4;">' + escHtml(title) + '</h2>',
-      description
-        ? '  <p style="margin:0;color:var(--lex-text-secondary,#4b5563);line-height:1.5;white-space:pre-wrap;">' + escHtml(description) + '</p>'
-        : '',
-      '  <div>' + renderTaskStatusPill(task, { size: 'lg' }) + '</div>',
-      '  <lex-divider></lex-divider>',
-      '  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">',
-      '    ' + metaKvs,
+      '<div class="cc-task-detail" data-task-body="view">',
+      '  <div class="cc-task-detail__badges">',
+      '    <lex-badge label="' + escHtml(scopeLabel) + '" color="' + (task.matter_id ? 'blue' : 'green') + '"></lex-badge>',
+      '    <lex-badge label="' + escHtml(taskStatusLabel(task.status || 'pending')) + '" color="' + escHtml(taskStatusColor(task.status || 'pending')) + '"></lex-badge>',
+      priority ? '    <lex-badge label="' + escHtml(dashboardTaskPriorityLabel(priority)) + '" color="' + escHtml(dashboardTaskPriorityColor(priority)) + '"></lex-badge>' : '',
       '  </div>',
-      '  <lex-divider></lex-divider>',
-      '  <div style="display:flex;gap:8px;flex-wrap:wrap;">',
-      '    <lex-btn variant="primary" size="sm" data-task-action="complete" data-task-id="' + escHtml(taskId) + '">Mark Complete</lex-btn>',
-      '    <lex-btn variant="secondary" size="sm" data-task-action="edit" data-task-id="' + escHtml(taskId) + '">Edit</lex-btn>',
-      '    <lex-btn variant="secondary" size="sm" data-task-action="open-page" data-task-id="' + escHtml(taskId) + '">Open in My Tasks</lex-btn>',
-      '  </div>',
-      '</lex-stack>'
+      '  <dl class="cc-task-detail__meta">',
+      '    <div class="cc-task-detail__row"><dt>Status</dt><dd>' + renderTaskStatusSelect(task) + '</dd></div>',
+      priority ? '    <div class="cc-task-detail__row"><dt>Priority</dt><dd>' + escHtml(dashboardTaskPriorityLabel(priority)) + '</dd></div>' : '',
+      matterName ? renderDashboardTaskMatterKv(task, matterName) : '    <div class="cc-task-detail__row"><dt>Level</dt><dd>Organization-level</dd></div>',
+      createdBy ? '    <div class="cc-task-detail__row"><dt>Created By</dt><dd>' + escHtml(createdBy) + '</dd></div>' : '',
+      createdLabel ? '    <div class="cc-task-detail__row"><dt>Created</dt><dd>' + escHtml(createdLabel) + '</dd></div>' : '',
+      updatedLabel ? '    <div class="cc-task-detail__row"><dt>Updated</dt><dd>' + escHtml(updatedLabel) + '</dd></div>' : '',
+      dueLabel ? '    <div class="cc-task-detail__row"><dt>Due</dt><dd>' + escHtml(dueLabel) + '</dd></div>' : '',
+      planLabel ? '    <div class="cc-task-detail__row"><dt>Task Group</dt><dd>' + escHtml(planLabel) + '</dd></div>' : '',
+      '  </dl>',
+      description ? '  <section class="cc-task-detail__section"><h3>Description</h3><p>' + escHtml(description) + '</p></section>' : '',
+      '  <section class="cc-task-detail__section">',
+      '    <h3>Checklist</h3>',
+      checklist.length ? '    <ul class="cc-task-detail__checklist">' + checklist.map(function (item) {
+        var label = typeof item === 'string' ? item : (item.title || item.label || item.description || 'Checklist item');
+        return '<li>' + escHtml(label) + '</li>';
+      }).join('') + '</ul>' : '    <p class="cc-task-detail__muted">No checklist items attached.</p>',
+      '  </section>',
+      '</div>'
     ].join('');
   }
 
@@ -1284,7 +1379,7 @@
       || task.assigned_to_id
       || task.assigneeId
       || '';
-    var matterName = task.matter_name || (task.matter_id ? task.matter_id : '');
+    var matterName = dashboardTaskMatterName(task);
     var createdLabel = formatDashboardTaskDate(task.created_at) || '—';
     var scopeLabel = dashboardTaskScope(task);
 
@@ -1316,7 +1411,7 @@
       '  <lex-divider></lex-divider>',
       '  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">',
       '    <lex-kv label="Scope" value="' + escHtml(scopeLabel) + '"></lex-kv>',
-      matterName ? '    <lex-kv label="Matter" value="' + escHtml(matterName) + '"></lex-kv>' : '',
+      matterName ? '    <lex-kv label="Workspace" value="' + escHtml(matterName) + '"></lex-kv>' : '',
       '    <lex-kv label="Created" value="' + escHtml(createdLabel) + '"></lex-kv>',
       '  </div>',
       '  <lex-divider></lex-divider>',
@@ -1348,7 +1443,7 @@
 
     var drawer = document.createElement('div');
     drawer.innerHTML = [
-      '<lex-drawer heading="Task" side="right" width="md" open data-task-detail-drawer="1" data-task-id="' + escHtml(taskId) + '">',
+      '<lex-drawer heading="' + escHtml(title) + '" side="right" width="md" open data-task-detail-drawer="1" data-task-id="' + escHtml(taskId) + '">',
       renderTaskViewBody(task),
       '</lex-drawer>'
     ].join('');
@@ -1356,12 +1451,69 @@
     var drawerEl = drawer.firstElementChild;
     drawerEl._task = task; // attach for handlers
     document.body.appendChild(drawerEl);
+    renderDashboardTaskHeaderActions(drawerEl, task);
     wireTaskDrawerHandlers(drawerEl);
+  }
+
+  function renderDashboardTaskHeaderActions(drawerEl, task) {
+    var headerActions = drawerEl.querySelector('.lex-drawer-header-actions');
+    if (!headerActions) return;
+
+    var isComplete = (task.status === 'complete' || task.status === 'completed');
+    var completeLabel = isComplete ? 'Reopen' : 'Mark Complete';
+    var completeAction = isComplete ? 'reopen' : 'complete';
+    var chevron = '<svg class="cc-task-actions-btn__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+
+    headerActions.innerHTML = [
+      '<div class="cc-task-header-actions" data-task-actions-wrap>',
+      '  <button type="button" class="cc-task-actions-btn" data-task-actions-toggle aria-haspopup="true" aria-expanded="false">',
+      '    <span>Actions</span>' + chevron,
+      '  </button>',
+      '  <div class="cc-task-actions-menu hidden" role="menu">',
+      '    <button type="button" role="menuitem" data-task-action="edit">Edit</button>',
+      '    <button type="button" role="menuitem" data-task-action="' + completeAction + '">' + completeLabel + '</button>',
+      '    <button type="button" role="menuitem" class="cc-task-actions-menu__danger" data-task-action="delete">Delete</button>',
+      '  </div>',
+      '</div>'
+    ].join('');
+  }
+
+  function closeDashboardTaskActionsMenu(drawerEl) {
+    if (!drawerEl) return;
+    var menu = drawerEl.querySelector('.cc-task-actions-menu');
+    var toggle = drawerEl.querySelector('[data-task-actions-toggle]');
+    if (menu) menu.classList.add('hidden');
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
   }
 
   function wireTaskDrawerHandlers(drawerEl) {
     var task = drawerEl._task || {};
     var taskId = getTaskId(task);
+
+    var actionsToggle = drawerEl.querySelector('[data-task-actions-toggle]');
+    if (actionsToggle) {
+      actionsToggle.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var menu = drawerEl.querySelector('.cc-task-actions-menu');
+        if (!menu) return;
+        var isHidden = menu.classList.contains('hidden');
+        menu.classList.toggle('hidden', !isHidden);
+        actionsToggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+      });
+    }
+
+    drawerEl.addEventListener('click', function (event) {
+      if (event.target.closest && event.target.closest('.cc-task-header-actions')) return;
+      closeDashboardTaskActionsMenu(drawerEl);
+    });
+
+    var statusSelect = drawerEl.querySelector('[data-task-status-select]');
+    if (statusSelect) {
+      statusSelect.addEventListener('change', async function () {
+        await updateTaskStatusFromDrawer(drawerEl, taskId, statusSelect.value);
+      });
+    }
 
     // Status pill — same in both view and edit modes.
     var pill = drawerEl.querySelector('[data-task-status-pill]');
@@ -1378,6 +1530,7 @@
     var completeBtn = drawerEl.querySelector('[data-task-action="complete"]');
     if (completeBtn) {
       completeBtn.addEventListener('click', async function () {
+        closeDashboardTaskActionsMenu(drawerEl);
         try {
           if (typeof api.completeTask === 'function') {
             await api.completeTask(taskId);
@@ -1395,11 +1548,45 @@
       });
     }
 
-    // Open in My Tasks (view mode).
-    var openPageBtn = drawerEl.querySelector('[data-task-action="open-page"]');
-    if (openPageBtn) {
-      openPageBtn.addEventListener('click', function () {
-        Lex.Nav.go('my-tasks.html');
+    var reopenBtn = drawerEl.querySelector('[data-task-action="reopen"]');
+    if (reopenBtn) {
+      reopenBtn.addEventListener('click', async function () {
+        closeDashboardTaskActionsMenu(drawerEl);
+        await updateTaskStatusFromDrawer(drawerEl, taskId, 'pending');
+      });
+    }
+
+    var deleteBtn = drawerEl.querySelector('[data-task-action="delete"]');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async function () {
+        closeDashboardTaskActionsMenu(drawerEl);
+        if (!window.confirm('Delete this task?')) return;
+        try {
+          await api.deleteTask(taskId);
+          drawerEl.remove();
+          await renderZoneD();
+        } catch (err) {
+          console.error('[Dashboard Zone D] Failed to delete task:', err);
+          if (window.Lex && Lex.Toast && Lex.Toast.error) {
+            Lex.Toast.error('Could not delete task: ' + (err && err.message || 'unknown error'));
+          }
+        }
+      });
+    }
+
+    var matterLink = drawerEl.querySelector('[data-task-matter-link]');
+    if (matterLink) {
+      matterLink.addEventListener('click', function () {
+        var matterId = matterLink.getAttribute('data-task-matter-link');
+        if (!matterId) return;
+        if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
+          Lex.Nav.go('workspace-details.html', {
+            params: { id: matterId, tab: 'activity' },
+            context: { matterId: matterId, tab: 'activity' }
+          });
+        } else {
+          window.location.href = 'workspace-details.html?id=' + encodeURIComponent(matterId) + '&tab=activity';
+        }
       });
     }
 
@@ -1408,12 +1595,15 @@
     var editBtn = drawerEl.querySelector('[data-task-action="edit"]');
     if (editBtn) {
       editBtn.addEventListener('click', async function () {
+        closeDashboardTaskActionsMenu(drawerEl);
         editBtn.setAttribute('disabled', 'true');
         var users = await loadOrgUsersForPicker();
         var bodyEl = drawerEl.querySelector('[data-task-body]');
         if (bodyEl) {
           bodyEl.outerHTML = renderTaskEditBody(drawerEl._task || task, users);
         }
+        var headerActions = drawerEl.querySelector('.lex-drawer-header-actions');
+        if (headerActions) headerActions.innerHTML = '';
         wireTaskDrawerHandlers(drawerEl);
       });
     }
@@ -1426,6 +1616,7 @@
         if (bodyEl) {
           bodyEl.outerHTML = renderTaskViewBody(drawerEl._task || task);
         }
+        renderDashboardTaskHeaderActions(drawerEl, drawerEl._task || task);
         wireTaskDrawerHandlers(drawerEl);
       });
     }
@@ -1472,6 +1663,32 @@
           }
         }
       });
+    }
+  }
+
+  async function updateTaskStatusFromDrawer(drawerEl, taskId, newStatus) {
+    if (!drawerEl || !taskId || !newStatus) return;
+    var task = drawerEl._task || {};
+    if (newStatus === task.status) return;
+    try {
+      if (newStatus === 'complete' && typeof api.completeTask === 'function') {
+        await api.completeTask(taskId);
+      } else {
+        await api.updateTask(taskId, { status: newStatus });
+      }
+      drawerEl._task = Object.assign({}, task, { status: newStatus });
+      var bodyEl = drawerEl.querySelector('[data-task-body]');
+      if (bodyEl) {
+        bodyEl.outerHTML = renderTaskViewBody(drawerEl._task);
+      }
+      renderDashboardTaskHeaderActions(drawerEl, drawerEl._task);
+      wireTaskDrawerHandlers(drawerEl);
+      await renderZoneD();
+    } catch (err) {
+      console.error('[Dashboard Zone D] Failed to update task status:', err);
+      if (window.Lex && Lex.Toast && Lex.Toast.error) {
+        Lex.Toast.error('Could not update task: ' + (err && err.message || 'unknown error'));
+      }
     }
   }
 
@@ -2373,8 +2590,36 @@
   }
 
   /**
+   * Convert backend role keys into human-readable labels for display.
+   * @param {string} value
+   * @returns {string}
+   */
+  function formatRoleLabel(value) {
+    if (!value) return '';
+    var roleMap = {
+      system_admin: 'System Admin',
+      org_admin: 'Organization Admin',
+      organization_admin: 'Organization Admin',
+      admin: 'Admin',
+      e2e_test_admin: 'E2E Test Admin',
+      upper_leader: 'Upper Leader',
+      senior_leader: 'Senior Leader',
+      senior_user: 'Senior User',
+      user: 'User'
+    };
+    var key = String(value).trim();
+    var normalized = key.toLowerCase();
+    if (roleMap[normalized]) return roleMap[normalized];
+    return key
+      .split('_')
+      .filter(Boolean)
+      .map(function (part) { return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase(); })
+      .join(' ');
+  }
+
+  /**
    * Build user rows HTML for the team detail panel.
-   * Each user object must have: first_name, last_name, email, role_name.
+   * Each user object must have: first_name, last_name, email.
    * @param {Array} users
    * @returns {string}
    */
@@ -2384,7 +2629,7 @@
       var u = users[i];
       var fullName = ((u.first_name || '') + ' ' + (u.last_name || '')).trim() || u.email || 'Unknown';
       var initial = fullName.charAt(0).toUpperCase();
-      var role = u.role_name || '';
+      var role = u.role_display_name || u.role_label || u.display_role || formatRoleLabel(u.role_name || u.role || '');
       var email = u.email || '';
 
       html +=
@@ -2448,6 +2693,10 @@
           last_name: u.last_name,
           email: u.email,
           role_name: u.role_name,
+          role: u.role,
+          role_display_name: u.role_display_name || u.roleDisplayName || (u.role && u.role.display_name),
+          role_label: u.role_label || u.roleLabel,
+          display_role: u.display_role || u.displayRole,
           event_count: activityMap[u.id] || 0
         };
         if (entry.event_count > 0) {
@@ -2513,8 +2762,14 @@
     content.innerHTML = '<div class="py-4 text-center"><lex-spinner size="sm"></lex-spinner></div>';
 
     try {
-      var result = await api.get('/api/v1/storage/recent?limit=10');
+      var results = await Promise.allSettled([
+        api.get('/api/v1/storage/recent?limit=10'),
+        api.getMatters(1, 200)
+      ]);
+      var result = results[0].status === 'fulfilled' ? results[0].value : null;
+      var mattersResult = results[1].status === 'fulfilled' ? results[1].value : null;
       var docs = (result && (result.files || result.documents || result.data)) || [];
+      var matterMap = buildMatterNameMap((mattersResult && (mattersResult.matters || mattersResult.data || mattersResult.items)) || []);
 
       if (docs.length === 0) {
         content.innerHTML = '<lex-empty icon="folder" message="No documents yet" description="Upload your first document to get started"></lex-empty>';
@@ -2525,11 +2780,11 @@
       for (var i = 0; i < docs.length; i++) {
         var d = docs[i];
         var name = d.filename || d.original_name || d.file_name || d.name || 'Untitled';
-        var matter = d.client_matter || d.matter_name || '';
+        var matterId = getDocumentMatterId(d);
+        var matter = getDocumentMatterName(d, matterMap);
         var ts = (d.last_accessed_at || d.created_at) ? timeAgo(d.last_accessed_at || d.created_at) : '';
 
         var fileId   = d.id || '';
-        var matterId = d.client_matter || d.matter_id || '';
 
         html +=
           '<div class="cc-detail-doc-row' + (fileId && matterId ? ' cc-detail-doc-row--clickable' : '') + '"' +
@@ -2569,6 +2824,41 @@
       console.warn('[Dashboard] renderDocsDetail failed:', err && err.message);
       content.innerHTML = '<lex-empty icon="alert" message="Could not load documents"></lex-empty>';
     }
+  }
+
+  function getMatterDisplayName(matter) {
+    if (!matter) return '';
+    return matter.matter_name || matter.name || matter.title || matter.display_name || '';
+  }
+
+  function buildMatterNameMap(matters) {
+    var map = {};
+    for (var i = 0; i < matters.length; i++) {
+      var matter = matters[i];
+      var name = getMatterDisplayName(matter);
+      if (!name) continue;
+      var ids = [matter.id, matter.matter_id, matter.matter_number, matter.client_matter].filter(Boolean);
+      for (var j = 0; j < ids.length; j++) {
+        map[String(ids[j])] = name;
+      }
+    }
+    return map;
+  }
+
+  function getDocumentMatterId(doc) {
+    if (!doc) return '';
+    return doc.matter_id || doc.client_matter_id || doc.client_matter || doc.workspace_id || '';
+  }
+
+  function getDocumentMatterName(doc, matterMap) {
+    if (!doc) return '';
+    var directName = doc.matter_name || doc.client_matter_name || doc.workspace_name || doc.workspaceName ||
+      (doc.matter && getMatterDisplayName(doc.matter)) ||
+      (doc.workspace && getMatterDisplayName(doc.workspace)) ||
+      '';
+    if (directName) return directName;
+    var matterId = getDocumentMatterId(doc);
+    return matterId && matterMap[String(matterId)] ? matterMap[String(matterId)] : '';
   }
 
   /**

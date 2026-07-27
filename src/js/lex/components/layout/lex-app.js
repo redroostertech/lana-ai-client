@@ -595,6 +595,9 @@
 
       // Back button (embedded chrome mode)
       this.delegate('topbar-back-click', 'lex-topbar', (e) => {
+        if (e && typeof e.preventDefault === 'function') {
+          e.preventDefault();
+        }
         const detail = e.detail || {};
         const href = detail.href || this.backHref;
 
@@ -1043,12 +1046,25 @@
         .join(' ');
     }
 
+    _backgroundRequestOptions(timeoutMs) {
+      if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        return { signal: AbortSignal.timeout(timeoutMs) };
+      }
+      if (typeof AbortController === 'undefined') return {};
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), timeoutMs);
+      return { signal: controller.signal };
+    }
+
     async _loadTopMoversForSidebar() {
       if (this._topMoversLoaded || !window.api || typeof window.api.getTopMovingMetrics !== 'function') return;
       this._topMoversLoaded = true;
 
       try {
-        const response = await window.api.getTopMovingMetrics({ window: '24h', limit: 8 });
+        const response = await window.api.getTopMovingMetrics(
+          { window: '24h', limit: 8 },
+          this._backgroundRequestOptions(3500)
+        );
         const rows = response && Array.isArray(response.data) ? response.data : [];
         const self = this;
         this._topMoverItems = rows.slice(0, 8).map((metric) => {
@@ -1071,6 +1087,7 @@
         }
       } catch (_) {
         this._topMoverItems = [];
+        this._topMoversLoaded = false;
       }
     }
 
@@ -1136,7 +1153,7 @@
 
       // Use the dedicated unread-count endpoint (O(1) denormalized counter)
       if (typeof window.api.getUnreadNotificationCount === 'function') {
-        window.api.getUnreadNotificationCount()
+        window.api.getUnreadNotificationCount(this._backgroundRequestOptions(3500))
           .then((result) => {
             const count = (result && result.unread_count) || 0;
             const topbar = this.$('lex-topbar');

@@ -92,6 +92,69 @@
   transform: translateY(-1px);
 }
 
+.insights-dashboard-card--loading {
+  cursor: default;
+  pointer-events: none;
+}
+
+.insights-dashboard-card--loading:hover {
+  border-color: var(--lex-border-subtle, #e5e7eb);
+  box-shadow: none;
+  transform: none;
+}
+
+.insights-dashboard-skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--lex-bg-tertiary, #eceae7);
+  color: transparent;
+}
+
+.insights-dashboard-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  animation: insights-dashboard-loading-shimmer 1.35s ease-in-out infinite;
+}
+
+.insights-dashboard-skeleton--eyebrow {
+  width: 34%;
+  height: 10px;
+}
+
+.insights-dashboard-skeleton--title {
+  width: 68%;
+  height: 18px;
+  margin-top: 14px;
+}
+
+.insights-dashboard-skeleton--description {
+  width: 92%;
+  height: 12px;
+  margin-top: 12px;
+}
+
+.insights-dashboard-skeleton--description-short {
+  width: 62%;
+  height: 12px;
+  margin-top: 8px;
+}
+
+.insights-dashboard-skeleton--pill {
+  width: 72px;
+  height: 12px;
+}
+
+@keyframes insights-dashboard-loading-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .insights-dashboard-card__eyebrow {
   font-size: 0.6875rem;
   font-weight: 700;

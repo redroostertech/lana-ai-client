@@ -3,6 +3,8 @@
 (function () {
   'use strict';
 
+  var OPTIONAL_DASHBOARD_TIMEOUT_MS = 3500;
+
   function el(id) { return document.getElementById(id); }
 
   function escapeHtml(value) {
@@ -16,6 +18,16 @@
 
   function dashboards() {
     return Array.isArray(window.LanaInsightsDashboards) ? window.LanaInsightsDashboards : [];
+  }
+
+  function optionalRequestOptions(timeoutMs) {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      return { signal: AbortSignal.timeout(timeoutMs) };
+    }
+    if (typeof AbortController === 'undefined') return {};
+    var controller = new AbortController();
+    setTimeout(function () { controller.abort(); }, timeoutMs);
+    return { signal: controller.signal };
   }
 
   // Tracks dashboards the current user has pinned. Hydrated by
@@ -52,7 +64,10 @@
     }
 
     try {
-      var response = await api.listBIDashboards({ limit: 100, sort: 'name', order: 'asc' });
+      var response = await api.listBIDashboards(
+        { limit: 100, sort: 'name', order: 'asc' },
+        optionalRequestOptions(OPTIONAL_DASHBOARD_TIMEOUT_MS)
+      );
       var rows = response && Array.isArray(response.data) ? response.data : [];
       if (!rows.length) return dashboards();
       return rows.map(normalizeDashboardRecord);
@@ -128,7 +143,7 @@
   async function loadPinnedDashboards() {
     if (!window.api || typeof window.api.listPinnedBIDashboards !== 'function') return;
     try {
-      var response = await api.listPinnedBIDashboards();
+      var response = await api.listPinnedBIDashboards(optionalRequestOptions(OPTIONAL_DASHBOARD_TIMEOUT_MS));
       var rows = response && Array.isArray(response.data) ? response.data : [];
       pinnedIds = new Set(rows.map(function (row) { return row.id; }).filter(Boolean));
     } catch (err) {
@@ -287,10 +302,13 @@
     renderDashboardLibrary(state.sourceDashboards);
     renderPinnedStrip(state.sourceDashboards);
 
-    // Load pins and dashboards in parallel; render the strip when both are
-    // available so the pinned cards carry full dashboard metadata.
-    Promise.all([loadDashboards(), loadPinnedDashboards()]).then(function (results) {
-      state.sourceDashboards = results[0];
+    loadDashboards().then(function (dashboardsResult) {
+      state.sourceDashboards = dashboardsResult;
+      renderDashboardLibrary(state.sourceDashboards);
+      renderPinnedStrip(state.sourceDashboards);
+    });
+
+    loadPinnedDashboards().then(function () {
       renderDashboardLibrary(state.sourceDashboards);
       renderPinnedStrip(state.sourceDashboards);
     });

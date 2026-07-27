@@ -249,7 +249,8 @@
   // setView is the single transition point. It tears down the previous view,
   // updates state, clears the content slot, syncs URL hash + sidebar, then
   // calls render() on the next view module.
-  function setView(view, params) {
+  function setView(view, params, options) {
+    options = options || {};
     var nextView = VIEW_PARENT[view] ? view : VIEW_IDS.catalog;
     var nextParams = (params && typeof params === 'object') ? params : {};
 
@@ -274,17 +275,26 @@
     var nextHash = buildHashFor(nextView, nextParams);
     if (typeof window !== 'undefined' && window.location) {
       var currentHash = window.location.hash || '';
-      if (currentHash !== nextHash) {
-        _suppressNextHashChange = true;
-        // Use replaceState when available so we don't pollute history during
-        // boot; navigate-style transitions still push naturally because the
-        // caller path (sidebar click, deep link) will have been a real nav.
-        if (typeof window.history !== 'undefined' && window.history.replaceState) {
-          var path = window.location.pathname + window.location.search;
-          window.history.replaceState(null, '', path + nextHash);
+      var path = window.location.pathname + window.location.search;
+      var historyPayload = {
+        lanaSubApp: 'agents',
+        agentsView: nextView,
+        agentsParams: nextParams
+      };
+
+      if (!options.skipHistory && currentHash !== nextHash) {
+        if (typeof window.history !== 'undefined' && window.history.pushState) {
+          if (options.replaceHistory || !state.booted) {
+            window.history.replaceState(historyPayload, '', path + nextHash);
+          } else {
+            window.history.pushState(historyPayload, '', path + nextHash);
+          }
         } else {
+          _suppressNextHashChange = true;
           window.location.hash = nextHash;
         }
+      } else if (!options.skipHistory && currentHash === nextHash && !state.booted && typeof window.history !== 'undefined' && window.history.replaceState) {
+        window.history.replaceState(historyPayload, '', path + nextHash);
       }
     }
 
@@ -386,9 +396,9 @@
     }
   }
 
-  function dispatchFromHash() {
+  function dispatchFromHash(options) {
     var parsed = parseHash(typeof window !== 'undefined' ? window.location.hash : '');
-    setView(parsed.view, parsed.params);
+    setView(parsed.view, parsed.params, options || {});
   }
 
   function onHashChange() {
@@ -396,7 +406,12 @@
       _suppressNextHashChange = false;
       return;
     }
-    dispatchFromHash();
+    dispatchFromHash({ replaceHistory: true });
+  }
+
+  function onPopState() {
+    _suppressNextHashChange = true;
+    dispatchFromHash({ skipHistory: true });
   }
 
   // -------------------------------------------------------------------------
@@ -473,10 +488,11 @@
 
     if (typeof window !== 'undefined') {
       window.addEventListener('hashchange', onHashChange);
+      window.addEventListener('popstate', onPopState);
     }
 
     // Dispatch the initial route from URL hash.
-    dispatchFromHash();
+    dispatchFromHash({ replaceHistory: true });
   }
 
   function bindShellReady() {

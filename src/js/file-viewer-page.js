@@ -268,7 +268,8 @@
     var sidebar = document.getElementById('metadataSidebar');
     if (!sidebar) return;
 
-    state.metadataSidebarVisible = !state.metadataSidebarVisible;
+    var currentlyVisible = sidebar.offsetWidth > 0 && sidebar.style.width !== '0px';
+    state.metadataSidebarVisible = !currentlyVisible;
     if (state.metadataSidebarVisible) {
       sidebar.style.width = '';
       sidebar.style.borderLeftWidth = '';
@@ -278,6 +279,28 @@
       sidebar.style.borderLeftWidth = '0';
       sidebar.style.overflow = 'hidden';
     }
+  }
+
+  function findBannerActionTarget(event) {
+    var path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+    for (var i = 0; i < path.length; i++) {
+      var node = path[i];
+      if (!node || node.nodeType !== 1) continue;
+      if (node.dataset && node.dataset.viewerAction) return node;
+      if (node.id && (
+        node.id === 'toggleSidebarBtn' ||
+        node.id === 'openDocStudioBtn' ||
+        node.id === 'viewerDownloadBtn' ||
+        node.id === 'viewerTemplateBtn' ||
+        node.id === 'viewerGenerateBtn' ||
+        node.id === 'viewerDeleteBtn'
+      )) {
+        return node;
+      }
+    }
+    return event.target && event.target.closest
+      ? event.target.closest('[data-viewer-action], lex-btn, button')
+      : null;
   }
 
   function updateDocStudioButton(file) {
@@ -1048,11 +1071,11 @@
     var bannerEl = document.getElementById('viewerBanner');
     if (bannerEl) {
       bannerEl.addEventListener('click', function (event) {
-        var target = event.target && event.target.closest
-          ? event.target.closest('lex-btn, button')
-          : null;
+        var target = findBannerActionTarget(event);
         if (!target) return;
-        switch (target.id) {
+        var action = target.dataset && target.dataset.viewerAction;
+        switch (action || target.id) {
+          case 'toggle-sidebar':
           case 'toggleSidebarBtn':
             toggleMetadataSidebar();
             break;

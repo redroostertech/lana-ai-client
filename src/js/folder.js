@@ -674,8 +674,25 @@
 
   // ── File upload with hints ───────────────────────────────────────────
 
+  function triggerFolderFilePicker() {
+    if (!folderState.currentMatterId) {
+      Lex.Toast.error('Select a workspace before uploading documents.');
+      return;
+    }
+
+    var input = document.getElementById('fileUploadInput');
+    if (!input) {
+      Lex.Toast.error('Upload is not available right now. Please reload.');
+      return;
+    }
+
+    input.value = '';
+    input.click();
+  }
+
   /**
-   * Handle file input change event. Routes to single or bulk upload modal.
+   * Handle file input change event. Starts the same ingestion upload flow used
+   * by workspace details.
    * @param {Event} event
    */
   function handleFileSelection(event) {
@@ -685,10 +702,76 @@
     pendingUploadFiles = Array.from(files);
     console.log('[Folder] Files selected:', pendingUploadFiles.length);
 
-    if (pendingUploadFiles.length === 1) {
-      showSingleUploadModal(pendingUploadFiles[0]);
-    } else {
-      showBulkUploadModal(pendingUploadFiles);
+    handleFolderFileUpload(pendingUploadFiles);
+  }
+
+  async function handleFolderFileUpload(files, options) {
+    var fileArray = Array.from(files || []);
+    if (!fileArray.length) return;
+
+    var matterId = folderState.currentMatterId;
+    if (!matterId) {
+      Lex.Toast.error('Select a workspace before uploading documents.');
+      return;
+    }
+
+    var CONCURRENT_UPLOADS = 3;
+    var folderId = folderState.currentFolderId || null;
+    var successCount = 0;
+
+    Lex.Toast.info('Uploading ' + fileArray.length + ' document' + (fileArray.length === 1 ? '' : 's') + '...');
+
+    try {
+      await api._readyPromise;
+
+      for (var i = 0; i < fileArray.length; i += CONCURRENT_UPLOADS) {
+        var batch = fileArray.slice(i, i + CONCURRENT_UPLOADS);
+        var batchPromises = batch.map(function (file) {
+          var uploadOptions = {
+            folder_id: folderId || undefined
+          };
+          if (options && options.hints) {
+            uploadOptions.hints = options.hints;
+          }
+          return api.uploadDocument(file, matterId, uploadOptions).then(function (result) {
+            successCount++;
+            return result;
+          }).catch(function (error) {
+            console.error('[Folder] Failed to upload file:', file.name, error);
+            Lex.Toast.error('Failed to upload ' + file.name + ': ' + error.message);
+          });
+        });
+        await Promise.all(batchPromises);
+      }
+
+      if (successCount > 0) {
+        Lex.Toast.success('Uploaded ' + successCount + ' document(s) - processing started');
+
+        if (window.FeatureTracker) {
+          for (var j = 0; j < fileArray.length; j++) {
+            try {
+              await window.FeatureTracker.trackFeature(window.Features.DOCUMENT_UPLOADED, {
+                file_type: fileArray[j].type || 'unknown',
+                file_size: fileArray[j].size,
+                matter_id: matterId,
+                folder_id: folderId,
+                is_bulk_upload: fileArray.length > 1
+              });
+            } catch (trackError) {
+              console.error('[FeatureTracker] Failed to track upload:', trackError);
+            }
+          }
+        }
+
+        await loadFolderContents({ silent: true });
+      }
+    } catch (error) {
+      console.error('[Folder] Failed to upload files:', error);
+      Lex.Toast.error('Failed to upload files. Please try again.');
+    } finally {
+      pendingUploadFiles = null;
+      var input = document.getElementById('fileUploadInput');
+      if (input) input.value = '';
     }
   }
 
@@ -746,62 +829,14 @@
       hasForms: hasForms
     });
 
+    var hints = {};
+    if (hasSignatures) hints.hasSignatures = true;
+    if (hasForms) hints.hasForms = true;
+
     hideSingleUploadModal();
-    Lex.Toast.info('Uploading file...');
-
-    try {
-      await api._readyPromise;
-
-      var formData = new FormData();
-      formData.append('file', file);
-      formData.append('matter_id', folderState.currentMatterId);
-      if (folderState.currentFolderId) {
-        formData.append('folder_id', folderState.currentFolderId);
-      }
-
-      if (hasSignatures || hasForms) {
-        var hints = {};
-        if (hasSignatures) hints.hasSignatures = true;
-        if (hasForms) hints.hasForms = true;
-        formData.append('hints', JSON.stringify(hints));
-      }
-
-      var response = await fetch(api.baseUrl + '/api/v1/storage/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + api.token
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed: ' + response.status);
-      }
-
-      var result = await response.json();
-      console.log('[Folder] Upload successful:', result);
-
-      Lex.Toast.success('File uploaded successfully');
-
-      if (window.FeatureTracker) {
-        try {
-          await window.FeatureTracker.trackFeature(window.Features.DOCUMENT_UPLOADED, {
-            file_type: file.type || 'unknown',
-            file_size: file.size,
-            matter_id: folderState.currentMatterId,
-            folder_id: folderState.currentFolderId || null,
-            has_hints: !!(hasSignatures || hasForms)
-          });
-        } catch (trackError) {
-          console.error('[FeatureTracker] Failed to track upload:', trackError);
-        }
-      }
-
-      await loadFolderContents();
-    } catch (error) {
-      console.error('[Folder] Failed to upload file:', error);
-      Lex.Toast.error('Failed to upload file. Please try again.');
-    }
+    await handleFolderFileUpload([file], {
+      hints: Object.keys(hints).length ? hints : null
+    });
   }
 
   /**
@@ -932,64 +967,11 @@
     console.log('[Folder] Uploading', filesWithHints.length, 'files with hints');
 
     hideBulkUploadModal();
-    Lex.Toast.info('Uploading ' + filesWithHints.length + ' file(s)...');
 
-    try {
-      await api._readyPromise;
-
-      var uploadPromises = filesWithHints.map(function (item) {
-        var formData = new FormData();
-        formData.append('file', item.file);
-        formData.append('matter_id', folderState.currentMatterId);
-        if (folderState.currentFolderId) {
-          formData.append('folder_id', folderState.currentFolderId);
-        }
-        if (item.hints) {
-          formData.append('hints', JSON.stringify(item.hints));
-        }
-
-        return fetch(api.baseUrl + '/api/v1/storage/upload', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer ' + api.token
-          },
-          body: formData
-        });
+    for (var i = 0; i < filesWithHints.length; i++) {
+      await handleFolderFileUpload([filesWithHints[i].file], {
+        hints: filesWithHints[i].hints
       });
-
-      var responses = await Promise.all(uploadPromises);
-      var failedUploads = responses.filter(function (r) { return !r.ok; });
-
-      if (failedUploads.length > 0) {
-        throw new Error(failedUploads.length + ' file(s) failed to upload');
-      }
-
-      var results = await Promise.all(responses.map(function (r) { return r.json(); }));
-      console.log('[Folder] Bulk upload successful:', results);
-
-      Lex.Toast.success('Successfully uploaded ' + filesWithHints.length + ' file(s)');
-
-      if (window.FeatureTracker) {
-        for (var i = 0; i < filesWithHints.length; i++) {
-          var item = filesWithHints[i];
-          try {
-            await window.FeatureTracker.trackFeature(window.Features.DOCUMENT_UPLOADED, {
-              file_type: item.file.type || 'unknown',
-              file_size: item.file.size,
-              matter_id: folderState.currentMatterId,
-              folder_id: folderState.currentFolderId || null,
-              is_bulk_upload: true
-            });
-          } catch (trackError) {
-            console.error('[FeatureTracker] Failed to track bulk upload:', trackError);
-          }
-        }
-      }
-
-      await loadFolderContents();
-    } catch (error) {
-      console.error('[Folder] Failed to upload files:', error);
-      Lex.Toast.error('Failed to upload files. Please try again.');
     }
   }
 
@@ -1205,15 +1187,13 @@
     // Empty state upload button - lex-empty fires 'action' event
     var contentEmptyWidget = document.getElementById('contentEmptyWidget');
     contentEmptyWidget && contentEmptyWidget.addEventListener('action', function () {
-      var input = document.getElementById('fileUploadInput');
-      input && input.click();
+      triggerFolderFilePicker();
     });
 
     // Empty state Upload action - reuses the existing file picker / upload flow
     var emptyUploadBtn = document.getElementById('emptyUploadBtn');
     emptyUploadBtn && emptyUploadBtn.addEventListener('click', function () {
-      var input = document.getElementById('fileUploadInput');
-      input && input.click();
+      triggerFolderFilePicker();
     });
 
     // Empty state Create using Doc Studio action - opens the in-page Doc Studio
@@ -1235,11 +1215,10 @@
     // Upload button triggers file picker (lex-btn fires native click)
     var uploadBtn = document.getElementById('uploadBtn');
     uploadBtn && uploadBtn.addEventListener('click', function () {
-      var input = document.getElementById('fileUploadInput');
-      input && input.click();
+      triggerFolderFilePicker();
     });
 
-    // File selection triggers hints modal
+    // File selection starts the ingestion upload flow
     var fileUploadInput = document.getElementById('fileUploadInput');
     fileUploadInput && fileUploadInput.addEventListener('change', handleFileSelection);
 
@@ -1396,6 +1375,7 @@
     exposeGlobal('navigateToMatterBreadcrumb', navigateToMatterBreadcrumb);
     exposeGlobal('showFolderMenu', showFolderMenu);
     exposeGlobal('_navToFileViewer', _navToFileViewer);
+    exposeGlobal('triggerFolderFilePicker', triggerFolderFilePicker);
 
     setupEventListeners();
     renderBreadcrumbs();

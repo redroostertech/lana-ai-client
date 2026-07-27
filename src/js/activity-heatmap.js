@@ -325,15 +325,36 @@ const ActivityHeatmap = (function() {
 
     const formattedDate = formatDateReadable(date);
     const activityText = count === 1 ? 'activity' : 'activities';
+    const formattedCount = formatActivityCount(count);
 
     tooltip.innerHTML = `
-      <div><strong>${count} ${activityText}</strong></div>
+      <div><strong>${formattedCount} ${activityText}</strong></div>
       <div style="font-size: 11px; margin-top: 2px; opacity: 0.8;">${formattedDate}</div>
     `;
 
     tooltip.style.display = 'block';
     tooltip.style.left = (event.pageX + 10) + 'px';
     tooltip.style.top = (event.pageY - 10) + 'px';
+  }
+
+  /**
+   * Format activity counts for compact tooltip display.
+   */
+  function formatActivityCount(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return '0';
+    const whole = Math.trunc(n);
+    if (whole < 1000) return String(whole);
+
+    const format = (scaled, suffix) => {
+      const rounded = Math.round(scaled * 10) / 10;
+      const str = rounded % 1 === 0 ? String(Math.trunc(rounded)) : rounded.toFixed(1);
+      return str + suffix;
+    };
+
+    if (whole >= 1000000000) return format(whole / 1000000000, 'B');
+    if (whole >= 1000000) return format(whole / 1000000, 'M');
+    return format(whole / 1000, 'K');
   }
 
   /**

@@ -99,7 +99,7 @@ const state = {
     ? localStorage.getItem(STORAGE_KEYS.connectorsChecklistHidden) === '1'
     : false,
   links: null,
-  currentView: 'home',
+  currentView: 'library',
   dashboard: null,
   templates: [],
   automations: [],
@@ -391,6 +391,8 @@ function bindGlobalEvents() {
   if (els.connectorImportDropZone) {
     setupConnectorImportDropZone(els.connectorImportDropZone);
   }
+
+  window.addEventListener('popstate', onAutomationPopState);
 }
 
 function onAppLexClose(event) {
@@ -432,25 +434,14 @@ async function bootstrapApp() {
     }
   }
 
+  const initialRoute = parseAutomationRouteFromLocation();
+  if (initialRoute) {
+    applyAutomationRouteState(initialRoute);
+  }
+
   renderUserChip();
-  setView(state.currentView);
-  await Promise.all([
-    loadDashboard(),
-    loadTemplates(),
-    loadAutomations(),
-    loadHomeRecentRuns(),
-    loadMatters(),
-    loadConnectors(),
-    // Load installed connectors at boot too, not just when the Connectors
-    // view is opened. The Home screen's "N ready connectors" badge reads
-    // from state.connectorIndex (built from state.installedConnectors), so
-    // without this the badge always shows 0 on first render.
-    loadInstalledConnectors(),
-    loadConnectorHealth(),
-    loadUserProfile()
-  ]);
-  rebuildConnectorIndex();
-  await loadOnboardingState();
+  setView(state.currentView, { replaceHistory: true });
+  await refreshCurrentView();
 
   // Check for deep-link: /builder?automationId=<uuid>
   // If present, go directly to the builder in edit mode.
@@ -468,9 +459,7 @@ async function bootstrapApp() {
     return;
   }
 
-  restoreOnboardingDraft();
   renderUserChip();
-  renderCurrentView();
 }
 
 /**
@@ -540,7 +529,7 @@ function showApp() {
   if (root) root.classList.remove('hidden');
 }
 
-function setView(view) {
+function setView(view, options = {}) {
   if (state.currentView === 'connector-detail' && view !== 'connector-detail') {
     teardownConnectorDetail();
     // GAP #10: clear lazy-loaded sources when leaving connector-detail
@@ -561,6 +550,7 @@ function setView(view) {
     }
   }
   state.currentView = view;
+  syncAutomationHistory(view, options);
   syncSidebarActive();
 
   const meta = VIEW_DEFINITIONS[view] || VIEW_DEFINITIONS.home;
@@ -582,6 +572,90 @@ function setView(view) {
     els.shell.activeNavId = state.currentView;
   }
   renderCurrentView();
+}
+
+function parseAutomationRouteFromLocation() {
+  if (typeof window === 'undefined') return null;
+  const hash = String(window.location.hash || '').replace(/^#/, '').trim();
+  if (!hash) return null;
+
+  if (hash.startsWith('automation/')) {
+    const automationId = decodeURIComponent(hash.slice('automation/'.length).trim());
+    return automationId ? { view: 'library-detail', automationId } : null;
+  }
+
+  const view = hash.split('?')[0];
+  if (VIEW_DEFINITIONS[view]) {
+    return { view };
+  }
+
+  return null;
+}
+
+function applyAutomationRouteState(route) {
+  if (!route || !VIEW_DEFINITIONS[route.view]) return;
+  if (route.view === 'library-detail' && route.automationId) {
+    state.libraryDetail = createLibraryDetailState(route.automationId);
+  }
+  state.currentView = route.view;
+}
+
+function buildAutomationHash(view) {
+  if (view === 'library-detail') {
+    const automationId = state.libraryDetail?.automationId;
+    return automationId ? `#automation/${encodeURIComponent(automationId)}` : '#library';
+  }
+  if (VIEW_DEFINITIONS[view]) return `#${encodeURIComponent(view)}`;
+  return '#library';
+}
+
+function syncAutomationHistory(view, options = {}) {
+  if (state._applyingHistory || options.skipHistory || typeof window === 'undefined' || !window.history) return;
+
+  const hash = buildAutomationHash(view);
+  const nextUrl = `${window.location.pathname}${window.location.search}${hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash || ''}`;
+
+  const historyState = {
+    ...(window.history.state || {}),
+    lanaSubApp: 'automate',
+    automationView: view,
+    automationId: view === 'library-detail' ? (state.libraryDetail?.automationId || '') : ''
+  };
+
+  if (nextUrl === currentUrl) {
+    if (!state._historyInitialized) {
+      window.history.replaceState(historyState, '', nextUrl);
+      state._historyInitialized = true;
+    }
+    return;
+  }
+
+  if (options.replaceHistory || !state._historyInitialized) {
+    window.history.replaceState(historyState, '', nextUrl);
+    state._historyInitialized = true;
+  } else {
+    window.history.pushState(historyState, '', nextUrl);
+  }
+}
+
+function onAutomationPopState() {
+  const route = parseAutomationRouteFromLocation() || { view: 'library' };
+  state._applyingHistory = true;
+  applyAutomationRouteState(route);
+  setView(state.currentView, { skipHistory: true });
+  state._applyingHistory = false;
+
+  if (route.view === 'library-detail' && route.automationId) {
+    loadLibraryDetailAutomation(createContext(), route.automationId)
+      .catch((err) => flash(err.message || 'Failed to load automation.', true))
+      .finally(() => renderCurrentView());
+    return;
+  }
+
+  refreshCurrentView().catch((error) => {
+    flash(error.message || 'Failed to refresh view.', true);
+  });
 }
 
 function resolveSelectedConnector() {
@@ -775,7 +849,7 @@ async function refreshCurrentView() {
       rebuildConnectorIndex();
       break;
     case 'library':
-      await Promise.all([loadTemplates(), loadAutomations()]);
+      await loadLibraryData();
       break;
     case 'library-detail': {
       const automationId = state.libraryDetail?.automationId;
@@ -1590,6 +1664,21 @@ async function showLibraryLoadingState() {
   renderCurrentView();
 }
 
+async function loadLibraryData() {
+  const token = Date.now();
+  state.libraryLoadingToken = token;
+  state.libraryLoading = true;
+  renderCurrentView();
+
+  try {
+    await Promise.all([loadTemplates(), loadAutomations()]);
+  } finally {
+    if (state.libraryLoadingToken === token) {
+      state.libraryLoading = false;
+    }
+  }
+}
+
 async function onAppInput(event) {
   // "Build with Lana" description — store without re-rendering so the textarea
   // keeps focus while typing (re-render wipes and rebuilds the DOM).
@@ -1738,6 +1827,9 @@ function gotoBuilder(templateId, automationId) {
     state.builderStep = 1;
     state.builder.publishModalOpen = false;
     setView('builder');
+    loadBuilderReferenceData().catch((error) => {
+      console.warn('[automation] Failed to load builder reference data', error);
+    });
     // Load automation asynchronously; loadAutomationForEdit calls renderCurrentView when done.
     loadAutomationForEdit(createContext(), automationId);
     return;
@@ -1757,6 +1849,35 @@ function gotoBuilder(templateId, automationId) {
   state.builder.publishModalOpen = false;
   setView('builder');
   renderCurrentView();
+  loadBuilderReferenceData().catch((error) => {
+    console.warn('[automation] Failed to load builder reference data', error);
+  });
+}
+
+async function loadBuilderReferenceData() {
+  if (state._builderReferenceDataPromise) return state._builderReferenceDataPromise;
+
+  state._builderReferenceDataPromise = (async () => {
+    const tasks = [];
+    if (!state.templates.length || !state.actionCatalog.length) {
+      tasks.push(loadTemplates());
+      tasks.push(loadAutomations());
+    }
+    if (!state.matters.length) tasks.push(loadMatters());
+    if (!state.connectors.length) tasks.push(loadConnectors());
+    if (!state.installedConnectors.length) tasks.push(loadInstalledConnectors());
+    if (!state.connectorHealth.length) tasks.push(loadConnectorHealth());
+    if (!state.onboardingState) tasks.push(loadOnboardingState());
+
+    if (tasks.length) {
+      await Promise.allSettled(tasks);
+      rebuildConnectorIndex();
+      restoreOnboardingDraft();
+      if (state.currentView === 'builder') renderCurrentView();
+    }
+  })();
+
+  return state._builderReferenceDataPromise;
 }
 
 /**
@@ -2878,12 +2999,18 @@ async function submitConnectorImport() {
 }
 
 async function loadConnectors() {
-  const payload = await fetchJson('/api/connectors', {
-    headers: authHeaders()
-  });
-  const fetched = Array.isArray(payload.data)
-    ? payload.data
-    : (Array.isArray(payload.connectors) ? payload.connectors : []);
+  let fetched = [];
+  try {
+    const payload = await fetchJson('/api/connectors', {
+      headers: authHeaders(),
+      timeoutMs: 8000
+    });
+    fetched = Array.isArray(payload.data)
+      ? payload.data
+      : (Array.isArray(payload.connectors) ? payload.connectors : []);
+  } catch (error) {
+    console.warn('Failed to load connector catalog', error);
+  }
 
   // Always include SYSTEM_CONNECTORS in the readiness catalog so legacy
   // built-ins (Leadly, ActionStep, GoHighLevel) are visible in the table
@@ -2916,7 +3043,8 @@ async function loadConnectors() {
 async function loadConnectorHealth() {
   try {
     const payload = await fetchJson('/api/connector-health', {
-      headers: authHeaders()
+      headers: authHeaders(),
+      timeoutMs: 8000
     });
     state.connectorHealth = payload.data || [];
   } catch (error) {
@@ -3081,7 +3209,7 @@ function renderUserChip() {
   if (!els.sidebar) return;
 
   // Primary nav is owned by the automation app — its own surfaces (Create
-  // + SIDEBAR_NAV_ITEMS like Home, Connectors, Library, Runs, Approvals).
+  // + SIDEBAR_NAV_ITEMS like Library, Runs, Approvals).
   const sections = [
     {
       id: 'main-actions',
@@ -3215,7 +3343,13 @@ async function fetchJson(url, options = {}) {
   // Browser → canonical Lana API. The shared ApiClient owns the active Core
   // server URL; this wrapper preserves legacy automation paths and retries
   // equivalent /api/v1 routes when older unversioned paths are missing.
-  const { headers: optionHeaders = {}, _skipFallback = false, ...restOptions } = options;
+  const {
+    headers: optionHeaders = {},
+    _skipFallback = false,
+    timeoutMs = 15000,
+    signal: optionSignal,
+    ...restOptions
+  } = options;
   const baseHeaders = {
     'Content-Type': 'application/json',
     ...(state.token ? { Authorization: `Bearer ${state.token}` } : {})
@@ -3223,18 +3357,47 @@ async function fetchJson(url, options = {}) {
   const preferredUrl = !_skipFallback ? resolvePreferredApiUrl(url) : '';
   const apiPath = preferredUrl || url;
   const requestUrl = getApiUrl(apiPath);
-  const response = await fetch(requestUrl, {
-    ...restOptions,
-    headers: {
-      ...baseHeaders,
-      ...optionHeaders
-    }
-  });
 
-  const contentType = response.headers.get('content-type') || '';
-  const payload = contentType.includes('application/json')
-    ? await response.json()
-    : await response.text();
+  let timeoutId = null;
+  let requestSignal = optionSignal;
+  let controller = null;
+  if (timeoutMs && Number(timeoutMs) > 0 && typeof AbortController !== 'undefined') {
+    controller = new AbortController();
+    requestSignal = controller.signal;
+    timeoutId = window.setTimeout(() => controller.abort(), Number(timeoutMs));
+    if (optionSignal) {
+      if (optionSignal.aborted) {
+        controller.abort();
+      } else {
+        optionSignal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
+    }
+  }
+
+  let response;
+  let payload;
+  try {
+    response = await fetch(requestUrl, {
+      ...restOptions,
+      ...(requestSignal ? { signal: requestSignal } : {}),
+      headers: {
+        ...baseHeaders,
+        ...optionHeaders
+      }
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    payload = contentType.includes('application/json')
+      ? await response.json()
+      : await response.text();
+  } catch (error) {
+    if (error && error.name === 'AbortError') {
+      throw new Error('Request timed out.');
+    }
+    throw error;
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     if (response.status === 404 && !_skipFallback) {
@@ -3243,6 +3406,8 @@ async function fetchJson(url, options = {}) {
         return fetchJson(fallbackUrl, {
           ...restOptions,
           headers: optionHeaders,
+          timeoutMs,
+          signal: optionSignal,
           _skipFallback: true
         });
       }
