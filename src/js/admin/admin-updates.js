@@ -299,8 +299,25 @@
     );
   }
 
+  // -------------------------------------------------------------------------
+  // Backend / Client App scope toggle
+  // -------------------------------------------------------------------------
+  function initScopeToggle() {
+    var toggle = document.getElementById('updatesScopeToggle');
+    if (!toggle) return;
+    toggle.addEventListener('lex-change', function (e) {
+      var scope = e && e.detail && e.detail.value;
+      if (scope === 'client') { hide('backendSection'); show('clientSection'); }
+      else { show('backendSection'); hide('clientSection'); }
+    });
+  }
+
   function initClientAppSection() {
-    if (!appUpdatesSupported()) return; // browser tab — card stays hidden
+    if (!appUpdatesSupported()) {
+      // Browser tab: no Electron IPC, so self-update is impossible here.
+      show('clientAppUnsupported');
+      return;
+    }
 
     loadAppVersion().then(function (currentVersion) {
       renderAppState(ClientAppUpdateState.fromCheckResult({ supported: true, currentVersion: currentVersion }), currentVersion);
@@ -337,6 +354,7 @@
 
   function init() {
     setupButtons();
+    initScopeToggle();
     loadStatus();
     initClientAppSection();
   }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Backend Updates - LANA AI</title>
+  <title>Software Updates - LANA AI</title>
 
   <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
   <link rel="stylesheet" href="../css/lex-tokens.css">
@@ -24,7 +24,7 @@
     logo-alt="LANA AI"
     logo-href="../dashboard.html"
     active-nav-id="admin"
-    page-title="Backend Updates"
+    page-title="Software Updates"
   ></lex-app>
 
   <!-- Page content as inert <template> -->
@@ -36,13 +36,23 @@
       <lex-banner
         id="updatesBanner"
         variant="light"
-        heading="Backend Updates"
-        subtitle="Review and apply backend updates for this deployment"
+        heading="Software Updates"
+        subtitle="Review and apply backend and client app updates"
       >
         <div id="updateStatusBadge"></div>
       </lex-banner>
 
-      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Backend Updates"}]'></lex-breadcrumb>
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Software Updates"}]'></lex-breadcrumb>
+
+      <!-- Scope toggle: one surface, two update targets -->
+      <div class="mb-6">
+        <lex-segmented id="updatesScopeToggle" value="backend"
+          options='[{"value":"backend","label":"Backend"},{"value":"client","label":"Client App"}]'>
+        </lex-segmented>
+      </div>
+
+      <!-- ══ BACKEND section ══ -->
+      <div id="backendSection">
 
       <!-- Mandatory update banner (shown by JS only when mandatory) -->
       <div id="mandatoryBanner" class="hidden mb-6">
@@ -86,22 +96,6 @@
 
       </div>
 
-      <!-- Client app self-update (desktop app only — revealed by JS when the
-           Electron updates IPC is present; stays hidden in a browser tab) -->
-      <lex-card id="clientAppCard" heading="Client App (this computer)" class="hidden mb-6">
-        <div class="grid grid-cols-2 gap-3">
-          <lex-kv id="kvAppCurrentVersion" label="Installed Version" value="--"></lex-kv>
-          <lex-kv id="kvAppLatestVersion"  label="Latest Version"    value="--"></lex-kv>
-          <lex-kv id="kvAppUpdateStatus"   label="Status"            value="--"></lex-kv>
-          <lex-kv id="kvAppChannel"        label="Channel"           value="--"></lex-kv>
-        </div>
-        <div class="mt-6 flex items-center gap-3" data-slot="footer">
-          <lex-btn id="checkAppUpdateBtn" variant="secondary" leading-icon="refresh-cw">Check for Updates</lex-btn>
-          <lex-btn id="installAppUpdateBtn" variant="success" leading-icon="download" disabled>Download &amp; Install</lex-btn>
-          <span id="appUpdateHint" class="text-xs lex-text-secondary"></span>
-        </div>
-      </lex-card>
-
       <!-- Update progress / result (shown by JS during + after an apply) -->
       <lex-card id="progressCard" heading="Update Progress" class="hidden mb-6">
         <div class="flex items-center gap-3">
@@ -116,6 +110,35 @@
         <lex-btn id="refreshBtn" variant="secondary" leading-icon="refresh-cw">Refresh</lex-btn>
         <span id="lastUpdatedText" class="text-xs lex-text-secondary"></span>
       </div>
+
+      </div><!-- /backendSection -->
+
+      <!-- ══ CLIENT APP section (toggle) ══ -->
+      <div id="clientSection" class="hidden">
+
+        <!-- Client app self-update (desktop app only — revealed by JS when the
+             Electron updates IPC is present) -->
+        <lex-card id="clientAppCard" heading="Client App (this computer)" class="hidden mb-6">
+          <div class="grid grid-cols-2 gap-3">
+            <lex-kv id="kvAppCurrentVersion" label="Installed Version" value="--"></lex-kv>
+            <lex-kv id="kvAppLatestVersion"  label="Latest Version"    value="--"></lex-kv>
+            <lex-kv id="kvAppUpdateStatus"   label="Status"            value="--"></lex-kv>
+            <lex-kv id="kvAppChannel"        label="Channel"           value="--"></lex-kv>
+          </div>
+          <div class="mt-6 flex items-center gap-3" data-slot="footer">
+            <lex-btn id="checkAppUpdateBtn" variant="secondary" leading-icon="refresh-cw">Check for Updates</lex-btn>
+            <lex-btn id="installAppUpdateBtn" variant="success" leading-icon="download" disabled>Download &amp; Install</lex-btn>
+            <span id="appUpdateHint" class="text-xs lex-text-secondary"></span>
+          </div>
+        </lex-card>
+
+        <!-- Shown instead of the card when the Electron updates IPC is absent
+             (plain browser tab): app self-update only exists in the desktop app -->
+        <div id="clientAppUnsupported" class="hidden text-sm lex-text-secondary">
+          Client app updates are managed from the desktop app. Open this page inside the LANA desktop client to check or install app updates.
+        </div>
+
+      </div><!-- /clientSection -->
 
     </main>
 

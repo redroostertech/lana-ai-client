@@ -52,8 +52,8 @@
     },
     {
       value: 'admin/updates.html',
-      label: 'Backend Updates',
-      description: 'Review and apply backend updates for this deployment',
+      label: 'Software Updates',
+      description: 'Review and apply backend and client app updates',
       allowedRoles: ['system_admin', 'org_admin', 'organization_admin']
     },
     {
