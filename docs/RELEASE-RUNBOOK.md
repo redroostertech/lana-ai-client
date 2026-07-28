@@ -139,6 +139,8 @@ Method: POST. Auth: none required (clients may send `Authorization: Bearer <toke
 
 Expect `status: "update_available"` with `latest_version` set to the promoted version, the platform-specific `download_url`, and `release_notes`. Other response fields the client consumes: `force_update`, `update_channel`, `checksum_sha256`. Repeat with `"platform":"win32","arch":"x64"` and `"platform":"linux"` to verify each installer URL.
 
+Known limitation: `checksum_sha256` is currently always `null`. The GitHub API does not expose asset hashes, so promote cannot fill it. Download integrity relies on signed and notarized installers plus HTTPS. To close this, publish a `SHASUMS256` asset from `build-client.sh` and parse it during promote.
+
 ## 7. What customers see
 
 - On every app launch the client posts to the version-check endpoint. If an update is available, every user gets the update dialog: forced and non-dismissible when `force_update` is set (or `status` is `update_required`), otherwise dismissible with Later and Skip.
