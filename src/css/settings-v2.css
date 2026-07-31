@@ -968,6 +968,91 @@
   margin: 6px 0 0;
 }
 
+/* ── Personalization Memory ──────────────────────────────────────── */
+
+.sv2-memory {
+  display: grid;
+  gap: 12px;
+}
+
+.sv2-memory-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sv2-memory-header lex-text[tag="p"] {
+  display: block;
+  margin-top: 2px;
+}
+
+.sv2-memory-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sv2-memory-record {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-md);
+  background: var(--lex-bg-secondary);
+}
+
+.sv2-memory-record-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sv2-memory-record-title {
+  min-width: 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size);
+  font-weight: var(--lex-weight-semibold);
+  line-height: var(--lex-body-sm-height);
+  overflow-wrap: anywhere;
+}
+
+.sv2-memory-record-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-body-xs-size);
+  line-height: var(--lex-body-xs-height);
+  text-align: right;
+}
+
+.sv2-memory-record-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 6px;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: var(--lex-radius-sm);
+  background: var(--lex-bg-primary);
+}
+
+.sv2-memory-record-body {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  overflow-wrap: anywhere;
+}
+
+.sv2-memory-empty {
+  padding: 18px 0;
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-body-sm-size);
+  text-align: center;
+}
+
 @media (max-width: 540px) {
   .sv2-capability-heading {
     flex-direction: column;
@@ -993,6 +1078,16 @@
   .sv2-capability-permission {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .sv2-memory-header,
+  .sv2-memory-record-head {
+    flex-direction: column;
+  }
+
+  .sv2-memory-record-meta {
+    justify-content: flex-start;
+    text-align: left;
   }
 }
 

@@ -6,8 +6,6 @@
  * screen when the endpoint has not shipped yet; saved values hydrate when it is
  * available.
  *
- * TODO(personalization-memory): Add the learning toggle and memory-management
- * UI only after the supporting API and privacy behavior are finalized.
  */
 (function () {
   'use strict';
@@ -53,6 +51,108 @@
     s.setAttribute('variant', isErr ? 'danger' : 'tertiary');
   }
 
+  function setMemoryStatus(msg, isErr) {
+    var s = el('sv2-memory-status');
+    if (!s) return;
+    s.textContent = msg || '';
+    s.setAttribute('variant', isErr ? 'danger' : 'tertiary');
+  }
+
+  function esc(value) {
+    var div = document.createElement('div');
+    div.textContent = value == null ? '' : String(value);
+    return div.innerHTML;
+  }
+
+  function humanizeValue(value) {
+    if (value == null) return '';
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) {
+      return value.map(function (entry) {
+        return humanizeValue(entry);
+      }).filter(Boolean).join(', ');
+    }
+    if (typeof value === 'object') {
+      if (typeof value.text === 'string') return value.text;
+      if (typeof value.value === 'string') return value.value;
+      if (typeof value.summary === 'string') return value.summary;
+      if (typeof value.content === 'string') return value.content;
+      return Object.keys(value).map(function (key) {
+        return key + ': ' + humanizeValue(value[key]);
+      }).filter(Boolean).join(' · ');
+    }
+    return String(value);
+  }
+
+  function formatDate(value) {
+    if (!value) return '';
+    var date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function renderMemoryRecords(records) {
+    var list = el('sv2-memory-list');
+    if (!list) return;
+
+    if (!Array.isArray(records) || records.length === 0) {
+      list.innerHTML = '<div class="sv2-memory-empty">No active memories yet.</div>';
+      return;
+    }
+
+    list.innerHTML = records.map(function (record) {
+      var title = record.key || record.memory_type || 'Memory';
+      var body = humanizeValue(record.value_jsonb);
+      var updated = formatDate(record.updated_at || record.created_at);
+      return '<article class="sv2-memory-record">' +
+        '<div class="sv2-memory-record-head">' +
+          '<div class="sv2-memory-record-title">' + esc(title) + '</div>' +
+          '<div class="sv2-memory-record-meta">' +
+            '<span>' + esc(record.memory_type || 'memory') + '</span>' +
+            '<span>' + esc(record.scope_type || 'scope') + '</span>' +
+            (updated ? '<span>' + esc(updated) + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="sv2-memory-record-body">' + esc(body || 'No value stored.') + '</div>' +
+      '</article>';
+    }).join('');
+  }
+
+  function loadMemoryRecords() {
+    var section = el('sv2-personalization-memory');
+    var api = window.api;
+    if (!section) return;
+    section.hidden = false;
+    section.removeAttribute('aria-hidden');
+    section.setAttribute('aria-busy', 'true');
+
+    if (!api || typeof api.listMemoryRecords !== 'function') {
+      renderMemoryRecords([]);
+      setMemoryStatus('Memory is unavailable.');
+      section.setAttribute('aria-busy', 'false');
+      return;
+    }
+
+    setMemoryStatus('Loading memory...');
+    api.listMemoryRecords({ limit: 50 }).then(function (res) {
+      renderMemoryRecords(res && res.records);
+      setMemoryStatus('');
+    }).catch(function () {
+      renderMemoryRecords([]);
+      setMemoryStatus('Could not load memory.', true);
+    }).finally(function () {
+      section.setAttribute('aria-busy', 'false');
+    });
+  }
+
+  function bindMemory() {
+    var btn = el('sv2-memory-refresh-btn');
+    if (btn && btn.getAttribute('data-memory-bound') !== 'true') {
+      btn.setAttribute('data-memory-bound', 'true');
+      btn.addEventListener('click', loadMemoryRecords);
+    }
+  }
+
   function save(ev) {
     if (ev && ev.preventDefault) ev.preventDefault();
     var api = window.api;
@@ -83,6 +183,8 @@
     section.classList.remove('sv2-hidden');
     populate({});
     bindForm();
+    bindMemory();
+    loadMemoryRecords();
 
     if (!api || typeof api.getPersonalization !== 'function') return;
     api.getPersonalization().then(function (res) {
