@@ -45,6 +45,18 @@ function getLoginPath() {
   return getPagePath('login.html');
 }
 
+function apiNowMs() {
+  return window.LanaTime.nowMs();
+}
+
+function apiMillisecondsSince(startMs) {
+  return window.LanaTime.millisecondsSince(startMs);
+}
+
+function apiMsPerMinute() {
+  return window.LanaTime.MS_PER_MINUTE;
+}
+
 class ApiClient {
   constructor() {
     // Get configuration from config.js (must be loaded before this script)
@@ -341,8 +353,8 @@ class ApiClient {
 
     // Periodically check if we should refresh based on activity
     this.activityCheckInterval = setInterval(() => {
-      const timeSinceActivity = Date.now() - this.lastActivityTime;
-      const wasRecentlyActive = timeSinceActivity < 5 * 60 * 1000; // Active in last 5 minutes
+      const timeSinceActivity = apiMillisecondsSince(this.lastActivityTime);
+      const wasRecentlyActive = timeSinceActivity < 5 * apiMsPerMinute();
 
       // If user was recently active and token is near expiration, refresh it
       if (wasRecentlyActive && this.isTokenNearExpiration(refreshThreshold)) {
@@ -1986,8 +1998,8 @@ class ApiClient {
           failed: 0
         },
         results: fileArray.map(file => ({
-          job_id: 'job-' + Date.now() + '-' + Math.random(),
-          file_id: 'doc-' + Date.now() + '-' + Math.random(),
+          job_id: 'job-' + apiNowMs() + '-' + Math.random(),
+          file_id: 'doc-' + apiNowMs() + '-' + Math.random(),
           matter_id: matterId,
           filename: file.name,
           status: 'queued'

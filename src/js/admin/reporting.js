@@ -38,10 +38,9 @@
   // ==========================================================================
 
   function formatDate(date) {
-    var year = date.getFullYear();
-    var month = String(date.getMonth() + 1).padStart(2, '0');
-    var day = String(date.getDate()).padStart(2, '0');
-    return year + '-' + month + '-' + day;
+    return window.Lex && window.Lex.Utils
+      ? window.Lex.Utils.formatUtcDateOnly(date)
+      : new Date(date).toISOString().split('T')[0];
   }
 
   function showInfo(message) {
@@ -140,45 +139,43 @@
   // ==========================================================================
 
   function selectPeriodPreset(preset) {
-    var today = new Date();
+    var utils = window.Lex.Utils;
+    var today = utils.nowDate();
     var startDate, endDate;
 
     switch (preset) {
       case 'last7days':
-        endDate = new Date(today);
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 6);
+        endDate = today;
+        startDate = utils.addDays(today, -6);
         break;
       case 'last30days':
-        endDate = new Date(today);
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 29);
+        endDate = today;
+        startDate = utils.addDays(today, -29);
         break;
       case 'thisMonth':
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-        endDate = new Date(today);
+        startDate = utils.startOfUtcMonth(today);
+        endDate = today;
         break;
       case 'lastMonth':
-        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        endDate = utils.addDays(utils.startOfUtcMonth(today), -1);
+        startDate = utils.startOfUtcMonth(endDate);
         break;
       case 'thisQuarter':
-        var currentQuarter = Math.floor(today.getMonth() / 3);
-        startDate = new Date(today.getFullYear(), currentQuarter * 3, 1);
-        endDate = new Date(today);
+        var currentQuarter = Math.floor(today.getUTCMonth() / 3);
+        startDate = new Date(Date.UTC(today.getUTCFullYear(), currentQuarter * 3, 1));
+        endDate = today;
         break;
       case 'thisYear':
-        startDate = new Date(today.getFullYear(), 0, 1);
-        endDate = new Date(today);
+        startDate = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
+        endDate = today;
         break;
       case 'lastYear':
-        startDate = new Date(today.getFullYear() - 1, 0, 1);
-        endDate = new Date(today.getFullYear() - 1, 11, 31);
+        startDate = new Date(Date.UTC(today.getUTCFullYear() - 1, 0, 1));
+        endDate = new Date(Date.UTC(today.getUTCFullYear() - 1, 11, 31));
         break;
       default:
-        endDate = new Date(today);
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 7);
+        endDate = today;
+        startDate = utils.addDays(today, -7);
     }
 
     var periodStartEl = document.getElementById('periodStart');
@@ -3337,7 +3334,7 @@
         bypass_cache: false
       });
 
-      var executionTimeMs = Date.now() - startTime;
+      var executionTimeMs = Lex.Utils.millisecondsSince(startTime);
 
       // Store metadata for display
       currentModuleMetadata = {

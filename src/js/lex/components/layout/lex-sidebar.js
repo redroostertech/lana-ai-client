@@ -2488,11 +2488,9 @@
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return { label: 'No Due Date', rank: 900 };
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const due = new Date(date);
-      due.setHours(0, 0, 0, 0);
-      const days = Math.round((due.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+      const today = Lex.Utils.startOfLocalDay();
+      const due = Lex.Utils.startOfLocalDay(date);
+      const days = Lex.Utils.daysBetween(today, due);
 
       if (days < 0) return { label: 'Overdue', rank: 0 };
       if (days === 0) return { label: 'Due Today', rank: 1 };

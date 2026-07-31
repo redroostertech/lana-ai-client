@@ -1992,7 +1992,7 @@
     }
     if (subtitle) subtitle.textContent = active.detail || active.label || 'Working...';
     if (elapsed && docStudioDocumentState.progressStartedAt) {
-      elapsed.textContent = Math.max(0, Math.round((Date.now() - docStudioDocumentState.progressStartedAt) / 1000)) + 's';
+      elapsed.textContent = Math.max(0, Math.round((Lex.Utils.millisecondsSince(docStudioDocumentState.progressStartedAt)) / 1000)) + 's';
     }
 
     list.innerHTML = steps.map(function (step) {

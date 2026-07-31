@@ -160,7 +160,7 @@
       var d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
       // Use timeAgo for dates within the last 7 days
-      var daysDiff = (Date.now() - d.getTime()) / 86400000;
+      var daysDiff = Lex.Utils.millisecondsSince(d.getTime()) / Lex.Utils.MS_PER_DAY;
       if (daysDiff < 7) {
         return timeAgo(dateStr);
       }

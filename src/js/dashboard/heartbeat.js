@@ -137,7 +137,7 @@
     if (!ts) return true;
     var lastRunMs = new Date(ts).getTime();
     if (isNaN(lastRunMs)) return true;
-    var elapsedMs = Date.now() - lastRunMs;
+    var elapsedMs = Lex.Utils.millisecondsSince(lastRunMs);
     return elapsedMs >= 10 * 60 * 1000; // 10 minutes
   }
 

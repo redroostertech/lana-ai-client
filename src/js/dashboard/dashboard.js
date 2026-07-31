@@ -1807,8 +1807,8 @@
   function syncAgeTier(lastSync) {
     if (!lastSync) return { tier: 'never', label: 'Never synced', color: 'danger', days: Infinity };
 
-    var ms = Date.now() - new Date(lastSync).getTime();
-    var days = Math.floor(ms / 86400000);
+    var ms = Lex.Utils.millisecondsSince(new Date(lastSync).getTime());
+    var days = Math.floor(ms / Lex.Utils.MS_PER_DAY);
 
     if (days < 1)  return { tier: 'fresh',   label: 'Today',            color: 'success', days: days };
     if (days < 3)  return { tier: 'recent',  label: days + 'd ago',     color: 'success', days: days };
@@ -2108,13 +2108,13 @@
     healthy.sort(function (a, b) {
       if (!a.lastSync) return 1;
       if (!b.lastSync) return -1;
-      return new Date(b.lastSync).getTime() - new Date(a.lastSync).getTime();
+      return Lex.Utils.millisecondsSince(new Date(a.lastSync).getTime(), new Date(b.lastSync).getTime());
     });
     needsAttention.sort(function (a, b) {
       if (!a.lastSync && !b.lastSync) return 0;
       if (!a.lastSync) return -1;
       if (!b.lastSync) return 1;
-      return new Date(a.lastSync).getTime() - new Date(b.lastSync).getTime();
+      return Lex.Utils.millisecondsSince(new Date(b.lastSync).getTime(), new Date(a.lastSync).getTime());
     });
 
     // Cap total displayed at 10

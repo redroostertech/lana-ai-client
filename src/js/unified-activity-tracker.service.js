@@ -709,8 +709,7 @@ class UnifiedActivityTrackerService {
    */
   async getRecentActivity({ organizationId, hours = 24, limit = 100 }) {
     try {
-      const since = new Date();
-      since.setHours(since.getHours() - parseInt(hours));
+      const since = Lex.Utils.addHours(Lex.Utils.nowDate(), -parseInt(hours));
 
       const result = await postgres.query(
         `SELECT
@@ -777,8 +776,7 @@ class UnifiedActivityTrackerService {
    */
   async getActivityStats({ organizationId, days = 7 }) {
     try {
-      const since = new Date();
-      since.setDate(since.getDate() - parseInt(days));
+      const since = Lex.Utils.addDays(Lex.Utils.nowDate(), -parseInt(days));
 
       // Get counts by event type
       const byTypeResult = await postgres.query(
@@ -1023,9 +1021,7 @@ class UnifiedActivityTrackerService {
    * @private
    */
   _daysAgo(days) {
-    const date = new Date();
-    date.setDate(date.getDate() - days);
-    return date;
+    return Lex.Utils.addDays(Lex.Utils.nowDate(), -days);
   }
 }
 

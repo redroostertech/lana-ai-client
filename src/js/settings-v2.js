@@ -957,7 +957,7 @@
     if (!iso) return '';
     var then = new Date(iso).getTime();
     if (!then || isNaN(then)) return '';
-    var diff = Date.now() - then;
+    var diff = Lex.Utils.millisecondsSince(then);
     if (diff < 0) diff = 0;
 
     var sec = Math.floor(diff / 1000);

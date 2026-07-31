@@ -238,30 +238,28 @@ export class PeriodSelector {
    * @returns {void}
    */
   _selectPreset(preset) {
-    const today = new Date();
+    const today = Lex.Utils.nowDate();
     let startDate, endDate;
 
     switch (preset) {
       case 'last7days':
         endDate = new Date(today);
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 6);  // 7 days inclusive (today + 6 prior days)
+        startDate = Lex.Utils.addDays(today, -6);  // 7 days inclusive (today + 6 prior days)
         break;
 
       case 'last30days':
         endDate = new Date(today);
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 29);  // 30 days inclusive (today + 29 prior days)
+        startDate = Lex.Utils.addDays(today, -29);  // 30 days inclusive (today + 29 prior days)
         break;
 
       case 'thisMonth':
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        startDate = Lex.Utils.startOfLocalMonth(today);
         endDate = new Date(today);
         break;
 
       case 'lastMonth':
-        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        endDate = new Date(today.getFullYear(), today.getMonth(), 0); // Last day of previous month
+        startDate = Lex.Utils.startOfLocalMonth(Lex.Utils.addUtcMonths(today, -1));
+        endDate = Lex.Utils.endOfLocalMonth(Lex.Utils.addUtcMonths(today, -1));
         break;
 
       case 'thisQuarter':
@@ -271,20 +269,19 @@ export class PeriodSelector {
         break;
 
       case 'thisYear':
-        startDate = new Date(today.getFullYear(), 0, 1);
+        startDate = Lex.Utils.startOfLocalYear(today);
         endDate = new Date(today);
         break;
 
       case 'lastYear':
-        startDate = new Date(today.getFullYear() - 1, 0, 1); // January 1st of last year
-        endDate = new Date(today.getFullYear() - 1, 11, 31); // December 31st of last year
+        startDate = Lex.Utils.startOfLocalYear(Lex.Utils.addUtcMonths(today, -12));
+        endDate = Lex.Utils.endOfLocalYear(Lex.Utils.addUtcMonths(today, -12));
         break;
 
       default:
         // Default: Last 7 days
         endDate = new Date(today);
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 6);
+        startDate = Lex.Utils.addDays(today, -6);
     }
 
     // Update input fields

@@ -129,7 +129,7 @@
   // Poll status until the box reports targetVersion. Unreachable / transient
   // errors during a cloud re-provision are EXPECTED — swallow them and keep waiting.
   function waitForVersion(targetVersion) {
-    var deadline = Date.now() + MAX_WAIT_MS;
+    var deadline = Lex.Utils.nowMs() + MAX_WAIT_MS;
     function attempt() {
       return api.getSystemUpdateStatus().then(function (resp) {
         var d = (resp && resp.data) || {};

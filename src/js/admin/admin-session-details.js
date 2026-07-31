@@ -47,7 +47,7 @@
    */
   function isSessionActive(session) {
     if (!session || !session.last_activity) return false;
-    return (Date.now() - new Date(session.last_activity).getTime()) < 5 * 60 * 1000;
+    return Lex.Utils.millisecondsSince(new Date(session.last_activity).getTime()) < 5 * Lex.Utils.MS_PER_MINUTE;
   }
 
   /**
@@ -211,7 +211,7 @@
     if (kvStarted)    kvStarted.value    = session.created_at ? fmtDateTime(session.created_at) : '\u2014';
     if (kvLastActive) kvLastActive.value = session.last_activity ? fmtDateTime(session.last_activity) : '\u2014';
     if (kvDuration)   kvDuration.value   = session.created_at
-      ? formatDuration(Date.now() - new Date(session.created_at).getTime())
+      ? formatDuration(Lex.Utils.millisecondsSince(new Date(session.created_at).getTime()))
       : '\u2014';
 
     // User Information KVs

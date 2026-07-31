@@ -7,6 +7,13 @@
 
   global.Lex = global.Lex || {};
 
+  var LanaTime = global.LanaTime;
+  var SYSTEM_TIME_ZONE = LanaTime.SYSTEM_TIME_ZONE;
+  var MS_PER_SECOND = LanaTime.MS_PER_SECOND;
+  var MS_PER_MINUTE = LanaTime.MS_PER_MINUTE;
+  var MS_PER_HOUR = LanaTime.MS_PER_HOUR;
+  var MS_PER_DAY = LanaTime.MS_PER_DAY;
+
   // ── HTML escaping (no regex) ──────────────────────────────────────────
 
   var HTML_ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
@@ -55,6 +62,27 @@
 
   // ── Date formatters ───────────────────────────────────────────────────
 
+  var nowDate = LanaTime.nowDate;
+  var nowMs = LanaTime.nowMs;
+  var nowIso = LanaTime.nowIso;
+  var addMilliseconds = LanaTime.addMilliseconds;
+  var subtractMilliseconds = LanaTime.subtractMilliseconds;
+  var addMinutes = LanaTime.addMinutes;
+  var addHours = LanaTime.addHours;
+  var addDays = LanaTime.addDays;
+  var startOfUtcDay = LanaTime.startOfUtcDay;
+  var startOfUtcMonth = LanaTime.startOfUtcMonth;
+  var addUtcMonths = LanaTime.addUtcMonths;
+  var startOfLocalDay = LanaTime.startOfLocalDay;
+  var startOfLocalMonth = LanaTime.startOfLocalMonth;
+  var endOfLocalMonth = LanaTime.endOfLocalMonth;
+  var startOfLocalYear = LanaTime.startOfLocalYear;
+  var endOfLocalYear = LanaTime.endOfLocalYear;
+  var formatUtcDateOnly = LanaTime.formatUtcDateOnly;
+  var millisecondsSince = LanaTime.millisecondsSince;
+  var millisecondsUntil = LanaTime.millisecondsUntil;
+  var daysBetween = LanaTime.daysBetween;
+
   function readStoredUser() {
     try {
       return JSON.parse(global.localStorage && global.localStorage.getItem('user') || 'null') || {};
@@ -66,7 +94,7 @@
   function validTimezone(value) {
     if (!value || typeof value !== 'string') return '';
     try {
-      new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+      new Intl.DateTimeFormat('en-US', { timeZone: value }).format(nowDate());
       return value;
     } catch (_error) {
       return '';
@@ -96,7 +124,7 @@
       || user.organizationTimezone
       || (preferences.general && preferences.general.timezone)
       || preferences.timezone
-    ) || browserTimezone();
+    ) || browserTimezone() || SYSTEM_TIME_ZONE;
   }
 
   function timestampHasExplicitTimezone(value) {
@@ -208,7 +236,7 @@
     if (!dateString) return '-';
     var date = parseApiUtcDate(dateString);
     if (!date) return '-';
-    var seconds = Math.floor((new Date() - date) / 1000);
+    var seconds = Math.floor(millisecondsSince(date.getTime()) / MS_PER_SECOND);
     for (var i = 0; i < TIME_INTERVALS.length; i++) {
       var count = Math.floor(seconds / TIME_INTERVALS[i].seconds);
       if (count >= 1) {
@@ -281,9 +309,8 @@
     if (!dateString) return '\u2014';
     var date = parseApiUtcDate(dateString);
     if (!date) return '\u2014';
-    var now = new Date();
-    var diffMs = now - date;
-    var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    var diffMs = millisecondsSince(date.getTime());
+    var diffDays = Math.floor(diffMs / MS_PER_DAY);
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return diffDays + ' days ago';
@@ -421,6 +448,31 @@
   };
 
   global.Lex.Utils = {
+    SYSTEM_TIME_ZONE:    SYSTEM_TIME_ZONE,
+    MS_PER_SECOND:       MS_PER_SECOND,
+    MS_PER_MINUTE:       MS_PER_MINUTE,
+    MS_PER_HOUR:         MS_PER_HOUR,
+    MS_PER_DAY:          MS_PER_DAY,
+    nowDate:             nowDate,
+    nowMs:               nowMs,
+    nowIso:              nowIso,
+    addMilliseconds:     addMilliseconds,
+    subtractMilliseconds: subtractMilliseconds,
+    addMinutes:          addMinutes,
+    addHours:            addHours,
+    addDays:             addDays,
+    addUtcMonths:        addUtcMonths,
+    startOfUtcDay:       startOfUtcDay,
+    startOfUtcMonth:     startOfUtcMonth,
+    startOfLocalDay:     startOfLocalDay,
+    startOfLocalMonth:   startOfLocalMonth,
+    endOfLocalMonth:     endOfLocalMonth,
+    startOfLocalYear:    startOfLocalYear,
+    endOfLocalYear:      endOfLocalYear,
+    formatUtcDateOnly:   formatUtcDateOnly,
+    millisecondsSince:   millisecondsSince,
+    millisecondsUntil:   millisecondsUntil,
+    daysBetween:         daysBetween,
     escapeHtml:         escapeHtml,
     decodeHtmlEntities: decodeHtmlEntities,
     formatFileSize:     formatFileSize,
@@ -458,6 +510,7 @@
   global.debounce           = debounce;
   global.formatFileSize     = formatFileSize;
   global.getOrganizationTimezone = getOrganizationTimezone;
+  global.LexNowIso       = nowIso;
   global.formatPercentage   = formatPercentage;
   global.truncateText       = truncateText;
   global.statusBadge        = statusBadge;

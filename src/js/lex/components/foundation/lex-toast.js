@@ -337,7 +337,7 @@
           if (timer) {
             clearTimeout(timer);
             timer = null;
-            remaining = Math.max(0, remaining - (Date.now() - startTime));
+            remaining = Math.max(0, remaining - (Lex.Utils.millisecondsSince(startTime)));
           }
           const progress = toast.querySelector('.lex-toast-progress');
           if (progress) progress.style.animationPlayState = 'paused';

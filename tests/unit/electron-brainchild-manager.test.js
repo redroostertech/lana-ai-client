@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const {
   installRootCandidates,
@@ -16,6 +17,19 @@ const {
 } = require(path.join(__dirname, '../../src/electron-brainchild-manager.js'));
 
 const HOME = '/Users/tester';
+const ORIGINAL_BRAINCHILD_HOME = process.env.BRAINCHILD_HOME;
+const TEST_INSTALL = fs.mkdtempSync(path.join(os.tmpdir(), 'lana-brainchild-install-'));
+fs.mkdirSync(path.join(TEST_INSTALL, 'bin'), { recursive: true });
+fs.writeFileSync(path.join(TEST_INSTALL, 'bin', 'brainchild-mcp.js'), '#!/usr/bin/env node\n');
+process.env.BRAINCHILD_HOME = TEST_INSTALL;
+
+afterAll(() => {
+  if (ORIGINAL_BRAINCHILD_HOME === undefined) {
+    delete process.env.BRAINCHILD_HOME;
+  } else {
+    process.env.BRAINCHILD_HOME = ORIGINAL_BRAINCHILD_HOME;
+  }
+});
 
 describe('electron-brainchild-manager (pure path/discovery helpers)', () => {
   describe('mcpBinForRoot', () => {
@@ -191,7 +205,7 @@ describe('electron-brainchild-manager (pure path/discovery helpers)', () => {
     // and is on the allowlist) vs the same bin reached via a non-allowlisted
     // path alias. The IPC-boundary validateLink folds in the allowlist; the
     // persisted-link validateLinkFs is filesystem-only.
-    const INSTALL = path.resolve(__dirname, '../../..', 'brainchild');
+    const INSTALL = TEST_INSTALL;
 
     test('validateLink accepts an allowlisted, on-disk install', () => {
       const checks = validateLink({ installPath: INSTALL, vaultPath: __dirname });
@@ -392,7 +406,7 @@ describe('BrainchildManager auto-bind (_resolveLink / status / _ensureClient)', 
   const { BrainchildManager } = require(path.join(__dirname, '../../src/electron-brainchild-manager.js'));
 
   // Real on-disk install + vault so validateLinkFs passes for resolved links.
-  const INSTALL = path.resolve(__dirname, '../../..', 'brainchild');
+  const INSTALL = TEST_INSTALL;
   const VAULT = __dirname;
   const EXPLICIT = { installPath: INSTALL, vaultPath: VAULT };
   const DISCOVERED = { installPath: INSTALL, vaultPath: VAULT, mcpBin: path.join(INSTALL, 'bin', 'brainchild-mcp.js') };
@@ -514,7 +528,7 @@ describe('BrainchildManager JSON-RPC round-trip (fake child)', () => {
 
   // Install root = dev sibling checkout (has bin/brainchild-mcp.js + is on the
   // allowlist). Vault = this test directory (a real readable dir).
-  const INSTALL = path.resolve(__dirname, '../../..', 'brainchild');
+  const INSTALL = TEST_INSTALL;
   const VAULT = __dirname;
   const LINK = { installPath: INSTALL, vaultPath: VAULT };
 

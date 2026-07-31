@@ -991,7 +991,7 @@
         case 'done':
           // Finalize the streaming message
           if (this._threadEl) {
-            const duration = event.processingTimeMs || (this._sendStartTime ? Date.now() - this._sendStartTime : null);
+            const duration = event.processingTimeMs || (this._sendStartTime ? Lex.Utils.millisecondsSince(this._sendStartTime) : null);
             if (Array.isArray(event.references) && event.references.length > 0) {
               this._references = event.references;
             }

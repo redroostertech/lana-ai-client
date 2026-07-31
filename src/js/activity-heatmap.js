@@ -56,9 +56,8 @@ const ActivityHeatmap = (function() {
     });
 
     // Calculate date range (last 90 days by default)
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 89); // 90 days including today
+    const endDate = Lex.Utils.nowDate();
+    const startDate = Lex.Utils.addDays(endDate, -89); // 90 days including today
 
     // Generate all dates in range
     const allDates = generateDateRange(startDate, endDate);
@@ -100,7 +99,7 @@ const ActivityHeatmap = (function() {
 
     while (currentDate <= end) {
       dates.push(new Date(currentDate));
-      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate = Lex.Utils.addDays(currentDate, 1);
     }
 
     return dates;

@@ -35,11 +35,9 @@
     const date = parseTimestampAsUtc(iso);
     if (!date || isNaN(date.getTime())) return '';
 
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const today = Lex.Utils.startOfLocalDay();
+    const yesterday = Lex.Utils.addDays(today, -1);
+    const msgDay = Lex.Utils.startOfLocalDay(date);
 
     // Format UTC timestamps in the client's local timezone.
     const timeStr = new Intl.DateTimeFormat('en-US', {
