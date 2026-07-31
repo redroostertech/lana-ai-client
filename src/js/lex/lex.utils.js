@@ -88,9 +88,12 @@
     return validTimezone(
       options.timeZone
       || options.timezone
+      || user.timezone
+      || user.user_timezone
+      || user.userTimezone
+      || (preferences.regional && preferences.regional.timezone)
       || user.organization_timezone
       || user.organizationTimezone
-      || user.timezone
       || (preferences.general && preferences.general.timezone)
       || preferences.timezone
     ) || browserTimezone();

@@ -3,13 +3,14 @@
 const path = require('path');
 const fs = require('fs');
 
-function loadLexUtils() {
+function loadLexUtils(storedUser) {
   const src = fs.readFileSync(
     path.resolve(__dirname, '../../src/js/lex/lex.utils.js'),
     'utf8'
   );
+  const userJson = storedUser ? JSON.stringify(storedUser) : null;
   const fakeWindow = {
-    localStorage: { getItem: () => null },
+    localStorage: { getItem: (key) => key === 'user' ? userJson : null },
     Intl,
     Date
   };
@@ -48,5 +49,26 @@ describe('Lex.Utils UTC API timestamp handling', () => {
       .toBe('5/11/2026 8:30 AM');
     expect(win.Lex.Utils.formatTime('2026-05-11T12:30:00', { timeZone: 'America/Los_Angeles' }))
       .toBe('5:30 AM');
+  });
+
+  test('prefers explicit user timezone over organization timezone for display', () => {
+    const userWindow = loadLexUtils({
+      timezone: 'America/Los_Angeles',
+      organization_timezone: 'America/New_York',
+      preferences: { regional: { timezone: 'America/Chicago' } }
+    });
+
+    expect(userWindow.Lex.Utils.getOrganizationTimezone()).toBe('America/Los_Angeles');
+    expect(userWindow.Lex.Utils.formatTime('2026-05-11T12:30:00Z')).toBe('5:30 AM');
+  });
+
+  test('uses regional preference timezone when profile timezone is absent', () => {
+    const userWindow = loadLexUtils({
+      organization_timezone: 'America/New_York',
+      preferences: { regional: { timezone: 'America/Chicago' } }
+    });
+
+    expect(userWindow.Lex.Utils.getOrganizationTimezone()).toBe('America/Chicago');
+    expect(userWindow.Lex.Utils.formatTime('2026-05-11T12:30:00Z')).toBe('7:30 AM');
   });
 });
