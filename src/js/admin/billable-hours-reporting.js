@@ -47,17 +47,15 @@
       if (!btn) return;
 
       var preset = btn.getAttribute('data-preset');
-      var now = new Date();
+      var now = Lex.Utils.nowDate();
       var from, to;
 
       if (preset === 'last7days') {
         to = now.toISOString().substring(0, 10);
-        var d7 = new Date(now); d7.setDate(d7.getDate() - 7);
-        from = d7.toISOString().substring(0, 10);
+        from = Lex.Utils.addDays(now, -7).toISOString().substring(0, 10);
       } else if (preset === 'last30days') {
         to = now.toISOString().substring(0, 10);
-        var d30 = new Date(now); d30.setDate(d30.getDate() - 30);
-        from = d30.toISOString().substring(0, 10);
+        from = Lex.Utils.addDays(now, -30).toISOString().substring(0, 10);
       } else if (preset === 'thisMonth') {
         from = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
         to = now.toISOString().substring(0, 10);

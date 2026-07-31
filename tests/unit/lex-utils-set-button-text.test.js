@@ -39,6 +39,10 @@ function makeFakeButton({ withSlot } = {}) {
 // --- Load Lex.Utils against a minimal window shim --------------------------
 
 function loadLexUtils() {
+  const timeSrc = fs.readFileSync(
+    path.resolve(__dirname, '../../src/js/time-utils.js'),
+    'utf8'
+  );
   const src = fs.readFileSync(
     path.resolve(__dirname, '../../src/js/lex/lex.utils.js'),
     'utf8'
@@ -54,8 +58,10 @@ function loadLexUtils() {
       return { nodeType: 3, textContent: String(text) };
     }
   };
-  const sandbox = new Function('window', 'document', src);
-  sandbox(fakeWindow, fakeDocument);
+  const timeSandbox = new Function('window', timeSrc);
+  const lexSandbox = new Function('window', 'document', src);
+  timeSandbox(fakeWindow);
+  lexSandbox(fakeWindow, fakeDocument);
   return fakeWindow;
 }
 

@@ -648,7 +648,7 @@ class AgenticUI {
 
   startElapsedTimeCounter() {
     this.elapsedTimeInterval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - this.progressStartTime) / 1000);
+      const elapsed = Math.floor((Lex.Utils.millisecondsSince(this.progressStartTime)) / 1000);
       const minutes = Math.floor(elapsed / 60);
       const seconds = elapsed % 60;
       const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;

@@ -203,16 +203,15 @@
     switch (preset) {
       case 'last30days':
         endDate = new Date(today);
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 29);
+        startDate = Lex.Utils.addDays(today, -29);
         break;
       case 'thisMonth':
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        startDate = Lex.Utils.startOfLocalMonth(today);
         endDate = new Date(today);
         break;
       case 'lastMonth':
-        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        startDate = Lex.Utils.startOfLocalMonth(Lex.Utils.addUtcMonths(today, -1));
+        endDate = Lex.Utils.endOfLocalMonth(Lex.Utils.addUtcMonths(today, -1));
         break;
       case 'thisQuarter':
         var currentQuarter = Math.floor(today.getMonth() / 3);
@@ -220,18 +219,17 @@
         endDate = new Date(today);
         break;
       case 'thisYear':
-        startDate = new Date(today.getFullYear(), 0, 1);
+        startDate = Lex.Utils.startOfLocalYear(today);
         endDate = new Date(today);
         break;
       case 'lastYear':
-        startDate = new Date(today.getFullYear() - 1, 0, 1);
-        endDate = new Date(today.getFullYear() - 1, 11, 31);
+        startDate = Lex.Utils.startOfLocalYear(Lex.Utils.addUtcMonths(today, -12));
+        endDate = Lex.Utils.endOfLocalYear(Lex.Utils.addUtcMonths(today, -12));
         break;
       case 'last7days':
       default:
         endDate = new Date(today);
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 6);
+        startDate = Lex.Utils.addDays(today, -6);
         break;
     }
 

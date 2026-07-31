@@ -260,7 +260,7 @@
         this._hideTimeout = null;
       }
 
-      const elapsed = Date.now() - this._showTime;
+      const elapsed = Lex.Utils.millisecondsSince(this._showTime);
       const remaining = this.minDisplayTime - elapsed;
 
       if (remaining > 0) {

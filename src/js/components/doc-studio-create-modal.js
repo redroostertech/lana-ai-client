@@ -624,7 +624,7 @@
     }
     if (subtitle) subtitle.textContent = active.detail || active.label || 'Working...';
     if (elapsed && state.progressStartedAt) {
-      elapsed.textContent = Math.max(0, Math.round((Date.now() - state.progressStartedAt) / 1000)) + 's';
+      elapsed.textContent = Math.max(0, Math.round((Lex.Utils.millisecondsSince(state.progressStartedAt)) / 1000)) + 's';
     }
 
     list.innerHTML = steps.map(function (step) {

@@ -48,7 +48,7 @@
 
   function isCacheValid(entry, duration) {
     if (!entry) return false;
-    return (Date.now() - entry.timestamp) < duration;
+    return (Lex.Utils.millisecondsSince(entry.timestamp)) < duration;
   }
 
   function getCachedOrFetch(key, fetchFn, duration) {

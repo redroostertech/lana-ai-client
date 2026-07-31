@@ -67,9 +67,9 @@
    */
   function timeAgo(dateStr) {
     if (!dateStr) return '-';
-    var diff = Date.now() - new Date(dateStr).getTime();
+    var diff = Lex.Utils.millisecondsSince(new Date(dateStr).getTime());
     if (diff < 0) return 'just now';
-    var seconds = Math.floor(diff / 1000);
+    var seconds = Math.floor(diff / Lex.Utils.MS_PER_SECOND);
     var minutes = Math.floor(seconds / 60);
     var hours   = Math.floor(minutes / 60);
     var days    = Math.floor(hours / 24);
@@ -87,7 +87,7 @@
    */
   function isSessionActive(session) {
     if (!session.last_activity) return false;
-    return (Date.now() - new Date(session.last_activity).getTime()) < 5 * 60 * 1000;
+    return Lex.Utils.millisecondsSince(new Date(session.last_activity).getTime()) < 5 * Lex.Utils.MS_PER_MINUTE;
   }
 
   /**

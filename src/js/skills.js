@@ -790,7 +790,7 @@
     if (!container) return;
 
     var stepIndex = skillSteps.length;
-    var stepId = 'step-' + Date.now() + '-' + stepIndex;
+    var stepId = 'step-' + Lex.Utils.nowMs() + '-' + stepIndex;
 
     var stepData = {
       id: stepId,

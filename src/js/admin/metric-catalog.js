@@ -441,7 +441,7 @@
         controller
       );
       var payload = response && response.data ? response.data : response;
-      var elapsed = Date.now() - started;
+      var elapsed = Lex.Utils.millisecondsSince(started);
       // status 'unregistered' is the synthesized stub for keys not in the
       // canonical registry — treat as a soft pass since the endpoint
       // returned without throwing.
@@ -457,7 +457,7 @@
       lastRunByKey[metricKey] = {
         status: 'fail',
         error: msg,
-        elapsed_ms: Date.now() - started,
+        elapsed_ms: Lex.Utils.millisecondsSince(started),
       };
       failedCount += 1;
     }
@@ -726,8 +726,7 @@
         break;
       case 'last30days':
         endDate = new Date(today);
-        startDate = new Date(today);
-        startDate.setDate(startDate.getDate() - 29);
+        startDate = Lex.Utils.addDays(today, -29);
         grain = 'daily';
         break;
       case 'thisQuarter':

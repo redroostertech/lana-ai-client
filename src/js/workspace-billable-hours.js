@@ -1186,9 +1186,9 @@
     var labelStyle = 'font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;';
 
     // Default start/end to "now minus 30 min" → "now" so the inputs are pre-filled.
-    var now = new Date();
+    var now = Lex.Utils.nowDate();
     var nowStr = _toDatetimeLocal(now);
-    var halfHourAgoStr = _toDatetimeLocal(new Date(now.getTime() - 30 * 60 * 1000));
+    var halfHourAgoStr = _toDatetimeLocal(Lex.Utils.addMinutes(now, -30));
 
     var matterIdForForm = (matter && matter.matter_id) || _matterId || '';
     var hasPresetMatter = !!matterIdForForm;

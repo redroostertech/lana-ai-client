@@ -1110,7 +1110,7 @@
 
     function updateDuration() {
       if (!dom.generationDuration) return;
-      var seconds = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+      var seconds = Math.floor(Lex.Utils.millisecondsSince(new Date(startedAt).getTime()) / Lex.Utils.MS_PER_SECOND);
       if (seconds < 60) {
         dom.generationDuration.textContent = seconds + (seconds === 1 ? ' second ago' : ' seconds ago');
       } else {

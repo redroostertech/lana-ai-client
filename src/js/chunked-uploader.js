@@ -476,7 +476,7 @@ class ChunkedUploader {
    * @returns {string} Formatted time remaining
    */
   static calculateTimeRemaining(uploadedBytes, totalBytes, startTime) {
-    const elapsedTime = Date.now() - startTime;
+    const elapsedTime = Lex.Utils.millisecondsSince(startTime);
     const uploadSpeed = uploadedBytes / (elapsedTime / 1000); // bytes per second
     const remainingBytes = totalBytes - uploadedBytes;
     const remainingSeconds = Math.round(remainingBytes / uploadSpeed);

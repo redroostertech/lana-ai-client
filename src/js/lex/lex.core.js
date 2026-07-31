@@ -14,6 +14,10 @@
 
   const LEX_VERSION = '1.0.0';
 
+  function lexMillisecondsSince(startMs) {
+    return global.LanaTime.millisecondsSince(startMs);
+  }
+
   // =========================================================================
   // LexElement — Reactive base class for all Lex components
   // =========================================================================
@@ -526,7 +530,7 @@
       var t = this._timers.get(element);
       if (t) clearTimeout(t);
       var start   = this._starts.get(element) || 0;
-      var elapsed = Date.now() - start;
+      var elapsed = lexMillisecondsSince(start);
       var remain  = Math.max(0, this.MIN_DURATION - elapsed);
       var self    = this;
       if (remain > 0) {
