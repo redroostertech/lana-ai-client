@@ -137,6 +137,29 @@ class NoteListComponent {
         </div>
       </div>
 
+      <!-- Note View Modal -->
+      <div id="notesViewModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center p-6">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden">
+          <div class="flex-shrink-0 border-b border-gray-200 px-6 py-4 flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <h3 id="notesViewTitle" class="text-xl font-semibold text-gray-900 truncate">Untitled Note</h3>
+              <div id="notesViewMeta" class="mt-1 flex items-center gap-2 text-xs text-gray-500"></div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button id="notesViewEditBtn" class="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Edit</button>
+              <button id="notesViewClose" class="p-2 text-gray-400 hover:text-gray-700 rounded-md hover:bg-gray-100" title="Close note">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="flex-1 overflow-y-auto px-6 py-5">
+            <div id="notesViewContent" class="prose max-w-none text-gray-700 leading-relaxed"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Focus Mode Modal -->
       <div id="notesFocusModal" class="hidden fixed inset-0 z-50 bg-white">
         <div class="h-full flex flex-col">
@@ -262,6 +285,26 @@ class NoteListComponent {
       focusSaveBtn.addEventListener('click', () => this.handleSaveNote(true));
     }
 
+    // View Modal Close/Edit
+    const viewModal = document.getElementById('notesViewModal');
+    const viewClose = document.getElementById('notesViewClose');
+    const viewEditBtn = document.getElementById('notesViewEditBtn');
+    if (viewClose) {
+      viewClose.addEventListener('click', () => this.closeNoteView());
+    }
+    if (viewEditBtn) {
+      viewEditBtn.addEventListener('click', () => {
+        const noteId = viewEditBtn.getAttribute('data-note-id');
+        this.closeNoteView();
+        this.handleEditNote(noteId);
+      });
+    }
+    if (viewModal) {
+      viewModal.addEventListener('click', (e) => {
+        if (e.target === viewModal) this.closeNoteView();
+      });
+    }
+
     // Focus Mode Clear
     const focusClearBtn = document.getElementById('notesFocusClearBtn');
     if (focusClearBtn) {
@@ -295,6 +338,7 @@ class NoteListComponent {
         if (noteItem) {
           const noteId = noteItem.getAttribute('data-note-id');
           this.selectNote(noteId);
+          this.openNoteView(noteId);
         }
       });
     }
@@ -302,6 +346,11 @@ class NoteListComponent {
     // ESC key to close focus mode
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
+        const viewModal = document.getElementById('notesViewModal');
+        if (viewModal && !viewModal.classList.contains('hidden')) {
+          this.closeNoteView();
+          return;
+        }
         const modal = document.getElementById('notesFocusModal');
         if (modal && !modal.classList.contains('hidden')) {
           this.closeFocusMode();
@@ -462,6 +511,78 @@ class NoteListComponent {
   }
 
   /**
+   * Open a read-only note view. Edit is available from the modal header.
+   */
+  openNoteView(noteId) {
+    const note = this.notes.find(n => n.note_id === noteId);
+    if (!note) {
+      this.showError('Note not found');
+      return;
+    }
+
+    const modal = document.getElementById('notesViewModal');
+    const title = document.getElementById('notesViewTitle');
+    const meta = document.getElementById('notesViewMeta');
+    const content = document.getElementById('notesViewContent');
+    const editBtn = document.getElementById('notesViewEditBtn');
+
+    if (!modal || !title || !meta || !content || !editBtn) return;
+
+    const relativeDate = this.options.apiClient.formatRelativeDate(note.updated_at || note.created_at);
+
+    title.textContent = note.title || 'Untitled Note';
+    meta.innerHTML = '';
+
+    const dateEl = document.createElement('span');
+    dateEl.textContent = relativeDate || '';
+    meta.appendChild(dateEl);
+
+    if (note.ai_generated) {
+      const aiEl = document.createElement('span');
+      aiEl.className = 'px-2 py-0.5 bg-purple-100 text-purple-700 rounded';
+      aiEl.textContent = 'AI Generated';
+      meta.appendChild(aiEl);
+    }
+
+    content.innerHTML = this.sanitizeNoteContent(note.content || '<p>No content</p>');
+    editBtn.setAttribute('data-note-id', note.note_id);
+    modal.classList.remove('hidden');
+  }
+
+  /**
+   * Close the read-only note view.
+   */
+  closeNoteView() {
+    const modal = document.getElementById('notesViewModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  /**
+   * Conservative rich-text sanitizer for locally-authored note HTML.
+   */
+  sanitizeNoteContent(html) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html || '';
+
+    const blockedTags = ['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META'];
+    blockedTags.forEach((tag) => {
+      wrapper.querySelectorAll(tag).forEach((node) => node.remove());
+    });
+
+    wrapper.querySelectorAll('*').forEach((node) => {
+      Array.from(node.attributes).forEach((attr) => {
+        const name = attr.name.toLowerCase();
+        const value = String(attr.value || '').trim().toLowerCase();
+        if (name.indexOf('on') === 0 || value.indexOf('javascript:') === 0) {
+          node.removeAttribute(attr.name);
+        }
+      });
+    });
+
+    return wrapper.innerHTML;
+  }
+
+  /**
    * Handle search input
    */
   async handleSearch(event) {
@@ -613,6 +734,7 @@ class NoteListComponent {
           saveBtn.classList.remove('bg-amber-600', 'hover:bg-amber-700');
           saveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
         }
+        this.resetFocusSaveButton();
 
         this.showSuccess('Note updated successfully');
       } else {
@@ -691,6 +813,14 @@ class NoteListComponent {
         saveBtn.classList.remove('bg-amber-600', 'hover:bg-amber-700');
         saveBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
       }
+      this.resetFocusSaveButton();
+    }
+  }
+
+  resetFocusSaveButton() {
+    const focusSaveBtn = document.getElementById('notesFocusSaveBtn');
+    if (focusSaveBtn) {
+      focusSaveBtn.textContent = 'Save Note';
     }
   }
 
@@ -959,12 +1089,17 @@ class NoteListComponent {
       saveBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
     }
 
-    // Scroll to top to show the editor
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    this.toggleFocusMode();
+
+    const focusSaveBtn = document.getElementById('notesFocusSaveBtn');
+    if (focusSaveBtn) {
+      focusSaveBtn.textContent = 'Update Note';
+    }
 
     // Focus on title input
-    if (titleInput) {
-      setTimeout(() => titleInput.focus(), 300);
+    const focusTitle = document.getElementById('notesFocusTitleInput');
+    if (focusTitle) {
+      setTimeout(() => focusTitle.focus(), 150);
     }
 
     this.showSuccess('Note loaded for editing');
