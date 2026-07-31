@@ -123,7 +123,12 @@ describe('rename-conversation helper', () => {
       });
 
       expect(seen).toHaveLength(1);
-      expect(seen[0]).toEqual({ threadId: 't1', title: 'New Name' });
+      // Kept exact rather than loosened to objectContaining: the event is a
+      // public contract and an accidental extra field should still fail here.
+      // registryId is deliberate — dock RECENTS listens on the
+      // conversation_threads row id, which is not always the stream thread_id,
+      // and falls back to threadId when the caller does not distinguish them.
+      expect(seen[0]).toEqual({ threadId: 't1', title: 'New Name', registryId: 't1' });
     });
 
     test('returns the canonical {threadId, title} after success', async () => {
