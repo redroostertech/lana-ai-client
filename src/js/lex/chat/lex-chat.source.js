@@ -25,6 +25,41 @@
     });
   }
 
+  function extractApiError(payload, fallback) {
+    if (!payload) return fallback;
+    var err = payload.error || payload.message || payload.detail;
+    if (typeof err === 'string') return err;
+    if (err && typeof err === 'object') {
+      return err.message || err.detail || err.code || fallback;
+    }
+    return fallback;
+  }
+
+  function readJsonSafe(response) {
+    return response.json().catch(function () { return null; });
+  }
+
+  function humanizePhase(phase) {
+    var raw = String(phase || 'thinking').trim();
+    var known = {
+      thinking: 'Thinking',
+      routing: 'Routing',
+      retrieving: 'Retrieving context',
+      generating: 'Generating',
+      grounding: 'Grounding',
+      grounding_buffered_generation: 'Grounding',
+      finalizing: 'Finalizing',
+      agentic: 'Working'
+    };
+    var key = raw.toLowerCase();
+    if (known[key]) return known[key];
+    return raw
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, function (letter) { return letter.toUpperCase(); });
+  }
+
   // =========================================================================
   // ChatSource — abstract base
   // =========================================================================
@@ -177,6 +212,7 @@
             content: m.content,
             timestamp: m.created_at || m.timestamp,
             citations: (m.metadata && m.metadata.citations) || m.citations || [],
+            references: (m.metadata && m.metadata.references) || m.references || [],
             artifacts: (m.metadata && m.metadata.artifacts) || m.artifacts || [],
             duration: m.duration_ms || null,
             tokenCount: m.token_count || null,
@@ -406,8 +442,9 @@
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ documentId: docId, filename, matterId })
       });
-      if (!res.ok) throw new Error((await res.json()).error || 'Failed to add document');
-      return (await res.json()).state;
+      const payload = await readJsonSafe(res);
+      if (!res.ok) throw new Error(extractApiError(payload, 'Failed to add document'));
+      return payload?.state || null;
     }
 
     async removeDocument(docId) {
@@ -418,8 +455,9 @@
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error((await res.json()).error || 'Failed to remove document');
-      return (await res.json()).state;
+      const payload = await readJsonSafe(res);
+      if (!res.ok) throw new Error(extractApiError(payload, 'Failed to remove document'));
+      return payload?.state || null;
     }
 
     async clearDocuments() {
@@ -430,8 +468,9 @@
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error((await res.json()).error || 'Failed to clear documents');
-      return (await res.json()).state;
+      const payload = await readJsonSafe(res);
+      if (!res.ok) throw new Error(extractApiError(payload, 'Failed to clear documents'));
+      return payload?.state || null;
     }
 
     async loadState() {
@@ -459,10 +498,10 @@
           };
 
         case 'thinking':
-          return { type: 'thinking', message: data.message, phase: data.phase || 'thinking' };
+          return { type: 'thinking', message: data.message, phase: humanizePhase(data.phase) };
 
         case 'status':
-          return { type: 'thinking', message: data.message, phase: data.phase || 'thinking' };
+          return { type: 'thinking', message: data.message, phase: humanizePhase(data.phase) };
 
         case 'reasoning':
           return {
@@ -545,6 +584,9 @@
 
         case 'citations':
           return { type: 'citations', citations: data.citations || data.sources || [] };
+
+        case 'references':
+          return { type: 'references', references: data.references || [] };
 
         case 'context_usage':
           return {
@@ -647,7 +689,7 @@
           };
 
         case 'phase':
-          return { type: 'thinking', message: data.message, phase: data.phase || 'thinking' };
+          return { type: 'thinking', message: data.message, phase: humanizePhase(data.phase) };
 
         case 'done':
           if (!data.message_id) {
@@ -667,7 +709,8 @@
             threadId: data.thread_id,
             tokenCount: data.token_count || data.total_tokens || null,
             processingTimeMs: data.processing_time_ms || data.generation_time_ms || null,
-            matterId: data.matter_id || null
+            matterId: data.matter_id || null,
+            references: data.references || []
           };
 
         case 'block_hints':
@@ -686,6 +729,10 @@
             retrievalCoverage: data.grounding.retrieval_coverage || null,
             fallbackUsed: data.grounding.fallback_used || false,
             validatorFailures: data.grounding.validator_failures || [],
+            validatorWarnings: data.grounding.validator_warnings || [],
+            validationFindings: data.grounding.validation_findings || [],
+            validationDisposition: data.grounding.validation_disposition || null,
+            validationSeverity: data.grounding.validation_severity || null,
             toolEvidenceCount: data.grounding.tool_evidence_count || 0,
             policy: data.grounding_policy || null,
             handler: data.handler || null,

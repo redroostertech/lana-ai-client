@@ -146,6 +146,7 @@
       this._source = null;
       this._documents = [];
       this._citations = [];
+      this._references = [];
       this._artifacts = [];
       this._streamingContent = '';
       this._initialized = false;
@@ -295,7 +296,17 @@
         });
         this.dispatchEvent(evt);
         if (!evt.defaultPrevented) {
-          this._openCitationDocument(e.detail);
+          this._openCitationSource(e.detail);
+        }
+      });
+
+      this.addEventListener('lex-reference-click', (e) => {
+        const evt = new CustomEvent('lex-chat-reference-click', {
+          detail: e.detail, bubbles: true, composed: true, cancelable: true
+        });
+        this.dispatchEvent(evt);
+        if (!evt.defaultPrevented) {
+          this._openReference(e.detail && e.detail.reference);
         }
       });
 
@@ -436,6 +447,7 @@
 
       // Reset per-message state
       this._citations = [];
+      this._references = [];
       this._artifacts = [];
       this._streamingContent = '';
       this._groundingContext = null;
@@ -588,6 +600,7 @@
                 messageId: m.id || m.message_id,
                 timestamp: m.timestamp || m.created_at,
                 citations: m.citations && m.citations.length > 0 ? m.citations : undefined,
+                references: m.references && m.references.length > 0 ? m.references : undefined,
                 artifacts: m.artifacts && m.artifacts.length > 0 ? m.artifacts : undefined,
                 duration: m.duration || null,
                 tokenCount: m.tokenCount || null
@@ -686,6 +699,7 @@
       this._loadConversationSeq += 1;
       this._props.conversationId = null;
       this._citations = [];
+      this._references = [];
       this._artifacts = [];
       this._resetContextMeter();
       if (this._threadEl) {
@@ -707,7 +721,17 @@
         const state = await this._source.addDocument(id, name, this.matterId);
         if (state) this._updateDocumentState(state);
       } catch (err) {
+        // Expected on a brand-new thread: the backend refuses to persist
+        // conversation state before the first message exists. The first
+        // turn already carries the document context in its payload, so
+        // queue the attach and retry silently after the first response.
+        if (String(err.message || '').toLowerCase().indexOf('persisted before its first message') !== -1) {
+          this._pendingDocumentAdds = this._pendingDocumentAdds || [];
+          this._pendingDocumentAdds.push({ id, name });
+          return;
+        }
         this._showSystemMessage('Failed to add document: ' + err.message);
+        throw err;
       }
     }
 
@@ -845,6 +869,10 @@
           this._citations = event.citations || [];
           break;
 
+        case 'references':
+          this._references = event.references || [];
+          break;
+
         case 'context_usage':
           this._updateContextMeter(event.percentUsed, event.percentUntilCompact);
           this.emit('lex-chat-context-usage', {
@@ -964,11 +992,15 @@
           // Finalize the streaming message
           if (this._threadEl) {
             const duration = event.processingTimeMs || (this._sendStartTime ? Date.now() - this._sendStartTime : null);
+            if (Array.isArray(event.references) && event.references.length > 0) {
+              this._references = event.references;
+            }
             this._threadEl.finalizeLastMessage({
               messageId: event.messageId,
               duration,
               tokenCount: event.tokenCount || null,
               citations: this._citations.length > 0 ? this._citations : undefined,
+              references: this._references.length > 0 ? this._references : undefined,
               artifacts: this._artifacts.length > 0 ? this._artifacts : undefined,
               grounding: this._groundingContext || undefined
             });
@@ -978,6 +1010,22 @@
           if (event.threadId && !this.conversationId) {
             this._props.conversationId = event.threadId;
             this.emit('lex-chat-conversation-created', { conversationId: event.threadId });
+          }
+
+          // The thread now has its first persisted message — flush document
+          // attaches that were queued because state could not be persisted
+          // on a brand-new thread (see addDocument).
+          if (this._pendingDocumentAdds && this._pendingDocumentAdds.length > 0) {
+            const pending = this._pendingDocumentAdds;
+            this._pendingDocumentAdds = [];
+            (async () => {
+              for (const d of pending) {
+                try {
+                  const state = await this._source.addDocument(d.id, d.name, this.matterId);
+                  if (state) this._updateDocumentState(state);
+                } catch (e) { /* silent — context already active this session */ }
+              }
+            })();
           }
 
           // Capture backend-resolved matter ID (e.g. resolved from attachment file)
@@ -996,7 +1044,8 @@
         case 'stopped':
           if (this._threadEl) {
             this._threadEl.finalizeLastMessage({
-              citations: this._citations.length > 0 ? this._citations : undefined
+              citations: this._citations.length > 0 ? this._citations : undefined,
+              references: this._references.length > 0 ? this._references : undefined
             });
           }
           this._showSystemMessage('Generation stopped');
@@ -1230,9 +1279,27 @@
     // Default citation click — open document at cited page
     // ---------------------------------------------------------------------------
 
+    async _openCitationSource(detail) {
+      const citation = detail && detail.citation ? detail.citation : {};
+      const sourceType = String((citation && (citation.sourceType || citation.source_type)) || '').toLowerCase();
+      const source = String((citation && citation.source) || '').toLowerCase();
+      const explicitDocId = detail && (detail.documentId || citation.document_id || citation.documentId || citation.doc_id);
+      const docId = explicitDocId || (sourceType === 'document' || sourceType === 'chunk' ? citation.sourceRef : null);
+
+      if (!docId || sourceType === 'domain_pack' || source === 'domain_pack') {
+        await this._showCitationSourceDetails(detail);
+        return;
+      }
+
+      await this._openCitationDocument({ ...detail, documentId: docId });
+    }
+
     async _openCitationDocument(detail) {
       const docId = detail && detail.documentId;
-      if (!docId) return;
+      if (!docId) {
+        await this._showCitationSourceDetails(detail);
+        return;
+      }
 
       const page = detail.page || 1;
 
@@ -1243,7 +1310,7 @@
         }
 
         const resp = await fetch(
-          apiClient.baseUrl + '/api/v1/documents/' + encodeURIComponent(docId) + '/download',
+          apiClient.baseUrl + '/api/v1/storage/download/' + encodeURIComponent(docId),
           { headers: { 'Authorization': 'Bearer ' + (apiClient.token || localStorage.getItem('token') || '') } }
         );
 
@@ -1257,6 +1324,232 @@
       } catch (err) {
         console.error('[lex-chat] Citation document open failed:', err);
         this._showSystemMessage('Could not open document. Please try again.');
+      }
+    }
+
+    _openReference(reference) {
+      if (!reference || typeof reference !== 'object') {
+        this._showSystemMessage('Reference details are not available.');
+        return;
+      }
+
+      const target = reference.navigation_target || reference.navigationTarget || null;
+      if (target && target.page && global.Lex && global.Lex.Nav && typeof global.Lex.Nav.go === 'function') {
+        global.Lex.Nav.go(target.page, {
+          params: target.params || {},
+          context: target.context || {}
+        });
+        return;
+      }
+
+      this._showReferenceDetails(reference);
+    }
+
+    _showReferenceDetails(reference) {
+      const h = (value) => ChatFormat && ChatFormat.escapeHtml
+        ? ChatFormat.escapeHtml(String(value == null ? '' : value))
+        : String(value == null ? '' : value);
+      const label = reference.label || reference.title || reference.name || reference.id || 'Reference';
+      const rows = [
+        ['Type', reference.type || reference.entity_type || 'reference'],
+        ['ID', reference.id || reference.entity_id || ''],
+        ['Source', reference.source || ''],
+        ['Workspace', reference.workspace_id || reference.workspaceId || ''],
+        ['Matter', reference.matter_id || reference.matterId || '']
+      ].filter((row) => row[1] !== undefined && row[1] !== null && String(row[1]).trim() !== '');
+      const preview = reference.preview && typeof reference.preview === 'object'
+        ? reference.preview
+        : null;
+
+      const rowHtml = rows.map((row) => `
+        <div style="display:grid;grid-template-columns:110px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--lex-border-subtle,#eee)">
+          <div style="font-size:11px;font-weight:600;color:var(--lex-chat-text-dim,#777)">${h(row[0])}</div>
+          <div style="font-size:12px;color:var(--lex-chat-text,#222)">${h(row[1])}</div>
+        </div>
+      `).join('');
+      const previewHtml = preview
+        ? `
+          <div style="margin-top:14px">
+            <div style="font-size:11px;font-weight:700;color:var(--lex-chat-text-dim,#777);margin-bottom:6px">Preview</div>
+            ${Object.keys(preview).map((key) => `
+              <div style="display:grid;grid-template-columns:110px 1fr;gap:10px;padding:4px 0">
+                <div style="font-size:11px;font-weight:600;color:var(--lex-chat-text-dim,#777)">${h(key)}</div>
+                <div style="font-size:12px;color:var(--lex-chat-text,#222)">${h(preview[key])}</div>
+              </div>
+            `).join('')}
+          </div>
+        `
+        : '';
+
+      const content = `
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:13px;font-weight:700;color:var(--lex-chat-text,#222)">${h(label)}</div>
+          ${rowHtml}
+          ${previewHtml}
+        </div>
+      `;
+
+      if (global.Lex && global.Lex.Modal && typeof global.Lex.Modal.open === 'function') {
+        global.Lex.Modal.open({
+          heading: 'Reference Details',
+          content,
+          size: 'lg',
+          hideActions: true
+        });
+      } else {
+        this._showSystemMessage(`${label}: ${reference.description || reference.subtitle || 'No reference detail available.'}`);
+      }
+    }
+
+    _getCitationSourceKind(citation) {
+      const source = String(citation && citation.source || '').toLowerCase();
+      const sourceType = String(citation && (citation.sourceType || citation.source_type) || '').toLowerCase();
+      if (source === 'domain_pack' || sourceType === 'domain_pack') {
+        return {
+          label: 'Legal authority',
+          description: 'External legal authority from the active domain pack. Use it for legal background or law-supported claims; it is not a workspace document, task, contact, or matter record.'
+        };
+      }
+      if (sourceType === 'document' || sourceType === 'chunk' || citation.document_id || citation.documentId || citation.doc_id) {
+        return {
+          label: 'Workspace document',
+          description: 'Matter/workspace document evidence used to support document-derived facts in the response.'
+        };
+      }
+      return {
+        label: 'Source',
+        description: 'Supporting material attached to this response.'
+      };
+    }
+
+    async _showCitationSourceDetails(detail) {
+      let citation = detail && detail.citation ? detail.citation : {};
+      citation = await this._hydrateDomainPackCitation(citation);
+      const label = citation.label || citation.filename || citation.citation || detail.filename || 'Source';
+      const sourceKind = this._getCitationSourceKind(citation);
+      const sourceType = sourceKind.label;
+      const authorityId = citation.authority_id || citation.authorityId || citation.sourceRef || citation.id || '';
+      const citationText = citation.citation || citation.label || citation.filename || '';
+      const excerpt = citation.excerpt || citation.snippet || citation.chunk_text || citation.content || citation.text || '';
+      const pack = citation.domain_pack || citation.domainPack || null;
+      const locator = citation.locator || {};
+      const locatorText = citation.locator_text || citation.citation_locator || locator.pageRange || locator.page || '';
+      const claimMapping = citation.claim_mapping || citation.claimMapping || {};
+      const relationText = citation.used_for || citation.relevance_note || citation.claim || claimMapping.claim || '';
+      const h = (value) => ChatFormat && ChatFormat.escapeHtml
+        ? ChatFormat.escapeHtml(String(value == null ? '' : value))
+        : String(value == null ? '' : value);
+
+      const rows = [
+        ['Type', sourceType],
+        ['Authority ID', authorityId],
+        ['Citation', citationText],
+        ['Locator', locatorText],
+        ['Source', citation.external_source || citation.source || ''],
+        ['Jurisdiction', citation.jurisdiction || ''],
+        ['Court', citation.court || ''],
+        ['Authority Level', citation.authority_level || citation.doc_type || ''],
+        ['Mapping Status', claimMapping.status || citation.claim_mapping_status || ''],
+        ['Claim', citation.claim || claimMapping.claim || ''],
+        ['URL', citation.url || ''],
+        ['Date Published', citation.date_published || '']
+      ].filter((row) => row[1] !== undefined && row[1] !== null && String(row[1]).trim() !== '');
+
+      const rowHtml = rows.map((row) => `
+        <div style="display:grid;grid-template-columns:110px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--lex-border-subtle,#eee)">
+          <div style="font-size:11px;font-weight:600;color:var(--lex-chat-text-dim,#777)">${h(row[0])}</div>
+          <div style="font-size:12px;color:var(--lex-chat-text,#222)">${h(row[1])}</div>
+        </div>
+      `).join('');
+
+      const usageHtml = `
+        <div style="margin-top:12px;border:1px solid var(--lex-border-subtle,#eee);border-radius:6px;padding:10px;background:var(--lex-surface-muted,#fafafa)">
+          <div style="font-size:11px;font-weight:700;color:var(--lex-chat-text-dim,#777);margin-bottom:5px">How this relates</div>
+          <div style="font-size:12px;line-height:1.5;color:var(--lex-chat-text,#222)">${h(sourceKind.description)}</div>
+          ${relationText ? `<div style="font-size:12px;line-height:1.5;color:var(--lex-chat-text,#222);margin-top:6px">${h(relationText)}</div>` : ''}
+        </div>
+      `;
+
+      const packHtml = pack && typeof pack === 'object'
+        ? `
+          <div style="margin-top:14px">
+            <div style="font-size:11px;font-weight:700;color:var(--lex-chat-text-dim,#777);margin-bottom:6px">Domain Pack</div>
+            ${[
+              ['Name', pack.name],
+              ['Version', pack.version],
+              ['Channel', pack.release_channel],
+              ['Corpus Cutoff', pack.corpus_cutoff_timestamp],
+              ['Verified At', pack.verified_at]
+            ].filter((row) => row[1]).map((row) => `
+              <div style="display:grid;grid-template-columns:110px 1fr;gap:10px;padding:4px 0">
+                <div style="font-size:11px;font-weight:600;color:var(--lex-chat-text-dim,#777)">${h(row[0])}</div>
+                <div style="font-size:12px;color:var(--lex-chat-text,#222)">${h(row[1])}</div>
+              </div>
+            `).join('')}
+          </div>
+        `
+        : '';
+
+      const excerptHtml = excerpt
+        ? `
+          <div style="margin-top:14px">
+            <div style="font-size:11px;font-weight:700;color:var(--lex-chat-text-dim,#777);margin-bottom:6px">Excerpt</div>
+            <div style="font-size:12px;line-height:1.5;white-space:pre-wrap;border:1px solid var(--lex-border-subtle,#eee);border-radius:6px;padding:10px;background:var(--lex-surface-muted,#fafafa)">${h(excerpt)}</div>
+          </div>
+        `
+        : '<div style="margin-top:14px;font-size:12px;color:var(--lex-chat-text-dim,#777)">No excerpt was included with this source.</div>';
+
+      const content = `
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:13px;font-weight:700;color:var(--lex-chat-text,#222)">${h(label)}</div>
+          ${rowHtml}
+          ${usageHtml}
+          ${packHtml}
+          ${excerptHtml}
+        </div>
+      `;
+
+      if (global.Lex && global.Lex.Modal && typeof global.Lex.Modal.open === 'function') {
+        global.Lex.Modal.open({
+          heading: 'Source Details',
+          content,
+          size: 'lg',
+          hideActions: true
+        });
+      } else {
+        this._showSystemMessage(`${label}: ${excerpt || citationText || 'No source detail available.'}`);
+      }
+    }
+
+    async _hydrateDomainPackCitation(citation) {
+      if (!citation || typeof citation !== 'object') return citation || {};
+      const source = String(citation.source || '').toLowerCase();
+      const sourceType = String(citation.sourceType || citation.source_type || '').toLowerCase();
+      if (source !== 'domain_pack' && sourceType !== 'domain_pack') return citation;
+      if (citation.excerpt || citation.snippet || citation.text || citation.content) return citation;
+
+      const authorityId = citation.authority_id || citation.authorityId || citation.sourceRef || citation.id || '';
+      if (!authorityId) return citation;
+
+      try {
+        const apiClient = global.api;
+        if (!apiClient || typeof apiClient.get !== 'function') return citation;
+        const resp = await apiClient.get('/api/v1/domain-packs/authority/' + encodeURIComponent(authorityId));
+        const data = resp && (resp.data || resp);
+        const evidence = data && data.evidence;
+        if (!evidence || typeof evidence !== 'object') return citation;
+        return {
+          ...citation,
+          ...evidence,
+          label: citation.label || evidence.citation || evidence.title || citation.filename,
+          filename: citation.filename || evidence.citation || evidence.title,
+          citation: citation.citation || evidence.citation,
+          source: 'domain_pack',
+          domain_pack: citation.domain_pack || data.pack || null
+        };
+      } catch (err) {
+        console.warn('[lex-chat] Domain-pack source hydration failed:', err && err.message ? err.message : err);
+        return citation;
       }
     }
 

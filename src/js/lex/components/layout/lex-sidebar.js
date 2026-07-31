@@ -2597,8 +2597,15 @@
         return;
       }
 
-      if (this._workspaceListLoading) return;
+      if (this._workspaceListLoading) {
+        if (!container.innerHTML.trim()) {
+          container.innerHTML = '<div class="lex-sidebar-dynamic-loading">Loading workspaces...</div>';
+        }
+        return;
+      }
       this._workspaceListLoading = true;
+      const requestId = (this._workspaceListRequestId || 0) + 1;
+      this._workspaceListRequestId = requestId;
       container.innerHTML = '<div class="lex-sidebar-dynamic-loading">Loading workspaces...</div>';
 
       try {
@@ -2631,12 +2638,26 @@
         this._pinnedWorkspaceItems = pinnedRows;
         this._workspaceItems = recentRows.slice(0, 10);
         this._workspaceHasMore = total > this._workspaceItems.length + pinnedRows.length || recentRows.length > 10;
-        this._renderWorkspaceList(container);
+        if (this._workspaceListRequestId === requestId) {
+          const liveContainer = this.querySelector('#lexWorkspaceListContainer');
+          if (liveContainer) this._renderWorkspaceList(liveContainer);
+        }
       } catch (error) {
         console.error('[lex-sidebar] Failed to load workspaces:', error);
-        container.innerHTML = '<div class="lex-sidebar-dynamic-error">Could not load workspaces</div>';
+        if (this._workspaceListRequestId === requestId) {
+          const liveContainer = this.querySelector('#lexWorkspaceListContainer');
+          if (liveContainer) {
+            liveContainer.innerHTML = '<div class="lex-sidebar-dynamic-error">Could not load workspaces</div>';
+          }
+        }
       } finally {
-        this._workspaceListLoading = false;
+        if (this._workspaceListRequestId === requestId) {
+          this._workspaceListLoading = false;
+          const liveContainer = this.querySelector('#lexWorkspaceListContainer');
+          if (liveContainer && Array.isArray(this._workspaceItems) && !liveContainer.querySelector('.lex-sidebar-workspace-item, .lex-sidebar-dynamic-empty')) {
+            this._renderWorkspaceList(liveContainer);
+          }
+        }
         requestAnimationFrame(() => this._updateScrollableFades());
       }
     }

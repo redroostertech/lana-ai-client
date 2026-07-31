@@ -96,6 +96,30 @@
         border-top: 1px solid var(--lex-chat-border-soft);
         padding-top: 8px;
       }
+      .lex-chat-evidence-tabs {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        margin-bottom: 6px;
+        border: 1px solid var(--lex-chat-border-soft);
+        border-radius: 6px;
+        padding: 2px;
+        background: var(--lex-chat-bg-surface);
+      }
+      .lex-chat-evidence-tab {
+        border: none;
+        background: transparent;
+        color: var(--lex-chat-text-dim);
+        border-radius: 4px;
+        padding: 3px 7px;
+        font-size: 10.5px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .lex-chat-evidence-tab[aria-selected="true"] {
+        color: var(--lex-chat-text);
+        background: var(--lex-chat-bg-elevated);
+      }
       .lex-chat-citations-section .lex-chat-citation-item {
         display: flex;
         align-items: flex-start;
@@ -109,6 +133,33 @@
       .lex-chat-citations-section .lex-chat-citation-item:hover {
         border-left-color: var(--lex-chat-accent);
       }
+      .lex-chat-reference-empty {
+        padding: 6px 8px;
+        font-size: 10.5px;
+        color: var(--lex-chat-text-dim);
+      }
+      .lex-chat-validation-section {
+        margin-top: 10px;
+        border: 1px solid var(--lex-chat-border-soft);
+        border-left: 3px solid #b7791f;
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: rgba(183, 121, 31, 0.07);
+      }
+      .lex-chat-validation-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--lex-chat-text);
+        margin-bottom: 5px;
+      }
+      .lex-chat-validation-item {
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--lex-chat-text-dim);
+      }
+      .lex-chat-validation-item + .lex-chat-validation-item {
+        margin-top: 4px;
+      }
       .lex-chat-citation-item button {
         text-align: left;
         font-weight: 500;
@@ -120,6 +171,20 @@
         transition: color var(--lex-transition-fast, 0.15s);
       }
       .lex-chat-citation-item button:hover {
+        color: var(--lex-chat-accent);
+        text-decoration: underline;
+      }
+      .lex-chat-citations-more {
+        margin: 4px 0 0 8px;
+        padding: 0;
+        border: none;
+        background: none;
+        color: var(--lex-chat-text-dim);
+        font-size: 10px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .lex-chat-citations-more:hover {
         color: var(--lex-chat-accent);
         text-decoration: underline;
       }
@@ -244,6 +309,7 @@
         tokenCount: { type: Number, default: null, attribute: 'token-count' },
         streaming:  { type: Boolean, default: false, reflect: true },
         citations:  { type: Array, default: [] },
+        references: { type: Array, default: [] },
         artifacts:  { type: Array, default: [] },
         attachments: { type: Array, default: [] },
         grounding:   { type: Object, default: null }
@@ -254,6 +320,8 @@
       super();
       this._rawContent = ''; // Accumulated raw content for streaming
       this._contentEl = null;
+      this._expandedCitations = false;
+      this._activeEvidenceTab = 'sources';
     }
 
     connected() {
@@ -284,10 +352,19 @@
           parts.push(min + 'm ' + remSec + 's');
         }
       }
-      // Tokens
+      // Tokens — compact above 999: 1k, 1.2k, 12k
       const tc = this.tokenCount;
       if (tc) {
-        parts.push(tc.toLocaleString() + ' tokens');
+        let label;
+        if (tc < 1000) {
+          label = String(tc);
+        } else if (tc < 10000) {
+          const k = Math.round(tc / 100) / 10;
+          label = (k % 1 === 0 ? String(Math.round(k)) : k.toFixed(1)) + 'k';
+        } else {
+          label = Math.round(tc / 1000) + 'k';
+        }
+        parts.push(label + ' tokens');
       }
       return parts.length > 0 ? ' · ' + parts.join(' · ') : '';
     }
@@ -322,9 +399,10 @@
           </div>`;
       }
 
-      // assistant
+      // assistant — the breathing logo only exists while streaming; a
+      // completed reply carries no icon.
       const streamCls = this.streaming ? ' lex-chat-narrative--streaming' : '';
-      const logo = this.streaming ? BREATHING_LOGO : BREATHING_LOGO_STATIC;
+      const logo = this.streaming ? BREATHING_LOGO : '';
       const formatted = ChatFormat ? ChatFormat.format(this.content, this.citations) : this.content;
 
       return `
@@ -343,11 +421,45 @@
       // Bind citation clicks via delegation
       this.delegate('click', '.lex-chat-citation-link', (e, target) => {
         e.preventDefault();
+        const index = parseInt(target.dataset.citationIndex, 10);
+        const citation = Number.isFinite(index) && Array.isArray(this.citations)
+          ? (this.citations[index] || null)
+          : null;
         this.emit('lex-citation-click', {
           documentId: target.dataset.documentId,
           filename: target.dataset.filename,
           page: parseInt(target.dataset.page, 10) || 1,
-          citationNum: target.dataset.citationNum ? parseInt(target.dataset.citationNum, 10) : null
+          citationNum: target.dataset.citationNum ? parseInt(target.dataset.citationNum, 10) : null,
+          citationIndex: Number.isFinite(index) ? index : null,
+          citation
+        });
+      });
+
+      this.delegate('click', '.lex-chat-citations-more', (e) => {
+        e.preventDefault();
+        this._expandedCitations = !this._expandedCitations;
+        const existing = this.querySelector('.lex-chat-citations-section');
+        if (existing) existing.remove();
+        this._renderCitationsSection(this.citations || []);
+      });
+
+      this.delegate('click', '.lex-chat-evidence-tab', (e, target) => {
+        e.preventDefault();
+        this._activeEvidenceTab = target.dataset.evidenceTab || 'sources';
+        const existing = this.querySelector('.lex-chat-citations-section');
+        if (existing) existing.remove();
+        this._renderCitationsSection(this.citations || []);
+      });
+
+      this.delegate('click', '.lex-chat-reference-link', (e, target) => {
+        e.preventDefault();
+        const index = parseInt(target.dataset.referenceIndex, 10);
+        const reference = Number.isFinite(index) && Array.isArray(this.references)
+          ? (this.references[index] || null)
+          : null;
+        this.emit('lex-reference-click', {
+          referenceIndex: Number.isFinite(index) ? index : null,
+          reference
         });
       });
 
@@ -399,6 +511,21 @@
         this._renderArtifactsSection(this.artifacts);
       }
 
+      // The grounding badge lives on the timestamp line but isn't part of the
+      // render template, so any re-render after finalize() rebuilds the line
+      // without it. Re-apply from props (idempotent — _renderGroundingIndicator
+      // guards against double render).
+      if (!this.streaming && this.grounding) {
+        this._renderGroundingIndicator(this.grounding);
+        this._renderValidationFindingsSection(this.grounding);
+      }
+
+      // Same wipe applies to the citations (Sources) section — re-apply it
+      // for finalized messages (idempotent — guarded inside the renderer).
+      if (!this.streaming && ((this.citations && this.citations.length > 0) || (this.references && this.references.length > 0))) {
+        this._renderCitationsSection(this.citations);
+      }
+
       // Bind mermaid copy buttons
       this.delegate('click', '[data-mermaid-copy]', (e, target) => {
         const wrapper = target.closest('.lex-mermaid-wrapper');
@@ -421,7 +548,7 @@
     appendContent(chunk) {
       this._rawContent += chunk;
       this._props.content = this._rawContent;
-      this._props.streaming = true;
+      this.streaming = true;
 
       // Direct DOM update (no re-render)
       if (this._contentEl) {
@@ -447,10 +574,11 @@
      * @param {Object} metadata - { messageId, citations, artifacts, timestamp }
      */
     finalize(metadata = {}) {
-      this._props.streaming = false;
+      this.streaming = false;
       if (metadata.messageId) this._props.messageId = metadata.messageId;
       if (metadata.timestamp) this._props.timestamp = metadata.timestamp;
       if (metadata.citations) this._props.citations = metadata.citations;
+      if (metadata.references) this._props.references = metadata.references;
       if (metadata.artifacts) this._props.artifacts = metadata.artifacts;
       if (metadata.duration != null) this._props.duration = metadata.duration;
       if (metadata.tokenCount != null) this._props.tokenCount = metadata.tokenCount;
@@ -503,9 +631,10 @@
       }
 
       // Switch logo to static after streaming completes
+      // The reply is back from the service — the indicator's job is done.
       const logo = this.querySelector('.lex-chat-indicator');
       if (logo) {
-        logo.classList.add('lex-chat-indicator--static');
+        logo.remove();
       }
 
       // Render mermaid diagrams (must be after content is in DOM)
@@ -527,9 +656,14 @@
 
       var status = grounding.groundingStatus;
       var evidenceMode = grounding.evidenceMode;
+      var findings = Array.isArray(grounding.validationFindings) ? grounding.validationFindings : [];
+      var disposition = grounding.validationDisposition || null;
 
       var label, color;
-      if (status === 'strong') {
+      if (disposition === 'flag_and_deliver' || findings.length > 0) {
+        label = 'Needs review';
+        color = 'yellow';
+      } else if (status === 'strong') {
         label = 'Grounded';
         color = 'green';
       } else if (status === 'partial' || status === 'weak') {
@@ -539,12 +673,13 @@
         if (evidenceMode === 'grounded_tool') {
           label = 'Tool-verified';
           color = 'blue';
-        } else if (evidenceMode === 'ungrounded_fallback') {
-          // General chat / greetings — no badge needed
-          return;
         } else {
-          label = 'Ungrounded';
-          color = 'gray';
+          // No evidence backing this response — show nothing rather than an
+          // "Ungrounded" badge. A negative label on every general-knowledge
+          // answer reads as a warning and erodes trust; the response text
+          // already carries the "general legal principles" caveat, and the
+          // grounding telemetry still flows in debug_context for QA.
+          return;
         }
       } else {
         // Unknown status — don't show
@@ -556,27 +691,69 @@
       badge.color = color;
       badge.size = 'sm';
       badge.style.marginLeft = '8px';
+      if (findings.length > 0) {
+        badge.title = findings.map((finding) => finding.message || finding.code).filter(Boolean).join('\n');
+      }
       wrapper.appendChild(badge);
+    }
+
+    _renderValidationFindingsSection(grounding) {
+      const body = this.querySelector('.lex-chat-msg-agent-body');
+      if (!body || body.querySelector('.lex-chat-validation-section')) return;
+      const findings = Array.isArray(grounding && grounding.validationFindings)
+        ? grounding.validationFindings
+        : [];
+      if (findings.length === 0 && grounding && grounding.validationDisposition !== 'flag_and_deliver') return;
+
+      const items = findings.length > 0
+        ? findings.map((finding) => {
+          const message = finding.message || finding.code || 'This answer has a validator warning.';
+          const code = finding.code ? ` (${finding.code})` : '';
+          return `<div class="lex-chat-validation-item">${ChatFormat.escapeHtml(String(message + code))}</div>`;
+        }).join('')
+        : '<div class="lex-chat-validation-item">This answer was delivered with validator warnings.</div>';
+
+      body.insertAdjacentHTML('beforeend', `
+        <div class="lex-chat-validation-section">
+          <div class="lex-chat-validation-title">Review Notes</div>
+          ${items}
+        </div>`);
     }
 
     _renderCitationsSection(citations) {
       const body = this.querySelector('.lex-chat-msg-agent-body');
       if (!body || body.querySelector('.lex-chat-citations-section')) return;
 
+      citations = Array.isArray(citations) ? citations : [];
+      const references = Array.isArray(this.references) ? this.references : [];
+      const sourceCount = citations.length;
+      const referenceCount = references.length;
+      if (sourceCount === 0 && referenceCount === 0) return;
+      const activeTab = this._activeEvidenceTab === 'references' ? 'references' : 'sources';
+
       const max = 5;
-      const items = citations.slice(0, max).map((c, i) => {
-        const fn = ChatFormat.escapeHtml(c.filename || 'Unknown');
-        const pg = c.page_number || c.page || '?';
-        const docId = ChatFormat.escapeHtml(c.document_id || '');
-        const excerpt = c.chunk_text || c.excerpt || '';
+      const visibleCitations = this._expandedCitations ? citations : citations.slice(0, max);
+      const items = visibleCitations.map((c, i) => {
+        const absoluteIndex = this._expandedCitations ? i : i;
+        const label = c.label || c.filename || c.citation || c.title || c.name || 'Unknown';
+        const fn = ChatFormat.escapeHtml(label);
+        const pg = c.page_number || c.page || (c.locator && c.locator.page) || '?';
+        const docId = ChatFormat.escapeHtml(c.document_id || c.documentId || c.doc_id || c.sourceRef || '');
+        const excerpt = c.chunk_text || c.excerpt || c.snippet || c.content || c.text || '';
         const rel = c.relevance_score || c.relevance || 0;
         const pct = Math.round(rel * 100);
+        const sourceType = ChatFormat.escapeHtml(c.sourceType || c.source_type || '');
+        const source = ChatFormat.escapeHtml(c.source || '');
+        const sourceKind = this._getCitationSourceKind(c);
+        const relation = c.used_for || c.relevance_note || c.claim || '';
 
         return `
           <div class="lex-chat-citation-item">
-            <span>${i + 1}.</span>
+            <span>${absoluteIndex + 1}.</span>
             <div>
-              <button class="lex-chat-citation-link" data-document-id="${docId}" data-filename="${fn}" data-page="${pg}">${fn}</button>
+              <button class="lex-chat-citation-link" data-citation-index="${absoluteIndex}" data-document-id="${docId}" data-filename="${fn}" data-page="${ChatFormat.escapeHtml(String(pg))}" data-source-type="${sourceType}" data-source="${source}">${fn}</button>
+              <div>${sourceKind}</div>
+              ${relation ? `<div style="opacity:0.8">${ChatFormat.escapeHtml(String(relation))}</div>` : ''}
               ${pg !== '?' ? `<div>page ${pg}</div>` : ''}
               ${pct > 0 ? `<div>Relevance: ${pct}%</div>` : ''}
               ${excerpt ? `<div style="opacity:0.7;font-style:italic">${ChatFormat.escapeHtml(excerpt.substring(0, 100))}${excerpt.length > 100 ? '...' : ''}</div>` : ''}
@@ -584,14 +761,54 @@
           </div>`;
       }).join('');
 
-      const more = citations.length > max ? `<div style="font-size:10px;opacity:0.6;padding-left:8px">+ ${citations.length - max} more</div>` : '';
+      const more = !this._expandedCitations && citations.length > max
+        ? `<button class="lex-chat-citations-more" type="button">+ ${citations.length - max} more</button>`
+        : this._expandedCitations && citations.length > max
+          ? '<button class="lex-chat-citations-more" type="button">Show less</button>'
+        : '';
+      const referencesHtml = referenceCount > 0
+        ? references.map((ref, i) => this._renderReferenceItem(ref, i)).join('')
+        : '<div class="lex-chat-reference-empty">No structured references for this response.</div>';
+      const sourcesHtml = sourceCount > 0
+        ? items + more
+        : '<div class="lex-chat-reference-empty">No sources for this response.</div>';
+      const panelHtml = activeTab === 'references'
+        ? referencesHtml
+        : sourcesHtml;
 
       body.insertAdjacentHTML('beforeend', `
         <div class="lex-chat-citations-section">
-          <div style="font-size:11px;font-weight:600;color:var(--lex-chat-text-dim);margin-bottom:4px">Sources (${citations.length})</div>
-          ${items}
-          ${more}
+          <div class="lex-chat-evidence-tabs" role="tablist" aria-label="Response evidence">
+            <button class="lex-chat-evidence-tab" type="button" role="tab" aria-selected="${activeTab === 'sources'}" data-evidence-tab="sources">Sources (${sourceCount})</button>
+            <button class="lex-chat-evidence-tab" type="button" role="tab" aria-selected="${activeTab === 'references'}" data-evidence-tab="references">References (${referenceCount})</button>
+          </div>
+          ${panelHtml}
         </div>`);
+    }
+
+    _renderReferenceItem(ref, i) {
+      const label = ChatFormat.escapeHtml(ref.label || ref.title || ref.name || ref.id || 'Reference');
+      const type = ChatFormat.escapeHtml(ref.type || ref.entity_type || 'reference');
+      const description = ref.preview && typeof ref.preview === 'object'
+        ? Object.keys(ref.preview).slice(0, 3).map((key) => `${key}: ${ref.preview[key]}`).join(' - ')
+        : (ref.description || ref.subtitle || '');
+      return `
+        <div class="lex-chat-citation-item">
+          <span>${i + 1}.</span>
+          <div>
+            <button class="lex-chat-reference-link" data-reference-index="${i}">${label}</button>
+            <div>${type}</div>
+            ${description ? `<div style="opacity:0.7">${ChatFormat.escapeHtml(String(description))}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    _getCitationSourceKind(citation) {
+      const source = String(citation && citation.source || '').toLowerCase();
+      const sourceType = String(citation && (citation.sourceType || citation.source_type) || '').toLowerCase();
+      if (source === 'domain_pack' || sourceType === 'domain_pack') return 'Legal authority';
+      if (sourceType === 'document' || sourceType === 'chunk' || citation.document_id || citation.documentId || citation.doc_id) return 'Workspace document';
+      return 'Source';
     }
 
     _renderArtifactsSection(artifacts) {

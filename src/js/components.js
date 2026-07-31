@@ -656,10 +656,14 @@ const ConversationActionsModal = {
   },
 
   // Open conversation actions modal
-  open(conversationId, conversationTitle, matterId, isPinned) {
+  open(conversationId, conversationTitle, matterId, isPinned, options) {
     this.init(); // Ensure modal is initialized
 
-    this.selectedConversationId = conversationId;
+    options = options || {};
+
+    this.selectedConversationId = options.registryId || conversationId;
+    this.selectedConversationRegistryId = options.registryId || conversationId;
+    this.selectedConversationThreadId = options.threadId || conversationId;
     this.selectedConversationTitle = conversationTitle;
     this.selectedConversationMatterId = matterId;
     this.selectedConversationIsProject = matterId !== null && matterId !== 'null';
@@ -715,6 +719,8 @@ const ConversationActionsModal = {
     this.selectedConversationTitle = null;
     this.selectedConversationIsProject = false;
     this.selectedConversationMatterId = null;
+    this.selectedConversationRegistryId = null;
+    this.selectedConversationThreadId = null;
   },
 
   // Edit conversation (open rename modal). Returns a Promise so callers/tests
@@ -791,7 +797,8 @@ const ConversationActionsModal = {
       const legacy = document.getElementById('renameInput');
       rawTitle = legacy ? legacy.value : '';
     }
-    const threadId = this.selectedConversationId;
+    const threadId = this.selectedConversationRegistryId || this.selectedConversationId;
+    const streamThreadId = this.selectedConversationThreadId || threadId;
 
     // Delegate to the shared rename helper. It:
     //   - validates the title (empty / too long),
@@ -812,7 +819,7 @@ const ConversationActionsModal = {
         this.closeRename();
         if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
           window.dispatchEvent(new CustomEvent('conversation:renamed', {
-            detail: { threadId: threadId, title: trimmed }
+            detail: { threadId: streamThreadId, registryId: threadId, title: trimmed }
           }));
         }
         if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
@@ -830,6 +837,8 @@ const ConversationActionsModal = {
       await helper.renameConversation({
         api: api,
         threadId: threadId,
+        eventThreadId: streamThreadId,
+        registryId: threadId,
         title: rawTitle
       });
 
@@ -879,7 +888,8 @@ const ConversationActionsModal = {
     }
 
     // Capture values before close() clears state
-    const convId = this.selectedConversationId;
+    const convId = this.selectedConversationThreadId || this.selectedConversationId;
+    const registryId = this.selectedConversationRegistryId || this.selectedConversationId;
     const convTitle = this.selectedConversationTitle
       .split('&apos;').join("'")
       .split('&quot;').join('"')
@@ -901,7 +911,7 @@ const ConversationActionsModal = {
           }
           if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
             window.dispatchEvent(new CustomEvent('conversation:archived', {
-              detail: { threadId: convId }
+              detail: { threadId: convId, registryId: registryId }
             }));
           }
           if (typeof this.onRefresh === 'function') {
@@ -925,7 +935,8 @@ const ConversationActionsModal = {
       return;
     }
 
-    const convId = this.selectedConversationId;
+    const convId = this.selectedConversationRegistryId || this.selectedConversationId;
+    const streamThreadId = this.selectedConversationThreadId || convId;
     const wasPinned = this.selectedConversationIsPinned;
     const onRefresh = this.onRefresh;
     this.close();
@@ -944,7 +955,7 @@ const ConversationActionsModal = {
       }
       if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
         window.dispatchEvent(new CustomEvent('conversation:pin-changed', {
-          detail: { threadId: convId, isPinned: !wasPinned }
+          detail: { threadId: streamThreadId, registryId: convId, isPinned: !wasPinned }
         }));
       }
       if (typeof onRefresh === 'function') {
@@ -964,7 +975,8 @@ const ConversationActionsModal = {
       return;
     }
 
-    const convId = this.selectedConversationId;
+    const convId = this.selectedConversationRegistryId || this.selectedConversationId;
+    const streamThreadId = this.selectedConversationThreadId || convId;
     const convTitle = this.selectedConversationTitle
       .split('&apos;').join("'")
       .split('&quot;').join('"')
@@ -989,7 +1001,7 @@ const ConversationActionsModal = {
           }
           if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
             window.dispatchEvent(new CustomEvent('conversation:deleted', {
-              detail: { threadId: convId, permanent: true }
+              detail: { threadId: streamThreadId, registryId: convId, permanent: true }
             }));
           }
           if (typeof this.onRefresh === 'function') {
@@ -1010,8 +1022,8 @@ const ConversationActionsModal = {
 window.ConversationActionsModal = ConversationActionsModal;
 
 // Create global alias for backward compatibility
-window.openConversationActionsModal = function(conversationId, conversationTitle, matterId, isPinned) {
-  ConversationActionsModal.open(conversationId, conversationTitle, matterId, isPinned);
+window.openConversationActionsModal = function(conversationId, conversationTitle, matterId, isPinned, options) {
+  ConversationActionsModal.open(conversationId, conversationTitle, matterId, isPinned, options);
 };
 window.closeConversationActionsModal = function() {
   ConversationActionsModal.close();

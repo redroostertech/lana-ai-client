@@ -124,7 +124,13 @@
         size:     { type: String, default: 'md' },
         label:    { type: String, default: 'LANA' },
         disabled: { type: Boolean, default: false, reflect: true },
-        active:   { type: Boolean, default: false, reflect: true }
+        active:   { type: Boolean, default: false, reflect: true },
+        // Context the button injects when it opens the LANA dock. Pages set
+        // these; the button itself is just a trigger.
+        matterId:     { type: String, default: '', attribute: 'matter-id' },
+        documentId:   { type: String, default: '', attribute: 'document-id' },
+        documentName: { type: String, default: '', attribute: 'document-name' },
+        contextType:  { type: String, default: '', attribute: 'context-type' }
       };
     }
 
@@ -169,7 +175,20 @@
       if (this.disabled) return;
       this.emit('lex-ask-lana-click', {});
 
-      // Auto-toggle connected panel
+      // Dock-first: when the page hosts the LANA dock, the button's only
+      // job is to open it with this surface's context injected.
+      var dock = document.querySelector('lex-lana-dock');
+      if (dock && typeof dock.openWith === 'function') {
+        dock.openWith({
+          matterId: this.matterId || null,
+          documentId: this.documentId || null,
+          documentName: this.documentName || null,
+          contextType: this.contextType || null
+        });
+        return;
+      }
+
+      // Legacy: auto-toggle connected drawer panel
       if (this._panelEl && typeof this._panelEl.toggle === 'function') {
         this._panelEl.toggle();
       }

@@ -1842,6 +1842,14 @@ class ApiClient {
     return this.get(`/api/v1/chat/sessions?${params.toString()}`);
   }
 
+  /**
+   * Re-scope a conversation to a matter, or clear its scope with null.
+   * The scope belongs to the conversation, not the page it started from.
+   */
+  setChatSessionMatter(sessionId, matterId) {
+    return this.put(`/api/v1/chat/sessions/${sessionId}/matter`, { matter_id: matterId || null });
+  }
+
   // Pinned chat sessions — mirrors /matters/pinned. When matterId is supplied
   // results are scoped to that matter (matches the matter detail tab).
   async getPinnedChatSessions(opts = {}) {
@@ -2727,6 +2735,19 @@ class ApiClient {
   async updatePersonalization(updates) {
     if (!this.user?.id) throw new Error('Not logged in');
     return this.request('PATCH', '/api/v1/users/me/personalization', updates);
+  }
+
+  async listMemoryRecords(params = {}) {
+    if (!this.user?.id) throw new Error('Not logged in');
+    const query = new URLSearchParams();
+    Object.keys(params || {}).forEach((key) => {
+      const value = params[key];
+      if (value !== undefined && value !== null && value !== '') {
+        query.set(key, String(value));
+      }
+    });
+    const queryString = query.toString();
+    return this.get('/api/v1/memory/v2/records' + (queryString ? '?' + queryString : ''));
   }
 
   async getPreferences() {

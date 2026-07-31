@@ -223,12 +223,15 @@
         border-radius: 50%;
         border: none;
         cursor: pointer;
-        background: var(--lex-chat-text);
-        color: var(--lex-chat-bg-surface);
+        /* Brand gradient — same as the Ask LANA pill (lex-ask-lana-btn) */
+        background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 40%, #7c3aed 70%, #c026d3 100%);
+        background-size: 200% 200%;
+        color: #fff;
         flex-shrink: 0;
-        transition: opacity var(--lex-transition-fast, 0.15s), transform 0.1s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 4px 12px rgba(99,102,241,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+        transition: opacity var(--lex-transition-fast, 0.15s), transform 0.1s, background-position 0.4s ease;
       }
-      .lex-cmp-send:hover { opacity: 0.85; }
+      .lex-cmp-send:hover { background-position: 100% 100%; }
       .lex-cmp-send:active { transform: scale(0.92); }
       .lex-cmp-send:disabled { opacity: 0.25; cursor: default; transform: none; }
       .lex-cmp-send svg { width: 14px; height: 14px; }

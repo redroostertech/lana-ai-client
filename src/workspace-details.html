@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <script src="js/tailwind-loader.js"></script>
+  <link rel="stylesheet" href="css/lex-chat.css">
 </head>
 <body>
 
@@ -74,7 +75,7 @@
             class="flex-1"
             active="activity"
             variant="underline"
-            tabs='[{"id":"summary","label":"Summary"},{"id":"activity","label":"Activity"},{"id":"notes","label":"Notes"},{"id":"tasks","label":"Tasks"},{"id":"comments","label":"Discussions"},{"id":"documents","label":"Documents"},{"id":"conversations","label":"Conversations"},{"id":"billableHours","label":"Billable Hours"}]'
+            tabs='[{"id":"summary","label":"Summary"},{"id":"activity","label":"Activity"},{"id":"notes","label":"Notes"},{"id":"tasks","label":"Tasks"},{"id":"comments","label":"Discussions"},{"id":"documents","label":"Documents"},{"id":"billableHours","label":"Billable Hours"}]'
           ></lex-tabs>
         </div>
 
@@ -1211,6 +1212,25 @@
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->
   <script src="js/companion-bridge-consent.js"></script>
+
+  <lex-lana-dock page-scope="workspace" context-type="full_chat" placeholder="Ask about this matter..." thread-title="Matter Chat"></lex-lana-dock>
+
+  <!-- LANA dock (IDE-style docked chat panel) -->
+  <script src="js/lex/chat/lex-chat.format.js"></script>
+  <script src="js/lex/chat/lex-chat.source.js"></script>
+  <script src="js/lex/chat/lex-chat.message.js"></script>
+  <script src="js/lex/chat/lex-chat.activity.js"></script>
+  <script src="js/lex/chat/lex-chat.documents.js"></script>
+  <script src="js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="js/lex/chat/lex-chat.composer.js"></script>
+  <script src="js/lex/chat/lex-chat.thread.js"></script>
+  <script src="js/lex/chat/lex-chat.threads.js"></script>
+  <script src="js/lex/chat/lex-chat.js"></script>
+  <script src="js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="js/lex/chat/lex-chat.index.js"></script>
+  <script src="js/lex/components/chat/lex-lana-panel.js"></script>
+  <script src="js/lex/components/layout/lex-lana-dock.js"></script>
 
   <!-- Auth guard + loader dismiss (MUST be last) -->
   <script src="js/auth-guard.js"></script>

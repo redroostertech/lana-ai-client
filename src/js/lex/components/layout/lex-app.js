@@ -770,6 +770,30 @@
       if (sidebar) sidebar.sections = sections;
     }
 
+    /**
+     * Drop the sidebar RECENTS section once a dock announces itself.
+     *
+     * `_buildSidebarSections()` asks `document.querySelector('lex-lana-dock')`
+     * whether this page has a dock, but that question is unanswerable at the
+     * time it is asked: `<lex-app>` sits at the top of page markup and
+     * `<lex-lana-dock>` near the bottom (line 23 vs 1216 in
+     * workspace-details.html), so the shell upgrades and builds its sections
+     * while the dock tag is still unparsed. The query returns null and the
+     * sidebar renders RECENTS on exactly the pages that were supposed to have
+     * lost it.
+     *
+     * Parse order is not something to race, so the dock tells us instead. This
+     * is idempotent and cheap when there is nothing to remove — the early
+     * return keeps it from triggering the sidebar re-render that would destroy
+     * #lexConversationListContainer on pages that legitimately keep the list.
+     */
+    dropSidebarConversationSection() {
+      const sections = this._sections || [];
+      const next = sections.filter((section) => !section || section.id !== 'chats');
+      if (next.length === sections.length) return;
+      this.setSections(next);
+    }
+
     /** Set user menu items for the sidebar profile */
     setUserMenuItems(items) {
       this._userMenuItems = items;
@@ -978,7 +1002,7 @@
             { id: 'billable-hours', label: 'Billable Hours', icon: 'clock', href: 'admin/billable-hours.html' }
           ]
         : [
-            { id: 'new-chat', label: 'New Chat', isButton: true, onClick: 'openNewProjectModal', variant: 'create-chat' },
+            // New Chat moved into the LANA dock (rail bubble + RECENTS "+")
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
             { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html', children: [
               { id: 'library-all-sources', label: 'All Sources', href: 'drive.html' },
@@ -1017,13 +1041,19 @@
           isWorkspaceList: true,
           items: []
         });
-        sections.push({
-          id: 'chats',
-          title: 'Recents',
-          isScrollable: true,
-          isConversationList: true,
-          items: []
-        });
+        // Recents moved into the LANA dock (lex-lana-dock) — the docked
+        // panel's RECENTS list is the home for recent chats. Pages without
+        // a dock (chat-v2, embed) keep the sidebar section so conversation
+        // switching still exists there.
+        if (!document.querySelector('lex-lana-dock')) {
+          sections.push({
+            id: 'chats',
+            title: 'Recents',
+            isScrollable: true,
+            isConversationList: true,
+            items: []
+          });
+        }
       }
 
       return sections;

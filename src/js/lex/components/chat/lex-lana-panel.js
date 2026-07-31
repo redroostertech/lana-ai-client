@@ -68,6 +68,23 @@
   var CLOSE_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" '
     + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     + '<path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+  var VALID_PAGE_SCOPES = [
+    'reporting',
+    'firm_reporting',
+    'billable_hours',
+    'matter',
+    'workspace',
+    'workspace_data',
+    'dashboard',
+    'data_visualization',
+    'automations',
+    'skills',
+    'meeting_recording'
+  ];
+
+  function normalizePageScope(pageScope) {
+    return VALID_PAGE_SCOPES.indexOf(pageScope) !== -1 ? pageScope : 'dashboard';
+  }
 
   var stylesInjected = false;
 
@@ -162,7 +179,9 @@
         columnHeading:  { type: String, default: 'LANA Assistant', attribute: 'column-heading' },
         columnSubtitle: { type: String, default: '', attribute: 'column-subtitle' },
         open:           { type: Boolean, default: false, reflect: true },
-        destroyOnClose: { type: Boolean, default: false, attribute: 'destroy-on-close' }
+        destroyOnClose: { type: Boolean, default: false, attribute: 'destroy-on-close' },
+        threadsHeading: { type: String, default: '', attribute: 'threads-heading' },
+        threadsRecents: { type: Boolean, default: false, attribute: 'threads-recents' }
       };
     }
 
@@ -436,6 +455,8 @@
       threads.setAttribute('page-scope', this.pageScope);
       threads.setAttribute('context-type', this.contextType);
       if (this.matterId) threads.setAttribute('matter-id', this.matterId);
+      if (this.threadsHeading) threads.setAttribute('heading', this.threadsHeading);
+      if (this.threadsRecents) threads.setAttribute('recents', 'true');
       threads.style.flexShrink = '0';
 
       // Create lex-chat
@@ -580,10 +601,17 @@
         self.emit('lex-lana-thread-selected', { thread: thread });
       });
 
-      // Auto-select page_general thread when loaded
+      // Auto-select page_general thread when loaded.
+      // NOT in recents mode (the dock): the app-wide recents registry also
+      // contains page_general rows from other surfaces, and auto-loading
+      // one would silently hijack the dock's fresh/current conversation on
+      // every threads refresh — the dock always starts on the welcome
+      // screen and binds conversations only by explicit selection.
       container.addEventListener('lex-threads-loaded', function (e) {
+        if (self.threadsRecents) return;
         var threads = e.detail && e.detail.threads;
         if (!threads || !threads.length || !self._chatEl) return;
+        if (self._chatEl.conversationId) return; // never displace a live conversation
         for (var i = 0; i < threads.length; i++) {
           if (threads[i].thread_type === 'page_general' && threads[i].thread_id) {
             self._chatEl.loadConversation(threads[i].thread_id);
@@ -602,6 +630,15 @@
       // it (see _wrapSend + lex-chat.source.js).
       container.addEventListener('lex-thread-create', function (e) {
         if (!self._chatEl) return;
+        // Recents mode (the dock): New Chat starts a fresh conversation —
+        // the session is persisted on first message, exactly like the
+        // dynamic menu's New Chat. No ad-hoc thread record up front.
+        if (self.threadsRecents) {
+          self._chatEl.clearConversation();
+          if (self._threadsEl) self._threadsEl.setActiveThread(null);
+          self._focusComposer();
+          return;
+        }
         var threadType = (e.detail && e.detail.threadType) || 'ad_hoc';
         self.createThread({
           title: threadType === 'page_general' ? self.threadTitle : 'New Thread',
@@ -640,6 +677,31 @@
               return;
             }
           }
+        }
+
+        if (self.threadsRecents) {
+          var recentPayload = {
+            title: self.threadTitle,
+            thread_type: 'ad_hoc',
+            context_type: self.contextType,
+            page_scope: normalizePageScope(self.pageScope),
+            thread_id: conversationId
+          };
+          if (self.matterId) recentPayload.matter_id = self.matterId;
+          api.post('/api/v1/conversation-threads', recentPayload).then(function (resp) {
+            var created = resp.data || resp;
+            if (self._threadsEl) {
+              self._threadsEl.addThread(created);
+              self._threadsEl.setActiveThread(created.id);
+            }
+            self.emit('lex-lana-thread-created', { thread: created });
+          }).catch(function (err) {
+            console.warn('[lex-lana-panel] Failed to register recent conversation:', err);
+            if (self._threadsEl && typeof self._threadsEl.refresh === 'function') {
+              self._threadsEl.refresh();
+            }
+          });
+          return;
         }
 
         // Check if page_general thread already exists

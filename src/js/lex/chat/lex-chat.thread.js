@@ -174,7 +174,7 @@
      * Add a message to the thread.
      * @param {string} role - 'user' | 'assistant' | 'system'
      * @param {string} content
-     * @param {Object} meta - { messageId, timestamp, citations, artifacts }
+     * @param {Object} meta - { messageId, timestamp, citations, references, artifacts }
      * @returns {HTMLElement} The created lex-chat-message element
      */
     addMessage(role, content, meta = {}) {
@@ -190,6 +190,7 @@
       if (meta.messageId) msg.messageId = meta.messageId;
       if (meta.timestamp) msg.timestamp = meta.timestamp;
       if (meta.citations) msg.citations = meta.citations;
+      if (meta.references) msg.references = meta.references;
       if (meta.artifacts) msg.artifacts = meta.artifacts;
       if (meta.attachments) msg.attachments = meta.attachments;
       if (meta.duration != null) msg.duration = meta.duration;

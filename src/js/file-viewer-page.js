@@ -380,6 +380,29 @@
         }
       }
 
+      // The Ask LANA button injects this document's context into the dock
+      var askLanaBtn = document.getElementById('askLanaBtn');
+      if (askLanaBtn) {
+        askLanaBtn.setAttribute('document-id', response.id);
+        askLanaBtn.setAttribute('document-name', response.filename || 'Document');
+        askLanaBtn.setAttribute('context-type', 'document_chat');
+        if (response.client_matter || response.matter_id) {
+          askLanaBtn.setAttribute('matter-id', response.client_matter || response.matter_id);
+        }
+      }
+
+      // Declare the document as the dock's page context so a rail-opened
+      // dock can OFFER it ("Ask about <file>") instead of arriving blank.
+      var pageDock = document.querySelector('lex-lana-dock');
+      if (pageDock && typeof pageDock.setPageContext === 'function') {
+        pageDock.setPageContext({
+          documentId: response.id,
+          documentName: response.filename || 'Document',
+          matterId: response.client_matter || response.matter_id || null,
+          matterName: null
+        });
+      }
+
       state.originalMetadata = {
         document_type: (response.metadata && response.metadata.document_type) || '',
         tags: (response.metadata && response.metadata.tags) || '',

@@ -50,7 +50,8 @@
    */
   function emitRenamed(opts) {
     var detail = {
-      threadId: opts.threadId,
+      threadId: opts.eventThreadId || opts.threadId,
+      registryId: opts.registryId || opts.threadId,
       title: opts.title
     };
     var target = opts.target || (typeof window !== 'undefined' ? window : null);
@@ -65,7 +66,9 @@
    *
    * @param {object} deps
    * @param {object} deps.api - api client with .put()
-   * @param {string} deps.threadId - chat session thread_id (also accepted as row id by the new endpoint)
+   * @param {string} deps.threadId - conversation_threads row id or chat session thread_id
+   * @param {string} [deps.eventThreadId] - stream thread_id to emit for row listeners
+   * @param {string} [deps.registryId] - conversation_threads row id to emit for registry listeners
    * @param {string} deps.title - new title (will be trimmed/validated)
    * @param {EventTarget} [deps.eventTarget] - test seam; defaults to window
    * @returns {Promise<{ threadId: string, title: string }>}
@@ -90,6 +93,8 @@
 
     emitRenamed({
       threadId: deps.threadId,
+      eventThreadId: deps.eventThreadId,
+      registryId: deps.registryId,
       title: v.value,
       target: deps.eventTarget
     });

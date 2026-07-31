@@ -49,12 +49,44 @@
   // Document tab page size, passed to the MatterDocumentsView component, which
   // owns the file-list search and pagination state internally.
   var _docPageSize = 12;
+  var _documentsRefreshSeq = 0;
+  var _documentsPollTimer = null;
 
   // Shared matter file-list component (window.MatterDocumentsView). The matter
   // Documents tab renders its file list (and all per-row / batch / orphan /
   // workflow actions) exclusively through this component. See
   // renderDocumentsTab() for the host chrome that stays host-side.
   var _matterDocsViewInstance = null;
+
+  function _getMatterIdentity(matter) {
+    return matter && (matter.matter_id || matter.id || matter.external_id || null);
+  }
+
+  function _hasProcessingDocuments(documents) {
+    var active = { uploaded: true, pending: true, processing: true, text_extracted: true };
+    return (documents || []).some(function (doc) {
+      var status = String(doc.processing_status || doc.status || '').toLowerCase();
+      return active[status] === true;
+    });
+  }
+
+  function clearDocumentsProcessingPoll() {
+    if (_documentsPollTimer) {
+      clearTimeout(_documentsPollTimer);
+      _documentsPollTimer = null;
+    }
+  }
+
+  function scheduleDocumentsProcessingPoll(matterId) {
+    clearDocumentsProcessingPoll();
+    if (!matterId || getCurrentActiveTab() !== 'documents') return;
+    _documentsPollTimer = trackTimeout(setTimeout(function () {
+      _documentsPollTimer = null;
+      if (getCurrentActiveTab() === 'documents') {
+        refreshDrawerDocuments(matterId);
+      }
+    }, 3000));
+  }
 
   // Document generation state
   var docGenState = {
@@ -371,6 +403,18 @@
         window.Lex.state.setActiveMatter(matter.matter_id);
       }
 
+      // Declare this matter as the dock's PAGE context: feeds the RECENTS
+      // "This workspace" group and the scope suggestion bubble. It does not
+      // bind the conversation — scope is adopted via the suggestion, the
+      // scope chip, or the explicit Ask-Matter button (openWith).
+      var lanaDock = document.querySelector('lex-lana-dock');
+      if (lanaDock && typeof lanaDock.setPageContext === 'function') {
+        lanaDock.setPageContext({
+          matterId: matter.matter_id,
+          matterName: matter.matter_name || matter.name || matter.title || ''
+        });
+      }
+
     } catch (error) {
       console.error('[loadMatterDetails] Error:', error);
       Lex.Toast.error(error.message || 'Failed to load matter');
@@ -518,9 +562,19 @@
 
         var id = target.id;
 
-        // Ask Matter
+        // Ask Matter — opens the LANA dock scoped to this matter (falls
+        // back to the chat page when no dock is present)
         if (id === 'askMatterBtn') {
-          Lex.Nav.go('chat-v2.html', { params: { matter: matterId } });
+          var lanaDock = document.querySelector('lex-lana-dock');
+          if (lanaDock && typeof lanaDock.openWith === 'function') {
+            var m = window.currentViewedMatter || {};
+            lanaDock.openWith({
+              matterId: matterId,
+              matterName: m.matter_name || m.name || m.title || ''
+            });
+          } else {
+            Lex.Nav.go('chat-v2.html', { params: { matter: matterId } });
+          }
           return;
         }
 
@@ -615,6 +669,7 @@
         break;
       case 'documents':
         renderDocumentsTab(m.matter, m.documents, m.docPagination, m.orphanedFiles);
+        refreshDrawerDocuments(_getMatterIdentity(m.matter));
         break;
       case 'conversations':
         renderConversationsTab(m.matter, m.chats, m.chatPagination, m.pinnedChats || []);
@@ -638,6 +693,10 @@
       case 'analytics':
         renderMatterAnalyticsTab(m.matter);
         break;
+    }
+
+    if (tab !== 'documents') {
+      clearDocumentsProcessingPoll();
     }
 
     // Update URL param without navigation
@@ -1618,6 +1677,8 @@
 
   // Refresh the documents tab after an upload/delete operation (fetches from API)
   async function refreshDrawerDocuments(matterId) {
+    if (!matterId) return;
+    var refreshSeq = ++_documentsRefreshSeq;
     try {
       var docsResult = await api.getMatterFiles(matterId, { page: 1, pageSize: 500 });
       var documents = docsResult.files || [];
@@ -1625,13 +1686,15 @@
       var orphanedResult = await api.getOrphanedFiles(matterId).catch(function () { return { orphaned_files: [] }; });
       var orphanedFiles = orphanedResult.orphaned_files || orphanedResult.files || [];
 
+      if (refreshSeq !== _documentsRefreshSeq) return;
+
       if (currentMatterData) {
         currentMatterData.documents = documents;
         currentMatterData.docPagination = pagination;
         currentMatterData.orphanedFiles = orphanedFiles;
       }
 
-      if (currentMatterData && currentMatterData.matter) {
+      if (currentMatterData && currentMatterData.matter && getCurrentActiveTab() === 'documents') {
         // When the component is mounted, refresh it in place with the new file
         // and orphan sets. If the tab transitioned in or out of the empty state
         // (no mounted instance), do a full host re-render so the chrome and the
@@ -1642,6 +1705,12 @@
         } else {
           renderDocumentsTab(currentMatterData.matter, documents, pagination, orphanedFiles);
         }
+      }
+
+      if (_hasProcessingDocuments(documents)) {
+        scheduleDocumentsProcessingPoll(matterId);
+      } else {
+        clearDocumentsProcessingPoll();
       }
     } catch (error) {
       console.error('[refreshDrawerDocuments] Failed to refresh documents:', error);

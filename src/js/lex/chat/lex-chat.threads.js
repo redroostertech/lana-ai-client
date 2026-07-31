@@ -28,19 +28,41 @@
         contextType: { type: String, default: 'insights_chat', attribute: 'context-type' },
         matterId:    { type: String, default: null, attribute: 'matter-id' },
         activeThread:{ type: String, default: null, attribute: 'active-thread' },
-        collapsed:   { type: Boolean, default: false, reflect: true }
+        collapsed:   { type: Boolean, default: false, reflect: true },
+        heading:     { type: String, default: 'Threads' },
+        // Recents mode: list the user's recent chat sessions app-wide
+        // (same data as the sidebar Recents) instead of page-scoped threads.
+        recents:     { type: Boolean, default: false }
       };
     }
 
     constructor() {
       super();
       this._threads = [];
+      this._groups = null;
       this._loading = false;
+      this._userToggledCollapsed = false;
     }
 
     connected() {
-      if (this.pageScope) {
+      if (this.pageScope || this.recents) {
         this.loadThreads();
+      }
+      // Recents mode: stay in sync with the shared conversation actions
+      // modal (rename / pin / archive / delete).
+      if (this.recents && !this._convEventsBound) {
+        this._convEventsBound = true;
+        this._onConvChanged = this.refresh.bind(this);
+        var evts = ['conversation:renamed', 'conversation:pin-changed', 'conversation:archived', 'conversation:deleted'];
+        for (var i = 0; i < evts.length; i++) window.addEventListener(evts[i], this._onConvChanged);
+      }
+    }
+
+    disconnected() {
+      if (this._convEventsBound && this._onConvChanged) {
+        var evts = ['conversation:renamed', 'conversation:pin-changed', 'conversation:archived', 'conversation:deleted'];
+        for (var i = 0; i < evts.length; i++) window.removeEventListener(evts[i], this._onConvChanged);
+        this._convEventsBound = false;
       }
     }
 
@@ -50,63 +72,107 @@
         + '.lct-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;user-select:none;}'
         + '.lct-header:hover{background:var(--lex-bg-hover, #f9fafb);}'
         + '.lct-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--lex-text-secondary, #6b7280);}'
-        + '.lct-chevron{width:14px;height:14px;color:var(--lex-text-tertiary, #9ca3af);transition:transform 0.15s ease;}'
-        + '.lct-chevron.open{transform:rotate(180deg);}'
+        /* Chevron matches the dynamic menu sections: points right when
+           closed, rotates down when open. */
+        + '.lct-chevron{width:14px;height:14px;color:var(--lex-text-tertiary, #9ca3af);'
+        + 'transform:rotate(-90deg);transition:transform var(--lex-transition-fast, 0.15s ease);}'
+        + '.lct-chevron.open{transform:rotate(0deg);}'
         + '.lct-actions{display:flex;align-items:center;gap:6px;}'
         + '.lct-new-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;font-size:10.5px;font-weight:600;'
         + 'color:var(--lex-text-accent, #4f46e5);background:var(--lex-bg-accent-soft, #eef2ff);border:none;border-radius:4px;'
         + 'cursor:pointer;transition:background 0.15s;}'
         + '.lct-new-btn:hover{background:var(--lex-bg-accent-hover, #e0e7ff);}'
-        + '.lct-list{max-height:200px;overflow-y:auto;padding:4px 8px 8px;}'
-        + '.lct-list.collapsed{display:none;}'
+        /* Soft close (house drawer animation): height + fade, no jump. */
+        + '.lct-list{max-height:200px;overflow-y:auto;padding:4px 8px 8px;opacity:1;'
+        + 'transition:max-height var(--lex-transition-slide, 0.3s ease),opacity 0.25s ease,padding 0.25s ease;}'
+        + '.lct-list.collapsed{max-height:0;opacity:0;padding-top:0;padding-bottom:0;overflow:hidden;}'
         + '.lct-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;'
         + 'transition:background 0.12s;font-size:12.5px;color:var(--lex-text-primary, #111827);position:relative;}'
         + '.lct-item:hover{background:var(--lex-bg-hover, #f3f4f6);}'
         + '.lct-item.active{background:var(--lex-bg-accent-soft, #eef2ff);color:var(--lex-text-accent, #4f46e5);}'
         + '.lct-item-icon{flex-shrink:0;width:14px;height:14px;color:var(--lex-text-tertiary, #9ca3af);}'
         + '.lct-item.active .lct-item-icon{color:var(--lex-text-accent, #4f46e5);}'
-        + '.lct-item-title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
-        + '.lct-item-time{font-size:10px;color:var(--lex-text-tertiary, #9ca3af);white-space:nowrap;}'
+        + '.lct-item-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}'
+        + '.lct-item-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '.lct-item-sub{font-size:10.5px;color:var(--lex-text-tertiary, #9ca3af);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '.lct-item-time{font-size:10px;color:var(--lex-text-tertiary, #9ca3af);white-space:nowrap;align-self:flex-start;margin-top:2px;}'
         + '.lct-item.pinned{font-weight:600;}'
         + '.lct-delete-btn{display:none;flex-shrink:0;width:20px;height:20px;padding:2px;border:none;background:none;'
         + 'color:var(--lex-text-tertiary, #9ca3af);cursor:pointer;border-radius:4px;transition:color 0.12s,background 0.12s;}'
         + '.lct-item:hover .lct-delete-btn{display:inline-flex;align-items:center;justify-content:center;}'
         + '.lct-delete-btn:hover{color:#ef4444;background:rgba(239,68,68,0.1);}'
+        /* Hover-revealed kebab on recents items — more options, like the
+           old dynamic-menu Recents. */
+        + '.lct-more-btn{display:none;flex-shrink:0;width:20px;height:20px;padding:2px;border:none;background:none;'
+        + 'color:var(--lex-text-tertiary, #9ca3af);cursor:pointer;border-radius:4px;transition:color 0.12s,background 0.12s;}'
+        + '.lct-item:hover .lct-more-btn{display:inline-flex;align-items:center;justify-content:center;}'
+        + '.lct-more-btn:hover{color:var(--lex-text-primary, #111827);background:var(--lex-bg-hover, #e5e7eb);}'
         + '.lct-empty{padding:12px 14px;font-size:11.5px;color:var(--lex-text-tertiary, #9ca3af);text-align:center;}'
+        + '.lct-group-label{padding:8px 10px 3px;font-size:10px;font-weight:700;text-transform:uppercase;'
+        + 'letter-spacing:0.5px;color:var(--lex-text-tertiary, #9ca3af);}'
+        /* Recents mode: boxed + (new chat) button in the dropdown header,
+           header sized up to fit it. */
+        + '.lct-header.recents{min-height:44px;}'
+        + '.lct-newchat-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;'
+        + 'color:var(--lex-text-secondary, #6b7280);background:transparent;'
+        + 'border:1px solid var(--lex-border-default, #e5e7eb);border-radius:6px;cursor:pointer;'
+        + 'transition:background 0.15s,border-color 0.15s,color 0.15s;}'
+        + '.lct-newchat-btn:hover{background:var(--lex-bg-hover, #f3f4f6);color:var(--lex-text-primary, #111827);}'
         + '.lct-loading{padding:12px 14px;font-size:11.5px;color:var(--lex-text-tertiary, #9ca3af);text-align:center;}'
         + '</style>';
 
       var chevronSvg = '<svg class="lct-chevron' + (this.collapsed ? '' : ' open') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
 
-      var headerHtml = '<div class="lct-header" data-toggle>'
-        + '<span class="lct-title">Threads</span>'
+      var plusSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>';
+      var newBtn = this.recents
+        ? '<button class="lct-newchat-btn" data-new-thread title="New chat" aria-label="New chat">' + plusSvg + '</button>'
+        : '<button class="lct-new-btn" data-new-thread>+ New</button>';
+      var headerHtml = '<div class="lct-header' + (this.recents ? ' recents' : '') + '" data-toggle>'
+        + '<span class="lct-title">' + this.escapeHtml(this.heading || 'Threads') + '</span>'
         + '<div class="lct-actions">'
-        + '<button class="lct-new-btn" data-new-thread>+ New</button>'
+        + newBtn
         + chevronSvg
         + '</div>'
         + '</div>';
 
-      var listHtml = '';
-      if (this._loading) {
-        listHtml = '<div class="lct-loading">Loading threads...</div>';
-      } else if (this._threads.length === 0) {
-        listHtml = '<div class="lct-empty">No threads yet</div>';
-      } else {
-        listHtml = this._threads.map(function (t) {
+      var renderItem = function (t) {
           var isActive = this.activeThread === t.id;
-          var isPinned = t.thread_type === 'page_general';
+          var isPinned = this.recents ? t.is_pinned === true : t.thread_type === 'page_general';
           var cls = 'lct-item' + (isActive ? ' active' : '') + (isPinned ? ' pinned' : '');
           var icon = this._getThreadIcon(t.thread_type);
           var title = this.escapeHtml(t.title || this._getDefaultTitle(t.thread_type));
+          var subtitle = t.subtitle ? '<span class="lct-item-sub">' + this.escapeHtml(t.subtitle) + '</span>' : '';
           var time = this._relativeTime(t.last_activity || t.created_at);
           var trashSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>';
+          var kebabSvg = '<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+          var canShowActions = this.recents && typeof window.openConversationActionsModal === 'function';
+          var deleteBtn = this.recents
+            ? (canShowActions
+              ? '<button class="lct-more-btn" data-more-thread="' + t.id + '" title="More options" aria-label="More options">' + kebabSvg + '</button>'
+              : '')
+            : '<button class="lct-delete-btn" data-delete-thread="' + t.id + '" title="Delete thread">' + trashSvg + '</button>';
           return '<div class="' + cls + '" data-thread-id="' + t.id + '">'
             + '<span class="lct-item-icon">' + icon + '</span>'
-            + '<span class="lct-item-title">' + title + '</span>'
+            + '<span class="lct-item-text"><span class="lct-item-title">' + title + '</span>' + subtitle + '</span>'
             + '<span class="lct-item-time">' + time + '</span>'
-            + '<button class="lct-delete-btn" data-delete-thread="' + t.id + '" title="Delete thread">' + trashSvg + '</button>'
+            + deleteBtn
             + '</div>';
+      }.bind(this);
+
+      var listHtml = '';
+      if (this._loading) {
+        listHtml = '<div class="lct-loading">Loading...</div>';
+      } else if (this._threads.length === 0) {
+        listHtml = '<div class="lct-empty">' + (this.recents ? 'No recent chats' : 'No threads yet') + '</div>';
+      } else if (this._groups && this._groups.length > 0) {
+        // Grouped recents: workspace-scoped conversations first, then the
+        // app-wide list — one dropdown, organized by scope.
+        listHtml = this._groups.map(function (g) {
+          var label = g.label ? '<div class="lct-group-label">' + this.escapeHtml(g.label) + '</div>' : '';
+          return label + g.items.map(renderItem).join('');
         }.bind(this)).join('');
+      } else {
+        listHtml = this._threads.map(renderItem).join('');
       }
 
       var listWrapper = '<div class="lct-list' + (this.collapsed ? ' collapsed' : '') + '">' + listHtml + '</div>';
@@ -115,11 +181,20 @@
     }
 
     updated() {
-      // Toggle collapse
+      // Toggle collapse. Class changes are applied to the live DOM instead
+      // of going through a re-render: a rebuilt list can't animate, and the
+      // soft-close transition (max-height + fade) needs the same nodes.
       this.delegate('click', '[data-toggle]', function (e) {
         // Don't toggle if clicking the new-thread button
         if (e.target.closest('[data-new-thread]')) return;
-        this.collapsed = !this.collapsed;
+        this._userToggledCollapsed = true;
+        var next = !this.collapsed;
+        this._props.collapsed = next;
+        this._reflectToAttribute('collapsed', next);
+        var list = this.querySelector('.lct-list');
+        var chevron = this.querySelector('.lct-chevron');
+        if (list) list.classList.toggle('collapsed', next);
+        if (chevron) chevron.classList.toggle('open', !next);
       });
 
       // New thread button
@@ -135,10 +210,31 @@
         this._deleteThread(threadId);
       });
 
+      // Kebab (recents): open the shared conversation actions modal —
+      // rename / pin / delete, same surface the dynamic menu used.
+      this.delegate('click', '[data-more-thread]', function (e, target) {
+        e.stopPropagation();
+        var id = target.getAttribute('data-more-thread');
+        var t = null;
+        for (var i = 0; i < this._threads.length; i++) {
+          if (this._threads[i].id === id) { t = this._threads[i]; break; }
+        }
+        if (t && typeof window.openConversationActionsModal === 'function') {
+          window.openConversationActionsModal(t.id, t.title, t.matter_id || null, t.is_pinned === true, {
+            registryId: t.id,
+            threadId: t.thread_id,
+            source: 'conversation_threads'
+          });
+        }
+      });
+
       // Thread item click
       this.delegate('click', '[data-thread-id]', function (e, target) {
-        // Ignore clicks on the delete button
+        // Ignore clicks on the action buttons — delegate() attaches sibling
+        // listeners on the same root, so stopPropagation() in their handlers
+        // cannot suppress this one.
         if (e.target.closest('[data-delete-thread]')) return;
+        if (e.target.closest('[data-more-thread]')) return;
         var threadId = target.getAttribute('data-thread-id');
         var thread = null;
         for (var i = 0; i < this._threads.length; i++) {
@@ -162,17 +258,68 @@
      * Load threads from the API.
      */
     async loadThreads() {
-      if (!this.pageScope || typeof api === 'undefined') return;
+      if ((!this.pageScope && !this.recents) || typeof api === 'undefined') return;
 
       this._loading = true;
       this._scheduleUpdate();
 
       try {
-        var params = 'page_scope=' + encodeURIComponent(this.pageScope) + '&limit=50&sort_by=last_activity&sort_order=desc';
-        if (this.matterId) params += '&matter_id=' + encodeURIComponent(this.matterId);
+        if (this.recents) {
+          // App-wide conversation registry rows. Recents is a conversation
+          // control surface, so its source of truth is conversation_threads:
+          // id drives rename/pin/archive/delete, thread_id drives stream load.
+          var mapThread = function (t) {
+            var matterName = (t.matter_name || (t.metadata && t.metadata.matter_name) || '').trim();
+            if (matterName.toLowerCase() === 'unknown matter') matterName = '';
+            return {
+              id: t.id,
+              thread_id: t.thread_id,
+              title: t.title || (t.metadata && t.metadata.title) || 'Untitled Chat',
+              thread_type: t.thread_type || 'ad_hoc',
+              subtitle: matterName,
+              matter_id: t.matter_id || null,
+              is_pinned: t.is_pinned === true,
+              last_activity: t.last_activity || t.updated_at || t.created_at
+            };
+          };
+          var buildThreadsUrl = function (matterId) {
+            var params = 'limit=50&sort_by=last_activity&sort_order=desc';
+            if (matterId) params += '&matter_id=' + encodeURIComponent(matterId);
+            return '/api/v1/conversation-threads?' + params;
+          };
+          var calls = [api.get(buildThreadsUrl(null))];
+          var wantMatter = !!this.matterId;
+          if (wantMatter) {
+            calls.push(api.get(buildThreadsUrl(this.matterId)).catch(function () { return { data: [] }; }));
+          }
+          var settled = await Promise.all(calls);
+          var allRows = settled[0].data || settled[0].threads || (Array.isArray(settled[0]) ? settled[0] : []);
+          var allItems = allRows.map(mapThread).filter(function (t) { return !!t.thread_id; });
+          if (wantMatter) {
+            var wsRows = settled[1].data || settled[1].threads || (Array.isArray(settled[1]) ? settled[1] : []);
+            var wsItems = wsRows.map(mapThread).filter(function (t) { return !!t.thread_id; });
+            var wsIds = {};
+            wsItems.forEach(function (t) { wsIds[t.id] = true; });
+            var rest = allItems.filter(function (t) { return !wsIds[t.id]; });
+            this._groups = [];
+            if (wsItems.length > 0) this._groups.push({ label: 'This workspace', items: wsItems });
+            this._groups.push({ label: wsItems.length > 0 ? 'All recents' : null, items: rest });
+            this._threads = wsItems.concat(rest);
+          } else {
+            this._groups = null;
+            this._threads = allItems;
+          }
+        } else {
+          this._groups = null;
+          var params = 'page_scope=' + encodeURIComponent(this.pageScope) + '&limit=50&sort_by=last_activity&sort_order=desc';
+          if (this.matterId) params += '&matter_id=' + encodeURIComponent(this.matterId);
 
-        var result = await api.get('/api/v1/conversation-threads?' + params);
-        this._threads = result.data || result.threads || [];
+          var result = await api.get('/api/v1/conversation-threads?' + params);
+          this._threads = result.data || result.threads || [];
+        }
+        if (this._threads.length === 0 && !this._userToggledCollapsed) {
+          this.collapsed = true;
+        }
       } catch (err) {
         console.warn('[lex-chat-threads] Failed to load threads:', err);
         this._threads = [];
@@ -250,7 +397,7 @@
     }
 
     _getThreadIcon(threadType) {
-      if (threadType === 'page_general') {
+      if (threadType === 'page_general' || threadType === 'chat_session') {
         return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>';
       }
       if (threadType === 'report_run') {

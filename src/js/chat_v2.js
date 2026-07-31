@@ -161,7 +161,9 @@
     _onTopbarBackClick = function (e) {
       if (!_matter || !_matter.id) return;
       if (e && typeof e.preventDefault === 'function') e.preventDefault();
-      openWorkspaceDetails('conversations');
+      // The Conversations tab was removed from workspace-details (recents
+      // live in the LANA dock now) — land on the default Activity tab.
+      openWorkspaceDetails('activity');
     };
     window.addEventListener('topbar-back-click', _onTopbarBackClick);
     _windowEventListeners.push({

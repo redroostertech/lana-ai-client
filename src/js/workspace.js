@@ -762,11 +762,11 @@
           html += `</div>`;
         }
 
-        // All Matters Section
+        // All Workspaces section
         if (unpinnedMatters.length > 0) {
           const totalUnpinned = unpinnedResult.total || 0;
           // Dynamic heading based on filter
-          let sectionHeading = 'All Matters';
+          let sectionHeading = 'All Workspaces';
           if (matterTypeFilterValue === 'matter') {
             sectionHeading = 'Client Matters';
           } else if (matterTypeFilterValue === 'workspace') {
