@@ -109,7 +109,6 @@ Methods callable from inline `onclick` handlers:
 |--------|---------|
 | `showModuleInfo()` | Open module info modal |
 | `closeModuleInfo()` | Close module info modal |
-| `askLanaAboutReport()` | Send report data to LANA AI chat |
 | `closeDrilldownModal()` | Close drilldown modal |
 | `closeDataOverridePanel()` | Close override panel |
 | `closeDataSourcesModal()` | Close data sources modal |

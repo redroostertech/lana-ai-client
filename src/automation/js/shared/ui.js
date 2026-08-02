@@ -89,6 +89,8 @@ export function sectionIntro({ eyebrow, title, copy, badges = [] }) {
     <section class="automation-page-banner" aria-label="${escapeAttribute(eyebrow)}">
       <lex-banner
         variant="light"
+        lana
+        lana-context-type="full_chat"
         heading="${escapeAttribute(title)}"
         subtitle="${escapeAttribute(copy)}"
       ></lex-banner>

@@ -1303,6 +1303,8 @@ export function renderBuilder(context) {
         class="automations-builder-banner"
         variant="light"
         size="compact"
+        lana
+        lana-context-type="full_chat"
         heading="${escapeAttribute(bannerHeading)}"
         subtitle="${escapeAttribute(bannerSubtitle)}"
         status="${bannerStatus}"

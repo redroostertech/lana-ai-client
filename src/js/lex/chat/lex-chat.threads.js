@@ -5,7 +5,7 @@
 
    Usage:
      <lex-chat-threads
-       page-scope="reporting"
+       page-scope="dashboard"
        context-type="insights_chat"
      ></lex-chat-threads>
 

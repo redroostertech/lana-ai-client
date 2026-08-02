@@ -350,11 +350,59 @@
             stay available (they fall back to their legacy behavior). ── */
       + '@media (min-width: 1024px) {'
       + '  html[data-lana-dock="expanded"] lex-ask-lana-btn,'
-      + '  html[data-lana-dock="expanded"] #askMatterBtn,'
       + '  html[data-lana-dock="expanded"] [data-lana-dock-trigger] {'
       + '    display: none !important;'
       + '  }'
-      + '}';
+      + '}'
+      + '[data-lana-dock-trigger].lana-dock-trigger {'
+      + '  display: inline-flex;'
+      + '  align-items: center;'
+      + '  justify-content: center;'
+      + '  gap: 6px;'
+      + '  min-height: 30px;'
+      + '  padding: 6px 12px;'
+      + '  border: 0;'
+      + '  border-radius: var(--lex-radius-full, 9999px);'
+      + '  background: linear-gradient(135deg, #4f46e5 0%, #6d28d9 100%);'
+      + '  color: #fff;'
+      + '  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28);'
+      + '  cursor: pointer;'
+      + '  font-family: var(--lex-font-sans, inherit);'
+      + '  font-size: 10.5px;'
+      + '  font-weight: 800;'
+      + '  letter-spacing: 0;'
+      + '  line-height: 1;'
+      + '  text-transform: uppercase;'
+      + '  white-space: nowrap;'
+      + '  transition: transform var(--lex-transition-fast), box-shadow var(--lex-transition-fast), filter var(--lex-transition-fast);'
+      + '}'
+      + '[data-lana-dock-trigger].lana-dock-trigger:hover {'
+      + '  filter: brightness(1.04);'
+      + '  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.34);'
+      + '  transform: translateY(-1px);'
+      + '}'
+      + '[data-lana-dock-trigger].lana-dock-trigger:active { transform: translateY(0) scale(0.98); }'
+      + '[data-lana-dock-trigger].lana-dock-trigger:focus-visible {'
+      + '  outline: none;'
+      + '  box-shadow: 0 0 0 2px var(--lex-bg-primary, #fff), 0 0 0 4px rgba(79, 70, 229, 0.45);'
+      + '}'
+      + '[data-lana-dock-trigger].lana-dock-trigger .lana-dock-trigger-icon {'
+      + '  position: relative;'
+      + '  display: inline-flex;'
+      + '  width: 16px;'
+      + '  height: 16px;'
+      + '  flex: 0 0 16px;'
+      + '}'
+      + '[data-lana-dock-trigger].lana-dock-trigger .lana-dock-trigger-icon svg {'
+      + '  position: absolute;'
+      + '  width: 8px;'
+      + '  height: 8px;'
+      + '  fill: none;'
+      + '  stroke: currentColor;'
+      + '  stroke-width: 1.5;'
+      + '}'
+      + '[data-lana-dock-trigger].lana-dock-trigger .lana-dock-trigger-icon svg:first-child { top: 0; left: 0; }'
+      + '[data-lana-dock-trigger].lana-dock-trigger .lana-dock-trigger-icon svg:last-child { right: 0; bottom: 0; }';
 
     document.head.appendChild(style);
   }
@@ -386,6 +434,7 @@
       this._scopeMenuEl = null;
       this._mattersCache = null;
       this._injectedDocId = null;
+      this._boundTriggerClick = this._handleDockTriggerClick.bind(this);
     }
 
     connected() {
@@ -409,11 +458,13 @@
       if (app && typeof app.dropSidebarConversationSection === 'function') {
         app.dropSidebarConversationSection();
       }
+      document.addEventListener('click', this._boundTriggerClick);
     }
 
     disconnected() {
       // Leave the CSS variable untouched: page teardown during navigation
       // should not cause a visible content reflow before unload.
+      document.removeEventListener('click', this._boundTriggerClick);
     }
 
     render() { return null; }
@@ -547,6 +598,21 @@
         }
         if (typeof p._focusComposer === 'function') p._focusComposer();
       }, 300);
+    }
+
+    _handleDockTriggerClick(event) {
+      var trigger = event.target && event.target.closest && event.target.closest('[data-lana-dock-trigger]');
+      if (!trigger || !document.contains(trigger)) return;
+      if (trigger.closest('lex-lana-dock')) return;
+      if (trigger.closest('lex-banner')) return;
+      event.preventDefault();
+      this.openWith({
+        contextType: trigger.getAttribute('data-lana-context-type') || trigger.getAttribute('context-type') || null,
+        matterId: trigger.getAttribute('data-lana-matter-id') || trigger.getAttribute('matter-id') || null,
+        matterName: trigger.getAttribute('data-lana-matter-name') || trigger.getAttribute('matter-name') || null,
+        documentId: trigger.getAttribute('data-lana-document-id') || trigger.getAttribute('document-id') || null,
+        documentName: trigger.getAttribute('data-lana-document-name') || trigger.getAttribute('document-name') || null
+      });
     }
 
     /** Expand the dock and start a fresh conversation. */

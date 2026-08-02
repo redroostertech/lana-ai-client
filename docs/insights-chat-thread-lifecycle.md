@@ -1,6 +1,6 @@
 # LANA Insights Chat: Thread Lifecycle
 
-This document is the source of truth for **how the LANA Insights chat drawer talks to the backend**. Every UI action below maps to a specific HTTP request or SSE event. If you change the drawer, the backend `conversation_threads` API, or anything that consumes the platform thread registry (PAC / `pac/`, optional apps), read this first.
+This document describes the legacy page-scoped LANA drawer lifecycle and the shared `conversation_threads` API. Ordinary pages now use the global `lex-lana-dock`, with page-level entry through `lex-banner lana`; do not add new page-specific Insights drawers for Dashboard, Reporting, Billable Hours, or Data Visualization.
 
 ## TL;DR
 
@@ -10,7 +10,7 @@ This document is the source of truth for **how the LANA Insights chat drawer tal
 4. The user's first message in a fresh drawer creates a `page_general` thread (one per user / `page_scope` / matter) lazily, from the SSE-allocated `conversation_id`.
 5. Clicking **+ New** is eager: the panel `POST`s a fresh `ad_hoc` thread, adds it to the list, and rebinds the chat to the new `conversation_id` returned by the backend. The user's next message goes to that new thread.
 6. The backend auto-generates a title from the first turn (`generateAndSaveTitle`) and mirrors it into `conversation_threads.title`. The client receives the same title over SSE as `lex-chat-title-generated` and updates the visible row immediately.
-7. **`page_scope` is per page, not per app.** Each Insights surface has a unique `page-scope` value. The backend whitelists scopes in `conversation-threads.validators.js`; if you add a new one, update the whitelist.
+7. **`page_scope` is per surface family.** The global dock currently uses `dashboard` for the app-wide page assistant. Specialized retained surfaces use their own whitelisted scope.
 
 ## Components (client)
 
@@ -19,7 +19,7 @@ This document is the source of truth for **how the LANA Insights chat drawer tal
 | Panel (host) | `src/js/lex/components/chat/lex-lana-panel.js` | Mounts the drawer, owns thread/conversation orchestration, makes the API calls |
 | Thread list UI | `src/js/lex/chat/lex-chat.threads.js` | Renders the THREADS header and items; emits UI events |
 | Chat stream | `src/js/lex/chat/lex-chat.js` | Owns the active `conversationId`, opens the SSE stream, re-emits server events |
-| Trigger button | `src/js/lex/components/chat/lex-ask-lana-btn.js` | The "LANA" pill that opens/closes the drawer |
+| Trigger button | `src/js/lex/components/foundation/lex-banner.js` | `lana` banner action that opens the global dock |
 
 ## Backend surface
 
@@ -52,7 +52,7 @@ Response (HTTP 200):
       "title": "Q1 utilization summary",
       "thread_type": "ad_hoc",
       "context_type": "insights_chat",
-      "page_scope": "firm_reporting",
+      "page_scope": "dashboard",
       "matter_id": null,
       "is_pinned": false,
       "pinned_at": null,
@@ -78,7 +78,7 @@ Request body:
   "title": "New Thread",                    // optional, default null
   "thread_type": "ad_hoc",                  // REQUIRED — page_general | ad_hoc | report_run
   "context_type": "insights_chat",          // default insights_chat
-  "page_scope": "firm_reporting",           // REQUIRED — must be whitelisted
+  "page_scope": "dashboard",                // REQUIRED — must be whitelisted
   "matter_id": null,                        // optional
   "parent_thread_id": null,                 // optional; for child threads (e.g. report_run)
   "thread_id": "29be4efc-…",                // optional; pass only when binding to an existing conversation
@@ -131,10 +131,11 @@ Whitelist enforced on `POST` (`conversation-threads.validators.js`):
 
 ```
 reporting, firm_reporting, billable_hours, matter, workspace,
-workspace_data, dashboard, data_visualization, automations, skills
+workspace_data, dashboard, data_visualization, automations, skills,
+meeting_recording
 ```
 
-Add new scopes to this whitelist before mounting a new drawer with a fresh scope.
+`reporting`, `firm_reporting`, `billable_hours`, and `data_visualization` are legacy Insights thread buckets retained for compatibility. New page work should use the global dock/banner path unless a specialized assistant surface is explicitly approved.
 
 ## Thread types
 
@@ -148,12 +149,12 @@ Add new scopes to this whitelist before mounting a new drawer with a fresh scope
 
 ### Drawer open
 
-1. User clicks the **LANA** button (`lex-ask-lana-btn`) → `panel.show()`.
+1. User clicks the banner **LANA** action (`<lex-banner lana>`) → `lex-lana-dock.openWith(...)`.
 2. On first open, `_buildChat()` injects `<lex-chat-threads>` and `<lex-chat>`.
 3. `lex-chat-threads.connected()` calls:
    ```
    GET /api/v1/conversation-threads
-     ?page_scope=firm_reporting
+     ?page_scope=dashboard
      &limit=50
      &sort_by=last_activity
      &sort_order=desc
@@ -184,7 +185,7 @@ User wants a fresh thread without losing the `page_general` one.
      "title": "New Thread",
      "thread_type": "ad_hoc",
      "context_type": "insights_chat",
-     "page_scope": "firm_reporting"
+     "page_scope": "dashboard"
    }
    ```
 3. On 201, the new row is `addThread`-ed and `setActiveThread`-ed.
@@ -259,14 +260,24 @@ The chat SSE stream emits typed events; these are the ones that drive the thread
 | `title` | First-turn finalize, after `generateAndSaveTitle` runs | `lex-chat-title-generated` → panel updates the visible row's title |
 | `done` | Stream finalized | History flush, response-end emit |
 
-## Adding the drawer to a new page
+## Adding LANA to a New Page
 
-1. Mount `<lex-lana-panel>` with a **unique** `page-scope` attribute. Threads list filters by `page_scope`, so two pages sharing a scope share their list.
-2. Add the new scope to the whitelist in `LANA-AI/src/services/processor/conversation-threads/conversation-threads.validators.js` (`VALID_PAGE_SCOPES`). If you skip this step, `POST /api/v1/conversation-threads` will 400 the first time the user clicks "+ New".
-3. Add `<lex-ask-lana-btn>` to the page and wire it to `panel.toggle()` on click.
-4. No other server changes are needed — the drawer self-mounts threads and chat on first open and the title generation flow is keyed off `thread_id`.
+1. Mount the global `<lex-lana-dock>` once on the page.
+2. Add `lana lana-context-type="full_chat"` to the page-level `<lex-banner>`.
+3. Use `lana-matter-id`, `lana-matter-name`, `lana-document-id`, or `lana-document-name` only for bounded scope already owned by that page.
+4. Do not add a new page-specific `<lex-lana-panel>` unless the page has a specialized retained assistant workflow.
 
-Current scopes in use: `firm_reporting`, `billable_hours`, `data_visualization`, `skills`, `workspace`, `workspace_data`.
+Current active scopes in use: `dashboard`, `workspace`, `workspace_data`, `skills`. Legacy compatible scopes: `reporting`, `firm_reporting`, `billable_hours`, `data_visualization`.
+
+## Deferred Specialized Provider Migrations
+
+The remaining page-owned assistant surfaces should migrate as consumers of the future page context provider layer, not as hardwired behavior in `lex-banner` or `lex-lana-dock`.
+
+- `file-viewer` becomes a provider for active document context.
+- `workspace-data` becomes a provider for active dataset/table/query context.
+- `skills` becomes a provider for skills-designer context and tool defaults.
+
+Until that provider layer exists, keep those surfaces on their existing specialized assistant panels so their per-send context injection and tool behavior remain explicit.
 
 ## Consuming `conversation_threads` from other apps
 

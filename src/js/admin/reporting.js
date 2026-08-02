@@ -31,7 +31,6 @@
   var trendsChart = null;
   var statusChart = null;
   var timeSeriesChart = null;
-  var reportingModuleContextDismissed = false;
 
   // ==========================================================================
   // Helpers
@@ -472,10 +471,9 @@
     hideError();
     showInfo('Executing ' + selectedModuleKey + ' from ' + startDate + ' to ' + endDate + '...');
 
-    // Hide previous results and restore topbar LANA button while loading
+    // Hide previous results while loading
     var resultsEl = document.getElementById('moduleResults');
     if (resultsEl) resultsEl.style.display = 'none';
-    setTopbarLanaVisible(true);
 
     try {
       var startTime = Date.now();
@@ -506,7 +504,6 @@
 
       // Store full module configuration
       currentModuleConfig = data;
-      reportingModuleContextDismissed = false;
 
       // Update module header
       var moduleTitleEl = document.getElementById('moduleTitle');
@@ -545,11 +542,7 @@
       if (placeholder) placeholder.style.display = 'none';
       if (resultsEl) resultsEl.style.display = 'flex';
 
-      // Hide topbar LANA button when in-card Ask LANA is visible
-      setTopbarLanaVisible(false);
-
       showInfo('Module executed successfully in ' + executionTimeMs + 'ms. ' + (data.metrics ? data.metrics.length : 0) + ' metrics calculated.');
-      attachCurrentModuleContextToComposer();
 
     } catch (error) {
       console.error('[Reporting] Execution failed:', error);
@@ -3324,7 +3317,6 @@
     // Hide previous results
     var resultsEl = document.getElementById('moduleResults');
     if (resultsEl) resultsEl.style.display = 'none';
-    setTopbarLanaVisible(true);
 
     try {
       var startTime = Date.now();
@@ -3413,9 +3405,6 @@
           vizContainer.innerHTML = tableHtml;
         }
       }
-
-      // Hide topbar LANA since in-card button is visible
-      setTopbarLanaVisible(false);
 
       showInfo('Report executed successfully. ' + (result.row_count || 0) + ' rows returned in ' + (result.execution_time_ms || executionTimeMs) + 'ms' + (result.cached ? ' (cached)' : '') + '.');
 
@@ -3962,7 +3951,6 @@
     showMetricDrilldown: showMetricDrilldown,
     closeDataSourcesModal: closeDataSourcesModal,
     closeMissingEntitiesModal: closeMissingEntitiesModal,
-    askLanaAboutReport: askLanaAboutReport,
     closeImportModal: closeImportModal,
     openImportModal: openImportModal,
     deleteImportedReport: deleteImportedReport,
@@ -3980,68 +3968,6 @@
   window.closeMissingEntitiesModal = closeMissingEntitiesModal;
   window.closeModuleInfo = closeModuleInfo;
   window.showModuleInfo = showModuleInfo;
-
-  // ==========================================================================
-  // Init
-  // ==========================================================================
-
-  // ==========================================================================
-  // LANA Insights Panel (via lex-lana-panel)
-  // ==========================================================================
-
-  // setTopbarLanaVisible — no-op, topbar button replaced by lex-ask-lana-btn
-  function setTopbarLanaVisible() {}
-
-  // injectLanaButton — no longer needed, button is in HTML
-  function injectLanaButton() {}
-
-  // openInsightsPanel — delegates to panel.show()
-  function openInsightsPanel() {
-    var panel = document.getElementById('reportingLana');
-    if (panel) panel.show();
-  }
-
-  /**
-   * Create a report-run thread and open the insights panel focused on it.
-   * Called when user clicks the in-card "Ask LANA" button after execution.
-   */
-  async function askLanaAboutReport() {
-    if (typeof api === 'undefined') return;
-    if (!currentModuleData && !currentModuleConfig) return;
-
-    var panel = document.getElementById('reportingLana');
-    if (!panel) return;
-
-    var snapshot = {
-      moduleName: currentModuleMetadata ? currentModuleMetadata.moduleName : selectedModuleKey,
-      moduleKey: selectedModuleKey,
-      periodType: currentModuleConfig ? currentModuleConfig.period && currentModuleConfig.period.type : null,
-      periodStart: currentModuleConfig ? currentModuleConfig.period && currentModuleConfig.period.start : null,
-      periodEnd: currentModuleConfig ? currentModuleConfig.period && currentModuleConfig.period.end : null,
-      metrics: currentModuleData ? currentModuleData.map(function (m) {
-        return { name: m.name, key: m.key, current: m.current, prior: m.prior, target: m.target, status: m.status };
-      }) : [],
-      executedAt: new Date().toISOString()
-    };
-
-    panel.show();
-    await new Promise(function (resolve) { setTimeout(resolve, 300); });
-
-    try {
-      var title = (snapshot.moduleName || 'Report') + ' — '
-        + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: getOrganizationTimezone() });
-
-      await panel.createThread({
-        title: title,
-        thread_type: 'report_run',
-        context_type: 'insights_chat',
-        page_scope: 'reporting',
-        metadata: snapshot
-      });
-    } catch (err) {
-      console.error('[Reporting] Failed to create report-run thread:', err);
-    }
-  }
 
   // ==========================================================================
   // Init
@@ -4066,154 +3992,6 @@
       missingEntitiesBtn.addEventListener('click', openMissingEntitiesModal);
     }
 
-    // Wire the in-card "Ask LANA" button to askLanaAboutReport
-    var reportingLanaBtn = document.getElementById('reportingLanaBtn');
-    if (reportingLanaBtn) {
-      reportingLanaBtn.addEventListener('lex-ask-lana-click', function () {
-        askLanaAboutReport();
-      });
-    }
-
-    // Wire report-context attachment onto every Lana send so Lana grounds
-    // her answers on the currently-displayed report (Option A: single
-    // unified thread, shifting context per-send). Mirrors the document
-    // chat pattern in file-viewer-page.js (lex-lana-before-send hook).
-    wireReportingLanaContext();
-  }
-
-  // ==========================================================================
-  // LANA Insights — Per-Send Context Injection
-  // ==========================================================================
-
-  // Build a structured snapshot of the currently-displayed report. Returns
-  // null if no module has been executed yet, so general firm-wide questions
-  // still pass through unchanged.
-  function buildModuleContextAttachment() {
-    // Nothing has been run — let the send go through with no module_context.
-    if (!selectedModuleKey && !currentModuleConfig && !currentModuleData) {
-      return null;
-    }
-
-    var moduleTitleEl = document.getElementById('moduleTitle');
-    var resultPeriodTypeEl = document.getElementById('resultPeriodType');
-    var resultCurrentPeriodEl = document.getElementById('resultCurrentPeriod');
-    var resultPriorPeriodEl = document.getElementById('resultPriorPeriod');
-    var executionTimeEl = document.getElementById('executionTime');
-    var periodStartEl = document.getElementById('periodStart');
-    var periodEndEl = document.getElementById('periodEnd');
-
-    // Period start/end: prefer state (ISO from backend), fall back to date inputs.
-    var periodStart = null;
-    var periodEnd = null;
-    if (currentModuleConfig && currentModuleConfig.period) {
-      periodStart = currentModuleConfig.period.start || null;
-      periodEnd = currentModuleConfig.period.end || null;
-    }
-    if (!periodStart && periodStartEl) periodStart = periodStartEl.value || null;
-    if (!periodEnd && periodEndEl) periodEnd = periodEndEl.value || null;
-
-    // Parse "1234ms" → 1234. Falls back to null if not parseable.
-    var executionTimeMs = null;
-    if (executionTimeEl && executionTimeEl.textContent) {
-      var match = executionTimeEl.textContent.match(/(\d+)/);
-      if (match) executionTimeMs = parseInt(match[1], 10);
-    }
-
-    // Metric snapshots: keep raw numbers AND the user-visible formatted strings
-    // so Lana can both reason numerically and reference exactly what the user
-    // is looking at. We deliberately exclude underlying SQL row data.
-    var metrics = [];
-    if (Array.isArray(currentModuleData)) {
-      metrics = currentModuleData.map(function (m) {
-        return {
-          key: m.key,
-          label: m.name,
-          current_value: m.current,
-          prior_value: m.prior,
-          target_value: m.target,
-          unit: m.unit || null,
-          type: m.type || null,
-          status: m.status || null,
-          change: (m.change !== undefined) ? m.change : null,
-          change_direction: m.changeDirection || null,
-          formatted_current: m.formattedCurrent || null,
-          formatted_prior: m.formattedPrior || null
-        };
-      });
-    }
-
-    var moduleName = (currentModuleMetadata && currentModuleMetadata.moduleName)
-      || (moduleTitleEl ? moduleTitleEl.textContent : '')
-      || selectedModuleKey
-      || '';
-
-    return {
-      module_key: selectedModuleKey || (currentModuleMetadata ? currentModuleMetadata.moduleKey : null),
-      module_name: moduleName,
-      period: {
-        start: periodStart,
-        end: periodEnd,
-        label: resultCurrentPeriodEl ? resultCurrentPeriodEl.textContent : null,
-        compare_by: resultPeriodTypeEl ? resultPeriodTypeEl.textContent : null,
-        prior_label: resultPriorPeriodEl ? resultPriorPeriodEl.textContent : null
-      },
-      metrics: metrics,
-      execution_time_ms: executionTimeMs
-    };
-  }
-
-  function attachCurrentModuleContextToComposer() {
-    if (reportingModuleContextDismissed) return;
-    var panel = document.getElementById('reportingLana');
-    if (!panel || typeof panel.attachModuleContext !== 'function') return;
-    var ctx = buildModuleContextAttachment();
-    if (ctx) panel.attachModuleContext(ctx);
-  }
-
-  // Guard against double-binding when init() runs twice (page-init may
-  // both auto-call init() and re-fire it via LexRouter.registerPageInit).
-  // Two listeners would each set module_context idempotently — harmless —
-  // but we still avoid stacking them.
-  var _reportingLanaContextWired = false;
-
-  function wireReportingLanaContext() {
-    if (_reportingLanaContextWired) return;
-    var panel = document.getElementById('reportingLana');
-    if (!panel) return;
-    _reportingLanaContextWired = true;
-
-    panel.addEventListener('lex-lana-module-context-remove', function () {
-      reportingModuleContextDismissed = true;
-    });
-
-    panel.addEventListener('lex-lana-before-send', function (e) {
-      // Defensive: any throw from this listener must NOT bubble up and break
-      // the chat send pipeline. If anything goes wrong building the context,
-      // fall back to sending without it.
-      try {
-        var opts = e.detail && e.detail.opts;
-        if (!opts) return;
-
-        if (reportingModuleContextDismissed) {
-          opts.contextType = 'data_chat';
-          if (opts.attachments) delete opts.attachments.module_context;
-          return;
-        }
-
-        var ctx = buildModuleContextAttachment();
-        if (!ctx) {
-          opts.contextType = 'data_chat';
-          return;
-        }
-
-        opts.attachments = opts.attachments || {};
-        opts.attachments.module_context = ctx;
-        opts.contextType = 'insights_chat';
-        attachCurrentModuleContextToComposer();
-      } catch (err) {
-        console.warn('[Reporting] Failed to attach module_context to chat send:', err);
-      }
-    });
   }
 
   if (typeof LexRouter !== 'undefined') {

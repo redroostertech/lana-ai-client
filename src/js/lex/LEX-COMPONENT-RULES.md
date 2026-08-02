@@ -358,16 +358,23 @@ Lex.Toast.warning('Token expires in 5 minutes');
 | `size` | String | `'default'` | `default` or `compact` (reduced padding) |
 | `corners` | Boolean | `true` | Show decorative corner brackets |
 | `align` | String | `'left'` | `left` or `center` |
+| `lana` | Boolean | `false` | Show the standard banner action that opens the global LANA dock |
+| `lanaContextType` | String | — | Context type passed to `lex-lana-dock.openWith()` |
+| `lanaMatterId` | String | — | Matter scope passed to `lex-lana-dock.openWith()` |
+| `lanaMatterName` | String | — | Matter label passed to `lex-lana-dock.openWith()` |
+| `lanaDocumentId` | String | — | Document scope passed to `lex-lana-dock.openWith()` |
+| `lanaDocumentName` | String | — | Document label passed to `lex-lana-dock.openWith()` |
 
 **Slot:** Place child elements (e.g. `<lex-btn>`) inside for the actions area.
 
-**Events:** `banner-action`
+**Events:** `banner-action`, `lex-banner-lana-open`
 
 **Rules:**
 - Use `variant="light"` + `size="compact"` for in-page section headers (e.g. admin landing, workspace header)
 - Use `variant="dark"` (default) for hero/dashboard banners with brand identity
 - Use `status` for connection/integration status indicators (not for alerts)
 - Use `Lex.Toast.*` for transient action results instead of banners
+- Use `lana` on page-level banners when the page hosts the global LANA dock; do not mount page-specific LANA drawers for ordinary page chat
 - The `heading` renders as `<h1>` — ensure only one banner per page for accessibility
 
 ### `<lex-accordion>`

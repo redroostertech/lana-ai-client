@@ -13,7 +13,6 @@
   <link rel="stylesheet" href="../css/drilldown-renderer.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
   <link rel="stylesheet" href="../css/admin/reporting.css">
-  <!-- lana-ask-btn.css replaced by self-contained lex-ask-lana-btn component -->
   <script src="../js/tailwind-loader.js"></script>
 
   <style>
@@ -50,6 +49,8 @@
         corners
         heading="Firm Reporting"
         subtitle="Firm-wide analytics, trends, and performance metrics"
+        lana
+        lana-context-type="full_chat"
       >
         <lex-btn id="importReportBtn" variant="secondary" size="sm">
           <span style="display:flex;align-items:center;gap:0.375rem;">
@@ -59,7 +60,6 @@
             Import Report
           </span>
         </lex-btn>
-        <lex-ask-lana-btn id="reportingLanaBtn" panel="reportingLana" size="sm"></lex-ask-lana-btn>
       </lex-banner>
 
       <lex-spacer size="md"></lex-spacer>
@@ -171,14 +171,6 @@
           <div id="moduleResults" style="display:none;flex-direction:column;gap:1.5rem;">
             <!-- Results Header Card -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <!--
-                Header: Title + Learn More.
-                The Ask LANA button used to live here (id=reportingLanaBtn).
-                It moved into the page banner so users can chat with Lana
-                from the moment the page opens, not just after running a
-                module. Removing the duplicate avoids two buttons fighting
-                over the same id.
-              -->
               <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-3">
                   <h2 id="moduleTitle" class="text-xl font-bold text-gray-900"></h2>
@@ -454,23 +446,6 @@
         </div>
       </div>
 
-    <!-- Unified LANA Insights panel (drawer mode, destroy on close). -->
-    <!-- page-scope is the per-page thread bucket. Each Insights surface
-         keeps its own thread list so Firm Reporting / Billable Hours /
-         Data Visualization don't bleed into each other. -->
-    <lex-lana-panel
-      id="reportingLana"
-      mode="drawer"
-      drawer-heading="LANA Insights"
-      drawer-width="lg"
-      page-scope="firm_reporting"
-      context-type="insights_chat"
-      placeholder="Ask about forecasts, trends, and insights..."
-      tools-locked="true"
-      default-tool="insights_chat"
-      thread-title="Insights Chat"
-      destroy-on-close="true"
-    ></lex-lana-panel>
     </main>
 
   </template>
@@ -538,7 +513,7 @@
   <!-- Mermaid diagram rendering (before chat format) -->
   <script src="../js/vendor/mermaid.min.js"></script>
 
-  <!-- Chat components for LANA insights panel -->
+  <!-- Chat components for the global LANA dock -->
   <script src="../js/lex/chat/lex-chat.format.js"></script>
   <script src="../js/lex/chat/lex-chat.source.js"></script>
   <script src="../js/lex/chat/lex-chat.message.js"></script>
@@ -552,7 +527,6 @@
   <script src="../js/lex/chat/lex-dynamic-card.renderer.js"></script>
   <script src="../js/lex/chat/lex-agentic-plan-card.js"></script>
   <script src="../js/lex/chat/lex-chat.index.js"></script>
-  <script src="../js/lex/components/chat/lex-ask-lana-btn.js"></script>
   <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
 
   <!-- Inject page content + hoist modals -->

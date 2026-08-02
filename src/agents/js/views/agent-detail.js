@@ -27,6 +27,8 @@
     +   ' variant="light"'
     +   ' heading="Agent"'
     +   ' subtitle="Loading agent profile..."'
+    +   ' lana'
+    +   ' lana-context-type="full_chat"'
     + '>'
     +   '<div id="agentDetailEnabledBlock" class="agent-detail-enabled-block hidden">'
     +     '<lex-toggle'

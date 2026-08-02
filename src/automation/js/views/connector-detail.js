@@ -120,6 +120,13 @@ export function renderConnectorDetail(context) {
         <div class="connector-detail-header-trailing">
           ${connector.last_sync ? renderLastSyncPill(connector) : ''}
           <div class="connector-detail-actions">
+            <button type="button" class="lana-dock-trigger" data-lana-dock-trigger data-lana-context-type="full_chat" aria-label="Ask LANA" title="Ask LANA">
+              <span class="lana-dock-trigger-icon" aria-hidden="true">
+                <svg viewBox="0 0 12 12"><path d="M1 5V1h4"/><path d="M11 7v4H7"/></svg>
+                <svg viewBox="0 0 12 12"><path d="M1 5V1h4"/><path d="M11 7v4H7"/></svg>
+              </span>
+              <span>LANA</span>
+            </button>
             ${renderHeaderActions(connector)}
           </div>
         </div>

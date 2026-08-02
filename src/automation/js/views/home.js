@@ -46,6 +46,8 @@ export function renderHome(context) {
       <section class="automation-page-banner" aria-label="Automation home">
         <lex-banner
           variant="light"
+          lana
+          lana-context-type="full_chat"
           heading="What would you like to automate, ${escapeAttribute(firstName)}?"
           subtitle="Pick a starter template below or run an existing automation."
         ></lex-banner>

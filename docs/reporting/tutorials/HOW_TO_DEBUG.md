@@ -206,7 +206,6 @@ console.log(el.value, el.getAttribute('value'));
 // Available methods on window._reporting:
 window._reporting.showModuleInfo()         // Open module info modal
 window._reporting.closeModuleInfo()        // Close module info modal
-window._reporting.askLanaAboutReport()     // Send to LANA AI chat
 window._reporting.closeDrilldownModal()    // Close drilldown modal
 window._reporting.closeDataOverridePanel() // Close override panel
 window._reporting.closeDataSourcesModal()  // Close data sources modal

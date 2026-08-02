@@ -25,7 +25,7 @@
   var TEMPLATE = ''
     + '<main>'
 
-    + '<lex-banner id="atdBanner" variant="light" heading="Loading..." subtitle="Loading run details">'
+    + '<lex-banner id="atdBanner" variant="light" heading="Loading..." subtitle="Loading run details" lana lana-context-type="full_chat">'
     +   '<a id="atdMatterLink" class="atd-banner-action hidden" href="#">View Matter</a>'
     + '</lex-banner>'
     + '<lex-breadcrumb id="atdBreadcrumb" style="margin:12px 0 16px;" items=\'[{"label":"LanaAgents","href":"#catalog"},{"label":"Activity","href":"#activity"},{"label":"Run detail"}]\'></lex-breadcrumb>'

@@ -10,7 +10,6 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
-  <!-- lana-ask-btn.css replaced by self-contained lex-ask-lana-btn component -->
   <script src="../js/tailwind-loader.js"></script>
 
 </head>
@@ -44,9 +43,9 @@
             variant="light"
             heading="Data Visualization"
             subtitle="Browse database tables and query data with natural language"
-          >
-            <lex-ask-lana-btn panel="dataVizLana" size="sm"></lex-ask-lana-btn>
-          </lex-banner>
+            lana
+            lana-context-type="full_chat"
+          ></lex-banner>
 
           <lex-breadcrumb items='[{"label":"Analytics","href":"admin/analytics.html"},{"label":"Data Visualization"}]'></lex-breadcrumb>
 
@@ -84,22 +83,6 @@
           </div>
 
         </div>
-
-        <!-- Right column: Unified LANA chat panel -->
-        <lex-lana-panel
-          id="dataVizLana"
-          mode="column"
-          page-scope="data_visualization"
-          context-type="insights_chat"
-          placeholder="Ask about the data..."
-          tools-locked="true"
-          default-tool="insights_chat"
-          thread-title="Data Visualization"
-          column-heading="Ask LANA about this data"
-          column-subtitle="Use natural language to query and analyze"
-          width="380"
-          style="margin-left:16px;"
-        ></lex-lana-panel>
 
       </div>
 
@@ -169,7 +152,7 @@
   <!-- Mermaid diagram rendering (before chat format) -->
   <script src="../js/vendor/mermaid.min.js"></script>
 
-  <!-- Chat components for embedded insights panel -->
+  <!-- Chat components for the global LANA dock -->
   <script src="../js/lex/chat/lex-chat.format.js"></script>
   <script src="../js/lex/chat/lex-chat.source.js"></script>
   <script src="../js/lex/chat/lex-chat.message.js"></script>
@@ -183,7 +166,6 @@
   <script src="../js/lex/chat/lex-dynamic-card.renderer.js"></script>
   <script src="../js/lex/chat/lex-agentic-plan-card.js"></script>
   <script src="../js/lex/chat/lex-chat.index.js"></script>
-  <script src="../js/lex/components/chat/lex-ask-lana-btn.js"></script>
   <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
 
   <!-- Inject page content + hoist modals -->

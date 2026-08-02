@@ -21,7 +21,7 @@
   var TEMPLATE = ''
     + '<main>'
 
-    + '<lex-banner variant="light" heading="Lana Tasks" subtitle="Interactive tasks assigned to Lana"></lex-banner>'
+    + '<lex-banner variant="light" heading="Lana Tasks" subtitle="Interactive tasks assigned to Lana" lana lana-context-type="full_chat"></lex-banner>'
     + '<lex-breadcrumb style="margin:12px 0 16px;" items=\'[{"label":"LanaAgents","href":"#catalog"},{"label":"Activity"}]\'></lex-breadcrumb>'
 
     + '<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">'

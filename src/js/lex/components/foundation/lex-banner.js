@@ -23,9 +23,11 @@
      corners   — Show decorative corner brackets (default: true)
      align     — left (default) | center
      max-actions — Number of visible action elements before overflow menu (-1 = no overflow)
+     lana      — Show a standard banner action that opens the global LANA dock
 
    Events:
      banner-action — emitted when an action button in the slot is clicked
+     lex-banner-lana-open — emitted when the built-in LANA action is clicked
 */
 
 (function () {
@@ -287,6 +289,73 @@
         display: contents;
       }
 
+      .lex-banner-lana-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 30px;
+        padding: 6px 12px;
+        border: 0;
+        border-radius: var(--lex-radius-full, 9999px);
+        background: linear-gradient(135deg, #4f46e5 0%, #6d28d9 100%);
+        color: #fff;
+        box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28);
+        cursor: pointer;
+        font-family: var(--lex-font-sans, inherit);
+        font-size: 10.5px;
+        font-weight: 800;
+        letter-spacing: 0;
+        line-height: 1;
+        text-transform: uppercase;
+        white-space: nowrap;
+        transition: transform var(--lex-transition-fast), box-shadow var(--lex-transition-fast), filter var(--lex-transition-fast);
+      }
+
+      .lex-banner-lana-trigger:hover {
+        filter: brightness(1.04);
+        box-shadow: 0 8px 20px rgba(79, 70, 229, 0.34);
+        transform: translateY(-1px);
+      }
+
+      .lex-banner-lana-trigger:active {
+        transform: translateY(0) scale(0.98);
+      }
+
+      .lex-banner-lana-trigger:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--lex-bg-primary, #fff), 0 0 0 4px rgba(79, 70, 229, 0.45);
+      }
+
+      .lex-banner-lana-icon {
+        position: relative;
+        display: inline-flex;
+        width: 16px;
+        height: 16px;
+        flex: 0 0 16px;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .lex-banner-lana-icon svg {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+      }
+
+      .lex-banner-lana-icon svg:first-child {
+        top: 0;
+        left: 0;
+      }
+
+      .lex-banner-lana-icon svg:last-child {
+        right: 0;
+        bottom: 0;
+      }
+
       .lex-banner-overflow {
         position: relative;
         display: inline-flex;
@@ -440,7 +509,14 @@
         size:     { type: String, default: 'default' },
         corners:  { type: Boolean, default: true },
         align:    { type: String, default: 'left' },
-        maxActions: { type: Number, default: -1 }
+        maxActions: { type: Number, default: -1 },
+        lana: { type: Boolean, default: false },
+        lanaLabel: { type: String, default: 'LANA' },
+        lanaContextType: { type: String, default: '' },
+        lanaMatterId: { type: String, default: '' },
+        lanaMatterName: { type: String, default: '' },
+        lanaDocumentId: { type: String, default: '' },
+        lanaDocumentName: { type: String, default: '' }
       };
     }
 
@@ -494,6 +570,25 @@
         ? `<p class="lex-banner-subtitle">${this.escapeHtml(this.subtitle)}</p>`
         : '';
 
+      const lanaHtml = this.lana
+        ? `
+          <button
+            type="button"
+            class="lex-banner-lana-trigger"
+            data-lex-banner-lana
+            data-lana-dock-trigger
+            aria-label="Ask LANA"
+            title="Ask LANA"
+          >
+            <span class="lex-banner-lana-icon" aria-hidden="true">
+              <svg viewBox="0 0 8 8"><path d="M0 0H8M0 0V8"/></svg>
+              <svg viewBox="0 0 8 8"><path d="M8 8H0M8 8V0"/></svg>
+            </span>
+            <span>${this.escapeHtml(this.lanaLabel || 'LANA')}</span>
+          </button>
+        `
+        : '';
+
       return `
         <div class="${classes}">
           ${cornersHtml}
@@ -508,6 +603,7 @@
             </div>
           </div>
           <div class="lex-banner-actions">
+            ${lanaHtml}
             <slot-content data-slot="actions"></slot-content>
           </div>
         </div>
@@ -529,6 +625,25 @@
         const toggle = this.querySelector('[data-lex-banner-overflow-toggle]');
         if (menu) menu.setAttribute('hidden', '');
         if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      });
+
+      this.delegate('click', '[data-lex-banner-lana]', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const detail = {
+          contextType: this.lanaContextType || null,
+          matterId: this.lanaMatterId || null,
+          matterName: this.lanaMatterName || null,
+          documentId: this.lanaDocumentId || null,
+          documentName: this.lanaDocumentName || null
+        };
+        this.emit('lex-banner-lana-open', detail);
+
+        const dock = document.querySelector('lex-lana-dock');
+        if (dock && typeof dock.openWith === 'function') {
+          dock.openWith(detail);
+        }
       });
 
       this.listen(document, 'click', (event) => {

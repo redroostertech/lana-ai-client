@@ -1930,6 +1930,13 @@ export function renderLibraryDetail(context) {
 
         <div class="connector-detail-header-trailing">
           <div class="connector-detail-actions">
+            <button type="button" class="lana-dock-trigger" data-lana-dock-trigger data-lana-context-type="full_chat" aria-label="Ask LANA" title="Ask LANA">
+              <span class="lana-dock-trigger-icon" aria-hidden="true">
+                <svg viewBox="0 0 12 12"><path d="M1 5V1h4"/><path d="M11 7v4H7"/></svg>
+                <svg viewBox="0 0 12 12"><path d="M1 5V1h4"/><path d="M11 7v4H7"/></svg>
+              </span>
+              <span>LANA</span>
+            </button>
             <lex-btn variant="primary" size="sm" data-ld-run-now>Run Now</lex-btn>
             <lex-btn variant="secondary" size="sm" data-ld-edit data-ld-edit-automation="${escapeAttribute(ld.automationId || '')}">Edit</lex-btn>
             <lex-btn variant="ghost" size="sm" data-ld-attach-to-matter title="Attach this automation to a matter">Attach to Matter</lex-btn>

@@ -1152,7 +1152,7 @@
         return {
           type: 'conversation_threads',
           title: 'Insights Chats',
-          pageScopes: ['dashboard', 'reporting', 'data_visualization']
+          pageScopes: ['dashboard']
         };
       }
 

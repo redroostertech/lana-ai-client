@@ -402,7 +402,7 @@
   var _availableViews = [];     // populated from /api/v1/mcp-data/views
   var _rawRows     = [];        // unformatted rows for detail drawer
   var _connectedRows = {};      // connected data rows keyed by view name
-  // _chatEl / _threadsEl removed — managed by lex-lana-panel
+  // _chatEl / _threadsEl removed — managed by the global LANA dock.
 
   // ═══════════════════════════════════════════════════════════════
   // Helpers
@@ -451,7 +451,6 @@
         _wirePagination();
         _wireRefresh();
         _wireRowClick();
-        _initLanaPanel();
         _loadData();
       })
       .catch(function (err) {
@@ -650,35 +649,6 @@
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Ask LANA panel integration (lex-lana-panel)
-  // ═══════════════════════════════════════════════════════════════
-
-  function _initLanaPanel() {
-    var panel = document.getElementById('dataVizLana');
-    if (!panel) return;
-
-    // Inject active view as attachment on every send
-    panel.addEventListener('lex-lana-before-send', function (e) {
-      var opts = e.detail.opts;
-      var viewName = _getEffectiveView();
-      var config = VIEW_CONFIG[viewName];
-      if (!viewName || !config) return;
-
-      var label = viewName.substring(4); // strip 'mcp_'
-      label = label.split('_').map(function (w) {
-        return w.charAt(0).toUpperCase() + w.substring(1);
-      }).join(' ');
-
-      opts.attachments = opts.attachments || {};
-      opts.attachments.views = [{
-        view_name: viewName,
-        label: label,
-        columns: config.columns ? config.columns.split(',') : []
-      }];
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════════════
   // Data loading
   // ═══════════════════════════════════════════════════════════════
 
@@ -773,7 +743,7 @@
     return out;
   }
 
-  // _setupChat() removed — managed by lex-lana-panel component
+  // _setupChat() removed — managed by the global LANA dock.
 
   // ═══════════════════════════════════════════════════════════════
   // Row detail drawer

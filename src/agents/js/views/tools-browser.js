@@ -44,6 +44,8 @@
     +   ' variant="light"'
     +   ' heading="Browse tools"'
     +   ' subtitle="Add tools to your agent. Filter by category or search by name."'
+    +   ' lana'
+    +   ' lana-context-type="full_chat"'
     + '>'
     +   '<lex-btn id="toolsBrowserDoneBtn" variant="primary" icon="check">Done</lex-btn>'
     + '</lex-banner>'

@@ -27,6 +27,8 @@
     +   ' variant="light"'
     +   ' heading="Agents"'
     +   ' subtitle="Browse and configure system and custom agents."'
+    +   ' lana'
+    +   ' lana-context-type="full_chat"'
     + '>'
     +   '<lex-btn id="agentsCreateBtn" variant="primary" icon="plus">Create agent</lex-btn>'
     + '</lex-banner>'

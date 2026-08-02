@@ -72,6 +72,8 @@
     +   ' variant="light"'
     +   ' heading="Create agent"'
     +   ' subtitle="Pick a template, give the agent a name, and choose what tools it can call."'
+    +   ' lana'
+    +   ' lana-context-type="full_chat"'
     + '></lex-banner>'
 
     + '<div class="agent-create-form-shell">'

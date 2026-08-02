@@ -451,6 +451,8 @@
 
     var name = matter.matter_name || matter.name || 'Untitled';
     banner.heading = name;
+    banner.lanaMatterId = matter.matter_id || '';
+    banner.lanaMatterName = name;
 
     // Setting heading triggers an async re-render (queueMicrotask) that rebuilds
     // the entire banner DOM. We must inject badges AFTER that re-render completes.
@@ -561,22 +563,6 @@
         if (!target) return;
 
         var id = target.id;
-
-        // Ask Matter — opens the LANA dock scoped to this matter (falls
-        // back to the chat page when no dock is present)
-        if (id === 'askMatterBtn') {
-          var lanaDock = document.querySelector('lex-lana-dock');
-          if (lanaDock && typeof lanaDock.openWith === 'function') {
-            var m = window.currentViewedMatter || {};
-            lanaDock.openWith({
-              matterId: matterId,
-              matterName: m.matter_name || m.name || m.title || ''
-            });
-          } else {
-            Lex.Nav.go('chat-v2.html', { params: { matter: matterId } });
-          }
-          return;
-        }
 
         if (id === 'headerOptionsEdit') {
           openEditMatterModal(matter);
