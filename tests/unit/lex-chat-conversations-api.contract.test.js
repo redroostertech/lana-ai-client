@@ -75,4 +75,48 @@ describe('Lex conversations domain API', () => {
     expect(api.getConversationGeneration).toHaveBeenCalledWith('thread/1');
     expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread/1');
   });
+
+  test('uses canonical conversation document-selection subresources', async () => {
+    const fetchMock = jest.fn();
+    const { api, DomainClient } = loadDomain(fetchMock, {
+      get: jest.fn().mockResolvedValue({
+        data: {
+          documents: [{ documentId: 'doc-1', filename: 'evidence.pdf' }]
+        }
+      }),
+      post: jest.fn().mockResolvedValue({
+        data: {
+          documents: [{ documentId: 'doc-1', filename: 'evidence.pdf' }],
+          retrieval: { active: false, status: 'degraded', fallback: 'system_or_matter_scope' }
+        }
+      }),
+      delete: jest.fn().mockResolvedValue({
+        data: { documents: [] }
+      })
+    });
+    const client = new DomainClient(api);
+
+    const selected = await client.addDocument('thread/1', 'doc-1', 'evidence.pdf', 'MAT-1');
+    const loaded = await client.loadState('thread/1');
+    const removed = await client.removeDocument('thread/1', 'doc-1');
+    const cleared = await client.clearDocuments('thread/1');
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1/documents', {
+      documentId: 'doc-1',
+      filename: 'evidence.pdf',
+      matterId: 'MAT-1',
+      selectionSource: 'prompt_mention'
+    });
+    expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1/documents');
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1/documents/doc-1');
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1/documents');
+    expect(selected).toEqual({
+      mode: 'document',
+      activeDocuments: [{ documentId: 'doc-1', filename: 'evidence.pdf' }],
+      retrieval: { active: false, status: 'degraded', fallback: 'system_or_matter_scope' }
+    });
+    expect(loaded.mode).toBe('document');
+    expect(removed).toEqual({ mode: 'general', activeDocuments: [], retrieval: null });
+    expect(cleared).toEqual({ mode: 'general', activeDocuments: [], retrieval: null });
+  });
 });

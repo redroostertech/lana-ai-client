@@ -20,8 +20,8 @@ class LanaChat {
     this.maxDemoQueries = 50;
     this.currentMessageCitations = {};  // Store citations for current message
 
-    // Stateful Chat Mode - Stored in backend, synced locally
-    // NOTE: This is now managed by the backend API, not local state
+    // Document selection is loaded from canonical conversation subresources.
+    // chatState remains a local facade for this legacy component's UI only.
     this.chatState = {
       mode: 'general',
       agentPersona: 'default',
@@ -241,6 +241,17 @@ class LanaChat {
   // DOCUMENT CHAT MODE MANAGEMENT
   // ========================================================================
 
+  applyDocumentSelectionResponse(data) {
+    const payload = data && data.data ? data.data : data;
+    const documents = payload && Array.isArray(payload.documents) ? payload.documents : [];
+    this.chatState = {
+      ...this.chatState,
+      mode: documents.length > 0 ? 'document' : 'general',
+      activeDocuments: documents,
+      retrieval: payload && payload.retrieval ? payload.retrieval : null
+    };
+  }
+
   /**
    * Add a document to active document chat mode (max 3)
    * Calls backend API to update chat state
@@ -267,8 +278,8 @@ class LanaChat {
     }
 
     try {
-      // Call backend API to add document
-      const response = await fetch(`${this.api.baseUrl}/api/chat/conversations/${this.currentConversationId}/documents`, {
+      const conversationId = encodeURIComponent(this.currentConversationId);
+      const response = await fetch(`${this.api.baseUrl}/api/v1/conversations/${conversationId}/documents`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -277,19 +288,19 @@ class LanaChat {
         body: JSON.stringify({
           documentId,
           filename,
-          matterId: this.api.currentMatterId || null
+          matterId: this.api.currentMatterId || null,
+          selectionSource: 'prompt_mention'
         })
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to add document');
+        throw new Error(error.error?.message || error.error || 'Failed to add document');
       }
 
       const data = await response.json();
 
-      // Update local state from backend response
-      this.chatState = data.state;
+      this.applyDocumentSelectionResponse(data);
 
       // Update UI
       this.updateDocumentModeBanner();
@@ -323,7 +334,8 @@ class LanaChat {
     }
 
     try {
-      const response = await fetch(`${this.api.baseUrl}/api/chat/conversations/${this.currentConversationId}/documents/${documentId}`, {
+      const conversationId = encodeURIComponent(this.currentConversationId);
+      const response = await fetch(`${this.api.baseUrl}/api/v1/conversations/${conversationId}/documents/${encodeURIComponent(documentId)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${await this.api.getToken()}`
@@ -332,13 +344,12 @@ class LanaChat {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to remove document');
+        throw new Error(error.error?.message || error.error || 'Failed to remove document');
       }
 
       const data = await response.json();
 
-      // Update local state from backend response
-      this.chatState = data.state;
+      this.applyDocumentSelectionResponse(data);
 
       // Update UI
       this.updateDocumentModeBanner();
@@ -368,8 +379,9 @@ class LanaChat {
     }
 
     try {
-      const response = await fetch(`${this.api.baseUrl}/api/chat/conversations/${this.currentConversationId}/documents/clear`, {
-        method: 'POST',
+      const conversationId = encodeURIComponent(this.currentConversationId);
+      const response = await fetch(`${this.api.baseUrl}/api/v1/conversations/${conversationId}/documents`, {
+        method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${await this.api.getToken()}`
         }
@@ -377,13 +389,12 @@ class LanaChat {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to exit document mode');
+        throw new Error(error.error?.message || error.error || 'Failed to exit document mode');
       }
 
       const data = await response.json();
 
-      // Update local state from backend response
-      this.chatState = data.state;
+      this.applyDocumentSelectionResponse(data);
 
       // Hide banner
       const banner = this.container.querySelector('#documentModeBanner');
@@ -456,8 +467,8 @@ class LanaChat {
   }
 
   /**
-   * Load chat state from backend
-   * Called when conversation is loaded/switched
+   * Load selected documents from canonical conversation API.
+   * Called when conversation is loaded/switched.
    */
   async loadChatState() {
     if (!this.currentConversationId) {
@@ -465,18 +476,19 @@ class LanaChat {
     }
 
     try {
-      const response = await fetch(`${this.api.baseUrl}/api/chat/conversations/${this.currentConversationId}/state`, {
+      const conversationId = encodeURIComponent(this.currentConversationId);
+      const response = await fetch(`${this.api.baseUrl}/api/v1/conversations/${conversationId}/documents`, {
         headers: {
           'Authorization': `Bearer ${await this.api.getToken()}`
         }
       });
 
       if (!response.ok) {
-        throw new Error('Failed to load chat state');
+        throw new Error('Failed to load selected documents');
       }
 
       const data = await response.json();
-      this.chatState = data.state;
+      this.applyDocumentSelectionResponse(data);
 
       // Update UI to reflect loaded state
       this.updateDocumentModeBanner();

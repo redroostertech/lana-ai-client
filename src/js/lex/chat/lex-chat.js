@@ -582,7 +582,7 @@
         await this._source.connect(id);
         if (!isCurrentLoad() || this._activeTurnId) return;
 
-        // Load chat state (document mode)
+        // Load selected documents for document mode without exposing raw chat state.
         const state = await this._source.loadState();
         if (!isCurrentLoad() || this._activeTurnId) return;
         if (state) this._updateDocumentState(state);

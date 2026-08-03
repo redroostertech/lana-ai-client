@@ -19,6 +19,16 @@
     return response.json().catch(function () { return null; });
   }
 
+  function documentSelectionToState(response) {
+    const payload = response && response.data ? response.data : response;
+    const documents = payload && Array.isArray(payload.documents) ? payload.documents : [];
+    return {
+      mode: documents.length > 0 ? 'document' : 'general',
+      activeDocuments: documents,
+      retrieval: payload && payload.retrieval ? payload.retrieval : null
+    };
+  }
+
   class ConversationsApiClient {
     constructor(apiClient, options = {}) {
       this.api = apiClient || global.api || null;
@@ -102,27 +112,32 @@
 
     async addDocument(conversationId, docId, filename, matterId) {
       const api = this._requireApi();
-      const payload = { documentId: docId, filename, matterId };
-      const response = await api.post(`/api/chat/conversations/${encode(conversationId)}/documents`, payload);
-      return response && response.state ? response.state : null;
+      const payload = {
+        documentId: docId,
+        filename,
+        matterId,
+        selectionSource: 'prompt_mention'
+      };
+      const response = await api.post(`/api/v1/conversations/${encode(conversationId)}/documents`, payload);
+      return documentSelectionToState(response);
     }
 
     async removeDocument(conversationId, docId) {
       const api = this._requireApi();
-      const response = await api.delete(`/api/chat/conversations/${encode(conversationId)}/documents/${encode(docId)}`);
-      return response && response.state ? response.state : null;
+      const response = await api.delete(`/api/v1/conversations/${encode(conversationId)}/documents/${encode(docId)}`);
+      return documentSelectionToState(response);
     }
 
     async clearDocuments(conversationId) {
       const api = this._requireApi();
-      const response = await api.post(`/api/chat/conversations/${encode(conversationId)}/documents/clear`, {});
-      return response && response.state ? response.state : null;
+      const response = await api.delete(`/api/v1/conversations/${encode(conversationId)}/documents`);
+      return documentSelectionToState(response);
     }
 
     async loadState(conversationId) {
       const api = this._requireApi();
-      const response = await api.get(`/api/chat/conversations/${encode(conversationId)}/state`);
-      return response && response.state ? response.state : null;
+      const response = await api.get(`/api/v1/conversations/${encode(conversationId)}/documents`);
+      return documentSelectionToState(response);
     }
 
     async readJsonSafe(response) {
