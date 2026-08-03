@@ -118,15 +118,6 @@
     return Promise.reject(new Error('canonical conversation create API not available'));
   }
 
-  function updateConversationRegistryEntry(registryId, payload) {
-    var client = requireApi();
-    if (!client) return Promise.reject(new Error('api not available'));
-    if (typeof client.updateConversationRegistryEntry === 'function') {
-      return client.updateConversationRegistryEntry(registryId, payload);
-    }
-    return Promise.reject(new Error('canonical conversation update API not available'));
-  }
-
   var stylesInjected = false;
 
   function injectStyles() {

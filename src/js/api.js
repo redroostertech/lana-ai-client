@@ -1843,6 +1843,8 @@ class ApiClient {
     return this.get(`/api/v1/activity/matter/${matterId}?limit=${limit}&offset=${offset}`);
   }
 
+  // TODO(deprecation): Legacy chat-session list helper. New chat/dock code
+  // should use getConversations({ matterId, ... }) against /api/v1/conversations.
   async getMatterConversations(matterId, limit = 5, offset = 0, opts = {}) {
     const params = new URLSearchParams({
       matter_id: matterId,
@@ -1947,8 +1949,9 @@ class ApiClient {
     return this.updateConversationScope(conversationId, matterId);
   }
 
-  // Pinned chat sessions — mirrors /matters/pinned. When matterId is supplied
-  // results are scoped to that matter (matches the matter detail tab).
+  // TODO(deprecation): Legacy pinned chat-session helper. Replace callers with
+  // getConversations({ pinned: true, matterId, pageScope }) once supported by
+  // the canonical conversation list contract.
   async getPinnedChatSessions(opts = {}) {
     const params = new URLSearchParams({
       limit: String(opts.limit != null ? opts.limit : 100),
@@ -1960,8 +1963,8 @@ class ApiClient {
     return this.get(`/api/v1/chat/sessions/pinned?${params.toString()}`);
   }
 
-  // Pinned conversation threads — mirrors /matters/pinned for the
-  // /conversation-threads endpoint used by the insights sidebar scope.
+  // TODO(deprecation): Legacy /conversation-threads helpers retained for older
+  // sidebar/thread surfaces. New chat code should stay on /api/v1/conversations.
   async getPinnedConversationThreads(opts = {}) {
     const params = new URLSearchParams({
       limit: String(opts.limit != null ? opts.limit : 100),
@@ -1972,8 +1975,6 @@ class ApiClient {
     return this.get(`/api/v1/conversation-threads/pinned?${params.toString()}`);
   }
 
-  // Conversation thread pinning + permanent delete (separate from soft archive
-  // which is the existing DELETE /:id route).
   async pinThread(threadId) {
     return this.post(`/api/v1/conversation-threads/${threadId}/pin`, {});
   }
@@ -2585,6 +2586,9 @@ class ApiClient {
 
   // ============================================================
   // Chat Session Files
+  // TODO(deprecation): Legacy /api/v1/chat/sessions/:id/files helpers. Move
+  // active chat document attachment flows behind a canonical conversation
+  // subresource before removing this compatibility section.
   // ============================================================
 
   /**
@@ -2938,6 +2942,9 @@ class ApiClient {
     return this.get(`/api/v1/activity/my/productivity${query}`);
   }
 
+  // TODO(deprecation): Legacy usage probe that only needs a recent
+  // conversation row. Replace with /api/v1/conversations once dashboard callers
+  // no longer rely on chat-session response shape.
   async getMyConversationUsageSummary() {
     const params = new URLSearchParams({
       page: '1',
