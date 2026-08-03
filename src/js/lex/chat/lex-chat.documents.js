@@ -174,7 +174,7 @@
           <div class="lex-chat-docs-header">
             <div class="lex-chat-docs-title">
               ${DOC_ICON}
-              <span class="lex-chat-docs-title-text">Document Chat Mode</span>
+              <span class="lex-chat-docs-title-text">Document Context Mode</span>
               <span class="lex-chat-docs-count">(${docs.length} of ${this.maxDocuments})</span>
             </div>
             <button class="lex-chat-docs-exit" data-exit>Exit</button>

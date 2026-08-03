@@ -25,14 +25,14 @@
      <lex-lana-panel
        id="fileViewerLana"
        mode="drawer"
-       drawer-heading="LANA — Document Chat"
+       drawer-heading="LANA — Document Context"
        drawer-width="lg"
        page-scope="workspace"
        context-type="document_chat"
        placeholder="Ask about this document..."
        tools-locked="true"
        default-tool="document_chat"
-       thread-title="Document Chat"
+       thread-title="Document Context"
      ></lex-lana-panel>
 
    Events (all bubble + compose):

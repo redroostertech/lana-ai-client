@@ -584,7 +584,7 @@
   // ---------------------------------------------------------------------------
 
   const DEFAULT_TOOLS = [
-    { id: 'document_chat',  label: 'Document Chat',    icon: ICON_FILE, description: 'Ask questions about specific documents' },
+    { id: 'document_chat',  label: 'Document Context', icon: ICON_FILE, description: 'Focus answers on selected documents' },
     { id: 'agentic',        label: 'Agentic Mode',     icon: ICON_ZAP,  description: 'AI performs multi-step research and analysis' },
     { id: 'insights_chat',  label: 'Insights Chat',    icon: ICON_EYE,  description: 'Ask about forecasts, trends, and insights' }
   ];
@@ -974,7 +974,7 @@
       if (idx >= 0) {
         active.splice(idx, 1);
         this._props.activeTools = active;
-        // Deselecting Document Chat clears all attached files
+        // Deselecting Document Context clears all attached files
         if (id === 'document_chat' && this._attachedDocs.length > 0) {
           const removed = this._attachedDocs.slice();
           this._attachedDocs = [];
@@ -1002,7 +1002,7 @@
       this._props.activeTools = active;
       this._refreshToolsPopover();
       this._refreshActiveChips();
-      // Dismissing Document Chat clears all attached files
+      // Dismissing Document Context clears all attached files
       if (id === 'document_chat' && this._attachedDocs.length > 0) {
         const removed = this._attachedDocs.slice();
         this._attachedDocs = [];
@@ -1180,7 +1180,7 @@
       if (!alreadyAttached) {
         this._attachedDocs.push({ id: docId, filename: name });
         this._renderDocBadges();
-        // Auto-activate Document Chat tool
+        // Auto-activate Document Context tool
         const active = this.activeTools || [];
         if (!active.includes('document_chat')) {
           this._props.activeTools = [...active, 'document_chat'];

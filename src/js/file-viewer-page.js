@@ -7,7 +7,7 @@
  * Features:
  *   - Full-page file preview (PDF, DOCX, image, text)
  *   - Metadata sidebar (view/edit) with save
- *   - "Ask LANA" document chat drawer
+ *   - "Ask LANA" document context drawer
  *   - Back navigation via Lex.Nav context referrer
  *
  * Dependencies (loaded before this file):
@@ -871,7 +871,7 @@
   }
 
   // =========================================================================
-  // Ask LANA — Document Chat (via lex-lana-panel)
+  // Ask LANA — Document Context (via lex-lana-panel)
   // =========================================================================
 
   function _initLanaPanel() {
@@ -935,7 +935,7 @@
 
           // bindConversationId handles sidebar + thread registration
           panel.bindConversationId(threadId, {
-            title: file.filename || 'Document Chat',
+            title: file.filename || 'Document Context',
             matterId: matterId
           });
 

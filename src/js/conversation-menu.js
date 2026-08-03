@@ -1,6 +1,10 @@
 /**
  * Conversation Menu Manager
  * Handles rendering conversations in legacy sidebar menus and dock-aware pages.
+ *
+ * TODO(deprecation): Compatibility sidebar Recents renderer. The LANA dock owns
+ * the primary chat Recents list; keep this only for legacy/non-dock shell pages
+ * and until lex-app no longer renders #lexConversationListContainer.
  */
 
 const ConversationMenu = {
