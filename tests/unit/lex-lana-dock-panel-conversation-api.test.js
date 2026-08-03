@@ -144,4 +144,104 @@ describe('LANA dock/panel conversation API routing', () => {
     expect(api.setConversationMatter).toHaveBeenCalledWith('conversation-1', 'matter-1');
     expect(refresh).toHaveBeenCalledTimes(1);
   });
+
+  test('panel openConversation loads existing canonical conversation and hydrates recents metadata', async () => {
+    const api = {
+      getConversation: jest.fn(() => Promise.resolve({
+        data: {
+          registryId: 'registry-1',
+          conversationId: 'conversation-1',
+          title: 'Hydrated Chat',
+          scope: { matterId: 'matter-1' }
+        }
+      }))
+    };
+    const { Component } = loadComponent(
+      'src/js/lex/components/chat/lex-lana-panel.js',
+      api,
+      'lex-lana-panel'
+    );
+    const panel = new Component();
+    panel.threadTitle = 'Fallback Chat';
+    panel.contextType = 'full_chat';
+    panel.pageScope = 'dashboard';
+    panel.setAttribute = jest.fn();
+    panel.emit = jest.fn();
+    panel._chatEl = {
+      clearConversation: jest.fn(),
+      loadConversation: jest.fn(),
+      setAttribute: jest.fn()
+    };
+    panel._threadsEl = {
+      addThread: jest.fn(),
+      setActiveThread: jest.fn()
+    };
+
+    const opened = await panel.openConversation('conversation-1', 'matter-1', { matterName: 'Matter One' });
+
+    expect(panel._chatEl.loadConversation).toHaveBeenCalledWith('conversation-1');
+    expect(api.getConversation).toHaveBeenCalledWith('conversation-1');
+    expect(opened).toEqual(expect.objectContaining({
+      id: 'registry-1',
+      thread_id: 'conversation-1',
+      title: 'Hydrated Chat',
+      matter_id: 'matter-1'
+    }));
+    expect(panel._threadsEl.setActiveThread).toHaveBeenLastCalledWith('registry-1');
+    expect(panel.emit).toHaveBeenCalledWith('lex-lana-thread-selected', expect.objectContaining({
+      thread: expect.objectContaining({ thread_id: 'conversation-1' })
+    }));
+  });
+
+  test('dock openConversation delegates to the panel and updates conversation header', async () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    const openedThread = { id: 'registry-1', thread_id: 'conversation-1', title: 'Opened Chat', subtitle: 'Matter One' };
+    dock.expand = jest.fn();
+    dock._syncScopeLocal = jest.fn();
+    dock._setConvo = jest.fn();
+    dock._panelEl = {
+      openConversation: jest.fn(() => Promise.resolve(openedThread)),
+      setContextType: jest.fn(),
+      _focusComposer: jest.fn()
+    };
+
+    await dock.openConversation('conversation-1', 'matter-1', { contextType: 'full_chat', matterName: 'Matter One' });
+
+    expect(dock.expand).toHaveBeenCalledTimes(1);
+    expect(dock._syncScopeLocal).toHaveBeenCalledWith('matter-1', 'Matter One');
+    expect(dock._panelEl.openConversation).toHaveBeenCalledWith('conversation-1', 'matter-1', {
+      contextType: 'full_chat',
+      matterName: 'Matter One'
+    });
+    expect(dock._setConvo).toHaveBeenCalledWith('Opened Chat', 'Matter One');
+    expect(dock._panelEl._focusComposer).toHaveBeenCalledTimes(1);
+  });
+
+  test('dock openWith sends an initial prompt after applying matter context', async () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    dock.expand = jest.fn();
+    dock._applyScope = jest.fn();
+    dock._panelEl = {
+      _chatEl: { send: jest.fn() },
+      _focusComposer: jest.fn()
+    };
+
+    dock.openWith({ matterId: 'matter-1', matterName: 'Matter One', initialPrompt: 'Discuss this task' });
+    await new Promise(resolve => setTimeout(resolve, 320));
+
+    expect(dock.expand).toHaveBeenCalledTimes(1);
+    expect(dock._applyScope).toHaveBeenCalledWith('matter-1', 'Matter One');
+    expect(dock._panelEl._chatEl.send).toHaveBeenCalledWith('Discuss this task');
+    expect(dock._panelEl._focusComposer).toHaveBeenCalledTimes(1);
+  });
 });

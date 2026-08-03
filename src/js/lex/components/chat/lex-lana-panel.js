@@ -48,6 +48,7 @@
    Public methods:
      show() / hide() / toggle()
      createThread(config) → Promise<thread>
+     openConversation(threadId, matterId?, opts?) → Promise<thread>
      sendMessage(content, opts) → calls internal lex-chat.send()
      setContextType(type)
      bindConversationId(id, opts?) — opts: { title, matterId }
@@ -118,6 +119,20 @@
     return Promise.reject(new Error('canonical conversation create API not available'));
   }
 
+  function getConversationRegistryEntry(conversationId) {
+    var client = requireApi();
+    if (!client || typeof client.getConversation !== 'function') {
+      return Promise.resolve(null);
+    }
+    return client.getConversation(conversationId).then(function (resp) {
+      var row = resp && (resp.data || resp.conversation || resp);
+      return normalizeRegistryThread(row);
+    }).catch(function (err) {
+      console.warn('[lex-lana-panel] Failed to hydrate conversation metadata:', err);
+      return null;
+    });
+  }
+
   var stylesInjected = false;
 
   function injectStyles() {
@@ -181,6 +196,53 @@
       + '   min-height: 0;'
       + '   overflow: hidden;'
       + ' }'
+      + ' .llp-generation-banner,'
+      + ' .llp-compact-banner {'
+      + '   display: none;'
+      + '   align-items: center;'
+      + '   gap: 8px;'
+      + '   padding: 8px 12px;'
+      + '   font-size: 12px;'
+      + '   color: var(--lex-text-secondary, #6b7280);'
+      + '   background: var(--lex-surface-secondary, #f9fafb);'
+      + '   border-bottom: 1px solid var(--lex-border-subtle, #e5e7eb);'
+      + ' }'
+      + ' .llp-generation-banner[data-visible="true"],'
+      + ' .llp-compact-banner[data-visible="true"] { display: flex; }'
+      + ' .llp-banner-spacer { flex: 1; }'
+      + ' .llp-banner-stop {'
+      + '   border: 1px solid var(--lex-border-default, #e5e7eb);'
+      + '   background: var(--lex-surface-primary, #fff);'
+      + '   color: var(--lex-text-primary, #111827);'
+      + '   border-radius: 6px;'
+      + '   padding: 3px 8px;'
+      + '   cursor: pointer;'
+      + ' }'
+      + ' .llp-followups {'
+      + '   display: none;'
+      + '   flex-wrap: wrap;'
+      + '   gap: 6px;'
+      + '   padding: 8px 12px;'
+      + '   border-top: 1px solid var(--lex-border-subtle, #e5e7eb);'
+      + '   background: var(--lex-surface-primary, #fff);'
+      + ' }'
+      + ' .llp-followups[data-visible="true"] { display: flex; }'
+      + ' .llp-followups-label {'
+      + '   width: 100%;'
+      + '   font-size: 12px;'
+      + '   color: var(--lex-text-secondary, #6b7280);'
+      + ' }'
+      + ' .llp-followup-chip {'
+      + '   padding: 5px 10px;'
+      + '   font-size: 12px;'
+      + '   color: var(--lex-text-primary, #111827);'
+      + '   background: var(--lex-surface-secondary, #f3f4f6);'
+      + '   border: 1px solid var(--lex-border-default, #e5e7eb);'
+      + '   border-radius: 9999px;'
+      + '   cursor: pointer;'
+      + '   white-space: nowrap;'
+      + ' }'
+      + ' .llp-followup-chip:hover { background: var(--lex-bg-hover, #e5e7eb); }'
 
       /* ── Drawer mode — component itself is invisible ─ */
       + ' lex-lana-panel[mode="drawer"] {'
@@ -225,6 +287,11 @@
       this._container = null;
       this._originalSend = null;
       this._chatReady = false;
+      this._generationBannerEl = null;
+      this._generationDurationEl = null;
+      this._generationTimer = null;
+      this._compactBannerEl = null;
+      this._followupsEl = null;
     }
 
     connected() {
@@ -317,6 +384,66 @@
 
         self.emit('lex-lana-thread-created', { thread: thread });
         return thread;
+      });
+    }
+
+    /**
+     * Open an existing canonical conversation inside the shared panel.
+     * This is the dock/Recents path for old deep links that used to navigate
+     * to chat-v2.html?session=...; it reuses the same loadConversation chain
+     * as manual thread selection instead of creating a parallel page flow.
+     * @param {string} threadId - Durable canonical conversation id.
+     * @param {string} [matterId] - Optional workspace scope carried by caller.
+     * @param {Object} [opts] - Optional { title, matterName } display hints.
+     * @returns {Promise<Object>} The opened local/canonical thread row.
+     */
+    openConversation(threadId, matterId, opts) {
+      opts = opts || {};
+      if (!threadId) return Promise.reject(new Error('threadId is required'));
+      if (!this._chatEl || typeof this._chatEl.loadConversation !== 'function') {
+        return Promise.reject(new Error('chat panel not ready'));
+      }
+
+      var self = this;
+      var fallback = normalizeRegistryThread({
+        id: threadId,
+        thread_id: threadId,
+        title: opts.title || self.threadTitle || 'LANA Chat',
+        thread_type: 'ad_hoc',
+        context_type: self.contextType,
+        page_scope: normalizePageScope(self.pageScope)
+      });
+      if (matterId) fallback.matter_id = matterId;
+      if (opts.matterName) fallback.subtitle = opts.matterName;
+
+      function activate(thread) {
+        thread = normalizeRegistryThread(thread) || fallback;
+        if (!thread.id) thread.id = thread.thread_id || threadId;
+        if (!thread.thread_id) thread.thread_id = threadId;
+        if (matterId && !thread.matter_id) thread.matter_id = matterId;
+        if (opts.matterName && !thread.subtitle) thread.subtitle = opts.matterName;
+
+        if (thread.matter_id) {
+          self._props.matterId = thread.matter_id;
+          self.setAttribute('matter-id', thread.matter_id);
+          self._chatEl.setAttribute('matter-id', thread.matter_id);
+        }
+
+        self._chatEl.clearConversation();
+        self._chatEl.loadConversation(thread.thread_id);
+
+        if (self._threadsEl) {
+          self._threadsEl.addThread(thread);
+          self._threadsEl.setActiveThread(thread.id);
+        }
+        self.emit('lex-lana-thread-selected', { thread: thread });
+        return thread;
+      }
+
+      activate(fallback);
+      return getConversationRegistryEntry(threadId).then(function (thread) {
+        if (!thread) return fallback;
+        return activate(thread);
       });
     }
 
@@ -502,7 +629,10 @@
       chat.style.overflow = 'hidden';
 
       container.appendChild(threads);
+      container.appendChild(this._createGenerationBanner());
+      container.appendChild(this._createCompactBanner());
       container.appendChild(chat);
+      container.appendChild(this._createFollowupsRow());
 
       // Re-acquire live refs after potential cloning by parent components
       var liveChat = container.querySelector('lex-chat');
@@ -522,6 +652,308 @@
       // Configure composer after lex-chat upgrades its children
       var self = this;
       setTimeout(function () { self._configureComposer(); }, 200);
+    }
+
+    _createGenerationBanner() {
+      var banner = document.createElement('div');
+      banner.className = 'llp-generation-banner';
+      banner.setAttribute('role', 'status');
+      banner.innerHTML = '<span>LANA is still responding</span>'
+        + '<span class="llp-generation-duration"></span>'
+        + '<span class="llp-banner-spacer"></span>'
+        + '<button type="button" class="llp-banner-stop">Stop</button>';
+      this._generationBannerEl = banner;
+      this._generationDurationEl = banner.querySelector('.llp-generation-duration');
+      var self = this;
+      banner.querySelector('.llp-banner-stop').addEventListener('click', function () {
+        self._hideGenerationBanner();
+        if (self._chatEl && typeof self._chatEl.stop === 'function') self._chatEl.stop();
+      });
+      return banner;
+    }
+
+    _createCompactBanner() {
+      var banner = document.createElement('div');
+      banner.className = 'llp-compact-banner';
+      banner.setAttribute('role', 'status');
+      banner.textContent = 'Optimising conversation context...';
+      this._compactBannerEl = banner;
+      return banner;
+    }
+
+    _createFollowupsRow() {
+      var row = document.createElement('div');
+      row.className = 'llp-followups';
+      this._followupsEl = row;
+      return row;
+    }
+
+    _showGenerationBanner(startedAt) {
+      if (!this._generationBannerEl) return;
+      this._generationBannerEl.setAttribute('data-visible', 'true');
+      var self = this;
+      function updateDuration() {
+        if (!self._generationDurationEl) return;
+        var startedMs = new Date(startedAt || Date.now()).getTime();
+        var seconds = Math.max(0, Math.floor((Date.now() - startedMs) / 1000));
+        if (seconds < 60) {
+          self._generationDurationEl.textContent = seconds + (seconds === 1 ? ' second ago' : ' seconds ago');
+        } else {
+          var mins = Math.floor(seconds / 60);
+          self._generationDurationEl.textContent = mins + (mins === 1 ? ' minute ago' : ' minutes ago');
+        }
+      }
+      updateDuration();
+      clearInterval(this._generationTimer);
+      this._generationTimer = setInterval(updateDuration, 1000);
+    }
+
+    _hideGenerationBanner() {
+      if (this._generationBannerEl) this._generationBannerEl.setAttribute('data-visible', 'false');
+      clearInterval(this._generationTimer);
+      this._generationTimer = null;
+    }
+
+    _showCompactBanner() {
+      if (this._compactBannerEl) this._compactBannerEl.setAttribute('data-visible', 'true');
+      this._setComposerGenerating(true);
+    }
+
+    _hideCompactBanner(detail) {
+      if (this._compactBannerEl) this._compactBannerEl.setAttribute('data-visible', 'false');
+      this._setComposerGenerating(false);
+      var saved = detail && detail.tokensSaved;
+      var dur = detail && detail.durationMs;
+      if (saved || dur) {
+        var msg = 'Context optimised';
+        if (saved) msg += ' - saved ' + (saved > 999 ? (saved / 1000).toFixed(1) + 'K' : saved) + ' tokens';
+        if (dur) msg += ' in ' + (dur / 1000).toFixed(1) + 's';
+        this._toast('success', msg);
+      }
+    }
+
+    _setComposerGenerating(value) {
+      if (!this._chatEl) return;
+      var composer = this._chatEl.querySelector('lex-chat-composer');
+      if (composer && typeof composer.setGenerating === 'function') {
+        composer.setGenerating(!!value);
+      }
+    }
+
+    _showFollowups(followups, message) {
+      if (!this._followupsEl) return;
+      this._followupsEl.innerHTML = '';
+      followups = Array.isArray(followups) ? followups : [];
+      if (message) {
+        var label = document.createElement('span');
+        label.className = 'llp-followups-label';
+        label.textContent = message;
+        this._followupsEl.appendChild(label);
+      }
+      var self = this;
+      followups.forEach(function (followup) {
+        var chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'llp-followup-chip';
+        chip.textContent = followup.description || followup.label || followup.entity_type || 'Follow up';
+        chip.addEventListener('click', function () {
+          self._clearFollowups();
+          var prompt = followup.description || followup.label || 'Yes, proceed';
+          if (self._chatEl && typeof self._chatEl.send === 'function') self._chatEl.send(prompt);
+        });
+        self._followupsEl.appendChild(chip);
+      });
+      this._followupsEl.setAttribute('data-visible', (followups.length > 0 || !!message) ? 'true' : 'false');
+    }
+
+    _clearFollowups() {
+      if (!this._followupsEl) return;
+      this._followupsEl.innerHTML = '';
+      this._followupsEl.setAttribute('data-visible', 'false');
+    }
+
+    _toast(type, message) {
+      var toast = window.Lex && window.Lex.Toast;
+      if (!toast) return;
+      if (toast[type] && typeof toast[type] === 'function') {
+        toast[type](message);
+      } else if (typeof toast.show === 'function') {
+        toast.show(message, type);
+      }
+    }
+
+    _openArtifact(detail) {
+      detail = detail || {};
+      var entityId = detail.entityId;
+      var artifactType = detail.artifactType;
+      if (!entityId) return;
+
+      if (artifactType === 'copy' && detail.content) {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          var self = this;
+          navigator.clipboard.writeText(detail.content).then(function () {
+            self._toast('success', 'Copied to clipboard');
+          });
+        }
+        return;
+      }
+
+      if (artifactType === 'version_history') {
+        this._openVersionHistory(entityId);
+        return;
+      }
+
+      if (artifactType === 'download' || !artifactType) {
+        var token = localStorage.getItem('token') || '';
+        var baseUrl = (window.api && window.api.baseUrl) ? window.api.baseUrl : '';
+        window.open(baseUrl + '/api/v1/documents/' + encodeURIComponent(entityId) + '/download?token=' + encodeURIComponent(token), '_blank');
+      }
+    }
+
+    _openVersionHistory(entityId) {
+      var self = this;
+      if (!window.api || typeof window.api.get !== 'function') return;
+      window.api.get('/api/v1/agentic/artifacts?entity_id=' + encodeURIComponent(entityId))
+        .then(function (data) {
+          var versions = (data && data.artifacts) || [];
+          if (!versions.length) {
+            self._toast('error', 'No version history found');
+            return;
+          }
+          var html = versions.map(function (v, index) {
+            var current = index === 0 ? '<lex-badge color="green" label="Current"></lex-badge>' : '';
+            var date = v.created_at ? '<div style="font-size:var(--lex-body-xs-size);color:var(--lex-text-tertiary);margin-top:4px;">' + self._escapeHtml(new Date(v.created_at).toLocaleString()) + '</div>' : '';
+            var summary = v.summary ? '<div style="font-size:var(--lex-body-sm-size);color:var(--lex-text-secondary);margin-top:8px;">' + self._escapeHtml(v.summary) + '</div>' : '';
+            return '<div style="padding:12px;border:1px solid var(--lex-border-subtle);border-radius:var(--lex-radius-md);margin-bottom:8px;background:var(--lex-bg-primary);">'
+              + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+              + '<span style="font-size:var(--lex-body-sm-size);font-weight:var(--lex-weight-medium,500);color:var(--lex-text-primary);">Version ' + (versions.length - index) + '</span>'
+              + current
+              + '</div>' + date + summary + '</div>';
+          }).join('');
+          if (window.Lex && window.Lex.Drawer && typeof window.Lex.Drawer.open === 'function') {
+            window.Lex.Drawer.open({
+              heading: 'Version History',
+              subtitle: versions.length + ' version' + (versions.length !== 1 ? 's' : ''),
+              side: 'right',
+              width: 'md',
+              content: html
+            });
+          }
+        }).catch(function (err) {
+          console.error('[lex-lana-panel] Failed to load version history:', err);
+          self._toast('error', 'Failed to load version history');
+        });
+    }
+
+    _requestArtifactPromotion(detail) {
+      var self = this;
+      var action = (detail && detail.action) || {};
+      var run = function () { self._executeArtifactPromotion(detail || {}); };
+      if (action.requires_confirmation === true) {
+        if (!window.Lex || !window.Lex.Modal || typeof window.Lex.Modal.confirm !== 'function') {
+          self._setArtifactPromotionError(detail || {}, 'Confirmation is unavailable. The draft was not promoted.');
+          return;
+        }
+        window.Lex.Modal.confirm(
+          'Save to Documents?',
+          'This will promote the generated draft to the matter Documents library and queue it for ingestion.',
+          run,
+          { confirmText: 'Save to Documents', cancelText: 'Keep as Draft' }
+        );
+        return;
+      }
+      run();
+    }
+
+    _executeArtifactPromotion(detail) {
+      var action = detail.action || {};
+      var messageElement = detail.messageElement;
+      var artifactId = detail.artifactId || '';
+      var helpers = window.Lex && window.Lex.Chat && window.Lex.Chat.ArtifactPromotion;
+      var request;
+
+      if (!helpers || typeof helpers.getPromotionRequest !== 'function' || !window.api || typeof window.api.post !== 'function') {
+        this._setArtifactPromotionError(detail, 'The save action is unavailable. The draft remains saved as a draft.');
+        return;
+      }
+
+      try {
+        request = helpers.getPromotionRequest(action);
+      } catch (err) {
+        this._setArtifactPromotionError(detail, err.message + ' The draft remains saved as a draft.');
+        return;
+      }
+
+      if (messageElement && typeof messageElement.updateArtifactPromotion === 'function') {
+        messageElement.updateArtifactPromotion(artifactId, { tone: 'pending', message: 'Saving to Documents...' });
+      }
+
+      var self = this;
+      window.api.post(request.endpoint, request.body)
+        .then(function (response) {
+          if (typeof helpers.normalizePromotionResponse !== 'function') {
+            throw new Error('The saved-document response could not be verified.');
+          }
+          var result = helpers.normalizePromotionResponse(response);
+          var msg = 'Saved to Documents';
+          if (result.ingestion && result.ingestion.status) {
+            msg += ' - Ingestion ' + String(result.ingestion.status).split('_').join(' ');
+          }
+          if (messageElement && typeof messageElement.updateArtifactPromotion === 'function') {
+            messageElement.updateArtifactPromotion(artifactId, {
+              tone: 'success',
+              message: msg,
+              document: result.document
+            });
+          }
+          self._toast('success', result.alreadyPromoted ? 'Document was already saved' : 'Saved to Documents');
+        })
+        .catch(function (err) {
+          console.error('[lex-lana-panel] Failed to promote artifact:', err);
+          self._setArtifactPromotionError(detail, err && err.message ? err.message : 'The save request failed.');
+        });
+    }
+
+    _setArtifactPromotionError(detail, reason) {
+      var messageElement = detail && detail.messageElement;
+      if (messageElement && typeof messageElement.updateArtifactPromotion === 'function') {
+        messageElement.updateArtifactPromotion(detail.artifactId || '', {
+          tone: 'error',
+          message: 'Could not save to Documents. ' + reason
+        });
+      }
+      this._toast('error', 'Could not save this draft to Documents');
+    }
+
+    _searchDocuments(query, composerEl) {
+      if (!composerEl || typeof composerEl.setDocumentResults !== 'function') return;
+      var convId = this._chatEl && this._chatEl.conversationId;
+      if (!convId || !window.api) {
+        composerEl.setDocumentResults([]);
+        return;
+      }
+      var params = new URLSearchParams();
+      if (query) params.set('search', query);
+      params.set('limit', '10');
+      // TODO(deprecation): This search still reads the legacy chat-session
+      // files compatibility endpoint because canonical conversation documents
+      // currently model selected documents, not searchable matter candidates.
+      window.api.get('/api/v1/chat/sessions/' + encodeURIComponent(convId) + '/files?' + params.toString())
+        .then(function (data) {
+          composerEl.setDocumentResults((data && data.files) || []);
+        })
+        .catch(function () {
+          composerEl.setDocumentResults([]);
+        });
+    }
+
+    _escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .split('&').join('&amp;')
+        .split('<').join('&lt;')
+        .split('>').join('&gt;')
+        .split('"').join('&quot;')
+        .split("'").join('&#39;');
     }
 
     _buildColumnDOM() {
@@ -598,6 +1030,9 @@
         if (this._chatEl && this._chatEl.disconnect) {
           this._chatEl.disconnect();
         }
+        this._hideGenerationBanner();
+        this._clearFollowups();
+        if (this._compactBannerEl) this._compactBannerEl.setAttribute('data-visible', 'false');
         if (this._drawerEl.parentNode) {
           this._drawerEl.remove();
         }
@@ -768,6 +1203,79 @@
             break;
           }
         }
+        if (conversationId && window.ConversationMenu && typeof window.ConversationMenu.updateConversation === 'function') {
+          window.ConversationMenu.updateConversation(conversationId, { title: newTitle });
+        }
+      });
+
+      container.addEventListener('lex-chat-artifact-click', function (e) {
+        self._openArtifact(e.detail || {});
+      });
+
+      container.addEventListener('lex-chat-artifact-promote', function (e) {
+        self._requestArtifactPromotion(e.detail || {});
+      });
+
+      container.addEventListener('lex-chat-manage-documents', function () {
+        var convId = self._chatEl && self._chatEl.conversationId;
+        if (window.ChatFileDrawer && convId) {
+          window.ChatFileDrawer.open(convId, self.matterId || null);
+        }
+      });
+
+      container.addEventListener('lex-composer-document-search', function (e) {
+        var composer = self._chatEl && self._chatEl.querySelector('lex-chat-composer');
+        self._searchDocuments((e.detail && e.detail.query) || '', composer);
+      });
+
+      container.addEventListener('lex-chat-agentic-followup', function (e) {
+        var detail = e.detail || {};
+        var followups = detail.followups || detail.options || [];
+        var message = detail.message || '';
+        if (followups.length > 0 || message) self._showFollowups(followups, message);
+      });
+
+      container.addEventListener('lex-chat-agentic-blocked', function (e) {
+        var detail = e.detail || {};
+        var followups = detail.suggestedFollowups || [];
+        if (followups.length > 0) {
+          self._showFollowups(
+            followups,
+            detail.message || 'The workflow is blocked. Choose a follow-up action to continue.'
+          );
+        }
+      });
+
+      container.addEventListener('lex-chat-send', function () {
+        self._clearFollowups();
+      });
+
+      container.addEventListener('lex-chat-generation-active', function (e) {
+        var detail = e.detail || {};
+        if (detail.active) self._showGenerationBanner(detail.startedAt || new Date().toISOString());
+        else self._hideGenerationBanner();
+      });
+
+      container.addEventListener('lex-chat-response-end', function () {
+        self._hideGenerationBanner();
+      });
+
+      container.addEventListener('lex-chat-auto-compact-start', function () {
+        self._showCompactBanner();
+      });
+
+      container.addEventListener('lex-chat-auto-compact-complete', function (e) {
+        self._hideCompactBanner(e.detail || {});
+      });
+
+      container.addEventListener('lex-chat-error', function (e) {
+        var detail = e.detail || {};
+        if (detail.status !== 401) return;
+        try { localStorage.removeItem('token'); } catch (_) {}
+        self._toast('error', 'Your session has expired. Please log in again.');
+        setTimeout(function () {
+          window.location.href = 'index.html';
+        }, 1500);
       });
 
       // Re-emit composer tool events

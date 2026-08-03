@@ -44,11 +44,30 @@ const NavigationHelpers = {
   },
 
   /**
-   * Resolve path to chat-v2.html from current location.
+   * Resolve the legacy standalone chat page path from current location.
+   * New chat entrypoints should use the LANA dock when it is available.
    * @returns {string} Resolved path to chat-v2.html
    */
   resolveChatPath() {
     return this.resolvePath('chat-v2.html');
+  },
+
+  /**
+   * Return the global LANA dock element/singleton when mounted.
+   * @returns {HTMLElement|null} Dock element or compatible singleton.
+   */
+  getLanaDock() {
+    if (window.Lex && window.Lex.LanaDock) {
+      if (typeof window.Lex.LanaDock.get === 'function') {
+        var dock = window.Lex.LanaDock.get();
+        if (dock) return dock;
+      }
+      return window.Lex.LanaDock;
+    }
+    if (window.document && typeof window.document.querySelector === 'function') {
+      return window.document.querySelector('lex-lana-dock');
+    }
+    return null;
   },
 
   /**
@@ -67,6 +86,12 @@ const NavigationHelpers = {
    */
   navigateToConversation(threadId, matterId) {
     matterId = matterId || '';
+    var dock = this.getLanaDock();
+    if (dock && typeof dock.openConversation === 'function') {
+      dock.openConversation(threadId, matterId || null);
+      return;
+    }
+
     var params = { session: threadId };
     if (matterId) params.matter = matterId;
 
@@ -87,6 +112,12 @@ const NavigationHelpers = {
    * Delegates to Lex.Nav.go() when available.
    */
   navigateToNewProject() {
+    var dock = this.getLanaDock();
+    if (dock && typeof dock.newChat === 'function') {
+      dock.newChat();
+      return;
+    }
+
     if (window.Lex && window.Lex.Nav) {
       window.Lex.Nav.go('chat-v2.html', { params: { openModal: 'newProject' } });
       return;
@@ -101,6 +132,21 @@ const NavigationHelpers = {
    * @param {string} matterId - Matter ID
    */
   navigateToMatterChat(matterId) {
+    var initialPrompt = null;
+    try {
+      initialPrompt = window.sessionStorage && window.sessionStorage.getItem('lana_chat_prompt');
+    } catch (e) { /* ignore unavailable storage */ }
+
+    var dock = this.getLanaDock();
+    if (dock && typeof dock.openWith === 'function') {
+      try {
+        if (initialPrompt && window.sessionStorage) window.sessionStorage.removeItem('lana_chat_prompt');
+      } catch (e) { /* ignore unavailable storage */ }
+      if (typeof dock.newChat === 'function') dock.newChat();
+      dock.openWith({ matterId: matterId, contextType: 'full_chat', initialPrompt: initialPrompt });
+      return;
+    }
+
     if (window.Lex && window.Lex.Nav) {
       window.Lex.Nav.go('chat-v2.html', { params: { matter: matterId } });
       return;

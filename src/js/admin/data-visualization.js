@@ -864,11 +864,13 @@
       });
     }
 
-    // Conversations: View Chat → opens chat.html with thread
+    // Conversations: View Chat opens the global LANA dock with the thread.
     if (viewName === 'mcp_conversations' && row.thread_id) {
       actions.push({
         label: 'View Chat',
-        href: '../chat.html?conversation_id=' + encodeURIComponent(row.thread_id)
+        action: 'open-chat',
+        threadId: row.thread_id,
+        matterId: row.matter_id || ''
       });
     }
 
@@ -889,8 +891,13 @@
       html += '<div style="display:flex;gap:0.5rem;margin-bottom:1rem;">';
       for (var ai = 0; ai < actions.length; ai++) {
         var act = actions[ai];
-        html += '<a href="' + Lex.Utils.escapeHtml(act.href) + '" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.375rem 0.75rem;font-size:0.8rem;font-weight:500;background:var(--lex-bg-accent,#4f46e5);color:#fff;border-radius:0.375rem;text-decoration:none;cursor:pointer;">' +
-          Lex.Utils.escapeHtml(act.label) + '</a>';
+        if (act.action === 'open-chat') {
+          html += '<button type="button" data-open-chat-thread="' + Lex.Utils.escapeHtml(act.threadId) + '" data-open-chat-matter="' + Lex.Utils.escapeHtml(act.matterId || '') + '" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.375rem 0.75rem;font-size:0.8rem;font-weight:500;background:var(--lex-bg-accent,#4f46e5);color:#fff;border:0;border-radius:0.375rem;text-decoration:none;cursor:pointer;">' +
+            Lex.Utils.escapeHtml(act.label) + '</button>';
+        } else {
+          html += '<a href="' + Lex.Utils.escapeHtml(act.href) + '" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.375rem 0.75rem;font-size:0.8rem;font-weight:500;background:var(--lex-bg-accent,#4f46e5);color:#fff;border-radius:0.375rem;text-decoration:none;cursor:pointer;">' +
+            Lex.Utils.escapeHtml(act.label) + '</a>';
+        }
       }
       html += '</div>';
     }
@@ -1117,6 +1124,19 @@
           _navigateToRecordById(navField, navId);
           return;
         }
+      }
+
+      var chatBtn = e.target.closest('[data-open-chat-thread]');
+      if (chatBtn) {
+        e.preventDefault();
+        var threadId = chatBtn.getAttribute('data-open-chat-thread');
+        var matterId = chatBtn.getAttribute('data-open-chat-matter') || '';
+        if (window.NavigationHelpers && typeof window.NavigationHelpers.navigateToConversation === 'function') {
+          window.NavigationHelpers.navigateToConversation(threadId, matterId);
+        } else if (window.Lex && window.Lex.Nav) {
+          window.Lex.Nav.go('../chat-v2.html', { params: { session: threadId, matter: matterId } });
+        }
+        return;
       }
 
       // Check for clickable connected data rows

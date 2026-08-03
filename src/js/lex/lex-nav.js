@@ -39,6 +39,8 @@
   // =========================================================================
 
   var _deepLinks = {
+    // TODO(deprecation): Chat standalone page params are compatibility-only.
+    // New chat navigation should call NavigationHelpers/Lex.LanaDock.
     'chat.html':                              { session: 'string', matter: 'string', openModal: 'string' },
     'chat-v2.html':                            { matter: 'string', session: 'string' },
     'matters.html':                           { matter_id: 'string', open: 'string', tab: 'string', action: 'string' },

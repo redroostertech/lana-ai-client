@@ -643,7 +643,11 @@
               prompt += ' Suggested action: ' + actionText + '.';
             }
             try { sessionStorage.setItem('lana_chat_prompt', prompt); } catch (e) { /* ignore */ }
-            Lex.Nav.go('chat-v2.html', { params: { matter: mid } });
+            if (window.NavigationHelpers && typeof window.NavigationHelpers.navigateToMatterChat === 'function') {
+              window.NavigationHelpers.navigateToMatterChat(mid);
+            } else {
+              Lex.Nav.go('chat-v2.html', { params: { matter: mid } });
+            }
           });
         }
       });

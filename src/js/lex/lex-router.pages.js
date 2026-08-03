@@ -27,6 +27,9 @@
     // ── Dashboard ── (standalone page — no descriptor needed)
 
     // ── Chat ──
+    // TODO(deprecation): Legacy standalone chat route. Keep only while
+    // document-generation still depends on js/chat.js; new chat entrypoints
+    // should open the global lex-lana-dock instead.
     'chat.html': {
       title: 'Chat',
       activeNav: 'chat',
@@ -39,6 +42,8 @@
       stylesheets: []
     },
 
+    // TODO(deprecation): Intermediate standalone Lex chat route. Keep as a
+    // fallback until all chat-v2 matter/session/new-chat flows are dock-native.
     'chat-v2.html': {
       title: 'New Conversation',
       activeNav: 'chat',
@@ -662,6 +667,8 @@
     },
 
     // ── Chat sub-pages ──
+    // TODO(deprecation): Legacy chat demo/sub-page routes. Remove with
+    // chat.html once the remaining document-generation dependency is migrated.
     'chat/index.html': {
       title: 'Chat',
       activeNav: 'chat',

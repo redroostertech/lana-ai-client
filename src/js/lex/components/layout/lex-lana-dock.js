@@ -30,8 +30,12 @@
 
    Public API:
      expand() / minimize() / toggleDock()
+     openWith(opts)
+     openConversation(threadId, matterId?, opts?)
+     newChat()
      panel() → the inner lex-lana-panel (built lazily on first expand)
-   Also registered as Lex.LanaDock ({ get, toggle, expand, minimize }).
+   Also registered as Lex.LanaDock ({ get, toggle, expand, minimize,
+   openWith, openConversation, newChat }).
    ========================================================================== */
 
 (function () {
@@ -458,6 +462,12 @@
       Lex.LanaDock.toggle = function () { var d = Lex.LanaDock.get(); if (d) d.toggleDock(); };
       Lex.LanaDock.expand = function () { var d = Lex.LanaDock.get(); if (d) d.expand(); };
       Lex.LanaDock.minimize = function () { var d = Lex.LanaDock.get(); if (d) d.minimize(); };
+      Lex.LanaDock.openWith = function (opts) { var d = Lex.LanaDock.get(); if (d) return d.openWith(opts); };
+      Lex.LanaDock.openConversation = function (threadId, matterId, opts) {
+        var d = Lex.LanaDock.get();
+        if (d) return d.openConversation(threadId, matterId, opts);
+      };
+      Lex.LanaDock.newChat = function () { var d = Lex.LanaDock.get(); if (d) return d.newChat(); };
 
       // This dock is the home for recent chats, so the sidebar must not also
       // carry a RECENTS section. lex-app cannot decide that on its own: it is
@@ -580,7 +590,7 @@
      * app's Ask LANA buttons. The buttons do nothing except call this with
      * whatever context their surface owns (matter, document, context type),
      * exactly like the file-viewer drawer used to inject its document.
-     * @param {Object} [opts] - { matterId, documentId, documentName, contextType }
+     * @param {Object} [opts] - { matterId, documentId, documentName, contextType, initialPrompt }
      */
     openWith(opts) {
       opts = opts || {};
@@ -607,8 +617,47 @@
               .catch(function () { /* pending-attach path handles new threads */ });
           }
         }
+        if (opts.initialPrompt && p._chatEl && typeof p._chatEl.send === 'function') {
+          p._chatEl.send(opts.initialPrompt);
+        }
         if (typeof p._focusComposer === 'function') p._focusComposer();
       }, 300);
+    }
+
+    /**
+     * Expand the global dock and open an existing canonical conversation.
+     * This is the dock-first replacement for standalone chat page links.
+     * @param {string} threadId - Durable canonical conversation id.
+     * @param {string} [matterId] - Optional workspace scope carried by caller.
+     * @param {Object} [opts] - Optional { title, matterName } display hints.
+     * @returns {Promise<Object|null>} The opened thread row when available.
+     */
+    openConversation(threadId, matterId, opts) {
+      opts = opts || {};
+      if (!threadId) return Promise.reject(new Error('threadId is required'));
+      this.expand();
+      var self = this;
+
+      return new Promise(function (resolve, reject) {
+        setTimeout(function () {
+          var p = self._panelEl;
+          if (!p || typeof p.openConversation !== 'function') {
+            reject(new Error('lana dock panel not ready'));
+            return;
+          }
+          if (opts.contextType && typeof p.setContextType === 'function') {
+            p.setContextType(opts.contextType);
+          }
+          if (matterId) {
+            self._syncScopeLocal(matterId, opts.matterName || '');
+          }
+          p.openConversation(threadId, matterId, opts).then(function (thread) {
+            self._setConvo(thread && thread.title ? thread.title : 'LANA Chat', (thread && thread.subtitle) || opts.matterName || '');
+            if (typeof p._focusComposer === 'function') p._focusComposer();
+            resolve(thread);
+          }).catch(reject);
+        }, 300);
+      });
     }
 
     _handleDockTriggerClick(event) {
