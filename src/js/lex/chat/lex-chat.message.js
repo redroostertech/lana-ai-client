@@ -657,10 +657,32 @@
       var findings = Array.isArray(grounding.validationFindings) ? grounding.validationFindings : [];
       var disposition = grounding.validationDisposition || null;
 
+      // Who checked the answer is a separate question from how well it is
+      // grounded, and the two must not be collapsed. A second-pass reviewer
+      // that is a DIFFERENT model from the one that drafted the answer is a
+      // genuine independent check and earns the stronger word. The same model
+      // re-reading its own draft against the sources is worth doing — it
+      // catches unsupported figures and broken citations — but calling that
+      // "Verified" would claim an independence the system does not have.
+      //
+      // Self-review therefore never upgrades the badge. It only annotates it,
+      // so the label a user reads is never stronger than what actually
+      // happened.
+      var verification = grounding.verification || null;
+      var independentlyVerified = !!(verification
+        && verification.verified === true
+        && verification.independent === true);
+      var selfReviewed = !!(verification
+        && verification.attempted === true
+        && verification.independent === false);
+
       var label, color;
       if (disposition === 'flag_and_deliver' || findings.length > 0) {
         label = 'Needs review';
         color = 'yellow';
+      } else if (independentlyVerified) {
+        label = 'Verified';
+        color = 'green';
       } else if (status === 'strong') {
         label = 'Grounded';
         color = 'green';
@@ -689,8 +711,19 @@
       badge.color = color;
       badge.size = 'sm';
       badge.style.marginLeft = '8px';
+      // Say plainly what was and was not done. The tooltip is where the
+      // distinction lives for anyone who wants it; the label stays short.
+      var titleLines = [];
       if (findings.length > 0) {
-        badge.title = findings.map((finding) => finding.message || finding.code).filter(Boolean).join('\n');
+        titleLines = findings.map((finding) => finding.message || finding.code).filter(Boolean);
+      }
+      if (independentlyVerified) {
+        titleLines.push('Checked against its sources by a separate model.');
+      } else if (selfReviewed) {
+        titleLines.push('Re-checked against its sources by the same model that wrote it, then validated by automated source checks.');
+      }
+      if (titleLines.length > 0) {
+        badge.title = titleLines.join('\n');
       }
       wrapper.appendChild(badge);
     }

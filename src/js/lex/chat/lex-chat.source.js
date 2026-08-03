@@ -650,7 +650,21 @@
             toolEvidenceCount: data.grounding.tool_evidence_count || 0,
             policy: data.grounding_policy || null,
             handler: data.handler || null,
-            strategy: data.strategy || null
+            strategy: data.strategy || null,
+            // Who checked this answer, and were they a different model than the
+            // one that wrote it. `verified` alone cannot answer the second
+            // question, and a self-review presented as verification would be a
+            // stronger claim than the system can support.
+            verification: data.response_verification
+              ? {
+                attempted: data.response_verification.attempted === true,
+                verified: data.response_verification.verified === true,
+                independent: data.response_verification.independent_review,
+                verdict: data.response_verification.verdict || null,
+                disposition: data.response_verification.disposition || null,
+                latencyMs: data.response_verification.latency_ms || null
+              }
+              : null
           };
 
         case 'sources':
