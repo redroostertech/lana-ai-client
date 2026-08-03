@@ -340,9 +340,9 @@
     }
 
     /**
-     * Check whether an active generation exists for a conversation.
-     * Used on page load / thread switch to detect generations started
-     * in another tab or device.
+     * Check whether an active assistant response exists for a conversation.
+     * Used on page load / thread switch to detect responses started in another
+     * tab or device.
      *
      * @param {string} [conversationId] defaults to the currently-bound conversation
      * @returns {Promise<{active:boolean, startedAt?:string, durationSeconds?:number, clientId?:string}>}
@@ -354,6 +354,7 @@
       try {
         const data = await this._conversationsApi.getGeneration(id);
         if (!data.active) return { active: false };
+        const activeResponse = data.active_response || {};
         this._conversationId = id;
         if (data.generation_id || data.session_id) {
           this._generationId = data.generation_id || data.session_id;
@@ -363,8 +364,8 @@
           sessionId: data.generation_id || data.session_id || null,
           generationId: data.generation_id || data.session_id || null,
           clientId: data.client_id || null,
-          startedAt: data.started_at || null,
-          durationSeconds: data.duration_seconds || 0
+          startedAt: data.started_at || activeResponse.started_at || null,
+          durationSeconds: data.duration_seconds || activeResponse.duration_seconds || 0
         };
       } catch (_) {
         return { active: false };

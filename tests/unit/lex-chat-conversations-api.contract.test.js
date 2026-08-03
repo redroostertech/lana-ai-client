@@ -17,6 +17,12 @@ function loadDomain(fetchMock, apiOverrides = {}) {
     post: jest.fn().mockResolvedValue({}),
     delete: jest.fn().mockResolvedValue({}),
     createConversation: jest.fn().mockResolvedValue({ data: { conversationId: 'thread-1' } }),
+    getConversationActivity: jest.fn().mockResolvedValue({ active: false }),
+    stopConversationActivity: jest.fn().mockResolvedValue({ stopped: true }),
+    getConversationDocumentContextConfig: jest.fn().mockResolvedValue({ data: {} }),
+    getConversationDocumentContextMergeFields: jest.fn().mockResolvedValue({ data: { fields: [] } }),
+    auditConversationDocumentContext: jest.fn().mockResolvedValue({ status: 'success' }),
+    streamConversationDocumentContext: jest.fn().mockResolvedValue({ ok: true }),
     getConversationGeneration: jest.fn().mockResolvedValue({ active: false }),
     stopConversationGeneration: jest.fn().mockResolvedValue({ success: true }),
     ...apiOverrides
@@ -60,7 +66,7 @@ describe('Lex conversations domain API', () => {
     );
   });
 
-  test('delegates canonical metadata/history/generation calls to the core API client', async () => {
+  test('delegates canonical metadata/history/activity calls to the core API client', async () => {
     const fetchMock = jest.fn();
     const { api, DomainClient } = loadDomain(fetchMock);
     const client = new DomainClient(api);
@@ -74,8 +80,33 @@ describe('Lex conversations domain API', () => {
     expect(api.createConversation).toHaveBeenCalledWith({ title: 'Draft' });
     expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1/messages?page=2&limit=25&order=desc');
     expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1/document-candidates?limit=10&search=contract');
-    expect(api.getConversationGeneration).toHaveBeenCalledWith('thread/1');
-    expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread/1');
+    expect(api.getConversationActivity).toHaveBeenCalledWith('thread/1');
+    expect(api.stopConversationActivity).toHaveBeenCalledWith('thread/1');
+    expect(api.getConversationGeneration).not.toHaveBeenCalled();
+    expect(api.stopConversationGeneration).not.toHaveBeenCalled();
+  });
+
+  test('delegates document-context helpers to canonical core API methods', async () => {
+    const fetchMock = jest.fn();
+    const { api, DomainClient } = loadDomain(fetchMock);
+    const client = new DomainClient(api);
+    const signal = { aborted: false };
+
+    await client.getDocumentContextConfig('thread/1');
+    await client.getDocumentContextMergeFields('thread/1', { matterId: 'matter-1' });
+    await client.auditDocumentContext('thread/1', { action: 'apply' });
+    await client.streamDocumentContext('thread/1', {
+      message: 'Fix this',
+      context: { documentContent: '<p>Text</p>' }
+    }, signal);
+
+    expect(api.getConversationDocumentContextConfig).toHaveBeenCalledWith('thread/1');
+    expect(api.getConversationDocumentContextMergeFields).toHaveBeenCalledWith('thread/1', { matterId: 'matter-1' });
+    expect(api.auditConversationDocumentContext).toHaveBeenCalledWith('thread/1', { action: 'apply' });
+    expect(api.streamConversationDocumentContext).toHaveBeenCalledWith('thread/1', {
+      message: 'Fix this',
+      context: { documentContent: '<p>Text</p>' }
+    }, { signal });
   });
 
   test('uses canonical conversation document-selection subresources', async () => {

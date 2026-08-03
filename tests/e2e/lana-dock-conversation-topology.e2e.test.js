@@ -53,13 +53,13 @@ describe('LANA dock canonical conversation topology', () => {
     api.post = jest.fn().mockResolvedValue({});
 
     await api.getConversationMessages('conversation/1', { page: 1, limit: 20 });
-    await api.getConversationGeneration('conversation/1');
-    await api.stopConversationGeneration('conversation/1');
+    await api.getConversationActivity('conversation/1');
+    await api.stopConversationActivity('conversation/1');
     await api.setConversationMatter('conversation/1', 'matter-1');
 
     expect(api.get).toHaveBeenNthCalledWith(1, '/api/v1/conversations/conversation%2F1/messages?page=1&limit=20&order=desc');
-    expect(api.get).toHaveBeenNthCalledWith(2, '/api/v1/conversations/conversation%2F1/generation');
-    expect(api.post).toHaveBeenCalledWith('/api/v1/conversations/conversation%2F1/generation/stop', {});
+    expect(api.get).toHaveBeenNthCalledWith(2, '/api/v1/conversations/conversation%2F1/activity');
+    expect(api.post).toHaveBeenCalledWith('/api/v1/conversations/conversation%2F1/stop', {});
     expect(api.patch).toHaveBeenCalledWith('/api/v1/conversations/conversation%2F1/scope', { matter_id: 'matter-1' });
   });
 

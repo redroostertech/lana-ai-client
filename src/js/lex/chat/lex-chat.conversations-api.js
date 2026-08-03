@@ -107,6 +107,50 @@
       return api.get(`/api/v1/conversations/${encode(conversationId)}/document-candidates${query ? `?${query}` : ''}`);
     }
 
+    async getDocumentContextConfig(conversationId) {
+      const api = this._requireApi();
+      if (typeof api.getConversationDocumentContextConfig === 'function') {
+        return api.getConversationDocumentContextConfig(conversationId);
+      }
+      return api.get(`/api/v1/conversations/${encode(conversationId)}/document-context/config`);
+    }
+
+    async getDocumentContextMergeFields(conversationId, options = {}) {
+      const api = this._requireApi();
+      if (typeof api.getConversationDocumentContextMergeFields === 'function') {
+        return api.getConversationDocumentContextMergeFields(conversationId, options);
+      }
+
+      const query = buildQuery({
+        matterId: options.matterId || options.matter_id
+      });
+      return api.get(`/api/v1/conversations/${encode(conversationId)}/document-context/merge-fields${query ? `?${query}` : ''}`);
+    }
+
+    async auditDocumentContext(conversationId, payload = {}) {
+      const api = this._requireApi();
+      if (typeof api.auditConversationDocumentContext === 'function') {
+        return api.auditConversationDocumentContext(conversationId, payload);
+      }
+      return api.post(`/api/v1/conversations/${encode(conversationId)}/document-context/audit`, payload);
+    }
+
+    async streamDocumentContext(conversationId, body, signal) {
+      const api = this._requireApi();
+      if (typeof api.streamConversationDocumentContext === 'function') {
+        return api.streamConversationDocumentContext(conversationId, body, { signal });
+      }
+
+      const baseUrl = await this._resolveBaseUrl();
+      const response = await fetch(`${baseUrl}/api/v1/conversations/${encode(conversationId)}/document-context/stream`, {
+        method: 'POST',
+        headers: this._headers(),
+        body: JSON.stringify(body),
+        signal
+      });
+      return response;
+    }
+
     async streamMessage(conversationId, body, signal) {
       const baseUrl = await this._resolveBaseUrl();
       const response = await fetch(`${baseUrl}/api/v1/conversations/${encode(conversationId)}/messages/stream`, {
@@ -120,18 +164,24 @@
 
     async getGeneration(conversationId) {
       const api = this._requireApi();
+      if (typeof api.getConversationActivity === 'function') {
+        return api.getConversationActivity(conversationId);
+      }
       if (typeof api.getConversationGeneration === 'function') {
         return api.getConversationGeneration(conversationId);
       }
-      return api.get(`/api/v1/conversations/${encode(conversationId)}/generation`);
+      return api.get(`/api/v1/conversations/${encode(conversationId)}/activity`);
     }
 
     async stopGeneration(conversationId) {
       const api = this._requireApi();
+      if (typeof api.stopConversationActivity === 'function') {
+        return api.stopConversationActivity(conversationId);
+      }
       if (typeof api.stopConversationGeneration === 'function') {
         return api.stopConversationGeneration(conversationId);
       }
-      return api.post(`/api/v1/conversations/${encode(conversationId)}/generation/stop`, {});
+      return api.post(`/api/v1/conversations/${encode(conversationId)}/stop`, {});
     }
 
     async addDocument(conversationId, docId, filename, matterId) {

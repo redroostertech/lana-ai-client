@@ -392,12 +392,14 @@
       }
 
       try {
-        if (typeof api.stopConversationGeneration === 'function') {
+        if (typeof api.stopConversationActivity === 'function') {
+          await api.stopConversationActivity(conversationId);
+        } else if (typeof api.stopConversationGeneration === 'function') {
           await api.stopConversationGeneration(conversationId);
         }
       } catch (_) {
-        // Best-effort only: deletion should still proceed when no generation is
-        // active or an older backend lacks active-generation lookup.
+        // Best-effort only: deletion should still proceed when no response is
+        // active or an older backend lacks active response lookup.
       }
     }
 

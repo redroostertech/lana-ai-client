@@ -1927,12 +1927,51 @@ class ApiClient {
     return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/document-candidates${query ? `?${query}` : ''}`);
   }
 
+  async getConversationDocumentContextConfig(conversationId) {
+    return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/document-context/config`);
+  }
+
+  async getConversationDocumentContextMergeFields(conversationId, opts = {}) {
+    const params = new URLSearchParams();
+    if (opts.matterId || opts.matter_id) params.set('matterId', String(opts.matterId || opts.matter_id));
+
+    const query = params.toString();
+    return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/document-context/merge-fields${query ? `?${query}` : ''}`);
+  }
+
+  async auditConversationDocumentContext(conversationId, payload = {}) {
+    return this.post(`/api/v1/conversations/${encodeURIComponent(conversationId)}/document-context/audit`, payload);
+  }
+
+  async streamConversationDocumentContext(conversationId, payload = {}, options = {}) {
+    await this._readyPromise;
+
+    const response = await fetch(`${this.baseUrl}/api/v1/conversations/${encodeURIComponent(conversationId)}/document-context/stream`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+      signal: options.signal
+    });
+
+    return response;
+  }
+
+  async getConversationActivity(conversationId) {
+    return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/activity`);
+  }
+
+  async stopConversationActivity(conversationId) {
+    return this.post(`/api/v1/conversations/${encodeURIComponent(conversationId)}/stop`, {});
+  }
+
   async getConversationGeneration(conversationId) {
-    return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/generation`);
+    // TODO(deprecation): Compatibility alias. Use getConversationActivity().
+    return this.getConversationActivity(conversationId);
   }
 
   async stopConversationGeneration(conversationId) {
-    return this.post(`/api/v1/conversations/${encodeURIComponent(conversationId)}/generation/stop`, {});
+    // TODO(deprecation): Compatibility alias. Use stopConversationActivity().
+    return this.stopConversationActivity(conversationId);
   }
 
   async pinConversation(conversationId) {

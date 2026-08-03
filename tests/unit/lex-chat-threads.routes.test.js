@@ -57,6 +57,7 @@ function makeApi(overrides = {}) {
     post: jest.fn(async () => ({ success: true })),
     delete: jest.fn(async () => ({ success: true })),
     getConversations: jest.fn(async () => ({ conversations: [] })),
+    stopConversationActivity: jest.fn(async () => ({ stopped: true })),
     stopConversationGeneration: jest.fn(async () => ({ success: true })),
     deleteConversation: jest.fn(async () => ({ success: true })),
     ...overrides
@@ -115,7 +116,7 @@ describe('lex-chat-threads route contract', () => {
     ]);
   });
 
-  test('delete prefers the canonical conversation generation stop wrapper', async () => {
+  test('delete prefers the canonical conversation activity stop wrapper', async () => {
     const api = makeApi();
     const ThreadList = loadThreads(api);
     const el = new ThreadList();
@@ -124,7 +125,8 @@ describe('lex-chat-threads route contract', () => {
 
     await el._deleteThread('registry-1');
 
-    expect(api.stopConversationGeneration).toHaveBeenCalledWith('conversation-1');
+    expect(api.stopConversationActivity).toHaveBeenCalledWith('conversation-1');
+    expect(api.stopConversationGeneration).not.toHaveBeenCalled();
     expect(api.get).not.toHaveBeenCalled();
     expect(api.post).not.toHaveBeenCalled();
     expect(api.deleteConversation).toHaveBeenCalledWith('registry-1');
@@ -142,6 +144,7 @@ describe('lex-chat-threads route contract', () => {
 
     expect(api.get).not.toHaveBeenCalled();
     expect(api.post).not.toHaveBeenCalled();
+    expect(api.stopConversationActivity).not.toHaveBeenCalled();
     expect(api.stopConversationGeneration).not.toHaveBeenCalled();
     expect(api.deleteConversation).toHaveBeenCalledWith('registry-only');
     expect(api.delete).not.toHaveBeenCalled();

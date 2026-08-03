@@ -45,6 +45,16 @@ function canonicalApi(overrides = {}) {
     createConversation: jest.fn().mockResolvedValue({
       data: { conversationId: 'thread-1' }
     }),
+    getConversationActivity: jest.fn().mockResolvedValue({
+      status: 'success',
+      conversation_id: 'thread-1',
+      active: true,
+      active_response: {
+        started_at: '2026-08-03T12:00:00.000Z',
+        duration_seconds: 4
+      }
+    }),
+    stopConversationActivity: jest.fn().mockResolvedValue({ stopped: true }),
     getConversationGeneration: jest.fn().mockResolvedValue({
       active: true,
       thread_id: 'thread-1',
@@ -121,7 +131,8 @@ describe('SSEChatSource contract', () => {
 
     await source.stop();
     expect(fetchMock.mock.calls[0][0]).toBe('http://api.test/api/v1/conversations/thread-1/messages/stream');
-    expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread-1');
+    expect(api.stopConversationActivity).toHaveBeenCalledWith('thread-1');
+    expect(api.stopConversationGeneration).not.toHaveBeenCalled();
   });
 
   test('streams into an existing conversation through the canonical conversation route', async () => {
@@ -144,7 +155,8 @@ describe('SSEChatSource contract', () => {
     ]);
 
     await source.stop();
-    expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread-1');
+    expect(api.stopConversationActivity).toHaveBeenCalledWith('thread-1');
+    expect(api.stopConversationGeneration).not.toHaveBeenCalled();
   });
 
   test('parses fragmented frames and final frame without trailing blank line', async () => {
@@ -197,7 +209,7 @@ describe('SSEChatSource contract', () => {
     ]);
   });
 
-  test('checks active generation by thread and stores returned generation id for stop', async () => {
+  test('checks active response by conversation without requiring generation identifiers', async () => {
     const fetchMock = jest.fn();
     const api = canonicalApi();
     const { Source } = loadSource(fetchMock, { api });
@@ -206,13 +218,17 @@ describe('SSEChatSource contract', () => {
     const status = await source.checkActiveGeneration('thread-1');
     expect(status).toEqual(expect.objectContaining({
       active: true,
-      generationId: 'generation-1',
-      sessionId: 'generation-1'
+      generationId: null,
+      sessionId: null,
+      startedAt: '2026-08-03T12:00:00.000Z',
+      durationSeconds: 4
     }));
-    expect(api.getConversationGeneration).toHaveBeenCalledWith('thread-1');
+    expect(api.getConversationActivity).toHaveBeenCalledWith('thread-1');
+    expect(api.getConversationGeneration).not.toHaveBeenCalled();
 
     await source.stop();
-    expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread-1');
+    expect(api.stopConversationActivity).toHaveBeenCalledWith('thread-1');
+    expect(api.stopConversationGeneration).not.toHaveBeenCalled();
   });
 
   test('posts exact-generation stop before aborting an in-flight stream', async () => {
@@ -232,9 +248,9 @@ describe('SSEChatSource contract', () => {
     ]);
     const fetchMock = jest.fn(async () => streamResponse);
     const api = canonicalApi({
-      stopConversationGeneration: jest.fn(async () => {
+      stopConversationActivity: jest.fn(async () => {
         sequence.push('stop-post');
-        return { success: true };
+        return { stopped: true };
       })
     });
     const { Source } = loadSource(fetchMock, { AbortController: TrackedAbortController, api });
@@ -248,7 +264,8 @@ describe('SSEChatSource contract', () => {
 
     await source.stop();
 
-    expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread-1');
+    expect(api.stopConversationActivity).toHaveBeenCalledWith('thread-1');
+    expect(api.stopConversationGeneration).not.toHaveBeenCalled();
     expect(sequence).toEqual(['stop-post', 'abort']);
   });
 });

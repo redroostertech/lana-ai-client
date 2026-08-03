@@ -42,6 +42,7 @@ function loadApi() {
 
   const apiPath = path.join(__dirname, '../../src/js/api.js');
   vm.runInNewContext(fs.readFileSync(apiPath, 'utf8'), context, { filename: apiPath });
+  context.window.api.__fetchMock = context.fetch;
   return context.window.api;
 }
 
@@ -106,18 +107,18 @@ describe('ApiClient canonical conversation aliases', () => {
     expect(api.delete).toHaveBeenNthCalledWith(2, '/api/v1/conversations/thread%2F2?permanent=true');
   });
 
-  test('loads messages, reads generation state, and updates scope through canonical conversation subresources', async () => {
+  test('loads messages, reads activity state, and updates scope through canonical conversation subresources', async () => {
     const api = loadApi();
     api.get = jest.fn().mockResolvedValue({});
     api.patch = jest.fn().mockResolvedValue({});
 
     await api.getConversationMessages('conv/1', { page: 2, limit: 10, order: 'asc' });
-    await api.getConversationGeneration('conv/1');
+    await api.getConversationActivity('conv/1');
     await api.updateConversationScope('conv/1', 'matter-1');
     await api.updateConversationScope('conv/2', null);
 
     expect(api.get).toHaveBeenNthCalledWith(1, '/api/v1/conversations/conv%2F1/messages?page=2&limit=10&order=asc');
-    expect(api.get).toHaveBeenNthCalledWith(2, '/api/v1/conversations/conv%2F1/generation');
+    expect(api.get).toHaveBeenNthCalledWith(2, '/api/v1/conversations/conv%2F1/activity');
     expect(api.patch).toHaveBeenNthCalledWith(1, '/api/v1/conversations/conv%2F1/scope', { matter_id: 'matter-1' });
     expect(api.patch).toHaveBeenNthCalledWith(2, '/api/v1/conversations/conv%2F2/scope', { matter_id: null });
   });
@@ -137,6 +138,51 @@ describe('ApiClient canonical conversation aliases', () => {
 
     expect(api.get).toHaveBeenCalledWith(
       '/api/v1/conversations/conv%2F1/document-candidates?limit=10&offset=5&search=contract&status=completed&sort_by=filename&order=asc'
+    );
+  });
+
+  test('uses canonical conversation document-context support routes', async () => {
+    const api = loadApi();
+    api.get = jest.fn().mockResolvedValue({});
+    api.post = jest.fn().mockResolvedValue({});
+
+    await api.getConversationDocumentContextConfig('conv/1');
+    await api.getConversationDocumentContextMergeFields('conv/1', { matterId: 'matter-1' });
+    await api.auditConversationDocumentContext('conv/1', {
+      action: 'document_modified_by_ai',
+      templateId: 'template-1'
+    });
+
+    expect(api.get).toHaveBeenNthCalledWith(1, '/api/v1/conversations/conv%2F1/document-context/config');
+    expect(api.get).toHaveBeenNthCalledWith(2, '/api/v1/conversations/conv%2F1/document-context/merge-fields?matterId=matter-1');
+    expect(api.post).toHaveBeenCalledWith('/api/v1/conversations/conv%2F1/document-context/audit', {
+      action: 'document_modified_by_ai',
+      templateId: 'template-1'
+    });
+  });
+
+  test('streams document context through the canonical conversation subresource', async () => {
+    const api = loadApi();
+    api.baseUrl = 'http://api.test';
+    api._readyPromise = Promise.resolve('http://api.test');
+
+    const signal = new AbortController().signal;
+    await api.streamConversationDocumentContext('conv/1', {
+      message: 'Fix this',
+      context: { documentContent: '<p>Text</p>' }
+    }, { signal });
+
+    expect(api.__fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/conversations/conv%2F1/document-context/stream',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          message: 'Fix this',
+          context: { documentContent: '<p>Text</p>' }
+        }),
+        signal
+      })
     );
   });
 
@@ -168,12 +214,12 @@ describe('ApiClient canonical conversation aliases', () => {
     expect(api.deleteConversation).toHaveBeenCalledWith('conversation-6', { permanent: true });
   });
 
-  test('stops the active generation through the conversation-scoped generation route', async () => {
+  test('stops the active response through the conversation-owned stop route', async () => {
     const api = loadApi();
     api.post = jest.fn().mockResolvedValue({ success: true });
 
-    await api.stopConversationGeneration('thread-1');
+    await api.stopConversationActivity('thread-1');
 
-    expect(api.post).toHaveBeenCalledWith('/api/v1/conversations/thread-1/generation/stop', {});
+    expect(api.post).toHaveBeenCalledWith('/api/v1/conversations/thread-1/stop', {});
   });
 });
