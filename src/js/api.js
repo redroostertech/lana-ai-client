@@ -1914,6 +1914,19 @@ class ApiClient {
     return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/messages?${params.toString()}`);
   }
 
+  async getConversationDocumentCandidates(conversationId, opts = {}) {
+    const params = new URLSearchParams();
+    if (opts.limit != null) params.set('limit', String(opts.limit));
+    if (opts.offset != null) params.set('offset', String(opts.offset));
+    if (opts.search) params.set('search', String(opts.search));
+    if (opts.status) params.set('status', String(opts.status));
+    if (opts.sortBy || opts.sort_by) params.set('sort_by', String(opts.sortBy || opts.sort_by));
+    if (opts.order) params.set('order', String(opts.order));
+
+    const query = params.toString();
+    return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/document-candidates${query ? `?${query}` : ''}`);
+  }
+
   async getConversationGeneration(conversationId) {
     return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/generation`);
   }
@@ -2585,104 +2598,6 @@ class ApiClient {
    */
   getFileViewUrl(fileId, matterId) {
     return `${this.baseUrl}/api/v1/storage/files/${fileId}/view?matter_id=${matterId}`;
-  }
-
-  // ============================================================
-  // Chat Session Files
-  // TODO(deprecation): Legacy /api/v1/chat/sessions/:id/files helpers. Keep
-  // these wrappers until the backend exposes a canonical searchable file
-  // candidate endpoint for conversation document attachment flows.
-  // ============================================================
-
-  /**
-   * Upload file(s) to a chat session
-   * Files are automatically linked to both the matter and the chat session.
-   * @param {string} sessionId - The chat session/thread ID
-   * @param {File|File[]} files - File or array of files to upload
-   * @param {Object} options - Upload options
-   * @param {string} options.matterId - Matter ID (optional if session has matter)
-   * @param {string} options.processingStrategy - Processing strategy (fast|quality|ocr)
-   * @param {string} options.priority - Priority (high|normal|low)
-   * @param {Function} options.onProgress - Progress callback
-   * @returns {Promise<Object>} Upload result with file IDs
-   */
-  async uploadFilesToChat(sessionId, files, options = {}) {
-    const fileArray = Array.isArray(files) ? files : [files];
-    const formData = new FormData();
-
-    fileArray.forEach(file => {
-      formData.append('files', file);
-    });
-
-    if (options.matterId) {
-      formData.append('matter_id', options.matterId);
-    }
-    if (options.processingStrategy) {
-      formData.append('processing_strategy', options.processingStrategy);
-    }
-    if (options.priority) {
-      formData.append('priority', options.priority);
-    }
-    if (options.metadata) {
-      formData.append('metadata', JSON.stringify(options.metadata));
-    }
-
-    const response = await fetch(`${this.baseUrl}/api/v1/chat/sessions/${sessionId}/files`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.token}`
-      },
-      body: formData
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
-      throw new Error(error.message || 'Upload failed');
-    }
-
-    return response.json();
-  }
-
-  /**
-   * Get files associated with a chat session
-   * @param {string} sessionId - The chat session/thread ID
-   * @param {Object} options - Query options
-   * @param {number} options.limit - Max files to return
-   * @param {number} options.offset - Pagination offset
-   * @param {string} options.status - Filter by status
-   * @returns {Promise<Object>} Files list with pagination
-   */
-  async getChatSessionFiles(sessionId, options = {}) {
-    const params = new URLSearchParams();
-    if (options.limit) params.set('limit', options.limit);
-    if (options.offset) params.set('offset', options.offset);
-    if (options.status) params.set('status', options.status);
-
-    const queryString = params.toString();
-    const url = `/api/v1/chat/sessions/${sessionId}/files${queryString ? `?${queryString}` : ''}`;
-    return this.get(url);
-  }
-
-  /**
-   * Attach an existing file to a chat session
-   * Links a file that's already in the matter to a specific chat conversation.
-   * @param {string} sessionId - The chat session/thread ID
-   * @param {string} fileId - The file ID to attach
-   * @returns {Promise<Object>} Attachment result
-   */
-  async attachFileToChat(sessionId, fileId) {
-    return this.post(`/api/v1/chat/sessions/${sessionId}/files/${fileId}/attach`);
-  }
-
-  /**
-   * Detach a file from a chat session
-   * Removes the chat session association but keeps the file in the matter.
-   * @param {string} sessionId - The chat session/thread ID
-   * @param {string} fileId - The file ID to detach
-   * @returns {Promise<Object>} Detachment result
-   */
-  async detachFileFromChat(sessionId, fileId) {
-    return this.delete(`/api/v1/chat/sessions/${sessionId}/files/${fileId}`);
   }
 
   // ============================================================

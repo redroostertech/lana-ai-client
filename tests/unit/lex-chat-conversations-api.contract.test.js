@@ -67,11 +67,13 @@ describe('Lex conversations domain API', () => {
 
     await client.createConversation({ title: 'Draft' });
     await client.getMessages('thread/1', 2, 25);
+    await client.getDocumentCandidates('thread/1', { search: 'contract', limit: 10 });
     await client.getGeneration('thread/1');
     await client.stopGeneration('thread/1');
 
     expect(api.createConversation).toHaveBeenCalledWith({ title: 'Draft' });
     expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1/messages?page=2&limit=25&order=desc');
+    expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1/document-candidates?limit=10&search=contract');
     expect(api.getConversationGeneration).toHaveBeenCalledWith('thread/1');
     expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread/1');
   });

@@ -133,6 +133,18 @@
     });
   }
 
+  function getConversationDocumentCandidates(conversationId, options) {
+    var client = requireApi();
+    if (!client) return Promise.reject(new Error('api not available'));
+    if (Lex.Chat && typeof Lex.Chat.ConversationsApiClient === 'function') {
+      return new Lex.Chat.ConversationsApiClient(client).getDocumentCandidates(conversationId, options);
+    }
+    if (typeof client.getConversationDocumentCandidates === 'function') {
+      return client.getConversationDocumentCandidates(conversationId, options);
+    }
+    return Promise.reject(new Error('canonical conversation document candidates API not available'));
+  }
+
   var stylesInjected = false;
 
   function injectStyles() {
@@ -922,15 +934,12 @@
         composerEl.setDocumentResults([]);
         return;
       }
-      var params = new URLSearchParams();
-      if (query) params.set('search', query);
-      params.set('limit', '10');
-      // TODO(deprecation): This search still reads the legacy chat-session
-      // files compatibility endpoint because canonical conversation documents
-      // currently model selected documents, not searchable matter candidates.
-      window.api.get('/api/v1/chat/sessions/' + encodeURIComponent(convId) + '/files?' + params.toString())
+      getConversationDocumentCandidates(convId, {
+        search: query || '',
+        limit: 10
+      })
         .then(function (data) {
-          composerEl.setDocumentResults((data && data.files) || []);
+          composerEl.setDocumentResults((data && (data.document_candidates || data.files || data.candidates)) || []);
         })
         .catch(function () {
           composerEl.setDocumentResults([]);

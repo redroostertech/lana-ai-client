@@ -122,6 +122,24 @@ describe('ApiClient canonical conversation aliases', () => {
     expect(api.patch).toHaveBeenNthCalledWith(2, '/api/v1/conversations/conv%2F2/scope', { matter_id: null });
   });
 
+  test('loads searchable document candidates through canonical conversation subresource', async () => {
+    const api = loadApi();
+    api.get = jest.fn().mockResolvedValue({ document_candidates: [] });
+
+    await api.getConversationDocumentCandidates('conv/1', {
+      search: 'contract',
+      limit: 10,
+      offset: 5,
+      status: 'completed',
+      sortBy: 'filename',
+      order: 'asc'
+    });
+
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/conversations/conv%2F1/document-candidates?limit=10&offset=5&search=contract&status=completed&sort_by=filename&order=asc'
+    );
+  });
+
   test('exposes dock and panel wrapper aliases over canonical conversation methods', async () => {
     const api = loadApi();
     api.createConversation = jest.fn().mockResolvedValue({ id: 'created' });

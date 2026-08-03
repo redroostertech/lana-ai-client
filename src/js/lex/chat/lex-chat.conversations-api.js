@@ -19,6 +19,13 @@
     return response.json().catch(function () { return null; });
   }
 
+  function buildQuery(params) {
+    return Object.keys(params)
+      .filter(function (key) { return params[key] !== undefined && params[key] !== null && params[key] !== ''; })
+      .map(function (key) { return `${encodeURIComponent(key)}=${encodeURIComponent(String(params[key]))}`; })
+      .join('&');
+  }
+
   function documentSelectionToState(response) {
     const payload = response && response.data ? response.data : response;
     const documents = payload && Array.isArray(payload.documents) ? payload.documents : [];
@@ -81,6 +88,23 @@
     async getMessages(conversationId, page, limit) {
       const api = this._requireApi();
       return api.get(`/api/v1/conversations/${encode(conversationId)}/messages?page=${page}&limit=${limit}&order=desc`);
+    }
+
+    async getDocumentCandidates(conversationId, options = {}) {
+      const api = this._requireApi();
+      if (typeof api.getConversationDocumentCandidates === 'function') {
+        return api.getConversationDocumentCandidates(conversationId, options);
+      }
+
+      const query = buildQuery({
+        limit: options.limit,
+        offset: options.offset,
+        search: options.search,
+        status: options.status,
+        sort_by: options.sortBy || options.sort_by,
+        order: options.order
+      });
+      return api.get(`/api/v1/conversations/${encode(conversationId)}/document-candidates${query ? `?${query}` : ''}`);
     }
 
     async streamMessage(conversationId, body, signal) {
