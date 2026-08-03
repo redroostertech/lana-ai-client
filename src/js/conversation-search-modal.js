@@ -1,10 +1,8 @@
 /**
  * Conversation Search Modal
- * Provides a search interface for finding and selecting conversations
- *
- * TODO(deprecation): Legacy global conversation search modal. New chat
- * discovery should live in the LANA dock Recents/search flow. Keep while host
- * pages still load openConversationSearchModal.
+ * Shared conversation search surface for shell pages and the LANA dock.
+ * Selection always routes through the dock/navigation helper path so the modal
+ * can be reused when search moves directly into the dock.
  */
 
 const ConversationSearchModal = {
@@ -303,18 +301,23 @@ const ConversationSearchModal = {
    * Select a conversation and close modal
    */
   selectConversation(threadId, matterId = '') {
-    const canSelectLocally = NavigationHelpers.isOnChatPage()
-      && typeof window.selectConversation === 'function';
-
-    // Close modal first
     this.close();
 
     try {
-      if (canSelectLocally) {
-        window.selectConversation(threadId, matterId);
-      } else {
+      if (typeof NavigationHelpers !== 'undefined'
+          && typeof NavigationHelpers.navigateToConversation === 'function') {
         NavigationHelpers.navigateToConversation(threadId, matterId);
+        return;
       }
+      const dock = window.Lex
+        && window.Lex.LanaDock
+        && typeof window.Lex.LanaDock.get === 'function'
+        && window.Lex.LanaDock.get();
+      if (dock && typeof dock.openConversation === 'function') {
+        dock.openConversation(threadId, matterId || null);
+        return;
+      }
+      throw new Error('LANA dock navigation is not available');
     } catch (error) {
       console.error('[ConversationSearchModal.selectConversation] ERROR:', error);
       alert(`Error selecting conversation: ${error.message}`);
