@@ -1843,17 +1843,16 @@ class ApiClient {
     return this.get(`/api/v1/activity/matter/${matterId}?limit=${limit}&offset=${offset}`);
   }
 
-  // TODO(deprecation): Legacy chat-session list helper. New chat/dock code
-  // should use getConversations({ matterId, ... }) against /api/v1/conversations.
   async getMatterConversations(matterId, limit = 5, offset = 0, opts = {}) {
-    const params = new URLSearchParams({
-      matter_id: matterId,
-      limit: String(limit),
-      offset: String(offset),
-      _t: String(Date.now())
+    return this.getConversations({
+      matterId,
+      limit,
+      offset,
+      excludePinned: opts.excludePinned === true,
+      sortBy: opts.sortBy || opts.sort_by || 'last_activity',
+      sortOrder: opts.sortOrder || opts.sort_order || 'desc',
+      _: Date.now()
     });
-    if (opts.excludePinned) params.set('exclude_pinned', 'true');
-    return this.get(`/api/v1/chat/sessions?${params.toString()}`);
   }
 
   _conversationListParams(opts = {}) {
@@ -1923,6 +1922,14 @@ class ApiClient {
     return this.post(`/api/v1/conversations/${encodeURIComponent(conversationId)}/generation/stop`, {});
   }
 
+  async pinConversation(conversationId) {
+    return this.post(`/api/v1/conversations/${encodeURIComponent(conversationId)}/pin`, {});
+  }
+
+  async unpinConversation(conversationId) {
+    return this.post(`/api/v1/conversations/${encodeURIComponent(conversationId)}/unpin`, {});
+  }
+
   async updateConversationScope(conversationId, matterId) {
     return this.patch(`/api/v1/conversations/${encodeURIComponent(conversationId)}/scope`, { matter_id: matterId || null });
   }
@@ -1950,22 +1957,28 @@ class ApiClient {
     return this.updateConversationScope(conversationId, matterId);
   }
 
-  // TODO(deprecation): Legacy pinned chat-session helper. Replace callers with
-  // getConversations({ pinned: true, matterId, pageScope }) once supported by
-  // the canonical conversation list contract.
-  async getPinnedChatSessions(opts = {}) {
-    const params = new URLSearchParams({
-      limit: String(opts.limit != null ? opts.limit : 100),
-      offset: String(opts.offset != null ? opts.offset : 0),
-      _t: String(Date.now())
+  async getPinnedConversations(opts = {}) {
+    return this.getConversations({
+      limit: opts.limit != null ? opts.limit : 100,
+      offset: opts.offset != null ? opts.offset : 0,
+      matterId: opts.matterId || null,
+      pageScope: opts.pageScope || null,
+      pinned: true,
+      sortBy: opts.sortBy || opts.sort_by || 'last_activity',
+      sortOrder: opts.sortOrder || opts.sort_order || 'desc',
+      _: Date.now()
     });
-    if (opts.matterId) params.set('matter_id', opts.matterId);
-    if (opts.pageScope) params.set('page_scope', opts.pageScope);
-    return this.get(`/api/v1/chat/sessions/pinned?${params.toString()}`);
   }
 
-  // TODO(deprecation): Legacy /conversation-threads helpers retained for older
-  // sidebar/thread surfaces. New chat code should stay on /api/v1/conversations.
+  // TODO(deprecation): Legacy chat-session naming alias. Active callers should
+  // use getPinnedConversations().
+  async getPinnedChatSessions(opts = {}) {
+    return this.getPinnedConversations(opts);
+  }
+
+  // TODO(deprecation): Legacy /conversation-threads pinned-list helper
+  // retained for older sidebar/thread surfaces. New chat code should stay on
+  // /api/v1/conversations.
   async getPinnedConversationThreads(opts = {}) {
     const params = new URLSearchParams({
       limit: String(opts.limit != null ? opts.limit : 100),
@@ -1976,16 +1989,18 @@ class ApiClient {
     return this.get(`/api/v1/conversation-threads/pinned?${params.toString()}`);
   }
 
+  // TODO(deprecation): Legacy thread naming aliases. Active callers should use
+  // pinConversation/unpinConversation/deleteConversation.
   async pinThread(threadId) {
-    return this.post(`/api/v1/conversation-threads/${threadId}/pin`, {});
+    return this.pinConversation(threadId);
   }
 
   async unpinThread(threadId) {
-    return this.post(`/api/v1/conversation-threads/${threadId}/unpin`, {});
+    return this.unpinConversation(threadId);
   }
 
   async hardDeleteThread(threadId) {
-    return this.delete(`/api/v1/conversation-threads/${threadId}/permanent`);
+    return this.deleteConversation(threadId, { permanent: true });
   }
 
   // ============================================================

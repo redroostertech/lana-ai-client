@@ -58,10 +58,16 @@ describe('ApiClient canonical conversation aliases', () => {
       sortBy: 'updated_at',
       sortOrder: 'asc'
     });
+    await api.getPinnedConversations({ matterId: 'matter-1', limit: 10 });
 
-    expect(api.get).toHaveBeenCalledWith(
+    expect(api.get).toHaveBeenNthCalledWith(1,
       '/api/v1/conversations?limit=25&sort_by=updated_at&sort_order=asc&matter_id=matter-1&page_scope=workspace&exclude_pinned=true'
     );
+    expect(api.get).toHaveBeenNthCalledWith(2,
+      expect.stringContaining('/api/v1/conversations?limit=10')
+    );
+    expect(api.get.mock.calls[1][0]).toContain('matter_id=matter-1');
+    expect(api.get.mock.calls[1][0]).toContain('pinned=true');
   });
 
   test('creates, reads, updates, and deletes conversation metadata through canonical routes', async () => {
@@ -76,8 +82,12 @@ describe('ApiClient canonical conversation aliases', () => {
     await api.updateConversation('thread/1', { title: 'Renamed' });
     await api.deleteConversation('thread/1');
     await api.deleteConversation('thread/2', { permanent: true });
+    await api.pinConversation('thread/3');
+    await api.unpinConversation('thread/4');
 
     expect(api.post).toHaveBeenCalledWith('/api/v1/conversations', { title: 'Draft' });
+    expect(api.post).toHaveBeenCalledWith('/api/v1/conversations/thread%2F3/pin', {});
+    expect(api.post).toHaveBeenCalledWith('/api/v1/conversations/thread%2F4/unpin', {});
     expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1');
     expect(api.patch).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1', { title: 'Renamed' });
     expect(api.delete).toHaveBeenNthCalledWith(1, '/api/v1/conversations/thread%2F1');
@@ -105,18 +115,27 @@ describe('ApiClient canonical conversation aliases', () => {
     api.createConversation = jest.fn().mockResolvedValue({ id: 'created' });
     api.updateConversation = jest.fn().mockResolvedValue({ id: 'updated' });
     api.updateConversationScope = jest.fn().mockResolvedValue({ id: 'scoped' });
+    api.pinConversation = jest.fn().mockResolvedValue({ id: 'pinned' });
+    api.unpinConversation = jest.fn().mockResolvedValue({ id: 'unpinned' });
+    api.deleteConversation = jest.fn().mockResolvedValue({ id: 'deleted' });
 
     await api.createConversationRegistryEntry({ title: 'Draft' });
     await api.updateConversationRegistryEntry('registry-1', { title: 'Renamed' });
     await api.setConversationMatter('conversation-1', 'matter-1');
     await api.setConversationScope('conversation-2', { matterId: 'matter-2' });
     await api.setConversationScope('conversation-3', { scope: { matter_id: 'matter-3' } });
+    await api.pinThread('conversation-4');
+    await api.unpinThread('conversation-5');
+    await api.hardDeleteThread('conversation-6');
 
     expect(api.createConversation).toHaveBeenNthCalledWith(1, { title: 'Draft' });
     expect(api.updateConversation).toHaveBeenNthCalledWith(1, 'registry-1', { title: 'Renamed' });
     expect(api.updateConversationScope).toHaveBeenNthCalledWith(1, 'conversation-1', 'matter-1');
     expect(api.updateConversationScope).toHaveBeenNthCalledWith(2, 'conversation-2', 'matter-2');
     expect(api.updateConversationScope).toHaveBeenNthCalledWith(3, 'conversation-3', 'matter-3');
+    expect(api.pinConversation).toHaveBeenCalledWith('conversation-4');
+    expect(api.unpinConversation).toHaveBeenCalledWith('conversation-5');
+    expect(api.deleteConversation).toHaveBeenCalledWith('conversation-6', { permanent: true });
   });
 
   test('stops the active generation through the conversation-scoped generation route', async () => {

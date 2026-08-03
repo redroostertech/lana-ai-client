@@ -345,7 +345,7 @@
         api.getOrphanedFiles(matterId).catch(function () { return { orphaned_files: [], total_count: 0 }; }),
         api.getMatterTasks(matterId).catch(function () { return { tasks: [], total_count: 0 }; }),
         api.getComments(matterId, { limit: 0 }).catch(function () { return { data: [], pagination: { total: 0 } }; }),
-        api.getPinnedChatSessions({ matterId: matterId, limit: 100, offset: 0 }).catch(function () { return { sessions: [] }; })
+        api.getPinnedConversations({ matterId: matterId, limit: 100, offset: 0 }).catch(function () { return { sessions: [] }; })
       ]);
 
       // Extract results (match shapes returned by api.js methods)
@@ -2804,12 +2804,35 @@
 
   function getConversationList(result) {
     if (!result) return [];
-    return result.sessions || result.conversations || result.data || [];
+    var rows = result.sessions || result.conversations || result.data || [];
+    return rows.map(normalizeWorkspaceConversation);
+  }
+
+  function normalizeWorkspaceConversation(row) {
+    if (!row || typeof row !== 'object') return row;
+    if (row.thread_id || row.matter_id || row.updated_at) return row;
+
+    var scope = row.scope || {};
+    return {
+      id: row.registryId || row.registry_id || row.id || row.conversationId || row.conversation_id,
+      thread_id: row.conversationId || row.conversation_id || row.threadId || row.thread_id || row.id,
+      session_id: row.sessionId || row.session_id || null,
+      title: row.title || (row.metadata && row.metadata.title) || 'Untitled Conversation',
+      context_type: row.contextType || row.context_type || '',
+      metadata: row.metadata || {},
+      matter_id: scope.matterId || scope.matter_id || row.matterId || row.matter_id || '',
+      matter_name: row.matterName || row.matter_name || (row.metadata && row.metadata.matter_name) || '',
+      last_message: row.lastMessage || row.last_message || '',
+      is_pinned: row.isPinned === true || row.is_pinned === true,
+      pinned_at: row.pinnedAt || row.pinned_at || null,
+      created_at: row.createdAt || row.created_at,
+      updated_at: row.lastActivity || row.last_activity || row.updatedAt || row.updated_at || row.createdAt || row.created_at
+    };
   }
 
   function getConversationIdFromSession(session) {
     if (!session) return '';
-    return session.thread_id || session.id || session.session_id || '';
+    return session.thread_id || session.conversationId || session.conversation_id || session.threadId || session.id || session.session_id || '';
   }
 
   async function createMatterConversation(matterId, matterName) {
@@ -2823,9 +2846,15 @@
         matterName = currentMatterData.matter.matter_name || currentMatterData.matter.name || '';
       }
       var title = matterName ? matterName + ' Conversation' : 'Matter Conversation';
-      var response = await api.post('/api/v1/chat/sessions', {
-        matter_id: matterId,
-        title: title
+      var response = await api.createConversation({
+        matterId: matterId,
+        pageScope: 'matter',
+        threadType: 'ad_hoc',
+        contextType: 'full_chat',
+        title: title,
+        metadata: {
+          matter_name: matterName || null
+        }
       });
       var session = response && (response.session || response.data || response);
       var conversationId = getConversationIdFromSession(session);
@@ -2870,10 +2899,9 @@
     var pinColor = isPinned ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-600';
 
     // Safe attribute payload for the kebab. The ConversationActionsModal
-    // already implements rename/archive/delete-permanent and now points at the
-    // new conversation-threads endpoint, so we just delegate. The title comes
-    // from user input so it MUST be escaped for both HTML-attribute context
-    // AND JS-string-literal context.
+    // implements rename/archive/delete-permanent through the canonical
+    // conversation API. The title comes from user input so it MUST be escaped
+    // for both HTML-attribute context and JS-string-literal context.
     var matterAttr = matterId ? "'" + escapeJsForHtmlAttr(matterId) + "'" : 'null';
     var convIdAttr = escapeJsForHtmlAttr(conversationId);
     var titleAttr = escapeJsForHtmlAttr(rawTitle);
@@ -3019,10 +3047,10 @@
     _pinningThreads.add(threadId);
     try {
       if (isCurrentlyPinned) {
-        await api.unpinThread(threadId);
+        await api.unpinConversation(threadId);
         if (window.Lex && Lex.Toast) Lex.Toast.success('Conversation unpinned');
       } else {
-        await api.pinThread(threadId);
+        await api.pinConversation(threadId);
         if (window.Lex && Lex.Toast) Lex.Toast.success('Conversation pinned');
       }
       // Reload current page so ordering + is_pinned flags refresh
@@ -3044,7 +3072,7 @@
       // re-fetched on every page change so newly-pinned items pop to the top.
       var fetches = await Promise.all([
         api.getMatterConversations(matterId, limit, offset, { excludePinned: true }),
-        api.getPinnedChatSessions({ matterId: matterId, limit: 100, offset: 0 }).catch(function () { return { sessions: [] }; })
+        api.getPinnedConversations({ matterId: matterId, limit: 100, offset: 0 }).catch(function () { return { sessions: [] }; })
       ]);
       var result = fetches[0];
       var pinnedResult = fetches[1];

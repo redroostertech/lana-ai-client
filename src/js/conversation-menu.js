@@ -208,6 +208,7 @@ const ConversationMenu = {
     const response = await api.getConversations({
       limit: this.limit,
       offset: (this.page - 1) * this.limit,
+      excludePinned: true,
       sortBy: 'last_activity',
       sortOrder: 'desc',
       ...(reset ? { _: Date.now() } : {})
@@ -220,40 +221,44 @@ const ConversationMenu = {
     if (this.scope && this.scope.type === 'conversation_threads') {
       return this.fetchConversationThreads({ pinnedOnly: true });
     }
-    const result = await api.getPinnedChatSessions({ limit: 100, offset: 0 });
+    const result = await api.getPinnedConversations({ limit: 100, offset: 0 });
     // Normalize to { sessions: [...] } regardless of envelope
     const sessions = result.sessions || result.data || result.threads || [];
     return { sessions };
   },
 
   async fetchConversationThreads(opts = {}) {
-    // TODO(deprecation): Legacy insights sidebar mode still reads
-    // /api/v1/conversation-threads until pinned/page-scope parity lands on the
-    // canonical /api/v1/conversations list contract.
     const pageScopes = (this.scope && this.scope.pageScopes) || [];
     const limit = this.limit;
     const offset = opts.pinnedOnly ? 0 : (this.page - 1) * limit;
-    const pinnedQs = opts.pinnedOnly ? '' : (opts.excludePinned ? '&exclude_pinned=true' : '');
     const fetchLimit = opts.pinnedOnly ? 100 : 100;
 
-    const buildUrl = (pageScope) => {
-      const base = '/api/v1/conversation-threads' + (opts.pinnedOnly ? '/pinned' : '');
-      const ps = pageScope ? `page_scope=${encodeURIComponent(pageScope)}&` : '';
-      const sort = opts.pinnedOnly ? '' : '&sort_by=last_activity&sort_order=desc';
-      return `${base}?${ps}limit=${fetchLimit}${sort}${pinnedQs}`;
-    };
-
     const requests = pageScopes.length > 0
-      ? pageScopes.map((pageScope) => api.get(buildUrl(pageScope)))
-      : [api.get(buildUrl(null))];
+      ? pageScopes.map((pageScope) => api.getConversations({
+          pageScope,
+          limit: fetchLimit,
+          offset: 0,
+          pinned: opts.pinnedOnly === true,
+          excludePinned: opts.pinnedOnly !== true && opts.excludePinned === true,
+          sortBy: 'last_activity',
+          sortOrder: 'desc'
+        }))
+      : [api.getConversations({
+          limit: fetchLimit,
+          offset: 0,
+          pinned: opts.pinnedOnly === true,
+          excludePinned: opts.pinnedOnly !== true && opts.excludePinned === true,
+          sortBy: 'last_activity',
+          sortOrder: 'desc'
+        })];
 
     const results = await Promise.all(requests);
     const allThreads = [];
 
     results.forEach((result) => {
-      const threads = result.data || result.threads || [];
+      const threads = (result.conversations || result.data || result.threads || []).map((thread) => this.normalizeConversation(thread));
       threads.forEach((thread) => {
-        if (thread && thread.context_type === 'insights_chat') {
+        if (thread && (thread.context_type === 'insights_chat' || thread.contextType === 'insights_chat')) {
           allThreads.push(thread);
         }
       });
@@ -318,6 +323,8 @@ const ConversationMenu = {
       id: registryId,
       thread_id: conversationId,
       title: row.title || row.metadata?.title || 'Untitled Chat',
+      context_type: row.contextType || row.context_type || '',
+      contextType: row.contextType || row.context_type || '',
       metadata: row.metadata || {},
       matter_id: scope.matterId || scope.matter_id || row.matterId || row.matter_id || '',
       matter_name: row.matterName || row.matter_name || row.metadata?.matter_name || '',

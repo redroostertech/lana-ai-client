@@ -941,10 +941,10 @@ const ConversationActionsModal = {
 
     try {
       if (wasPinned) {
-        await api.unpinThread(convId);
+        await api.unpinConversation(convId);
         Toast.success('Conversation unpinned');
       } else {
-        await api.pinThread(convId);
+        await api.pinConversation(convId);
         Toast.success('Conversation pinned');
       }
 
