@@ -45,6 +45,22 @@
 
   var COLLAPSED_KEY = 'lana:lanaDock:collapsed';
 
+  function persistConversationMatter(conversationId, matterId) {
+    if (typeof api === 'undefined') return Promise.reject(new Error('api not available'));
+    if (typeof api.setConversationMatter === 'function') {
+      return api.setConversationMatter(conversationId, matterId || null);
+    }
+    if (typeof api.setConversationScope === 'function') {
+      return api.setConversationScope(conversationId, { matter_id: matterId || null });
+    }
+    if (typeof api.setChatSessionMatter === 'function') {
+      // TODO(deprecation): Replace chat-session scope persistence with the
+      // canonical conversations API wrapper once api.js exposes it.
+      return api.setChatSessionMatter(conversationId, matterId || null);
+    }
+    return Promise.reject(new Error('conversation scope API not available'));
+  }
+
   /* Minimize chevrons (slide the dock away to the right edge). */
   var CHEVRONS_RIGHT_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" '
     + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
@@ -814,9 +830,8 @@
 
       // Persist on the live conversation when one exists.
       var convId = p && p._chatEl ? p._chatEl.conversationId : null;
-      if (convId && typeof api !== 'undefined' && typeof api.setChatSessionMatter === 'function') {
-        var self = this;
-        api.setChatSessionMatter(convId, matterId || null).then(function () {
+      if (convId) {
+        persistConversationMatter(convId, matterId || null).then(function () {
           if (p._threadsEl && typeof p._threadsEl.refresh === 'function') p._threadsEl.refresh();
         }).catch(function (err) {
           console.warn('[lex-lana-dock] Failed to persist conversation scope:', err);

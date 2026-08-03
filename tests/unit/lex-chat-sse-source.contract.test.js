@@ -77,7 +77,30 @@ describe('SSEChatSource contract', () => {
     ]);
 
     await source.stop();
+    expect(fetchMock.mock.calls[0][0]).toBe('http://api.test/api/v1/streaming/chat/stream');
     expect(fetchMock.mock.calls[1][0]).toBe('http://api.test/api/v1/streaming/sessions/generation-1/stop');
+  });
+
+  test('streams into an existing conversation through the canonical conversation route', async () => {
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce(responseFromChunks([
+        'event: done\ndata: {"thread_id":"thread-1","generation_id":"generation-1","message_id":"assistant-1"}\n\n'
+      ]))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
+    const { Source } = loadSource(fetchMock);
+    const source = new Source({ endpoint: 'http://api.test' });
+    await source.connect('thread-1');
+
+    const events = [];
+    for await (const event of source.send('hello again')) events.push(event);
+
+    expect(fetchMock.mock.calls[0][0]).toBe('http://api.test/api/v1/conversations/thread-1/messages/stream');
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'done', messageId: 'assistant-1', generationId: 'generation-1' })
+    ]);
+
+    await source.stop();
+    expect(fetchMock.mock.calls[1][0]).toBe('http://api.test/api/v1/conversations/thread-1/generation/stop');
   });
 
   test('parses fragmented frames and final frame without trailing blank line', async () => {
@@ -133,10 +156,10 @@ describe('SSEChatSource contract', () => {
       generationId: 'generation-1',
       sessionId: 'generation-1'
     }));
-    expect(fetchMock.mock.calls[0][0]).toBe('http://api.test/api/v1/streaming/threads/thread-1/active-generation');
+    expect(fetchMock.mock.calls[0][0]).toBe('http://api.test/api/v1/conversations/thread-1/generation');
 
     await source.stop();
-    expect(fetchMock.mock.calls[1][0]).toBe('http://api.test/api/v1/streaming/sessions/generation-1/stop');
+    expect(fetchMock.mock.calls[1][0]).toBe('http://api.test/api/v1/conversations/thread-1/generation/stop');
   });
 
   test('posts exact-generation stop before aborting an in-flight stream', async () => {

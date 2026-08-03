@@ -1854,6 +1854,112 @@ class ApiClient {
     return this.get(`/api/v1/chat/sessions?${params.toString()}`);
   }
 
+  _conversationListParams(opts = {}) {
+    const params = new URLSearchParams();
+    const mappings = {
+      matterId: 'matter_id',
+      pageScope: 'page_scope',
+      excludePinned: 'exclude_pinned',
+      sortBy: 'sort_by',
+      sortOrder: 'sort_order'
+    };
+
+    Object.entries(opts).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return;
+      const paramKey = mappings[key] || key;
+      params.set(paramKey, String(value));
+    });
+
+    return params;
+  }
+
+  /**
+   * Canonical conversation API surface for new client code.
+   *
+   * TODO(conversation-api): switch these wrappers to /api/v1/conversations
+   * once that backend route represents chat containers instead of raw message
+   * rows. Until then, metadata/list operations delegate to conversation_threads.
+   */
+  async getConversations(opts = {}) {
+    const params = this._conversationListParams({
+      limit: opts.limit != null ? opts.limit : 50,
+      sort_by: opts.sort_by || opts.sortBy || 'last_activity',
+      sort_order: opts.sort_order || opts.sortOrder || 'desc',
+      ...opts
+    });
+    return this.get(`/api/v1/conversation-threads?${params.toString()}`);
+  }
+
+  async createConversation(payload = {}) {
+    return this.post('/api/v1/conversation-threads', payload);
+  }
+
+  async getConversation(conversationId) {
+    return this.get(`/api/v1/conversation-threads/${encodeURIComponent(conversationId)}`);
+  }
+
+  async updateConversation(conversationId, patch) {
+    return this.put(`/api/v1/conversation-threads/${encodeURIComponent(conversationId)}`, patch);
+  }
+
+  async deleteConversation(conversationId) {
+    return this.delete(`/api/v1/conversation-threads/${encodeURIComponent(conversationId)}`);
+  }
+
+  async getConversationMessages(conversationId, opts = {}) {
+    const params = this._conversationListParams({
+      page: opts.page != null ? opts.page : 1,
+      limit: opts.limit != null ? opts.limit : 50,
+      order: opts.order || 'desc',
+      ...opts
+    });
+    return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/messages?${params.toString()}`);
+  }
+
+  async getConversationGeneration(conversationId) {
+    return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/generation`);
+  }
+
+  async stopConversationGeneration(conversationId) {
+    return this.post(`/api/v1/conversations/${encodeURIComponent(conversationId)}/generation/stop`, {});
+  }
+
+  async updateConversationScope(conversationId, matterId) {
+    return this.patch(`/api/v1/conversations/${encodeURIComponent(conversationId)}/scope`, { matter_id: matterId || null });
+  }
+
+  // Compatibility aliases for dock/panel code that should not know whether
+  // the current backing store is conversation_threads or chat_sessions.
+  async createConversationRegistryEntry(payload = {}) {
+    return this.createConversation(payload);
+  }
+
+  async updateConversationRegistryEntry(conversationId, patch) {
+    return this.updateConversation(conversationId, patch);
+  }
+
+  async createConversationThread(payload = {}) {
+    return this.createConversation(payload);
+  }
+
+  async updateConversationThread(conversationId, patch) {
+    return this.updateConversation(conversationId, patch);
+  }
+
+  async setConversationMatter(conversationId, matterId) {
+    return this.updateConversationScope(conversationId, matterId);
+  }
+
+  async setConversationScope(conversationId, scope = {}) {
+    const matterId = scope && (
+      scope.matter_id ||
+      scope.matterId ||
+      (scope.scope && (scope.scope.matter_id || scope.scope.matterId)) ||
+      null
+    );
+    return this.updateConversationScope(conversationId, matterId);
+  }
+
   /**
    * Re-scope a conversation to a matter, or clear its scope with null.
    * The scope belongs to the conversation, not the page it started from.

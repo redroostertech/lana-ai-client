@@ -20,6 +20,38 @@
   const { LexElement } = global.Lex;
   if (!LexElement) { console.error('[lex-chat-threads] LexElement not loaded'); return; }
 
+  function conversationThreadsPath(opts) {
+    var params = 'limit=50&sort_by=last_activity&sort_order=desc';
+    if (opts && opts.pageScope) params = 'page_scope=' + encodeURIComponent(opts.pageScope) + '&' + params;
+    if (opts && opts.matterId) params += '&matter_id=' + encodeURIComponent(opts.matterId);
+    // TODO(deprecate-chat-routes): this is the legacy conversation_threads
+    // registry endpoint. Dock/thread-list callers should eventually read from
+    // /api/v1/conversations and let the backend hide registry rows.
+    return '/api/v1/conversation-threads?' + params;
+  }
+
+  function activeGenerationPath(conversationId) {
+    return '/api/v1/conversations/' + encodeURIComponent(conversationId) + '/generation';
+  }
+
+  function legacyStopGenerationPath(generationId) {
+    return '/api/v1/streaming/sessions/' + encodeURIComponent(generationId) + '/stop';
+  }
+
+  function deleteConversationThreadPath(threadId) {
+    // TODO(deprecate-chat-routes): replace public /conversation-threads delete
+    // with /api/v1/conversations/:conversationId once the backend facade lands.
+    return '/api/v1/conversation-threads/' + encodeURIComponent(threadId);
+  }
+
+  function activeGenerationIdFromResponse(response) {
+    var data = response && response.data && typeof response.data === 'object'
+      ? response.data
+      : response;
+    if (!data || data.active !== true) return null;
+    return data.generation_id || data.session_id || null;
+  }
+
   class LexChatThreads extends LexElement {
 
     static get properties() {
@@ -282,15 +314,10 @@
               last_activity: t.last_activity || t.updated_at || t.created_at
             };
           };
-          var buildThreadsUrl = function (matterId) {
-            var params = 'limit=50&sort_by=last_activity&sort_order=desc';
-            if (matterId) params += '&matter_id=' + encodeURIComponent(matterId);
-            return '/api/v1/conversation-threads?' + params;
-          };
-          var calls = [api.get(buildThreadsUrl(null))];
+          var calls = [api.get(conversationThreadsPath({ matterId: null }))];
           var wantMatter = !!this.matterId;
           if (wantMatter) {
-            calls.push(api.get(buildThreadsUrl(this.matterId)).catch(function () { return { data: [] }; }));
+            calls.push(api.get(conversationThreadsPath({ matterId: this.matterId })).catch(function () { return { data: [] }; }));
           }
           var settled = await Promise.all(calls);
           var allRows = settled[0].data || settled[0].threads || (Array.isArray(settled[0]) ? settled[0] : []);
@@ -311,10 +338,7 @@
           }
         } else {
           this._groups = null;
-          var params = 'page_scope=' + encodeURIComponent(this.pageScope) + '&limit=50&sort_by=last_activity&sort_order=desc';
-          if (this.matterId) params += '&matter_id=' + encodeURIComponent(this.matterId);
-
-          var result = await api.get('/api/v1/conversation-threads?' + params);
+          var result = await api.get(conversationThreadsPath({ pageScope: this.pageScope, matterId: this.matterId }));
           this._threads = result.data || result.threads || [];
         }
         if (this._threads.length === 0 && !this._userToggledCollapsed) {
@@ -376,6 +400,42 @@
     // Private helpers
     // -----------------------------------------------------------------------
 
+    _findThread(threadId) {
+      for (var i = 0; i < this._threads.length; i++) {
+        if (this._threads[i] && this._threads[i].id === threadId) return this._threads[i];
+      }
+      return null;
+    }
+
+    async _stopActiveGenerationForThread(threadId) {
+      var thread = this._findThread(threadId);
+      var conversationId = thread && thread.thread_id;
+      if (!conversationId) {
+        // TODO(deprecate-chat-routes): legacy thread rows sometimes expose only
+        // conversation_threads.id here. That id is not safe to send to the
+        // /streaming/sessions/:generationId/stop route, so stop is skipped until
+        // the list API exposes a canonical conversationId on every row.
+        return;
+      }
+
+      try {
+        if (typeof api.stopConversationGeneration === 'function') {
+          await api.stopConversationGeneration(conversationId);
+          return;
+        }
+
+        // Compatibility fallback for older API clients: look up the active
+        // generation first, then stop by generation id.
+        var status = await api.get(activeGenerationPath(conversationId));
+        var generationId = activeGenerationIdFromResponse(status);
+        if (!generationId) return;
+        await api.post(legacyStopGenerationPath(generationId), {});
+      } catch (_) {
+        // Best-effort only: deletion should still proceed when no generation is
+        // active or an older backend lacks active-generation lookup.
+      }
+    }
+
     /**
      * Delete a thread via the API, then remove it from the list.
      * @private
@@ -384,12 +444,9 @@
       if (typeof api === 'undefined') return;
 
       try {
-        // Stop any active LLM generation for this thread before deleting.
-        // Fire-and-forget — don't block delete on stop success.
-        api.post('/api/v1/streaming/sessions/' + threadId + '/stop', {})
-          .catch(function () { /* best-effort — generation may not be active */ });
+        await this._stopActiveGenerationForThread(threadId);
 
-        await api.delete('/api/v1/conversation-threads/' + threadId);
+        await api.delete(deleteConversationThreadPath(threadId));
         this.removeThread(threadId);
       } catch (err) {
         console.error('[lex-chat-threads] Failed to delete thread:', err);

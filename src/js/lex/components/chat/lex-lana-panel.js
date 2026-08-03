@@ -86,6 +86,39 @@
     return VALID_PAGE_SCOPES.indexOf(pageScope) !== -1 ? pageScope : 'dashboard';
   }
 
+  function requireApi() {
+    if (typeof api === 'undefined') return null;
+    return api;
+  }
+
+  function createConversationRegistryEntry(payload) {
+    var client = requireApi();
+    if (!client) return Promise.reject(new Error('api not available'));
+    if (typeof client.createConversationRegistryEntry === 'function') {
+      return client.createConversationRegistryEntry(payload);
+    }
+    if (typeof client.createConversationThread === 'function') {
+      return client.createConversationThread(payload);
+    }
+    // TODO(deprecation): Replace the legacy conversation-threads route with
+    // the canonical conversations API wrapper once api.js exposes it.
+    return client.post('/api/v1/conversation-threads', payload);
+  }
+
+  function updateConversationRegistryEntry(registryId, payload) {
+    var client = requireApi();
+    if (!client) return Promise.reject(new Error('api not available'));
+    if (typeof client.updateConversationRegistryEntry === 'function') {
+      return client.updateConversationRegistryEntry(registryId, payload);
+    }
+    if (typeof client.updateConversationThread === 'function') {
+      return client.updateConversationThread(registryId, payload);
+    }
+    // TODO(deprecation): Replace the legacy conversation-threads route with
+    // the canonical conversations API wrapper once api.js exposes it.
+    return client.put('/api/v1/conversation-threads/' + registryId, payload);
+  }
+
   var stylesInjected = false;
 
   function injectStyles() {
@@ -258,7 +291,7 @@
      */
     createThread(config) {
       var self = this;
-      if (typeof api === 'undefined') return Promise.reject(new Error('api not available'));
+      if (!requireApi()) return Promise.reject(new Error('api not available'));
 
       // Default the matter_id from the panel's bound matter context when the
       // caller didn't supply one. Without this, threads created from a
@@ -269,7 +302,7 @@
         payload.matter_id = self.matterId;
       }
 
-      return api.post('/api/v1/conversation-threads', payload).then(function (resp) {
+      return createConversationRegistryEntry(payload).then(function (resp) {
         var thread = resp.data || resp;
 
         if (self._threadsEl) {
@@ -348,7 +381,7 @@
       // Create conversation-thread record in backend + add to threads component.
       // Include matter_id so the thread shows up in the matter-scoped fetch
       // (?matter_id=…); without it, threads vanish from per-matter views.
-      if (typeof api !== 'undefined') {
+      if (requireApi()) {
         var boundMatterId = (opts && opts.matterId) || self.matterId || null;
         var threadPayload = {
           title: threadTitle,
@@ -358,7 +391,7 @@
           thread_id: id
         };
         if (boundMatterId) threadPayload.matter_id = boundMatterId;
-        api.post('/api/v1/conversation-threads', threadPayload).then(function (resp) {
+        createConversationRegistryEntry(threadPayload).then(function (resp) {
           var created = resp.data || resp;
           if (self._threadsEl) {
             self._threadsEl.addThread(created);
@@ -688,7 +721,7 @@
             thread_id: conversationId
           };
           if (self.matterId) recentPayload.matter_id = self.matterId;
-          api.post('/api/v1/conversation-threads', recentPayload).then(function (resp) {
+          createConversationRegistryEntry(recentPayload).then(function (resp) {
             var created = resp.data || resp;
             if (self._threadsEl) {
               self._threadsEl.addThread(created);
@@ -710,7 +743,7 @@
             if (self._threadsEl._threads[i].thread_type === 'page_general') {
               var existing = self._threadsEl._threads[i];
               existing.thread_id = conversationId;
-              api.put('/api/v1/conversation-threads/' + existing.id, {
+              updateConversationRegistryEntry(existing.id, {
                 thread_id: conversationId
               }).catch(function (err) {
                 console.warn('[lex-lana-panel] Failed to update thread:', err);
@@ -730,7 +763,7 @@
           thread_id: conversationId
         };
         if (self.matterId) generalPayload.matter_id = self.matterId;
-        api.post('/api/v1/conversation-threads', generalPayload).then(function (resp) {
+        createConversationRegistryEntry(generalPayload).then(function (resp) {
           var created = resp.data || resp;
           if (self._threadsEl) {
             self._threadsEl.addThread(created);

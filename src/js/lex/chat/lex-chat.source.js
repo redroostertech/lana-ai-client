@@ -39,6 +39,31 @@
     return response.json().catch(function () { return null; });
   }
 
+  function conversationMessagesPath(conversationId, page, limit) {
+    return `/api/v1/conversations/${encodeURIComponent(conversationId)}/messages?page=${page}&limit=${limit}&order=desc`;
+  }
+
+  function conversationStreamPath(conversationId) {
+    if (conversationId) {
+      return `/api/v1/conversations/${encodeURIComponent(conversationId)}/messages/stream`;
+    }
+    // TODO(conversation-api): add a canonical create-and-stream first-message
+    // route so brand-new conversations do not need the legacy streaming path.
+    return '/api/v1/streaming/chat/stream';
+  }
+
+  function activeGenerationPath(conversationId) {
+    return `/api/v1/conversations/${encodeURIComponent(conversationId)}/generation`;
+  }
+
+  function stopConversationGenerationPath(conversationId) {
+    return `/api/v1/conversations/${encodeURIComponent(conversationId)}/generation/stop`;
+  }
+
+  function legacyStopGenerationPath(generationId) {
+    return `/api/v1/streaming/sessions/${encodeURIComponent(generationId)}/stop`;
+  }
+
   function humanizePhase(phase) {
     var raw = String(phase || 'thinking').trim();
     var known = {
@@ -126,6 +151,7 @@
       this._abortController = null;
       this._conversationId = null;
       this._generationId = null;
+      this._streamStartedWithConversationId = false;
       this._model = null;
     }
 
@@ -191,7 +217,7 @@
         const token = this._getToken();
 
         const res = await fetch(
-          `${baseUrl}/api/v1/chat/sessions/${this._conversationId}/messages?page=${page}&limit=${limit}&order=desc`,
+          `${baseUrl}${conversationMessagesPath(this._conversationId, page, limit)}`,
           {
             headers: { 'Authorization': `Bearer ${token}` }
           }
@@ -246,6 +272,7 @@
       this._generating = true;
       this._abortController = new AbortController();
       this._generationId = null;
+      this._streamStartedWithConversationId = !!this._conversationId;
       const clientRequestId = options.clientRequestId || generateClientRequestId();
 
       try {
@@ -268,7 +295,7 @@
         if (options.attachments) body.attachments = options.attachments;
         if (options.contextType) body.context_type = options.contextType;
 
-        const response = await fetch(`${baseUrl}/api/v1/streaming/chat/stream`, {
+        const response = await fetch(`${baseUrl}${conversationStreamPath(this._streamStartedWithConversationId ? this._conversationId : null)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -365,7 +392,7 @@
 
     async stop() {
       const key = this._generationId;
-      if (!key) {
+      if (!key && !this._conversationId) {
         if (this._abortController) this._abortController.abort();
         return { success: false, reason: 'no-generation' };
       }
@@ -373,7 +400,10 @@
       try {
         const baseUrl = await this._resolveBaseUrl();
         const token = this._getToken();
-        const res = await fetch(`${baseUrl}/api/v1/streaming/sessions/${key}/stop`, {
+        const stopPath = this._conversationId && this._streamStartedWithConversationId
+          ? stopConversationGenerationPath(this._conversationId)
+          : legacyStopGenerationPath(key);
+        const res = await fetch(`${baseUrl}${stopPath}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -404,12 +434,14 @@
       try {
         const baseUrl = await this._resolveBaseUrl();
         const token = this._getToken();
-        const res = await fetch(`${baseUrl}/api/v1/streaming/threads/${id}/active-generation`, {
+        const res = await fetch(`${baseUrl}${activeGenerationPath(id)}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) return { active: false };
         const data = await res.json();
         if (!data.active) return { active: false };
+        this._conversationId = id;
+        this._streamStartedWithConversationId = true;
         if (data.generation_id || data.session_id) {
           this._generationId = data.generation_id || data.session_id;
         }
