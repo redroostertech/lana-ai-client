@@ -1079,6 +1079,157 @@ ipcMain.handle('capabilities:request-voice-permission', async (_event, payload) 
   catch (_) { return { success: false, error: 'The permission request could not be opened.' }; }
 });
 
+const OWNED_WEB_ENDPOINTS = Object.freeze({
+  health: { method: 'GET', path: '/api/v1/web/health' },
+  capabilities: { method: 'GET', path: '/api/v1/web/capabilities' },
+  search: { method: 'POST', path: '/api/v1/web/search' },
+  read: { method: 'POST', path: '/api/v1/web/read' },
+  crawlStart: { method: 'POST', path: '/api/v1/web/crawls' },
+  browserPreview: { method: 'POST', path: null },
+  browserExecute: { method: 'POST', path: null }
+});
+
+async function getRendererAuthToken() {
+  if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents) return null;
+  return mainWindow.webContents.executeJavaScript(
+    "(() => { try { return window.localStorage.getItem('token') || window.localStorage.getItem('lana_auth_token') || null; } catch (_) { return null; } })()",
+    true
+  );
+}
+
+function assertOwnedWebSender(event) {
+  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) {
+    throw new Error('unauthorized_sender');
+  }
+}
+
+function ownedWebBaseUrl() {
+  const server = getSavedServer();
+  const base = server && (server.url || server.serverUrl);
+  if (!base) throw new Error('backend_not_configured');
+  return String(base).replace(/\/+$/, '');
+}
+
+async function callOwnedWebBackend(event, endpoint, payload) {
+  assertOwnedWebSender(event);
+  const token = await getRendererAuthToken();
+  if (!token) return { success: false, error: 'Not authenticated.' };
+  const url = ownedWebBaseUrl() + endpoint.path;
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'X-Lana-Surface': 'desktop'
+  };
+  const response = await fetch(url, {
+    method: endpoint.method,
+    headers,
+    body: endpoint.method === 'GET' ? undefined : JSON.stringify(payload || {})
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return {
+      success: false,
+      error: body.error?.message || body.message || `HTTP ${response.status}`,
+      code: body.error?.code || null
+    };
+  }
+  return body;
+}
+
+function validId(value) {
+  return typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,128}$/.test(value);
+}
+
+ipcMain.handle('owned-web:health', async (event) => {
+  try { return await callOwnedWebBackend(event, OWNED_WEB_ENDPOINTS.health); }
+  catch (error) { return { success: false, error: String(error.message || error) }; }
+});
+
+ipcMain.handle('owned-web:capabilities', async (event) => {
+  try { return await callOwnedWebBackend(event, OWNED_WEB_ENDPOINTS.capabilities); }
+  catch (error) { return { success: false, error: String(error.message || error) }; }
+});
+
+ipcMain.handle('owned-web:search', async (event, payload) => {
+  try {
+    const body = {
+      query: String(payload?.query || '').slice(0, 500),
+      limit: payload?.limit ? Number(payload.limit) : undefined,
+      matterId: payload?.matterId ? String(payload.matterId).slice(0, 128) : undefined
+    };
+    return await callOwnedWebBackend(event, OWNED_WEB_ENDPOINTS.search, body);
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:read', async (event, payload) => {
+  try {
+    return await callOwnedWebBackend(event, OWNED_WEB_ENDPOINTS.read, {
+      url: String(payload?.url || '').slice(0, 4096),
+      matterId: payload?.matterId ? String(payload.matterId).slice(0, 128) : undefined
+    });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:crawl:start', async (event, payload) => {
+  try {
+    const seedUrls = Array.isArray(payload?.seedUrls) ? payload.seedUrls.slice(0, 25).map((entry) => String(entry).slice(0, 4096)) : [];
+    return await callOwnedWebBackend(event, OWNED_WEB_ENDPOINTS.crawlStart, {
+      seedUrls,
+      maxDepth: payload?.maxDepth == null ? undefined : Number(payload.maxDepth),
+      maxPages: payload?.maxPages == null ? undefined : Number(payload.maxPages),
+      matterId: payload?.matterId ? String(payload.matterId).slice(0, 128) : undefined
+    });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:crawl:status', async (event, payload) => {
+  try {
+    if (!validId(payload?.crawlId)) return { success: false, error: 'Invalid crawl id.' };
+    return await callOwnedWebBackend(event, { method: 'GET', path: `/api/v1/web/crawls/${encodeURIComponent(payload.crawlId)}` });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:crawl:cancel', async (event, payload) => {
+  try {
+    if (!validId(payload?.crawlId)) return { success: false, error: 'Invalid crawl id.' };
+    return await callOwnedWebBackend(event, { method: 'POST', path: `/api/v1/web/crawls/${encodeURIComponent(payload.crawlId)}/cancel` }, {});
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:browser:preview', async (event, payload) => {
+  try {
+    if (!validId(payload?.sessionId)) return { success: false, error: 'Invalid browser session id.' };
+    return await callOwnedWebBackend(event, {
+      method: 'POST',
+      path: `/api/v1/web/browser/sessions/${encodeURIComponent(payload.sessionId)}/actions/preview`
+    }, { action: payload?.action || {} });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:browser:execute', async (event, payload) => {
+  try {
+    if (!validId(payload?.sessionId)) return { success: false, error: 'Invalid browser session id.' };
+    return await callOwnedWebBackend(event, {
+      method: 'POST',
+      path: `/api/v1/web/browser/sessions/${encodeURIComponent(payload.sessionId)}/actions`
+    }, { action: payload?.action || {} });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
 // Clear saved server (logout)
 ipcMain.handle('clear-saved-server', async () => {
   try {

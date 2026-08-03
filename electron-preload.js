@@ -67,6 +67,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
+   * Owned web capability relay. These fixed-shape calls go through Electron
+   * main so desktop-local browser work can remain behind the privileged
+   * boundary. The renderer never receives provider config, cookies, Playwright
+   * objects, or backend-side browser credentials.
+   */
+  ownedWeb: {
+    health: () => ipcRenderer.invoke('owned-web:health'),
+    capabilities: () => ipcRenderer.invoke('owned-web:capabilities'),
+    search: (payload) => ipcRenderer.invoke('owned-web:search', payload || {}),
+    read: (payload) => ipcRenderer.invoke('owned-web:read', payload || {}),
+    startCrawl: (payload) => ipcRenderer.invoke('owned-web:crawl:start', payload || {}),
+    getCrawl: (crawlId) => ipcRenderer.invoke('owned-web:crawl:status', { crawlId }),
+    cancelCrawl: (crawlId) => ipcRenderer.invoke('owned-web:crawl:cancel', { crawlId }),
+    previewBrowserAction: (sessionId, action) => ipcRenderer.invoke('owned-web:browser:preview', { sessionId, action }),
+    executeBrowserAction: (sessionId, action) => ipcRenderer.invoke('owned-web:browser:execute', { sessionId, action })
+  },
+
+  /**
    * Updates
    */
   checkUpdates: (serverUrl) => ipcRenderer.invoke('check-updates', serverUrl),
