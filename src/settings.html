@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings - LanaAI</title>
+  <link rel="stylesheet" href="css/lex-tokens.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/lex-chat.css">
   <script src="js/tailwind-loader.js"></script>
   <script src="js/error-reporter.js"></script>
   <script src="js/config.js"></script>
@@ -16,9 +18,18 @@
   <script src="js/version.js"></script>
   <script src="js/menu.js"></script>
   <script src="js/navigation-helpers.js"></script>
-    <script src="js/new-project-modal.js"></script>
-    <script src="js/conversation-menu.js"></script>
+  <script src="js/new-project-modal.js"></script>
   <script src="js/conversation-search-modal.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
 
   <!-- Inline preloader styles - Pure CSS, no dependencies -->
   <style>
@@ -473,12 +484,6 @@
 
     // Render dynamic menu
     renderMenu('#mainNav');
-
-    // Initialize conversation menu in sidebar
-    if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
-      // Load conversations into the menu
-      ConversationMenu.loadConversations(true);
-    }
 
     // Initialize conversation search modal
     if (typeof ConversationSearchModal !== 'undefined') {
@@ -1107,5 +1112,23 @@
   </script>
 
   </div>
+  <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
+  <!-- LANA dock (IDE-style docked chat panel) -->
+  <script src="js/lex/chat/lex-chat.format.js"></script>
+  <script src="js/lex/chat/lex-chat.conversations-api.js"></script>
+  <script src="js/lex/chat/lex-chat.source.js"></script>
+  <script src="js/lex/chat/lex-chat.message.js"></script>
+  <script src="js/lex/chat/lex-chat.activity.js"></script>
+  <script src="js/lex/chat/lex-chat.documents.js"></script>
+  <script src="js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="js/lex/chat/lex-chat.composer.js"></script>
+  <script src="js/lex/chat/lex-chat.thread.js"></script>
+  <script src="js/lex/chat/lex-chat.threads.js"></script>
+  <script src="js/lex/chat/lex-chat.js"></script>
+  <script src="js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="js/lex/chat/lex-chat.index.js"></script>
+  <script src="js/lex/components/chat/lex-lana-panel.js"></script>
+  <script src="js/lex/components/layout/lex-lana-dock.js"></script>
 </body>
 </html>

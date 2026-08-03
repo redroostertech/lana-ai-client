@@ -30,11 +30,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Render sidebar menu
     renderMenu('#mainNav', { menuType: 'portal' });
 
-    // Initialize conversation menu
-    if (typeof ConversationMenu !== 'undefined' && ConversationMenu.init()) {
-      ConversationMenu.loadConversations(true);
-    }
-
     // Initialize conversation search modal
     if (typeof ConversationSearchModal !== 'undefined') {
       ConversationSearchModal.init();

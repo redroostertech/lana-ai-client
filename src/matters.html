@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Matters - LanaAI</title>
+  <link rel="stylesheet" href="css/lex-tokens.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
+  <link rel="stylesheet" href="css/lex-chat.css">
   <script src="js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="css/components.css">
   <script src="js/error-reporter.js"></script>
@@ -19,8 +21,7 @@
   <script src="js/version.js"></script>
   <script src="js/menu.js"></script>
   <script src="js/navigation-helpers.js"></script>
-    <script src="js/new-project-modal.js"></script>
-    <script src="js/conversation-menu.js"></script>
+  <script src="js/new-project-modal.js"></script>
   <script src="js/conversation-search-modal.js"></script>
   <script src="js/contact-search-modal.js"></script>
   <script src="js/notifications.js"></script>
@@ -50,6 +51,16 @@
 
   <!-- Matter Skills - Skills Plugin System -->
   <script src="../src/js/matter-skills.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.icons.js"></script>
+  <script src="js/lex/lex.data.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/lex.state.js"></script>
+  <script src="js/lex/lex.utils.js"></script>
+  <script src="js/lex/lex.auth.js"></script>
+  <script src="js/lex/lex-nav.js"></script>
 
   <!-- Drawflow Library for Visual Workflow Builder -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css">
@@ -1320,22 +1331,6 @@
 
       // Initialize notifications panel
       NotificationPanel.init();
-
-      // Initialize conversation menu in sidebar
-      // Wait for menu to be in DOM before initializing
-      if (typeof ConversationMenu !== 'undefined') {
-        // Try to initialize, with retry if container doesn't exist yet
-        const initConversations = () => {
-          if (ConversationMenu.init()) {
-            console.log('[matters.html] ConversationMenu initialized, loading conversations');
-            ConversationMenu.loadConversations(true);
-          } else {
-            console.warn('[matters.html] ConversationMenu init failed, retrying in 100ms');
-            setTimeout(initConversations, 100);
-          }
-        };
-        initConversations();
-      }
 
       // Initialize conversation search modal
       if (typeof ConversationSearchModal !== 'undefined') {
@@ -11134,5 +11129,23 @@
 
   </div>
   <script src="js/lana-one-terminology.js"></script>
+  <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
+  <!-- LANA dock (IDE-style docked chat panel) -->
+  <script src="js/lex/chat/lex-chat.format.js"></script>
+  <script src="js/lex/chat/lex-chat.conversations-api.js"></script>
+  <script src="js/lex/chat/lex-chat.source.js"></script>
+  <script src="js/lex/chat/lex-chat.message.js"></script>
+  <script src="js/lex/chat/lex-chat.activity.js"></script>
+  <script src="js/lex/chat/lex-chat.documents.js"></script>
+  <script src="js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="js/lex/chat/lex-chat.composer.js"></script>
+  <script src="js/lex/chat/lex-chat.thread.js"></script>
+  <script src="js/lex/chat/lex-chat.threads.js"></script>
+  <script src="js/lex/chat/lex-chat.js"></script>
+  <script src="js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="js/lex/chat/lex-chat.index.js"></script>
+  <script src="js/lex/components/chat/lex-lana-panel.js"></script>
+  <script src="js/lex/components/layout/lex-lana-dock.js"></script>
 </body>
 </html>

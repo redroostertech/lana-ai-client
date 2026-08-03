@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Management Boards - LanaAI</title>
+  <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
   <script src="../js/error-reporter.js"></script>
@@ -16,7 +17,6 @@
   <script src="../js/menu.js"></script>
   <script src="../js/navigation-helpers.js"></script>
   <script src="../js/new-project-modal.js"></script>
-  <script src="../js/conversation-menu.js"></script>
   <script src="../js/conversation-search-modal.js"></script>
   <script src="../js/notifications.js"></script>
 
@@ -29,6 +29,7 @@
   <script src="../js/services/session-tracking-service.js"></script>
   <script src="../js/pages/management-boards-team-performance.js"></script>
   <link rel="stylesheet" href="../css/session-tracking.css">
+  <link rel="stylesheet" href="../css/lex-chat.css">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -1096,6 +1097,46 @@
   </script>
 
   <script src="../js/pages/management-boards-main.js"></script>
+
+  <!-- Lex UI core -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <!-- Lex UI components used by the dock/chat -->
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+
+  <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
+
+  <!-- LANA dock (IDE-style docked chat panel) -->
+  <script src="../js/lex/chat/lex-chat.format.js"></script>
+  <script src="../js/lex/chat/lex-chat.conversations-api.js"></script>
+  <script src="../js/lex/chat/lex-chat.source.js"></script>
+  <script src="../js/lex/chat/lex-chat.message.js"></script>
+  <script src="../js/lex/chat/lex-chat.activity.js"></script>
+  <script src="../js/lex/chat/lex-chat.documents.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer.js"></script>
+  <script src="../js/lex/chat/lex-chat.thread.js"></script>
+  <script src="../js/lex/chat/lex-chat.threads.js"></script>
+  <script src="../js/lex/chat/lex-chat.js"></script>
+  <script src="../js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="../js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="../js/lex/chat/lex-chat.index.js"></script>
+  <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-lana-dock.js"></script>
+
   <script src="../js/auth-guard.js"></script>
 </body>
 </html>
