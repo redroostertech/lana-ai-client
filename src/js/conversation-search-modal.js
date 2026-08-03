@@ -151,8 +151,13 @@ const ConversationSearchModal = {
     try {
       this.renderLoading();
 
-      const response = await api.get(`/api/v1/chat/sessions?page=1&limit=10&sort=updated_at&order=desc`);
-      const conversations = response.sessions || [];
+      const response = await api.getConversations({
+        limit: 10,
+        offset: 0,
+        sortBy: 'last_activity',
+        sortOrder: 'desc'
+      });
+      const conversations = this.normalizeConversations(response);
 
       // DEBUG: Log the full API response
       console.log('[ConversationSearchModal.loadRecentConversations] API Response:', response);
@@ -185,9 +190,12 @@ const ConversationSearchModal = {
     try {
       this.renderLoading();
 
-      // Use backend semantic search - sends query to server for AI-powered search
-      const response = await api.get(`/api/v1/chat/sessions?page=1&limit=50&search=${encodeURIComponent(query)}`);
-      const conversations = response.sessions || [];
+      const response = await api.getConversations({
+        limit: 50,
+        offset: 0,
+        search: query
+      });
+      const conversations = this.normalizeConversations(response);
 
       if (conversations.length === 0) {
         this.renderEmpty('No conversations found');
@@ -220,6 +228,32 @@ const ConversationSearchModal = {
     `;
     const html = conversations.map(conv => this.renderResultItem(conv, '')).join('');
     this.resultsContainer.innerHTML = header + html;
+  },
+
+  normalizeConversations(response) {
+    const rows = response && (response.conversations || response.data || response.sessions || []);
+    return rows.map((row) => this.normalizeConversation(row));
+  },
+
+  normalizeConversation(row) {
+    if (!row || typeof row !== 'object') return row;
+    if (row.thread_id || row.matter_id || row.updated_at) return row;
+
+    const conversationId = row.conversationId || row.conversation_id || row.threadId || row.thread_id || row.id;
+    const registryId = row.registryId || row.registry_id || row.id || conversationId;
+    const scope = row.scope || {};
+
+    return {
+      id: registryId,
+      thread_id: conversationId,
+      title: row.title || row.metadata?.title || 'Untitled Chat',
+      metadata: row.metadata || {},
+      matter_id: scope.matterId || scope.matter_id || row.matterId || row.matter_id || '',
+      matter_name: row.matterName || row.matter_name || row.metadata?.matter_name || '',
+      last_message: row.lastMessage || row.last_message || '',
+      created_at: row.createdAt || row.created_at,
+      updated_at: row.lastActivity || row.last_activity || row.updatedAt || row.updated_at || row.createdAt || row.created_at
+    };
   },
 
   /**

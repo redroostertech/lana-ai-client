@@ -75,11 +75,13 @@ describe('ApiClient canonical conversation aliases', () => {
     await api.getConversation('thread/1');
     await api.updateConversation('thread/1', { title: 'Renamed' });
     await api.deleteConversation('thread/1');
+    await api.deleteConversation('thread/2', { permanent: true });
 
     expect(api.post).toHaveBeenCalledWith('/api/v1/conversations', { title: 'Draft' });
     expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1');
     expect(api.patch).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1', { title: 'Renamed' });
-    expect(api.delete).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1');
+    expect(api.delete).toHaveBeenNthCalledWith(1, '/api/v1/conversations/thread%2F1');
+    expect(api.delete).toHaveBeenNthCalledWith(2, '/api/v1/conversations/thread%2F2?permanent=true');
   });
 
   test('loads messages, reads generation state, and updates scope through canonical conversation subresources', async () => {

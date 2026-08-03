@@ -2,7 +2,7 @@
  * Rename Conversation Helper
  *
  * Single source of truth for renaming a conversation thread from the client.
- * Wraps the PUT /api/v1/conversation-threads/:id call, validates input, and
+ * Wraps the PATCH /api/v1/conversations/:id call, validates input, and
  * fans out a window-level `conversation:renamed` CustomEvent so any mounted
  * view (chat header, sidebar menu, workspace Conversations tab) can react
  * without coupling to each other.
@@ -65,7 +65,7 @@
    * Rename a conversation thread via the backend.
    *
    * @param {object} deps
-   * @param {object} deps.api - api client with .put()
+   * @param {object} deps.api - api client with .updateConversation()
    * @param {string} deps.threadId - conversation_threads row id or chat session thread_id
    * @param {string} [deps.eventThreadId] - stream thread_id to emit for row listeners
    * @param {string} [deps.registryId] - conversation_threads row id to emit for registry listeners
@@ -74,8 +74,8 @@
    * @returns {Promise<{ threadId: string, title: string }>}
    */
   async function renameConversation(deps) {
-    if (!deps || !deps.api || typeof deps.api.put !== 'function') {
-      throw new Error('renameConversation: api.put is required');
+    if (!deps || !deps.api || typeof deps.api.updateConversation !== 'function') {
+      throw new Error('renameConversation: api.updateConversation is required');
     }
     if (!deps.threadId) {
       throw new Error('renameConversation: threadId is required');
@@ -88,8 +88,7 @@
       throw err;
     }
 
-    var path = '/api/v1/conversation-threads/' + encodeURIComponent(deps.threadId);
-    await deps.api.put(path, { title: v.value });
+    await deps.api.updateConversation(deps.threadId, { title: v.value });
 
     emitRenamed({
       threadId: deps.threadId,

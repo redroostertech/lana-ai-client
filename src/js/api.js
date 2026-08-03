@@ -1900,8 +1900,9 @@ class ApiClient {
     return this.patch(`/api/v1/conversations/${encodeURIComponent(conversationId)}`, patch);
   }
 
-  async deleteConversation(conversationId) {
-    return this.delete(`/api/v1/conversations/${encodeURIComponent(conversationId)}`);
+  async deleteConversation(conversationId, opts = {}) {
+    const query = opts.permanent === true ? '?permanent=true' : '';
+    return this.delete(`/api/v1/conversations/${encodeURIComponent(conversationId)}${query}`);
   }
 
   async getConversationMessages(conversationId, opts = {}) {

@@ -79,7 +79,7 @@ const ConversationMenu = {
     // (utils/rename-conversation.js) dispatches this on every rename, from
     // any surface (kebab modal, workspace Conversations tab, future inline
     // edit). Updating the cached row + re-rendering avoids a full
-    // /api/v1/conversation-threads list refetch for the common case.
+    // conversation list refetch for the common case.
     //
     // Bind once per ConversationMenu lifetime — `init` is idempotent (called
     // from sidebar mount), so we guard against double-binding.
@@ -205,9 +205,14 @@ const ConversationMenu = {
       return this.fetchConversationThreads({ excludePinned: true });
     }
 
-    // Add cache-busting parameter when resetting to ensure fresh data after title updates
-    const cacheBuster = reset ? `&_=${Date.now()}` : '';
-    return api.get(`/api/v1/chat/sessions?page=${this.page}&limit=${this.limit}&sort=updated_at&order=desc&exclude_pinned=true${cacheBuster}`);
+    const response = await api.getConversations({
+      limit: this.limit,
+      offset: (this.page - 1) * this.limit,
+      sortBy: 'last_activity',
+      sortOrder: 'desc',
+      ...(reset ? { _: Date.now() } : {})
+    });
+    return this.normalizeConversationResponse(response);
   },
 
   // Page-1 only — fetches the pinned strip in parallel with the regular list.
@@ -222,6 +227,9 @@ const ConversationMenu = {
   },
 
   async fetchConversationThreads(opts = {}) {
+    // TODO(deprecation): Legacy insights sidebar mode still reads
+    // /api/v1/conversation-threads until pinned/page-scope parity lands on the
+    // canonical /api/v1/conversations list contract.
     const pageScopes = (this.scope && this.scope.pageScopes) || [];
     const limit = this.limit;
     const offset = opts.pinnedOnly ? 0 : (this.page - 1) * limit;
@@ -283,6 +291,41 @@ const ConversationMenu = {
         offset,
         total: allThreads.length
       }
+    };
+  },
+
+  normalizeConversationResponse(response) {
+    const rows = response && (response.conversations || response.data || response.sessions || []);
+    const conversations = rows.map((row) => this.normalizeConversation(row));
+    const pagination = response && response.pagination || {};
+
+    return {
+      sessions: conversations,
+      hasMore: pagination.hasMore === true || response?.hasMore === true,
+      pagination
+    };
+  },
+
+  normalizeConversation(row) {
+    if (!row || typeof row !== 'object') return row;
+    if (row.thread_id || row.matter_id || row.updated_at) return row;
+
+    const conversationId = row.conversationId || row.conversation_id || row.threadId || row.thread_id || row.id;
+    const registryId = row.registryId || row.registry_id || row.id || conversationId;
+    const scope = row.scope || {};
+
+    return {
+      id: registryId,
+      thread_id: conversationId,
+      title: row.title || row.metadata?.title || 'Untitled Chat',
+      metadata: row.metadata || {},
+      matter_id: scope.matterId || scope.matter_id || row.matterId || row.matter_id || '',
+      matter_name: row.matterName || row.matter_name || row.metadata?.matter_name || '',
+      last_message: row.lastMessage || row.last_message || '',
+      is_pinned: row.isPinned === true || row.is_pinned === true,
+      pinned_at: row.pinnedAt || row.pinned_at || null,
+      created_at: row.createdAt || row.created_at,
+      updated_at: row.lastActivity || row.last_activity || row.updatedAt || row.updated_at || row.createdAt || row.created_at
     };
   },
 

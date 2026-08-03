@@ -800,21 +800,19 @@ const ConversationActionsModal = {
     const threadId = this.selectedConversationRegistryId || this.selectedConversationId;
     const streamThreadId = this.selectedConversationThreadId || threadId;
 
-    // Delegate to the shared rename helper. It:
-    //   - validates the title (empty / too long),
-    //   - PUTs /api/v1/conversation-threads/:id,
-    //   - dispatches `conversation:renamed` on window so the chat header,
-    //     sidebar, and workspace Conversations tab can self-refresh.
+    // Delegate to the shared rename helper. It validates the title, updates
+    // /api/v1/conversations/:id, and dispatches `conversation:renamed` so
+    // mounted views can self-refresh.
     const helper = (typeof window !== 'undefined') ? window.RenameConversation : null;
     if (!helper || typeof helper.renameConversation !== 'function') {
-      console.error('RenameConversation helper not loaded — falling back to inline PUT.');
+      console.error('RenameConversation helper not loaded — falling back to inline canonical update.');
       try {
         const trimmed = (rawTitle || '').trim();
         if (!trimmed) {
           Toast.error('Conversation name cannot be empty');
           return;
         }
-        await api.put(`/api/v1/conversation-threads/${threadId}`, { title: trimmed });
+        await api.updateConversation(threadId, { title: trimmed });
         Toast.success('Conversation renamed successfully');
         this.closeRename();
         if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
@@ -879,7 +877,7 @@ const ConversationActionsModal = {
     });
   },
 
-  // Delete conversation (soft archive — DELETE /chat/sessions/:id)
+  // Delete conversation (soft archive)
   async deleteConversation() {
     if (!this.selectedConversationId || !this.selectedConversationTitle) {
       Toast.error('No conversation selected');
@@ -903,7 +901,7 @@ const ConversationActionsModal = {
       `Archive "${convTitle}"? It will be hidden from the list but can be restored later.`,
       async () => {
         try {
-          await api.delete(`/api/v1/chat/sessions/${convId}`);
+          await api.deleteConversation(convId);
           Toast.success('Conversation archived');
 
           if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
@@ -967,7 +965,7 @@ const ConversationActionsModal = {
     }
   },
 
-  // Hard delete (cannot be recovered) — DELETE /conversation-threads/:id/permanent
+  // Hard delete (cannot be recovered)
   async permanentDeleteConversation() {
     if (!this.selectedConversationId || !this.selectedConversationTitle) {
       Toast.error('No conversation selected');
@@ -990,8 +988,9 @@ const ConversationActionsModal = {
       `Permanently delete "${convTitle}" and all its messages? This cannot be undone.`,
       async () => {
         try {
-          const result = await api.hardDeleteThread(convId);
-          const deletedMessages = (result && (result.deleted_messages || result.deletedMessages)) || 0;
+          const result = await api.deleteConversation(convId, { permanent: true });
+          const payload = (result && (result.data || result)) || {};
+          const deletedMessages = payload.deleted_messages || payload.deletedMessages || 0;
           Toast.success(deletedMessages > 0
             ? `Conversation and ${deletedMessages} message${deletedMessages === 1 ? '' : 's'} deleted`
             : 'Conversation deleted');

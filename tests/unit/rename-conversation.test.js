@@ -3,7 +3,7 @@
  *
  * Covers:
  *   - validateTitle() input handling
- *   - renameConversation() endpoint, payload, event dispatch
+ *   - renameConversation() canonical API helper, payload, event dispatch
  *   - error paths (missing api, missing threadId, invalid title, API failure)
  */
 
@@ -62,7 +62,7 @@ describe('rename-conversation helper', () => {
 
   describe('renameConversation', () => {
     function makeApi(impl) {
-      return { put: jest.fn(impl || (() => Promise.resolve({}))) };
+      return { updateConversation: jest.fn(impl || (() => Promise.resolve({}))) };
     }
 
     function makeTarget() {
@@ -83,7 +83,7 @@ describe('rename-conversation helper', () => {
       };
     }
 
-    test('calls PUT /api/v1/conversation-threads/:id with trimmed title', async () => {
+    test('calls canonical updateConversation with trimmed title', async () => {
       const api = makeApi();
       const target = makeTarget();
       await mod.renameConversation({
@@ -92,11 +92,11 @@ describe('rename-conversation helper', () => {
         title: '  My New Title  ',
         eventTarget: target
       });
-      expect(api.put).toHaveBeenCalledTimes(1);
-      expect(api.put).toHaveBeenCalledWith('/api/v1/conversation-threads/abc-123', { title: 'My New Title' });
+      expect(api.updateConversation).toHaveBeenCalledTimes(1);
+      expect(api.updateConversation).toHaveBeenCalledWith('abc-123', { title: 'My New Title' });
     });
 
-    test('encodes threadId so weird chars are URL-safe', async () => {
+    test('passes raw threadId to the canonical API helper', async () => {
       const api = makeApi();
       const target = makeTarget();
       await mod.renameConversation({
@@ -105,8 +105,7 @@ describe('rename-conversation helper', () => {
         title: 'X',
         eventTarget: target
       });
-      const calledPath = api.put.mock.calls[0][0];
-      expect(calledPath).toBe('/api/v1/conversation-threads/' + encodeURIComponent('a/b c'));
+      expect(api.updateConversation.mock.calls[0][0]).toBe('a/b c');
     });
 
     test('dispatches conversation:renamed event with threadId + title', async () => {
@@ -152,18 +151,18 @@ describe('rename-conversation helper', () => {
         title: '   ',
         eventTarget: target
       })).rejects.toMatchObject({ code: 'INVALID_TITLE' });
-      expect(api.put).not.toHaveBeenCalled();
+      expect(api.updateConversation).not.toHaveBeenCalled();
     });
 
-    test('throws if api is missing or has no .put()', async () => {
+    test('throws if api is missing or has no .updateConversation()', async () => {
       const target = makeTarget();
       await expect(mod.renameConversation({
         threadId: 't', title: 'X', eventTarget: target
-      })).rejects.toThrow(/api\.put is required/);
+      })).rejects.toThrow(/api\.updateConversation is required/);
 
       await expect(mod.renameConversation({
         api: {}, threadId: 't', title: 'X', eventTarget: target
-      })).rejects.toThrow(/api\.put is required/);
+      })).rejects.toThrow(/api\.updateConversation is required/);
     });
 
     test('throws if threadId is missing', async () => {
@@ -172,7 +171,7 @@ describe('rename-conversation helper', () => {
       await expect(mod.renameConversation({
         api, title: 'X', eventTarget: target
       })).rejects.toThrow(/threadId is required/);
-      expect(api.put).not.toHaveBeenCalled();
+      expect(api.updateConversation).not.toHaveBeenCalled();
     });
 
     test('propagates API errors and does NOT emit the event', async () => {
