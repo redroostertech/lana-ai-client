@@ -36,7 +36,6 @@
       scripts: [
         'js/chat-demo-responses.js',
         'js/file-drawer.js',
-        'js/agentic-ui.js',
         'js/chat.js'
       ],
       stylesheets: []
@@ -675,17 +674,6 @@
       scripts: [
         'js/chat-demo-responses.js',
         'js/file-drawer.js',
-        'js/agentic-ui.js',
-        'js/chat.js'
-      ],
-      stylesheets: []
-    },
-
-    'chat/demo.html': {
-      title: 'Chat Demo',
-      activeNav: 'chat',
-      scripts: [
-        'js/chat-demo-responses.js',
         'js/chat.js'
       ],
       stylesheets: []
