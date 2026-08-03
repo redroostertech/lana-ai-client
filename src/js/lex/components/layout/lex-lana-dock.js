@@ -53,11 +53,6 @@
     if (typeof api.setConversationScope === 'function') {
       return api.setConversationScope(conversationId, { matter_id: matterId || null });
     }
-    if (typeof api.setChatSessionMatter === 'function') {
-      // TODO(deprecation): Replace chat-session scope persistence with the
-      // canonical conversations API wrapper once api.js exposes it.
-      return api.setChatSessionMatter(conversationId, matterId || null);
-    }
     return Promise.reject(new Error('conversation scope API not available'));
   }
 

@@ -20,43 +20,11 @@
   const { LexElement } = global.Lex;
   if (!LexElement) { console.error('[lex-chat-threads] LexElement not loaded'); return; }
 
-  function conversationThreadsPath(opts) {
-    var params = 'limit=50&sort_by=last_activity&sort_order=desc';
-    if (opts && opts.pageScope) params = 'page_scope=' + encodeURIComponent(opts.pageScope) + '&' + params;
-    if (opts && opts.matterId) params += '&matter_id=' + encodeURIComponent(opts.matterId);
-    // TODO(deprecate-chat-routes): this is the legacy conversation_threads
-    // registry endpoint. Dock/thread-list callers should eventually read from
-    // /api/v1/conversations and let the backend hide registry rows.
-    return '/api/v1/conversation-threads?' + params;
-  }
-
   function listConversations(opts) {
     if (typeof api !== 'undefined' && typeof api.getConversations === 'function') {
       return api.getConversations(opts || {});
     }
-    return api.get(conversationThreadsPath(opts));
-  }
-
-  function activeGenerationPath(conversationId) {
-    return '/api/v1/conversations/' + encodeURIComponent(conversationId) + '/generation';
-  }
-
-  function legacyStopGenerationPath(generationId) {
-    return '/api/v1/streaming/sessions/' + encodeURIComponent(generationId) + '/stop';
-  }
-
-  function deleteConversationThreadPath(threadId) {
-    // TODO(deprecate-chat-routes): replace public /conversation-threads delete
-    // after all pages load api.js with deleteConversation().
-    return '/api/v1/conversation-threads/' + encodeURIComponent(threadId);
-  }
-
-  function activeGenerationIdFromResponse(response) {
-    var data = response && response.data && typeof response.data === 'object'
-      ? response.data
-      : response;
-    if (!data || data.active !== true) return null;
-    return data.generation_id || data.session_id || null;
+    return Promise.reject(new Error('canonical conversation API not available'));
   }
 
   class LexChatThreads extends LexElement {
@@ -302,25 +270,26 @@
       this._loading = true;
       this._scheduleUpdate();
 
+      var mapThread = function (t) {
+        var matterName = (t.matter_name || (t.metadata && t.metadata.matter_name) || '').trim();
+        if (matterName.toLowerCase() === 'unknown matter') matterName = '';
+        return {
+          id: t.id || t.registryId || t.registry_id || t.conversationId || t.conversation_id,
+          thread_id: t.thread_id || t.conversationId || t.conversation_id,
+          title: t.title || (t.metadata && t.metadata.title) || 'Untitled Chat',
+          thread_type: t.thread_type || t.type || 'ad_hoc',
+          subtitle: matterName,
+          matter_id: t.matter_id || t.scope?.matterId || t.scope?.matter_id || null,
+          is_pinned: t.is_pinned === true || t.isPinned === true,
+          last_activity: t.last_activity || t.lastActivity || t.updated_at || t.updatedAt || t.created_at || t.createdAt
+        };
+      };
+
       try {
         if (this.recents) {
           // App-wide conversation registry rows. Recents is a conversation
           // control surface, so its source of truth is conversation_threads:
           // id drives rename/pin/archive/delete, thread_id drives stream load.
-          var mapThread = function (t) {
-            var matterName = (t.matter_name || (t.metadata && t.metadata.matter_name) || '').trim();
-            if (matterName.toLowerCase() === 'unknown matter') matterName = '';
-            return {
-              id: t.id || t.registryId || t.registry_id || t.conversationId || t.conversation_id,
-              thread_id: t.thread_id || t.conversationId || t.conversation_id,
-              title: t.title || (t.metadata && t.metadata.title) || 'Untitled Chat',
-              thread_type: t.thread_type || t.type || 'ad_hoc',
-              subtitle: matterName,
-              matter_id: t.matter_id || t.scope?.matterId || t.scope?.matter_id || null,
-              is_pinned: t.is_pinned === true || t.isPinned === true,
-              last_activity: t.last_activity || t.lastActivity || t.updated_at || t.updatedAt || t.created_at || t.createdAt
-            };
-          };
           var calls = [listConversations({ matterId: null })];
           var wantMatter = !!this.matterId;
           if (wantMatter) {
@@ -346,7 +315,8 @@
         } else {
           this._groups = null;
           var result = await listConversations({ pageScope: this.pageScope, matterId: this.matterId });
-          this._threads = result.data || result.threads || result.conversations || [];
+          var rows = result.data || result.threads || result.conversations || [];
+          this._threads = rows.map(mapThread).filter(function (t) { return !!t.thread_id; });
         }
         if (this._threads.length === 0 && !this._userToggledCollapsed) {
           this.collapsed = true;
@@ -418,25 +388,13 @@
       var thread = this._findThread(threadId);
       var conversationId = thread && thread.thread_id;
       if (!conversationId) {
-        // TODO(deprecate-chat-routes): legacy thread rows sometimes expose only
-        // conversation_threads.id here. That id is not safe to send to the
-        // /streaming/sessions/:generationId/stop route, so stop is skipped until
-        // the list API exposes a canonical conversationId on every row.
         return;
       }
 
       try {
         if (typeof api.stopConversationGeneration === 'function') {
           await api.stopConversationGeneration(conversationId);
-          return;
         }
-
-        // Compatibility fallback for older API clients: look up the active
-        // generation first, then stop by generation id.
-        var status = await api.get(activeGenerationPath(conversationId));
-        var generationId = activeGenerationIdFromResponse(status);
-        if (!generationId) return;
-        await api.post(legacyStopGenerationPath(generationId), {});
       } catch (_) {
         // Best-effort only: deletion should still proceed when no generation is
         // active or an older backend lacks active-generation lookup.
@@ -456,7 +414,7 @@
         if (typeof api.deleteConversation === 'function') {
           await api.deleteConversation(threadId);
         } else {
-          await api.delete(deleteConversationThreadPath(threadId));
+          throw new Error('canonical conversation delete API not available');
         }
         this.removeThread(threadId);
       } catch (err) {

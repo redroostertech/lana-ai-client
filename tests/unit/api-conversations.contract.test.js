@@ -105,17 +105,13 @@ describe('ApiClient canonical conversation aliases', () => {
     api.updateConversationScope = jest.fn().mockResolvedValue({ id: 'scoped' });
 
     await api.createConversationRegistryEntry({ title: 'Draft' });
-    await api.createConversationThread({ title: 'Thread' });
     await api.updateConversationRegistryEntry('registry-1', { title: 'Renamed' });
-    await api.updateConversationThread('registry-2', { title: 'Thread Renamed' });
     await api.setConversationMatter('conversation-1', 'matter-1');
     await api.setConversationScope('conversation-2', { matterId: 'matter-2' });
     await api.setConversationScope('conversation-3', { scope: { matter_id: 'matter-3' } });
 
     expect(api.createConversation).toHaveBeenNthCalledWith(1, { title: 'Draft' });
-    expect(api.createConversation).toHaveBeenNthCalledWith(2, { title: 'Thread' });
     expect(api.updateConversation).toHaveBeenNthCalledWith(1, 'registry-1', { title: 'Renamed' });
-    expect(api.updateConversation).toHaveBeenNthCalledWith(2, 'registry-2', { title: 'Thread Renamed' });
     expect(api.updateConversationScope).toHaveBeenNthCalledWith(1, 'conversation-1', 'matter-1');
     expect(api.updateConversationScope).toHaveBeenNthCalledWith(2, 'conversation-2', 'matter-2');
     expect(api.updateConversationScope).toHaveBeenNthCalledWith(3, 'conversation-3', 'matter-3');

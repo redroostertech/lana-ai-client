@@ -115,12 +115,7 @@
     if (typeof client.createConversationRegistryEntry === 'function') {
       return client.createConversationRegistryEntry(payload).then(normalizeRegistryResponse);
     }
-    if (typeof client.createConversationThread === 'function') {
-      return client.createConversationThread(payload).then(normalizeRegistryResponse);
-    }
-    // TODO(deprecation): Remove after all pages load api.js with the canonical
-    // conversation wrapper methods.
-    return client.post('/api/v1/conversation-threads', payload).then(normalizeRegistryResponse);
+    return Promise.reject(new Error('canonical conversation create API not available'));
   }
 
   function updateConversationRegistryEntry(registryId, payload) {
@@ -129,12 +124,7 @@
     if (typeof client.updateConversationRegistryEntry === 'function') {
       return client.updateConversationRegistryEntry(registryId, payload);
     }
-    if (typeof client.updateConversationThread === 'function') {
-      return client.updateConversationThread(registryId, payload);
-    }
-    // TODO(deprecation): Remove after all pages load api.js with the canonical
-    // conversation wrapper methods.
-    return client.put('/api/v1/conversation-threads/' + registryId, payload);
+    return Promise.reject(new Error('canonical conversation update API not available'));
   }
 
   var stylesInjected = false;

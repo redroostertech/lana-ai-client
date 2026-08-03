@@ -103,12 +103,8 @@ describe('LANA dock/panel conversation API routing', () => {
     }));
   });
 
-  test('panel createThread preserves the legacy conversation-threads fallback', async () => {
-    const api = {
-      post: jest.fn(() => Promise.resolve({
-        data: { id: 'registry-legacy', thread_id: 'conversation-legacy' }
-      }))
-    };
+  test('panel createThread requires the canonical conversation wrapper', async () => {
+    const api = {};
     const { Component } = loadComponent(
       'src/js/lex/components/chat/lex-lana-panel.js',
       api,
@@ -116,17 +112,13 @@ describe('LANA dock/panel conversation API routing', () => {
     );
     const panel = new Component();
 
-    await panel.createThread({ title: 'Fallback Thread' });
-
-    expect(api.post).toHaveBeenCalledWith('/api/v1/conversation-threads', {
-      title: 'Fallback Thread'
-    });
+    await expect(panel.createThread({ title: 'Missing API Thread' }))
+      .rejects.toThrow('canonical conversation create API not available');
   });
 
   test('dock scope persistence prefers canonical conversation scope wrappers', async () => {
     const api = {
-      setConversationMatter: jest.fn(() => Promise.resolve({ ok: true })),
-      setChatSessionMatter: jest.fn()
+      setConversationMatter: jest.fn(() => Promise.resolve({ ok: true }))
     };
     const { Component } = loadComponent(
       'src/js/lex/components/layout/lex-lana-dock.js',
@@ -150,7 +142,6 @@ describe('LANA dock/panel conversation API routing', () => {
     await Promise.resolve();
 
     expect(api.setConversationMatter).toHaveBeenCalledWith('conversation-1', 'matter-1');
-    expect(api.setChatSessionMatter).not.toHaveBeenCalled();
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 });

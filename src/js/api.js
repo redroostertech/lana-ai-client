@@ -1924,21 +1924,12 @@ class ApiClient {
     return this.patch(`/api/v1/conversations/${encodeURIComponent(conversationId)}/scope`, { matter_id: matterId || null });
   }
 
-  // Compatibility aliases for dock/panel code that should not know whether
-  // the current backing store is conversation_threads or chat_sessions.
+  // Canonical aliases for dock/panel code.
   async createConversationRegistryEntry(payload = {}) {
     return this.createConversation(payload);
   }
 
   async updateConversationRegistryEntry(conversationId, patch) {
-    return this.updateConversation(conversationId, patch);
-  }
-
-  async createConversationThread(payload = {}) {
-    return this.createConversation(payload);
-  }
-
-  async updateConversationThread(conversationId, patch) {
     return this.updateConversation(conversationId, patch);
   }
 
@@ -1954,14 +1945,6 @@ class ApiClient {
       null
     );
     return this.updateConversationScope(conversationId, matterId);
-  }
-
-  /**
-   * Re-scope a conversation to a matter, or clear its scope with null.
-   * The scope belongs to the conversation, not the page it started from.
-   */
-  setChatSessionMatter(sessionId, matterId) {
-    return this.put(`/api/v1/chat/sessions/${sessionId}/matter`, { matter_id: matterId || null });
   }
 
   // Pinned chat sessions — mirrors /matters/pinned. When matterId is supplied

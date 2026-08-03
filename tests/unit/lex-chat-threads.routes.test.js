@@ -56,6 +56,9 @@ function makeApi(overrides = {}) {
     get: jest.fn(async () => ({ data: [] })),
     post: jest.fn(async () => ({ success: true })),
     delete: jest.fn(async () => ({ success: true })),
+    getConversations: jest.fn(async () => ({ conversations: [] })),
+    stopConversationGeneration: jest.fn(async () => ({ success: true })),
+    deleteConversation: jest.fn(async () => ({ success: true })),
     ...overrides
   };
 }
@@ -87,33 +90,16 @@ describe('lex-chat-threads route contract', () => {
     ]);
   });
 
-  test('loads recents from the legacy conversation registry route', async () => {
+  test('loads page-scoped threads through the canonical conversation wrapper', async () => {
     const api = makeApi({
-      get: jest.fn(async () => ({
-        data: [{
-          id: 'registry-1',
-          thread_id: 'conversation-1',
-          title: 'Recent chat',
-          last_activity: '2026-08-03T12:00:00Z'
+      getConversations: jest.fn(async () => ({
+        conversations: [{
+          registryId: 'registry-1',
+          conversationId: 'conversation-1',
+          title: 'Dashboard chat'
         }]
       }))
     });
-    const ThreadList = loadThreads(api);
-    const el = new ThreadList();
-    el.recents = true;
-    el.pageScope = '';
-    el.matterId = null;
-
-    await el.loadThreads();
-
-    expect(api.get).toHaveBeenCalledWith('/api/v1/conversation-threads?limit=50&sort_by=last_activity&sort_order=desc');
-    expect(el._threads).toEqual([
-      expect.objectContaining({ id: 'registry-1', thread_id: 'conversation-1', title: 'Recent chat' })
-    ]);
-  });
-
-  test('loads page-scoped threads through the same legacy registry route', async () => {
-    const api = makeApi();
     const ThreadList = loadThreads(api);
     const el = new ThreadList();
     el.recents = false;
@@ -122,16 +108,15 @@ describe('lex-chat-threads route contract', () => {
 
     await el.loadThreads();
 
-    expect(api.get).toHaveBeenCalledWith(
-      '/api/v1/conversation-threads?page_scope=dashboard&limit=50&sort_by=last_activity&sort_order=desc&matter_id=matter-1'
-    );
+    expect(api.getConversations).toHaveBeenCalledWith({ pageScope: 'dashboard', matterId: 'matter-1' });
+    expect(api.get).not.toHaveBeenCalled();
+    expect(el._threads).toEqual([
+      expect.objectContaining({ id: 'registry-1', thread_id: 'conversation-1' })
+    ]);
   });
 
   test('delete prefers the canonical conversation generation stop wrapper', async () => {
-    const api = makeApi({
-      stopConversationGeneration: jest.fn(async () => ({ success: true })),
-      deleteConversation: jest.fn(async () => ({ success: true }))
-    });
+    const api = makeApi();
     const ThreadList = loadThreads(api);
     const el = new ThreadList();
     el.activeThread = 'registry-1';
@@ -147,24 +132,6 @@ describe('lex-chat-threads route contract', () => {
     expect(el._events).toContainEqual({ name: 'lex-thread-delete', detail: { threadId: 'registry-1' } });
   });
 
-  test('delete fallback stops by active generation id, not by registry thread id', async () => {
-    const api = makeApi({
-      get: jest.fn(async () => ({ active: true, generation_id: 'generation-1' }))
-    });
-    const ThreadList = loadThreads(api);
-    const el = new ThreadList();
-    el.activeThread = 'registry-1';
-    el._threads = [{ id: 'registry-1', thread_id: 'conversation-1', title: 'Delete me' }];
-
-    await el._deleteThread('registry-1');
-
-    expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/conversation-1/generation');
-    expect(api.post).toHaveBeenCalledWith('/api/v1/streaming/sessions/generation-1/stop', {});
-    expect(api.post).not.toHaveBeenCalledWith('/api/v1/streaming/sessions/registry-1/stop', {});
-    expect(api.delete).toHaveBeenCalledWith('/api/v1/conversation-threads/registry-1');
-    expect(el._events).toContainEqual({ name: 'lex-thread-delete', detail: { threadId: 'registry-1' } });
-  });
-
   test('delete skips stop when only the registry id is available', async () => {
     const api = makeApi();
     const ThreadList = loadThreads(api);
@@ -175,6 +142,8 @@ describe('lex-chat-threads route contract', () => {
 
     expect(api.get).not.toHaveBeenCalled();
     expect(api.post).not.toHaveBeenCalled();
-    expect(api.delete).toHaveBeenCalledWith('/api/v1/conversation-threads/registry-only');
+    expect(api.stopConversationGeneration).not.toHaveBeenCalled();
+    expect(api.deleteConversation).toHaveBeenCalledWith('registry-only');
+    expect(api.delete).not.toHaveBeenCalled();
   });
 });
