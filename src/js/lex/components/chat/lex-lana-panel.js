@@ -91,18 +91,36 @@
     return api;
   }
 
+  function normalizeRegistryThread(row) {
+    if (!row || typeof row !== 'object') return row;
+    if (!row.conversationId && !row.registryId && !row.conversation_id && !row.registry_id) return row;
+    var normalized = Object.assign({}, row);
+    if (!normalized.id) normalized.id = row.registryId || row.registry_id || row.conversationId || row.conversation_id;
+    if (!normalized.thread_id) normalized.thread_id = row.conversationId || row.conversation_id;
+    if (!normalized.thread_type) normalized.thread_type = row.type || 'ad_hoc';
+    if (!normalized.matter_id && row.scope) normalized.matter_id = row.scope.matterId || row.scope.matter_id || null;
+    return normalized;
+  }
+
+  function normalizeRegistryResponse(resp) {
+    if (resp && resp.data) {
+      return Object.assign({}, resp, { data: normalizeRegistryThread(resp.data) });
+    }
+    return normalizeRegistryThread(resp);
+  }
+
   function createConversationRegistryEntry(payload) {
     var client = requireApi();
     if (!client) return Promise.reject(new Error('api not available'));
     if (typeof client.createConversationRegistryEntry === 'function') {
-      return client.createConversationRegistryEntry(payload);
+      return client.createConversationRegistryEntry(payload).then(normalizeRegistryResponse);
     }
     if (typeof client.createConversationThread === 'function') {
-      return client.createConversationThread(payload);
+      return client.createConversationThread(payload).then(normalizeRegistryResponse);
     }
-    // TODO(deprecation): Replace the legacy conversation-threads route with
-    // the canonical conversations API wrapper once api.js exposes it.
-    return client.post('/api/v1/conversation-threads', payload);
+    // TODO(deprecation): Remove after all pages load api.js with the canonical
+    // conversation wrapper methods.
+    return client.post('/api/v1/conversation-threads', payload).then(normalizeRegistryResponse);
   }
 
   function updateConversationRegistryEntry(registryId, payload) {
@@ -114,8 +132,8 @@
     if (typeof client.updateConversationThread === 'function') {
       return client.updateConversationThread(registryId, payload);
     }
-    // TODO(deprecation): Replace the legacy conversation-threads route with
-    // the canonical conversations API wrapper once api.js exposes it.
+    // TODO(deprecation): Remove after all pages load api.js with the canonical
+    // conversation wrapper methods.
     return client.put('/api/v1/conversation-threads/' + registryId, payload);
   }
 

@@ -61,6 +61,32 @@ function makeApi(overrides = {}) {
 }
 
 describe('lex-chat-threads route contract', () => {
+  test('loads recents through the canonical conversation wrapper when available', async () => {
+    const api = makeApi({
+      getConversations: jest.fn(async () => ({
+        conversations: [{
+          registryId: 'registry-1',
+          conversationId: 'conversation-1',
+          title: 'Recent chat',
+          lastActivity: '2026-08-03T12:00:00Z'
+        }]
+      }))
+    });
+    const ThreadList = loadThreads(api);
+    const el = new ThreadList();
+    el.recents = true;
+    el.pageScope = '';
+    el.matterId = null;
+
+    await el.loadThreads();
+
+    expect(api.getConversations).toHaveBeenCalledWith({ matterId: null });
+    expect(api.get).not.toHaveBeenCalled();
+    expect(el._threads).toEqual([
+      expect.objectContaining({ id: 'registry-1', thread_id: 'conversation-1', title: 'Recent chat' })
+    ]);
+  });
+
   test('loads recents from the legacy conversation registry route', async () => {
     const api = makeApi({
       get: jest.fn(async () => ({
@@ -103,7 +129,8 @@ describe('lex-chat-threads route contract', () => {
 
   test('delete prefers the canonical conversation generation stop wrapper', async () => {
     const api = makeApi({
-      stopConversationGeneration: jest.fn(async () => ({ success: true }))
+      stopConversationGeneration: jest.fn(async () => ({ success: true })),
+      deleteConversation: jest.fn(async () => ({ success: true }))
     });
     const ThreadList = loadThreads(api);
     const el = new ThreadList();
@@ -115,7 +142,8 @@ describe('lex-chat-threads route contract', () => {
     expect(api.stopConversationGeneration).toHaveBeenCalledWith('conversation-1');
     expect(api.get).not.toHaveBeenCalled();
     expect(api.post).not.toHaveBeenCalled();
-    expect(api.delete).toHaveBeenCalledWith('/api/v1/conversation-threads/registry-1');
+    expect(api.deleteConversation).toHaveBeenCalledWith('registry-1');
+    expect(api.delete).not.toHaveBeenCalled();
     expect(el._events).toContainEqual({ name: 'lex-thread-delete', detail: { threadId: 'registry-1' } });
   });
 

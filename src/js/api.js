@@ -1875,10 +1875,6 @@ class ApiClient {
 
   /**
    * Canonical conversation API surface for new client code.
-   *
-   * TODO(conversation-api): switch these wrappers to /api/v1/conversations
-   * once that backend route represents chat containers instead of raw message
-   * rows. Until then, metadata/list operations delegate to conversation_threads.
    */
   async getConversations(opts = {}) {
     const params = this._conversationListParams({
@@ -1887,23 +1883,23 @@ class ApiClient {
       sort_order: opts.sort_order || opts.sortOrder || 'desc',
       ...opts
     });
-    return this.get(`/api/v1/conversation-threads?${params.toString()}`);
+    return this.get(`/api/v1/conversations?${params.toString()}`);
   }
 
   async createConversation(payload = {}) {
-    return this.post('/api/v1/conversation-threads', payload);
+    return this.post('/api/v1/conversations', payload);
   }
 
   async getConversation(conversationId) {
-    return this.get(`/api/v1/conversation-threads/${encodeURIComponent(conversationId)}`);
+    return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}`);
   }
 
   async updateConversation(conversationId, patch) {
-    return this.put(`/api/v1/conversation-threads/${encodeURIComponent(conversationId)}`, patch);
+    return this.patch(`/api/v1/conversations/${encodeURIComponent(conversationId)}`, patch);
   }
 
   async deleteConversation(conversationId) {
-    return this.delete(`/api/v1/conversation-threads/${encodeURIComponent(conversationId)}`);
+    return this.delete(`/api/v1/conversations/${encodeURIComponent(conversationId)}`);
   }
 
   async getConversationMessages(conversationId, opts = {}) {

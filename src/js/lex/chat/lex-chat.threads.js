@@ -30,6 +30,13 @@
     return '/api/v1/conversation-threads?' + params;
   }
 
+  function listConversations(opts) {
+    if (typeof api !== 'undefined' && typeof api.getConversations === 'function') {
+      return api.getConversations(opts || {});
+    }
+    return api.get(conversationThreadsPath(opts));
+  }
+
   function activeGenerationPath(conversationId) {
     return '/api/v1/conversations/' + encodeURIComponent(conversationId) + '/generation';
   }
@@ -40,7 +47,7 @@
 
   function deleteConversationThreadPath(threadId) {
     // TODO(deprecate-chat-routes): replace public /conversation-threads delete
-    // with /api/v1/conversations/:conversationId once the backend facade lands.
+    // after all pages load api.js with deleteConversation().
     return '/api/v1/conversation-threads/' + encodeURIComponent(threadId);
   }
 
@@ -304,26 +311,26 @@
             var matterName = (t.matter_name || (t.metadata && t.metadata.matter_name) || '').trim();
             if (matterName.toLowerCase() === 'unknown matter') matterName = '';
             return {
-              id: t.id,
-              thread_id: t.thread_id,
+              id: t.id || t.registryId || t.registry_id || t.conversationId || t.conversation_id,
+              thread_id: t.thread_id || t.conversationId || t.conversation_id,
               title: t.title || (t.metadata && t.metadata.title) || 'Untitled Chat',
-              thread_type: t.thread_type || 'ad_hoc',
+              thread_type: t.thread_type || t.type || 'ad_hoc',
               subtitle: matterName,
-              matter_id: t.matter_id || null,
-              is_pinned: t.is_pinned === true,
-              last_activity: t.last_activity || t.updated_at || t.created_at
+              matter_id: t.matter_id || t.scope?.matterId || t.scope?.matter_id || null,
+              is_pinned: t.is_pinned === true || t.isPinned === true,
+              last_activity: t.last_activity || t.lastActivity || t.updated_at || t.updatedAt || t.created_at || t.createdAt
             };
           };
-          var calls = [api.get(conversationThreadsPath({ matterId: null }))];
+          var calls = [listConversations({ matterId: null })];
           var wantMatter = !!this.matterId;
           if (wantMatter) {
-            calls.push(api.get(conversationThreadsPath({ matterId: this.matterId })).catch(function () { return { data: [] }; }));
+            calls.push(listConversations({ matterId: this.matterId }).catch(function () { return { data: [] }; }));
           }
           var settled = await Promise.all(calls);
-          var allRows = settled[0].data || settled[0].threads || (Array.isArray(settled[0]) ? settled[0] : []);
+          var allRows = settled[0].data || settled[0].threads || settled[0].conversations || (Array.isArray(settled[0]) ? settled[0] : []);
           var allItems = allRows.map(mapThread).filter(function (t) { return !!t.thread_id; });
           if (wantMatter) {
-            var wsRows = settled[1].data || settled[1].threads || (Array.isArray(settled[1]) ? settled[1] : []);
+            var wsRows = settled[1].data || settled[1].threads || settled[1].conversations || (Array.isArray(settled[1]) ? settled[1] : []);
             var wsItems = wsRows.map(mapThread).filter(function (t) { return !!t.thread_id; });
             var wsIds = {};
             wsItems.forEach(function (t) { wsIds[t.id] = true; });
@@ -338,8 +345,8 @@
           }
         } else {
           this._groups = null;
-          var result = await api.get(conversationThreadsPath({ pageScope: this.pageScope, matterId: this.matterId }));
-          this._threads = result.data || result.threads || [];
+          var result = await listConversations({ pageScope: this.pageScope, matterId: this.matterId });
+          this._threads = result.data || result.threads || result.conversations || [];
         }
         if (this._threads.length === 0 && !this._userToggledCollapsed) {
           this.collapsed = true;
@@ -446,7 +453,11 @@
       try {
         await this._stopActiveGenerationForThread(threadId);
 
-        await api.delete(deleteConversationThreadPath(threadId));
+        if (typeof api.deleteConversation === 'function') {
+          await api.deleteConversation(threadId);
+        } else {
+          await api.delete(deleteConversationThreadPath(threadId));
+        }
         this.removeThread(threadId);
       } catch (err) {
         console.error('[lex-chat-threads] Failed to delete thread:', err);

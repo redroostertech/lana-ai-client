@@ -46,7 +46,7 @@ function loadApi() {
 }
 
 describe('ApiClient canonical conversation aliases', () => {
-  test('lists conversations through the current conversation-threads compatibility route', async () => {
+  test('lists conversations through the canonical conversation route', async () => {
     const api = loadApi();
     api.get = jest.fn().mockResolvedValue({ data: [] });
 
@@ -60,15 +60,15 @@ describe('ApiClient canonical conversation aliases', () => {
     });
 
     expect(api.get).toHaveBeenCalledWith(
-      '/api/v1/conversation-threads?limit=25&sort_by=updated_at&sort_order=asc&matter_id=matter-1&page_scope=workspace&exclude_pinned=true'
+      '/api/v1/conversations?limit=25&sort_by=updated_at&sort_order=asc&matter_id=matter-1&page_scope=workspace&exclude_pinned=true'
     );
   });
 
-  test('creates, reads, updates, and deletes conversation metadata through compatibility routes', async () => {
+  test('creates, reads, updates, and deletes conversation metadata through canonical routes', async () => {
     const api = loadApi();
     api.post = jest.fn().mockResolvedValue({});
     api.get = jest.fn().mockResolvedValue({});
-    api.put = jest.fn().mockResolvedValue({});
+    api.patch = jest.fn().mockResolvedValue({});
     api.delete = jest.fn().mockResolvedValue({});
 
     await api.createConversation({ title: 'Draft' });
@@ -76,10 +76,10 @@ describe('ApiClient canonical conversation aliases', () => {
     await api.updateConversation('thread/1', { title: 'Renamed' });
     await api.deleteConversation('thread/1');
 
-    expect(api.post).toHaveBeenCalledWith('/api/v1/conversation-threads', { title: 'Draft' });
-    expect(api.get).toHaveBeenCalledWith('/api/v1/conversation-threads/thread%2F1');
-    expect(api.put).toHaveBeenCalledWith('/api/v1/conversation-threads/thread%2F1', { title: 'Renamed' });
-    expect(api.delete).toHaveBeenCalledWith('/api/v1/conversation-threads/thread%2F1');
+    expect(api.post).toHaveBeenCalledWith('/api/v1/conversations', { title: 'Draft' });
+    expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1');
+    expect(api.patch).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1', { title: 'Renamed' });
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/conversations/thread%2F1');
   });
 
   test('loads messages, reads generation state, and updates scope through canonical conversation subresources', async () => {

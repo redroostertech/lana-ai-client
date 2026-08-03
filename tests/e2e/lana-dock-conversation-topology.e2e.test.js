@@ -63,15 +63,15 @@ describe('LANA dock canonical conversation topology', () => {
     expect(api.patch).toHaveBeenCalledWith('/api/v1/conversations/conversation%2F1/scope', { matter_id: 'matter-1' });
   });
 
-  test('conversation registry aliases still point at compatibility metadata routes', async () => {
+  test('conversation registry aliases use canonical metadata routes', async () => {
     const api = loadApi();
     api.post = jest.fn().mockResolvedValue({});
-    api.put = jest.fn().mockResolvedValue({});
+    api.patch = jest.fn().mockResolvedValue({});
 
     await api.createConversationRegistryEntry({ title: 'New chat' });
     await api.updateConversationRegistryEntry('registry/1', { title: 'Renamed' });
 
-    expect(api.post).toHaveBeenCalledWith('/api/v1/conversation-threads', { title: 'New chat' });
-    expect(api.put).toHaveBeenCalledWith('/api/v1/conversation-threads/registry%2F1', { title: 'Renamed' });
+    expect(api.post).toHaveBeenCalledWith('/api/v1/conversations', { title: 'New chat' });
+    expect(api.patch).toHaveBeenCalledWith('/api/v1/conversations/registry%2F1', { title: 'Renamed' });
   });
 });

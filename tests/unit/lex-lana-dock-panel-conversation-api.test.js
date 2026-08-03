@@ -76,7 +76,7 @@ describe('LANA dock/panel conversation API routing', () => {
   test('panel createThread prefers a conversation registry wrapper', async () => {
     const api = {
       createConversationRegistryEntry: jest.fn(() => Promise.resolve({
-        data: { id: 'registry-1', thread_id: 'conversation-1' }
+        data: { registryId: 'registry-1', conversationId: 'conversation-1', type: 'ad_hoc' }
       })),
       post: jest.fn()
     };
@@ -95,7 +95,12 @@ describe('LANA dock/panel conversation API routing', () => {
       matter_id: 'matter-1'
     });
     expect(api.post).not.toHaveBeenCalled();
-    expect(created).toEqual({ id: 'registry-1', thread_id: 'conversation-1' });
+    expect(created).toEqual(expect.objectContaining({
+      id: 'registry-1',
+      thread_id: 'conversation-1',
+      registryId: 'registry-1',
+      conversationId: 'conversation-1'
+    }));
   });
 
   test('panel createThread preserves the legacy conversation-threads fallback', async () => {
