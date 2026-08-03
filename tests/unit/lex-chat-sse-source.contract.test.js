@@ -5,6 +5,7 @@ const path = require('path');
 const vm = require('vm');
 
 function loadSource(fetchMock, overrides = {}) {
+  const api = overrides.api || null;
   const context = {
     console,
     TextDecoder,
@@ -19,14 +20,40 @@ function loadSource(fetchMock, overrides = {}) {
       randomUUID: jest.fn(() => '11111111-1111-4111-8111-111111111111')
     },
     fetch: fetchMock,
+    api,
     Lex: {}
   };
   context.window = context;
   context.globalThis = context;
 
+  const domainPath = path.join(__dirname, '../../src/js/lex/chat/lex-chat.conversations-api.js');
   const sourcePath = path.join(__dirname, '../../src/js/lex/chat/lex-chat.source.js');
+  vm.runInNewContext(fs.readFileSync(domainPath, 'utf8'), context, { filename: domainPath });
   vm.runInNewContext(fs.readFileSync(sourcePath, 'utf8'), context, { filename: sourcePath });
   return { context, Source: context.Lex.Chat.SSEChatSource };
+}
+
+function canonicalApi(overrides = {}) {
+  return {
+    baseUrl: 'http://api.test',
+    _readyPromise: Promise.resolve('http://api.test'),
+    token: 'token-1',
+    getHeaders: jest.fn(() => ({
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer token-1'
+    })),
+    createConversation: jest.fn().mockResolvedValue({
+      data: { conversationId: 'thread-1' }
+    }),
+    getConversationGeneration: jest.fn().mockResolvedValue({
+      active: true,
+      thread_id: 'thread-1',
+      generation_id: 'generation-1',
+      client_id: 'client-1'
+    }),
+    stopConversationGeneration: jest.fn().mockResolvedValue({ success: true }),
+    ...overrides
+  };
 }
 
 function responseFromChunks(chunks, status = 200) {
@@ -53,23 +80,39 @@ function responseFromChunks(chunks, status = 200) {
 }
 
 describe('SSEChatSource contract', () => {
-  test('sends client_request_id and captures server generation_id', async () => {
+  test('creates a canonical conversation before first-message streaming', async () => {
     const fetchMock = jest.fn()
       .mockResolvedValueOnce(responseFromChunks([
         'event: connected\ndata: {"thread_id":"thread-1","generation_id":"generation-1"}\n\n',
         'event: done\ndata: {"thread_id":"thread-1","generation_id":"generation-1","message_id":"assistant-1"}\n\n'
       ]))
       .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
-    const { Source } = loadSource(fetchMock);
-    const source = new Source({ endpoint: 'http://api.test' });
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
 
     const events = [];
-    for await (const event of source.send('hello')) events.push(event);
+    for await (const event of source.send('hello', {
+      title: 'LANA Chat',
+      matterId: 'matter-1',
+      pageScope: 'dashboard',
+      contextType: 'full_chat'
+    })) events.push(event);
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(api.createConversation).toHaveBeenCalledWith({
+      title: 'LANA Chat',
+      thread_type: 'ad_hoc',
+      context_type: 'full_chat',
+      matter_id: 'matter-1',
+      page_scope: 'dashboard'
+    });
     expect(body).toEqual(expect.objectContaining({
       message: 'hello',
-      client_request_id: '11111111-1111-4111-8111-111111111111'
+      client_request_id: '11111111-1111-4111-8111-111111111111',
+      conversation_id: 'thread-1',
+      matter_id: 'matter-1',
+      context_type: 'full_chat'
     }));
     expect(events).toEqual([
       expect.objectContaining({ type: 'connected', threadId: 'thread-1', generationId: 'generation-1' }),
@@ -77,8 +120,8 @@ describe('SSEChatSource contract', () => {
     ]);
 
     await source.stop();
-    expect(fetchMock.mock.calls[0][0]).toBe('http://api.test/api/v1/streaming/chat/stream');
-    expect(fetchMock.mock.calls[1][0]).toBe('http://api.test/api/v1/streaming/sessions/generation-1/stop');
+    expect(fetchMock.mock.calls[0][0]).toBe('http://api.test/api/v1/conversations/thread-1/messages/stream');
+    expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread-1');
   });
 
   test('streams into an existing conversation through the canonical conversation route', async () => {
@@ -87,8 +130,9 @@ describe('SSEChatSource contract', () => {
         'event: done\ndata: {"thread_id":"thread-1","generation_id":"generation-1","message_id":"assistant-1"}\n\n'
       ]))
       .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
-    const { Source } = loadSource(fetchMock);
-    const source = new Source({ endpoint: 'http://api.test' });
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
     await source.connect('thread-1');
 
     const events = [];
@@ -100,7 +144,7 @@ describe('SSEChatSource contract', () => {
     ]);
 
     await source.stop();
-    expect(fetchMock.mock.calls[1][0]).toBe('http://api.test/api/v1/conversations/thread-1/generation/stop');
+    expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread-1');
   });
 
   test('parses fragmented frames and final frame without trailing blank line', async () => {
@@ -109,8 +153,9 @@ describe('SSEChatSource contract', () => {
       'lo"}\n\n',
       'event: error\ndata: {"reason_code":"INTERNAL_ERROR","generation_id":"generation-1"}'
     ]));
-    const { Source } = loadSource(fetchMock);
-    const source = new Source({ endpoint: 'http://api.test' });
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
 
     const events = [];
     for await (const event of source.send('hello')) events.push(event);
@@ -118,6 +163,23 @@ describe('SSEChatSource contract', () => {
     expect(events).toEqual([
       { type: 'content', text: 'hello' },
       expect.objectContaining({ type: 'error', code: 'INTERNAL_ERROR', generationId: 'generation-1' })
+    ]);
+  });
+
+  test('reports a terminal error when canonical conversation creation is unavailable', async () => {
+    const fetchMock = jest.fn();
+    const { Source } = loadSource(fetchMock);
+    const source = new Source({ endpoint: 'http://api.test' });
+
+    const events = [];
+    for await (const event of source.send('hello')) events.push(event);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'error',
+        error: 'Core API client not available'
+      })
     ]);
   });
 
@@ -136,19 +198,10 @@ describe('SSEChatSource contract', () => {
   });
 
   test('checks active generation by thread and stores returned generation id for stop', async () => {
-    const fetchMock = jest.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          active: true,
-          thread_id: 'thread-1',
-          generation_id: 'generation-1',
-          client_id: 'client-1'
-        })
-      })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
-    const { Source } = loadSource(fetchMock);
-    const source = new Source({ endpoint: 'http://api.test' });
+    const fetchMock = jest.fn();
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
 
     const status = await source.checkActiveGeneration('thread-1');
     expect(status).toEqual(expect.objectContaining({
@@ -156,10 +209,10 @@ describe('SSEChatSource contract', () => {
       generationId: 'generation-1',
       sessionId: 'generation-1'
     }));
-    expect(fetchMock.mock.calls[0][0]).toBe('http://api.test/api/v1/conversations/thread-1/generation');
+    expect(api.getConversationGeneration).toHaveBeenCalledWith('thread-1');
 
     await source.stop();
-    expect(fetchMock.mock.calls[1][0]).toBe('http://api.test/api/v1/conversations/thread-1/generation/stop');
+    expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread-1');
   });
 
   test('posts exact-generation stop before aborting an in-flight stream', async () => {
@@ -177,14 +230,15 @@ describe('SSEChatSource contract', () => {
       'event: connected\ndata: {"thread_id":"thread-1","generation_id":"generation-1"}\n\n',
       'event: content\ndata: {"content":"still running"}\n\n'
     ]);
-    const fetchMock = jest.fn(async (url) => {
-      if (String(url).includes('/stop')) sequence.push('stop-post');
-      return String(url).includes('/stop')
-        ? { ok: true, json: async () => ({ success: true }) }
-        : streamResponse;
+    const fetchMock = jest.fn(async () => streamResponse);
+    const api = canonicalApi({
+      stopConversationGeneration: jest.fn(async () => {
+        sequence.push('stop-post');
+        return { success: true };
+      })
     });
-    const { Source } = loadSource(fetchMock, { AbortController: TrackedAbortController });
-    const source = new Source({ endpoint: 'http://api.test' });
+    const { Source } = loadSource(fetchMock, { AbortController: TrackedAbortController, api });
+    const source = new Source({ api });
 
     const iterator = source.send('hello');
     await expect(iterator.next()).resolves.toEqual(expect.objectContaining({
@@ -194,7 +248,7 @@ describe('SSEChatSource contract', () => {
 
     await source.stop();
 
-    expect(fetchMock.mock.calls[1][0]).toBe('http://api.test/api/v1/streaming/sessions/generation-1/stop');
+    expect(api.stopConversationGeneration).toHaveBeenCalledWith('thread-1');
     expect(sequence).toEqual(['stop-post', 'abort']);
   });
 });

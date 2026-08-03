@@ -40,7 +40,7 @@
      lex-lana-closed        — Panel hidden
      lex-lana-before-send   — Before lex-chat.send(); page mutates opts.attachments.
                               Call e.preventDefault() to take over send manually.
-     lex-lana-thread-created — Thread registered via API
+     lex-lana-thread-created — Thread created/registered in the panel list
      lex-lana-thread-selected — User selected a thread
      lex-lana-tool-select   — Composer tool selected (detail: { toolId })
      lex-lana-tool-dismiss  — Composer tool dismissed (detail: { toolId })
@@ -671,9 +671,10 @@
       // it (see _wrapSend + lex-chat.source.js).
       container.addEventListener('lex-thread-create', function (e) {
         if (!self._chatEl) return;
-        // Recents mode (the dock): New Chat starts a fresh conversation —
-        // the session is persisted on first message, exactly like the
-        // dynamic menu's New Chat. No ad-hoc thread record up front.
+        // Recents mode (the dock): New Chat starts a fresh conversation.
+        // The chat source creates the canonical conversation container just
+        // before the first stream so that streaming never falls back to the
+        // legacy streaming route.
         if (self.threadsRecents) {
           self._chatEl.clearConversation();
           if (self._threadsEl) self._threadsEl.setActiveThread(null);
@@ -721,66 +722,40 @@
         }
 
         if (self.threadsRecents) {
-          var recentPayload = {
+          var recentThread = normalizeRegistryThread({
+            id: conversationId,
+            thread_id: conversationId,
             title: self.threadTitle,
             thread_type: 'ad_hoc',
             context_type: self.contextType,
             page_scope: normalizePageScope(self.pageScope),
-            thread_id: conversationId
-          };
-          if (self.matterId) recentPayload.matter_id = self.matterId;
-          createConversationRegistryEntry(recentPayload).then(function (resp) {
-            var created = resp.data || resp;
-            if (self._threadsEl) {
-              self._threadsEl.addThread(created);
-              self._threadsEl.setActiveThread(created.id);
-            }
-            self.emit('lex-lana-thread-created', { thread: created });
-          }).catch(function (err) {
-            console.warn('[lex-lana-panel] Failed to register recent conversation:', err);
-            if (self._threadsEl && typeof self._threadsEl.refresh === 'function') {
-              self._threadsEl.refresh();
-            }
           });
+          if (self.matterId) recentThread.matter_id = self.matterId;
+          if (self._threadsEl) {
+            self._threadsEl.addThread(recentThread);
+            self._threadsEl.setActiveThread(recentThread.id);
+          }
+          self.emit('lex-lana-thread-created', { thread: recentThread });
           return;
         }
 
-        // Check if page_general thread already exists
-        if (self._threadsEl && self._threadsEl._threads && self._threadsEl._threads.length > 0) {
-          for (var i = 0; i < self._threadsEl._threads.length; i++) {
-            if (self._threadsEl._threads[i].thread_type === 'page_general') {
-              var existing = self._threadsEl._threads[i];
-              existing.thread_id = conversationId;
-              updateConversationRegistryEntry(existing.id, {
-                thread_id: conversationId
-              }).catch(function (err) {
-                console.warn('[lex-lana-panel] Failed to update thread:', err);
-              });
-              return;
-            }
-          }
-        }
-
-        // Create new page_general thread. Carry the panel's bound matter_id
-        // through so the thread is discoverable via ?matter_id=… filters.
-        var generalPayload = {
+        // The source already created the canonical backend conversation
+        // container before streaming. Add a matching local row so the panel
+        // list updates immediately without issuing a duplicate create.
+        var generalThread = normalizeRegistryThread({
+          id: conversationId,
+          thread_id: conversationId,
           title: self.threadTitle,
           thread_type: 'page_general',
           context_type: self.contextType,
-          page_scope: self.pageScope,
-          thread_id: conversationId
-        };
-        if (self.matterId) generalPayload.matter_id = self.matterId;
-        createConversationRegistryEntry(generalPayload).then(function (resp) {
-          var created = resp.data || resp;
-          if (self._threadsEl) {
-            self._threadsEl.addThread(created);
-            self._threadsEl.setActiveThread(created.id);
-          }
-          self.emit('lex-lana-thread-created', { thread: created });
-        }).catch(function (err) {
-          console.warn('[lex-lana-panel] Failed to register thread:', err);
+          page_scope: self.pageScope
         });
+        if (self.matterId) generalThread.matter_id = self.matterId;
+        if (self._threadsEl) {
+          self._threadsEl.addThread(generalThread);
+          self._threadsEl.setActiveThread(generalThread.id);
+        }
+        self.emit('lex-lana-thread-created', { thread: generalThread });
       });
 
       // Auto-title arrives over SSE as a 'title' event, which lex-chat
@@ -829,6 +804,11 @@
       this._chatEl.send = function (content, opts) {
         opts = opts || {};
         opts.attachments = opts.attachments || {};
+        if (!opts.title) opts.title = self.threadTitle;
+        if (!opts.threadType) opts.threadType = 'ad_hoc';
+        if (!opts.contextType) opts.contextType = self.contextType;
+        if (!opts.pageScope) opts.pageScope = normalizePageScope(self.pageScope);
+        if (!opts.matterId && self.matterId) opts.matterId = self.matterId;
 
         // Emit cancelable before-send event
         var event = new CustomEvent('lex-lana-before-send', {

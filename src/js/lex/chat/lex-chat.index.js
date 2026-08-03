@@ -5,14 +5,15 @@
 
    Load order (matches <script> tags):
      1. lex-chat.format.js     — pure utility, no deps
-     2. lex-chat.source.js     — ChatSource protocol + SSE + Demo
-     3. lex-chat.message.js    — depends on format
-     4. lex-chat.activity.js   — standalone
-     5. lex-chat.documents.js  — standalone
-     6. lex-chat.composer.js   — standalone
-     7. lex-chat.thread.js     — depends on message
-     8. lex-chat.js            — orchestrator, depends on all above
-     9. lex-chat.index.js      — this file (barrel)
+     2. lex-chat.conversations-api.js — conversation domain API
+     3. lex-chat.source.js     — ChatSource protocol + SSE + Demo
+     4. lex-chat.message.js    — depends on format
+     5. lex-chat.activity.js   — standalone
+     6. lex-chat.documents.js  — standalone
+     7. lex-chat.composer.js   — standalone
+     8. lex-chat.thread.js     — depends on message
+     9. lex-chat.js            — orchestrator, depends on all above
+    10. lex-chat.index.js      — this file (barrel)
    ========================================================================== */
 
 (function (global) {

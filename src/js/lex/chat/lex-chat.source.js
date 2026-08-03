@@ -25,43 +25,14 @@
     });
   }
 
-  function extractApiError(payload, fallback) {
-    if (!payload) return fallback;
-    var err = payload.error || payload.message || payload.detail;
-    if (typeof err === 'string') return err;
-    if (err && typeof err === 'object') {
-      return err.message || err.detail || err.code || fallback;
+  function createConversationsApi(options = {}) {
+    if (options.conversationsApi) return options.conversationsApi;
+    if (!Lex.Chat || !Lex.Chat.ConversationsApiClient) {
+      throw new Error('Lex.Chat.ConversationsApiClient not loaded');
     }
-    return fallback;
-  }
-
-  function readJsonSafe(response) {
-    return response.json().catch(function () { return null; });
-  }
-
-  function conversationMessagesPath(conversationId, page, limit) {
-    return `/api/v1/conversations/${encodeURIComponent(conversationId)}/messages?page=${page}&limit=${limit}&order=desc`;
-  }
-
-  function conversationStreamPath(conversationId) {
-    if (conversationId) {
-      return `/api/v1/conversations/${encodeURIComponent(conversationId)}/messages/stream`;
-    }
-    // TODO(conversation-api): add a canonical create-and-stream first-message
-    // route so brand-new conversations do not need the legacy streaming path.
-    return '/api/v1/streaming/chat/stream';
-  }
-
-  function activeGenerationPath(conversationId) {
-    return `/api/v1/conversations/${encodeURIComponent(conversationId)}/generation`;
-  }
-
-  function stopConversationGenerationPath(conversationId) {
-    return `/api/v1/conversations/${encodeURIComponent(conversationId)}/generation/stop`;
-  }
-
-  function legacyStopGenerationPath(generationId) {
-    return `/api/v1/streaming/sessions/${encodeURIComponent(generationId)}/stop`;
+    return new Lex.Chat.ConversationsApiClient(options.api || global.api, {
+      endpoint: options.endpoint || ''
+    });
   }
 
   function humanizePhase(phase) {
@@ -147,59 +118,11 @@
   class SSEChatSource extends ChatSource {
     constructor(options = {}) {
       super(options);
-      this._baseUrl = options.endpoint || '';
+      this._conversationsApi = createConversationsApi(options);
       this._abortController = null;
       this._conversationId = null;
       this._generationId = null;
-      this._streamStartedWithConversationId = false;
       this._model = null;
-    }
-
-    // -- URL resolution chain --
-    async _resolveBaseUrl() {
-      let url = this._baseUrl;
-
-      // 1. API client
-      const api = this._options.api || global.api;
-      if (api) {
-        if (api._readyPromise) await api._readyPromise;
-        if (api.baseUrl) url = api.baseUrl;
-      }
-
-      // 2. Config fallback
-      if (!url || url === 'null' || url.startsWith('file:')) {
-        url = global.LanaConfig?.API_BASE_URL || '';
-      }
-
-      // 3. localStorage
-      if (!url || url === 'null' || url.startsWith('file:')) {
-        try {
-          const saved = localStorage.getItem('lana_saved_server');
-          if (saved) {
-            const info = JSON.parse(saved);
-            if (info.url) url = info.url;
-          }
-        } catch (_) { /* ignore */ }
-      }
-
-      // 4. Electron IPC
-      if ((!url || url === 'null' || url.startsWith('file:')) && global.electronAPI) {
-        try {
-          const res = await global.electronAPI.getSavedServer();
-          if (res?.success && res.server?.url) url = res.server.url;
-        } catch (_) { /* ignore */ }
-      }
-
-      if (!url || url === 'null' || url.startsWith('file:')) {
-        throw new Error('Server not connected. Please wait for server discovery or check your connection.');
-      }
-
-      this._baseUrl = url;
-      return url;
-    }
-
-    _getToken() {
-      return localStorage.getItem('token') || '';
     }
 
     async connect(conversationId) {
@@ -208,24 +131,41 @@
       return { conversationId: this._conversationId, sessionId: null, model: null };
     }
 
+    async _ensureConversation(options = {}) {
+      if (this._conversationId) return this._conversationId;
+
+      const payload = {
+        title: options.title || 'New chat',
+        thread_type: options.threadType || 'ad_hoc',
+        context_type: options.contextType || 'full_chat'
+      };
+      if (options.matterId) payload.matter_id = options.matterId;
+      if (options.pageScope) payload.page_scope = options.pageScope;
+      if (options.metadata) payload.metadata = options.metadata;
+
+      const response = await this._conversationsApi.createConversation(payload);
+      const conversation = response && (response.conversation || response.data || response);
+      const conversationId = conversation && (
+        conversation.conversationId ||
+        conversation.conversation_id ||
+        conversation.thread_id ||
+        conversation.id
+      );
+
+      if (!conversationId) {
+        throw new Error('Canonical conversation create API returned no conversation id');
+      }
+
+      this._conversationId = conversationId;
+      return conversationId;
+    }
+
     /** Load message history for the current conversation. */
     async loadHistory(page, limit) {
       if (!this._conversationId) return { messages: [], pagination: null, hasMore: false };
 
       try {
-        const baseUrl = await this._resolveBaseUrl();
-        const token = this._getToken();
-
-        const res = await fetch(
-          `${baseUrl}${conversationMessagesPath(this._conversationId, page, limit)}`,
-          {
-            headers: { 'Authorization': `Bearer ${token}` }
-          }
-        );
-
-        if (!res.ok) return { messages: [], pagination: null, hasMore: false };
-
-        const data = await res.json();
+        const data = await this._conversationsApi.getMessages(this._conversationId, page, limit);
         const rawMessages = (data.messages || []).filter(function (m) {
           return m.role !== 'tool' && m.role !== 'system';
         });
@@ -272,12 +212,10 @@
       this._generating = true;
       this._abortController = new AbortController();
       this._generationId = null;
-      this._streamStartedWithConversationId = !!this._conversationId;
       const clientRequestId = options.clientRequestId || generateClientRequestId();
 
       try {
-        const baseUrl = await this._resolveBaseUrl();
-        const token = this._getToken();
+        const conversationId = await this._ensureConversation(options);
 
         // Guard streaming
         if (global.api && typeof global.api.setStreamingActive === 'function') {
@@ -290,24 +228,19 @@
           client_time: new Date().toISOString(),
           client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
-        if (this._conversationId) body.conversation_id = this._conversationId;
+        body.conversation_id = conversationId;
         if (options.matterId) body.matter_id = options.matterId;
         if (options.attachments) body.attachments = options.attachments;
         if (options.contextType) body.context_type = options.contextType;
 
-        const response = await fetch(`${baseUrl}${conversationStreamPath(this._streamStartedWithConversationId ? this._conversationId : null)}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(body),
-          signal: this._abortController.signal
-        });
+        const response = await this._conversationsApi.streamMessage(
+          conversationId,
+          body,
+          this._abortController.signal
+        );
 
         if (!response.ok) {
-          let payload = null;
-          try { payload = await response.json(); } catch (_) { /* ignore */ }
+          const payload = await this._conversationsApi.readJsonSafe(response);
           if (response.status === 401) {
             yield { type: 'error', error: 'Session expired', status: 401 };
             return;
@@ -398,20 +331,7 @@
       }
 
       try {
-        const baseUrl = await this._resolveBaseUrl();
-        const token = this._getToken();
-        const stopPath = this._conversationId && this._streamStartedWithConversationId
-          ? stopConversationGenerationPath(this._conversationId)
-          : legacyStopGenerationPath(key);
-        const res = await fetch(`${baseUrl}${stopPath}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (!res.ok) return { success: false, status: res.status };
-        return await res.json().catch(() => ({ success: true }));
+        return await this._conversationsApi.stopGeneration(this._conversationId);
       } catch (err) {
         return { success: false, error: err.message };
       } finally {
@@ -432,16 +352,9 @@
       if (!id) return { active: false };
 
       try {
-        const baseUrl = await this._resolveBaseUrl();
-        const token = this._getToken();
-        const res = await fetch(`${baseUrl}${activeGenerationPath(id)}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!res.ok) return { active: false };
-        const data = await res.json();
+        const data = await this._conversationsApi.getGeneration(id);
         if (!data.active) return { active: false };
         this._conversationId = id;
-        this._streamStartedWithConversationId = true;
         if (data.generation_id || data.session_id) {
           this._generationId = data.generation_id || data.session_id;
         }
@@ -467,53 +380,22 @@
 
     async addDocument(docId, filename, matterId) {
       if (!this._conversationId) return null;
-      const baseUrl = await this._resolveBaseUrl();
-      const token = this._getToken();
-      const res = await fetch(`${baseUrl}/api/chat/conversations/${this._conversationId}/documents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ documentId: docId, filename, matterId })
-      });
-      const payload = await readJsonSafe(res);
-      if (!res.ok) throw new Error(extractApiError(payload, 'Failed to add document'));
-      return payload?.state || null;
+      return await this._conversationsApi.addDocument(this._conversationId, docId, filename, matterId);
     }
 
     async removeDocument(docId) {
       if (!this._conversationId) return null;
-      const baseUrl = await this._resolveBaseUrl();
-      const token = this._getToken();
-      const res = await fetch(`${baseUrl}/api/chat/conversations/${this._conversationId}/documents/${docId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const payload = await readJsonSafe(res);
-      if (!res.ok) throw new Error(extractApiError(payload, 'Failed to remove document'));
-      return payload?.state || null;
+      return await this._conversationsApi.removeDocument(this._conversationId, docId);
     }
 
     async clearDocuments() {
       if (!this._conversationId) return null;
-      const baseUrl = await this._resolveBaseUrl();
-      const token = this._getToken();
-      const res = await fetch(`${baseUrl}/api/chat/conversations/${this._conversationId}/documents/clear`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const payload = await readJsonSafe(res);
-      if (!res.ok) throw new Error(extractApiError(payload, 'Failed to clear documents'));
-      return payload?.state || null;
+      return await this._conversationsApi.clearDocuments(this._conversationId);
     }
 
     async loadState() {
       if (!this._conversationId) return null;
-      const baseUrl = await this._resolveBaseUrl();
-      const token = this._getToken();
-      const res = await fetch(`${baseUrl}/api/chat/conversations/${this._conversationId}/state`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!res.ok) return null;
-      return (await res.json()).state;
+      return await this._conversationsApi.loadState(this._conversationId);
     }
 
     // -- SSE event → ChatEvent mapping --

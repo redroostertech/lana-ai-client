@@ -52,6 +52,7 @@
         'js/vendor/mermaid.min.js',
         'js/services/document-processing.service.js',
         'js/lex/chat/lex-chat.format.js',
+        'js/lex/chat/lex-chat.conversations-api.js',
         'js/lex/chat/lex-chat.source.js',
         'js/lex/chat/lex-chat.source-llama.js',
         'js/lex/chat/lex-chat-artifact-promotion.js',
