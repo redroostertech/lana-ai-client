@@ -389,8 +389,8 @@
 
     /**
      * Open an existing canonical conversation inside the shared panel.
-     * This is the dock/Recents path for old deep links that used to navigate
-     * to chat-v2.html?session=...; it reuses the same loadConversation chain
+     * This is the dock/Recents path for existing conversation links; it
+     * reuses the same loadConversation chain
      * as manual thread selection instead of creating a parallel page flow.
      * @param {string} threadId - Durable canonical conversation id.
      * @param {string} [matterId] - Optional workspace scope carried by caller.

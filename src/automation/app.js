@@ -424,7 +424,7 @@ async function bootstrapApp() {
   // username, organization_name, etc.). The login response stores a slim
   // user object; without this, the sidebar footer's role gating treats
   // every user as non-admin and the @handle falls back to the email.
-  // Host pages (dashboard.html, matters.html, chat.html, etc.) all do this
+  // Host pages (dashboard.html, matters.html, workspace-details.html, etc.) all do this
   // up-front — sub-apps must do the same for parity.
   if (window.api && typeof window.api.loadUserProfile === 'function') {
     try {

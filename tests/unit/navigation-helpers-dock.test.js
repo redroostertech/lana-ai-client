@@ -18,6 +18,7 @@ describe('NavigationHelpers dock-first chat routing', () => {
     };
     global.window.sessionStorage = {
       getItem: jest.fn(() => null),
+      setItem: jest.fn(),
       removeItem: jest.fn()
     };
     global.document = global.window.document;
@@ -73,25 +74,34 @@ describe('NavigationHelpers dock-first chat routing', () => {
     expect(global.window.sessionStorage.removeItem).toHaveBeenCalledWith('lana_chat_prompt');
   });
 
-  test('navigateToConversation falls back to chat-v2 when no dock is mounted', () => {
+  test('navigateToConversation falls back to dashboard dock host when no dock is mounted', () => {
     global.window.Lex.Nav = { go: jest.fn() };
 
     NavigationHelpers.navigateToConversation('conversation-1', 'matter-1');
 
-    expect(global.window.Lex.Nav.go).toHaveBeenCalledWith('chat-v2.html', {
-      params: { session: 'conversation-1', matter: 'matter-1' }
-    });
+    expect(global.window.Lex.Nav.go).toHaveBeenCalledWith('dashboard.html');
+    const queued = JSON.parse(global.window.sessionStorage.setItem.mock.calls[0][1]);
+    expect(global.window.sessionStorage.setItem.mock.calls[0][0]).toBe('lana_dock_pending_action');
+    expect(queued).toEqual(expect.objectContaining({
+      type: 'conversation',
+      threadId: 'conversation-1',
+      matterId: 'matter-1'
+    }));
   });
 
-  test('navigateToMatterChat fallback leaves queued prompt for chat-v2 to consume', () => {
+  test('navigateToMatterChat fallback queues prompt for dashboard dock host', () => {
     global.window.Lex.Nav = { go: jest.fn() };
     global.window.sessionStorage.getItem.mockReturnValue('Discuss this task');
 
     NavigationHelpers.navigateToMatterChat('matter-1');
 
-    expect(global.window.Lex.Nav.go).toHaveBeenCalledWith('chat-v2.html', {
-      params: { matter: 'matter-1' }
-    });
-    expect(global.window.sessionStorage.removeItem).not.toHaveBeenCalled();
+    expect(global.window.Lex.Nav.go).toHaveBeenCalledWith('dashboard.html');
+    const queued = JSON.parse(global.window.sessionStorage.setItem.mock.calls[0][1]);
+    expect(queued).toEqual(expect.objectContaining({
+      type: 'matter_chat',
+      matterId: 'matter-1',
+      initialPrompt: 'Discuss this task'
+    }));
+    expect(global.window.sessionStorage.removeItem).toHaveBeenCalledWith('lana_chat_prompt');
   });
 });

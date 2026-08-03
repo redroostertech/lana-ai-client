@@ -112,7 +112,6 @@ defineLex('my-component', MyComponent);
 ```javascript
 Lex.Nav.go('matters.html');
 Lex.Nav.go('matters.html', { params: { matter_id: 'abc-123' } });
-Lex.Nav.go('chat.html', { params: { session: id }, context: { source: 'dashboard' } });
 Lex.Nav.go('dashboard.html', { replace: true });
 
 // Reading on destination page

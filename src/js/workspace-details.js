@@ -434,10 +434,7 @@
       var origin;
       if (_navContext && _navContext.source === 'chat') {
         var chatLabel = _navContext.conversationTitle || 'Conversation';
-        var chatHref = 'chat-v2.html';
-        if (_navContext.conversationId) {
-          chatHref += '?session=' + encodeURIComponent(_navContext.conversationId);
-        }
+        var chatHref = 'dashboard.html';
         origin = { label: chatLabel, href: chatHref };
       } else {
         origin = { label: 'Workspaces & Matters', href: 'workspaces.html' };
@@ -2872,9 +2869,7 @@
         return;
       }
 
-      Lex.Nav.go('chat-v2.html', {
-        params: { session: conversationId, matter: matterId }
-      });
+      Lex.Nav.go('dashboard.html');
     } catch (error) {
       console.error('[createMatterConversation] Failed:', error);
       Lex.Toast.error(error.message || 'Failed to create conversation');

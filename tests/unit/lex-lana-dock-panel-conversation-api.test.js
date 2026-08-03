@@ -244,4 +244,58 @@ describe('LANA dock/panel conversation API routing', () => {
     expect(dock._panelEl._chatEl.send).toHaveBeenCalledWith('Discuss this task');
     expect(dock._panelEl._focusComposer).toHaveBeenCalledTimes(1);
   });
+
+  test('dock consumes queued conversation navigation intent from sessionStorage', async () => {
+    const { context, Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    dock.openConversation = jest.fn();
+    context.window.sessionStorage = {
+      getItem: jest.fn(() => JSON.stringify({
+        type: 'conversation',
+        threadId: 'conversation-1',
+        matterId: 'matter-1'
+      })),
+      removeItem: jest.fn()
+    };
+
+    dock._consumePendingAction();
+    await new Promise(resolve => setTimeout(resolve, 320));
+
+    expect(context.window.sessionStorage.getItem).toHaveBeenCalledWith('lana_dock_pending_action');
+    expect(context.window.sessionStorage.removeItem).toHaveBeenCalledWith('lana_dock_pending_action');
+    expect(dock.openConversation).toHaveBeenCalledWith('conversation-1', 'matter-1');
+  });
+
+  test('dock consumes queued matter chat intent from sessionStorage', async () => {
+    const { context, Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    dock.newChat = jest.fn();
+    dock.openWith = jest.fn();
+    context.window.sessionStorage = {
+      getItem: jest.fn(() => JSON.stringify({
+        type: 'matter_chat',
+        matterId: 'matter-1',
+        initialPrompt: 'Discuss this task'
+      })),
+      removeItem: jest.fn()
+    };
+
+    dock._consumePendingAction();
+    await new Promise(resolve => setTimeout(resolve, 320));
+
+    expect(dock.newChat).toHaveBeenCalledTimes(1);
+    expect(dock.openWith).toHaveBeenCalledWith({
+      matterId: 'matter-1',
+      contextType: 'full_chat',
+      initialPrompt: 'Discuss this task'
+    });
+  });
 });

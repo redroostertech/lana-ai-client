@@ -1410,34 +1410,22 @@
           matterName
         });
 
-        // Navigate to chat.html with session and matter parameters
-        const params = new URLSearchParams();
-        params.set('session', threadId);
-        params.set('matter', matterId);
-
-        const chatPath = NavigationHelpers.resolveChatPath();
-        const fullUrl = `${chatPath}?${params.toString()}`;
-
         console.log('[matters.html.createMatterConversation] ========================================');
         console.log('[matters.html.createMatterConversation] READY TO NAVIGATE');
         console.log('[matters.html.createMatterConversation] ========================================');
         console.log('[matters.html.createMatterConversation] Thread ID:', threadId);
         console.log('[matters.html.createMatterConversation] Matter ID:', matterId);
         console.log('[matters.html.createMatterConversation] Matter Name:', matterName);
-        console.log('[matters.html.createMatterConversation] Chat Path:', chatPath);
-        console.log('[matters.html.createMatterConversation] URL Params:', params.toString());
-        console.log('[matters.html.createMatterConversation] Full URL:', fullUrl);
         console.log('[matters.html.createMatterConversation] Current window.location.href:', window.location.href);
         console.log('[matters.html.createMatterConversation] ========================================');
-        console.log('[matters.html.createMatterConversation] 🚀 WILL NAVIGATE TO:', fullUrl);
-        console.log('[matters.html.createMatterConversation] ⏱️  Waiting 2 seconds for log capture...');
+        console.log('[matters.html.createMatterConversation] WILL OPEN LANA DOCK');
         console.log('[matters.html.createMatterConversation] ========================================');
 
         // Wait 2 seconds before navigating so user can copy logs
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        console.log('[matters.html.createMatterConversation] 🚀 NAVIGATING NOW to:', fullUrl);
-        window.location.href = fullUrl;
+        console.log('[matters.html.createMatterConversation] Opening conversation in LANA dock');
+        NavigationHelpers.navigateToConversation(threadId, matterId);
 
       } catch (error) {
         console.error('[matters.html.createMatterConversation] Failed to create conversation:', error);

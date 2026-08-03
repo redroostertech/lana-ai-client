@@ -838,7 +838,7 @@
             if (window.NavigationHelpers && typeof window.NavigationHelpers.navigateToMatterChat === 'function') {
               window.NavigationHelpers.navigateToMatterChat(mid);
             } else {
-              Lex.Nav.go('chat-v2.html', { params: { matter: mid } });
+              Lex.Nav.go('dashboard.html');
             }
           });
         }

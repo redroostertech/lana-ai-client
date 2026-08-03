@@ -1,8 +1,8 @@
 /**
  * Navigation Helpers
  * Path resolution and navigation utilities for LANA AI client.
- * Navigation methods delegate to Lex.Nav.go() when available, falling back
- * to direct window.location.href for backward compatibility.
+ * Chat navigation opens the global LANA dock when mounted, falling back to
+ * dashboard.html with a queued dock action for pages that do not host the dock.
  *
  * Rules:
  *   - NO regex anywhere — string methods only (includes, indexOf, split, etc.)
@@ -12,7 +12,7 @@ const NavigationHelpers = {
   /**
    * Resolve path to a target file from current location.
    * Handles file:// protocol depth calculation.
-   * @param {string} targetPath - Target file path (e.g., 'chat.html', 'matters.html')
+   * @param {string} targetPath - Target file path (e.g., 'dashboard.html', 'matters.html')
    * @returns {string} Resolved relative path
    */
   resolvePath(targetPath) {
@@ -44,12 +44,34 @@ const NavigationHelpers = {
   },
 
   /**
-   * Resolve the legacy standalone chat page path from current location.
-   * New chat entrypoints should use the LANA dock when it is available.
-   * @returns {string} Resolved path to chat-v2.html
+   * Resolve the dock host path from current location.
+   * @returns {string} Resolved path to dashboard.html
    */
   resolveChatPath() {
-    return this.resolvePath('chat-v2.html');
+    return this.resolvePath('dashboard.html');
+  },
+
+  /**
+   * Store a one-shot dock action for the dashboard-hosted LANA dock.
+   * @param {Object} action - Dock action payload.
+   */
+  queueLanaDockAction(action) {
+    if (!action || !window.sessionStorage) return;
+    try {
+      const payload = Object.assign({ createdAt: Date.now() }, action);
+      window.sessionStorage.setItem('lana_dock_pending_action', JSON.stringify(payload));
+    } catch (e) { /* ignore unavailable storage */ }
+  },
+
+  /**
+   * Navigate to the dashboard, which owns the global LANA dock.
+   */
+  navigateToDockHost() {
+    if (window.Lex && window.Lex.Nav) {
+      window.Lex.Nav.go('dashboard.html');
+      return;
+    }
+    window.location.href = this.resolveChatPath();
   },
 
   /**
@@ -71,16 +93,15 @@ const NavigationHelpers = {
   },
 
   /**
-   * Check if currently on chat page.
-   * @returns {boolean} True if on chat.html
+   * Check if currently on the dock host.
+   * @returns {boolean} True if on dashboard.html
    */
   isOnChatPage() {
-    return window.location.pathname.endsWith('chat.html') || window.location.pathname.endsWith('chat-v2.html');
+    return window.location.pathname.endsWith('dashboard.html');
   },
 
   /**
-   * Navigate to chat page with conversation.
-   * Delegates to Lex.Nav.go() when available.
+   * Open an existing conversation in the LANA dock.
    * @param {string} threadId - Conversation thread ID
    * @param {string} matterId - Optional matter ID
    */
@@ -92,24 +113,16 @@ const NavigationHelpers = {
       return;
     }
 
-    var params = { session: threadId };
-    if (matterId) params.matter = matterId;
-
-    if (window.Lex && window.Lex.Nav) {
-      window.Lex.Nav.go('chat-v2.html', { params: params });
-      return;
-    }
-
-    // Fallback for pre-Nav loading
-    var search = new URLSearchParams();
-    search.set('session', threadId);
-    if (matterId) search.set('matter', matterId);
-    window.location.href = this.resolveChatPath() + '?' + search.toString();
+    this.queueLanaDockAction({
+      type: 'conversation',
+      threadId: threadId,
+      matterId: matterId || null
+    });
+    this.navigateToDockHost();
   },
 
   /**
-   * Navigate to chat page with new project modal.
-   * Delegates to Lex.Nav.go() when available.
+   * Open a new dock chat.
    */
   navigateToNewProject() {
     var dock = this.getLanaDock();
@@ -118,17 +131,12 @@ const NavigationHelpers = {
       return;
     }
 
-    if (window.Lex && window.Lex.Nav) {
-      window.Lex.Nav.go('chat-v2.html', { params: { openModal: 'newProject' } });
-      return;
-    }
-
-    window.location.href = this.resolveChatPath() + '?openModal=newProject';
+    this.queueLanaDockAction({ type: 'new_chat' });
+    this.navigateToDockHost();
   },
 
   /**
-   * Navigate to chat page with matter context.
-   * Delegates to Lex.Nav.go() when available.
+   * Open a new dock chat with matter context.
    * @param {string} matterId - Matter ID
    */
   navigateToMatterChat(matterId) {
@@ -147,14 +155,15 @@ const NavigationHelpers = {
       return;
     }
 
-    if (window.Lex && window.Lex.Nav) {
-      window.Lex.Nav.go('chat-v2.html', { params: { matter: matterId } });
-      return;
-    }
-
-    var search = new URLSearchParams();
-    search.set('matter', matterId);
-    window.location.href = this.resolveChatPath() + '?' + search.toString();
+    this.queueLanaDockAction({
+      type: 'matter_chat',
+      matterId: matterId,
+      initialPrompt: initialPrompt || null
+    });
+    try {
+      if (initialPrompt && window.sessionStorage) window.sessionStorage.removeItem('lana_chat_prompt');
+    } catch (e) { /* ignore unavailable storage */ }
+    this.navigateToDockHost();
   },
 
   /**

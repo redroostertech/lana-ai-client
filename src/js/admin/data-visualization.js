@@ -1134,7 +1134,7 @@
         if (window.NavigationHelpers && typeof window.NavigationHelpers.navigateToConversation === 'function') {
           window.NavigationHelpers.navigateToConversation(threadId, matterId);
         } else if (window.Lex && window.Lex.Nav) {
-          window.Lex.Nav.go('../chat-v2.html', { params: { session: threadId, matter: matterId } });
+          window.Lex.Nav.go('../dashboard.html');
         }
         return;
       }

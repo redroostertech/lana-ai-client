@@ -364,7 +364,7 @@ function openScreenVoiceSettings() {
 }
 
 const SCREEN_VOICE_CLIENT_ROUTES = new Set([
-  'chat.html', 'matters.html', 'workspace-details.html', 'integrations/connectors.html', 'notifications.html'
+  'dashboard.html', 'matters.html', 'workspace-details.html', 'integrations/connectors.html', 'notifications.html'
 ]);
 
 async function navigateScreenVoiceClient(input = {}) {

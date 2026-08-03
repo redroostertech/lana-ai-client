@@ -480,6 +480,7 @@
         app.dropSidebarConversationSection();
       }
       document.addEventListener('click', this._boundTriggerClick);
+      this._consumePendingAction();
     }
 
     disconnected() {
@@ -658,6 +659,51 @@
           }).catch(reject);
         }, 300);
       });
+    }
+
+    /**
+     * Consume one-shot chat navigation intents from pages that cannot host the
+     * dock directly. NavigationHelpers writes this before sending the user to
+     * dashboard.html.
+     */
+    _consumePendingAction() {
+      var raw = null;
+      try {
+        if (!window.sessionStorage) return;
+        raw = window.sessionStorage.getItem('lana_dock_pending_action');
+        if (!raw) return;
+        window.sessionStorage.removeItem('lana_dock_pending_action');
+      } catch (e) {
+        return;
+      }
+
+      var action = null;
+      try {
+        action = JSON.parse(raw);
+      } catch (e) {
+        return;
+      }
+      if (!action || !action.type) return;
+
+      var self = this;
+      setTimeout(function () {
+        if (action.type === 'conversation' && action.threadId) {
+          self.openConversation(action.threadId, action.matterId || null);
+          return;
+        }
+        if (action.type === 'matter_chat' && action.matterId) {
+          if (typeof self.newChat === 'function') self.newChat();
+          self.openWith({
+            matterId: action.matterId,
+            contextType: 'full_chat',
+            initialPrompt: action.initialPrompt || null
+          });
+          return;
+        }
+        if (action.type === 'new_chat') {
+          self.newChat();
+        }
+      }, 300);
     }
 
     _handleDockTriggerClick(event) {

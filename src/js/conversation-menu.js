@@ -1,6 +1,6 @@
 /**
  * Conversation Menu Manager
- * Handles rendering conversations in the sidebar menu for chat.html
+ * Handles rendering conversations in legacy sidebar menus and dock-aware pages.
  */
 
 const ConversationMenu = {
@@ -484,22 +484,22 @@ const ConversationMenu = {
   },
 
   /**
-   * Handle conversation selection - navigate to chat.html or select in-page
+   * Handle conversation selection - open the dock host or select in-page.
    */
   selectConversation(threadId, matterId = '') {
     console.log('[ConversationMenu.selectConversation] Called with:', { threadId, matterId });
 
-    // Check if we're on the chat page
+    // Check if we're on the dock host with an in-page conversation selector.
     const isOnChatPage = NavigationHelpers.isOnChatPage();
     console.log('[ConversationMenu.selectConversation] isOnChatPage:', isOnChatPage);
     console.log('[ConversationMenu.selectConversation] window.selectConversation exists:', typeof window.selectConversation === 'function');
 
     if (isOnChatPage && typeof window.selectConversation === 'function') {
-      // We're on chat page, call the local function with matterId
+      // We're on a host page with a local selector, call it with matterId.
       console.log('[ConversationMenu.selectConversation] Calling window.selectConversation()');
       window.selectConversation(threadId, matterId);
     } else {
-      // Navigate to chat page with conversation - use centralized navigation
+      // Open the conversation through centralized dock-aware navigation.
       console.log('[ConversationMenu.selectConversation] Navigating to conversation');
       NavigationHelpers.navigateToConversation(threadId, matterId);
     }
@@ -617,7 +617,7 @@ const ConversationMenu = {
   }
 };
 
-// Export for use in chat.html
+// Export for host pages that still render the shared conversation menu.
 if (typeof window !== 'undefined') {
   window.ConversationMenu = ConversationMenu;
 }

@@ -442,7 +442,7 @@ window.openConversationSearchModal = function() {
   ConversationSearchModal.open();
 };
 
-// Export for use in chat.html
+// Export for host pages that still render the shared conversation search modal.
 if (typeof window !== 'undefined') {
   window.ConversationSearchModal = ConversationSearchModal;
 }

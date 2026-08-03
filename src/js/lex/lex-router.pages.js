@@ -26,61 +26,6 @@
 
     // ── Dashboard ── (standalone page — no descriptor needed)
 
-    // ── Chat ──
-    // TODO(deprecation): Legacy standalone chat route. Keep only while
-    // document-generation still depends on js/chat.js; new chat entrypoints
-    // should open the global lex-lana-dock instead.
-    'chat.html': {
-      title: 'Chat',
-      activeNav: 'chat',
-      scripts: [
-        'js/chat-demo-responses.js',
-        'js/file-drawer.js',
-        'js/chat.js'
-      ],
-      stylesheets: []
-    },
-
-    // TODO(deprecation): Intermediate standalone Lex chat route. Keep as a
-    // fallback until all chat-v2 matter/session/new-chat flows are dock-native.
-    'chat-v2.html': {
-      title: 'New Conversation',
-      activeNav: 'chat',
-      scripts: [
-        'js/utils/document-lifecycle.js',
-        'js/lex/components/foundation/lex-drawer.js',
-        'js/lex/components/foundation/lex-text.js',
-        'js/lex/components/foundation/lex-action-card.js',
-        'js/lex/components/foundation/lex-badge.js',
-        'js/lex/components/foundation/lex-divider.js',
-        'js/vendor/mermaid.min.js',
-        'js/services/document-processing.service.js',
-        'js/lex/chat/lex-chat.format.js',
-        'js/lex/chat/lex-chat.conversations-api.js',
-        'js/lex/chat/lex-chat.source.js',
-        'js/lex/chat/lex-chat.source-llama.js',
-        'js/lex/chat/lex-chat-artifact-promotion.js',
-        'js/lex/chat/lex-chat-progress-events.js',
-        'js/lex/chat/lex-chat.message.js',
-        'js/lex/chat/lex-chat.activity.js',
-        'js/lex/chat/lex-chat.documents.js',
-        'js/lex/chat/lex-chat.composer-mentions.js',
-        'js/lex/chat/lex-chat.composer.js',
-        'js/lex/chat/lex-chat.thread.js',
-        'js/lex/chat/lex-chat.js',
-        'js/lex/chat/lex-dynamic-card.renderer.js',
-        'js/lex/chat/lex-agentic-plan-card.js',
-        'js/lex/chat/lex-chat.index.js',
-        'js/chat-demo-responses.js',
-        'js/chat_v2.file-drawer.js',
-        'js/chat_v2.js'
-      ],
-      stylesheets: [
-        'css/lex-chat.css',
-        'css/chat-v2.css'
-      ]
-    },
-
     // ── Workspaces ── (standalone page — no descriptor needed)
 
     'workspace-details.html': {
@@ -633,20 +578,6 @@
       stylesheets: []
     },
 
-    'workflows/document-generation.html': {
-      title: 'Document Generation',
-      activeNav: 'workflows',
-      scripts: [
-        'js/document-templates-api.js',
-        'js/workflows.js',
-        'js/tiptap-bundle-built.js',
-        'js/chat.js',
-        'js/document-chat.js',
-        'js/document-actions.js'
-      ],
-      stylesheets: []
-    },
-
     'workflows/follow-up-cadences.html': {
       title: 'Follow-up Cadences',
       activeNav: 'workflows',
@@ -664,22 +595,6 @@
       ],
       stylesheets: []
     },
-
-    // ── Chat sub-pages ──
-    // TODO(deprecation): Legacy chat demo/sub-page routes. Remove with
-    // chat.html once the remaining document-generation dependency is migrated.
-    'chat/index.html': {
-      title: 'Chat',
-      activeNav: 'chat',
-      scripts: [
-        'js/chat-demo-responses.js',
-        'js/file-drawer.js',
-        'js/chat.js'
-      ],
-      stylesheets: []
-    },
-
-    // chat-v2.html — standalone page (not routed)
 
     // ── Lex UI demo pages ──
     'lex-test.html': {

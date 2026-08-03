@@ -606,7 +606,6 @@ class MenuSystem {
     // Admin pages now show the same menu with role-based Administration section
     // Removed special admin path detection - use portal menu everywhere
 
-    if (path.includes('chat.html')) return 'chat';
     if (path.includes('/insights/')) return 'insights';
     if (path.includes('/workflows/')) return 'workflows';
     if (path.includes('/integrations/')) return 'integrations';

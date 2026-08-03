@@ -39,10 +39,6 @@
   // =========================================================================
 
   var _deepLinks = {
-    // TODO(deprecation): Chat standalone page params are compatibility-only.
-    // New chat navigation should call NavigationHelpers/Lex.LanaDock.
-    'chat.html':                              { session: 'string', matter: 'string', openModal: 'string' },
-    'chat-v2.html':                            { matter: 'string', session: 'string' },
     'matters.html':                           { matter_id: 'string', open: 'string', tab: 'string', action: 'string' },
     'drive.html':                             { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string' },
     'search-results.html':                    { q: 'string' },
@@ -50,7 +46,6 @@
     'help.html':                              { section: 'string' },
     'faq.html':                               { section: 'string' },
     'workflows/builder.html':                 { template: 'string' },
-    'workflows/document-generation.html':     { matterId: 'string', temp_doc: 'string', save: 'string' },
     'integrations/connector-viewer.html':     { ui: 'string', name: 'string', tab: 'string', connectorId: 'string', connectorType: 'string', sourceId: 'string' },
     'admin/user-details.html':                { userId: 'string' },
     'admin/session-details.html':             { sessionId: 'string' },
@@ -300,7 +295,7 @@
    * Examples:
    *   Lex.Nav.go('matters.html')
    *   Lex.Nav.go('matters.html', { params: { action: 'create' }, context: { action: 'create' } })
-   *   Lex.Nav.go('chat.html', { params: { session: threadId, matter: matterId } })
+   *   Lex.Nav.go('matters.html', { params: { matter_id: matterId } })
    */
   function go(path, options) {
     options = options || {};
