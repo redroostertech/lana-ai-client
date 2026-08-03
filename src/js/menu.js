@@ -158,13 +158,6 @@ const MenuConfig = {
         isWorkspaceList: true,
         items: []
       },
-      {
-        id: 'projects',
-        title: 'Recents',
-        requiredRoles: [],
-        isConversationList: true,
-        items: []
-      },
       // Section 3: Non-scrollable static footer (user block + version rendered separately)
       {
         id: 'account',
@@ -281,13 +274,6 @@ const MenuConfig = {
         items: []
       },
       {
-        id: 'projects',
-        title: 'Recents',
-        requiredRoles: [],
-        isConversationList: true,
-        items: []
-      },
-      {
         id: 'account',
         title: null,
         requiredRoles: [],
@@ -349,13 +335,6 @@ const MenuConfig = {
         title: 'Workspaces',
         requiredRoles: [],
         isWorkspaceList: true,
-        items: []
-      },
-      {
-        id: 'projects',
-        title: 'Recents',
-        requiredRoles: [],
-        isConversationList: true,
         items: []
       },
       {
@@ -423,13 +402,6 @@ const MenuConfig = {
         items: []
       },
       {
-        id: 'projects',
-        title: 'Recents',
-        requiredRoles: [],
-        isConversationList: true,
-        items: []
-      },
-      {
         id: 'account',
         title: null,
         requiredRoles: [],
@@ -493,13 +465,6 @@ const MenuConfig = {
         title: 'Workspaces',
         requiredRoles: [],
         isWorkspaceList: true,
-        items: []
-      },
-      {
-        id: 'chat-projects',
-        title: 'Recents',
-        requiredRoles: [],
-        isConversationList: true,
         items: []
       },
       // Section 3: Non-scrollable static footer (user block + version rendered separately)
@@ -769,26 +734,9 @@ class MenuSystem {
     if (!this.isVisible(section)) return '';
 
     const visibleItems = section.items.filter(item => this.isVisible(item));
-    if (visibleItems.length === 0 && !section.isConversationList) return '';
+    if (visibleItems.length === 0) return '';
 
     let html = '';
-
-    // Handle conversation list section specially (no inner scroll - entire nav scrolls)
-    if (section.isConversationList) {
-      html += `
-        <div class="mt-8">
-          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">${section.title || ''}</p>
-          <div class="mt-3 space-y-1">
-            ${visibleItems.map(item => this.renderItem(item)).join('')}
-          </div>
-          <div class="mt-3 space-y-1" id="conversationListContainer">
-            <!-- Conversations will be dynamically loaded here -->
-            <p class="text-sm text-gray-400 italic px-3 py-2">Loading conversations...</p>
-          </div>
-        </div>
-      `;
-      return html;
-    }
 
     if (section.title) {
       html += `

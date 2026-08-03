@@ -494,16 +494,6 @@
       var self = this;
       var threadTitle = opts.title || this.threadTitle;
 
-      // Add to sidebar conversation menu
-      if (window.ConversationMenu && typeof window.ConversationMenu.addConversation === 'function') {
-        window.ConversationMenu.addConversation({
-          thread_id: id,
-          title: threadTitle,
-          matter_id: opts.matterId || self.matterId || undefined,
-          updated_at: new Date().toISOString()
-        });
-      }
-
       // Create conversation-thread record in backend + add to threads component.
       // Include matter_id so the thread shows up in the matter-scoped fetch
       // (?matter_id=…); without it, threads vanish from per-matter views.
@@ -1123,16 +1113,6 @@
         var conversationId = e.detail && e.detail.conversationId;
         if (!conversationId || typeof api === 'undefined') return;
 
-        // Add to sidebar menu
-        if (window.ConversationMenu && typeof window.ConversationMenu.addConversation === 'function') {
-          window.ConversationMenu.addConversation({
-            thread_id: conversationId,
-            title: self.threadTitle,
-            matter_id: self.matterId || undefined,
-            updated_at: new Date().toISOString()
-          });
-        }
-
         // If a thread row already tracks this conversation (e.g. the
         // user just clicked "+ New" and createThread() pre-allocated
         // it), there's nothing to register. Avoids a duplicate POST
@@ -1202,9 +1182,6 @@
             self.emit('lex-lana-thread-renamed', { thread: list[i] });
             break;
           }
-        }
-        if (conversationId && window.ConversationMenu && typeof window.ConversationMenu.updateConversation === 'function') {
-          window.ConversationMenu.updateConversation(conversationId, { title: newTitle });
         }
       });
 

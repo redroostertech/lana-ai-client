@@ -456,9 +456,6 @@
       // Initialize notification polling
       this._startNotificationPolling();
 
-      // Initialize conversation menu in sidebar
-      this._initConversationMenu();
-
       // Initialize backend reachability monitoring
       this._startReachabilityMonitor();
 
@@ -470,11 +467,6 @@
       if (window.Lex && window.Lex.state) {
         this._authChangeHandler = () => {
           this._hydrateUser();
-          // Re-init ConversationMenu: _hydrateUser() may trigger a full
-          // sidebar re-render (if userName/userEmail/version changed),
-          // which destroys #lexConversationListContainer. Re-init ensures
-          // ConversationMenu gets the new container reference.
-          this._initConversationMenu();
         };
         window.Lex.state.on('auth:changed', this._authChangeHandler);
       }
@@ -647,13 +639,6 @@
         }
       });
 
-      // Sidebar scroll end (conversation pagination)
-      this.delegate('sidebar-scroll-end', 'lex-sidebar', () => {
-        if (typeof window.ConversationMenu !== 'undefined') {
-          window.ConversationMenu.loadMore();
-        }
-      });
-
       // Notification bell → open notification panel
       this.delegate('topbar-notification-click', 'lex-topbar', () => {
         if (window.DesktopNotifications) {
@@ -770,30 +755,6 @@
       if (sidebar) sidebar.sections = sections;
     }
 
-    /**
-     * Drop the sidebar RECENTS section once a dock announces itself.
-     *
-     * `_buildSidebarSections()` asks `document.querySelector('lex-lana-dock')`
-     * whether this page has a dock, but that question is unanswerable at the
-     * time it is asked: `<lex-app>` sits at the top of page markup and
-     * `<lex-lana-dock>` near the bottom (line 23 vs 1216 in
-     * workspace-details.html), so the shell upgrades and builds its sections
-     * while the dock tag is still unparsed. The query returns null and the
-     * sidebar renders RECENTS on exactly the pages that were supposed to have
-     * lost it.
-     *
-     * Parse order is not something to race, so the dock tells us instead. This
-     * is idempotent and cheap when there is nothing to remove — the early
-     * return keeps it from triggering the sidebar re-render that would destroy
-     * #lexConversationListContainer on pages that legitimately keep the list.
-     */
-    dropSidebarConversationSection() {
-      const sections = this._sections || [];
-      const next = sections.filter((section) => !section || section.id !== 'chats');
-      if (next.length === sections.length) return;
-      this.setSections(next);
-    }
-
     /** Set user menu items for the sidebar profile */
     setUserMenuItems(items) {
       this._userMenuItems = items;
@@ -823,7 +784,6 @@
         if (!config || config.isLanaOne !== true || this._isLanaOne) return;
         this._isLanaOne = true;
         this._hydrateUser();
-        this._initConversationMenu();
       }).catch(function () { /* Standard client: keep LANA-ONE items hidden. */ });
     }
 
@@ -890,17 +850,14 @@
       sidebar.userInitials = initials;
       sidebar.userEmail = handle;
 
-      // Version — set once only (avoid async re-render destroying conversation list)
+      // Version — set once only.
       if (!this._versionSet) {
         this._versionSet = true;
         if (window.APP_VERSION && window.APP_VERSION.getVersion) {
           sidebar.version = window.APP_VERSION.getVersion();
         } else if (window.electronAPI && window.electronAPI.getVersion) {
-          var self = this;
           window.electronAPI.getVersion().then(function (v) {
             sidebar.version = 'v' + v;
-            // Re-init ConversationMenu since version change triggers full sidebar re-render
-            self._initConversationMenu();
           }).catch(function () {});
         }
       }
@@ -924,9 +881,6 @@
       const shellKey = (showAdmin ? 'admin' : 'user') + ':' + appContext + ':' + editionKey;
 
       // Only rebuild sidebar sections and menus when admin visibility or app context changes.
-      // Both setSections() and setUserMenuItems() create new arrays which
-      // increment the sidebar's generation counters, triggering a full re-render
-      // that destroys #lexConversationListContainer.
       if (this._lastShowAdmin !== showAdmin || this._lastShellKey !== shellKey) {
         this._lastShowAdmin = showAdmin;
         this._lastShellKey = shellKey;
@@ -1041,19 +995,7 @@
           isWorkspaceList: true,
           items: []
         });
-        // Recents moved into the LANA dock (lex-lana-dock) — the docked
-        // panel's RECENTS list is the home for recent chats. Pages without
-        // a dock (chat-v2, embed) keep the sidebar section so conversation
-        // switching still exists there.
-        if (!document.querySelector('lex-lana-dock')) {
-          sections.push({
-            id: 'chats',
-            title: 'Recents',
-            isScrollable: true,
-            isConversationList: true,
-            items: []
-          });
-        }
+        // Chat recents live in the LANA dock.
       }
 
       return sections;
@@ -1119,47 +1061,6 @@
         this._topMoverItems = [];
         this._topMoversLoaded = false;
       }
-    }
-
-    // -----------------------------------------------------------------------
-    // Internal — conversation menu
-    // -----------------------------------------------------------------------
-
-    _initConversationMenu() {
-      requestAnimationFrame(() => {
-        if (typeof window.ConversationMenu === 'undefined') return;
-        if (this._getAppContext() === 'insights') return;
-
-        // Skip if ConversationMenu's container is still in the DOM —
-        // avoids a visible flash + unnecessary API call on auth:changed
-        // when the sidebar fast-path preserved the container.
-        var existing = window.ConversationMenu.container;
-        if (existing && existing.isConnected) return;
-
-        if (typeof window.ConversationMenu.setScope === 'function') {
-          window.ConversationMenu.setScope(this._getConversationMenuScope());
-        }
-
-        if (window.ConversationMenu.init('#lexConversationListContainer')) {
-          window.ConversationMenu.loadConversations(true);
-        }
-      });
-    }
-
-    _getConversationMenuScope() {
-      const appContext = this._getAppContext();
-      if (appContext === 'insights') {
-        return {
-          type: 'conversation_threads',
-          title: 'Insights Chats',
-          pageScopes: ['dashboard']
-        };
-      }
-
-      return {
-        type: 'chat_sessions',
-        title: 'Recents'
-      };
     }
 
     // -----------------------------------------------------------------------

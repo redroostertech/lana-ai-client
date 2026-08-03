@@ -50,15 +50,15 @@ describe('LanaEmbedHost.resolveEmbedApp', () => {
     const hostJs = fs.readFileSync(path.join(SRC, 'js', 'embed-host.js'), 'utf8');
     const core = html.indexOf('js/lex/lex.core.js');
     const navigation = html.indexOf('js/navigation-helpers.js');
-    const conversations = html.indexOf('js/conversation-menu.js');
+    const conversationSearch = html.indexOf('js/conversation-search-modal.js');
     const sidebar = html.indexOf('js/lex/components/layout/lex-sidebar.js');
     const app = html.indexOf('js/lex/components/layout/lex-app.js');
     const host = html.indexOf('js/embed-host.js');
     const prime = html.indexOf('LanaEmbedHost.primeShell');
     expect(core).toBeGreaterThan(-1);
     expect(navigation).toBeGreaterThan(-1);
-    expect(conversations).toBeGreaterThan(navigation);
-    expect(conversations).toBeLessThan(core);
+    expect(conversationSearch).toBeGreaterThan(navigation);
+    expect(conversationSearch).toBeLessThan(core);
     expect(sidebar).toBeGreaterThan(core);
     expect(app).toBeGreaterThan(sidebar);
     expect(host).toBeGreaterThan(-1);

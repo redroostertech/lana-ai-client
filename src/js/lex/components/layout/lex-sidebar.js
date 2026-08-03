@@ -10,9 +10,7 @@
 
      // Set sections, user data, and menu items via JS
      sidebar.sections = [
-       { id: 'main', items: [...] },
-       { id: 'chats', title: 'Your Chats', isScrollable: true, isConversationList: true,
-         items: [{ id: 'new-chat', label: 'New Chat', icon: 'plus', isButton: true, onClick: 'openNewProjectModal' }] }
+       { id: 'main', items: [...] }
      ];
      sidebar.userName = 'Michael';
      sidebar.userEmail = '@michael.westbrooks';
@@ -26,7 +24,6 @@
 
    Section flags:
      isScrollable        — placed in the scrollable middle area
-     isConversationList  — renders #lexConversationListContainer for ConversationMenu injection
      isFooter            — pinned at the bottom above the user block
 
    Item flags:
@@ -165,16 +162,6 @@
           width: 0;
           flex: 0 0 0px;
           overflow: hidden;
-          pointer-events: none;
-        }
-
-        /* Conversation list fades + collapses height */
-        .lex-sidebar-root .lex-sidebar-conversation-list {
-          transition: opacity 0.25s ease, max-height var(--lex-transition-slide);
-        }
-        .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-conversation-list {
-          opacity: 0;
-          max-height: 0;
           pointer-events: none;
         }
 
@@ -986,16 +973,6 @@
         outline: none;
       }
 
-      /* Conversation list section */
-      .lex-sidebar-section-has-conversations {
-        display: flex;
-        flex-direction: column;
-      }
-
-      .lex-sidebar-section-has-conversations .lex-sidebar-conversation-list {
-        padding-bottom: 2rem;
-      }
-
       /* ── Nav item ───────────────────────────────────────── */
 
       .lex-sidebar-nav-item {
@@ -1146,19 +1123,6 @@
 
       .lex-sidebar-root[data-collapsed="true"] .lex-sidebar-nav-chevron {
         display: none;
-      }
-
-      /* ── Conversation list container ─────────────────────── */
-
-      .lex-sidebar-conversation-list {
-        margin-top: 0.25rem;
-        padding-bottom: 2rem;
-        overflow: hidden;
-        min-width: 0;
-      }
-
-      .lex-sidebar-conversation-list .conversation-item {
-        margin-bottom: 0.25rem;
       }
 
       /* ── Divider ────────────────────────────────────────── */
@@ -1597,8 +1561,6 @@
       injectStyles();
 
       // ── Fast-path: toggle-only changes don't need full re-render ──
-      // This preserves external DOM content (e.g. ConversationMenu injected
-      // into #lexConversationListContainer).
       const root = this.querySelector('.lex-sidebar-root');
       if (root) {
         root.dataset.open = String(this.open);
@@ -1625,7 +1587,7 @@
             && this._lastVersion === this.version
             && this._lastMenuItemsGen === this._menuItemsGen
             && this._lastAppCatalogGen === this._appCatalogGen) {
-          return null; // Skip innerHTML, preserve conversation list DOM
+          return null; // Skip innerHTML, preserve dynamic sidebar DOM
         }
       }
 
@@ -2037,14 +1999,12 @@
     // -----------------------------------------------------------------------
 
     _renderSection(section) {
-      const isConversationList = !!section.isConversationList;
       const isTaskList = !!section.isTaskList;
       const isWorkspaceList = !!section.isWorkspaceList;
-      const isCollapsible = isConversationList || isTaskList || isWorkspaceList;
+      const isCollapsible = isTaskList || isWorkspaceList;
       const sectionClass = [
         'lex-sidebar-section',
         isCollapsible ? 'lex-sidebar-collapsible-section' : '',
-        isConversationList ? 'lex-sidebar-section-has-conversations' : '',
         isTaskList ? 'lex-sidebar-section-has-tasks' : '',
         isWorkspaceList ? 'lex-sidebar-section-has-workspaces' : ''
       ].filter(Boolean).join(' ');
@@ -2054,13 +2014,11 @@
       let html = `<div class="${sectionClass}" data-static-top="${section.isStaticTop ? 'true' : 'false'}"${collapsedAttr}>`;
       if (section.title) {
         if (isCollapsible) {
-          const action = isTaskList ? 'create-task' : (isWorkspaceList ? 'create-workspace' : 'create-conversation');
-          const actionLabel = isTaskList ? 'New task' : (isWorkspaceList ? 'New workspace' : 'New chat');
+          const action = isTaskList ? 'create-task' : 'create-workspace';
+          const actionLabel = isTaskList ? 'New task' : 'New workspace';
           const actionIcon = isTaskList
             ? (icon('plus', 'small') || icon('clipboard-check', 'small'))
-            : isWorkspaceList
-            ? (icon('plus', 'small') || icon('briefcase', 'small'))
-            : (icon('edit', 'small') || icon('file-plus', 'small') || icon('plus', 'small'));
+            : (icon('plus', 'small') || icon('briefcase', 'small'));
           html += `<div class="lex-sidebar-section-toggle-row">
             <button type="button" class="lex-sidebar-section-toggle" data-action="toggle-dynamic-section" aria-expanded="${!isCollapsed}" aria-controls="${contentId}">
               <span class="lex-sidebar-section-toggle-label">${this.escapeHtml(section.title)}</span>
@@ -2078,9 +2036,7 @@
         html += `<div class="lex-sidebar-section-content" id="${contentId}">`;
       }
       html += this._renderSectionItems(section.items);
-      if (isConversationList) {
-        html += `<div class="lex-sidebar-conversation-list" id="lexConversationListContainer"></div>`;
-      } else if (isTaskList) {
+      if (isTaskList) {
         html += `<div class="lex-sidebar-dynamic-list lex-sidebar-task-list" id="lexTaskListContainer"></div>`;
       } else if (isWorkspaceList) {
         html += `<div class="lex-sidebar-dynamic-list lex-sidebar-workspace-list" id="lexWorkspaceListContainer"></div>`;
@@ -2811,14 +2767,6 @@
         this._setSectionCollapsed(section, collapsed);
         this._syncDynamicSectionState(section, collapsed);
         requestAnimationFrame(() => this._updateScrollableFades());
-      });
-
-      this.delegate('click', '[data-action="create-conversation"]', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (typeof window.openNewProjectModal === 'function') {
-          window.openNewProjectModal();
-        }
       });
 
       this.delegate('click', '[data-action="create-task"]', (e) => {

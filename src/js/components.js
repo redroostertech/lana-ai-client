@@ -820,9 +820,6 @@ const ConversationActionsModal = {
             detail: { threadId: streamThreadId, registryId: threadId, title: trimmed }
           }));
         }
-        if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
-          window.ConversationMenu.loadConversations(true);
-        }
         if (typeof this.onRefresh === 'function') this.onRefresh();
       } catch (error) {
         console.error('Failed to rename conversation:', error);
@@ -843,13 +840,8 @@ const ConversationActionsModal = {
       Toast.success('Conversation renamed successfully');
       this.closeRename();
 
-      // Refresh sidebar conversation menu directly (it's a simple call;
-      // the `conversation:renamed` event is also dispatched for any other
-      // mounted views — chat header, workspace Conversations tab, etc.)
-      if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
-        window.ConversationMenu.loadConversations(true);
-      }
-      // Refresh page-level content (e.g. search results)
+      // Refresh page-level content (e.g. search results). Other mounted views
+      // observe the `conversation:renamed` event dispatched by the helper.
       if (typeof this.onRefresh === 'function') {
         this.onRefresh();
       }
@@ -904,9 +896,6 @@ const ConversationActionsModal = {
           await api.deleteConversation(convId);
           Toast.success('Conversation archived');
 
-          if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
-            window.ConversationMenu.loadConversations(true);
-          }
           if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
             window.dispatchEvent(new CustomEvent('conversation:archived', {
               detail: { threadId: convId, registryId: registryId }
@@ -948,9 +937,6 @@ const ConversationActionsModal = {
         Toast.success('Conversation pinned');
       }
 
-      if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
-        window.ConversationMenu.loadConversations(true);
-      }
       if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
         window.dispatchEvent(new CustomEvent('conversation:pin-changed', {
           detail: { threadId: streamThreadId, registryId: convId, isPinned: !wasPinned }
@@ -995,9 +981,6 @@ const ConversationActionsModal = {
             ? `Conversation and ${deletedMessages} message${deletedMessages === 1 ? '' : 's'} deleted`
             : 'Conversation deleted');
 
-          if (typeof window.ConversationMenu !== 'undefined' && window.ConversationMenu.loadConversations) {
-            window.ConversationMenu.loadConversations(true);
-          }
           if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
             window.dispatchEvent(new CustomEvent('conversation:deleted', {
               detail: { threadId: streamThreadId, registryId: convId, permanent: true }

@@ -775,13 +775,13 @@ app.setUserMenuItems(menuItems);    // User dropdown items
 app.setTopbarMenuItems(items);      // Topbar action items
 ```
 
-**RULE:** Never call `setSections()` or `setUserMenuItems()` in polling callbacks or reactive loops — they destroy the conversation list container on every call.
+**RULE:** Never call `setSections()` or `setUserMenuItems()` in polling callbacks or reactive loops; they trigger full sidebar re-renders and create visible churn.
 
 ### `<lex-sidebar>`
 
-Collapsible navigation sidebar with sections, items, conversation list, and version footer.
+Collapsible navigation sidebar with sections, items, dynamic task/workspace lists, and version footer.
 
-**Fast-path rendering:** Uses generation counters (`_sectionsGen`, `_menuItemsGen`) to skip full re-render when data hasn't changed. If all counters match, `render()` returns `null` to preserve external DOM content (ConversationMenu).
+**Fast-path rendering:** Uses generation counters (`_sectionsGen`, `_menuItemsGen`) to skip full re-render when data hasn't changed. If all counters match, `render()` returns `null` to preserve dynamic sidebar state.
 
 ### `<lex-topbar>`
 
@@ -819,8 +819,8 @@ app.html                          ← SPA entry point (loaded once)
     ├── <a class="lex-app-skip-link">  ← Accessibility skip link
     ├── <lex-sidebar>             ← Persistent sidebar navigation
     │   ├── Logo area
-    │   ├── Nav sections (static top + tools + scrollable chats)
-    │   ├── Conversation list     ← #lexConversationListContainer
+    │   ├── Nav sections (static top + tools + scrollable lists)
+    │   ├── Task/workspace lists
     │   └── User profile + menu
     ├── <lex-body>                ← Right-side container (margin-left: sidebar width)
     │   ├── <lex-header>          ← Sticky header wrapper
@@ -1272,7 +1272,7 @@ These are absolute prohibitions:
 - **NEVER** read `window.location.search` for SPA params — use `Lex.Nav.getParams()`
 - **NEVER** push URLs to `history.state` — the URL stays at `app.html`, routes live in `state.path`
 - **NEVER** render a page without registering in `lex-router.pages.js`
-- **NEVER** call `setSections()`/`setUserMenuItems()` in polling or reactive loops — destroys conversation list
+- **NEVER** call `setSections()`/`setUserMenuItems()` in polling or reactive loops — forces full sidebar re-renders
 - **NEVER** put `const`/`class` at top level in page scripts using `registerPageInit` — wrap in IIFE
 
 ---

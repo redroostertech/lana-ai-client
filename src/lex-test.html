@@ -3697,7 +3697,6 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
   <script src="js/version.js"></script>
   <script src="js/navigation-helpers.js"></script>
   <script src="js/new-project-modal.js"></script>
-  <script src="js/conversation-menu.js"></script>
   <script src="js/conversation-search-modal.js"></script>
 
   <!-- Lex Core -->
@@ -3871,13 +3870,6 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
             isScrollable: true,
             isWorkspaceList: true,
             items: []
-          },
-          {
-            id: 'chats',
-            title: 'Recents',
-            isScrollable: true,
-            isConversationList: true,
-            items: []
           }
         ];
 
@@ -3897,22 +3889,6 @@ Lex.Orchestrator.<span class="fn">handleSSEBlock</span>(data, container);
         menuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle', href: 'help.html' });
         menuItems.push({ id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true });
         sidebar.userMenuItems = menuItems;
-
-        // -- Initialize ConversationMenu after sidebar renders --
-        requestAnimationFrame(() => {
-          if (typeof ConversationMenu !== 'undefined') {
-            if (ConversationMenu.init('#lexConversationListContainer')) {
-              ConversationMenu.loadConversations(true);
-            }
-          }
-        });
-
-        // -- Infinite scroll for conversation pagination --
-        sidebar.addEventListener('sidebar-scroll-end', () => {
-          if (typeof ConversationMenu !== 'undefined') {
-            ConversationMenu.loadMore();
-          }
-        });
 
         // -- User menu actions --
         sidebar.addEventListener('sidebar-user-action', (e) => {

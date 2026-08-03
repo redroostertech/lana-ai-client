@@ -469,16 +469,6 @@
       };
       Lex.LanaDock.newChat = function () { var d = Lex.LanaDock.get(); if (d) return d.newChat(); };
 
-      // This dock is the home for recent chats, so the sidebar must not also
-      // carry a RECENTS section. lex-app cannot decide that on its own: it is
-      // declared at the top of page markup and upgrades while this element is
-      // still unparsed further down, so its `querySelector('lex-lana-dock')`
-      // check sees nothing and adds the section anyway. Announce ourselves
-      // instead of leaving it to parse order.
-      var app = document.querySelector('lex-app');
-      if (app && typeof app.dropSidebarConversationSection === 'function') {
-        app.dropSidebarConversationSection();
-      }
       document.addEventListener('click', this._boundTriggerClick);
       this._consumePendingAction();
     }
