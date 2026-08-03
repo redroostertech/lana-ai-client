@@ -1,5 +1,10 @@
 # LANA Insights Chat: Thread Lifecycle
 
+> TODO(deprecation): This document is stale. The client chat topology is now
+> dock-first and should use canonical `/api/v1/conversations` resources for
+> conversation/session behavior. Do not use this document as an authoritative
+> implementation contract for new chat work until it is rewritten.
+
 This document describes the legacy page-scoped LANA drawer lifecycle and the shared `conversation_threads` API. Ordinary pages now use the global `lex-lana-dock`, with page-level entry through `lex-banner lana`; do not add new page-specific Insights drawers for Dashboard, Reporting, Billable Hours, or Data Visualization.
 
 ## TL;DR

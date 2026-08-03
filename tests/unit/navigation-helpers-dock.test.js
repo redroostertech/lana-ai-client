@@ -42,12 +42,12 @@ describe('NavigationHelpers dock-first chat routing', () => {
     expect(global.window.Lex.Nav.go).not.toHaveBeenCalled();
   });
 
-  test('navigateToMatterChat opens the LANA dock with matter context when available', () => {
+  test('openMatterDockChat opens the LANA dock with matter context when available', () => {
     const dock = { newChat: jest.fn(), openWith: jest.fn() };
     global.window.Lex.LanaDock = { get: jest.fn(() => dock) };
     global.window.Lex.Nav = { go: jest.fn() };
 
-    NavigationHelpers.navigateToMatterChat('matter-1');
+    NavigationHelpers.openMatterDockChat('matter-1');
 
     expect(dock.newChat).toHaveBeenCalledTimes(1);
     expect(dock.openWith).toHaveBeenCalledWith({
@@ -58,12 +58,12 @@ describe('NavigationHelpers dock-first chat routing', () => {
     expect(global.window.Lex.Nav.go).not.toHaveBeenCalled();
   });
 
-  test('navigateToMatterChat forwards queued prompt to the dock and clears it only on dock path', () => {
+  test('openMatterDockChat forwards queued prompt to the dock and clears it only on dock path', () => {
     const dock = { newChat: jest.fn(), openWith: jest.fn() };
     global.window.Lex.LanaDock = { get: jest.fn(() => dock) };
     global.window.sessionStorage.getItem.mockReturnValue('Discuss this task');
 
-    NavigationHelpers.navigateToMatterChat('matter-1');
+    NavigationHelpers.openMatterDockChat('matter-1');
 
     expect(dock.newChat).toHaveBeenCalledTimes(1);
     expect(dock.openWith).toHaveBeenCalledWith({
@@ -89,11 +89,11 @@ describe('NavigationHelpers dock-first chat routing', () => {
     }));
   });
 
-  test('navigateToMatterChat fallback queues prompt for dashboard dock host', () => {
+  test('openMatterDockChat fallback queues prompt for dashboard dock host', () => {
     global.window.Lex.Nav = { go: jest.fn() };
     global.window.sessionStorage.getItem.mockReturnValue('Discuss this task');
 
-    NavigationHelpers.navigateToMatterChat('matter-1');
+    NavigationHelpers.openMatterDockChat('matter-1');
 
     expect(global.window.Lex.Nav.go).toHaveBeenCalledWith('dashboard.html');
     const queued = JSON.parse(global.window.sessionStorage.setItem.mock.calls[0][1]);
@@ -103,5 +103,16 @@ describe('NavigationHelpers dock-first chat routing', () => {
       initialPrompt: 'Discuss this task'
     }));
     expect(global.window.sessionStorage.removeItem).toHaveBeenCalledWith('lana_chat_prompt');
+  });
+
+  test('dock host naming resolves and detects dashboard', () => {
+    global.window.location.pathname = '/src/settings/account.html';
+
+    expect(NavigationHelpers.resolveDockHostPath()).toBe('../dashboard.html');
+    expect(NavigationHelpers.isOnDockHost()).toBe(false);
+
+    global.window.location.pathname = '/src/dashboard.html';
+
+    expect(NavigationHelpers.isOnDockHost()).toBe(true);
   });
 });

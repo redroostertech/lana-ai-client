@@ -227,8 +227,8 @@
   }
 
   // --- Matter picker (Create/Edit Task Plan modal) ----------------------
-  // Reuses NewProjectModal as a generic matter picker, giving the user the
-  // same recent-matters + search experience as the New Chat picker instead
+  // Reuses MatterPickerModal as a generic matter picker, giving the user the
+  // same recent-matters + search experience as the shared matter picker instead
   // of a bare typeahead where they wouldn't know what to type.
 
   function setPlanMatterScope(matterId, matterName) {
@@ -249,11 +249,11 @@
   }
 
   function openPlanMatterPicker() {
-    if (typeof NewProjectModal === 'undefined' || !NewProjectModal.open) {
+    if (typeof MatterPickerModal === 'undefined' || !MatterPickerModal.open) {
       Lex.Toast.error('Matter picker is unavailable on this page.');
       return;
     }
-    NewProjectModal.open({
+    MatterPickerModal.open({
       heading: 'Pick a matter for this plan',
       footerHint: 'Optional — leave unselected for organization-level work.',
       hideCreateBtn: true,

@@ -82,6 +82,32 @@ const ADMIN_ROLES = [
   UserRoles.ADMIN
 ];
 
+function openLanaDockNewChat() {
+  var dock = null;
+  if (window.Lex && window.Lex.LanaDock) {
+    if (typeof window.Lex.LanaDock.get === 'function') {
+      dock = window.Lex.LanaDock.get();
+    }
+    if (!dock) dock = window.Lex.LanaDock;
+  }
+  if (!dock && window.document && typeof window.document.querySelector === 'function') {
+    dock = window.document.querySelector('lex-lana-dock');
+  }
+  if (dock && typeof dock.newChat === 'function') {
+    dock.newChat();
+    return;
+  }
+  if (window.NavigationHelpers && typeof window.NavigationHelpers.openNewDockChat === 'function') {
+    window.NavigationHelpers.openNewDockChat();
+    return;
+  }
+  window.location.href = 'dashboard.html';
+}
+
+if (typeof window !== 'undefined') {
+  window.openLanaDockNewChat = openLanaDockNewChat;
+}
+
 // ============================================================
 // MENU CONFIGURATION
 // ============================================================
@@ -126,7 +152,7 @@ const MenuConfig = {
             label: 'New Chat',
             href: '#',
             isButton: true,
-            onClick: 'openNewProjectModal',
+            onClick: 'openLanaDockNewChat',
             variant: 'create-chat'
           },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
@@ -243,7 +269,7 @@ const MenuConfig = {
             label: 'New Chat',
             href: '#',
             isButton: true,
-            onClick: 'openNewProjectModal',
+            onClick: 'openLanaDockNewChat',
             variant: 'create-chat'
           },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
@@ -307,7 +333,7 @@ const MenuConfig = {
             label: 'New Chat',
             href: '#',
             isButton: true,
-            onClick: 'openNewProjectModal',
+            onClick: 'openLanaDockNewChat',
             variant: 'create-chat'
           },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
@@ -371,7 +397,7 @@ const MenuConfig = {
             label: 'New Chat',
             href: '#',
             isButton: true,
-            onClick: 'openNewProjectModal',
+            onClick: 'openLanaDockNewChat',
             variant: 'create-chat'
           },
           { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
@@ -436,7 +462,7 @@ const MenuConfig = {
             label: 'New Chat',
             href: '#',
             isButton: true,
-            onClick: 'openNewProjectModal',
+            onClick: 'openLanaDockNewChat',
             variant: 'create-chat'
           },
           { id: 'chat-dashboard', label: 'Dashboard', href: '/dashboard.html', icon: 'home' },
@@ -1223,6 +1249,7 @@ if (typeof module !== 'undefined' && module.exports) {
     MenuConfig,
     MenuIcons,
     UserRoles,
+    openLanaDockNewChat,
     renderMenu,
     isAdmin,
     isSystemAdmin

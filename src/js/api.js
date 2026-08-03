@@ -1976,19 +1976,6 @@ class ApiClient {
     return this.getPinnedConversations(opts);
   }
 
-  // TODO(deprecation): Legacy /conversation-threads pinned-list helper
-  // retained for older sidebar/thread surfaces. New chat code should stay on
-  // /api/v1/conversations.
-  async getPinnedConversationThreads(opts = {}) {
-    const params = new URLSearchParams({
-      limit: String(opts.limit != null ? opts.limit : 100),
-      offset: String(opts.offset != null ? opts.offset : 0)
-    });
-    if (opts.pageScope) params.set('page_scope', opts.pageScope);
-    if (opts.matterId) params.set('matter_id', opts.matterId);
-    return this.get(`/api/v1/conversation-threads/pinned?${params.toString()}`);
-  }
-
   // TODO(deprecation): Legacy thread naming aliases. Active callers should use
   // pinConversation/unpinConversation/deleteConversation.
   async pinThread(threadId) {
@@ -2602,9 +2589,9 @@ class ApiClient {
 
   // ============================================================
   // Chat Session Files
-  // TODO(deprecation): Legacy /api/v1/chat/sessions/:id/files helpers. Move
-  // active chat document attachment flows behind a canonical conversation
-  // subresource before removing this compatibility section.
+  // TODO(deprecation): Legacy /api/v1/chat/sessions/:id/files helpers. Keep
+  // these wrappers until the backend exposes a canonical searchable file
+  // candidate endpoint for conversation document attachment flows.
   // ============================================================
 
   /**
@@ -2958,17 +2945,13 @@ class ApiClient {
     return this.get(`/api/v1/activity/my/productivity${query}`);
   }
 
-  // TODO(deprecation): Legacy usage probe that only needs a recent
-  // conversation row. Replace with /api/v1/conversations once dashboard callers
-  // no longer rely on chat-session response shape.
   async getMyConversationUsageSummary() {
-    const params = new URLSearchParams({
-      page: '1',
-      limit: '1',
-      sort: 'updated_at',
-      order: 'desc'
+    return this.getConversations({
+      limit: 1,
+      offset: 0,
+      sortBy: 'updated_at',
+      sortOrder: 'desc'
     });
-    return this.get(`/api/v1/chat/sessions?${params.toString()}`);
   }
 
   async getStorageUsage() {

@@ -28,7 +28,7 @@
 
    Item flags:
      isButton  — renders as <button> instead of <a>
-     onClick   — global function name to call when button is clicked (e.g. 'openNewProjectModal')
+     onClick   - global function name to call when button is clicked (e.g. 'openLanaDockNewChat')
 
    Events: sidebar-close, sidebar-nav-click, sidebar-user-action, sidebar-scroll-end
 */
@@ -2197,7 +2197,7 @@
         const choice = action.dataset.createChoice;
         close();
         if (choice === 'chat') {
-          if (typeof window.openNewProjectModal === 'function') window.openNewProjectModal();
+          this._openDockFirstNewChat();
         } else if (choice === 'task') {
           this._openTasksIndex({ create: true });
         } else if (choice === 'workspace') {
@@ -2214,6 +2214,25 @@
 
       const firstAction = overlay.querySelector('[data-create-choice="chat"]');
       if (firstAction && typeof firstAction.focus === 'function') firstAction.focus();
+    }
+
+    _openDockFirstNewChat() {
+      if (window.Lex && window.Lex.LanaDock) {
+        var dock = null;
+        if (typeof window.Lex.LanaDock.get === 'function') {
+          dock = window.Lex.LanaDock.get();
+        }
+        if (!dock) dock = window.Lex.LanaDock;
+        if (dock && typeof dock.newChat === 'function') {
+          dock.newChat();
+          return;
+        }
+      }
+      if (window.NavigationHelpers && typeof window.NavigationHelpers.openNewDockChat === 'function') {
+        window.NavigationHelpers.openNewDockChat();
+        return;
+      }
+      window.location.href = 'dashboard.html';
     }
 
     _closeCollapsedCreateChooser() {

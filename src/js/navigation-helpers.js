@@ -47,7 +47,7 @@ const NavigationHelpers = {
    * Resolve the dock host path from current location.
    * @returns {string} Resolved path to dashboard.html
    */
-  resolveChatPath() {
+  resolveDockHostPath() {
     return this.resolvePath('dashboard.html');
   },
 
@@ -71,7 +71,7 @@ const NavigationHelpers = {
       window.Lex.Nav.go('dashboard.html');
       return;
     }
-    window.location.href = this.resolveChatPath();
+    window.location.href = this.resolveDockHostPath();
   },
 
   /**
@@ -96,7 +96,7 @@ const NavigationHelpers = {
    * Check if currently on the dock host.
    * @returns {boolean} True if on dashboard.html
    */
-  isOnChatPage() {
+  isOnDockHost() {
     return window.location.pathname.endsWith('dashboard.html');
   },
 
@@ -124,7 +124,7 @@ const NavigationHelpers = {
   /**
    * Open a new dock chat.
    */
-  navigateToNewProject() {
+  openNewDockChat() {
     var dock = this.getLanaDock();
     if (dock && typeof dock.newChat === 'function') {
       dock.newChat();
@@ -139,7 +139,7 @@ const NavigationHelpers = {
    * Open a new dock chat with matter context.
    * @param {string} matterId - Matter ID
    */
-  navigateToMatterChat(matterId) {
+  openMatterDockChat(matterId) {
     var initialPrompt = null;
     try {
       initialPrompt = window.sessionStorage && window.sessionStorage.getItem('lana_chat_prompt');
@@ -176,28 +176,6 @@ const NavigationHelpers = {
       return window.Lex.Nav.getParams();
     }
     return new URLSearchParams(window.location.search);
-  },
-
-  /**
-   * Validate session ID format.
-   * Session IDs should be alphanumeric with hyphens and underscores.
-   * Uses string character checking — no regex.
-   * @param {string} sessionId - Session ID to validate
-   * @returns {boolean} True if valid format
-   */
-  validateSessionId(sessionId) {
-    if (!sessionId) return false;
-    var s = String(sessionId);
-    if (s.length === 0) return false;
-    for (var i = 0; i < s.length; i++) {
-      var c = s.charAt(i);
-      var code = s.charCodeAt(i);
-      // a-z, A-Z, 0-9, _, -
-      var isAlpha = (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
-      var isDigit = (code >= 48 && code <= 57);
-      if (!isAlpha && !isDigit && c !== '_' && c !== '-') return false;
-    }
-    return true;
   },
 
   /**

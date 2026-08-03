@@ -1164,49 +1164,52 @@
   };
 
   // ============================================================
-  // CHAT TESTS
+  // CONVERSATION TESTS
   // ============================================================
 
   const ChatTests = {
-    testSessionId: null,
+    testConversationId: null,
 
     async testGetChatSessions() {
-      return await runTest('GET /api/v1/chat/sessions', async () => {
-        return await request('GET', '/api/v1/chat/sessions?limit=10');
+      return await runTest('GET /api/v1/conversations', async () => {
+        return await request('GET', '/api/v1/conversations?limit=10');
       });
     },
 
     async testCreateChatSession() {
-      const result = await runTest('POST /api/v1/chat/sessions', async () => {
-        return await request('POST', '/api/v1/chat/sessions', {
+      const result = await runTest('POST /api/v1/conversations', async () => {
+        return await request('POST', '/api/v1/conversations', {
           title: `Test Chat ${Date.now()}`,
-          context: { test: true }
+          context_type: 'full_chat',
+          metadata: { test: true }
         });
       });
 
-      if (result.success && result.data?.session?.id) {
-        this.testSessionId = result.data.session.id;
+      const conversation = result.data?.conversation || result.data?.data || result.data || {};
+      this.testConversationId = conversation.conversation_id || conversation.conversationId || conversation.thread_id || conversation.threadId || conversation.id || null;
+      if (!this.testConversationId && result.data?.session?.id) {
+        this.testConversationId = result.data.session.id;
       }
       return result;
     },
 
     async testGetChatSession() {
-      if (!this.testSessionId) {
-        skipTest('GET /api/v1/chat/sessions/{sessionId}', 'No session ID available');
+      if (!this.testConversationId) {
+        skipTest('GET /api/v1/conversations/{conversationId}', 'No conversation ID available');
         return;
       }
-      return await runTest('GET /api/v1/chat/sessions/{sessionId}', async () => {
-        return await request('GET', `/api/v1/chat/sessions/${this.testSessionId}`);
+      return await runTest('GET /api/v1/conversations/{conversationId}', async () => {
+        return await request('GET', `/api/v1/conversations/${this.testConversationId}`);
       });
     },
 
     async testSendChatMessage() {
-      if (!this.testSessionId) {
-        skipTest('POST /api/v1/chat/sessions/{sessionId}/messages', 'No session ID available');
+      if (!this.testConversationId) {
+        skipTest('POST /api/v1/conversations/{conversationId}/messages', 'No conversation ID available');
         return;
       }
-      return await runTest('POST /api/v1/chat/sessions/{sessionId}/messages', async () => {
-        return await request('POST', `/api/v1/chat/sessions/${this.testSessionId}/messages`, {
+      return await runTest('POST /api/v1/conversations/{conversationId}/messages', async () => {
+        return await request('POST', `/api/v1/conversations/${this.testConversationId}/messages`, {
           content: 'Hello, this is a test message',
           role: 'user'
         });
@@ -1214,22 +1217,22 @@
     },
 
     async testGetChatMessages() {
-      if (!this.testSessionId) {
-        skipTest('GET /api/v1/chat/sessions/{sessionId}/messages', 'No session ID available');
+      if (!this.testConversationId) {
+        skipTest('GET /api/v1/conversations/{conversationId}/messages', 'No conversation ID available');
         return;
       }
-      return await runTest('GET /api/v1/chat/sessions/{sessionId}/messages', async () => {
-        return await request('GET', `/api/v1/chat/sessions/${this.testSessionId}/messages`);
+      return await runTest('GET /api/v1/conversations/{conversationId}/messages', async () => {
+        return await request('GET', `/api/v1/conversations/${this.testConversationId}/messages`);
       });
     },
 
     async testDeleteChatSession() {
-      if (!this.testSessionId) {
-        skipTest('DELETE /api/v1/chat/sessions/{sessionId}', 'No session ID available');
+      if (!this.testConversationId) {
+        skipTest('DELETE /api/v1/conversations/{conversationId}', 'No conversation ID available');
         return;
       }
-      return await runTest('DELETE /api/v1/chat/sessions/{sessionId}', async () => {
-        return await request('DELETE', `/api/v1/chat/sessions/${this.testSessionId}`);
+      return await runTest('DELETE /api/v1/conversations/{conversationId}', async () => {
+        return await request('DELETE', `/api/v1/conversations/${this.testConversationId}`);
       });
     }
   };

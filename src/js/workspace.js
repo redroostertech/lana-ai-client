@@ -1357,6 +1357,25 @@
     });
 
     // Create conversation for a matter and navigate to chat
+    function getConversationIdFromCreateResponse(response) {
+      const seen = [];
+
+      function fromObject(obj) {
+        if (!obj || typeof obj !== 'object' || seen.indexOf(obj) !== -1) return '';
+        seen.push(obj);
+
+        const directId = obj.conversation_id || obj.conversationId || obj.thread_id || obj.threadId;
+        if (directId) return directId;
+
+        const nestedId = fromObject(obj.conversation) || fromObject(obj.session) || fromObject(obj.data);
+        if (nestedId) return nestedId;
+
+        return obj.id || '';
+      }
+
+      return fromObject(response);
+    }
+
     window.createMatterConversation = async function(matterId, matterName) {
       console.log('[matters.html.createMatterConversation] Creating conversation for matter:', { matterId, matterName });
 
@@ -1386,10 +1405,16 @@
       try {
         console.log('[matters.html.createMatterConversation] Calling API to create conversation...');
 
-        // Create conversation via API
-        const response = await api.post('/api/v1/chat/sessions', {
+        const response = await api.createConversation({
           matter_id: matterId,
           title: matterName || matterId,
+          thread_type: 'ad_hoc',
+          context_type: 'full_chat',
+          page_scope: 'matter',
+          metadata: {
+            matter_name: matterName,
+            matter_id: matterId
+          },
           context: {
             matter_name: matterName,
             matter_id: matterId
@@ -1398,7 +1423,7 @@
 
         console.log('[matters.html.createMatterConversation] API response:', response);
 
-        const threadId = response.session?.thread_id || response.session?.id || response.thread_id;
+        const threadId = getConversationIdFromCreateResponse(response);
 
         if (!threadId) {
           throw new Error('No thread ID returned from API');
@@ -1420,9 +1445,6 @@
         console.log('[matters.html.createMatterConversation] ========================================');
         console.log('[matters.html.createMatterConversation] WILL OPEN LANA DOCK');
         console.log('[matters.html.createMatterConversation] ========================================');
-
-        // Wait 2 seconds before navigating so user can copy logs
-        await new Promise(resolve => setTimeout(resolve, 2000));
 
         console.log('[matters.html.createMatterConversation] Opening conversation in LANA dock');
         NavigationHelpers.navigateToConversation(threadId, matterId);

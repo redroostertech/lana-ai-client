@@ -498,7 +498,7 @@ const ConversationActionsModal = {
 
   // Ensure lex-modal, lex-input, and lex-btn custom elements are defined.
   // On standalone pages (not app.html), they may not be loaded yet — inject
-  // <script> tags and wait for them to register. Mirrors NewProjectModal._ensureComponents().
+  // <script> tags and wait for them to register. Mirrors MatterPickerModal._ensureComponents().
   async _ensureLexComponents() {
     var needed = [];
 

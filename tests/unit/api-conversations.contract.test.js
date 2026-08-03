@@ -70,6 +70,18 @@ describe('ApiClient canonical conversation aliases', () => {
     expect(api.get.mock.calls[1][0]).toContain('pinned=true');
   });
 
+  test('loads usage conversation totals through the canonical conversation list route', async () => {
+    const api = loadApi();
+    api.get = jest.fn().mockResolvedValue({ conversations: [], pagination: { total: 7 } });
+
+    const response = await api.getMyConversationUsageSummary();
+
+    expect(response).toEqual({ conversations: [], pagination: { total: 7 } });
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/conversations?limit=1&sort_by=updated_at&sort_order=desc&offset=0'
+    );
+  });
+
   test('creates, reads, updates, and deletes conversation metadata through canonical routes', async () => {
     const api = loadApi();
     api.post = jest.fn().mockResolvedValue({});

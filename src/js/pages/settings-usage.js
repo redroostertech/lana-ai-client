@@ -3,7 +3,7 @@
  *
  * Renders the current user's Usage settings view from authenticated APIs:
  *   - GET /api/v1/activity/my/productivity
- *   - GET /api/v1/chat/sessions (pagination total only)
+ *   - GET /api/v1/conversations (pagination total only)
  *   - GET /api/v1/storage/usage
  *
  * The normalizer also accepts richer usage fields when the activity endpoint

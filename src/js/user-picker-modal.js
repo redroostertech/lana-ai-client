@@ -2,7 +2,7 @@
  * User Picker Modal
  *
  * Reusable modal for picking a user (assignee, target). Mirrors the
- * pattern in `new-project-modal.js` so the affordance (Browse trigger +
+ * pattern in `matter-picker-modal.js` so the affordance (Browse trigger +
  * full modal with search + grouped list + back chevron) is consistent
  * across "Matter / Workspace" and "User" fields throughout the app.
  *

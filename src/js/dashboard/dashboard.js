@@ -643,8 +643,8 @@
               prompt += ' Suggested action: ' + actionText + '.';
             }
             try { sessionStorage.setItem('lana_chat_prompt', prompt); } catch (e) { /* ignore */ }
-            if (window.NavigationHelpers && typeof window.NavigationHelpers.navigateToMatterChat === 'function') {
-              window.NavigationHelpers.navigateToMatterChat(mid);
+            if (window.NavigationHelpers && typeof window.NavigationHelpers.openMatterDockChat === 'function') {
+              window.NavigationHelpers.openMatterDockChat(mid);
             } else {
               Lex.Nav.go('dashboard.html');
             }

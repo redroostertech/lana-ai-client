@@ -1,5 +1,9 @@
 # LANA Conversational Desktop Agent
 
+> TODO(deprecation): This document references legacy chat navigation surfaces
+> such as `chat.html`. Update the chat-related route guidance to the LANA dock
+> flow before using it for implementation.
+
 ## Architecture
 
 The feature extends the existing Electron client and authenticated LANA API. It does not introduce another application or AI stack.

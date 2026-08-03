@@ -62,6 +62,25 @@
     }
   }
 
+  function getConversationIdFromCreateResponse(response) {
+    var seen = [];
+
+    function fromObject(obj) {
+      if (!obj || typeof obj !== 'object' || seen.indexOf(obj) !== -1) return '';
+      seen.push(obj);
+
+      var directId = obj.conversation_id || obj.conversationId || obj.thread_id || obj.threadId;
+      if (directId) return directId;
+
+      var nestedId = fromObject(obj.conversation) || fromObject(obj.session) || fromObject(obj.data);
+      if (nestedId) return nestedId;
+
+      return obj.id || '';
+    }
+
+    return fromObject(response);
+  }
+
   function formatFileSize(bytes) {
     if (!bytes) return '0 B';
     var k = 1024;
@@ -895,7 +914,7 @@
       state._lanaSessionBootstrapped = true;
     });
 
-    // Inject file attachment on every send + session bootstrap on first send
+    // Inject file attachment on every send + conversation bootstrap on first send
     panel.addEventListener('lex-lana-before-send', function (e) {
       var file = state.currentFile;
       if (!file) return;
@@ -913,7 +932,7 @@
         opts.matterId = matterId;
       }
 
-      // First message: bootstrap session + register document before send.
+      // First message: create canonical conversation + register document before send.
       // Skip bootstrap if a conversation is already active on the panel —
       // covers the case where the user resumed a saved thread before the
       // bootstrap flag was flipped (defensive backstop to the
@@ -926,29 +945,40 @@
         state._lanaSessionBootstrapped = true;
         var content = e.detail.content;
 
-        api.post('/api/v1/chat/sessions', {
+        var createConversation = api.createConversationRegistryEntry || api.createConversation;
+        var payload = {
           title: file.filename,
-          matter_id: matterId || undefined
-        }).then(function (resp) {
-          var session = resp.session || resp.data || resp;
-          var threadId = session.thread_id || session.id;
+          thread_type: 'page_general',
+          context_type: panel.contextType || 'document_chat',
+          page_scope: panel.pageScope || 'workspace'
+        };
+        if (matterId) payload.matter_id = matterId;
 
-          // bindConversationId handles sidebar + thread registration
-          panel.bindConversationId(threadId, {
-            title: file.filename || 'Document Context',
-            matterId: matterId
-          });
+        var createPromise = typeof createConversation === 'function'
+          ? createConversation.call(api, payload)
+          : Promise.reject(new Error('canonical conversation create API not available'));
 
-          var docPromise = panel.addDocument(file.id, file.filename, matterId)
-            .catch(function (err) {
-              console.warn('[FileViewerPage] addDocument failed (non-fatal):', err);
+        createPromise.then(function (resp) {
+          var threadId = getConversationIdFromCreateResponse(resp);
+
+          if (!threadId) {
+            throw new Error('No conversation ID returned from API');
+          }
+
+          return panel.openConversation(threadId, matterId, {
+            title: file.filename || 'Document Context'
+          }).then(function () {
+            var docPromise = panel.addDocument(file.id, file.filename, matterId)
+              .catch(function (err) {
+                console.warn('[FileViewerPage] addDocument failed (non-fatal):', err);
+              });
+
+            return docPromise.then(function () {
+              panel.sendMessage(content, opts);
             });
-
-          return docPromise.then(function () {
-            panel.sendMessage(content, opts);
           });
         }).catch(function (err) {
-          console.error('[FileViewerPage] Session bootstrap failed:', err);
+          console.error('[FileViewerPage] Conversation bootstrap failed:', err);
           state._lanaSessionBootstrapped = false;
           panel.sendMessage(content, opts);
         });

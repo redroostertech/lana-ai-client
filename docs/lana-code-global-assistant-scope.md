@@ -1,5 +1,10 @@
 # LANA Code Global Assistant Scope
 
+> TODO(deprecation): This scope predates the dock-first chat cleanup. References
+> to `chat-v2.html`, `conversation-threads`, and legacy chat/session routing are
+> stale and should be reconciled with the canonical `/api/v1/conversations`
+> topology before this is used for implementation.
+
 ## Summary
 
 LANA Code is a global assistant surface inside the LANA desktop/web shell. It opens from the top navigation using the approved LANA app icon and provides a persistent assistant panel with a transcript area and composer footer.

@@ -159,7 +159,7 @@
   grid-column: 1 / -1;
 }
 
-/* Matter/workspace picker — opens NewProjectModal as a rich picker
+/* Matter/workspace picker — opens MatterPickerModal as a rich picker
    instead of a bare typeahead the user wouldn't know how to fill out. */
 .task-plan-picker-field {
   display: flex;

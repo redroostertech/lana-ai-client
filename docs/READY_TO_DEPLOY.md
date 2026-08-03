@@ -1,5 +1,9 @@
 # Ready to Deploy - ChatGPT-Class AI Improvements
 
+> TODO(deprecation): This deployment note references removed legacy chat pages
+> and streaming setup. Treat the chat-related sections as stale until rewritten
+> for the dock-first LANA chat flow and canonical conversation endpoints.
+
 ## Status: ✅ Production Ready - Direct Deployment for All Customers
 
 All improvements are implemented and ready to deploy to all customers. No feature flags or gradual rollout needed.

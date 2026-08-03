@@ -1,13 +1,13 @@
 /**
- * New Project Modal
- * Reusable modal for creating new matter-based conversations.
+ * Matter Picker Modal
+ * Reusable modal for selecting matters.
  * Uses <lex-modal> and <lex-input> from the Lex UI framework.
  * Works on any page — creates the modal element on first open.
  *
  * No regex. String methods only.
  */
 
-const NewProjectModal = {
+const MatterPickerModal = {
   /** @type {HTMLElement|null} lex-modal element */
   modal: null,
   /** @type {HTMLElement|null} lex-input search element */
@@ -49,14 +49,14 @@ const NewProjectModal = {
     // Footer
     contentHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid var(--lex-border-subtle,rgba(0,0,0,0.06))">';
     contentHtml += '<p class="npm-footer-hint" style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);line-height:1.5">';
-    contentHtml += 'Select a matter to start a new conversation.';
+    contentHtml += 'Select a matter.';
     contentHtml += '</p>';
     contentHtml += '<lex-btn id="newProjectCreateBtn" variant="primary" size="sm">+ Create Matter</lex-btn>';
     contentHtml += '</div>';
 
     // Create <lex-modal>
     var modal = document.createElement('lex-modal');
-    modal.heading = 'Start New Chat';
+    modal.heading = 'Select Matter';
     modal.size = 'lg';
     modal.hideActions = true;
     modal.innerHTML = contentHtml;
@@ -134,12 +134,12 @@ const NewProjectModal = {
     if (this._renderOverrides.heading) {
       this.modal.heading = this._renderOverrides.heading;
     } else {
-      this.modal.heading = 'Start New Chat';
+      this.modal.heading = 'Select Matter';
     }
     var footer = this.modal.querySelector('.npm-footer-hint');
     if (footer) {
       footer.textContent = this._renderOverrides.footerHint
-        || 'Select a matter to start a new conversation.';
+        || 'Select a matter.';
     }
     var createBtn = this.modal.querySelector('#newProjectCreateBtn');
     if (createBtn) {
@@ -150,7 +150,7 @@ const NewProjectModal = {
     // picker (onSelect callback), the user is in a sub-flow under another
     // modal. Surface that with a back-chevron leading the title, hide the
     // default X close button, and tag the modal so CSS can adjust. Default
-    // "Start New Chat" flow keeps the standard chrome.
+    // "Select Matter" flow keeps the standard chrome.
     var isPickerMode = !!this._onSelect;
     this.modal.classList.toggle('npm-picker-mode', isPickerMode);
     // Inject the back-chevron once; reuse on subsequent opens.
@@ -190,7 +190,7 @@ const NewProjectModal = {
       this.allMatters = response.matters || [];
       this.renderDefaultView();
     } catch (error) {
-      console.error('[NewProjectModal] Failed to load matters:', error);
+      console.error('[MatterPickerModal] Failed to load matters:', error);
       if (this.listContainer) {
         this.listContainer.innerHTML = '<p style="text-align:center;color:var(--lex-color-danger-500);padding:32px 0">Failed to load matters. Please try again.</p>';
       }
@@ -241,14 +241,14 @@ const NewProjectModal = {
     if (pinnedMatters.length > 0) {
       html += '<div style="margin-bottom:20px">';
       html += '<p style="font-size:var(--lex-body-xs-size,0.75rem);font-weight:600;color:var(--lex-text-tertiary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Pinned Matters</p>';
-      html += pinnedMatters.map(function (m) { return NewProjectModal.renderMatterItem(m, true); }).join('');
+      html += pinnedMatters.map(function (m) { return MatterPickerModal.renderMatterItem(m, true); }).join('');
       html += '</div>';
     }
 
     if (recentMatters.length > 0) {
       html += '<div style="margin-bottom:20px">';
       html += '<p style="font-size:var(--lex-body-xs-size,0.75rem);font-weight:600;color:var(--lex-text-tertiary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Recent Matters</p>';
-      html += recentMatters.map(function (m) { return NewProjectModal.renderMatterItem(m, false); }).join('');
+      html += recentMatters.map(function (m) { return MatterPickerModal.renderMatterItem(m, false); }).join('');
       html += '</div>';
     }
 
@@ -264,7 +264,7 @@ const NewProjectModal = {
     }
 
     var html = '<p style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);margin-bottom:12px">' + matters.length + ' result' + (matters.length !== 1 ? 's' : '') + ' found</p>';
-    html += matters.map(function (m) { return NewProjectModal.renderMatterItem(m, false); }).join('');
+    html += matters.map(function (m) { return MatterPickerModal.renderMatterItem(m, false); }).join('');
 
     this.listContainer.innerHTML = html;
   },
@@ -276,7 +276,7 @@ const NewProjectModal = {
     var status = matter.status || 'Active';
 
     if (!matterIdString) {
-      console.warn('[NewProjectModal] Matter missing matter_id:', matter);
+      console.warn('[MatterPickerModal] Matter missing matter_id:', matter);
       return '';
     }
 
@@ -296,7 +296,7 @@ const NewProjectModal = {
     return '<div class="npm-matter-item" style="padding:12px 14px;border-radius:var(--lex-radius-md,8px);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.08));cursor:pointer;margin-bottom:8px;transition:border-color 0.15s,background 0.15s" '
       + 'onmouseenter="this.style.borderColor=\'var(--lex-border-accent,#6366f1)\';this.style.background=\'var(--lex-bg-secondary)\'" '
       + 'onmouseleave="this.style.borderColor=\'var(--lex-border-subtle,rgba(0,0,0,0.08))\';this.style.background=\'transparent\'" '
-      + 'onclick="NewProjectModal.selectMatter(\'' + safeId + '\', \'' + safeNameJs + '\')">'
+      + 'onclick="MatterPickerModal.selectMatter(\'' + safeId + '\', \'' + safeNameJs + '\')">'
       + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
       + pinHtml
       + '<span style="font-weight:500;color:var(--lex-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + safeName + '</span>'
@@ -336,7 +336,7 @@ const NewProjectModal = {
   async selectMatter(matterId, matterName) {
     try {
       if (!this.validateMatterId(matterId)) {
-        console.error('[NewProjectModal] Invalid matter_id format:', matterId);
+        console.error('[MatterPickerModal] Invalid matter_id format:', matterId);
         if (window.Lex && window.Lex.Toast) {
           window.Lex.Toast.show('Invalid matter ID. Please try again.', 'error');
         }
@@ -357,25 +357,26 @@ const NewProjectModal = {
         try {
           cb(matterIdString, matterName, matterRow);
         } catch (cbErr) {
-          console.error('[NewProjectModal] onSelect callback threw:', cbErr);
+          console.error('[MatterPickerModal] onSelect callback threw:', cbErr);
         }
         return;
       }
 
       // Default mode — open a chat for the selected matter
       this.close();
-      console.log('[NewProjectModal] Matter selected:', { matterId: matterIdString, matterName: matterName });
-      var isOnChatPage = NavigationHelpers.isOnChatPage();
-      if (isOnChatPage && typeof window.createProjectChat === 'function') {
-        await window.createProjectChat(matterIdString, matterName);
+      console.log('[MatterPickerModal] Matter selected:', { matterId: matterIdString, matterName: matterName });
+      if (window.Lex && window.Lex.Toast) {
+        window.Lex.Toast.show('Opening chat for ' + matterName + '...', 'success');
+      }
+      if (window.NavigationHelpers && typeof window.NavigationHelpers.openMatterDockChat === 'function') {
+        window.NavigationHelpers.openMatterDockChat(matterIdString);
+      } else if (window.NavigationHelpers && typeof window.NavigationHelpers.navigateToDockHost === 'function') {
+        window.NavigationHelpers.navigateToDockHost();
       } else {
-        if (window.Lex && window.Lex.Toast) {
-          window.Lex.Toast.show('Opening chat for ' + matterName + '...', 'success');
-        }
-        NavigationHelpers.navigateToMatterChat(matterIdString);
+        window.location.href = 'dashboard.html';
       }
     } catch (error) {
-      console.error('[NewProjectModal] Failed to select matter:', error);
+      console.error('[MatterPickerModal] Failed to select matter:', error);
       if (window.Lex && window.Lex.Toast) {
         window.Lex.Toast.show('Failed to select matter. Please try again.', 'error');
       }
@@ -417,7 +418,7 @@ const NewProjectModal = {
 
     // Hide the default close button via CSS (the `npm-picker-mode` class
     // on the modal element gates the rule injected in _injectPickerStyles).
-    NewProjectModal._injectPickerStyles();
+    MatterPickerModal._injectPickerStyles();
 
     // Already injected? Just make sure it's visible.
     var existing = header.querySelector('.npm-back-btn');
@@ -429,7 +430,7 @@ const NewProjectModal = {
     btn.setAttribute('aria-label', 'Go back');
     btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
     btn.addEventListener('click', function () {
-      NewProjectModal.close();
+      MatterPickerModal.close();
     });
     // Insert as the FIRST child of the header so it leads the title.
     header.insertBefore(btn, header.firstChild);
@@ -438,10 +439,10 @@ const NewProjectModal = {
   _stylesInjected: false,
 
   _injectPickerStyles() {
-    if (NewProjectModal._stylesInjected) return;
-    NewProjectModal._stylesInjected = true;
+    if (MatterPickerModal._stylesInjected) return;
+    MatterPickerModal._stylesInjected = true;
     var style = document.createElement('style');
-    style.setAttribute('data-source', 'new-project-modal');
+    style.setAttribute('data-source', 'matter-picker-modal');
     style.textContent = [
       // Hide the default X close button in picker mode — the chevron is the
       // only dismissal affordance.
@@ -516,7 +517,7 @@ const NewProjectModal = {
         script.src = prefix + src;
         script.onload = resolve;
         script.onerror = function () {
-          console.warn('[NewProjectModal] Failed to load:', src);
+          console.warn('[MatterPickerModal] Failed to load:', src);
           resolve(); // don't block the modal
         };
         document.head.appendChild(script);
@@ -544,17 +545,17 @@ const NewProjectModal = {
   }
 };
 
-// Global function for opening the modal (called from sidebar buttons)
-window.openNewProjectModal = function () {
-  NewProjectModal.open();
+// Global function for opening the picker directly.
+window.openMatterPickerModal = function () {
+  MatterPickerModal.open();
 };
 
 // Export for use across the application
 if (typeof window !== 'undefined') {
-  window.NewProjectModal = NewProjectModal;
+  window.MatterPickerModal = MatterPickerModal;
 }
 
 // Export for module usage
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = NewProjectModal;
+  module.exports = MatterPickerModal;
 }

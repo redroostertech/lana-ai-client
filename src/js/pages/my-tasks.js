@@ -487,7 +487,7 @@
   }
 
   // --- Matter picker (Create Task modal) ----------------------------------
-  // Reuses the NewProjectModal "Start New Chat" picker as a generic matter
+  // Reuses MatterPickerModal as a generic matter
   // browser. The user sees recent + pinned matters by default, can search,
   // and clicks a card to select. No more bare typeahead where the user
   // doesn't know what to type.
@@ -553,11 +553,11 @@
   }
 
   function openMatterPicker() {
-    if (typeof NewProjectModal === 'undefined' || !NewProjectModal.open) {
+    if (typeof MatterPickerModal === 'undefined' || !MatterPickerModal.open) {
       Lex.Toast.error('Matter picker is unavailable on this page.');
       return;
     }
-    NewProjectModal.open({
+    MatterPickerModal.open({
       heading: 'Pick a matter for this task',
       footerHint: 'Select a matter — the task will be created under it.',
       hideCreateBtn: true,
@@ -587,11 +587,11 @@
   }
 
   function openPlanMatterPicker() {
-    if (typeof NewProjectModal === 'undefined' || !NewProjectModal.open) {
+    if (typeof MatterPickerModal === 'undefined' || !MatterPickerModal.open) {
       Lex.Toast.error('Matter picker is unavailable on this page.');
       return;
     }
-    NewProjectModal.open({
+    MatterPickerModal.open({
       heading: 'Pick a matter for this plan',
       footerHint: 'Optional — leave unselected to scope the plan to your workspace.',
       hideCreateBtn: true,
@@ -602,7 +602,7 @@
   }
 
   // --- User picker (Create Task modal, target_type='user') ----------------
-  // Opens UserPickerModal — a sibling of NewProjectModal that shows the
+  // Opens UserPickerModal — a sibling of MatterPickerModal that shows the
   // same Browse-trigger + modal flow for picking a user. Scoped to the
   // currently selected matter when set, so the picker shows shared
   // matter users first and "rest of org" after.
