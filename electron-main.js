@@ -13,6 +13,7 @@ const url = require('url');
 const crypto = require('crypto');
 const fs = require('fs');
 const Store = require('electron-store');
+const { OwnedWebDesktopBrowserManager } = require('./src/owned-web/desktop-browser');
 
 /**
  * Resolve app icon candidates for the macOS Dock override. In development the
@@ -231,6 +232,7 @@ function getAppVersion() {
 let mainWindow;
 let screenVoice = null;
 let capabilityPreferencesStore = null;
+let ownedWebDesktopBrowser = null;
 
 function getCapabilityPreferencesStore() {
   if (!capabilityPreferencesStore) {
@@ -1085,6 +1087,8 @@ const OWNED_WEB_ENDPOINTS = Object.freeze({
   search: { method: 'POST', path: '/api/v1/web/search' },
   read: { method: 'POST', path: '/api/v1/web/read' },
   crawlStart: { method: 'POST', path: '/api/v1/web/crawls' },
+  browserSession: { method: 'POST', path: '/api/v1/web/browser/sessions' },
+  browserTask: { method: 'POST', path: '/api/v1/web/browser/tasks' },
   browserPreview: { method: 'POST', path: null },
   browserExecute: { method: 'POST', path: null }
 });
@@ -1101,6 +1105,18 @@ function assertOwnedWebSender(event) {
   if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) {
     throw new Error('unauthorized_sender');
   }
+}
+
+function getOwnedWebDesktopBrowser() {
+  if (!ownedWebDesktopBrowser) {
+    ownedWebDesktopBrowser = new OwnedWebDesktopBrowserManager({
+      BrowserWindow,
+      dialog,
+      app,
+      assertSender: assertOwnedWebSender
+    });
+  }
+  return ownedWebDesktopBrowser;
 }
 
 function ownedWebBaseUrl() {
@@ -1206,9 +1222,77 @@ ipcMain.handle('owned-web:crawl:cancel', async (event, payload) => {
   }
 });
 
+ipcMain.handle('owned-web:crawl:results', async (event, payload) => {
+  try {
+    if (!validId(payload?.crawlId)) return { success: false, error: 'Invalid crawl id.' };
+    const params = new URLSearchParams();
+    if (payload?.limit != null) params.set('limit', String(Math.min(Number(payload.limit) || 100, 500)));
+    if (payload?.offset != null) params.set('offset', String(Math.max(Number(payload.offset) || 0, 0)));
+    if (payload?.includeFailures != null) params.set('includeFailures', payload.includeFailures ? 'true' : 'false');
+    const query = params.toString();
+    return await callOwnedWebBackend(event, {
+      method: 'GET',
+      path: `/api/v1/web/crawls/${encodeURIComponent(payload.crawlId)}/results${query ? `?${query}` : ''}`
+    });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:document:ingest', async (event, payload) => {
+  try {
+    if (!validId(payload?.documentId)) return { success: false, error: 'Invalid document id.' };
+    return await callOwnedWebBackend(event, {
+      method: 'POST',
+      path: `/api/v1/web/documents/${encodeURIComponent(payload.documentId)}/ingest`
+    }, {
+      matterId: payload?.matterId ? String(payload.matterId).slice(0, 128) : undefined,
+      classification: payload?.classification ? String(payload.classification).slice(0, 128) : undefined
+    });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:browser:session:open', async (event, payload) => {
+  try {
+    if (payload?.executionTarget === 'desktop_local') {
+      const session = await getOwnedWebDesktopBrowser().openSession(event, payload || {});
+      return { success: true, data: session };
+    }
+    return await callOwnedWebBackend(event, OWNED_WEB_ENDPOINTS.browserSession, {
+      executionTarget: payload?.executionTarget || 'server_isolated',
+      allowedOrigins: Array.isArray(payload?.allowedOrigins) ? payload.allowedOrigins.slice(0, 25) : undefined,
+      matterId: payload?.matterId ? String(payload.matterId).slice(0, 128) : undefined,
+      persistAuthenticationState: Boolean(payload?.persistAuthenticationState),
+      idempotencyKey: payload?.idempotencyKey ? String(payload.idempotencyKey).slice(0, 256) : undefined
+    });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:browser:snapshot', async (event, payload) => {
+  try {
+    if (!validId(payload?.sessionId)) return { success: false, error: 'Invalid browser session id.' };
+    if (getOwnedWebDesktopBrowser().hasSession(payload.sessionId)) {
+      return await getOwnedWebDesktopBrowser().snapshot(event, payload.sessionId);
+    }
+    return await callOwnedWebBackend(event, {
+      method: 'POST',
+      path: `/api/v1/web/browser/sessions/${encodeURIComponent(payload.sessionId)}/snapshot`
+    }, {});
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
 ipcMain.handle('owned-web:browser:preview', async (event, payload) => {
   try {
     if (!validId(payload?.sessionId)) return { success: false, error: 'Invalid browser session id.' };
+    if (getOwnedWebDesktopBrowser().hasSession(payload.sessionId)) {
+      return await getOwnedWebDesktopBrowser().previewAction(event, payload.sessionId, payload?.action || {});
+    }
     return await callOwnedWebBackend(event, {
       method: 'POST',
       path: `/api/v1/web/browser/sessions/${encodeURIComponent(payload.sessionId)}/actions/preview`
@@ -1221,10 +1305,66 @@ ipcMain.handle('owned-web:browser:preview', async (event, payload) => {
 ipcMain.handle('owned-web:browser:execute', async (event, payload) => {
   try {
     if (!validId(payload?.sessionId)) return { success: false, error: 'Invalid browser session id.' };
+    if (getOwnedWebDesktopBrowser().hasSession(payload.sessionId)) {
+      return await getOwnedWebDesktopBrowser().executeAction(event, payload.sessionId, payload?.action || {});
+    }
     return await callOwnedWebBackend(event, {
       method: 'POST',
       path: `/api/v1/web/browser/sessions/${encodeURIComponent(payload.sessionId)}/actions`
     }, { action: payload?.action || {} });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:approval:decide', async (event, payload) => {
+  try {
+    if (!validId(payload?.approvalId)) return { success: false, error: 'Invalid approval id.' };
+    if (String(payload.approvalId).startsWith('desktop_approval_')) {
+      return await getOwnedWebDesktopBrowser().decideApproval(event, payload.approvalId, payload?.decision);
+    }
+    return await callOwnedWebBackend(event, {
+      method: 'POST',
+      path: `/api/v1/web/approvals/${encodeURIComponent(payload.approvalId)}/decision`
+    }, {
+      decision: payload?.decision === 'denied' ? 'denied' : 'approved'
+    });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:browser:task', async (event, payload) => {
+  try {
+    return await callOwnedWebBackend(event, OWNED_WEB_ENDPOINTS.browserTask, {
+      goal: String(payload?.goal || '').slice(0, 4000),
+      startUrl: payload?.startUrl ? String(payload.startUrl).slice(0, 4096) : undefined,
+      allowedOrigins: Array.isArray(payload?.allowedOrigins) ? payload.allowedOrigins.slice(0, 25) : undefined,
+      sessionId: payload?.sessionId ? String(payload.sessionId).slice(0, 128) : undefined,
+      maxSteps: payload?.maxSteps == null ? undefined : Number(payload.maxSteps),
+      matterId: payload?.matterId ? String(payload.matterId).slice(0, 128) : undefined,
+      idempotencyKey: payload?.idempotencyKey ? String(payload.idempotencyKey).slice(0, 256) : undefined
+    });
+  } catch (error) {
+    return { success: false, error: String(error.message || error) };
+  }
+});
+
+ipcMain.handle('owned-web:upload:choose', async (event, payload) => {
+  try { return await getOwnedWebDesktopBrowser().chooseUploadFiles(event, payload || {}); }
+  catch (error) { return { success: false, error: String(error.message || error) }; }
+});
+
+ipcMain.handle('owned-web:browser:close', async (event, payload) => {
+  try {
+    if (!validId(payload?.sessionId)) return { success: false, error: 'Invalid browser session id.' };
+    if (getOwnedWebDesktopBrowser().hasSession(payload.sessionId)) {
+      return await getOwnedWebDesktopBrowser().closeSession(event, payload.sessionId);
+    }
+    return await callOwnedWebBackend(event, {
+      method: 'DELETE',
+      path: `/api/v1/web/browser/sessions/${encodeURIComponent(payload.sessionId)}`
+    });
   } catch (error) {
     return { success: false, error: String(error.message || error) };
   }
@@ -2093,6 +2233,12 @@ app.on('before-quit', async () => {
     screenVoice?.shutdown();
   } catch (error) {
     logError('[electron-main] Failed to stop screen-aware voice', error);
+  }
+
+  try {
+    ownedWebDesktopBrowser?.shutdown();
+  } catch (error) {
+    logError('[electron-main] Failed to stop owned-web desktop browser sessions', error);
   }
 
   // End session tracking

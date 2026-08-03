@@ -142,6 +142,7 @@ const MenuConfig = {
         requiredRoles: [],
         items: [
           { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
+          { id: 'owned-web', label: 'Owned Web', href: '/owned-web.html', icon: 'search' },
           {
             id: 'insights',
             label: 'Analytics',

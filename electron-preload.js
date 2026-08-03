@@ -79,9 +79,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     read: (payload) => ipcRenderer.invoke('owned-web:read', payload || {}),
     startCrawl: (payload) => ipcRenderer.invoke('owned-web:crawl:start', payload || {}),
     getCrawl: (crawlId) => ipcRenderer.invoke('owned-web:crawl:status', { crawlId }),
+    getCrawlResults: (crawlId, options) => ipcRenderer.invoke('owned-web:crawl:results', { crawlId, ...(options || {}) }),
     cancelCrawl: (crawlId) => ipcRenderer.invoke('owned-web:crawl:cancel', { crawlId }),
+    ingestDocument: (payload) => ipcRenderer.invoke('owned-web:document:ingest', payload || {}),
+    openBrowserSession: (payload) => ipcRenderer.invoke('owned-web:browser:session:open', payload || {}),
+    snapshotBrowserSession: (sessionId) => ipcRenderer.invoke('owned-web:browser:snapshot', { sessionId }),
     previewBrowserAction: (sessionId, action) => ipcRenderer.invoke('owned-web:browser:preview', { sessionId, action }),
-    executeBrowserAction: (sessionId, action) => ipcRenderer.invoke('owned-web:browser:execute', { sessionId, action })
+    executeBrowserAction: (sessionId, action) => ipcRenderer.invoke('owned-web:browser:execute', { sessionId, action }),
+    decideApproval: (approvalId, decision) => ipcRenderer.invoke('owned-web:approval:decide', { approvalId, decision }),
+    runBrowserTask: (payload) => ipcRenderer.invoke('owned-web:browser:task', payload || {}),
+    chooseUploadFiles: (payload) => ipcRenderer.invoke('owned-web:upload:choose', payload || {}),
+    closeBrowserSession: (sessionId) => ipcRenderer.invoke('owned-web:browser:close', { sessionId })
   },
 
   /**
