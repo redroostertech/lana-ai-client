@@ -12,9 +12,9 @@ const {
 describe('OwnedWebDesktopBrowserManager', () => {
   test('sanitizes typed actions and rejects arbitrary browser code', () => {
     expect(sanitizeOwnedWebAction({ type: 'snapshot' })).toEqual({ type: 'snapshot' });
-    expect(() => sanitizeOwnedWebAction({ type: 'eval', script: 'document.cookie' })).toThrow(/unsupported_action/);
-    expect(() => sanitizeOwnedWebAction({ type: 'snapshot', script: 'document.cookie' })).toThrow(/arbitrary_browser_code_denied/);
-    expect(() => sanitizeOwnedWebAction({ type: 'navigate', url: 'file:///etc/passwd' })).toThrow(/url_denied/);
+    expect(() => sanitizeOwnedWebAction({ type: 'eval', script: 'document.cookie' })).toThrow('unsupported_action');
+    expect(() => sanitizeOwnedWebAction({ type: 'snapshot', script: 'document.cookie' })).toThrow('arbitrary_browser_code_denied');
+    expect(() => sanitizeOwnedWebAction({ type: 'navigate', url: 'file:///etc/passwd' })).toThrow('url_denied');
   });
 
   test('applies desktop URL policy before navigation', () => {
@@ -50,7 +50,7 @@ describe('OwnedWebDesktopBrowserManager', () => {
       assertSender: () => { throw new Error('unauthorized_sender'); }
     });
 
-    await expect(manager.openSession(event(), { executionTarget: 'desktop_local' })).rejects.toThrow(/unauthorized_sender/);
+    await expect(manager.openSession(event(), { executionTarget: 'desktop_local' })).rejects.toThrow('unauthorized_sender');
   });
 
   test('approval is exact, one-time, and bound to the desktop session action', async () => {
@@ -64,7 +64,7 @@ describe('OwnedWebDesktopBrowserManager', () => {
     const preview = await manager.previewAction(event(), session.id, { type: 'requestSubmission', selector: '#submit' });
 
     expect(preview.data.approvalRequired).toBe(true);
-    await expect(manager.executeAction(event(), session.id, { type: 'requestSubmission', selector: '#submit' })).rejects.toThrow(/approval_required/);
+    await expect(manager.executeAction(event(), session.id, { type: 'requestSubmission', selector: '#submit' })).rejects.toThrow('approval_required');
     await manager.decideApproval(event(), preview.data.approvalId, 'approved');
     await expect(manager.executeAction(event(), session.id, {
       type: 'requestSubmission',
@@ -75,7 +75,7 @@ describe('OwnedWebDesktopBrowserManager', () => {
       type: 'requestSubmission',
       selector: '#submit',
       approvalId: preview.data.approvalId
-    })).rejects.toThrow(/approval_required/);
+    })).rejects.toThrow('approval_required');
   });
 
   test('approval fails when the action changes after preview', async () => {
@@ -91,7 +91,7 @@ describe('OwnedWebDesktopBrowserManager', () => {
       type: 'requestSubmission',
       selector: '#two',
       approvalId: preview.data.approvalId
-    })).rejects.toThrow(/approval_action_mismatch/);
+    })).rejects.toThrow('approval_action_mismatch');
   });
 
   test('upload selection returns brokered refs without exposing local paths', async () => {

@@ -9,12 +9,18 @@
   };
 
   function esc(value) {
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+    var input = String(value == null ? '' : value);
+    var out = '';
+    for (var i = 0; i < input.length; i += 1) {
+      var ch = input.charAt(i);
+      if (ch === '&') out += '&amp;';
+      else if (ch === '<') out += '&lt;';
+      else if (ch === '>') out += '&gt;';
+      else if (ch === '"') out += '&quot;';
+      else if (ch === "'") out += '&#39;';
+      else out += ch;
+    }
+    return out;
   }
 
   function unwrap(response) {

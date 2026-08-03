@@ -1123,7 +1123,7 @@ function ownedWebBaseUrl() {
   const server = getSavedServer();
   const base = server && (server.url || server.serverUrl);
   if (!base) throw new Error('backend_not_configured');
-  return String(base).replace(/\/+$/, '');
+  return stripTrailingSlashes(String(base));
 }
 
 async function callOwnedWebBackend(event, endpoint, payload) {
@@ -1153,7 +1153,27 @@ async function callOwnedWebBackend(event, endpoint, payload) {
 }
 
 function validId(value) {
-  return typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,128}$/.test(value);
+  if (typeof value !== 'string' || value.length < 1 || value.length > 128) return false;
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    const safe = (code >= 48 && code <= 57) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122) ||
+      char === '_' ||
+      char === '.' ||
+      char === ':' ||
+      char === '-';
+    if (!safe) return false;
+  }
+  return true;
+}
+
+function stripTrailingSlashes(value) {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') {
+    end -= 1;
+  }
+  return value.slice(0, end);
 }
 
 ipcMain.handle('owned-web:health', async (event) => {

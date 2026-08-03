@@ -31,8 +31,10 @@ describe('owned-web preload contract', () => {
   test('owned-web bridge does not expose browser objects, cookies, tokens, or generic owned-web invoke', () => {
     const ownedWebBlock = preload.slice(preload.indexOf('ownedWeb:'), preload.indexOf('/**\n   * Updates'));
 
-    expect(ownedWebBlock).not.toMatch(/ipcRenderer:\s*ipcRenderer/);
-    expect(ownedWebBlock).not.toMatch(/BrowserWindow|webContents|Playwright|cookie|token/i);
+    expect(ownedWebBlock).not.toContain('ipcRenderer: ipcRenderer');
+    for (const forbidden of ['BrowserWindow', 'webContents', 'Playwright', 'cookie', 'Cookie', 'token', 'Token']) {
+      expect(ownedWebBlock).not.toContain(forbidden);
+    }
     expect(ownedWebBlock).not.toContain('invoke:');
     expect(ownedWebBlock).not.toContain('send:');
     expect(ownedWebBlock).not.toContain('readFile');

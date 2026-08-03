@@ -327,6 +327,8 @@ function isSafeDesktopUrl(value) {
     if (!['http:', 'https:'].includes(parsed.protocol)) return false;
     if (parsed.username || parsed.password) return false;
     const host = parsed.hostname.toLowerCase();
+    const ipv4 = parseIPv4(host);
+    if (ipv4) {return !isPrivateIPv4(ipv4);}
     return !(
       host === 'localhost' ||
       host === '0.0.0.0' ||
@@ -335,7 +337,7 @@ function isSafeDesktopUrl(value) {
       host === '169.254.169.254' ||
       host.startsWith('10.') ||
       host.startsWith('192.168.') ||
-      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+      is172PrivateHost(host)
     );
   } catch (_) {
     return false;
@@ -371,13 +373,82 @@ function clickScript(selector) {
 }
 
 function normalizeFilename(value) {
-  const base = path.basename(String(value || 'upload.bin'))
-    .normalize('NFKC')
-    .replace(/[^\w.\- ]+/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 160);
+  const base = sanitizeBaseFilename(value, 'upload.bin');
   return base && base !== '.' && base !== '..' ? base : 'upload.bin';
+}
+
+function sanitizeBaseFilename(value, fallback) {
+  const source = path.basename(String(value || fallback)).normalize('NFKC');
+  let out = '';
+  let previousWasSpace = false;
+  for (const char of source) {
+    const safe = isFilenameChar(char) ? char : '_';
+    if (safe.trim() === '') {
+      if (!previousWasSpace) {
+        out += ' ';
+        previousWasSpace = true;
+      }
+      continue;
+    }
+    out += safe;
+    previousWasSpace = false;
+    if (out.length >= 160) break;
+  }
+  return out.trim() || fallback;
+}
+
+function isFilenameChar(char) {
+  if (char === '.' || char === '-' || char === '_' || char === ' ') return true;
+  if (!char || char.length !== 1) return false;
+  const code = char.charCodeAt(0);
+  return (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122);
+}
+
+function is172PrivateHost(host) {
+  const octets = String(host || '').split('.');
+  if (octets.length !== 4 || octets[0] !== '172') return false;
+  const second = Number(octets[1]);
+  return Number.isInteger(second) && second >= 16 && second <= 31;
+}
+
+function parseIPv4(value) {
+  const parts = String(value || '').split('.');
+  if (parts.length !== 4) return null;
+  const octets = parts.map((part) => {
+    if (!isDecimal(part)) return NaN;
+    return Number(part);
+  });
+  if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return null;
+  return octets.join('.');
+}
+
+function isPrivateIPv4(ip) {
+  const parts = String(ip || '').split('.').map(Number);
+  const a = parts[0];
+  const b = parts[1];
+  return a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 192 && b === 0) ||
+    (a === 192 && b === 88) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    a >= 224 ||
+    ip === '255.255.255.255';
+}
+
+function isDecimal(value) {
+  const input = String(value || '');
+  if (!input) return false;
+  for (const char of input) {
+    if (char < '0' || char > '9') return false;
+  }
+  return true;
 }
 
 function hashForLog(value) {
