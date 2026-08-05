@@ -1759,12 +1759,12 @@
 
   function formatConnectionMeta(row) {
     var parts = [];
-    if (row.provider) parts.push(esc(row.provider));
-    if (row.auth_type) parts.push(esc(String(row.auth_type).toUpperCase()));
     if (row.account) parts.push(esc(row.account));
     if (row.last_synced_at) {
       var times = formatGrantedAt(row.last_synced_at);
-      parts.push(times.relative ? 'Synced ' + esc(times.relative) : 'Synced');
+      parts.push('Last sync ' + esc(times.absolute || row.last_synced_at));
+    } else {
+      parts.push('Last sync N/A');
     }
     if (row.data_record_count) parts.push(String(row.data_record_count) + ' records');
     return parts.join(' • ');
