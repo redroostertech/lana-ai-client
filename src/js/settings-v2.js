@@ -1761,8 +1761,7 @@
     var parts = [];
     if (row.account) parts.push(esc(row.account));
     if (row.last_synced_at) {
-      var times = formatGrantedAt(row.last_synced_at);
-      parts.push('Last sync ' + esc(times.absolute || row.last_synced_at));
+      parts.push('Last sync ' + esc(fmtDateTime(row.last_synced_at) || row.last_synced_at));
     } else {
       parts.push('Last sync N/A');
     }
