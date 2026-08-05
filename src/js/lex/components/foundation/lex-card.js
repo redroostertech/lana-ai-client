@@ -76,7 +76,10 @@
     const style = document.createElement('style');
     style.id = 'lex-card-styles';
     style.textContent = `
-      lex-card { display: block; }
+      lex-card {
+        display: block;
+        margin-block-end: var(--lex-card-stack-gap, 12px);
+      }
       lex-card > .rounded-xl { height: inherit; display: inherit; flex-direction: inherit; min-height: inherit; overflow: inherit; flex: 1; }
       slot-content { display: contents; }
 

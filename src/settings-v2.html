@@ -222,9 +222,8 @@
                 <lex-text variant="primary" size="body-sm" weight="semibold" tag="h3">LANA Memory</lex-text>
                 <lex-text variant="secondary" size="body-sm" tag="p">What LANA has retained for personalization and workspace continuity.</lex-text>
               </div>
-              <lex-btn id="sv2-memory-refresh-btn" variant="ghost" size="sm" icon="refresh-cw">Refresh</lex-btn>
+              <lex-btn id="sv2-memory-manage-btn" variant="secondary" size="sm" icon="database">Manage memories</lex-btn>
             </div>
-            <div id="sv2-memory-list" class="sv2-memory-list" aria-live="polite"></div>
             <lex-text id="sv2-memory-status" variant="tertiary" size="body-sm" tag="p">Loading memory...</lex-text>
           </section>
         </lex-card>
@@ -278,7 +277,7 @@
               searchable="true">
             </lex-select>
             <lex-stack direction="horizontal" gap="3" align="center">
-              <lex-btn id="sv2-tz-detect-btn" variant="ghost" size="sm">Use browser default</lex-btn>
+              <lex-btn id="sv2-tz-detect-btn" variant="ghost" size="sm">Detect</lex-btn>
               <lex-text id="sv2-tz-current" variant="tertiary" size="body-sm"></lex-text>
             </lex-stack>
           </lex-stack>
@@ -304,7 +303,12 @@
                 <lex-text variant="primary" size="body" weight="medium">In-app notifications</lex-text>
                 <lex-text variant="tertiary" size="body-sm">Show notifications inside LANA AI</lex-text>
               </lex-stack>
-              <lex-toggle id="sv2-pref-in-app" name="in_app_notifications"></lex-toggle>
+              <lex-stack class="sv2-preference-actions" direction="horizontal" gap="2" align="center">
+                <lex-toggle id="sv2-pref-in-app" name="in_app_notifications"></lex-toggle>
+                <button type="button" id="sv2-in-app-types-toggle" class="sv2-capability-chevron-button sv2-in-app-types-toggle" aria-expanded="false" aria-controls="sv2-in-app-types" aria-label="Show in-app notification types">
+                  <span class="sv2-capability-chevron" aria-hidden="true"></span>
+                </button>
+              </lex-stack>
             </lex-stack>
 
             <lex-stack id="sv2-in-app-types" class="sv2-in-app-types sv2-hidden" direction="vertical" gap="0" divider="true"></lex-stack>

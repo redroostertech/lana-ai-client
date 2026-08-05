@@ -23,6 +23,7 @@
   var _profileData = null;
   var _notificationPreferences = null;
   var _notificationTypes = [];
+  var _inAppTypesExpanded = false;
 
   // Password requirement special characters
   var PW_SPECIALS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
@@ -88,6 +89,7 @@
     // Preferences
     dom.prefPush  = document.getElementById('sv2-pref-push');
     dom.prefInApp = document.getElementById('sv2-pref-in-app');
+    dom.inAppTypesToggle = document.getElementById('sv2-in-app-types-toggle');
     dom.inAppTypes = document.getElementById('sv2-in-app-types');
 
     // Sessions
@@ -602,6 +604,51 @@
     localStorage.setItem('user', JSON.stringify(user));
   }
 
+  function timezoneCityLabel(value) {
+    if (!value) return '';
+    var parts = String(value).split('/');
+    var city = parts[parts.length - 1] || value;
+    return city.replace(/_/g, ' ');
+  }
+
+  function timezoneDisplayName(value) {
+    if (!value) return '';
+    try {
+      var parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: value,
+        timeZoneName: 'longGeneric'
+      }).formatToParts(new Date());
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].type === 'timeZoneName' && parts[i].value) {
+          return parts[i].value;
+        }
+      }
+    } catch (e) {
+      return timezoneCityLabel(value);
+    }
+    return timezoneCityLabel(value);
+  }
+
+  function timezoneOptionLabel(value) {
+    var display = timezoneDisplayName(value);
+    var city = timezoneCityLabel(value);
+    if (!display) return city || value;
+    if (!city || display === city) return display;
+    return display + ' - ' + city;
+  }
+
+  function timezoneStatusLabel(value, isDefault) {
+    var label = timezoneDisplayName(value) || timezoneCityLabel(value) || 'UTC';
+    try {
+      var time = new Intl.DateTimeFormat('en-US', {
+        timeZone: value || 'UTC', hour: 'numeric', minute: '2-digit', hour12: true
+      }).format(new Date());
+      return (isDefault ? 'Browser default · ' : '') + label + ' · Local time ' + time;
+    } catch (e) {
+      return (isDefault ? 'Browser default · ' : '') + label;
+    }
+  }
+
   function buildTimezoneOptions(currentValue) {
     var zones = [];
     if (typeof Intl.supportedValuesOf === 'function') {
@@ -650,7 +697,7 @@
       for (var z = 0; z < list.length; z++) {
         options.push({
           value: list[z],
-          label: list[z].replace(/_/g, ' '),
+          label: timezoneOptionLabel(list[z]),
           group: region
         });
       }
@@ -661,17 +708,10 @@
   function renderTimezoneCurrent(value) {
     if (!dom.tzCurrent) return;
     if (!value) {
-      dom.tzCurrent.textContent = 'Using browser default: ' + (browserTimezone() || 'UTC');
+      dom.tzCurrent.textContent = timezoneStatusLabel(browserTimezone() || 'UTC', true);
       return;
     }
-    try {
-      var time = new Intl.DateTimeFormat('en-US', {
-        timeZone: value, hour: 'numeric', minute: '2-digit', hour12: true
-      }).format(new Date());
-      dom.tzCurrent.textContent = 'Current local time: ' + time;
-    } catch (e) {
-      dom.tzCurrent.textContent = '';
-    }
+    dom.tzCurrent.textContent = timezoneStatusLabel(value, false);
   }
 
   function loadTimezone() {
@@ -748,6 +788,24 @@
     return Array.isArray(root && root.types) ? root.types : [];
   }
 
+  function notificationTypeName(type) {
+    return type && type.type ? String(type.type) : '';
+  }
+
+  function toggleableInAppNotificationTypes() {
+    var rows = [];
+
+    for (var i = 0; i < _notificationTypes.length; i++) {
+      var type = _notificationTypes[i];
+      var channels = type.channels || {};
+      if (type.preference_gated === false || channels.in_app === false) continue;
+      if (!notificationTypeName(type)) continue;
+      rows.push(type);
+    }
+
+    return rows;
+  }
+
   function humanizeNotificationType(type) {
     var parts = String(type || '').split('_');
     for (var i = 0; i < parts.length; i++) {
@@ -757,31 +815,107 @@
     return parts.join(' ');
   }
 
-  function renderInAppNotificationTypes() {
-    if (!dom.inAppTypes) return;
+  function storedInAppTypeEnabled(typeName) {
     var prefs = _notificationPreferences || {};
     var perTypePrefs = prefs.notification_types || {};
-    var rows = [];
+    var typePrefs = perTypePrefs[typeName] || {};
+    return typePrefs.in_app !== false;
+  }
 
-    for (var i = 0; i < _notificationTypes.length; i++) {
-      var type = _notificationTypes[i];
-      var channels = type.channels || {};
-      if (type.preference_gated === false || channels.in_app === false) continue;
-      rows.push(type);
+  function effectiveInAppTypeEnabled(typeName) {
+    var prefs = _notificationPreferences || {};
+    if (prefs.in_app_enabled === false) return false;
+    return storedInAppTypeEnabled(typeName);
+  }
+
+  function inAppSelectionState(rows) {
+    var prefs = _notificationPreferences || {};
+    var typeRows = rows || toggleableInAppNotificationTypes();
+    var enabledCount = 0;
+
+    if (!typeRows.length) {
+      return {
+        checked: prefs.in_app_enabled !== false,
+        mixed: false
+      };
     }
 
+    for (var i = 0; i < typeRows.length; i++) {
+      if (effectiveInAppTypeEnabled(notificationTypeName(typeRows[i]))) enabledCount++;
+    }
+
+    return {
+      checked: enabledCount === typeRows.length,
+      mixed: enabledCount > 0 && enabledCount < typeRows.length
+    };
+  }
+
+  function syncInAppParentToggle(rows) {
+    if (!dom.prefInApp) return;
+    var state = inAppSelectionState(rows);
+    dom.prefInApp.checked = state.checked;
+    dom.prefInApp.mixed = state.mixed;
+  }
+
+  function setInAppTypesExpanded(expanded, hasRows) {
+    _inAppTypesExpanded = expanded === true && hasRows === true;
+
+    if (dom.inAppTypes) {
+      if (_inAppTypesExpanded) {
+        dom.inAppTypes.classList.remove('sv2-hidden');
+        dom.inAppTypes.removeAttribute('hidden');
+      } else {
+        dom.inAppTypes.classList.add('sv2-hidden');
+        dom.inAppTypes.setAttribute('hidden', '');
+      }
+    }
+
+    if (dom.inAppTypesToggle) {
+      if (hasRows) dom.inAppTypesToggle.classList.remove('sv2-hidden');
+      else dom.inAppTypesToggle.classList.add('sv2-hidden');
+      dom.inAppTypesToggle.setAttribute('aria-expanded', _inAppTypesExpanded ? 'true' : 'false');
+      dom.inAppTypesToggle.setAttribute('aria-label', (_inAppTypesExpanded ? 'Hide' : 'Show') + ' in-app notification types');
+    }
+  }
+
+  function applyNotificationPreferencesPatch(body) {
+    var key;
+    _notificationPreferences = _notificationPreferences || {};
+
+    for (key in body) {
+      if (!Object.prototype.hasOwnProperty.call(body, key) || key === 'notification_types') continue;
+      _notificationPreferences[key] = body[key] === true;
+    }
+
+    if (body.notification_types) {
+      _notificationPreferences.notification_types = _notificationPreferences.notification_types || {};
+      for (key in body.notification_types) {
+        if (!Object.prototype.hasOwnProperty.call(body.notification_types, key)) continue;
+        _notificationPreferences.notification_types[key] = Object.assign(
+          {},
+          _notificationPreferences.notification_types[key] || {},
+          body.notification_types[key]
+        );
+      }
+    }
+  }
+
+  function renderInAppNotificationTypes() {
+    if (!dom.inAppTypes) return;
+    var rows = toggleableInAppNotificationTypes();
+    syncInAppParentToggle(rows);
+
     if (!rows.length) {
-      dom.inAppTypes.classList.add('sv2-hidden');
       dom.inAppTypes.innerHTML = '';
+      setInAppTypesExpanded(false, false);
       return;
     }
 
     var html = '';
-    for (var j = 0; j < rows.length; j++) {
-      var row = rows[j];
-      var typeName = row.type || '';
-      var typePrefs = perTypePrefs[typeName] || {};
-      var checked = typePrefs.in_app !== false;
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var typeName = notificationTypeName(row);
+      var checked = effectiveInAppTypeEnabled(typeName);
       html +=
         '<lex-stack class="sv2-notification-type-row" direction="horizontal" gap="4" justify="between" align="center">' +
           '<lex-stack class="sv2-notification-type-copy" direction="vertical" gap="1">' +
@@ -793,20 +927,48 @@
     }
 
     dom.inAppTypes.innerHTML = html;
-    dom.inAppTypes.classList.remove('sv2-hidden');
+    setInAppTypesExpanded(_inAppTypesExpanded, true);
 
     var toggles = dom.inAppTypes.querySelectorAll('.sv2-in-app-type-toggle');
-    for (var k = 0; k < toggles.length; k++) {
-      toggles[k].checked = toggles[k].hasAttribute('checked');
-      toggles[k].addEventListener('lex-change', handleInAppTypePreferenceChange);
+    for (var j = 0; j < toggles.length; j++) {
+      toggles[j].checked = toggles[j].hasAttribute('checked');
+      toggles[j].addEventListener('lex-change', handleInAppTypePreferenceChange);
     }
+  }
+
+  function handleInAppTypesToggleClick() {
+    setInAppTypesExpanded(!_inAppTypesExpanded, toggleableInAppNotificationTypes().length > 0);
   }
 
   function handleNotificationPreferenceChange(key, value) {
     var body = {};
     body[key] = value === true;
     api.updateNotificationPreferences(body).then(function () {
-      if (_notificationPreferences) _notificationPreferences[key] = value === true;
+      applyNotificationPreferencesPatch(body);
+      renderInAppNotificationTypes();
+      Lex.Toast.success('Preference saved');
+    }).catch(function (error) {
+      Lex.Toast.error(error.message || 'Failed to save notification preference');
+      loadPreferences();
+    });
+  }
+
+  function handleInAppParentPreferenceChange(value) {
+    var enabled = value === true;
+    var rows = toggleableInAppNotificationTypes();
+    var body = {
+      in_app_enabled: enabled
+    };
+
+    if (rows.length) {
+      body.notification_types = {};
+      for (var i = 0; i < rows.length; i++) {
+        body.notification_types[notificationTypeName(rows[i])] = { in_app: enabled };
+      }
+    }
+
+    api.updateNotificationPreferences(body).then(function () {
+      applyNotificationPreferencesPatch(body);
       renderInAppNotificationTypes();
       Lex.Toast.success('Preference saved');
     }).catch(function (error) {
@@ -820,18 +982,26 @@
     var type = toggle && toggle.getAttribute('data-notification-type');
     if (!type) return;
 
+    var rows = toggleableInAppNotificationTypes();
     var enabled = e.detail && e.detail.value === true;
-    var body = { notification_types: {} };
-    body.notification_types[type] = { in_app: enabled };
+    var anyEnabled = false;
+    var body = {
+      in_app_enabled: false,
+      notification_types: {}
+    };
+
+    for (var i = 0; i < rows.length; i++) {
+      var typeName = notificationTypeName(rows[i]);
+      var typeEnabled = typeName === type ? enabled : effectiveInAppTypeEnabled(typeName);
+      if (typeEnabled) anyEnabled = true;
+      body.notification_types[typeName] = { in_app: typeEnabled };
+    }
+
+    body.in_app_enabled = anyEnabled;
 
     api.updateNotificationPreferences(body).then(function () {
-      _notificationPreferences = _notificationPreferences || {};
-      _notificationPreferences.notification_types = _notificationPreferences.notification_types || {};
-      _notificationPreferences.notification_types[type] = Object.assign(
-        {},
-        _notificationPreferences.notification_types[type] || {},
-        { in_app: enabled }
-      );
+      applyNotificationPreferencesPatch(body);
+      renderInAppNotificationTypes();
       Lex.Toast.success('Preference saved');
     }).catch(function (error) {
       Lex.Toast.error(error.message || 'Failed to save notification type preference');
@@ -1732,8 +1902,11 @@
     }
     if (dom.prefInApp) {
       dom.prefInApp.addEventListener('lex-change', function (e) {
-        handleNotificationPreferenceChange('in_app_enabled', e.detail.value);
+        handleInAppParentPreferenceChange(e.detail.value);
       });
+    }
+    if (dom.inAppTypesToggle) {
+      dom.inAppTypesToggle.addEventListener('click', handleInAppTypesToggleClick);
     }
 
     // ── Sessions ──

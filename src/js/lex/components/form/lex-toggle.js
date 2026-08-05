@@ -71,6 +71,10 @@
         background: var(--lex-toggle-bg-active, var(--lex-bg-accent));
       }
 
+      .lex-toggle-track--mixed {
+        background: var(--lex-toggle-bg-active, var(--lex-bg-accent));
+      }
+
       /* ── Knob ──────────────────────────────────────────── */
 
       .lex-toggle-knob {
@@ -101,6 +105,14 @@
         transform: translateX(16px);
       }
 
+      .lex-toggle-track--mixed .lex-toggle-knob--md {
+        transform: translateX(10px);
+      }
+
+      .lex-toggle-track--mixed .lex-toggle-knob--sm {
+        transform: translateX(8px);
+      }
+
       /* Hidden native input for accessibility */
       .lex-toggle-native {
         position: absolute;
@@ -126,6 +138,7 @@
       return {
         ...super.properties,
         checked:   { type: Boolean, default: false, reflect: true },
+        mixed:     { type: Boolean, default: false, reflect: true },
         labelSide: { type: String, default: 'right' }
       };
     }
@@ -134,16 +147,21 @@
       injectStyles();
 
       const sz = this.size === 'sm' ? 'sm' : 'md';
+      const mixedCls = this.mixed && !this.checked ? ' lex-toggle-track--mixed' : '';
       const checkedCls = this.checked ? ' lex-toggle-track--checked' : '';
       const disabledCls = this.disabled ? ' lex-toggle-row--disabled' : '';
       const checkedAttr = this.checked ? 'checked' : '';
       const disabledAttr = this.disabled ? 'disabled' : '';
+      const ariaChecked = this.mixed && !this.checked ? 'mixed' : String(Boolean(this.checked));
+      const fallbackLabel = this.name ? String(this.name).replace(/[_-]+/g, ' ') : 'Toggle';
+      const ariaLabel = this.label || this.getAttribute('aria-label') || fallbackLabel;
 
       const track = `
-        <div class="lex-toggle-track lex-toggle-track--${sz}${checkedCls}">
+        <div class="lex-toggle-track lex-toggle-track--${sz}${checkedCls}${mixedCls}">
           <input type="checkbox" class="lex-toggle-native" ${checkedAttr} ${disabledAttr}
             name="${this.escapeHtml(this.name)}"
-            aria-label="${this.escapeHtml(this.label)}" />
+            aria-label="${this.escapeHtml(ariaLabel)}"
+            aria-checked="${ariaChecked}" />
           <div class="lex-toggle-knob lex-toggle-knob--${sz}"></div>
         </div>
       `;
@@ -169,14 +187,18 @@
 
       this.listen(row, 'click', (e) => {
         if (e.target.closest('.lex-toggle-native')) return; // Let native handle
-        this.checked = !this.checked;
+        this.checked = this.mixed && !this.checked ? true : !this.checked;
+        this.mixed = false;
         this._emitChange(this.checked);
       });
 
       const native = this.querySelector('.lex-toggle-native');
       if (native) {
+        native.indeterminate = this.mixed && !this.checked;
+        native.setAttribute('aria-checked', native.indeterminate ? 'mixed' : String(Boolean(native.checked)));
         this.listen(native, 'change', (e) => {
           this.checked = e.target.checked;
+          this.mixed = false;
           this._emitChange(this.checked);
         });
       }
