@@ -224,6 +224,42 @@
 }
 
 
+/* ── Active Sessions ─────────────────────────────────────────────── */
+
+.sv2-sessions-summary {
+  min-height: 56px;
+}
+
+.sv2-sessions-summary lex-btn {
+  flex: 0 0 auto;
+}
+
+.sv2-sessions-modal {
+  display: grid;
+  gap: 12px;
+  min-height: 440px;
+}
+
+.sv2-sessions-modal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sv2-sessions-modal-toolbar lex-text[tag="p"] {
+  margin: 0;
+}
+
+.sv2-sessions-table {
+  min-height: 360px;
+}
+
+.sv2-sessions-table .lex-table-scroll-area {
+  max-height: 520px;
+}
+
+
 /* ── Profile Edit Mode ───────────────────────────────────────────── */
 
 #sv2-profile-edit {
@@ -1204,12 +1240,17 @@
   }
 
   .sv2-memory-header,
-  .sv2-memory-modal-toolbar {
+  .sv2-memory-modal-toolbar,
+  .sv2-sessions-summary,
+  .sv2-sessions-modal-toolbar {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .sv2-memory-header lex-btn,
-  .sv2-memory-modal-toolbar lex-btn {
+  .sv2-memory-modal-toolbar lex-btn,
+  .sv2-sessions-summary lex-btn,
+  .sv2-sessions-modal-toolbar lex-btn {
     width: 100%;
   }
 

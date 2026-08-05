@@ -418,7 +418,6 @@
   function setMemoryModalView(view, record) {
     var list = el('sv2-memory-list-view');
     var detail = el('sv2-memory-detail-view');
-    var backBtn = el('sv2-memory-back-btn');
     var refreshBtn = el('sv2-memory-modal-refresh-btn');
     var status = el('sv2-memory-modal-status');
     var isDetail = view === 'detail';
@@ -426,10 +425,13 @@
     _memoryModalView = isDetail ? 'detail' : 'list';
     if (list) list.hidden = isDetail;
     if (detail) detail.hidden = !isDetail;
-    if (backBtn) backBtn.classList.toggle('sv2-hidden', !isDetail);
     if (refreshBtn) refreshBtn.classList.toggle('sv2-hidden', isDetail);
     if (status) status.classList.toggle('sv2-hidden', isDetail);
-    if (_memoryModal) _memoryModal.heading = isDetail ? 'Memory Details' : 'Manage Memories';
+    if (_memoryModal) {
+      _memoryModal.heading = isDetail ? 'Memory Details' : 'Manage Memories';
+      _memoryModal.backButton = isDetail;
+      _memoryModal.backLabel = 'Back to memories';
+    }
     if (isDetail) renderMemoryDetail(record);
   }
 
@@ -527,7 +529,6 @@
       '</section>' +
       '<section id="sv2-memory-detail-view" hidden>' +
         '<lex-stack direction="vertical" gap="4">' +
-          '<lex-btn id="sv2-memory-back-btn" variant="ghost" size="sm" icon="arrow-left">Back</lex-btn>' +
           '<div id="sv2-memory-detail" class="sv2-memory-detail"></div>' +
         '</lex-stack>' +
       '</section>';
@@ -544,18 +545,15 @@
       _memoryModal = null;
       _memoryModalView = 'list';
     });
+    _memoryModal.addEventListener('lex-back', function () {
+      setMemoryModalView('list');
+    });
 
     setTimeout(function () {
       var refreshBtn = el('sv2-memory-modal-refresh-btn');
       if (refreshBtn) {
         refreshBtn.addEventListener('click', function () {
           loadMemoryRecords({ force: true });
-        });
-      }
-      var backBtn = el('sv2-memory-back-btn');
-      if (backBtn) {
-        backBtn.addEventListener('click', function () {
-          setMemoryModalView('list');
         });
       }
       var table = el('sv2-memory-table');

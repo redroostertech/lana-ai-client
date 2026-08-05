@@ -113,14 +113,23 @@
         padding: 16px 24px;
       }
 
+      .lex-modal-title-group {
+        display: inline-flex;
+        align-items: center;
+        min-width: 0;
+        gap: 8px;
+      }
+
       .lex-modal-title {
         font-size: var(--lex-body-base-size, 1rem);
         font-weight: var(--lex-weight-semibold, 600);
         color: var(--lex-text-primary);
         line-height: 1.4;
         margin: 0;
+        min-width: 0;
       }
 
+      .lex-modal-back,
       .lex-modal-close {
         display: flex;
         align-items: center;
@@ -136,11 +145,17 @@
         flex-shrink: 0;
       }
 
+      .lex-modal-back[hidden] {
+        display: none;
+      }
+
+      .lex-modal-back:hover,
       .lex-modal-close:hover {
         background: var(--lex-bg-tertiary);
         color: var(--lex-text-primary);
       }
 
+      .lex-modal-back svg,
       .lex-modal-close svg {
         width: 18px;
         height: 18px;
@@ -315,6 +330,7 @@
   }
 
   const CLOSE_SVG = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+  const BACK_SVG = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 18-6-6 6-6"/></svg>';
 
   // Monotonically increasing counter to generate unique aria-labelledby IDs.
   let _modalIdCounter = 0;
@@ -329,7 +345,9 @@
         cancelText:  { type: String, default: 'Cancel' },
         variant:     { type: String, default: 'default' },  // default | danger | info | success
         hideActions: { type: Boolean, default: false },
-        closeOnOverlay: { type: Boolean, default: true }
+        closeOnOverlay: { type: Boolean, default: true },
+        backButton:  { type: Boolean, default: false },
+        backLabel:   { type: String, default: 'Back' }
       };
     }
 
@@ -387,7 +405,10 @@
       // Header
       if (this.heading) {
         html += `<div class="lex-modal-header">`;
+        html += `<div class="lex-modal-title-group">`;
+        html += `<button type="button" class="lex-modal-back" data-action="back" aria-label="${this.escapeHtml(this.backLabel || 'Back')}"${this.backButton ? '' : ' hidden'}>${BACK_SVG}</button>`;
         html += `<h3 id="${this._titleId}" class="lex-modal-title">${this.escapeHtml(this.heading)}</h3>`;
+        html += `</div>`;
         html += `<button type="button" class="lex-modal-close" data-action="close" aria-label="Close dialog">${CLOSE_SVG}</button>`;
         html += `</div>`;
       }
@@ -425,6 +446,14 @@
           } else {
             panel.removeAttribute('aria-labelledby');
           }
+        }
+      }
+
+      if (changedProps && (changedProps.has('backButton') || changedProps.has('backLabel'))) {
+        const backBtn = this.querySelector('.lex-modal-back');
+        if (backBtn) {
+          backBtn.hidden = !this.backButton;
+          backBtn.setAttribute('aria-label', this.backLabel || 'Back');
         }
       }
 
@@ -515,6 +544,10 @@
         this.open = false;
       });
 
+      this.delegate('click', '[data-action="back"]', () => {
+        this.emit('lex-back');
+      });
+
       this.delegate('click', '[data-action="close"]', () => {
         this.emit('lex-close');
         this.open = false;
@@ -592,6 +625,8 @@
       modal.size = options.size || 'md';
       modal.hideActions = options.hideActions !== undefined ? options.hideActions : true;
       modal.closeOnOverlay = options.closeOnOverlay !== undefined ? options.closeOnOverlay : true;
+      modal.backButton = options.backButton === true;
+      modal.backLabel = options.backLabel || 'Back';
 
       if (options.content) {
         if (typeof options.content === 'string') {
