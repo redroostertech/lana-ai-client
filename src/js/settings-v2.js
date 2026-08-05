@@ -1743,16 +1743,16 @@
     if (!row) return null;
     if (row.status === 'connected') {
       var connectedActions = [];
-      if (row.source_id) connectedActions.push({ action: 'view-data', label: 'Data', variant: 'ghost', icon: 'database' });
+      if (row.source_id) connectedActions.push({ action: 'view-data', label: 'Data', variant: 'secondary', icon: 'database' });
       if (row.source_id && row.supports_sync !== false) connectedActions.push({ action: 'sync', label: 'Sync', variant: 'primary', icon: 'refresh-cw' });
       if (row.source_id) connectedActions.push({ action: 'disconnect', label: 'Disconnect', variant: 'danger', icon: 'unlink' });
       return connectedActions;
     }
     if (row.status === 'reauthorization_required') {
-      return [{ action: 'connect', label: 'Reconnect', variant: 'primary', icon: 'refresh-cw' }];
+      return [{ action: 'connect', label: 'Reconnect', variant: 'warning', icon: 'refresh-cw' }];
     }
     if (row.status === 'available') {
-      return [{ action: 'connect', label: 'Connect', variant: 'primary', icon: 'plug' }];
+      return [{ action: 'connect', label: 'Connect', variant: 'success', icon: 'plug' }];
     }
     return [];
   }
