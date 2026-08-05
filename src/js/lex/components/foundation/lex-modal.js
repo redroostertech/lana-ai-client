@@ -62,6 +62,7 @@
         max-height: calc(100vh - 32px);
         display: grid;
         grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr);
         background: var(--lex-bg-primary);
         border-radius: var(--lex-radius-xl, 12px);
         box-shadow: var(--lex-shadow-xl, 0 20px 60px rgba(0,0,0,0.15));
@@ -101,10 +102,12 @@
       /* ── Header ──────────────────────────────────────── */
 
       .lex-modal-header {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto auto;
+        grid-row: 1;
+        grid-column: 1;
+        display: flex;
         align-items: center;
         gap: 8px;
+        justify-content: flex-start;
         padding: 16px 20px;
         border-bottom: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
         min-width: 0;
@@ -117,6 +120,7 @@
       .lex-modal-title-group {
         display: inline-flex;
         align-items: center;
+        flex: 1 1 auto;
         min-width: 0;
         gap: 8px;
       }
@@ -124,6 +128,7 @@
       .lex-modal-header-actions {
         display: inline-flex;
         align-items: center;
+        flex: 0 0 auto;
         gap: 8px;
         justify-content: flex-end;
       }
@@ -172,9 +177,18 @@
       /* ── Body ────────────────────────────────────────── */
 
       .lex-modal-body {
+        grid-row: 2;
+        grid-column: 1;
         padding: 20px;
+        min-width: 0;
         min-height: 0;
         overflow-y: auto;
+      }
+
+      .lex-modal-body > slot-content {
+        display: block;
+        min-width: 0;
+        min-height: 0;
       }
 
       .lex-modal-panel--full .lex-modal-body {
@@ -190,6 +204,8 @@
       /* ── Footer / Actions ────────────────────────────── */
 
       .lex-modal-footer {
+        grid-row: 3;
+        grid-column: 1;
         display: flex;
         align-items: center;
         justify-content: flex-end;
