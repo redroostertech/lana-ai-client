@@ -24,6 +24,7 @@
   var _notificationPreferences = null;
   var _notificationTypes = [];
   var _inAppTypesExpanded = false;
+  var MFA_SETTINGS_VISIBLE = false;
 
   // Password requirement special characters
   var PW_SPECIALS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
@@ -411,18 +412,24 @@
   // MFA
   // =========================================================================
 
+  function hideMfaSection() {
+    if (!dom.mfaSection) return;
+    dom.mfaSection.innerHTML = '';
+    dom.mfaSection.classList.add('sv2-hidden');
+    dom.mfaSection.setAttribute('hidden', '');
+    dom.mfaSection.setAttribute('aria-hidden', 'true');
+  }
+
   function loadMfaStatus() {
     if (!dom.mfaSection) return;
-    if (!api.isMfaEnabled()) {
-      dom.mfaSection.innerHTML =
-        '<lex-card heading="Two-Factor Authentication">' +
-          '<div class="sv2-mfa-header">' +
-            '<lex-text variant="secondary" size="body-sm">Two-factor authentication is not available for this deployment</lex-text>' +
-            '<lex-badge label="Unavailable" color="gray" size="sm"></lex-badge>' +
-          '</div>' +
-        '</lex-card>';
+    if (MFA_SETTINGS_VISIBLE !== true || !api.isMfaEnabled()) {
+      hideMfaSection();
       return;
     }
+
+    dom.mfaSection.classList.remove('sv2-hidden');
+    dom.mfaSection.removeAttribute('hidden');
+    dom.mfaSection.removeAttribute('aria-hidden');
 
     api.getMfaStatus().then(function (result) {
       var enabled = result.mfa_enabled || result.enabled;
@@ -434,6 +441,9 @@
 
   function renderMfaCard(enabled) {
     if (!dom.mfaSection) return;
+    dom.mfaSection.classList.remove('sv2-hidden');
+    dom.mfaSection.removeAttribute('hidden');
+    dom.mfaSection.removeAttribute('aria-hidden');
     var badgeHtml;
     var buttonLabel;
     var buttonAction;
