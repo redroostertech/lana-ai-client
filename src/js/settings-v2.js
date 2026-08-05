@@ -1591,6 +1591,9 @@
   var _userConnectionsAvailable = false;
   var _oauthCallbackRegistered = false;
   var _pendingUserConnectionOAuth = null;
+  var _userConnectionRows = [];
+  var _userConnectionDataModal = null;
+  var _userConnectionDataState = null;
 
   function notifySettingsNavVisibilityChanged() {
     try {
@@ -1670,6 +1673,9 @@
         status: item.status || 'available',
         auth_type: item.auth_type || '',
         last_synced_at: item.last_synced_at || item.last_sync_at || '',
+        data_record_count: item.data_record_count || 0,
+        sync_settings: item.sync_settings || {},
+        tool_capabilities: item.tool_capabilities || {},
         supports_sync: item.supports_sync !== false,
         setup: item.setup || {}
       };
@@ -1686,6 +1692,9 @@
         existing.source_id = existing.source_id || connection.id || null;
         existing.account = existing.account || connection.account || '';
         existing.last_synced_at = existing.last_synced_at || connection.last_sync_at || '';
+        existing.data_record_count = connection.data_record_count || existing.data_record_count || 0;
+        existing.sync_settings = connection.sync_settings || existing.sync_settings || {};
+        existing.tool_capabilities = connection.tool_capabilities || existing.tool_capabilities || {};
         if (!existing.status || existing.status === 'available') {
           existing.status = connection.auth_status === 'connected'
             ? 'connected'
@@ -1704,6 +1713,9 @@
             : 'reauthorization_required',
           auth_type: '',
           last_synced_at: connection.last_sync_at || '',
+          data_record_count: connection.data_record_count || 0,
+          sync_settings: connection.sync_settings || {},
+          tool_capabilities: connection.tool_capabilities || {},
           supports_sync: true,
           setup: {}
         });
@@ -1727,19 +1739,22 @@
     return { label: value.split('_').join(' '), color: 'gray' };
   }
 
-  function actionForUserConnection(row) {
+  function actionsForUserConnection(row) {
     if (!row) return null;
     if (row.status === 'connected') {
-      if (row.source_id && row.supports_sync !== false) return { action: 'sync', label: 'Sync', variant: 'primary', icon: 'refresh-cw' };
-      if (row.source_id) return { action: 'disconnect', label: 'Disconnect', variant: 'danger', icon: 'unlink' };
+      var connectedActions = [];
+      if (row.source_id) connectedActions.push({ action: 'view-data', label: 'Data', variant: 'ghost', icon: 'database' });
+      if (row.source_id && row.supports_sync !== false) connectedActions.push({ action: 'sync', label: 'Sync', variant: 'primary', icon: 'refresh-cw' });
+      if (row.source_id) connectedActions.push({ action: 'disconnect', label: 'Disconnect', variant: 'danger', icon: 'unlink' });
+      return connectedActions;
     }
     if (row.status === 'reauthorization_required') {
-      return { action: 'connect', label: 'Reconnect', variant: 'primary', icon: 'refresh-cw' };
+      return [{ action: 'connect', label: 'Reconnect', variant: 'primary', icon: 'refresh-cw' }];
     }
     if (row.status === 'available') {
-      return { action: 'connect', label: (row.setup && row.setup.button_label) || 'Connect', variant: 'primary', icon: 'plug' };
+      return [{ action: 'connect', label: (row.setup && row.setup.button_label) || 'Connect', variant: 'primary', icon: 'plug' }];
     }
-    return null;
+    return [];
   }
 
   function formatConnectionMeta(row) {
@@ -1751,7 +1766,59 @@
       var times = formatGrantedAt(row.last_synced_at);
       parts.push(times.relative ? 'Synced ' + esc(times.relative) : 'Synced');
     }
+    if (row.data_record_count) parts.push(String(row.data_record_count) + ' records');
     return parts.join(' • ');
+  }
+
+  function renderToolCapabilities(row) {
+    var caps = row && row.tool_capabilities ? row.tool_capabilities : {};
+    var tools = Array.isArray(caps.tools) ? caps.tools : [];
+    if (!tools.length) {
+      return '<div class="sv2-connection-tools"><span class="sv2-connection-tool-chip is-muted">Read-only</span></div>';
+    }
+
+    var html = '<div class="sv2-connection-tools">';
+    for (var i = 0; i < tools.length; i++) {
+      var tool = tools[i] || {};
+      html += '<span class="sv2-connection-tool-chip" title="' + esc(tool.description || tool.key || '') + '">' +
+        esc(tool.label || tool.key || 'Tool') +
+      '</span>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function currentSyncFrequency(row) {
+    var settings = row && row.sync_settings ? row.sync_settings : {};
+    var frequency = settings.sync_frequency || 'manual';
+    if (frequency === 'custom') {
+      if (settings.sync_interval_minutes === 60) return 'hourly';
+      if (settings.sync_interval_minutes === 10080) return 'weekly';
+      return 'manual';
+    }
+    return ['manual', 'hourly', 'daily', 'weekly'].indexOf(frequency) !== -1 ? frequency : 'manual';
+  }
+
+  function renderSyncFrequencyControl(row) {
+    if (!row || row.status !== 'connected' || !row.source_id || row.supports_sync === false) return '';
+    var value = currentSyncFrequency(row);
+    var options = [
+      ['manual', 'Manual'],
+      ['hourly', 'Hourly'],
+      ['daily', 'Daily'],
+      ['weekly', 'Weekly']
+    ];
+    var html =
+      '<label class="sv2-connection-sync-control">' +
+        '<span>Sync</span>' +
+        '<select class="sv2-connection-sync-select" data-source-id="' + esc(row.source_id || '') + '" data-current-value="' + esc(value) + '">';
+    for (var i = 0; i < options.length; i++) {
+      html += '<option value="' + options[i][0] + '"' + (value === options[i][0] ? ' selected' : '') + '>' +
+        options[i][1] +
+      '</option>';
+    }
+    html += '</select></label>';
+    return html;
   }
 
   function renderUserConnectionsRows(rows) {
@@ -1760,12 +1827,13 @@
       renderUserConnectionsEmpty();
       return;
     }
+    _userConnectionRows = rows;
 
     var html = '<div class="sv2-connection-list">';
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
       var badge = statusBadgeMeta(row.status);
-      var action = actionForUserConnection(row);
+      var actions = actionsForUserConnection(row);
       var meta = formatConnectionMeta(row);
       var description = row.description || '';
 
@@ -1780,25 +1848,31 @@
             '</div>' +
             (description ? '<span class="sv2-connection-description">' + esc(description) + '</span>' : '') +
             (meta ? '<span class="sv2-connection-meta">' + meta + '</span>' : '') +
-          '</div>';
+            renderToolCapabilities(row) +
+          '</div>' +
+          '<div class="sv2-connection-controls">' +
+            renderSyncFrequencyControl(row);
 
-      if (action) {
-        html +=
-          '<lex-btn ' +
-            'class="sv2-connection-action-btn" ' +
-            'variant="' + esc(action.variant) + '" ' +
-            'size="sm" ' +
-            'icon="' + esc(action.icon) + '" ' +
-            'data-action="' + esc(action.action) + '" ' +
-            'data-connector-id="' + esc(row.connector_id) + '" ' +
-            'data-source-id="' + esc(row.source_id || '') + '">' +
-            esc(action.label) +
-          '</lex-btn>';
+      if (actions && actions.length) {
+        for (var a = 0; a < actions.length; a++) {
+          var action = actions[a];
+          html +=
+            '<lex-btn ' +
+              'class="sv2-connection-action-btn" ' +
+              'variant="' + esc(action.variant) + '" ' +
+              'size="sm" ' +
+              'icon="' + esc(action.icon) + '" ' +
+              'data-action="' + esc(action.action) + '" ' +
+              'data-connector-id="' + esc(row.connector_id) + '" ' +
+              'data-source-id="' + esc(row.source_id || '') + '">' +
+              esc(action.label) +
+            '</lex-btn>';
+        }
       } else {
         html += '<span class="sv2-connection-action-spacer" aria-hidden="true"></span>';
       }
 
-      html += '</div>';
+      html += '</div></div>';
     }
     html += '</div>';
 
@@ -1812,6 +1886,10 @@
     var buttons = dom.userConnectionsContent.querySelectorAll('.sv2-connection-action-btn');
     for (var i = 0; i < buttons.length; i++) {
       buttons[i].addEventListener('click', handleUserConnectionActionClick);
+    }
+    var selects = dom.userConnectionsContent.querySelectorAll('.sv2-connection-sync-select');
+    for (var j = 0; j < selects.length; j++) {
+      selects[j].addEventListener('change', handleUserConnectionSyncFrequencyChange);
     }
   }
 
@@ -1925,6 +2003,259 @@
     });
   }
 
+  function findUserConnectionRow(sourceId) {
+    for (var i = 0; i < _userConnectionRows.length; i++) {
+      if (String(_userConnectionRows[i].source_id || '') === String(sourceId || '')) return _userConnectionRows[i];
+    }
+    return null;
+  }
+
+  function getUserConnectionDataBody() {
+    return _userConnectionDataModal ? _userConnectionDataModal.querySelector('[data-user-connection-data-body]') : null;
+  }
+
+  function renderDataLoading() {
+    var body = getUserConnectionDataBody();
+    if (!body) return;
+    body.innerHTML =
+      '<div class="sv2-connection-data-loading">' +
+        '<lex-spinner size="sm" label="Loading data..."></lex-spinner>' +
+      '</div>';
+  }
+
+  function formatRecordTimestamp(value) {
+    if (!value) return '';
+    var formatted = formatGrantedAt(value);
+    return formatted.relative || value;
+  }
+
+  function renderEntityFilterOptions(counts, selected) {
+    var html = '<option value="">All entities</option>';
+    for (var i = 0; i < (counts || []).length; i++) {
+      var count = counts[i] || {};
+      var entity = count.entity_type || '';
+      if (!entity) continue;
+      html += '<option value="' + esc(entity) + '"' + (selected === entity ? ' selected' : '') + '>' +
+        esc(entity) + ' (' + esc(String(count.count || 0)) + ')' +
+      '</option>';
+    }
+    return html;
+  }
+
+  function renderConnectionDataRecords(payload) {
+    var records = payload.records || [];
+    if (!records.length) {
+      return '<lex-empty icon="database" message="No synced records found."></lex-empty>';
+    }
+
+    var html = '<div class="sv2-connection-data-table" role="table">';
+    html +=
+      '<div class="sv2-connection-data-row sv2-connection-data-head" role="row">' +
+        '<span role="columnheader">Type</span>' +
+        '<span role="columnheader">Record</span>' +
+        '<span role="columnheader">Synced</span>' +
+        '<span role="columnheader">Payload</span>' +
+      '</div>';
+
+    for (var i = 0; i < records.length; i++) {
+      var record = records[i] || {};
+      var payloadText = '';
+      try {
+        payloadText = JSON.stringify(record.data || {}, null, 2);
+      } catch (e) {
+        payloadText = '{}';
+      }
+
+      html +=
+        '<div class="sv2-connection-data-row" role="row">' +
+          '<span role="cell">' + esc(record.entity_type || '') + '</span>' +
+          '<span role="cell">' +
+            '<strong>' + esc(record.title || record.external_id || 'Record') + '</strong>' +
+            (record.external_id ? '<small>' + esc(record.external_id) + '</small>' : '') +
+            (record.matter_name ? '<small>' + esc(record.matter_name) + '</small>' : '') +
+          '</span>' +
+          '<span role="cell">' + esc(formatRecordTimestamp(record.synced_at || record.updated_at)) + '</span>' +
+          '<span role="cell">' +
+            '<details class="sv2-connection-data-json">' +
+              '<summary>JSON</summary>' +
+              '<pre>' + esc(payloadText) + '</pre>' +
+            '</details>' +
+          '</span>' +
+        '</div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function renderConnectionData(payload) {
+    var body = getUserConnectionDataBody();
+    if (!body) return;
+    var state = _userConnectionDataState || {};
+    var pagination = payload.pagination || {};
+    var source = payload.source || {};
+    var total = pagination.total || 0;
+    var page = pagination.page || state.page || 1;
+
+    body.innerHTML =
+      '<div class="sv2-connection-data-toolbar">' +
+        '<select class="sv2-connection-data-entity" aria-label="Entity type">' +
+          renderEntityFilterOptions(payload.entity_counts || [], state.entityType || '') +
+        '</select>' +
+        '<input class="sv2-connection-data-search" type="search" placeholder="Search records" value="' + esc(state.query || '') + '">' +
+        '<lex-btn size="sm" variant="secondary" icon="search" data-action="filter-data">Search</lex-btn>' +
+        '<lex-btn size="sm" variant="danger" icon="trash-2" data-action="delete-data">Delete data</lex-btn>' +
+      '</div>' +
+      '<div class="sv2-connection-data-summary">' +
+        esc(source.name || source.connector_id || 'Connection') + ' • ' + esc(String(total)) + ' records' +
+      '</div>' +
+      renderConnectionDataRecords(payload) +
+      '<div class="sv2-connection-data-pager">' +
+        '<lex-btn size="sm" variant="ghost" icon="chevron-left" data-action="data-prev" ' + (page <= 1 ? 'disabled' : '') + '>Previous</lex-btn>' +
+        '<span>Page ' + esc(String(page)) + '</span>' +
+        '<lex-btn size="sm" variant="ghost" icon="chevron-right" data-action="data-next" ' + (!pagination.has_more ? 'disabled' : '') + '>Next</lex-btn>' +
+      '</div>';
+
+    wireConnectionDataModal();
+  }
+
+  function loadUserConnectionData() {
+    var state = _userConnectionDataState;
+    if (!state || !state.sourceId) return;
+    renderDataLoading();
+    api.getUserConnectionData(state.sourceId, {
+      page: state.page || 1,
+      limit: state.limit || 25,
+      entity_type: state.entityType || '',
+      q: state.query || ''
+    }).then(function (payload) {
+      renderConnectionData(payload || {});
+    }).catch(function (error) {
+      var body = getUserConnectionDataBody();
+      if (body) {
+        body.innerHTML =
+          '<lex-empty icon="database" message="Data could not be loaded." description="' +
+          esc((error && error.message) || 'Try again.') +
+          '"></lex-empty>';
+      }
+    });
+  }
+
+  function wireConnectionDataModal() {
+    var body = getUserConnectionDataBody();
+    if (!body) return;
+    var filterBtn = body.querySelector('[data-action="filter-data"]');
+    var prevBtn = body.querySelector('[data-action="data-prev"]');
+    var nextBtn = body.querySelector('[data-action="data-next"]');
+    var deleteBtn = body.querySelector('[data-action="delete-data"]');
+
+    if (filterBtn) {
+      filterBtn.addEventListener('click', function () {
+        var entity = body.querySelector('.sv2-connection-data-entity');
+        var search = body.querySelector('.sv2-connection-data-search');
+        _userConnectionDataState.entityType = entity ? entity.value : '';
+        _userConnectionDataState.query = search ? search.value : '';
+        _userConnectionDataState.page = 1;
+        loadUserConnectionData();
+      });
+    }
+    if (prevBtn) {
+      prevBtn.addEventListener('click', function () {
+        _userConnectionDataState.page = Math.max(1, (_userConnectionDataState.page || 1) - 1);
+        loadUserConnectionData();
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener('click', function () {
+        _userConnectionDataState.page = (_userConnectionDataState.page || 1) + 1;
+        loadUserConnectionData();
+      });
+    }
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', deleteUserConnectionData);
+    }
+  }
+
+  function openUserConnectionData(sourceId) {
+    var row = findUserConnectionRow(sourceId);
+    if (!row || !sourceId) return;
+    _userConnectionDataState = {
+      sourceId: sourceId,
+      page: 1,
+      limit: 25,
+      entityType: '',
+      query: ''
+    };
+    _userConnectionDataModal = Lex.Modal.open({
+      heading: (row.name || 'Connection') + ' Data',
+      size: 'lg',
+      hideActions: true,
+      content: '<div class="sv2-connection-data-modal" data-user-connection-data-body></div>'
+    });
+    _userConnectionDataModal.addEventListener('lex-close', function () {
+      _userConnectionDataModal = null;
+      _userConnectionDataState = null;
+    });
+    loadUserConnectionData();
+  }
+
+  function deleteUserConnectionData() {
+    var state = _userConnectionDataState;
+    if (!state || !state.sourceId) return;
+    Lex.Modal.confirm(
+      'Delete synced data?',
+      'This deletes records pulled from this personal connector in LANA. It does not delete data from the external account.',
+      function () {
+        api.deleteUserConnectionData(state.sourceId).then(function (result) {
+          var deleted = result && result.deleted ? result.deleted.total : 0;
+          Lex.Toast.success('Deleted ' + deleted + ' synced records.');
+          loadUserConnections();
+          if (_userConnectionDataModal) {
+            _userConnectionDataState.page = 1;
+            _userConnectionDataState.entityType = '';
+            _userConnectionDataState.query = '';
+            loadUserConnectionData();
+          }
+        }).catch(function (error) {
+          Lex.Toast.error((error && error.message) || 'Failed to delete synced data.');
+        });
+      },
+      {
+        variant: 'danger',
+        confirmText: 'Delete data'
+      }
+    );
+  }
+
+  function updateUserConnectionSyncFrequency(select, sourceId, frequency) {
+    if (!sourceId || !frequency) return;
+    var previous = select ? select.getAttribute('data-current-value') || select.value : '';
+    if (select) select.disabled = true;
+    api.updateUserConnectionSyncSettings(sourceId, {
+      sync_frequency: frequency,
+      scheduled_sync_time: frequency === 'daily' ? '08:00:00' : undefined
+    }).then(function () {
+      Lex.Toast.success('Sync frequency updated.');
+      loadUserConnections();
+    }).catch(function (error) {
+      if (select) {
+        select.value = previous || 'manual';
+        select.disabled = false;
+      }
+      Lex.Toast.error((error && error.message) || 'Failed to update sync frequency.');
+    });
+  }
+
+  function handleUserConnectionSyncFrequencyChange(e) {
+    var select = e.currentTarget;
+    if (!select) return;
+    updateUserConnectionSyncFrequency(
+      select,
+      select.getAttribute('data-source-id'),
+      select.value
+    );
+  }
+
   function disconnectUserConnection(btn, sourceId) {
     if (!sourceId) return;
     Lex.Modal.confirm('Disconnect this account?', 'LANA will stop syncing this personal connector and clear its stored credentials.', function () {
@@ -1951,6 +2282,7 @@
 
     if (action === 'connect') connectUserConnector(btn, connectorId);
     else if (action === 'sync') syncUserConnection(btn, sourceId);
+    else if (action === 'view-data') openUserConnectionData(sourceId);
     else if (action === 'disconnect') disconnectUserConnection(btn, sourceId);
   }
 

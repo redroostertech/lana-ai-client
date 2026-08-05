@@ -2849,6 +2849,24 @@ class ApiClient {
     return this.post(`/api/v1/me/connections/${encodeURIComponent(sourceId)}/sync`, {});
   }
 
+  async updateUserConnectionSyncSettings(sourceId, settings) {
+    return this.patch(`/api/v1/me/connections/${encodeURIComponent(sourceId)}/sync-settings`, settings || {});
+  }
+
+  async getUserConnectionData(sourceId, params = {}) {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', params.page);
+    if (params.limit) query.set('limit', params.limit);
+    if (params.entity_type) query.set('entity_type', params.entity_type);
+    if (params.q) query.set('q', params.q);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.get(`/api/v1/me/connections/${encodeURIComponent(sourceId)}/data${suffix}`);
+  }
+
+  async deleteUserConnectionData(sourceId) {
+    return this.delete(`/api/v1/me/connections/${encodeURIComponent(sourceId)}/data`);
+  }
+
   // ============================================================
   // User Profile & Preferences
   // ============================================================
