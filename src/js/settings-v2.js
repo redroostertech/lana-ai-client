@@ -1752,7 +1752,7 @@
       return [{ action: 'connect', label: 'Reconnect', variant: 'primary', icon: 'refresh-cw' }];
     }
     if (row.status === 'available') {
-      return [{ action: 'connect', label: (row.setup && row.setup.button_label) || 'Connect', variant: 'primary', icon: 'plug' }];
+      return [{ action: 'connect', label: 'Connect', variant: 'primary', icon: 'plug' }];
     }
     return [];
   }
