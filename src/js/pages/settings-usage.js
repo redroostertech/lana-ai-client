@@ -30,6 +30,11 @@
     if (node) node.textContent = value;
   }
 
+  function setHidden(id, hidden) {
+    var node = el(id);
+    if (node) node.hidden = hidden === true;
+  }
+
   function finiteNumber(value) {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'string' && value.trim() === '') return null;
@@ -144,6 +149,11 @@
   }
 
   function renderRedaction(usage) {
+    var hasRedactionMetric = usage.redactionTotal !== null ||
+      (usage.redactionBreakdown && typeof usage.redactionBreakdown === 'object');
+    setHidden('sv2-redaction-usage', !hasRedactionMetric);
+    if (!hasRedactionMetric) return;
+
     setText('sv2-redaction-total', formatCount(usage.redactionTotal));
     var container = el('sv2-redaction-breakdown');
     var breakdown = usage.redactionBreakdown;
@@ -183,6 +193,11 @@
   }
 
   function renderProtect(usage) {
+    var hasProtectMetric = usage.protectPercent !== null ||
+      (usage.protectedMessages !== null && usage.researchMessages !== null);
+    setHidden('sv2-protect-usage', !hasProtectMetric);
+    if (!hasProtectMetric) return;
+
     setText('sv2-protect-percent', formatPercent(usage.protectPercent));
     if (usage.protectedMessages !== null && usage.researchMessages !== null) {
       setText('sv2-protect-detail', formatCount(usage.protectedMessages) + ' of ' +
@@ -218,10 +233,12 @@
     }
 
     if (usage.chatPercent !== null) {
+      setHidden('sv2-chat-usage-row', false);
       setText('sv2-chat-usage-percent', formatPercent(usage.chatPercent, 'used'));
       setProgress('sv2-chat-usage-bar', usage.chatPercent);
       if (usage.chatDetail) setText('sv2-chat-usage-detail', usage.chatDetail);
     } else {
+      setHidden('sv2-chat-usage-row', true);
       setText('sv2-chat-usage-percent', 'Not metered');
       setText('sv2-chat-usage-detail', 'Your current plan does not report a chat limit.');
       setProgress('sv2-chat-usage-bar', null);
@@ -234,20 +251,21 @@
   function renderStorage() {
     var storage = normalizeStorage(state.storage);
     var isOrganizationScope = storage.scope === 'organization';
+    var hasQuota = storage.percent !== null;
     setText('sv2-storage-label', isOrganizationScope ? 'Organization storage quota' : 'Your stored files');
-    setText('sv2-storage-percent', storage.percent === null ? 'Not metered' : formatPercent(storage.percent, 'used'));
+    setText('sv2-storage-percent', hasQuota ? formatPercent(storage.percent, 'used') : '');
     setProgress('sv2-storage-bar', storage.percent);
 
     if (storage.usedFormatted && storage.totalFormatted) {
       setText('sv2-storage-detail', storage.usedFormatted + ' of ' + storage.totalFormatted +
         (isOrganizationScope ? ' used across your organization.' : ''));
     } else if (storage.usedFormatted) {
-      setText('sv2-storage-detail', storage.usedFormatted + ' used. Personal storage quota is not metered.');
+      setText('sv2-storage-detail', storage.usedFormatted + ' used');
     } else if (storage.used !== null && storage.total !== null) {
       setText('sv2-storage-detail', formatCount(storage.used) + ' of ' + formatCount(storage.total) +
         ' bytes' + (isOrganizationScope ? ' across your organization.' : ''));
     } else if (storage.used !== null) {
-      setText('sv2-storage-detail', formatCount(storage.used) + ' bytes used. Personal storage quota is not metered.');
+      setText('sv2-storage-detail', formatCount(storage.used) + ' bytes used');
     } else {
       setText('sv2-storage-detail', 'Storage usage unavailable');
     }
@@ -266,18 +284,8 @@
   }
 
   function revealTeamUsageForAdmins() {
-    var user = window.api && window.api.user;
-    var roles = user && (user.roles || user.role_names || []);
-    if (!Array.isArray(roles)) roles = [roles];
-    var names = roles.map(function (role) {
-      return String(role && (role.name || role.role_name || role) || '').toLowerCase();
-    });
-    var directRole = String(user && (user.role_name || user.role) || '').toLowerCase();
-    var isAdmin = directRole.indexOf('admin') !== -1 || names.some(function (name) {
-      return name.indexOf('admin') !== -1;
-    });
     var link = el('sv2-team-usage-link');
-    if (link && isAdmin) link.classList.remove('sv2-hidden');
+    if (link) link.classList.add('sv2-hidden');
   }
 
   function finishLoading(failedCount) {
