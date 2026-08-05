@@ -3048,9 +3048,17 @@ class ApiClient {
 
   async getStorageUsage() {
     try {
-      return await this.get('/api/v1/storage/usage/me');
+      const response = await this.get('/api/v1/storage/usage/me');
+      return response && typeof response === 'object'
+        ? { ...response, usage_scope: response.usage_scope || 'user' }
+        : response;
     } catch (error) {
-      if (error && error.status === 404) return this.get('/api/v1/storage/usage');
+      if (error && error.status === 404) {
+        const response = await this.get('/api/v1/storage/usage');
+        return response && typeof response === 'object'
+          ? { ...response, usage_scope: response.usage_scope || 'organization' }
+          : response;
+      }
       throw error;
     }
   }

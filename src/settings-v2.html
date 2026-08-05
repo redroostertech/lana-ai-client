@@ -412,7 +412,7 @@
         <section id="sv2-section-usage" class="sv2-section-usage" aria-busy="true">
           <lex-card heading="Usage">
             <div class="sv2-usage">
-              <div class="sv2-usage-quota" aria-label="Account usage limits">
+              <div class="sv2-usage-quota" aria-label="Usage meters">
                 <div class="sv2-usage-quota-row">
                   <div class="sv2-usage-quota-heading">
                     <span class="sv2-usage-label">
@@ -421,7 +421,7 @@
                     </span>
                     <span id="sv2-chat-usage-percent" class="sv2-usage-value">Not metered</span>
                   </div>
-                  <lex-progress-bar id="sv2-chat-usage-bar" value="0" size="xs"></lex-progress-bar>
+                  <lex-progress-bar id="sv2-chat-usage-bar" value="0" size="xs" hidden></lex-progress-bar>
                   <p id="sv2-chat-usage-detail" class="sv2-usage-detail">Your current plan does not report a chat limit.</p>
                 </div>
 
@@ -429,7 +429,7 @@
                   <div class="sv2-usage-quota-heading">
                     <span class="sv2-usage-label">
                       <span class="sv2-usage-icon" data-usage-icon="file" aria-hidden="true"></span>
-                      Stored files
+                      <span id="sv2-storage-label">Your stored files</span>
                     </span>
                     <span id="sv2-storage-percent" class="sv2-usage-value">Loading...</span>
                   </div>
@@ -438,7 +438,7 @@
                 </div>
               </div>
 
-              <p class="sv2-usage-intro">How are you using LANA AI? Token figures are estimated (~4 characters per token); LANA AI does not store exact token counts.</p>
+              <p class="sv2-usage-intro">Activity counts use the selected period where supported. Some meters are unavailable until account telemetry is enabled.</p>
 
               <lex-segmented id="sv2-usage-period" name="usage_period" value="30days" size="sm"
                 aria-label="Usage reporting period"
@@ -454,14 +454,17 @@
                 <div class="sv2-usage-metric">
                   <strong id="sv2-message-count" class="sv2-usage-metric-value">—</strong>
                   <span class="sv2-usage-metric-label">Messages</span>
+                  <span id="sv2-message-detail" class="sv2-usage-metric-detail">In selected period</span>
                 </div>
                 <div class="sv2-usage-metric">
                   <strong id="sv2-conversation-count" class="sv2-usage-metric-value">—</strong>
                   <span class="sv2-usage-metric-label">Conversations</span>
+                  <span id="sv2-conversation-detail" class="sv2-usage-metric-detail">All-time total</span>
                 </div>
                 <div class="sv2-usage-metric">
                   <strong id="sv2-upload-count" class="sv2-usage-metric-value">—</strong>
                   <span class="sv2-usage-metric-label">Documents uploaded</span>
+                  <span id="sv2-upload-detail" class="sv2-usage-metric-detail">In selected period</span>
                 </div>
               </div>
 
@@ -471,7 +474,7 @@
                     <span class="sv2-usage-icon" data-usage-icon="shield" aria-hidden="true"></span>
                     <span>
                       <strong>Information redacted</strong>
-                      <span>Sensitive data LANA AI detected and removed before your conversation reached the AI model.</span>
+                      <span>Sensitive-data removal telemetry for AI requests.</span>
                     </span>
                   </span>
                   <strong id="sv2-redaction-total" class="sv2-usage-feature-total">—</strong>
@@ -486,7 +489,7 @@
                   <span class="sv2-usage-icon" data-usage-icon="shield-check" aria-hidden="true"></span>
                   <strong>Protect in research</strong>
                 </div>
-                <p>Of your research-mode messages (outside a matter), how often you turned Protect on.</p>
+                <p>Protection telemetry for research-mode messages outside a matter.</p>
                 <strong id="sv2-protect-percent" class="sv2-usage-protect-value">—</strong>
                 <p id="sv2-protect-detail">Protection detail is not available for this account.</p>
               </div>

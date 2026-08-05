@@ -31,6 +31,8 @@
   }
 
   function finiteNumber(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'string' && value.trim() === '') return null;
     var parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
@@ -60,7 +62,22 @@
     var bar = el(id);
     var number = finiteNumber(value);
     if (!bar) return;
-    bar.value = number === null ? 0 : Math.max(0, Math.min(100, number));
+    var hasValue = number !== null;
+    bar.hidden = !hasValue;
+    bar.value = hasValue ? Math.max(0, Math.min(100, number)) : 0;
+  }
+
+  function hasOwn(object, key) {
+    return !!object && Object.prototype.hasOwnProperty.call(object, key);
+  }
+
+  function firstOwnNumber(object, keys) {
+    for (var i = 0; i < keys.length; i++) {
+      if (!hasOwn(object, keys[i])) continue;
+      var value = finiteNumber(object[keys[i]]);
+      if (value !== null) return value;
+    }
+    return null;
   }
 
   function normalizeProductivity(response) {
@@ -73,19 +90,37 @@
     var chatQuota = root.chat_usage || root.chat_quota || {};
 
     return {
+      period: root.period || null,
+      periodStart: root.period_start || root.periodStart || null,
+      periodEnd: root.period_end || root.periodEnd || null,
       messages: firstNumber([root.messages, root.message_count, root.total_messages, root.total_messages_sent]),
       uploads: firstNumber([root.documents_uploaded, root.upload_count, root.total_documents_uploaded]),
       conversations: firstNumber([root.conversations, root.conversation_count, root.total_conversations]),
-      totalTokens: firstNumber([root.estimated_tokens, root.total_tokens, tokenRoot.total, tokenRoot.total_tokens]),
-      promptTokens: firstNumber([root.prompt_tokens, root.input_tokens, tokenRoot.prompt, tokenRoot.input_tokens]),
-      completionTokens: firstNumber([root.completion_tokens, root.output_tokens, tokenRoot.completion, tokenRoot.output_tokens]),
+      totalTokens: firstNumber([
+        firstOwnNumber(root, ['estimated_tokens', 'total_tokens']),
+        firstOwnNumber(tokenRoot, ['total', 'total_tokens'])
+      ]),
+      promptTokens: firstNumber([
+        firstOwnNumber(root, ['prompt_tokens', 'input_tokens']),
+        firstOwnNumber(tokenRoot, ['prompt', 'input_tokens'])
+      ]),
+      completionTokens: firstNumber([
+        firstOwnNumber(root, ['completion_tokens', 'output_tokens']),
+        firstOwnNumber(tokenRoot, ['completion', 'output_tokens'])
+      ]),
       chatPercent: firstNumber([chatQuota.percentage_used, chatQuota.usage_percent, chatQuota.percent]),
       chatDetail: chatQuota.detail || chatQuota.reset_detail || '',
-      redactionTotal: firstNumber([redactionRoot.total, root.redaction_total]),
+      redactionTotal: firstNumber([
+        firstOwnNumber(redactionRoot, ['total']),
+        firstOwnNumber(root, ['redaction_total'])
+      ]),
       redactionBreakdown: redactionRoot.breakdown || redactionRoot.entities || root.redaction_breakdown || null,
-      protectPercent: firstNumber([protectRoot.percentage, protectRoot.percent, root.protect_percentage]),
-      protectedMessages: firstNumber([protectRoot.protected, protectRoot.protected_messages]),
-      researchMessages: firstNumber([protectRoot.total, protectRoot.total_messages, protectRoot.research_messages])
+      protectPercent: firstNumber([
+        firstOwnNumber(protectRoot, ['percentage', 'percent']),
+        firstOwnNumber(root, ['protect_percentage'])
+      ]),
+      protectedMessages: firstOwnNumber(protectRoot, ['protected', 'protected_messages']),
+      researchMessages: firstOwnNumber(protectRoot, ['total', 'total_messages', 'research_messages'])
     };
   }
 
@@ -102,6 +137,7 @@
       used: used,
       total: total,
       percent: percent,
+      scope: root.usage_scope || root.scope || (root.user_id ? 'user' : (root.organization_id ? 'organization' : 'user')),
       usedFormatted: root.used_formatted || '',
       totalFormatted: root.total_formatted || ''
     };
@@ -111,7 +147,16 @@
     setText('sv2-redaction-total', formatCount(usage.redactionTotal));
     var container = el('sv2-redaction-breakdown');
     var breakdown = usage.redactionBreakdown;
-    if (!container || !breakdown || typeof breakdown !== 'object') return;
+    if (!container) return;
+
+    if (!breakdown || typeof breakdown !== 'object') {
+      container.textContent = '';
+      var unavailable = document.createElement('span');
+      unavailable.className = 'sv2-usage-unavailable';
+      unavailable.textContent = 'Redaction telemetry is not available for this account.';
+      container.appendChild(unavailable);
+      return;
+    }
 
     while (container.firstChild) container.removeChild(container.firstChild);
     var keys = Object.keys(breakdown);
@@ -142,6 +187,8 @@
     if (usage.protectedMessages !== null && usage.researchMessages !== null) {
       setText('sv2-protect-detail', formatCount(usage.protectedMessages) + ' of ' +
         formatCount(usage.researchMessages) + ' research messages protected');
+    } else {
+      setText('sv2-protect-detail', 'Protection telemetry is not available for this account.');
     }
   }
 
@@ -158,6 +205,12 @@
     setText('sv2-upload-count', formatCount(usage.uploads));
     setText('sv2-conversation-count', formatCount(conversationTotal));
     setText('sv2-estimated-tokens', formatCount(usage.totalTokens));
+    setText('sv2-message-detail', usage.period ? 'In selected period' : 'Recent activity');
+    setText('sv2-upload-detail', usage.period ? 'In selected period' : 'Recent activity');
+    setText('sv2-conversation-detail', usage.conversations === null && conversationTotal !== null
+      ? 'All-time total'
+      : 'In selected period');
+    setText('sv2-token-breakdown', 'Token detail unavailable');
 
     if (usage.promptTokens !== null || usage.completionTokens !== null) {
       setText('sv2-token-breakdown', formatCount(usage.promptTokens || 0) + ' prompt · ' +
@@ -168,6 +221,10 @@
       setText('sv2-chat-usage-percent', formatPercent(usage.chatPercent, 'used'));
       setProgress('sv2-chat-usage-bar', usage.chatPercent);
       if (usage.chatDetail) setText('sv2-chat-usage-detail', usage.chatDetail);
+    } else {
+      setText('sv2-chat-usage-percent', 'Not metered');
+      setText('sv2-chat-usage-detail', 'Your current plan does not report a chat limit.');
+      setProgress('sv2-chat-usage-bar', null);
     }
 
     renderRedaction(usage);
@@ -176,17 +233,21 @@
 
   function renderStorage() {
     var storage = normalizeStorage(state.storage);
+    var isOrganizationScope = storage.scope === 'organization';
+    setText('sv2-storage-label', isOrganizationScope ? 'Organization storage quota' : 'Your stored files');
     setText('sv2-storage-percent', storage.percent === null ? 'Not metered' : formatPercent(storage.percent, 'used'));
     setProgress('sv2-storage-bar', storage.percent);
 
     if (storage.usedFormatted && storage.totalFormatted) {
-      setText('sv2-storage-detail', storage.usedFormatted + ' of ' + storage.totalFormatted);
+      setText('sv2-storage-detail', storage.usedFormatted + ' of ' + storage.totalFormatted +
+        (isOrganizationScope ? ' used across your organization.' : ''));
     } else if (storage.usedFormatted) {
-      setText('sv2-storage-detail', storage.usedFormatted + ' used');
+      setText('sv2-storage-detail', storage.usedFormatted + ' used. Personal storage quota is not metered.');
     } else if (storage.used !== null && storage.total !== null) {
-      setText('sv2-storage-detail', formatCount(storage.used) + ' of ' + formatCount(storage.total) + ' bytes');
+      setText('sv2-storage-detail', formatCount(storage.used) + ' of ' + formatCount(storage.total) +
+        ' bytes' + (isOrganizationScope ? ' across your organization.' : ''));
     } else if (storage.used !== null) {
-      setText('sv2-storage-detail', formatCount(storage.used) + ' bytes used');
+      setText('sv2-storage-detail', formatCount(storage.used) + ' bytes used. Personal storage quota is not metered.');
     } else {
       setText('sv2-storage-detail', 'Storage usage unavailable');
     }
