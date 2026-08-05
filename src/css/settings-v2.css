@@ -233,11 +233,19 @@
 .sv2-sessions-summary-copy {
   flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
+  align-self: stretch;
   text-align: left;
 }
 
 .sv2-sessions-summary-copy lex-text {
   display: block;
+  width: 100%;
+  text-align: left;
+}
+
+.sv2-sessions-summary-copy lex-text .lex-text-inner {
+  justify-content: flex-start;
 }
 
 .sv2-sessions-summary lex-btn {

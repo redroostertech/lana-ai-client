@@ -60,8 +60,8 @@
         position: relative;
         width: 100%;
         max-height: calc(100vh - 32px);
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
         background: var(--lex-bg-primary);
         border-radius: var(--lex-radius-xl, 12px);
         box-shadow: var(--lex-shadow-xl, 0 20px 60px rgba(0,0,0,0.15));
@@ -101,12 +101,13 @@
       /* ── Header ──────────────────────────────────────── */
 
       .lex-modal-header {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
         align-items: center;
-        justify-content: space-between;
+        gap: 8px;
         padding: 16px 20px;
         border-bottom: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
-        flex-shrink: 0;
+        min-width: 0;
       }
 
       .lex-modal-panel--full .lex-modal-header {
@@ -118,14 +119,13 @@
         align-items: center;
         min-width: 0;
         gap: 8px;
-        flex: 1 1 auto;
       }
 
       .lex-modal-header-actions {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        flex: 0 0 auto;
+        justify-content: flex-end;
       }
 
       .lex-modal-title {
@@ -173,7 +173,7 @@
 
       .lex-modal-body {
         padding: 20px;
-        flex: 1;
+        min-height: 0;
         overflow-y: auto;
       }
 
@@ -197,7 +197,7 @@
         padding: 12px 20px;
         border-top: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
         background: var(--lex-bg-secondary);
-        flex-shrink: 0;
+        min-width: 0;
       }
 
       .lex-modal-panel--full .lex-modal-footer {
