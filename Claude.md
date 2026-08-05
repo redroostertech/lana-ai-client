@@ -1,19 +1,19 @@
 # Claude.md
 
-Guidance for agents working in **`lana-ai-client`**, the **Electron** desktop app (renderer + shell). For full-stack or cross-package context, read the workspace root **`../Claude.md`**. Backend-only rules live in **`../LANA-AI/CLAUDE.md`** and **`../LANA-AI/ARCHITECTURE.md`**.
+Guidance for agents working in **`lana-client`**, the **Electron** desktop app (renderer + shell). Backend-only rules live in **`../lana-ai-chef/AGENTS.md`** and **`../lana-ai-chef/ARCHITECTURE.md`**.
 
 ---
 
-## Relationship to `LANA-AI`
+## Relationship to `lana-ai-chef`
 
 | Package | Role |
 |---------|------|
-| **`LANA-AI/`** | Backend and platform: authoritative business logic, auth, APIs, persistence. **System of record.** |
-| **`lana-ai-client/`** (this repo) | Client: UI, local integration, and thin application wiring. **Not** the place for complex domain rules that belong on the server. |
+| **`lana-ai-chef/`** | Backend and platform: authoritative business logic, auth, APIs, persistence. **System of record.** |
+| **`lana-client/`** (this repo) | Client: UI, local integration, and thin application wiring. **Not** the place for complex domain rules that belong on the server. |
 
 The client is built for **multi-platform** distribution like the backend; keep configuration env-driven and paths portable.
 
-When a workflow needs the **backend API or workers recycled** after server-side changes, prefer telling operators to run **`lana restart`** from the **Lana CLI** ([`../LANA-AI/infra/lana-ctl.js`](../LANA-AI/infra/lana-ctl.js)) rather than ad-hoc **`pm2`** commands. See **`../LANA-AI/CLAUDE.md`** for context.
+When a workflow needs the **backend API or workers recycled** after server-side changes, prefer telling operators to run **`lana restart`** from the **Lana CLI** ([`../lana-ai-chef/infra/lana-ctl.js`](../lana-ai-chef/infra/lana-ctl.js)) rather than ad-hoc **`pm2`** commands. See **`../lana-ai-chef/AGENTS.md`** for context.
 
 ---
 
@@ -21,13 +21,14 @@ When a workflow needs the **backend API or workers recycled** after server-side 
 
 - Treat the renderer as **presentation-first**. The backend API is the **first line of defense**; the client should receive **stable, purpose-shaped** payloads and focus on rendering and light adaptation.
 - The **application layer** here is for orchestration, **mapping** DTOs to view needs, and combining data when **multiple** services or sources are involved—not for re-implementing backend validation or business rules.
-- Security- and business-critical rules must be enforced in **`LANA-AI`**, not only in the client.
+- Security- and business-critical rules must be enforced in **`lana-ai-chef`**, not only in the client.
 
 ---
 
 ## Lex UI and front-end structure
 
 - **All product UI should use the Lex UI framework** under `src/js/lex/`. Authoritative reference: **`src/js/lex/LEX-COMPONENT-RULES.md`**.
+- Dropdown styling standards are mirrored for Codex at **`.codex/references/DROPDOWN-STANDARDS.md`**.
 - **No inline styles** for product UI; use **dedicated CSS files** (alongside the feature or page, following existing layout conventions).
 - **Page hygiene:** each standalone HTML page should have a **corresponding `.js` and `.css` file** so HTML stays structural only—markup, behavior, and presentation stay separated.
 
@@ -36,7 +37,7 @@ When a workflow needs the **backend API or workers recycled** after server-side 
 ## Reuse before adding code
 
 1. Search **`src/js/lex/`**, **`src/js/`**, and existing HTML/CSS pairs for the same pattern or component.
-2. If the change depends on new server behavior or contracts, check **`../LANA-AI`** for an existing route, service, or DTO before inventing parallel client-only logic.
+2. If the change depends on new server behavior or contracts, check **`../lana-ai-chef`** for an existing route, service, or DTO before inventing parallel client-only logic.
 3. Prefer **extending** shared client modules and Lex primitives over duplicating markup or helpers.
 
 ---
@@ -58,8 +59,8 @@ Stack: **Jest** (see `package.json` scripts). Typical commands from the client r
 
 **Hitting the LANA API (contract smoke)**
 
-- When verifying endpoints against **`LANA-AI`**, follow that repo’s preference: **`curl`** plus **`../LANA-AI/scripts/dev/get-token.sh`** for JWT-backed routes (`Authorization: Bearer $TOKEN`). Details: **`../LANA-AI/CLAUDE.md`**.
-- This package may still ship **Newman** helpers under **`tests/run-api-tests.sh`** / **`tests/README.md`** for optional scripted suites; they do not replace **`LANA-AI`**’s **`curl`** + **`get-token.sh`** workflow for day-to-day API checks in the backend repo.
+- When verifying endpoints against **`lana-ai-chef`**, follow that repo’s preference: **`curl`** plus **`../lana-ai-chef/scripts/dev/get-token.sh`** for JWT-backed routes (`Authorization: Bearer $TOKEN`). Details: **`../lana-ai-chef/AGENTS.md`**.
+- This package may still ship **Newman** helpers under **`tests/run-api-tests.sh`** / **`tests/README.md`** for optional scripted suites; they do not replace **`lana-ai-chef`**’s **`curl`** + **`get-token.sh`** workflow for day-to-day API checks in the backend repo.
 
 When fixing a bug, add a **regression test** at the lowest layer that would have caught it.
 
@@ -67,7 +68,7 @@ When fixing a bug, add a **regression test** at the lowest layer that would have
 
 ## Quick checklist
 
-- [ ] Could this logic live in **`LANA-AI`** instead? If yes, put it there.
+- [ ] Could this logic live in **`lana-ai-chef`** instead? If yes, put it there.
 - [ ] UI built with **Lex** and **external CSS** (no inline styling)?
 - [ ] New page has matching **`.js` + `.css`**?
 - [ ] Confirmed no existing Lex component or module already covers this?
