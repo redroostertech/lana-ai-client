@@ -153,6 +153,53 @@
   display: none !important;
 }
 
+/* ── Preferences ─────────────────────────────────────────────────── */
+
+.sv2-preference-row {
+  min-height: 56px;
+  padding: 16px 0;
+}
+
+.sv2-preference-row:first-child {
+  padding-top: 4px;
+}
+
+.sv2-preference-row:last-child {
+  padding-bottom: 4px;
+}
+
+.sv2-preference-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+
+.sv2-preference-row lex-toggle {
+  flex: 0 0 auto;
+  justify-self: end;
+}
+
+.sv2-in-app-types {
+  margin-top: 4px;
+  padding-left: 16px;
+  border-left: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-notification-type-row {
+  min-height: 48px;
+  padding: 12px 0;
+}
+
+.sv2-notification-type-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+
+.sv2-notification-type-row lex-toggle {
+  flex: 0 0 auto;
+}
+
 
 /* ── Profile Edit Mode ───────────────────────────────────────────── */
 

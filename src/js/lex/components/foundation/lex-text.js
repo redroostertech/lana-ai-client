@@ -42,7 +42,19 @@
     style.id = 'lex-text-styles';
     style.textContent = `
       lex-text {
-        display: contents;
+        display: inline-block;
+        max-width: 100%;
+        vertical-align: baseline;
+      }
+      lex-text[tag="p"],
+      lex-text[tag="div"],
+      lex-text[tag="h1"],
+      lex-text[tag="h2"],
+      lex-text[tag="h3"],
+      lex-text[tag="h4"],
+      lex-text[tag="h5"],
+      lex-text[tag="h6"] {
+        display: block;
       }
       lex-text .lex-text-inner {
         display: inline-flex;

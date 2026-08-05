@@ -4,7 +4,7 @@
 
      Profile     — view/edit user name, email, role, org
      Security    — password change (live validation) + MFA (conditional)
-     Preferences — email notifications, dark mode toggles (conditional)
+     Preferences — desktop and in-app notification toggles (conditional)
      Sessions    — active session list, revoke individual/all
      VPN         — VPN status, config download, setup/reset (Electron only)
 
@@ -21,6 +21,8 @@
   // =========================================================================
 
   var _profileData = null;
+  var _notificationPreferences = null;
+  var _notificationTypes = [];
 
   // Password requirement special characters
   var PW_SPECIALS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
@@ -84,10 +86,9 @@
     dom.tzCurrent      = document.getElementById('sv2-tz-current');
 
     // Preferences
-    dom.prefEmail = document.getElementById('sv2-pref-email');
     dom.prefPush  = document.getElementById('sv2-pref-push');
     dom.prefInApp = document.getElementById('sv2-pref-in-app');
-    dom.prefDark  = document.getElementById('sv2-pref-dark');
+    dom.inAppTypes = document.getElementById('sv2-in-app-types');
 
     // Sessions
     dom.sessionsCard      = document.getElementById('sv2-sessions-card');
@@ -126,10 +127,7 @@
   // =========================================================================
 
   function showConditionalSections() {
-    // Preferences — user preferences are flag-gated, notification preferences are server-gated.
-    if (window.LanaConfig && window.LanaConfig.USER_PREFERENCES_EDIT_ENABLED === true) {
-      if (dom.preferencesSection) dom.preferencesSection.classList.remove('sv2-hidden');
-    }
+    // Preferences are server-gated by the notification preferences API.
     loadPreferences();
   }
 
@@ -715,42 +713,101 @@
   // =========================================================================
 
   function loadPreferences() {
-    var showed = false;
-
-    if (api && typeof api.getNotificationPreferences === 'function') {
-      api.getNotificationPreferences().then(function (result) {
-        var prefs = result.preferences || {};
-        showed = true;
-        if (dom.preferencesSection) dom.preferencesSection.classList.remove('sv2-hidden');
-        if (dom.prefEmail) dom.prefEmail.checked = prefs.email_enabled !== false;
-        if (dom.prefPush) dom.prefPush.checked = prefs.push_enabled !== false;
-        if (dom.prefInApp) dom.prefInApp.checked = prefs.in_app_enabled !== false;
-      }).catch(function (error) {
-        console.warn('[Settings V2] Failed to load notification preferences:', error);
-      });
+    if (!api || typeof api.getNotificationPreferences !== 'function') {
+      if (dom.preferencesSection) dom.preferencesSection.classList.add('sv2-hidden');
+      return;
     }
 
-    api.getPreferences().then(function (result) {
+    api.getNotificationPreferences().then(function (result) {
       var prefs = result.preferences || {};
-      if (window.LanaConfig && window.LanaConfig.USER_PREFERENCES_EDIT_ENABLED === true) {
-        showed = true;
-        if (dom.preferencesSection) dom.preferencesSection.classList.remove('sv2-hidden');
+      _notificationPreferences = prefs;
+      if (dom.preferencesSection) dom.preferencesSection.classList.remove('sv2-hidden');
+      if (dom.prefPush) dom.prefPush.checked = prefs.push_enabled !== false;
+      if (dom.prefInApp) dom.prefInApp.checked = prefs.in_app_enabled !== false;
+      renderInAppNotificationTypes();
+
+      if (api && typeof api.getNotificationTypes === 'function') {
+        api.getNotificationTypes().then(function (typesResult) {
+          _notificationTypes = normalizeNotificationTypes(typesResult);
+          renderInAppNotificationTypes();
+        }).catch(function (error) {
+          _notificationTypes = [];
+          renderInAppNotificationTypes();
+          console.warn('[Settings V2] Failed to load notification types:', error);
+        });
       }
-      if (dom.prefDark) dom.prefDark.checked = prefs.dark_mode === true;
+      return null;
     }).catch(function (error) {
-      // Silently fail — preferences will show default state
-      console.warn('[Settings V2] Failed to load preferences:', error);
-    }).finally(function () {
-      if (!showed && dom.preferencesSection && !(window.LanaConfig && window.LanaConfig.USER_PREFERENCES_EDIT_ENABLED === true)) {
-        dom.preferencesSection.classList.add('sv2-hidden');
-      }
+      if (dom.preferencesSection) dom.preferencesSection.classList.add('sv2-hidden');
+      console.warn('[Settings V2] Failed to load notification preferences:', error);
     });
+  }
+
+  function normalizeNotificationTypes(result) {
+    var root = result && (result.data || result);
+    return Array.isArray(root && root.types) ? root.types : [];
+  }
+
+  function humanizeNotificationType(type) {
+    var parts = String(type || '').split('_');
+    for (var i = 0; i < parts.length; i++) {
+      if (!parts[i]) continue;
+      parts[i] = parts[i].charAt(0).toUpperCase() + parts[i].slice(1);
+    }
+    return parts.join(' ');
+  }
+
+  function renderInAppNotificationTypes() {
+    if (!dom.inAppTypes) return;
+    var prefs = _notificationPreferences || {};
+    var perTypePrefs = prefs.notification_types || {};
+    var rows = [];
+
+    for (var i = 0; i < _notificationTypes.length; i++) {
+      var type = _notificationTypes[i];
+      var channels = type.channels || {};
+      if (type.preference_gated === false || channels.in_app === false) continue;
+      rows.push(type);
+    }
+
+    if (!rows.length) {
+      dom.inAppTypes.classList.add('sv2-hidden');
+      dom.inAppTypes.innerHTML = '';
+      return;
+    }
+
+    var html = '';
+    for (var j = 0; j < rows.length; j++) {
+      var row = rows[j];
+      var typeName = row.type || '';
+      var typePrefs = perTypePrefs[typeName] || {};
+      var checked = typePrefs.in_app !== false;
+      html +=
+        '<lex-stack class="sv2-notification-type-row" direction="horizontal" gap="4" justify="between" align="center">' +
+          '<lex-stack class="sv2-notification-type-copy" direction="vertical" gap="1">' +
+            '<lex-text variant="primary" size="body-sm" weight="medium">' + esc(humanizeNotificationType(typeName)) + '</lex-text>' +
+            '<lex-text variant="tertiary" size="body-xs">' + esc(row.description || '') + '</lex-text>' +
+          '</lex-stack>' +
+          '<lex-toggle class="sv2-in-app-type-toggle" name="in_app_' + esc(typeName) + '" data-notification-type="' + esc(typeName) + '"' + (checked ? ' checked' : '') + '></lex-toggle>' +
+        '</lex-stack>';
+    }
+
+    dom.inAppTypes.innerHTML = html;
+    dom.inAppTypes.classList.remove('sv2-hidden');
+
+    var toggles = dom.inAppTypes.querySelectorAll('.sv2-in-app-type-toggle');
+    for (var k = 0; k < toggles.length; k++) {
+      toggles[k].checked = toggles[k].hasAttribute('checked');
+      toggles[k].addEventListener('lex-change', handleInAppTypePreferenceChange);
+    }
   }
 
   function handleNotificationPreferenceChange(key, value) {
     var body = {};
     body[key] = value === true;
     api.updateNotificationPreferences(body).then(function () {
+      if (_notificationPreferences) _notificationPreferences[key] = value === true;
+      renderInAppNotificationTypes();
       Lex.Toast.success('Preference saved');
     }).catch(function (error) {
       Lex.Toast.error(error.message || 'Failed to save notification preference');
@@ -758,14 +815,29 @@
     });
   }
 
-  function handlePreferenceChange(key, value) {
-    api.updatePreference(key, value).then(function () {
+  function handleInAppTypePreferenceChange(e) {
+    var toggle = e.currentTarget;
+    var type = toggle && toggle.getAttribute('data-notification-type');
+    if (!type) return;
+
+    var enabled = e.detail && e.detail.value === true;
+    var body = { notification_types: {} };
+    body.notification_types[type] = { in_app: enabled };
+
+    api.updateNotificationPreferences(body).then(function () {
+      _notificationPreferences = _notificationPreferences || {};
+      _notificationPreferences.notification_types = _notificationPreferences.notification_types || {};
+      _notificationPreferences.notification_types[type] = Object.assign(
+        {},
+        _notificationPreferences.notification_types[type] || {},
+        { in_app: enabled }
+      );
       Lex.Toast.success('Preference saved');
     }).catch(function (error) {
-      Lex.Toast.error(error.message || 'Failed to save preference');
+      Lex.Toast.error(error.message || 'Failed to save notification type preference');
+      loadPreferences();
     });
   }
-
 
   // =========================================================================
   // Sessions
@@ -1653,11 +1725,6 @@
     }
 
     // ── Preferences ──
-    if (dom.prefEmail) {
-      dom.prefEmail.addEventListener('lex-change', function (e) {
-        handleNotificationPreferenceChange('email_enabled', e.detail.value);
-      });
-    }
     if (dom.prefPush) {
       dom.prefPush.addEventListener('lex-change', function (e) {
         handleNotificationPreferenceChange('push_enabled', e.detail.value);
@@ -1666,11 +1733,6 @@
     if (dom.prefInApp) {
       dom.prefInApp.addEventListener('lex-change', function (e) {
         handleNotificationPreferenceChange('in_app_enabled', e.detail.value);
-      });
-    }
-    if (dom.prefDark) {
-      dom.prefDark.addEventListener('lex-change', function (e) {
-        handlePreferenceChange('dark_mode', e.detail.value);
       });
     }
 

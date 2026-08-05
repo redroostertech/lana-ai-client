@@ -290,40 +290,24 @@
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-preferences" class="sv2-hidden" style="margin-bottom:0.5rem">
         <lex-card heading="Preferences" subtitle="Customize your experience">
-          <lex-stack direction="vertical" gap="5" divider="true">
-
-            <lex-stack direction="horizontal" gap="4" justify="between" align="center">
-              <lex-stack direction="vertical" gap="1">
-                <lex-text variant="primary" size="body" weight="medium">Email notifications</lex-text>
-                <lex-text variant="tertiary" size="body-sm">Receive notification emails when the server sends them</lex-text>
-              </lex-stack>
-              <lex-toggle id="sv2-pref-email" name="email_notifications"></lex-toggle>
-            </lex-stack>
-
-            <lex-stack direction="horizontal" gap="4" justify="between" align="center">
-              <lex-stack direction="vertical" gap="1">
+          <lex-stack direction="vertical" gap="0" divider="true">
+            <lex-stack class="sv2-preference-row" direction="horizontal" gap="4" justify="between" align="center">
+              <lex-stack class="sv2-preference-copy" direction="vertical" gap="1">
                 <lex-text variant="primary" size="body" weight="medium">Desktop notifications</lex-text>
                 <lex-text variant="tertiary" size="body-sm">Allow push notifications on devices where notifications are enabled</lex-text>
               </lex-stack>
               <lex-toggle id="sv2-pref-push" name="push_notifications"></lex-toggle>
             </lex-stack>
 
-            <lex-stack direction="horizontal" gap="4" justify="between" align="center">
-              <lex-stack direction="vertical" gap="1">
+            <lex-stack class="sv2-preference-row" direction="horizontal" gap="4" justify="between" align="center">
+              <lex-stack class="sv2-preference-copy" direction="vertical" gap="1">
                 <lex-text variant="primary" size="body" weight="medium">In-app notifications</lex-text>
                 <lex-text variant="tertiary" size="body-sm">Show notifications inside LANA AI</lex-text>
               </lex-stack>
               <lex-toggle id="sv2-pref-in-app" name="in_app_notifications"></lex-toggle>
             </lex-stack>
 
-            <lex-stack direction="horizontal" gap="4" justify="between" align="center">
-              <lex-stack direction="vertical" gap="1">
-                <lex-text variant="primary" size="body" weight="medium">Dark Mode</lex-text>
-                <lex-text variant="tertiary" size="body-sm">Use dark theme for the interface</lex-text>
-              </lex-stack>
-              <lex-toggle id="sv2-pref-dark" name="dark_mode"></lex-toggle>
-            </lex-stack>
-
+            <lex-stack id="sv2-in-app-types" class="sv2-in-app-types sv2-hidden" direction="vertical" gap="0" divider="true"></lex-stack>
           </lex-stack>
         </lex-card>
       </section>
