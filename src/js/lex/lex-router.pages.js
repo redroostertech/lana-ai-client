@@ -168,14 +168,6 @@
       ]
     },
 
-    // ── Settings ──
-    'settings.html': {
-      title: 'Settings',
-      activeNav: 'settings',
-      scripts: [],
-      stylesheets: []
-    },
-
     // ── Settings V2 ── (standalone page — no descriptor needed)
 
     // ── Help & Support ──

@@ -18,7 +18,7 @@
      sidebar.version = '4.0.0';
      sidebar.userMenuItems = [
        { id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' },
-       { id: 'settings', label: 'Settings', icon: 'settings', href: 'settings.html' },
+       { id: 'settings', label: 'Settings', icon: 'settings', href: 'settings-v2.html' },
        { id: 'signout', label: 'Sign Out', icon: 'log-out', action: 'signout', danger: true }
      ];
 

@@ -198,7 +198,7 @@ const MenuConfig = {
             icon: 'users',
             requiredRoles: ADMIN_ROLES
           },
-          { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'settings', label: 'Settings', href: '/settings-v2.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
@@ -312,7 +312,7 @@ const MenuConfig = {
             icon: 'users',
             requiredRoles: ADMIN_ROLES
           },
-          { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'settings', label: 'Settings', href: '/settings-v2.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
@@ -376,7 +376,7 @@ const MenuConfig = {
             icon: 'users',
             requiredRoles: ADMIN_ROLES
           },
-          { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'settings', label: 'Settings', href: '/settings-v2.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
@@ -440,7 +440,7 @@ const MenuConfig = {
             icon: 'users',
             requiredRoles: ADMIN_ROLES
           },
-          { id: 'settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'settings', label: 'Settings', href: '/settings-v2.html', icon: 'settings' },
           { id: 'help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
@@ -507,7 +507,7 @@ const MenuConfig = {
             icon: 'users',
             requiredRoles: ADMIN_ROLES
           },
-          { id: 'chat-settings', label: 'Settings', href: '/settings.html', icon: 'settings' },
+          { id: 'chat-settings', label: 'Settings', href: '/settings-v2.html', icon: 'settings' },
           { id: 'chat-help', label: 'Help & Support', href: '/help.html', icon: 'help' },
         ]
       }
@@ -957,7 +957,7 @@ class MenuSystem {
       const showAdmin = this.hasRole(ADMIN_ROLES);
       const isAdminPath = (this.currentPath || '').toLowerCase().includes('/admin/');
       const adminHref = this._resolveHref('/admin/index.html');
-      const settingsHref = this._resolveHref('/settings.html');
+      const settingsHref = this._resolveHref('/settings-v2.html');
       const helpHref = this._resolveHref('/help.html');
       const portalHref = this._resolveHref('/dashboard.html');
 
