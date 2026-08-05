@@ -2422,26 +2422,35 @@
     }
 
     _groupTasks(tasks) {
-      const order = [];
       const groups = {};
       tasks.forEach((task) => {
         const priority = this._getTaskPriorityLabel(task);
-        const due = this._getTaskDueBucket(task);
-        const key = priority.label + '|' + due.label;
+        const key = priority.key;
         if (!groups[key]) {
           groups[key] = {
-            label: priority.label + ' Priority · ' + due.label,
+            label: priority.label + ' Priority',
             priorityKey: priority.key,
-            rank: priority.rank + due.rank,
+            rank: priority.rank,
             items: []
           };
-          order.push(key);
         }
         groups[key].items.push(task);
       });
-      return order
-        .map((key) => groups[key])
+      return Object.keys(groups)
+        .map((key) => {
+          groups[key].items.sort((a, b) => this._compareSidebarTasks(a, b));
+          return groups[key];
+        })
         .sort((a, b) => a.rank - b.rank);
+    }
+
+    _compareSidebarTasks(a, b) {
+      const aDue = this._getTaskDueBucket(a);
+      const bDue = this._getTaskDueBucket(b);
+      if (aDue.rank !== bDue.rank) return aDue.rank - bDue.rank;
+      const aTime = new Date(a?.updated_at || a?.created_at || a?.due_date || 0).getTime();
+      const bTime = new Date(b?.updated_at || b?.created_at || b?.due_date || 0).getTime();
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
     }
 
     _getTaskPriorityLabel(task) {
@@ -2480,7 +2489,8 @@
       const titleParts = this._splitTaskTitle(title);
       const displayTitle = this._truncateTaskTitle(titleParts.taskTitle);
       const matter = this._getTaskMatterName(task);
-      const meta = matter || titleParts.matterName;
+      const due = this._getTaskDueBucket(task);
+      const meta = [matter || titleParts.matterName, due.label].filter(Boolean).join(' · ');
       return `<button type="button" class="lex-sidebar-task-item" data-task-id="${this.escapeHtml(id)}" title="${this.escapeHtml(title)}">
         <span class="lex-sidebar-task-icon">${icon('clipboard-check', 'small')}</span>
         <span class="lex-sidebar-task-copy">
