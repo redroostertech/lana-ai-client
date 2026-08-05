@@ -1769,6 +1769,20 @@
     return parts.join(' • ');
   }
 
+  function formatToolLabel(value) {
+    return String(value || 'Tool')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(' ')
+      .map(function (word) {
+        if (!word) return '';
+        if (word.length <= 3 && word === word.toUpperCase()) return word;
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      })
+      .join(' ');
+  }
+
   function renderToolCapabilities(row) {
     var caps = row && row.tool_capabilities ? row.tool_capabilities : {};
     var tools = Array.isArray(caps.tools) ? caps.tools : [];
@@ -1780,7 +1794,7 @@
     for (var i = 0; i < tools.length; i++) {
       var tool = tools[i] || {};
       html += '<span class="sv2-connection-tool-chip" title="' + esc(tool.description || tool.key || '') + '">' +
-        esc(tool.label || tool.key || 'Tool') +
+        esc(formatToolLabel(tool.label || tool.key)) +
       '</span>';
     }
     html += '</div>';
