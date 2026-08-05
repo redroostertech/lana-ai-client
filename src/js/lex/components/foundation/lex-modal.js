@@ -60,9 +60,8 @@
         position: relative;
         width: 100%;
         max-height: calc(100vh - 32px);
-        display: grid;
-        grid-template-rows: auto minmax(0, 1fr) auto;
-        grid-template-columns: minmax(0, 1fr);
+        display: flex !important;
+        flex-direction: column !important;
         background: var(--lex-bg-primary);
         border-radius: var(--lex-radius-xl, 12px);
         box-shadow: var(--lex-shadow-xl, 0 20px 60px rgba(0,0,0,0.15));
@@ -102,12 +101,11 @@
       /* ── Header ──────────────────────────────────────── */
 
       .lex-modal-header {
-        grid-row: 1;
-        grid-column: 1;
         display: flex;
         align-items: center;
         gap: 8px;
         justify-content: flex-start;
+        flex: 0 0 auto;
         padding: 16px 20px;
         border-bottom: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
         min-width: 0;
@@ -177,8 +175,7 @@
       /* ── Body ────────────────────────────────────────── */
 
       .lex-modal-body {
-        grid-row: 2;
-        grid-column: 1;
+        flex: 1 1 auto;
         padding: 20px;
         min-width: 0;
         min-height: 0;
@@ -186,7 +183,7 @@
       }
 
       .lex-modal-body > slot-content {
-        display: block;
+        display: block !important;
         min-width: 0;
         min-height: 0;
       }
@@ -204,11 +201,10 @@
       /* ── Footer / Actions ────────────────────────────── */
 
       .lex-modal-footer {
-        grid-row: 3;
-        grid-column: 1;
         display: flex;
         align-items: center;
         justify-content: flex-end;
+        flex: 0 0 auto;
         gap: 8px;
         padding: 12px 20px;
         border-top: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));
