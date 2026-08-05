@@ -232,6 +232,11 @@ let mainWindow;
 let screenVoice = null;
 let capabilityPreferencesStore = null;
 
+function isLanaOneEdition() {
+  const raw = process.env.LANA_ONE_EDITION || process.env.LANA_ONE || '';
+  return raw === '1' || raw.toLowerCase() === 'true';
+}
+
 function getCapabilityPreferencesStore() {
   if (!capabilityPreferencesStore) {
     capabilityPreferencesStore = new Store({
@@ -918,7 +923,8 @@ ipcMain.handle('get-config', async () => {
     appVersion: getAppVersion(),
     platform: process.platform,
     arch: process.arch,
-    isDevelopment: process.env.NODE_ENV === 'development'
+    isDevelopment: process.env.NODE_ENV === 'development',
+    isLanaOne: isLanaOneEdition()
   };
 });
 

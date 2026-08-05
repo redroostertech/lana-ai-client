@@ -176,13 +176,17 @@
 
   function renderStorage() {
     var storage = normalizeStorage(state.storage);
-    setText('sv2-storage-percent', formatPercent(storage.percent, 'used'));
+    setText('sv2-storage-percent', storage.percent === null ? 'Not metered' : formatPercent(storage.percent, 'used'));
     setProgress('sv2-storage-bar', storage.percent);
 
     if (storage.usedFormatted && storage.totalFormatted) {
       setText('sv2-storage-detail', storage.usedFormatted + ' of ' + storage.totalFormatted);
+    } else if (storage.usedFormatted) {
+      setText('sv2-storage-detail', storage.usedFormatted + ' used');
     } else if (storage.used !== null && storage.total !== null) {
       setText('sv2-storage-detail', formatCount(storage.used) + ' of ' + formatCount(storage.total) + ' bytes');
+    } else if (storage.used !== null) {
+      setText('sv2-storage-detail', formatCount(storage.used) + ' bytes used');
     } else {
       setText('sv2-storage-detail', 'Storage usage unavailable');
     }

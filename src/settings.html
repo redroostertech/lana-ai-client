@@ -877,9 +877,12 @@
     }
 
     async function disableMfa() {
-      Modal.confirm('Disable MFA', 'Are you sure you want to disable two-factor authentication? This will make your account less secure.', async () => {
+      const password = window.prompt('Enter your password to disable multi-factor authentication:');
+      if (!password) return;
+
+      Modal.confirm('Disable MFA', 'This will make your account less secure. Continue?', async () => {
         try {
-          await api.disableMfa();
+          await api.disableMfa(password);
           Toast.success('MFA disabled');
           loadMfaStatus();
         } catch (error) {
@@ -1100,7 +1103,16 @@
 
     // Initialize
     loadProfile();
-    loadMfaStatus();
+    if (api && typeof api.getSystemConfig === 'function') {
+      api.getSystemConfig().then((result) => {
+        if (typeof api.applyRuntimeConfig === 'function') api.applyRuntimeConfig(result);
+      }).catch(() => {
+        if (window.LanaConfig) window.LanaConfig.MFA_ENABLED = false;
+        if (api && api.config) api.config.MFA_ENABLED = false;
+      }).finally(loadMfaStatus);
+    } else {
+      loadMfaStatus();
+    }
     loadPreferences();
     loadSessions();
     loadVpnStatus();

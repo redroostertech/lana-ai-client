@@ -85,6 +85,8 @@
 
     // Preferences
     dom.prefEmail = document.getElementById('sv2-pref-email');
+    dom.prefPush  = document.getElementById('sv2-pref-push');
+    dom.prefInApp = document.getElementById('sv2-pref-in-app');
     dom.prefDark  = document.getElementById('sv2-pref-dark');
 
     // Sessions
@@ -99,6 +101,13 @@
     // Connected Apps (bridge consents)
     dom.connectedAppsSection = document.getElementById('sv2-section-connected-apps');
     dom.connectedAppsContent = document.getElementById('sv2-connected-apps-content');
+
+    // Plugins / user connector connections
+    dom.pluginsTab = document.getElementById('sv2-tab-plugins');
+    dom.pluginsPanel = document.getElementById('sv2-panel-plugins');
+    dom.userConnectionsSection = document.getElementById('sv2-section-user-connections');
+    dom.userConnectionsContent = document.getElementById('sv2-user-connections-content');
+    dom.userConnectionsStatus = document.getElementById('sv2-user-connections-status');
   }
 
 
@@ -117,11 +126,11 @@
   // =========================================================================
 
   function showConditionalSections() {
-    // Preferences — only if enabled in config
+    // Preferences — user preferences are flag-gated, notification preferences are server-gated.
     if (window.LanaConfig && window.LanaConfig.USER_PREFERENCES_EDIT_ENABLED === true) {
       if (dom.preferencesSection) dom.preferencesSection.classList.remove('sv2-hidden');
-      loadPreferences();
     }
+    loadPreferences();
   }
 
 
@@ -405,7 +414,13 @@
   function loadMfaStatus() {
     if (!dom.mfaSection) return;
     if (!api.isMfaEnabled()) {
-      dom.mfaSection.innerHTML = '';
+      dom.mfaSection.innerHTML =
+        '<lex-card heading="Two-Factor Authentication">' +
+          '<div class="sv2-mfa-header">' +
+            '<lex-text variant="secondary" size="body-sm">Two-factor authentication is not available for this deployment</lex-text>' +
+            '<lex-badge label="Unavailable" color="gray" size="sm"></lex-badge>' +
+          '</div>' +
+        '</lex-card>';
       return;
     }
 
@@ -467,7 +482,7 @@
   function enableMfa() {
     api.setupMfa().then(function (result) {
       var content = document.createElement('div');
-      content.style.textContent = 'center';
+      content.style.textAlign = 'center';
       content.innerHTML =
         '<p style="margin-bottom:16px;font-size:var(--lex-body-sm-size);color:var(--lex-text-secondary);">Scan this QR code with your authenticator app:</p>' +
         '<img src="' + esc(result.qr_code) + '" alt="MFA QR Code" style="display:block;margin:0 auto 16px;max-width:200px;">' +
@@ -516,20 +531,57 @@
   }
 
   function disableMfa() {
-    Lex.Modal.confirm({
+    var content = document.createElement('div');
+    content.innerHTML =
+      '<p class="sv2-modal-copy">Confirm your account password to disable two-factor authentication.</p>' +
+      '<lex-input id="sv2-mfa-disable-password" label="Password" type="password" required="true"></lex-input>' +
+      '<div class="sv2-form-actions">' +
+        '<lex-btn id="sv2-mfa-disable-confirm-btn" variant="danger" size="sm">Disable MFA</lex-btn>' +
+        '<lex-btn id="sv2-mfa-disable-cancel-btn" variant="ghost" size="sm">Cancel</lex-btn>' +
+      '</div>';
+
+    var modal = Lex.Modal.open({
       heading: 'Disable MFA',
-      body: 'Are you sure you want to disable two-factor authentication? This will make your account less secure.',
-      variant: 'danger',
-      confirmText: 'Disable MFA'
-    }).then(function (confirmed) {
-      if (!confirmed) return;
-      api.disableMfa().then(function () {
-        Lex.Toast.success('MFA disabled');
-        loadMfaStatus();
-      }).catch(function (error) {
-        Lex.Toast.error(error.message || 'Failed to disable MFA');
-      });
+      content: content,
+      hideActions: true,
+      size: 'sm',
+      closeOnOverlay: true
     });
+
+    setTimeout(function () {
+      var passwordInput = document.getElementById('sv2-mfa-disable-password');
+      var confirmBtn = document.getElementById('sv2-mfa-disable-confirm-btn');
+      var cancelBtn = document.getElementById('sv2-mfa-disable-cancel-btn');
+
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', function () {
+          if (modal) modal.open = false;
+        });
+      }
+
+      if (!confirmBtn) return;
+      confirmBtn.addEventListener('click', function () {
+        var password = passwordInput ? passwordInput.value : '';
+        if (!password) {
+          if (passwordInput) passwordInput.error = 'Password is required';
+          return;
+        }
+
+        confirmBtn.loading = true;
+        api.disableMfa(password).then(function () {
+          Lex.Toast.success('MFA disabled');
+          if (modal) modal.open = false;
+          loadMfaStatus();
+        }).catch(function (error) {
+          if (passwordInput && error && (error.status === 400 || error.status === 401)) {
+            passwordInput.error = error.message || 'Invalid password';
+          } else {
+            Lex.Toast.error(error.message || 'Failed to disable MFA');
+          }
+          confirmBtn.loading = false;
+        });
+      });
+    }, 100);
   }
 
 
@@ -663,14 +715,46 @@
   // =========================================================================
 
   function loadPreferences() {
+    var showed = false;
+
+    if (api && typeof api.getNotificationPreferences === 'function') {
+      api.getNotificationPreferences().then(function (result) {
+        var prefs = result.preferences || {};
+        showed = true;
+        if (dom.preferencesSection) dom.preferencesSection.classList.remove('sv2-hidden');
+        if (dom.prefEmail) dom.prefEmail.checked = prefs.email_enabled !== false;
+        if (dom.prefPush) dom.prefPush.checked = prefs.push_enabled !== false;
+        if (dom.prefInApp) dom.prefInApp.checked = prefs.in_app_enabled !== false;
+      }).catch(function (error) {
+        console.warn('[Settings V2] Failed to load notification preferences:', error);
+      });
+    }
+
     api.getPreferences().then(function (result) {
       var prefs = result.preferences || {};
-
-      if (dom.prefEmail) dom.prefEmail.checked = prefs.email_notifications !== false;
+      if (window.LanaConfig && window.LanaConfig.USER_PREFERENCES_EDIT_ENABLED === true) {
+        showed = true;
+        if (dom.preferencesSection) dom.preferencesSection.classList.remove('sv2-hidden');
+      }
       if (dom.prefDark) dom.prefDark.checked = prefs.dark_mode === true;
     }).catch(function (error) {
       // Silently fail — preferences will show default state
       console.warn('[Settings V2] Failed to load preferences:', error);
+    }).finally(function () {
+      if (!showed && dom.preferencesSection && !(window.LanaConfig && window.LanaConfig.USER_PREFERENCES_EDIT_ENABLED === true)) {
+        dom.preferencesSection.classList.add('sv2-hidden');
+      }
+    });
+  }
+
+  function handleNotificationPreferenceChange(key, value) {
+    var body = {};
+    body[key] = value === true;
+    api.updateNotificationPreferences(body).then(function () {
+      Lex.Toast.success('Preference saved');
+    }).catch(function (error) {
+      Lex.Toast.error(error.message || 'Failed to save notification preference');
+      loadPreferences();
     });
   }
 
@@ -728,13 +812,7 @@
   }
 
   function revokeAllSessions() {
-    Lex.Modal.confirm({
-      heading: 'Revoke All Sessions',
-      body: 'This will log you out of all other devices. Continue?',
-      variant: 'danger',
-      confirmText: 'Revoke All'
-    }).then(function (confirmed) {
-      if (!confirmed) return;
+    Lex.Modal.confirm('Revoke All Sessions', 'This will log you out of all other devices. Continue?', function () {
       var currentToken = localStorage.getItem('token');
       api.delete('/api/v1/auth/session/', { revoke_all_except: currentToken }).then(function () {
         Lex.Toast.success('All other sessions revoked');
@@ -742,6 +820,9 @@
       }).catch(function (error) {
         Lex.Toast.error(error.message || 'Failed to revoke sessions');
       });
+    }, {
+      variant: 'danger',
+      confirmText: 'Revoke All'
     });
   }
 
@@ -872,19 +953,16 @@
 
     if (resetBtn) {
       resetBtn.addEventListener('click', function () {
-        Lex.Modal.confirm({
-          heading: 'Reset VPN Configuration',
-          body: 'This will remove your VPN keys. You will need to set up VPN again. Continue?',
-          variant: 'danger',
-          confirmText: 'Reset'
-        }).then(function (confirmed) {
-          if (!confirmed) return;
+        Lex.Modal.confirm('Reset VPN Configuration', 'This will remove your VPN keys. You will need to set up VPN again. Continue?', function () {
           vpnManager.clearKeys().then(function () {
             Lex.Toast.success('VPN configuration reset');
             loadVpnStatus();
           }).catch(function (error) {
             Lex.Toast.error(error.message || 'Failed to reset VPN');
           });
+        }, {
+          variant: 'danger',
+          confirmText: 'Reset'
         });
       });
     }
@@ -1094,14 +1172,14 @@
     var appLabel = btn.getAttribute('data-label') || humanizeConnectedApp(appKey);
     if (!appKey) return;
 
-    Lex.Modal.confirm({
-      heading: 'Revoke access for ' + appLabel + '?',
-      body: appLabel + ' will need to ask for permission again the next time it tries to use this device\'s Lana session.',
+    Lex.Modal.confirm(
+      'Revoke access for ' + appLabel + '?',
+      appLabel + ' will need to ask for permission again the next time it tries to use this device\'s Lana session.',
+      function () {
+      revokeConnectedApp(btn, appKey, appLabel);
+    }, {
       variant: 'danger',
       confirmText: 'Revoke'
-    }).then(function (confirmed) {
-      if (!confirmed) return;
-      revokeConnectedApp(btn, appKey, appLabel);
     });
   }
 
@@ -1151,6 +1229,378 @@
     }).catch(function () {
       renderConnectedAppsError();
     });
+  }
+
+
+  // =========================================================================
+  // Plugins / Connections (user-scoped connectors)
+  // =========================================================================
+
+  var USER_CONNECTION_REDIRECT_URI = 'lana-ai://oauth/callback';
+  var _userConnectionsAvailable = false;
+  var _oauthCallbackRegistered = false;
+  var _pendingUserConnectionOAuth = null;
+
+  function notifySettingsNavVisibilityChanged() {
+    try {
+      window.dispatchEvent(new CustomEvent('settings-v2-section-visibility-changed'));
+    } catch (e) { /* optional nav sync */ }
+  }
+
+  function showUserConnectionsSection() {
+    if (dom.pluginsTab) dom.pluginsTab.classList.remove('sv2-hidden');
+    if (dom.pluginsPanel) dom.pluginsPanel.classList.remove('sv2-hidden');
+    if (dom.userConnectionsSection) dom.userConnectionsSection.classList.remove('sv2-hidden');
+    notifySettingsNavVisibilityChanged();
+  }
+
+  function hideUserConnectionsSection() {
+    if (dom.pluginsTab) dom.pluginsTab.classList.add('sv2-hidden');
+    if (dom.pluginsPanel) {
+      dom.pluginsPanel.classList.add('sv2-hidden');
+      dom.pluginsPanel.classList.remove('is-active');
+    }
+    notifySettingsNavVisibilityChanged();
+  }
+
+  function setUserConnectionsStatus(text) {
+    if (dom.userConnectionsStatus) dom.userConnectionsStatus.textContent = text || '';
+  }
+
+  function renderUserConnectionsLoading() {
+    if (!dom.userConnectionsContent) return;
+    dom.userConnectionsContent.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;padding:16px 0;">' +
+        '<lex-spinner size="sm" label="Loading connections..."></lex-spinner>' +
+      '</div>';
+    setUserConnectionsStatus('Loading connections...');
+  }
+
+  function renderUserConnectionsEmpty() {
+    if (!dom.userConnectionsContent) return;
+    dom.userConnectionsContent.innerHTML =
+      '<lex-empty ' +
+        'icon="plug" ' +
+        'message="No personal connectors are available." ' +
+        'description="Your organization has not enabled any user-scoped connectors yet.">' +
+      '</lex-empty>';
+    setUserConnectionsStatus('');
+  }
+
+  function renderUserConnectionsError(message) {
+    if (!dom.userConnectionsContent) return;
+    dom.userConnectionsContent.innerHTML =
+      '<lex-empty ' +
+        'icon="plug" ' +
+        'message="Connections could not be loaded." ' +
+        'description="' + esc(message || 'Try refreshing this page.') + '">' +
+      '</lex-empty>';
+    setUserConnectionsStatus('');
+  }
+
+  function normalizeUserConnectionRows(payload) {
+    var available = Array.isArray(payload && payload.available) ? payload.available : [];
+    var connections = Array.isArray(payload && payload.connections) ? payload.connections : [];
+    var rows = [];
+    var byConnector = {};
+    var i;
+
+    for (i = 0; i < available.length; i++) {
+      var item = available[i] || {};
+      var connectorId = item.connector_id || item.connectorId || '';
+      if (!connectorId) continue;
+      var row = {
+        source_id: item.source_id || item.id || null,
+        connector_id: connectorId,
+        name: item.name || item.connector_name || connectorId,
+        description: (item.setup && item.setup.description) || item.description || '',
+        provider: item.provider || '',
+        account: item.account || '',
+        status: item.status || 'available',
+        auth_type: item.auth_type || '',
+        last_synced_at: item.last_synced_at || item.last_sync_at || '',
+        supports_sync: item.supports_sync !== false,
+        setup: item.setup || {}
+      };
+      byConnector[connectorId] = row;
+      rows.push(row);
+    }
+
+    for (i = 0; i < connections.length; i++) {
+      var connection = connections[i] || {};
+      var id = connection.connector_id || connection.connectorId || '';
+      if (!id) continue;
+      var existing = byConnector[id];
+      if (existing) {
+        existing.source_id = existing.source_id || connection.id || null;
+        existing.account = existing.account || connection.account || '';
+        existing.last_synced_at = existing.last_synced_at || connection.last_sync_at || '';
+        if (!existing.status || existing.status === 'available') {
+          existing.status = connection.auth_status === 'connected'
+            ? 'connected'
+            : 'reauthorization_required';
+        }
+      } else {
+        rows.push({
+          source_id: connection.id || null,
+          connector_id: id,
+          name: connection.name || id,
+          description: '',
+          provider: '',
+          account: connection.account || '',
+          status: connection.auth_status === 'connected'
+            ? 'connected'
+            : 'reauthorization_required',
+          auth_type: '',
+          last_synced_at: connection.last_sync_at || '',
+          supports_sync: true,
+          setup: {}
+        });
+      }
+    }
+
+    rows.sort(function (a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+    return rows;
+  }
+
+  function statusBadgeMeta(status) {
+    var value = String(status || 'available');
+    if (value === 'connected') return { label: 'Connected', color: 'green' };
+    if (value === 'reauthorization_required') return { label: 'Reconnect required', color: 'yellow' };
+    if (value === 'awaiting_admin_configuration') return { label: 'Needs admin setup', color: 'yellow' };
+    if (value === 'disabled_by_organization') return { label: 'Disabled', color: 'gray' };
+    if (value === 'permission_denied') return { label: 'Permission denied', color: 'red' };
+    if (value === 'available') return { label: 'Available', color: 'blue' };
+    return { label: value.split('_').join(' '), color: 'gray' };
+  }
+
+  function actionForUserConnection(row) {
+    if (!row) return null;
+    if (row.status === 'connected') {
+      if (row.source_id && row.supports_sync !== false) return { action: 'sync', label: 'Sync', variant: 'primary', icon: 'refresh-cw' };
+      if (row.source_id) return { action: 'disconnect', label: 'Disconnect', variant: 'danger', icon: 'unlink' };
+    }
+    if (row.status === 'reauthorization_required') {
+      return { action: 'connect', label: 'Reconnect', variant: 'primary', icon: 'refresh-cw' };
+    }
+    if (row.status === 'available') {
+      return { action: 'connect', label: (row.setup && row.setup.button_label) || 'Connect', variant: 'primary', icon: 'plug' };
+    }
+    return null;
+  }
+
+  function formatConnectionMeta(row) {
+    var parts = [];
+    if (row.provider) parts.push(esc(row.provider));
+    if (row.auth_type) parts.push(esc(String(row.auth_type).toUpperCase()));
+    if (row.account) parts.push(esc(row.account));
+    if (row.last_synced_at) {
+      var times = formatGrantedAt(row.last_synced_at);
+      parts.push(times.relative ? 'Synced ' + esc(times.relative) : 'Synced');
+    }
+    return parts.join(' • ');
+  }
+
+  function renderUserConnectionsRows(rows) {
+    if (!dom.userConnectionsContent) return;
+    if (!rows || rows.length === 0) {
+      renderUserConnectionsEmpty();
+      return;
+    }
+
+    var html = '<div class="sv2-connection-list">';
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var badge = statusBadgeMeta(row.status);
+      var action = actionForUserConnection(row);
+      var meta = formatConnectionMeta(row);
+      var description = row.description || '';
+
+      html +=
+        '<div class="sv2-connection-row" ' +
+          'data-connector-id="' + esc(row.connector_id) + '" ' +
+          'data-source-id="' + esc(row.source_id || '') + '">' +
+          '<div class="sv2-connection-info">' +
+            '<div class="sv2-connection-heading">' +
+              '<lex-text variant="primary" size="body" weight="medium">' + esc(row.name) + '</lex-text>' +
+              '<lex-badge size="sm" color="' + esc(badge.color) + '" label="' + esc(badge.label) + '"></lex-badge>' +
+            '</div>' +
+            (description ? '<span class="sv2-connection-description">' + esc(description) + '</span>' : '') +
+            (meta ? '<span class="sv2-connection-meta">' + meta + '</span>' : '') +
+          '</div>';
+
+      if (action) {
+        html +=
+          '<lex-btn ' +
+            'class="sv2-connection-action-btn" ' +
+            'variant="' + esc(action.variant) + '" ' +
+            'size="sm" ' +
+            'icon="' + esc(action.icon) + '" ' +
+            'data-action="' + esc(action.action) + '" ' +
+            'data-connector-id="' + esc(row.connector_id) + '" ' +
+            'data-source-id="' + esc(row.source_id || '') + '">' +
+            esc(action.label) +
+          '</lex-btn>';
+      } else {
+        html += '<span class="sv2-connection-action-spacer" aria-hidden="true"></span>';
+      }
+
+      html += '</div>';
+    }
+    html += '</div>';
+
+    dom.userConnectionsContent.innerHTML = html;
+    wireUserConnectionButtons();
+    setUserConnectionsStatus('');
+  }
+
+  function wireUserConnectionButtons() {
+    if (!dom.userConnectionsContent) return;
+    var buttons = dom.userConnectionsContent.querySelectorAll('.sv2-connection-action-btn');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].addEventListener('click', handleUserConnectionActionClick);
+    }
+  }
+
+  function getUserConnectionsPayload() {
+    if (api && typeof api.getUserConnections === 'function') {
+      return api.getUserConnections();
+    }
+    return api.get('/api/v1/me/connections');
+  }
+
+  function endpointMissing(error) {
+    return error && (error.status === 404 || error.status === 405);
+  }
+
+  function loadUserConnections() {
+    if (!dom.userConnectionsContent || !dom.pluginsPanel) return;
+    renderUserConnectionsLoading();
+
+    getUserConnectionsPayload().then(function (payload) {
+      _userConnectionsAvailable = true;
+      showUserConnectionsSection();
+      renderUserConnectionsRows(normalizeUserConnectionRows(payload || {}));
+      registerUserConnectionOAuthCallback();
+    }).catch(function (error) {
+      if (endpointMissing(error)) {
+        _userConnectionsAvailable = false;
+        hideUserConnectionsSection();
+        return;
+      }
+      _userConnectionsAvailable = true;
+      showUserConnectionsSection();
+      renderUserConnectionsError((error && error.message) || 'Try refreshing this page.');
+    });
+  }
+
+  function openExternalUrl(url) {
+    if (!url) return;
+    if (window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
+      window.electronAPI.openExternal(url);
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  function connectUserConnector(btn, connectorId) {
+    if (!connectorId || !api) return;
+    if (btn) btn.loading = true;
+
+    api.connectUserConnection(connectorId, USER_CONNECTION_REDIRECT_URI).then(function (result) {
+      var data = (result && result.data) || result || {};
+      _pendingUserConnectionOAuth = {
+        connectorId: connectorId,
+        state: data.state || null
+      };
+      if (data.authorizationUrl) {
+        openExternalUrl(data.authorizationUrl);
+        Lex.Toast.info('Complete authorization in your browser.');
+      } else {
+        Lex.Toast.error('Authorization URL was not returned by the server.');
+        if (btn) btn.loading = false;
+      }
+    }).catch(function (error) {
+      Lex.Toast.error((error && error.message) || 'Failed to start authorization.');
+      if (btn) btn.loading = false;
+    });
+  }
+
+  function completeUserConnectorOAuth(data) {
+    if (!_pendingUserConnectionOAuth || !data) return;
+    if (data.error) {
+      Lex.Toast.error(data.error_description || data.error);
+      _pendingUserConnectionOAuth = null;
+      loadUserConnections();
+      return;
+    }
+    if (!data.code || !data.state) return;
+    if (_pendingUserConnectionOAuth.state && data.state !== _pendingUserConnectionOAuth.state) return;
+
+    var connectorId = _pendingUserConnectionOAuth.connectorId;
+    api.completeUserConnection(connectorId, {
+      code: data.code,
+      state: data.state,
+      redirect_uri: USER_CONNECTION_REDIRECT_URI
+    }).then(function () {
+      Lex.Toast.success('Connection authorized.');
+      _pendingUserConnectionOAuth = null;
+      loadUserConnections();
+    }).catch(function (error) {
+      Lex.Toast.error((error && error.message) || 'Failed to complete authorization.');
+      _pendingUserConnectionOAuth = null;
+      loadUserConnections();
+    });
+  }
+
+  function registerUserConnectionOAuthCallback() {
+    if (_oauthCallbackRegistered) return;
+    if (!window.electronAPI || typeof window.electronAPI.onOAuthCallback !== 'function') return;
+    window.electronAPI.onOAuthCallback(completeUserConnectorOAuth);
+    _oauthCallbackRegistered = true;
+  }
+
+  function syncUserConnection(btn, sourceId) {
+    if (!sourceId) return;
+    if (btn) btn.loading = true;
+    api.syncUserConnection(sourceId).then(function () {
+      Lex.Toast.success('Sync queued.');
+      loadUserConnections();
+    }).catch(function (error) {
+      Lex.Toast.error((error && error.message) || 'Failed to queue sync.');
+      if (btn) btn.loading = false;
+    });
+  }
+
+  function disconnectUserConnection(btn, sourceId) {
+    if (!sourceId) return;
+    Lex.Modal.confirm('Disconnect this account?', 'LANA will stop syncing this personal connector and clear its stored credentials.', function () {
+      if (btn) btn.loading = true;
+      api.disconnectUserConnection(sourceId).then(function () {
+        Lex.Toast.success('Connection disconnected.');
+        loadUserConnections();
+      }).catch(function (error) {
+        Lex.Toast.error((error && error.message) || 'Failed to disconnect.');
+        if (btn) btn.loading = false;
+      });
+    }, {
+      variant: 'danger',
+      confirmText: 'Disconnect'
+    });
+  }
+
+  function handleUserConnectionActionClick(e) {
+    var btn = e.currentTarget;
+    if (!btn) return;
+    var action = btn.getAttribute('data-action');
+    var connectorId = btn.getAttribute('data-connector-id');
+    var sourceId = btn.getAttribute('data-source-id');
+
+    if (action === 'connect') connectUserConnector(btn, connectorId);
+    else if (action === 'sync') syncUserConnection(btn, sourceId);
+    else if (action === 'disconnect') disconnectUserConnection(btn, sourceId);
   }
 
 
@@ -1205,7 +1655,17 @@
     // ── Preferences ──
     if (dom.prefEmail) {
       dom.prefEmail.addEventListener('lex-change', function (e) {
-        handlePreferenceChange('email_notifications', e.detail.value);
+        handleNotificationPreferenceChange('email_enabled', e.detail.value);
+      });
+    }
+    if (dom.prefPush) {
+      dom.prefPush.addEventListener('lex-change', function (e) {
+        handleNotificationPreferenceChange('push_enabled', e.detail.value);
+      });
+    }
+    if (dom.prefInApp) {
+      dom.prefInApp.addEventListener('lex-change', function (e) {
+        handleNotificationPreferenceChange('in_app_enabled', e.detail.value);
       });
     }
     if (dom.prefDark) {
@@ -1228,14 +1688,27 @@
       loadMfaStatus();
       loadSessions();
       loadConnectedApps();
+      if (_userConnectionsAvailable) loadUserConnections();
     });
 
     // ── Load all data ──
     loadProfile();
     loadTimezone();
-    loadMfaStatus();
+    if (api && typeof api.getSystemConfig === 'function') {
+      api.getSystemConfig().then(function (result) {
+        if (typeof api.applyRuntimeConfig === 'function') api.applyRuntimeConfig(result);
+      }).catch(function () {
+        if (window.LanaConfig) window.LanaConfig.MFA_ENABLED = false;
+        if (api && api.config) api.config.MFA_ENABLED = false;
+      }).finally(function () {
+        loadMfaStatus();
+      });
+    } else {
+      loadMfaStatus();
+    }
     loadSessions();
     loadConnectedApps();
+    loadUserConnections();
     showConditionalSections();
   }
 

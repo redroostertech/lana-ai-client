@@ -1042,6 +1042,58 @@ class ApiClient {
       return { success: true, message: 'Plugin uninstalled (demo mode)' };
     }
 
+    // -------------------- USER CONNECTIONS --------------------
+    if (path === '/api/v1/me/connections' && method === 'GET') {
+      return {
+        connections: [],
+        available: [
+          {
+            connector_id: 'google-calendar',
+            name: 'Google Calendar',
+            provider: 'Google',
+            auth_type: 'oauth2',
+            setup: {
+              title: 'Connect your Google Calendar account',
+              description: 'Link your own Google Calendar so LANA can work with your calendar.',
+              button_label: 'Connect Google Calendar'
+            },
+            status: 'available',
+            supports_sync: true
+          }
+        ],
+        pagination: { total: 0, page: 1, limit: 20, has_more: false }
+      };
+    }
+
+    if (path.match(/\/api\/v1\/me\/connections\/[^/]+\/connect$/) && method === 'POST') {
+      return {
+        success: true,
+        data: {
+          authorizationUrl: '#demo-oauth',
+          state: 'demo-state'
+        }
+      };
+    }
+
+    if (path.match(/\/api\/v1\/me\/connections\/[^/]+\/complete$/) && method === 'POST') {
+      return {
+        success: true,
+        data: {
+          integrationSourceId: 'demo-source',
+          connectorId: path.split('/')[5],
+          hasRefreshToken: true
+        }
+      };
+    }
+
+    if (path.match(/\/api\/v1\/me\/connections\/[^/]+\/disconnect$/) && method === 'DELETE') {
+      return { success: true, sourceId: path.split('/')[5] };
+    }
+
+    if (path.match(/\/api\/v1\/me\/connections\/[^/]+\/sync$/) && method === 'POST') {
+      return { success: true, sourceId: path.split('/')[5], message: 'Sync job queued' };
+    }
+
     // -------------------- INTEGRATIONS --------------------
     if (path === '/api/v1/integrations/connectors' && method === 'GET') {
       return { connectors: mock.connectors || [] };
@@ -2773,6 +2825,31 @@ class ApiClient {
   }
 
   // ============================================================
+  // User Connections
+  // ============================================================
+  async getUserConnections() {
+    return this.get('/api/v1/me/connections');
+  }
+
+  async connectUserConnection(connectorId, redirectUri) {
+    return this.post(`/api/v1/me/connections/${encodeURIComponent(connectorId)}/connect`, {
+      redirect_uri: redirectUri
+    });
+  }
+
+  async completeUserConnection(connectorId, data) {
+    return this.post(`/api/v1/me/connections/${encodeURIComponent(connectorId)}/complete`, data);
+  }
+
+  async disconnectUserConnection(sourceId) {
+    return this.delete(`/api/v1/me/connections/${encodeURIComponent(sourceId)}/disconnect`);
+  }
+
+  async syncUserConnection(sourceId) {
+    return this.post(`/api/v1/me/connections/${encodeURIComponent(sourceId)}/sync`, {});
+  }
+
+  // ============================================================
   // User Profile & Preferences
   // ============================================================
   async getProfile() {
@@ -2815,12 +2892,37 @@ class ApiClient {
 
   async updatePreference(key, value) {
     if (!this.user?.id) throw new Error('Not logged in');
-    return this.put(`/api/v1/users/me/preferences/${key}`, { value });
+    return this.updatePreferences({ [key]: value });
   }
 
   async updatePreferences(updates) {
     if (!this.user?.id) throw new Error('Not logged in');
     return this.request('PATCH', '/api/v1/users/me/preferences', updates);
+  }
+
+  async getSystemConfig() {
+    if (!this.user?.id) throw new Error('Not logged in');
+    try {
+      return await this.get('/api/v1/system/client-config');
+    } catch (error) {
+      if (error && (error.status === 404 || error.status === 405)) {
+        return this.get('/api/v1/system/config');
+      }
+      throw error;
+    }
+  }
+
+  applyRuntimeConfig(response) {
+    const root = response && (response.config || response.data || response);
+    const features = root && (root.features || root);
+    if (!features || typeof features !== 'object') return window.LanaConfig || {};
+
+    window.LanaConfig = window.LanaConfig || {};
+    if (typeof features.mfa_enabled === 'boolean') {
+      window.LanaConfig.MFA_ENABLED = features.mfa_enabled;
+      this.config.MFA_ENABLED = features.mfa_enabled;
+    }
+    return window.LanaConfig;
   }
 
   // ============================================================
@@ -2836,7 +2938,15 @@ class ApiClient {
     if (!this.isMfaEnabled()) {
       return { enabled: false, methods: [], mfa_disabled_by_config: true };
     }
-    return this.get('/api/v1/users/me/security/mfa/status');
+    const result = await this.get('/api/v1/users/me/security');
+    const security = result && (result.security || result.data || result);
+    const enabled = Boolean(security && (security.mfa_enabled || security.enabled));
+    return {
+      enabled,
+      mfa_enabled: enabled,
+      methods: enabled ? ['totp'] : [],
+      security: security || {}
+    };
   }
 
   async setupMfa() {
@@ -2852,15 +2962,16 @@ class ApiClient {
     if (!this.isMfaEnabled()) {
       throw new Error('MFA is disabled for this deployment');
     }
-    return this.post('/api/v1/users/me/security/mfa/verify', { token });
+    return this.post('/api/v1/users/me/security/mfa/verify', { code: token });
   }
 
-  async disableMfa() {
+  async disableMfa(password) {
     if (!this.user?.id) throw new Error('Not logged in');
     if (!this.isMfaEnabled()) {
       throw new Error('MFA is disabled for this deployment');
     }
-    return this.delete('/api/v1/users/me/security/mfa');
+    const query = password ? '?password=' + encodeURIComponent(password) : '';
+    return this.delete('/api/v1/users/me/security/mfa' + query);
   }
 
   async regenerateMfaBackupCodes() {
@@ -2909,7 +3020,12 @@ class ApiClient {
   }
 
   async getStorageUsage() {
-    return this.get('/api/v1/storage/usage');
+    try {
+      return await this.get('/api/v1/storage/usage/me');
+    } catch (error) {
+      if (error && error.status === 404) return this.get('/api/v1/storage/usage');
+      throw error;
+    }
   }
 
   async getUserProductivity(userId) {
@@ -2979,6 +3095,14 @@ class ApiClient {
 
   async getUnreadNotificationCount(options = {}) {
     return this.get('/api/v1/notifications/unread-count', options);
+  }
+
+  async getNotificationPreferences() {
+    return this.get('/api/v1/notifications/preferences');
+  }
+
+  async updateNotificationPreferences(preferences) {
+    return this.put('/api/v1/notifications/preferences', preferences);
   }
 
   async createAdminNotification(type, title, body, actionUrl = null) {

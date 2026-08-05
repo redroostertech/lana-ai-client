@@ -594,7 +594,11 @@
       modal.closeOnOverlay = options.closeOnOverlay !== undefined ? options.closeOnOverlay : true;
 
       if (options.content) {
-        modal.innerHTML = options.content;
+        if (typeof options.content === 'string') {
+          modal.innerHTML = options.content;
+        } else if (window.Node && options.content instanceof window.Node) {
+          modal.appendChild(options.content);
+        }
       }
       modal.open = true;
 

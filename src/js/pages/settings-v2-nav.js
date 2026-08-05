@@ -2,8 +2,8 @@
  * settings-v2-nav.js
  *
  * Left in-page section navigation for settings-v2.html. Turns the single
- * scrolling page into tabbed sections (Profile, General, Personalization,
- * Capabilities, Plan & billing, Usage, Data controls) driven by a vertical nav rail.
+ * scrolling page into tabbed sections (Profile, General, Security,
+ * Personalization, Capabilities, Plugins, Plan & billing, Usage, Data controls) driven by a vertical nav rail.
  *
  * Responsibilities:
  *   - Inject the nav icons from Lex.Icons (never emoji glyphs).
@@ -29,8 +29,10 @@
   var SECTIONS = [
     { id: 'profile',        icon: 'user' },
     { id: 'general',        icon: 'settings' },
+    { id: 'security',       icon: 'shield' },
     { id: 'personalization', icon: 'wand-2' },
     { id: 'capabilities',   icon: 'puzzle' },
+    { id: 'plugins',        icon: 'plug' },
     { id: 'billing',        icon: 'sparkles' },
     { id: 'usage',          icon: 'bar-chart-2' },
     { id: 'data-controls',  icon: 'shield' }
@@ -41,6 +43,10 @@
   var LANA_ONE_SECTIONS = ['billing', 'data-controls'];
 
   function sectionEnabled(id) {
+    var tab = tabEl(id);
+    var panel = panelEl(id);
+    if (!tab || !panel) return false;
+    if (tab.classList.contains('sv2-hidden') || panel.classList.contains('sv2-hidden')) return false;
     return LANA_ONE_SECTIONS.indexOf(id) === -1 || lanaOneEnabled;
   }
 
@@ -180,6 +186,10 @@
     }
 
     window.addEventListener('hashchange', onHashChange);
+    window.addEventListener('settings-v2-section-visibility-changed', function () {
+      injectIcons();
+      activate(sectionFromHash(), { updateHash: false });
+    });
 
     // Initial section comes from the hash (account-menu deep links), else Profile.
     activate(sectionFromHash(), { updateHash: false });

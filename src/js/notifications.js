@@ -14,9 +14,26 @@ window.DesktopNotifications = window.DesktopNotifications || (function() {
   const ENABLED_KEY = 'lana.desktopNotifications.enabled';
   const SEEN_KEY = 'lana.desktopNotifications.seenIds';
   const MAX_NOTIFICATIONS_PER_POLL = 3;
+  const PREFERENCES_CACHE_TTL_MS = (window.LanaTime && window.LanaTime.MS_PER_MINUTE) || 60000;
 
   let lastUnreadCount = null;
   let isFetching = false;
+  let serverPreferences = null;
+  let serverPreferencesLoadedAt = 0;
+
+  function nowMs() {
+    if (window.LanaTime && typeof window.LanaTime.nowMs === 'function') {
+      return window.LanaTime.nowMs();
+    }
+    return Date.now();
+  }
+
+  function millisecondsSince(timestamp) {
+    if (window.LanaTime && typeof window.LanaTime.millisecondsSince === 'function') {
+      return window.LanaTime.millisecondsSince(timestamp);
+    }
+    return nowMs() - Number(timestamp || 0);
+  }
 
   function isSupported() {
     return typeof window !== 'undefined' && 'Notification' in window;
@@ -108,6 +125,31 @@ window.DesktopNotifications = window.DesktopNotifications || (function() {
     return true;
   }
 
+  async function getServerPreferences() {
+    if (!window.api || typeof window.api.getNotificationPreferences !== 'function') {
+      return null;
+    }
+
+    if (serverPreferences && millisecondsSince(serverPreferencesLoadedAt) < PREFERENCES_CACHE_TTL_MS) {
+      return serverPreferences;
+    }
+
+    const result = await window.api.getNotificationPreferences();
+    serverPreferences = (result && result.preferences) || null;
+    serverPreferencesLoadedAt = nowMs();
+    return serverPreferences;
+  }
+
+  function allowsPush(preferences, notification) {
+    if (!preferences) return true;
+    if (preferences.push_enabled === false) return false;
+
+    const type = notification && notification.type;
+    const perType = preferences.notification_types || {};
+    if (type && perType[type] && perType[type].push === false) return false;
+    return true;
+  }
+
   async function requestPermissionAndTest() {
     const granted = await enableFromUserGesture();
     if (granted) {
@@ -184,14 +226,22 @@ window.DesktopNotifications = window.DesktopNotifications || (function() {
 
     isFetching = true;
     try {
+      const preferences = await getServerPreferences().catch(function() { return null; });
+      if (preferences && preferences.push_enabled === false) return;
+
       const limit = Math.min(Math.max(delta || 1, 1), MAX_NOTIFICATIONS_PER_POLL);
       const result = await window.api.getNotifications(true, limit, 0);
       const notifications = result.notifications || [];
 
-      notifications.forEach(show);
+      notifications.forEach(function(notification) {
+        if (allowsPush(preferences, notification)) show(notification);
+      });
 
-      if (delta > notifications.length) {
-        showSummary(delta - notifications.length);
+      const shownCount = notifications.filter(function(notification) {
+        return allowsPush(preferences, notification);
+      }).length;
+      if (delta > shownCount) {
+        showSummary(delta - shownCount);
       }
     } catch (error) {
       console.warn('[DesktopNotifications] Failed to show local notification:', error);

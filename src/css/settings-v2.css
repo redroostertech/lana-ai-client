@@ -372,6 +372,13 @@
   border-top: 1px solid var(--lex-border-subtle);
 }
 
+.sv2-modal-copy {
+  margin: 0 0 12px;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+}
+
 
 /* ── Per-user Usage ──────────────────────────────────────────────── */
 
@@ -1131,4 +1138,80 @@
   gap: 6px;
   font-size: var(--lex-body-xs-size);
   color: var(--lex-text-tertiary);
+}
+
+
+/* ── Plugins / User Connections ─────────────────────────────────── */
+
+.sv2-connection-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.sv2-connection-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--lex-border-subtle);
+}
+
+.sv2-connection-row:last-child {
+  border-bottom: none;
+}
+
+.sv2-connection-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sv2-connection-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.sv2-connection-description,
+.sv2-connection-meta,
+.sv2-connections-status {
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-xs-size);
+  line-height: var(--lex-body-xs-height);
+}
+
+.sv2-connection-description {
+  max-width: 68ch;
+}
+
+.sv2-connection-meta {
+  color: var(--lex-text-tertiary);
+}
+
+.sv2-connections-status {
+  margin: 10px 0 0;
+}
+
+.sv2-connections-status:empty {
+  display: none;
+}
+
+.sv2-connection-action-spacer {
+  flex: 0 0 92px;
+}
+
+@media (max-width: 620px) {
+  .sv2-connection-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sv2-connection-action-btn {
+    align-self: flex-start;
+  }
 }

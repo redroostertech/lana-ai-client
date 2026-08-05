@@ -61,6 +61,11 @@
           <span class="sv2-nav-icon" data-icon="settings" aria-hidden="true"></span>
           <span class="sv2-nav-label">General</span>
         </button>
+        <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-security"
+          data-section="security" aria-controls="sv2-panel-security" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="shield" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Security</span>
+        </button>
         <button type="button" class="sv2-nav-item" role="tab" id="sv2-tab-personalization"
           data-section="personalization" aria-controls="sv2-panel-personalization" aria-selected="false" tabindex="-1">
           <span class="sv2-nav-icon" data-icon="wand-2" aria-hidden="true"></span>
@@ -70,6 +75,11 @@
           data-section="capabilities" aria-controls="sv2-panel-capabilities" aria-selected="false" tabindex="-1">
           <span class="sv2-nav-icon" data-icon="puzzle" aria-hidden="true"></span>
           <span class="sv2-nav-label">Capabilities</span>
+        </button>
+        <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-plugins"
+          data-section="plugins" aria-controls="sv2-panel-plugins" aria-selected="false" tabindex="-1">
+          <span class="sv2-nav-icon" data-icon="plug" aria-hidden="true"></span>
+          <span class="sv2-nav-label">Plugins</span>
         </button>
         <button type="button" class="sv2-nav-item sv2-hidden" role="tab" id="sv2-tab-billing"
           data-section="billing" aria-controls="sv2-panel-billing" aria-selected="false" tabindex="-1">
@@ -237,6 +247,19 @@
         </section>
       </div><!-- /sv2-panel-capabilities -->
 
+      <!-- ╔══════════════════════ PLUGINS PANEL ══════════════════════╗ -->
+      <div class="sv2-panel sv2-hidden" id="sv2-panel-plugins" role="tabpanel"
+        aria-labelledby="sv2-tab-plugins" data-section="plugins">
+        <section id="sv2-section-user-connections" style="margin-bottom:0.5rem" aria-busy="true">
+          <lex-card heading="Plugins &amp; Connections" subtitle="Connect your personal accounts to available LANA connectors">
+            <div id="sv2-user-connections-content">
+              <!-- Loading / list / empty rendered by JS -->
+            </div>
+            <p id="sv2-user-connections-status" class="sv2-connections-status" role="status">Checking connector availability...</p>
+          </lex-card>
+        </section>
+      </div><!-- /sv2-panel-plugins -->
+
       <!-- ╔═══════════════════════ GENERAL PANEL ═══════════════════════╗
            App and account settings: time zone, password + MFA, preferences,
            active sessions, connected apps, and VPN. -->
@@ -263,43 +286,6 @@
       </section>
 
 
-      <!-- Security
-           ══════════════════════════════════════════════════════════════ -->
-      <section id="sv2-section-security" style="margin-bottom:0.5rem">
-
-        <!-- Password Change Card -->
-        <lex-card heading="Change Password" subtitle="Update your account password">
-          <lex-form id="sv2-password-form">
-            <lex-stack direction="vertical" gap="4">
-              <lex-input id="sv2-current-password" name="current_password"
-                label="Current Password" required="true"></lex-input>
-
-              <div>
-                <lex-input id="sv2-new-password" name="new_password"
-                  label="New Password" required="true"></lex-input>
-                <div id="sv2-pw-requirements" class="sv2-pw-requirements">
-                  <!-- Populated by JS -->
-                </div>
-              </div>
-
-              <lex-input id="sv2-confirm-password" name="confirm_password"
-                label="Confirm New Password" required="true"></lex-input>
-            </lex-stack>
-
-            <div class="sv2-form-actions">
-              <lex-btn id="sv2-update-password-btn" type="submit" variant="primary" size="sm" disabled>
-                Update Password
-              </lex-btn>
-            </div>
-          </lex-form>
-        </lex-card>
-
-        <!-- MFA Card (conditionally rendered by JS) -->
-        <div id="sv2-mfa-section"></div>
-
-      </section>
-
-
       <!-- Preferences (conditionally shown by JS)
            ══════════════════════════════════════════════════════════════ -->
       <section id="sv2-section-preferences" class="sv2-hidden" style="margin-bottom:0.5rem">
@@ -308,10 +294,26 @@
 
             <lex-stack direction="horizontal" gap="4" justify="between" align="center">
               <lex-stack direction="vertical" gap="1">
-                <lex-text variant="primary" size="body" weight="medium">Email Notifications</lex-text>
-                <lex-text variant="tertiary" size="body-sm">Receive email notifications for important updates</lex-text>
+                <lex-text variant="primary" size="body" weight="medium">Email notifications</lex-text>
+                <lex-text variant="tertiary" size="body-sm">Receive notification emails when the server sends them</lex-text>
               </lex-stack>
               <lex-toggle id="sv2-pref-email" name="email_notifications"></lex-toggle>
+            </lex-stack>
+
+            <lex-stack direction="horizontal" gap="4" justify="between" align="center">
+              <lex-stack direction="vertical" gap="1">
+                <lex-text variant="primary" size="body" weight="medium">Desktop notifications</lex-text>
+                <lex-text variant="tertiary" size="body-sm">Allow push notifications on devices where notifications are enabled</lex-text>
+              </lex-stack>
+              <lex-toggle id="sv2-pref-push" name="push_notifications"></lex-toggle>
+            </lex-stack>
+
+            <lex-stack direction="horizontal" gap="4" justify="between" align="center">
+              <lex-stack direction="vertical" gap="1">
+                <lex-text variant="primary" size="body" weight="medium">In-app notifications</lex-text>
+                <lex-text variant="tertiary" size="body-sm">Show notifications inside LANA AI</lex-text>
+              </lex-stack>
+              <lex-toggle id="sv2-pref-in-app" name="in_app_notifications"></lex-toggle>
             </lex-stack>
 
             <lex-stack direction="horizontal" gap="4" justify="between" align="center">
@@ -323,31 +325,6 @@
             </lex-stack>
 
           </lex-stack>
-        </lex-card>
-      </section>
-
-
-      <!-- Sessions
-           ══════════════════════════════════════════════════════════════ -->
-      <section id="sv2-section-sessions" style="margin-bottom:0.5rem">
-        <lex-card id="sv2-sessions-card">
-
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-            <h3 style="font-size:var(--lex-h4-size,1.125rem);font-weight:var(--lex-h4-weight,600);color:var(--lex-text-primary);margin:0;">Active Sessions</h3>
-            <lex-btn id="sv2-revoke-all-btn" variant="danger" size="sm" icon="log-out">Revoke All Other Sessions</lex-btn>
-          </div>
-
-          <lex-table
-            id="sv2-sessions-table"
-            columns="device,ip_address,created_at,expires_at"
-            labels="Device,IP Address,Created,Expires"
-            empty-text="No active sessions"
-            sort-by="created_at"
-            sort-dir="desc"
-          ></lex-table>
-
-          <lex-pagination id="sv2-sessions-pagination" style="margin-top:1rem;"></lex-pagination>
-
         </lex-card>
       </section>
 
@@ -372,6 +349,66 @@
       </section>
 
       </div><!-- /sv2-panel-general -->
+
+      <!-- ╔══════════════════════ SECURITY PANEL ══════════════════════╗ -->
+      <div class="sv2-panel" id="sv2-panel-security" role="tabpanel"
+        aria-labelledby="sv2-tab-security" data-section="security">
+        <section id="sv2-section-security" style="margin-bottom:0.5rem">
+
+          <!-- Password Change Card -->
+          <lex-card heading="Change Password" subtitle="Update your account password">
+            <lex-form id="sv2-password-form">
+              <lex-stack direction="vertical" gap="4">
+                <lex-input id="sv2-current-password" name="current_password"
+                  label="Current Password" required="true"></lex-input>
+
+                <div>
+                  <lex-input id="sv2-new-password" name="new_password"
+                    label="New Password" required="true"></lex-input>
+                  <div id="sv2-pw-requirements" class="sv2-pw-requirements">
+                    <!-- Populated by JS -->
+                  </div>
+                </div>
+
+                <lex-input id="sv2-confirm-password" name="confirm_password"
+                  label="Confirm New Password" required="true"></lex-input>
+              </lex-stack>
+
+              <div class="sv2-form-actions">
+                <lex-btn id="sv2-update-password-btn" type="submit" variant="primary" size="sm" disabled>
+                  Update Password
+                </lex-btn>
+              </div>
+            </lex-form>
+          </lex-card>
+
+          <!-- MFA Card (conditionally rendered by JS) -->
+          <div id="sv2-mfa-section"></div>
+
+        </section>
+
+        <section id="sv2-section-sessions" style="margin-bottom:0.5rem">
+          <lex-card id="sv2-sessions-card">
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+              <h3 style="font-size:var(--lex-h4-size,1.125rem);font-weight:var(--lex-h4-weight,600);color:var(--lex-text-primary);margin:0;">Active Sessions</h3>
+              <lex-btn id="sv2-revoke-all-btn" variant="danger" size="sm" icon="log-out">Revoke All Other Sessions</lex-btn>
+            </div>
+
+            <lex-table
+              id="sv2-sessions-table"
+              columns="device,ip_address,created_at,expires_at"
+              labels="Device,IP Address,Created,Expires"
+              empty-text="No active sessions"
+              sort-by="created_at"
+              sort-dir="desc"
+            ></lex-table>
+
+            <lex-pagination id="sv2-sessions-pagination" style="margin-top:1rem;"></lex-pagination>
+
+          </lex-card>
+        </section>
+      </div><!-- /sv2-panel-security -->
 
       <!-- ╔═══════════════════ PLAN & BILLING PANEL ════════════════════╗
            Account menu deep-links here via settings-v2.html#billing.
