@@ -118,6 +118,14 @@
         align-items: center;
         min-width: 0;
         gap: 8px;
+        flex: 1 1 auto;
+      }
+
+      .lex-modal-header-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex: 0 0 auto;
       }
 
       .lex-modal-title {
@@ -347,7 +355,9 @@
         hideActions: { type: Boolean, default: false },
         closeOnOverlay: { type: Boolean, default: true },
         backButton:  { type: Boolean, default: false },
-        backLabel:   { type: String, default: 'Back' }
+        backLabel:   { type: String, default: 'Back' },
+        headerActions: { type: String, default: '' },
+        footerContent: { type: String, default: '' }
       };
     }
 
@@ -409,6 +419,9 @@
         html += `<button type="button" class="lex-modal-back" data-action="back" aria-label="${this.escapeHtml(this.backLabel || 'Back')}"${this.backButton ? '' : ' hidden'}>${BACK_SVG}</button>`;
         html += `<h3 id="${this._titleId}" class="lex-modal-title">${this.escapeHtml(this.heading)}</h3>`;
         html += `</div>`;
+        if (this.headerActions) {
+          html += `<div class="lex-modal-header-actions">${this.headerActions}</div>`;
+        }
         html += `<button type="button" class="lex-modal-close" data-action="close" aria-label="Close dialog">${CLOSE_SVG}</button>`;
         html += `</div>`;
       }
@@ -417,7 +430,9 @@
       html += `<div class="lex-modal-body"><slot-content></slot-content></div>`;
 
       // Footer / Actions
-      if (!this.hideActions) {
+      if (this.footerContent) {
+        html += `<div class="lex-modal-footer">${this.footerContent}</div>`;
+      } else if (!this.hideActions) {
         html += `<div class="lex-modal-footer">`;
         if (this.cancelText) {
           html += `<button type="button" class="lex-modal-btn lex-modal-btn--cancel" data-action="cancel">${this.escapeHtml(this.cancelText)}</button>`;
@@ -627,6 +642,8 @@
       modal.closeOnOverlay = options.closeOnOverlay !== undefined ? options.closeOnOverlay : true;
       modal.backButton = options.backButton === true;
       modal.backLabel = options.backLabel || 'Back';
+      modal.headerActions = options.headerActions || '';
+      modal.footerContent = options.footerContent || '';
 
       if (options.content) {
         if (typeof options.content === 'string') {

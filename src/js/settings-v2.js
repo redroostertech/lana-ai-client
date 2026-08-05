@@ -1116,10 +1116,6 @@
         '<lex-text id="sv2-sessions-modal-status" variant="tertiary" size="body-sm" tag="p">' +
           esc(sessionCountLabel(_sessions.length)) +
         '</lex-text>' +
-        '<lex-stack direction="horizontal" gap="2" align="center">' +
-          '<lex-btn id="sv2-sessions-modal-refresh-btn" variant="ghost" size="sm" icon="refresh-cw">Refresh</lex-btn>' +
-          '<lex-btn id="sv2-revoke-all-btn" variant="danger" size="sm" icon="log-out">Revoke All Other Sessions</lex-btn>' +
-        '</lex-stack>' +
       '</div>' +
       '<lex-table ' +
         'id="sv2-sessions-modal-table" ' +
@@ -1140,7 +1136,9 @@
       size: 'xl',
       closeOnOverlay: true,
       backButton: true,
-      backLabel: 'Back to settings'
+      backLabel: 'Back to settings',
+      headerActions: '<lex-btn id="sv2-sessions-modal-refresh-btn" variant="ghost" size="sm" icon="refresh-cw" aria-label="Refresh sessions">Refresh</lex-btn>',
+      footerContent: '<lex-btn id="sv2-revoke-all-btn" variant="danger" size="sm" icon="log-out">Revoke All Other Sessions</lex-btn>'
     });
 
     _sessionsModal.addEventListener('lex-close', function () {
