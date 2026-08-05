@@ -16,6 +16,7 @@
   var _memoryLoaded = false;
   var _memoryLoading = null;
   var _memoryModal = null;
+  var _memoryModalView = 'list';
 
   function el(id) { return document.getElementById(id); }
   // Field ids are sv2-pz-<name-with-dashes>, e.g. custom_instructions -> sv2-pz-custom-instructions.
@@ -259,6 +260,14 @@
     return 'Memory';
   }
 
+  function memoryRecordId(record, index) {
+    return String((record && (record.id || record.record_id || record.key)) || index);
+  }
+
+  function memoryRecordUpdated(record) {
+    return record && (record.updated_at || record.updatedAt || record.last_used_at || record.lastUsedAt || record.created_at || record.createdAt);
+  }
+
   function memoryRecordValue(record) {
     if (!record) return '';
     var candidates = [
@@ -301,17 +310,25 @@
   }
 
   function mapMemoryRecord(record, index) {
-    var updated = record && (record.updated_at || record.updatedAt || record.last_used_at || record.lastUsedAt || record.created_at || record.createdAt);
+    var updated = memoryRecordUpdated(record);
     return {
-      id: String((record && (record.id || record.record_id || record.key)) || index),
+      id: memoryRecordId(record, index),
       memory: memoryRecordTitle(record),
       value: memoryRecordValue(record) || 'No value stored.',
       scope: memoryScopeLabel(record) || 'Account',
       updated: formatDate(updated, true) || '',
       _typeLabel: memoryTypeLabel(record),
       _confidenceLabel: memoryConfidenceLabel(record),
-      _keyLabel: record && record.key ? labelFromIdentifier(record.key) : ''
+      _keyLabel: record && record.key ? labelFromIdentifier(record.key) : '',
+      _record: record
     };
+  }
+
+  function memoryRecordById(id) {
+    for (var i = 0; i < _memoryRecords.length; i++) {
+      if (memoryRecordId(_memoryRecords[i], i) === String(id)) return _memoryRecords[i];
+    }
+    return null;
   }
 
   function memoryCountLabel(count) {
@@ -335,10 +352,6 @@
     '</div>';
   }
 
-  function renderMemoryValueCell(value) {
-    return '<div class="sv2-memory-value-cell" title="' + esc(value || '') + '">' + esc(value || '') + '</div>';
-  }
-
   function renderMemoryTable(records) {
     var table = el('sv2-memory-table');
     if (!table || typeof table.setData !== 'function') return;
@@ -346,11 +359,85 @@
     for (var i = 0; i < records.length; i++) rows.push(mapMemoryRecord(records[i], i));
     if (typeof table.setCellRenderers === 'function') {
       table.setCellRenderers({
-        memory: renderMemoryNameCell,
-        value: renderMemoryValueCell
+        memory: renderMemoryNameCell
       });
     }
     table.setData(rows);
+  }
+
+  function memoryDetailRow(label, value) {
+    if (!value) return '';
+    return '<div class="sv2-memory-detail-row">' +
+      '<dt>' + esc(label) + '</dt>' +
+      '<dd>' + esc(value) + '</dd>' +
+    '</div>';
+  }
+
+  function renderMemoryDetail(record) {
+    var detail = el('sv2-memory-detail');
+    if (!detail) return;
+    if (!record) {
+      detail.innerHTML = '<lex-empty message="Memory not found" icon="database"></lex-empty>';
+      return;
+    }
+
+    var title = memoryRecordTitle(record);
+    var typeLabel = memoryTypeLabel(record);
+    var scopeLabel = memoryScopeLabel(record) || 'Account';
+    var confidenceLabel = memoryConfidenceLabel(record);
+    var value = memoryRecordValue(record) || 'No value stored.';
+    var updated = formatDate(memoryRecordUpdated(record), true);
+    var created = formatDate(record.created_at || record.createdAt, true);
+    var keyLabel = record.key ? labelFromIdentifier(record.key) : '';
+    var meta = [];
+    if (typeLabel) meta.push(typeLabel);
+    if (scopeLabel) meta.push(scopeLabel);
+    if (confidenceLabel) meta.push(confidenceLabel);
+
+    detail.innerHTML =
+      '<lex-stack direction="vertical" gap="4">' +
+        '<div class="sv2-memory-detail-header">' +
+          '<lex-text variant="primary" size="body" weight="semibold" tag="h3">' + esc(title) + '</lex-text>' +
+          (meta.length ? '<lex-text variant="tertiary" size="body-sm" tag="p">' + esc(meta.join(' • ')) + '</lex-text>' : '') +
+        '</div>' +
+        '<section class="sv2-memory-detail-section">' +
+          '<lex-text variant="primary" size="body-sm" weight="semibold" tag="h4">Stored detail</lex-text>' +
+          '<p class="sv2-memory-detail-value">' + esc(value) + '</p>' +
+        '</section>' +
+        '<dl class="sv2-memory-detail-grid">' +
+          memoryDetailRow('Type', typeLabel) +
+          memoryDetailRow('Scope', scopeLabel) +
+          memoryDetailRow('Confidence', confidenceLabel) +
+          memoryDetailRow('Updated', updated) +
+          memoryDetailRow('Created', created) +
+          memoryDetailRow('Display key', keyLabel && keyLabel !== title ? keyLabel : '') +
+        '</dl>' +
+      '</lex-stack>';
+  }
+
+  function setMemoryModalView(view, record) {
+    var list = el('sv2-memory-list-view');
+    var detail = el('sv2-memory-detail-view');
+    var backBtn = el('sv2-memory-back-btn');
+    var refreshBtn = el('sv2-memory-modal-refresh-btn');
+    var status = el('sv2-memory-modal-status');
+    var isDetail = view === 'detail';
+
+    _memoryModalView = isDetail ? 'detail' : 'list';
+    if (list) list.hidden = isDetail;
+    if (detail) detail.hidden = !isDetail;
+    if (backBtn) backBtn.classList.toggle('sv2-hidden', !isDetail);
+    if (refreshBtn) refreshBtn.classList.toggle('sv2-hidden', isDetail);
+    if (status) status.classList.toggle('sv2-hidden', isDetail);
+    if (_memoryModal) _memoryModal.heading = isDetail ? 'Memory Details' : 'Manage Memories';
+    if (isDetail) renderMemoryDetail(record);
+  }
+
+  function handleMemoryRowClick(e) {
+    var detail = e && e.detail;
+    var row = detail && detail.row;
+    var record = (row && row._record) || memoryRecordById(detail && detail.id);
+    setMemoryModalView('detail', record);
   }
 
   function setMemoryModalStatus(message, isErr) {
@@ -424,18 +511,26 @@
         '</lex-text>' +
         '<lex-btn id="sv2-memory-modal-refresh-btn" variant="ghost" size="sm" icon="refresh-cw">Refresh</lex-btn>' +
       '</div>' +
-      '<lex-table ' +
-        'id="sv2-memory-table" ' +
-        'class="sv2-memory-table" ' +
-        'columns="memory,value,scope,updated" ' +
-        'labels="Memory,Value,Scope,Updated" ' +
-        'empty-text="No active memories yet" ' +
-        'sort-by="updated" ' +
-        'sort-dir="desc" ' +
-        'searchable ' +
-        'compact ' +
-        'aria-label="LANA memory records">' +
-      '</lex-table>';
+      '<section id="sv2-memory-list-view">' +
+        '<lex-table ' +
+          'id="sv2-memory-table" ' +
+          'class="sv2-memory-table" ' +
+          'columns="memory,scope,updated" ' +
+          'labels="Memory,Scope,Updated" ' +
+          'empty-text="No active memories yet" ' +
+          'sort-by="updated" ' +
+          'sort-dir="desc" ' +
+          'searchable ' +
+          'compact ' +
+          'aria-label="LANA memory records">' +
+        '</lex-table>' +
+      '</section>' +
+      '<section id="sv2-memory-detail-view" hidden>' +
+        '<lex-stack direction="vertical" gap="4">' +
+          '<lex-btn id="sv2-memory-back-btn" variant="ghost" size="sm" icon="arrow-left">Back</lex-btn>' +
+          '<div id="sv2-memory-detail" class="sv2-memory-detail"></div>' +
+        '</lex-stack>' +
+      '</section>';
 
     _memoryModal = Lex.Modal.open({
       heading: 'Manage Memories',
@@ -447,6 +542,7 @@
 
     _memoryModal.addEventListener('lex-close', function () {
       _memoryModal = null;
+      _memoryModalView = 'list';
     });
 
     setTimeout(function () {
@@ -456,6 +552,15 @@
           loadMemoryRecords({ force: true });
         });
       }
+      var backBtn = el('sv2-memory-back-btn');
+      if (backBtn) {
+        backBtn.addEventListener('click', function () {
+          setMemoryModalView('list');
+        });
+      }
+      var table = el('sv2-memory-table');
+      if (table) table.addEventListener('row-click', handleMemoryRowClick);
+      setMemoryModalView(_memoryModalView === 'detail' ? 'detail' : 'list');
       renderMemoryTable(_memoryRecords);
       if (_memoryLoading) setMemoryLoadingState(true);
       if (!_memoryLoaded) loadMemoryRecords();
