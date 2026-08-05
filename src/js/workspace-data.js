@@ -1044,8 +1044,10 @@
     // Listen for tool switches to update context-type
     panel.addEventListener('lex-lana-tool-select', function (e) {
       var toolId = e.detail && e.detail.toolId;
-      if (toolId === 'skills_chat' || toolId === 'insights_chat') {
-        panel.setContextType(toolId);
+      if (toolId === 'skills_chat') {
+        panel.setContextType('automations_chat');
+      } else if (toolId === 'insights_chat') {
+        panel.setContextType('insights_chat');
       }
     });
     panel.addEventListener('lex-lana-tool-dismiss', function () {
