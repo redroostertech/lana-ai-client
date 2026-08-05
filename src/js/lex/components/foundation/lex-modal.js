@@ -182,7 +182,7 @@
         overflow-y: auto;
       }
 
-      .lex-modal-body > slot-content {
+      .lex-modal-body > slot-content[data-lex-modal-content] {
         display: block !important;
         min-width: 0;
         min-height: 0;
@@ -439,7 +439,7 @@
       }
 
       // Body
-      html += `<div class="lex-modal-body"><slot-content></slot-content></div>`;
+      html += `<div class="lex-modal-body"><slot-content data-lex-modal-content></slot-content></div>`;
 
       // Footer / Actions
       if (this.footerContent) {
@@ -456,6 +456,16 @@
       html += `</div></div>`;
 
       return html;
+    }
+
+    _restoreContent() {
+      const slot = this.querySelector('.lex-modal-body > slot-content[data-lex-modal-content]');
+      if (slot && this._originalChildren) {
+        slot.innerHTML = '';
+        for (const node of this._originalChildren) {
+          slot.appendChild(node.cloneNode(true));
+        }
+      }
     }
 
     updated(changedProps) {
