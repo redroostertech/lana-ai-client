@@ -17,6 +17,7 @@
   var _memoryLoading = null;
   var _memoryModal = null;
   var _memoryModalView = 'list';
+  var _memoryDeleting = false;
 
   function el(id) { return document.getElementById(id); }
   // Field ids are sv2-pz-<name-with-dashes>, e.g. custom_instructions -> sv2-pz-custom-instructions.
@@ -264,6 +265,10 @@
     return String((record && (record.id || record.record_id || record.key)) || index);
   }
 
+  function memoryRecordApiId(record) {
+    return record && (record.id || record.record_id);
+  }
+
   function memoryRecordUpdated(record) {
     return record && (record.updated_at || record.updatedAt || record.last_used_at || record.lastUsedAt || record.created_at || record.createdAt);
   }
@@ -311,15 +316,18 @@
 
   function mapMemoryRecord(record, index) {
     var updated = memoryRecordUpdated(record);
+    var apiId = memoryRecordApiId(record);
     return {
       id: memoryRecordId(record, index),
       memory: memoryRecordTitle(record),
       value: memoryRecordValue(record) || 'No value stored.',
       scope: memoryScopeLabel(record) || 'Account',
       updated: formatDate(updated, true) || '',
+      actions: apiId ? 'delete' : '',
       _typeLabel: memoryTypeLabel(record),
       _confidenceLabel: memoryConfidenceLabel(record),
       _keyLabel: record && record.key ? labelFromIdentifier(record.key) : '',
+      _apiId: apiId ? String(apiId) : '',
       _record: record
     };
   }
@@ -352,6 +360,19 @@
     '</div>';
   }
 
+  function renderMemoryActionCell(value, row) {
+    if (!row || !row._apiId) return '';
+    return '<lex-btn ' +
+      'variant="ghost" ' +
+      'size="sm" ' +
+      'icon="trash-2" ' +
+      'aria-label="Forget memory" ' +
+      'data-memory-action="delete" ' +
+      'data-memory-id="' + esc(row._apiId) + '">' +
+      'Forget' +
+    '</lex-btn>';
+  }
+
   function renderMemoryTable(records) {
     var table = el('sv2-memory-table');
     if (!table || typeof table.setData !== 'function') return;
@@ -359,10 +380,117 @@
     for (var i = 0; i < records.length; i++) rows.push(mapMemoryRecord(records[i], i));
     if (typeof table.setCellRenderers === 'function') {
       table.setCellRenderers({
-        memory: renderMemoryNameCell
+        memory: renderMemoryNameCell,
+        actions: renderMemoryActionCell
       });
     }
     table.setData(rows);
+  }
+
+  function setMemoryDeletingState(isDeleting) {
+    _memoryDeleting = !!isDeleting;
+    var clearBtn = el('sv2-memory-clear-all-btn');
+    var refreshBtn = el('sv2-memory-modal-refresh-btn');
+    var deleteBtns = document.querySelectorAll('[data-memory-action="delete"]');
+    if (clearBtn) {
+      clearBtn.loading = _memoryDeleting;
+      clearBtn.disabled = _memoryDeleting || _memoryRecords.length === 0;
+    }
+    if (refreshBtn) refreshBtn.disabled = _memoryDeleting;
+    for (var i = 0; i < deleteBtns.length; i++) {
+      deleteBtns[i].disabled = _memoryDeleting;
+    }
+  }
+
+  function refreshMemoryAfterDelete(message) {
+    return loadMemoryRecords({ force: true }).then(function () {
+      var table = el('sv2-memory-table');
+      if (table && typeof table.deselectAll === 'function') table.deselectAll();
+      setMemoryModalView('list');
+      if (message && window.Lex && Lex.Toast) Lex.Toast.success(message);
+    });
+  }
+
+  function deleteMemoryIds(ids, options) {
+    options = options || {};
+    ids = Array.isArray(ids) ? ids.filter(Boolean).map(String) : [];
+    if (ids.length === 0 || _memoryDeleting) return Promise.resolve();
+    var api = window.api;
+    if (!api || typeof api.deleteMemoryRecords !== 'function') {
+      if (window.Lex && Lex.Toast) Lex.Toast.error('Memory deletion is unavailable.');
+      return Promise.resolve();
+    }
+
+    setMemoryDeletingState(true);
+    var request = ids.length === 1 && typeof api.deleteMemoryRecord === 'function'
+      ? api.deleteMemoryRecord(ids[0])
+      : api.deleteMemoryRecords(ids);
+
+    return request.then(function () {
+      return refreshMemoryAfterDelete(options.successMessage || (ids.length === 1 ? 'Memory forgotten.' : ids.length + ' memories forgotten.'));
+    }).catch(function (error) {
+      if (window.Lex && Lex.Toast) Lex.Toast.error((error && error.message) || 'Could not forget memory.');
+    }).finally(function () {
+      setMemoryDeletingState(false);
+    });
+  }
+
+  function confirmDeleteMemoryIds(ids) {
+    ids = Array.isArray(ids) ? ids.filter(Boolean).map(String) : [];
+    if (ids.length === 0) return;
+    var title = ids.length === 1 ? 'Forget Memory' : 'Forget Memories';
+    var message = ids.length === 1
+      ? 'This memory will no longer be used for personalization. Continue?'
+      : 'These ' + ids.length + ' memories will no longer be used for personalization. Continue?';
+    Lex.Modal.confirm(title, message, function () {
+      deleteMemoryIds(ids);
+    }, {
+      variant: 'danger',
+      confirmText: ids.length === 1 ? 'Forget Memory' : 'Forget Memories'
+    });
+  }
+
+  function clearAllMemories() {
+    if (_memoryDeleting || _memoryRecords.length === 0) return;
+    var api = window.api;
+    if (!api || typeof api.clearMemoryRecords !== 'function') {
+      if (window.Lex && Lex.Toast) Lex.Toast.error('Memory deletion is unavailable.');
+      return;
+    }
+
+    Lex.Modal.confirm('Clear All Memories', 'This will forget all account memories shown in settings. Continue?', function () {
+      setMemoryDeletingState(true);
+      api.clearMemoryRecords().then(function (res) {
+        var count = Number(res && (res.deleted_count || (res.data && res.data.deleted_count))) || _memoryRecords.length;
+        return refreshMemoryAfterDelete(count === 1 ? '1 memory forgotten.' : count + ' memories forgotten.');
+      }).catch(function (error) {
+        if (window.Lex && Lex.Toast) Lex.Toast.error((error && error.message) || 'Could not clear memories.');
+      }).finally(function () {
+        setMemoryDeletingState(false);
+      });
+    }, {
+      variant: 'danger',
+      confirmText: 'Clear All'
+    });
+  }
+
+  function handleMemoryBulkAction(e) {
+    var detail = e && e.detail;
+    if (!detail || detail.action !== 'delete-selected') return;
+    var items = Array.isArray(detail.items) ? detail.items : [];
+    var ids = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i]._apiId) ids.push(items[i]._apiId);
+    }
+    confirmDeleteMemoryIds(ids);
+  }
+
+  function handleMemoryActionClick(e) {
+    var btn = e && e.target && e.target.closest && e.target.closest('[data-memory-action="delete"]');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    confirmDeleteMemoryIds([btn.getAttribute('data-memory-id')]);
   }
 
   function memoryDetailRow(label, value) {
@@ -517,12 +645,13 @@
         '<lex-table ' +
           'id="sv2-memory-table" ' +
           'class="sv2-memory-table" ' +
-          'columns="memory,scope,updated" ' +
-          'labels="Memory,Scope,Updated" ' +
+          'columns="memory,scope,updated,actions" ' +
+          'labels="Memory,Scope,Updated," ' +
           'empty-text="No active memories yet" ' +
           'sort-by="updated" ' +
           'sort-dir="desc" ' +
           'searchable ' +
+          'selectable ' +
           'compact ' +
           'aria-label="LANA memory records">' +
         '</lex-table>' +
@@ -538,7 +667,8 @@
       content: content,
       hideActions: true,
       size: 'xl',
-      closeOnOverlay: true
+      closeOnOverlay: true,
+      footerContent: '<lex-btn id="sv2-memory-clear-all-btn" variant="danger" size="sm" icon="trash-2">Clear all memories</lex-btn>'
     });
 
     _memoryModal.addEventListener('lex-close', function () {
@@ -557,9 +687,17 @@
         });
       }
       var table = el('sv2-memory-table');
-      if (table) table.addEventListener('row-click', handleMemoryRowClick);
+      if (table) {
+        table.bulkActions = [{ label: 'Forget selected', action: 'delete-selected', variant: 'danger' }];
+        table.addEventListener('row-click', handleMemoryRowClick);
+        table.addEventListener('bulk-action', handleMemoryBulkAction);
+        table.addEventListener('click', handleMemoryActionClick);
+      }
+      var clearBtn = el('sv2-memory-clear-all-btn');
+      if (clearBtn) clearBtn.addEventListener('click', clearAllMemories);
       setMemoryModalView(_memoryModalView === 'detail' ? 'detail' : 'list');
       renderMemoryTable(_memoryRecords);
+      setMemoryDeletingState(false);
       if (_memoryLoading) setMemoryLoadingState(true);
       if (!_memoryLoaded) loadMemoryRecords();
     }, 0);

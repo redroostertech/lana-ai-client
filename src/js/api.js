@@ -2885,6 +2885,33 @@ class ApiClient {
     return this.get('/api/v1/memory/v2/records' + (queryString ? '?' + queryString : ''));
   }
 
+  async deleteMemoryRecord(recordId, params = {}) {
+    if (!this.user?.id) throw new Error('Not logged in');
+    if (!recordId) throw new Error('Memory record ID is required');
+    const query = new URLSearchParams();
+    if (params.matter_id) query.set('matter_id', String(params.matter_id));
+    const queryString = query.toString();
+    return this.delete('/api/v1/memory/v2/records/' + encodeURIComponent(recordId) + (queryString ? '?' + queryString : ''));
+  }
+
+  async deleteMemoryRecords(recordIds, params = {}) {
+    if (!this.user?.id) throw new Error('Not logged in');
+    const ids = Array.isArray(recordIds) ? recordIds.filter(Boolean).map(String) : [];
+    if (ids.length === 0) throw new Error('At least one memory record ID is required');
+    const query = new URLSearchParams();
+    if (params.matter_id) query.set('matter_id', String(params.matter_id));
+    const queryString = query.toString();
+    return this.delete('/api/v1/memory/v2/records' + (queryString ? '?' + queryString : ''), { record_ids: ids });
+  }
+
+  async clearMemoryRecords(params = {}) {
+    if (!this.user?.id) throw new Error('Not logged in');
+    const query = new URLSearchParams();
+    if (params.matter_id) query.set('matter_id', String(params.matter_id));
+    const queryString = query.toString();
+    return this.delete('/api/v1/memory/v2/records' + (queryString ? '?' + queryString : ''), { clear_all: true });
+  }
+
   async getPreferences() {
     if (!this.user?.id) throw new Error('Not logged in');
     return this.get('/api/v1/users/me/preferences');
