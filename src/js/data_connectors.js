@@ -139,6 +139,30 @@
     return authTypeMap[authType] || formatText(authType);
   }
 
+  function normalizeConnectorScope(scope) {
+    var value = String(scope || '').trim().toLowerCase();
+    if (value === 'user' || value === 'personal') return 'user';
+    if (value === 'organization' || value === 'org' || value === 'firm') return 'org';
+    return 'org';
+  }
+
+  function formatConnectorScope(connector) {
+    return normalizeConnectorScope(
+      connector && (
+        connector.connector_scope ||
+        connector.scope ||
+        (connector.manifest && connector.manifest.scope) ||
+        (connector.metadata && connector.metadata.scope)
+      )
+    ) === 'user' ? 'Personal' : 'Firm';
+  }
+
+  function renderScopeBadge(connector) {
+    var label = formatConnectorScope(connector);
+    var color = label === 'Personal' ? 'blue' : 'gray';
+    return '<lex-badge color="' + color + '" label="' + label + '" size="sm"></lex-badge>';
+  }
+
   function connectorIdentity(connector) {
     connector = connector || {};
     return String(
@@ -244,6 +268,7 @@
       category: manifest.category || metadata.category || connector.category || connector.connector_category || 'unknown',
       vendor: manifest.vendor || metadata.vendor || metadata.created_by || connector.vendor || '',
       auth_type: connector.auth_type || connector.authType || auth.type || 'unknown',
+      connector_scope: normalizeConnectorScope(connector.connector_scope || connector.scope || manifest.scope || metadata.scope),
       version: connector.version || manifest.version || '1.0.0',
       logo_url: manifest.icon || connector.logo_url || connector.logo || connector.icon || null,
       tags: connector.tags || [],
@@ -331,6 +356,7 @@
     }
     if (key === 'category') return normalized.category || '';
     if (key === 'auth') return normalized.auth_type || '';
+    if (key === 'scope') return formatConnectorScope(connector);
     if (key === 'version') return normalized.version || '';
     return normalized.name || '';
   }
@@ -508,7 +534,8 @@
       tags: connector.tags || [],
       documentation_url: connector.documentation_url || null,
       ui_entry_point: connector.ui_entry_point || null,
-      ui_layout_id: connector.ui_layout_id || null
+      ui_layout_id: connector.ui_layout_id || null,
+      connector_scope: normalizeConnectorScope(connector.connector_scope || connector.scope || manifest.scope)
     };
 
     /**
@@ -541,7 +568,7 @@
     var cardClick = '';
     if (!isComingSoon) {
       if (hasCustomUI) {
-        cardClick = 'onclick="openCustomConnectorUI(\'' + normalizedConnector.ui_entry_point + '\', \'' + normalizedConnector.name + '\', \'' + normalizedConnector.id + '\', \'' + (normalizedConnector.connector_id || normalizedConnector.connector_type || '') + '\')"';
+        cardClick = 'onclick="openCustomConnectorUI(\'' + normalizedConnector.ui_entry_point + '\', \'' + normalizedConnector.name + '\', \'' + normalizedConnector.id + '\', \'' + (normalizedConnector.connector_id || normalizedConnector.connector_type || '') + '\', \'' + normalizedConnector.connector_scope + '\')"';
       } else {
         cardClick = 'onclick="openConnector(\'' + normalizedConnector.id + '\', \'' + normalizedConnector.category + '\')"';
       }
@@ -583,6 +610,7 @@
       '</td>' +
       '<td>' + formatText(normalizedConnector.category) + '</td>' +
       '<td>' + formatAuthType(normalizedConnector.auth_type) + '</td>' +
+      '<td>' + renderScopeBadge(normalizedConnector) + '</td>' +
       '<td><lex-badge color="' + badgeConfig.color + '" label="' + badgeConfig.label + '" size="sm"></lex-badge></td>' +
       '<td>' + ((isActive || isInstalled) ? timeAgoStr : 'Never') + '</td>' +
       '<td><div class="dc-row-actions">' + buttonsHtml + '</div></td>' +
@@ -647,6 +675,7 @@
       '</td>' +
       '<td>' + escapeHtml(formatText(normalized.category)) + '</td>' +
       '<td>' + escapeHtml(formatAuthType(normalized.auth_type)) + '</td>' +
+      '<td>' + renderScopeBadge(normalized) + '</td>' +
       '<td><lex-badge color="' + badgeConfig.color + '" label="' + badgeConfig.label + '" size="sm"></lex-badge></td>' +
       '<td>' + escapeHtml(normalized.version ? 'v' + normalized.version : 'v1.0.0') + '</td>' +
       '<td><div class="dc-row-actions">' + actionButton + updateButton + '</div></td>' +
@@ -708,7 +737,8 @@
       return {
         connector: connector,
         sourceId: sourceId,
-        connectorType: catalogConnectorId || getCatalogConnectorSlug(connector, connectorId)
+        connectorType: catalogConnectorId || getCatalogConnectorSlug(connector, connectorId),
+        connectorScope: normalizeConnectorScope(connector.connector_scope || connector.scope || (connector.manifest && connector.manifest.scope))
       };
     }
 
@@ -732,6 +762,7 @@
       name: connectorName,
       connector_id: catalogConnectorId,
       connector_type: catalogConnectorId,
+      connector_scope: normalizeConnectorScope(connector.connector_scope || connector.scope || (connector.manifest && connector.manifest.scope)),
       status: 'configured',
       auth_status: 'configured'
     });
@@ -742,7 +773,8 @@
     return {
       connector: sourceConnector,
       sourceId: sourceId,
-      connectorType: catalogConnectorId
+      connectorType: catalogConnectorId,
+      connectorScope: normalizeConnectorScope(sourceConnector.connector_scope)
     };
   }
 
@@ -760,12 +792,18 @@
       : connector && isUuid(connector.id)
         ? connector.id
         : '';
+    var connectorScope = context
+      ? context.connectorScope
+      : connector
+        ? normalizeConnectorScope(connector.connector_scope || connector.scope || (connector.manifest && connector.manifest.scope))
+        : '';
 
     return buildCustomConnectorUIUrl(
       contextConnector && contextConnector.ui_entry_point ? contextConnector.ui_entry_point : '',
       contextConnector ? (contextConnector.name || contextConnector.connector_name || contextConnector.source_name || 'Connector') : 'Connector',
       sourceId,
-      catalogConnectorId
+      catalogConnectorId,
+      connectorScope
     );
   }
 
@@ -791,22 +829,23 @@
     openConnectorManage(connectorId);
   }
 
-  function buildCustomConnectorUIUrl(uiEntryPoint, connectorName, sourceId, connectorType) {
+  function buildCustomConnectorUIUrl(uiEntryPoint, connectorName, sourceId, connectorType, connectorScope) {
     var params = new URLSearchParams({
       ui: uiEntryPoint,
       name: connectorName,
       connectorId: connectorType || sourceId || '',
       connectorType: connectorType || '',
       sourceId: sourceId || '',
+      connectorScope: connectorScope || '',
       chrome: 'embedded'
     });
 
     return 'integrations/connector-viewer.html?' + params.toString();
   }
 
-  function openCustomConnectorUI(uiEntryPoint, connectorName, sourceId, connectorType) {
+  function openCustomConnectorUI(uiEntryPoint, connectorName, sourceId, connectorType, connectorScope) {
     openConnectorDashboardModal(
-      buildCustomConnectorUIUrl(uiEntryPoint, connectorName, sourceId, connectorType),
+      buildCustomConnectorUIUrl(uiEntryPoint, connectorName, sourceId, connectorType, connectorScope || ''),
       connectorName || 'Connector Dashboard'
     );
   }
@@ -899,6 +938,7 @@
       logo_url: connector.logo_url || connector.logo || connector.icon || null,
       vendor: connector.vendor || null,
       auth_type: connector.auth_type || 'unknown',
+      connector_scope: normalizeConnectorScope(connector.connector_scope || connector.scope || (connector.manifest && connector.manifest.scope)),
       capabilities: connector.capabilities || [],
       tags: connector.tags || [],
       documentation_url: connector.documentation_url || null
@@ -928,6 +968,7 @@
         ? 'background:var(--lex-bg-accent-muted);color:var(--lex-text-accent)'
         : 'background:var(--lex-status-neutral-bg);color:var(--lex-status-neutral-text)';
     contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Authentication</h4><span class="inline-flex items-center px-3 py-1 rounded-full text-sm" style="' + authStyle + '">' + authTypeLabel + '</span></div>');
+    contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Scope</h4>' + renderScopeBadge(nc) + '</div>');
 
     if (nc.capabilities && nc.capabilities.length > 0) {
       contentParts.push('<div><h4 class="font-semibold mb-2" style="color:var(--lex-text-primary)">Capabilities</h4><div class="flex flex-wrap gap-2">' +
@@ -1053,7 +1094,8 @@
         connector.ui_entry_point,
         (connector.manifest && connector.manifest.name) || connector.name,
         connector.id || '',
-        connector.connector_id || connector.connector_type || connector.id || ''
+        connector.connector_id || connector.connector_type || connector.id || '',
+        normalizeConnectorScope(connector.connector_scope || connector.scope || (connector.manifest && connector.manifest.scope))
       );
     } else {
       openConnectorManage(connector.id);
@@ -1238,7 +1280,7 @@
     if (connectorsCurrentPage < 1) connectorsCurrentPage = 1;
 
     if (total === 0) {
-      availableContainer.innerHTML = '<tr><td colspan="7" class="dc-empty">No connectors match the current filters.</td></tr>';
+      availableContainer.innerHTML = '<tr><td colspan="8" class="dc-empty">No connectors match the current filters.</td></tr>';
       noResultsMessage.classList.add('hidden');
       if (summaryEl) summaryEl.textContent = 'Showing 0 connectors';
       if (pageLabelEl) pageLabelEl.textContent = 'Page 1 of 1';

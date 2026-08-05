@@ -1,6 +1,7 @@
 import { badge, filterCollection, sectionIntro, surface } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, formatLabel, normalizeText } from '../shared/utils.js';
 import { hasAdminRole } from '../shared/access.js';
+import { connectorScopeLabel } from '../shared/connectors.js';
 
 export function connectorDisplayName(connector) {
   const raw = connector.metadata?.name || connector.name || connector.id || connector.connector_id || 'Connector';
@@ -126,6 +127,7 @@ export function connectorCompact(context, connector) {
     <article class="check-item">
       <div class="badge-row">
         ${badge(readiness.label, readiness.tone)}
+        ${badge(connectorScopeLabel(connector), connectorScopeLabel(connector) === 'Personal' ? 'info' : '')}
         ${badge(connector.auth?.type || connector.metadata?.category || 'runtime')}
       </div>
       <strong>${escapeHtml(connectorDisplayName(connector))}</strong>
@@ -158,10 +160,15 @@ function connectorVersionRaw(connector) {
   return String(connector?.version || '').trim();
 }
 
+function connectorScopeRaw(connector) {
+  return connectorScopeLabel(connector).toLowerCase();
+}
+
 function matchesConnectorFilters(context, connector, filters) {
   if (!matchesConnectorState(context, connector, filters.state)) return false;
   if (filters.category && filters.category !== 'all' && connectorCategoryRaw(connector) !== filters.category) return false;
   if (filters.auth && filters.auth !== 'all' && connectorAuthRaw(connector) !== filters.auth) return false;
+  if (filters.scope && filters.scope !== 'all' && connectorScopeRaw(connector) !== filters.scope) return false;
   if (filters.version && filters.version !== 'all' && connectorVersionRaw(connector) !== filters.version) return false;
   return true;
 }
@@ -187,6 +194,7 @@ function connectorSortValue(context, connector, sortBy) {
   if (sortBy === 'status') return connectorReadiness(context, connector).label;
   if (sortBy === 'category') return connector.category || connector.metadata?.category || '';
   if (sortBy === 'auth') return connector.auth_type || connector.auth?.type || '';
+  if (sortBy === 'scope') return connectorScopeLabel(connector);
   if (sortBy === 'version') return connector.version || '1.0.0';
   if (sortBy === 'id') return connector.id || connector.connector_id || '';
   return connectorDisplayName(connector);
@@ -250,6 +258,7 @@ function connectorTableRow(context, connector) {
       <td>${escapeHtml(connectorDisplayName(connector))}</td>
       <td>${escapeHtml(formatLabel(connector.category || connector.metadata?.category || 'connector'))}</td>
       <td>${escapeHtml(formatLabel(connector.auth_type || connector.auth?.type || 'runtime'))}</td>
+      <td>${badge(connectorScopeLabel(connector), connectorScopeLabel(connector) === 'Personal' ? 'info' : '')}</td>
       <td>${badge(readiness.label, readiness.tone)}</td>
       <td>${escapeHtml(connector.version || '1.0.0')}</td>
       <td>
@@ -456,6 +465,7 @@ export function renderConnectors(context) {
       connectorDisplayName(connector),
       connector.description || connector.metadata?.description,
       connector.auth_type || connector.auth?.type,
+      connectorScopeLabel(connector),
       connector.category || connector.metadata?.category
     ],
     (connector, activeFilters) => matchesConnectorFilters(context, connector, activeFilters)
@@ -560,6 +570,14 @@ export function renderConnectors(context) {
             </select>
           </label>
           <label class="toolbar-select">
+            <span>Scope</span>
+            <select data-filter-view="connectors" data-filter-field="scope">
+              <option value="all" ${(filters.scope || 'all') === 'all' ? 'selected' : ''}>All</option>
+              <option value="personal" ${filters.scope === 'personal' ? 'selected' : ''}>Personal</option>
+              <option value="firm" ${filters.scope === 'firm' ? 'selected' : ''}>Firm</option>
+            </select>
+          </label>
+          <label class="toolbar-select">
             <span>Version</span>
             <select data-filter-view="connectors" data-filter-field="version">
               <option value="all" ${(filters.version || 'all') === 'all' ? 'selected' : ''}>All</option>
@@ -586,6 +604,7 @@ export function renderConnectors(context) {
                 <th><button type="button" class="connectors-sort-btn" data-connectors-sort="name">Name${sortIndicator(filters, 'name')}</button></th>
                 <th><button type="button" class="connectors-sort-btn" data-connectors-sort="category">Category${sortIndicator(filters, 'category')}</button></th>
                 <th><button type="button" class="connectors-sort-btn" data-connectors-sort="auth">Auth${sortIndicator(filters, 'auth')}</button></th>
+                <th><button type="button" class="connectors-sort-btn" data-connectors-sort="scope">Scope${sortIndicator(filters, 'scope')}</button></th>
                 <th><button type="button" class="connectors-sort-btn" data-connectors-sort="status">Status${sortIndicator(filters, 'status')}</button></th>
                 <th><button type="button" class="connectors-sort-btn" data-connectors-sort="version">Version${sortIndicator(filters, 'version')}</button></th>
                 <th>Action</th>
@@ -594,7 +613,7 @@ export function renderConnectors(context) {
             <tbody>
               ${paged.length
                 ? paged.map((connector) => connectorTableRow(context, connector)).join('')
-                : `<tr><td colspan="7" class="connectors-empty">No connectors match the current filters.</td></tr>`}
+                : `<tr><td colspan="8" class="connectors-empty">No connectors match the current filters.</td></tr>`}
             </tbody>
           </table>
         </div>

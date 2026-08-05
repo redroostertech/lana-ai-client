@@ -105,6 +105,14 @@ export function normalizeConnector(raw) {
       || manifest.auth?.type
       || systemDefaults?.auth_type
       || 'unknown',
+    connector_scope: normalizeConnectorScope(
+      raw.connector_scope
+      || raw.scope
+      || manifest.scope
+      || metadata.scope
+      || systemDefaults?.connector_scope
+      || systemDefaults?.scope
+    ),
     status: raw.status || 'disconnected',
     records: raw.records || raw.total_records || 0,
     last_sync: raw.lastSync || raw.last_sync || raw.last_sync_at || null,
@@ -125,6 +133,26 @@ export function normalizeConnector(raw) {
     isSystem: Boolean(systemDefaults),
     _raw: raw
   };
+}
+
+export function normalizeConnectorScope(scope) {
+  const value = String(scope || '').trim().toLowerCase();
+  if (value === 'user' || value === 'personal') return 'user';
+  if (value === 'organization' || value === 'org' || value === 'firm') return 'org';
+  return 'org';
+}
+
+export function connectorScopeLabel(connector) {
+  return normalizeConnectorScope(
+    connector?.connector_scope ||
+    connector?.scope ||
+    connector?.manifest?.scope ||
+    connector?.metadata?.scope ||
+    connector?._raw?.connector_scope ||
+    connector?._raw?.manifest?.scope
+  ) === 'user'
+    ? 'Personal'
+    : 'Firm';
 }
 
 /**
@@ -301,7 +329,8 @@ export function buildLanaClientConnectorUrl(connector, baseUrl = '/lex-framework
     name: connector.name || connector.connector_name || connector.source_name || 'Connector',
     connectorId: rowId,
     connectorType,
-    sourceId: connector.id || ''
+    sourceId: connector.id || '',
+    connectorScope: connector.connector_scope || ''
   });
   return `${base}/integrations/connector-viewer.html?${params.toString()}`;
 }

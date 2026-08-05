@@ -573,6 +573,7 @@
       sourceId: urlParams.get('sourceId') || '',
       connectorType: urlParams.get('connectorType') || '',
       connectorId: urlParams.get('connectorId') || '',
+      connectorScope: normalizeConnectorScope(urlParams.get('connectorScope') || ''),
       connectorName: urlParams.get('name') || 'Connector',
       uiEntryPoint: urlParams.get('ui') || '',
       catalog: null,
@@ -938,6 +939,17 @@
       return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
     }
 
+    function normalizeConnectorScope(scope) {
+      const value = String(scope || '').trim().toLowerCase();
+      if (value === 'user' || value === 'personal') return 'user';
+      if (value === 'organization' || value === 'org' || value === 'firm') return 'org';
+      return 'org';
+    }
+
+    function connectorScopeLabel() {
+      return state.connectorScope === 'user' ? 'Personal' : 'Firm';
+    }
+
     function normalizeFieldOption(option) {
       if (option == null) {
         return null;
@@ -1036,6 +1048,7 @@
       if (match) {
         state.sourceId = state.sourceId || match.id || '';
         state.connectorType = state.connectorType || match.connector_id || match.connector_type || '';
+        state.connectorScope = normalizeConnectorScope(match.connector_scope || match.scope || match.manifest?.scope || match.metadata?.scope || state.connectorScope);
         state.connectorName = match.name || state.connectorName;
         state.uiEntryPoint = state.uiEntryPoint || match.ui_entry_point || '';
       }
@@ -1050,6 +1063,13 @@
             catalogConnector.name ||
             state.connectorName ||
             connectorType;
+          state.connectorScope = normalizeConnectorScope(
+            catalogConnector.connector_scope ||
+            catalogConnector.scope ||
+            catalogConnector.manifest?.scope ||
+            catalogConnector.metadata?.scope ||
+            state.connectorScope
+          );
 
           const createResult = await api.post('/api/v1/integrations/connectors/configure', {
             connector_type: connectorType,
@@ -1086,6 +1106,13 @@
 
       const result = await api.get(`/api/v1/integrations/connectors/catalog/${encodeURIComponent(state.connectorType)}`);
       state.catalog = result.connector || null;
+      state.connectorScope = normalizeConnectorScope(
+        state.catalog?.connector_scope ||
+        state.catalog?.scope ||
+        state.catalog?.manifest?.scope ||
+        state.catalog?.metadata?.scope ||
+        state.connectorScope
+      );
     }
 
     function normalizeCatalogField(field, fallbackRequired) {
@@ -1322,6 +1349,7 @@
         connectorId: connectorType || sourceId,
         connectorType: connectorType || '',
         sourceId,
+        connectorScope: normalizeConnectorScope(connector?.connector_scope || connector?.scope || connector?.manifest?.scope || connector?.metadata?.scope),
         chrome: 'embedded'
       });
 
@@ -3060,6 +3088,7 @@
         : [];
       const summaryItems = [
         `<div class="flex items-start justify-between gap-6"><span class="text-gray-500">Configured fields</span><span class="font-medium text-gray-900">${configuredFields.length}</span></div>`,
+        `<div class="flex items-start justify-between gap-6"><span class="text-gray-500">Scope</span><span class="font-medium text-gray-900">${escapeHtml(connectorScopeLabel())}</span></div>`,
         ...configSummaryFields.map((field) => `<div class="flex items-start justify-between gap-6"><span class="text-gray-500">${escapeHtml(field.label || 'Value')}</span><span class="font-medium text-gray-900">${escapeHtml(getBehaviorFieldValue(field))}</span></div>`),
         `<div class="flex items-start justify-between gap-6"><span class="text-gray-500">Auth status</span><span class="font-medium text-gray-900">${escapeHtml(humanizeStatus(state.configResponse ? state.configResponse.auth_status : 'unknown'))}</span></div>`,
         `<div class="flex items-start justify-between gap-6"><span class="text-gray-500">Sync status</span><span class="font-medium text-gray-900">${escapeHtml(humanizeStatus(state.configResponse ? state.configResponse.sync_status : 'unknown'))}</span></div>`,
@@ -6938,6 +6967,7 @@
             params.set('sourceId', result.integrationSourceId);
             params.set('connectorId', connectorType);
             params.set('connectorType', connectorType);
+            params.set('connectorScope', state.connectorScope);
             params.set('tab', 'configuration');
             window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
           }

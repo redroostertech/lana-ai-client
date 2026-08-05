@@ -35,6 +35,9 @@ export async function loadCustomConnectorUi({
   iframe,
   uiEntryPoint,
   connectorId,
+  connectorType = '',
+  sourceId = '',
+  connectorScope = '',
   connectorName = '',
   token = '',
   lanaConfig = {}
@@ -62,6 +65,9 @@ export async function loadCustomConnectorUi({
   const rewritten = rewriteConnectorHtml(rawHtml, {
     uiEntryPoint,
     connectorId,
+    connectorType,
+    sourceId,
+    connectorScope,
     connectorName,
     token,
     lanaConfig
@@ -132,7 +138,16 @@ function appendCacheBust(url) {
   return `${url}${separator}_cb=${Date.now()}`;
 }
 
-function rewriteConnectorHtml(html, { uiEntryPoint, connectorId, connectorName, token, lanaConfig }) {
+function rewriteConnectorHtml(html, {
+  uiEntryPoint,
+  connectorId,
+  connectorType,
+  sourceId,
+  connectorScope,
+  connectorName,
+  token,
+  lanaConfig
+}) {
   let output = html;
 
   // Remove the legacy Tailwind reference that connector ZIPs often ship with.
@@ -145,7 +160,15 @@ function rewriteConnectorHtml(html, { uiEntryPoint, connectorId, connectorName, 
   output = output.replace(/href=["']assets\//gi, `href="${baseUrl}assets/`);
   output = output.replace(/src=["']js\//gi, `src="${baseUrl}js/`);
 
-  const configScript = buildConfigScript({ connectorId, connectorName, token, lanaConfig });
+  const configScript = buildConfigScript({
+    connectorId,
+    connectorType,
+    sourceId,
+    connectorScope,
+    connectorName,
+    token,
+    lanaConfig
+  });
   const tailwindScript = '<script src="https://cdn.tailwindcss.com"></script>';
   const tabStyles = `
     <style>
@@ -163,7 +186,15 @@ function rewriteConnectorHtml(html, { uiEntryPoint, connectorId, connectorName, 
   return output;
 }
 
-function buildConfigScript({ connectorId, connectorName, token, lanaConfig }) {
+function buildConfigScript({
+  connectorId,
+  connectorType,
+  sourceId,
+  connectorScope,
+  connectorName,
+  token,
+  lanaConfig
+}) {
   const resolvedApiBase = resolveAutomationApiBaseUrl((lanaConfig && lanaConfig.API_BASE_URL) || '');
   const effectiveToken = String(
     token
@@ -179,6 +210,9 @@ function buildConfigScript({ connectorId, connectorName, token, lanaConfig }) {
   const safeConfig = JSON.stringify(injectedConfig);
   const safeToken = JSON.stringify(effectiveToken);
   const safeConnectorId = JSON.stringify(String(connectorId || ''));
+  const safeConnectorType = JSON.stringify(String(connectorType || ''));
+  const safeSourceId = JSON.stringify(String(sourceId || connectorId || ''));
+  const safeConnectorScope = JSON.stringify(String(connectorScope || ''));
   const safeConnectorName = JSON.stringify(String(connectorName || ''));
   const safeApiBase = JSON.stringify(String(resolvedApiBase || ''));
 
@@ -189,10 +223,20 @@ function buildConfigScript({ connectorId, connectorName, token, lanaConfig }) {
       window.LanaConfig = ${safeConfig};
       window.LanaConnectorId = ${safeConnectorId};
       window.LanaConnectorName = ${safeConnectorName};
+      window.LanaConnector = {
+        id: ${safeConnectorId},
+        sourceId: ${safeSourceId},
+        connectorType: ${safeConnectorType},
+        scope: ${safeConnectorScope},
+        name: ${safeConnectorName}
+      };
       window.lanaAuth = {
         token: ${safeToken},
         apiBaseUrl: ${safeApiBase},
         connectorId: ${safeConnectorId},
+        sourceId: ${safeSourceId},
+        connectorType: ${safeConnectorType},
+        connectorScope: ${safeConnectorScope},
         source: 'blob-injection'
       };
       window.api = { token: ${safeToken}, baseUrl: ${safeApiBase} };
@@ -219,6 +263,10 @@ function buildConfigScript({ connectorId, connectorName, token, lanaConfig }) {
             token: data.token || window.lanaAuth.token,
             apiBaseUrl: data.apiBaseUrl || window.lanaAuth.apiBaseUrl,
             user: data.user || null,
+            connectorId: data.connectorId || window.lanaAuth.connectorId,
+            sourceId: data.sourceId || window.lanaAuth.sourceId,
+            connectorType: data.connectorType || window.lanaAuth.connectorType,
+            connectorScope: data.connectorScope || window.lanaAuth.connectorScope,
             source: 'postmessage'
           });
           try {
@@ -244,7 +292,13 @@ function buildConfigScript({ connectorId, connectorName, token, lanaConfig }) {
         });
 
         try {
-          window.parent.postMessage({ type: 'lana-ready', connectorId: ${safeConnectorId} }, '*');
+            window.parent.postMessage({
+              type: 'lana-ready',
+              connectorId: ${safeConnectorId},
+              sourceId: ${safeSourceId},
+              connectorType: ${safeConnectorType},
+              connectorScope: ${safeConnectorScope}
+            }, '*');
         } catch (_e) {}
       })();
     <\/script>

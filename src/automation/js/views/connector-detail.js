@@ -1,6 +1,6 @@
 import { badge, surface } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, formatLabel, timeAgo } from '../shared/utils.js';
-import { findConnectorById, isInstalled, normalizeConnector } from '../shared/connectors.js';
+import { connectorScopeLabel, findConnectorById, isInstalled, normalizeConnector } from '../shared/connectors.js';
 import { resolveAutomationApiBaseUrl } from '../shared/api-base-url.js';
 import { loadCustomConnectorUi } from '../shared/custom-ui-loader.js';
 
@@ -110,6 +110,7 @@ export function renderConnectorDetail(context) {
               </div>
               <div class="badge-row connector-detail-badges">
                 ${badge(statusLabel, statusTone)}
+                ${badge(connectorScopeLabel(connector), connectorScopeLabel(connector) === 'Personal' ? 'info' : '')}
                 ${connector.isSystem ? badge('System', 'info') : ''}
                 ${hasCustomUi ? badge('Custom UI', 'success') : ''}
               </div>
@@ -256,6 +257,7 @@ function renderManagedExternallyCard(connector, sourcesState) {
   const categoryLabel = formatLabel(connector.category);
   if (categoryLabel && connector.category !== 'unknown') meta.push({ label: 'Category', value: categoryLabel });
   if (connector.auth_type && connector.auth_type !== 'unknown') meta.push({ label: 'Authentication', value: formatLabel(connector.auth_type) });
+  meta.push({ label: 'Scope', value: connectorScopeLabel(connector) });
   if (connector.version) meta.push({ label: 'Version', value: `v${connector.version}` });
   if (connector.vendor) meta.push({ label: 'Vendor', value: connector.vendor });
 
@@ -419,6 +421,9 @@ async function mountCustomUi(context, connector) {
       iframe,
       uiEntryPoint: connector.ui_entry_point,
       connectorId: connector.id || connector.connector_id,
+      connectorType: connector.connector_id || connector.connector_type || connector.source_type || '',
+      sourceId: connector.id || '',
+      connectorScope: connector.connector_scope || '',
       connectorName: connector.name,
       token: context.state.token || '',
       lanaConfig

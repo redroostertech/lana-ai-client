@@ -46,7 +46,7 @@
     'help.html':                              { section: 'string' },
     'faq.html':                               { section: 'string' },
     'workflows/builder.html':                 { template: 'string' },
-    'integrations/connector-viewer.html':     { ui: 'string', name: 'string', tab: 'string', connectorId: 'string', connectorType: 'string', sourceId: 'string' },
+    'integrations/connector-viewer.html':     { ui: 'string', name: 'string', tab: 'string', connectorId: 'string', connectorType: 'string', sourceId: 'string', connectorScope: 'string' },
     'admin/user-details.html':                { userId: 'string' },
     'admin/session-details.html':             { sessionId: 'string' },
     'admin/roles_manager.html':               { id: 'string' },
