@@ -30,6 +30,7 @@
 
   var api = null;
   var currentMatterData = null;
+  var currentWorkspaceState = null;
   var currentTaskMatterId = null;
   var currentEditingTask = null;
   var workspaceTaskSuggestionState = null;
@@ -357,7 +358,8 @@
         api.getOrphanedFiles(matterId).catch(function () { return { orphaned_files: [], total_count: 0 }; }),
         api.getMatterTasks(matterId).catch(function () { return { tasks: [], total_count: 0 }; }),
         api.getComments(matterId, { limit: 0 }).catch(function () { return { data: [], pagination: { total: 0 } }; }),
-        api.getPinnedConversations({ matterId: matterId, limit: 100, offset: 0 }).catch(function () { return { sessions: [] }; })
+        api.getPinnedConversations({ matterId: matterId, limit: 100, offset: 0 }).catch(function () { return { sessions: [] }; }),
+        api.getMatterWorkspaceState(matterId, { view: 'summary' }).catch(function () { return null; })
       ]);
 
       // Extract results (match shapes returned by api.js methods)
@@ -378,6 +380,8 @@
       var tasksData = results[6].status === 'fulfilled' ? results[6].value : { tasks: [], total_count: 0 };
       var commentsResult = results[7].status === 'fulfilled' ? results[7].value : { data: [], pagination: { total: 0 } };
       var pinnedChatsData = results[8].status === 'fulfilled' ? results[8].value : { sessions: [] };
+      var workspaceStateResult = results[9].status === 'fulfilled' ? results[9].value : null;
+      currentWorkspaceState = (workspaceStateResult && (workspaceStateResult.workspace_state || workspaceStateResult.state)) || null;
       var commentCount = (commentsResult.pagination && commentsResult.pagination.total) || 0;
 
       // Extract contacts and notes from matter object (shadow tables)
@@ -400,7 +404,8 @@
         tasks: tasksData.tasks || [],
         contacts: contacts,
         notes: notes,
-        commentCount: commentCount
+        commentCount: commentCount,
+        workspaceState: currentWorkspaceState
       };
 
       currentTaskMatterId = matter.matter_id;
@@ -409,6 +414,7 @@
       // Set globals for shared components
       window.currentViewedMatter = matter;
       window.currentMatterData = currentMatterData;
+      window.currentWorkspaceState = currentWorkspaceState;
 
       // Set active matter context
       if (window.Lex && window.Lex.state) {
@@ -6072,53 +6078,44 @@
     return text.length > 90 ? text.slice(0, 87).replace(/\s+\S*$/, '') + '...' : text;
   }
 
+  function compactWorkspaceStateForTask(state) {
+    if (!state || typeof state !== 'object') return null;
+    return {
+      schema_version: state.schema_version || null,
+      revision: state.revision || null,
+      identity: state.identity || null,
+      standing_summary: state.standing_summary ? {
+        one_line: state.standing_summary.one_line || '',
+        current_posture: state.standing_summary.current_posture || '',
+        latest_material_change: state.standing_summary.latest_material_change || ''
+      } : null,
+      counts: state.counts || {
+        tasks: state.work && state.work.counts ? state.work.counts : null,
+        documents: state.documents && state.documents.counts ? state.documents.counts : null,
+        notes: state.notes_and_conversations && state.notes_and_conversations.notes ? state.notes_and_conversations.notes.counts : null,
+        contacts: state.participants_and_entities && state.participants_and_entities.counts ? state.participants_and_entities.counts : null
+      },
+      open_tasks: (state.open_tasks || (state.work && state.work.open_tasks) || []).slice(0, 8),
+      upcoming_deadlines: (state.upcoming_deadlines || (state.work && state.work.upcoming_deadlines) || []).slice(0, 6),
+      recent_documents: (state.recent_documents || (state.documents && state.documents.recent_documents) || []).slice(0, 8),
+      people: (state.people || (state.participants_and_entities && state.participants_and_entities.people) || []).slice(0, 8),
+      risks: (state.risks || []).slice(0, 6),
+      freshness: state.freshness || null,
+      provenance: state.provenance ? {
+        generated_by: state.provenance.generated_by || null
+      } : null
+    };
+  }
+
   function buildWorkspaceTaskContext() {
-    var matter = currentMatterData && currentMatterData.matter ? currentMatterData.matter : {};
-    var contacts = currentMatterData && Array.isArray(currentMatterData.contacts) ? currentMatterData.contacts : [];
-    var documents = currentMatterData && Array.isArray(currentMatterData.documents) ? currentMatterData.documents : [];
-    var tasks = Array.isArray(currentTasksList) ? currentTasksList : [];
-    var activities = currentMatterData && Array.isArray(currentMatterData.activities) ? currentMatterData.activities : [];
+    var workspaceState = compactWorkspaceStateForTask(currentWorkspaceState);
 
     return {
-      matter: {
-        id: matter.matter_id || matter.id || currentTaskMatterId || null,
-        name: matter.matter_name || matter.name || matter.title || '',
-        client_name: matter.client_name || matter.client || matter.company || '',
-        practice_area: matter.practice_area || matter.practiceArea || matter.matter_type || '',
-        status: matter.status || '',
-        description: matter.description_summary || matter.description || matter.summary || ''
-      },
-      counts: {
-        tasks: tasks.length,
-        open_tasks: tasks.filter(function (task) {
-          return ['complete', 'cancelled', 'Complete', 'Cancelled'].indexOf(task.status) === -1;
-        }).length,
-        documents: documents.length,
-        contacts: contacts.length,
-        recent_activity_items: activities.length
-      },
-      recent_tasks: tasks.slice(0, 8).map(function (task) {
-        return {
-          title: task.title || task.task_name || '',
-          status: task.status || '',
-          priority: task.priority || '',
-          due_date: task.due_date || null,
-          source: task.source || ''
-        };
-      }),
-      contacts: contacts.slice(0, 8).map(function (contact) {
-        return {
-          name: contact.name || contact.full_name || contact.display_name || '',
-          role: contact.role || contact.relationship || '',
-          email: contact.email || ''
-        };
-      }),
-      documents: documents.slice(0, 12).map(function (doc) {
-        return {
-          name: doc.original_filename || doc.filename || doc.name || '',
-          type: doc.document_type || doc.mime_type || doc.type || ''
-        };
-      })
+      workspace_state_ref: workspaceState ? {
+        revision: workspaceState.revision || null,
+        schema_version: workspaceState.schema_version || null
+      } : null,
+      client_context_policy: 'ui_reference_only_server_builds_authoritative_workspace_state'
     };
   }
 
@@ -6129,7 +6126,9 @@
       title: suggestions.title || '',
       description: String((document.getElementById('taskDescription') || {}).value || '').trim(),
       signature: signature,
-      subtasks: Array.isArray(suggestions.subtasks) ? suggestions.subtasks : []
+      subtasks: Array.isArray(suggestions.subtasks) ? suggestions.subtasks : [],
+      workspace_state_revision: suggestions.workspace_state_revision || suggestions.workspaceStateRevision || null,
+      source_refs: Array.isArray(suggestions.source_refs) ? suggestions.source_refs : []
     };
 
     var titleEl = document.getElementById('taskSuggestedTitle');
@@ -6382,6 +6381,10 @@
         priority: createPriority,
         due_date: dueDateValue,
         assigned_to_user_id: assignedToUserId,
+        workspace_state_revision: workspaceTaskSuggestionState ? workspaceTaskSuggestionState.workspace_state_revision : null,
+        workspace_state_source_refs: workspaceTaskSuggestionState && Array.isArray(workspaceTaskSuggestionState.source_refs)
+          ? workspaceTaskSuggestionState.source_refs
+          : [],
         approved_subtasks: []
       };
 
@@ -6423,7 +6426,8 @@
         taskData.approved_subtasks = selectedSuggestedSubtasks().map(function (item) {
           return {
             title: item.title || item.name || '',
-            description: item.description || null
+            description: item.description || null,
+            source_refs: Array.isArray(item.source_refs) ? item.source_refs : []
           };
         }).filter(function (item) {
           return item.title;

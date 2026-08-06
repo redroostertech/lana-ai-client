@@ -2443,6 +2443,21 @@ class ApiClient {
   }
 
   /**
+   * Get the server-owned matter/workspace state projection
+   * @param {string} matterId - The matter ID
+   * @param {Object} options - Optional view/persist/cache controls
+   * @returns {Promise<Object>} Workspace state response
+   */
+  async getMatterWorkspaceState(matterId, options = {}) {
+    var params = new URLSearchParams();
+    if (options.view) params.append('view', options.view);
+    if (options.persist) params.append('persist', 'true');
+    if (options.bustCache) params.append('_t', String(Date.now()));
+    var query = params.toString();
+    return this.get(`/api/v1/matters/${matterId}/workspace-state${query ? '?' + query : ''}`);
+  }
+
+  /**
    * Update a LANA-native task
    * @param {string} taskId - The task ID
    * @param {Object} updates - Task updates (title, description, notes, status, priority, due_date, assigned_to_user_id)
