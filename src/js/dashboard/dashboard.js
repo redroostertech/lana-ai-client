@@ -2210,14 +2210,9 @@
 
       var heatmapContainer = el('activityHeatmapContainer');
       if (heatmapContainer) {
-        var daily = productivityData.daily_activity;
-        if (daily && daily.length > 0) {
-          if (typeof ActivityHeatmap !== 'undefined') {
-            ActivityHeatmap.render('activityHeatmapContainer', daily);
-          }
-        } else {
-          heatmapContainer.innerHTML =
-            '<lex-empty icon="chart" message="No activity data yet" description="Activity will appear here as you interact with the system"></lex-empty>';
+        var daily = Array.isArray(productivityData.daily_activity) ? productivityData.daily_activity : [];
+        if (typeof ActivityHeatmap !== 'undefined') {
+          ActivityHeatmap.render('activityHeatmapContainer', daily);
         }
       }
     } catch (err) {
@@ -2255,14 +2250,9 @@
 
       var heatmapContainer = el('activityHeatmapContainer');
       if (heatmapContainer) {
-        var daily = productivityData.daily_activity;
-        if (daily && daily.length > 0) {
-          if (typeof ActivityHeatmap !== 'undefined') {
-            ActivityHeatmap.render('activityHeatmapContainer', daily);
-          }
-        } else {
-          heatmapContainer.innerHTML =
-            '<lex-empty icon="chart" message="No activity data yet" description="Activity will appear here as users interact with the system"></lex-empty>';
+        var daily = Array.isArray(productivityData.daily_activity) ? productivityData.daily_activity : [];
+        if (typeof ActivityHeatmap !== 'undefined') {
+          ActivityHeatmap.render('activityHeatmapContainer', daily);
         }
       }
     } catch (err) {

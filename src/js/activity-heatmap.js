@@ -39,6 +39,7 @@ const ActivityHeatmap = (function() {
    */
   function render(containerId, data, options = {}) {
     const config = { ...DEFAULT_CONFIG, ...options };
+    const rows = Array.isArray(data) ? data : [];
     const container = document.getElementById(containerId);
 
     if (!container) {
@@ -51,7 +52,7 @@ const ActivityHeatmap = (function() {
 
     // Convert data array to map for quick lookup
     const activityMap = new Map();
-    data.forEach(item => {
+    rows.forEach(item => {
       activityMap.set(item.date, parseInt(item.count) || 0);
     });
 
