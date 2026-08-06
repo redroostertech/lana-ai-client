@@ -63,6 +63,7 @@
         'js/components/note-list.component.js',
         'js/components/note-editor.component.js',
         'js/components/task-detail-drawer.js',
+        'js/components/workspace-artifacts-view.js',
         'js/matter-notes.js',
         'js/shared/event-catalog.js',
         'js/shared/event-browser.js',
