@@ -176,16 +176,26 @@
           '</div>' +
         '</div>' +
         '<div id="matterArtifactsList">' +
-          '<div class="text-center py-8"><lex-spinner></lex-spinner></div>' +
+          this._renderLoading() +
         '</div>' +
       '</div>';
 
     await this.refresh();
   };
 
+  WorkspaceArtifactsView.prototype._renderLoading = function () {
+    return '<div class="space-y-2" aria-busy="true">' +
+      '<div class="h-16 rounded-lg border border-gray-100 bg-gray-50"></div>' +
+      '<div class="h-16 rounded-lg border border-gray-100 bg-gray-50"></div>' +
+      '<div class="h-16 rounded-lg border border-gray-100 bg-gray-50"></div>' +
+    '</div>';
+  };
+
   WorkspaceArtifactsView.prototype.refresh = async function () {
     var matterId = this.getMatterId(this.matter);
     if (!this.api || !matterId) return;
+    var list = this.container && this.container.querySelector('#matterArtifactsList');
+    if (list) list.innerHTML = this._renderLoading();
     var query = buildQuery({
       limit: this.limit,
       offset: this.offset,
@@ -193,11 +203,16 @@
       sort_by: this.sortBy,
       sort_dir: this.sortDir
     });
-    var result = await this.api.get('/api/v1/matters/' + encodeURIComponent(matterId) + '/artifacts?' + query);
-    var extracted = extractArtifactList(result);
-    this.artifacts = extracted.artifacts;
-    this.pagination = extracted.pagination;
-    this._renderList();
+    try {
+      var result = await this.api.get('/api/v1/matters/' + encodeURIComponent(matterId) + '/artifacts?' + query);
+      var extracted = extractArtifactList(result);
+      this.artifacts = extracted.artifacts;
+      this.pagination = extracted.pagination;
+      this._renderList();
+    } catch (error) {
+      this._renderListError(error);
+      throw error;
+    }
   };
 
   WorkspaceArtifactsView.prototype._renderSortOptions = function () {
@@ -221,7 +236,10 @@
     if (!list) return;
 
     if (!this.artifacts.length) {
-      list.innerHTML = '<lex-empty icon="document" message="No artifacts yet" description="LANA-generated drafts and proposed work product will appear here for review"></lex-empty>';
+      var isFiltered = Boolean(this.search);
+      list.innerHTML = isFiltered
+        ? '<lex-empty icon="search" message="No matching artifacts" description="Try a different search or clear the filter"></lex-empty>'
+        : '<lex-empty icon="document" message="No artifacts yet" description="LANA-generated drafts and proposed work product will appear here for review"></lex-empty>';
       return;
     }
 
@@ -240,6 +258,7 @@
     var type = artifact.artifact_type || artifact.type || 'artifact';
     var version = artifact.version || artifact.current_version || 1;
     var createdAt = artifact.created_at || artifact.createdAt || '';
+    var promotionError = artifact.promotion_error || artifact.error || '';
     var statusClass = status.tone === 'success'
       ? 'bg-green-50 text-green-700 border-green-200'
       : status.tone === 'error'
@@ -257,6 +276,7 @@
           '<span>Version ' + this.escapeHtml(String(version)) + '</span>' +
           (createdAt ? '<span>' + this.escapeHtml(this.formatDate(createdAt)) + '</span>' : '') +
         '</div>' +
+        (promotionError ? '<div class="mt-2 text-xs text-red-600">' + this.escapeHtml(promotionError) + '</div>' : '') +
         this._renderApprovalMeta(artifact) +
       '</div>' +
       '<div class="flex flex-wrap items-center gap-2">' +
@@ -378,6 +398,7 @@
     var documentRecord = getArtifactDocument(artifact);
     var canPromote = !!getArtifactPromotionAction(artifact);
     var content = artifact.content || artifact.preview || artifact.text || '';
+    var promotionError = artifact.promotion_error || artifact.error || '';
     var approvals = artifact.approvals && typeof artifact.approvals === 'object' ? artifact.approvals : {};
     var inclusions = Array.isArray(artifact.inclusions) ? artifact.inclusions : [];
     var versions = Array.isArray(artifact.version_history) ? artifact.version_history : [];
@@ -389,12 +410,14 @@
           '<span>' + this.escapeHtml(status.message || status.status || 'Status unavailable') + '</span>' +
           (artifact.created_at ? '<span>' + this.escapeHtml(this.formatDate(artifact.created_at)) + '</span>' : '') +
         '</div>' +
+        (promotionError ? '<div class="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">' + this.escapeHtml(promotionError) + '</div>' : '') +
         this._renderApprovalMeta(artifact) +
       '</div>' +
       '<div class="flex flex-wrap gap-2">' +
         (canPromote ? '<button type="button" class="px-3 py-2 rounded-lg text-sm font-medium text-white lex-bg-accent hover:lex-bg-accent" data-artifact-action="promote" data-artifact-id="' + this.escapeHtml(artifactId) + '">Save to Documents</button>' : '') +
         (documentRecord && documentRecord.id ? '<button type="button" class="px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50" data-artifact-action="open-document" data-document-id="' + this.escapeHtml(documentRecord.id) + '">Open Document</button>' : '') +
       '</div>' +
+      (documentRecord && documentRecord.filename ? '<div class="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">Saved to Documents as ' + this.escapeHtml(documentRecord.filename) + '</div>' : '') +
       '<div class="grid gap-4 md:grid-cols-2">' +
         '<div class="border border-gray-200 rounded-lg p-4"><h4 class="text-sm font-semibold text-gray-900 mb-3">Approvals</h4>' + this._renderApprovals(approvals) + '</div>' +
         '<div class="border border-gray-200 rounded-lg p-4"><h4 class="text-sm font-semibold text-gray-900 mb-3">Included sources</h4>' + this._renderInclusions(inclusions) + '</div>' +
@@ -488,6 +511,12 @@
 
   WorkspaceArtifactsView.prototype._showError = function (error) {
     if (this.toast && this.toast.error) this.toast.error(error.message || 'Artifact action failed');
+  };
+
+  WorkspaceArtifactsView.prototype._renderListError = function (error) {
+    var list = this.container && this.container.querySelector('#matterArtifactsList');
+    if (!list) return;
+    list.innerHTML = '<lex-empty icon="alert" message="Failed to load artifacts" description="' + this.escapeHtml(error.message || 'Artifact list unavailable') + '"></lex-empty>';
   };
 
   WorkspaceArtifactsView.prototype._showDrawerError = function (error) {

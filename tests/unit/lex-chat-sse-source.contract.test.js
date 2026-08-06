@@ -214,6 +214,41 @@ describe('SSEChatSource contract', () => {
     ]);
   });
 
+  test('rehydrates artifacts from current and legacy message metadata', async () => {
+    const fetchMock = jest.fn();
+    const legacyArtifact = { artifact_id: 'artifact-legacy', artifact_name: 'Legacy draft' };
+    const currentArtifact = { artifact_id: 'artifact-current', artifact_name: 'Current draft' };
+    const api = canonicalApi({
+      get: jest.fn().mockResolvedValue({
+        messages: [
+          {
+            id: 'assistant-2',
+            role: 'assistant',
+            content: 'newer',
+            created_at: '2026-08-03T12:02:00.000Z',
+            metadata: { artifacts: [currentArtifact] }
+          },
+          {
+            id: 'assistant-1',
+            role: 'assistant',
+            content: 'older',
+            created_at: '2026-08-03T12:01:00.000Z',
+            metadata: { agentic_artifacts: [legacyArtifact] }
+          }
+        ],
+        pagination: { hasMore: false }
+      })
+    });
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
+    await source.connect('thread-1');
+
+    const history = await source.loadHistory(1, 20);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/conversations/thread-1/messages?page=1&limit=20&order=desc');
+    expect(history.messages.map((m) => m.artifacts)).toEqual([[legacyArtifact], [currentArtifact]]);
+  });
+
   test('checks active response by conversation without requiring generation identifiers', async () => {
     const fetchMock = jest.fn();
     const api = canonicalApi();
