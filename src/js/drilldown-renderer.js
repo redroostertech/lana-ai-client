@@ -2209,18 +2209,15 @@ class DrilldownRenderer {
     if (text === null || text === undefined) return '';
     if (typeof text !== 'string') text = String(text);
 
-    // If marked is available, use it to render markdown
-    if (marked && typeof marked.parseInline === 'function') {
-      try {
-        // Use parseInline for inline markdown (no <p> tags)
-        return marked.parseInline(text);
-      } catch (e) {
-        console.warn('[DrilldownRenderer] Error rendering inline markdown:', e);
-        return this.escapeHtml(text);
-      }
-    }
+    // Drilldown content is LLM/BI-generated and untrusted: use the shared
+    // hardened parser (raw HTML escaped, links protocol-restricted, images
+    // as alt text) instead of raw marked.
+    const safe = window.Lex && window.Lex.Utils && window.Lex.Utils.renderMarkdownSafe
+      ? window.Lex.Utils.renderMarkdownSafe(text, { inline: true })
+      : null;
+    if (safe !== null) return safe;
 
-    // Fallback: escape HTML if marked is not available
+    // Fallback: escape HTML if the safe parser is not available
     return this.escapeHtml(text);
   }
 
@@ -2233,27 +2230,24 @@ class DrilldownRenderer {
     if (text === null || text === undefined) return '';
     if (typeof text !== 'string') text = String(text);
 
-    // If marked is available, use it to render markdown
-    if (marked && typeof marked.parse === 'function') {
-      try {
-        // Use parse for block-level markdown (with <p> tags, line breaks, etc.)
-        let html = marked.parse(text);
-
-        // Remove outer <p> tags if present (for cleaner rendering in our context)
-        // But keep inner structure like lists, line breaks, bold, etc.
-        html = html.trim();
-        if (html.startsWith('<p>') && html.endsWith('</p>') && html.split('<p>').length === 2) {
-          html = html.slice(3, -4); // Remove outer <p></p> only
-        }
-
-        return html;
-      } catch (e) {
-        console.warn('[DrilldownRenderer] Error rendering block markdown:', e);
-        return this.escapeHtml(text);
+    // Drilldown content is LLM/BI-generated and untrusted: use the shared
+    // hardened parser (raw HTML escaped, links protocol-restricted, images
+    // as alt text) instead of raw marked.
+    const safe = window.Lex && window.Lex.Utils && window.Lex.Utils.renderMarkdownSafe
+      ? window.Lex.Utils.renderMarkdownSafe(text)
+      : null;
+    if (safe !== null) {
+      // Remove outer <p> tags if present (for cleaner rendering in our context)
+      // But keep inner structure like lists, line breaks, bold, etc.
+      let html = safe.trim();
+      if (html.startsWith('<p>') && html.endsWith('</p>') && html.split('<p>').length === 2) {
+        html = html.slice(3, -4); // Remove outer <p></p> only
       }
+      return html;
     }
 
-    // Fallback: escape HTML and preserve line breaks if marked is not available
+    // Fallback: escape HTML and preserve line breaks if the safe parser is
+    // not available
     return this.escapeHtml(text).replace(/\n/g, '<br>');
   }
 

@@ -252,6 +252,54 @@
     return 'Just now';
   }
 
+  // ── Safe markdown rendering ───────────────────────────────────────────
+  // For LLM-generated or otherwise untrusted markdown: raw HTML renders as
+  // escaped text, links are restricted to http(s)/mailto (new tab with
+  // noopener), and images render as their alt text. Returns null when the
+  // vendored marked library is not loaded or parsing throws, so callers can
+  // fall back to plain escaping.
+
+  var _safeMarkedInstance = null;
+
+  function getSafeMarkedInstance() {
+    if (_safeMarkedInstance) return _safeMarkedInstance;
+    var markedLib = global.marked;
+    if (!markedLib || typeof markedLib.Marked !== 'function') return null;
+    _safeMarkedInstance = new markedLib.Marked({
+      renderer: {
+        html: function (token) {
+          return escapeHtml(token && token.text ? token.text : '');
+        },
+        link: function (token) {
+          var href = String((token && token.href) || '');
+          var label = this.parser.parseInline((token && token.tokens) || []);
+          if (/^(https?:|mailto:)/i.test(href)) {
+            var title = token && token.title ? ' title="' + escapeHtml(token.title) + '"' : '';
+            return '<a href="' + escapeHtml(href) + '"' + title + ' target="_blank" rel="noopener noreferrer">' + label + '</a>';
+          }
+          return label;
+        },
+        image: function (token) {
+          return escapeHtml((token && (token.text || token.title)) || '');
+        }
+      }
+    });
+    return _safeMarkedInstance;
+  }
+
+  function renderMarkdownSafe(text, options) {
+    if (text === null || text === undefined || text === '') return '';
+    var parser = getSafeMarkedInstance();
+    if (!parser) return null;
+    try {
+      return options && options.inline
+        ? parser.parseInline(String(text))
+        : parser.parse(String(text));
+    } catch (error) {
+      return null;
+    }
+  }
+
   // ── Debounce ──────────────────────────────────────────────────────────
 
   function debounce(fn, wait) {
@@ -492,6 +540,7 @@
     normalizeApiUtcTimestamp: normalizeApiUtcTimestamp,
     parseApiUtcDate:    parseApiUtcDate,
     timeAgo:            timeAgo,
+    renderMarkdownSafe: renderMarkdownSafe,
     debounce:           debounce,
     truncateText:       truncateText,
     formatPercentage:   formatPercentage,

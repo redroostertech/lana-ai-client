@@ -17,46 +17,16 @@
       .split("'").join('&#39;');
   }
 
-  // Markdown parser for artifact content. Artifact drafts are LLM-generated
-  // and therefore untrusted, so raw HTML in the markdown renders as escaped
-  // text, links are restricted to http(s)/mailto, and images render as their
-  // alt text. Falls back to null when the vendored marked library is absent.
-  var _safeMarked = null;
-  function getSafeMarked() {
-    if (_safeMarked) return _safeMarked;
-    if (!global.marked || typeof global.marked.Marked !== 'function') return null;
-    _safeMarked = new global.marked.Marked({
-      renderer: {
-        html: function (token) {
-          return fallbackEscape(token && token.text ? token.text : '');
-        },
-        link: function (token) {
-          var href = String((token && token.href) || '');
-          var label = this.parser.parseInline((token && token.tokens) || []);
-          if (/^(https?:|mailto:)/i.test(href)) {
-            var title = token && token.title ? ' title="' + fallbackEscape(token.title) + '"' : '';
-            return '<a href="' + fallbackEscape(href) + '"' + title + ' target="_blank" rel="noopener noreferrer">' + label + '</a>';
-          }
-          return label;
-        },
-        image: function (token) {
-          return fallbackEscape((token && (token.text || token.title)) || '');
-        }
-      }
-    });
-    return _safeMarked;
-  }
-
+  // Artifact drafts are LLM-generated and therefore untrusted; render them
+  // through the shared hardened parser (Lex.Utils.renderMarkdownSafe: raw
+  // HTML escaped, links protocol-restricted, images as alt text) and fall
+  // back to an escaped pre when it is unavailable.
   function renderMarkdownContent(content) {
     if (!content) return '<p class="text-sm text-gray-500">No preview available</p>';
-    var parser = getSafeMarked();
-    if (parser) {
-      try {
-        return parser.parse(String(content));
-      } catch (error) {
-        console.warn('[WorkspaceArtifacts] Markdown render failed, falling back to text:', error);
-      }
-    }
+    var safe = global.Lex && global.Lex.Utils && global.Lex.Utils.renderMarkdownSafe
+      ? global.Lex.Utils.renderMarkdownSafe(content)
+      : null;
+    if (safe !== null) return safe;
     return '<pre class="text-sm text-gray-700 whitespace-pre-wrap">' + fallbackEscape(content) + '</pre>';
   }
 
