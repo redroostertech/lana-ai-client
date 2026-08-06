@@ -65,7 +65,7 @@
       actions.push({
         type: eventType,
         detail: detail || null,
-        timestamp: new Date().toISOString(),
+        timestamp: LanaTime.nowIso(),
         page: this._page,
         matterId: this._matterId
       });
@@ -104,7 +104,7 @@
           detail: a.detail,
           timestamp: a.timestamp
         })),
-        timestamp: new Date().toISOString(),
+        timestamp: LanaTime.nowIso(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
       };
     },

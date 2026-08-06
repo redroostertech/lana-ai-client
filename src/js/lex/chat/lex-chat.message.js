@@ -9,9 +9,15 @@
   'use strict';
 
   const { LexElement, defineLex, ChatFormat } = global.Lex;
-  const ArtifactPromotion = global.Lex.Chat && global.Lex.Chat.ArtifactPromotion;
-  const ContextPromotion = global.Lex.Chat && global.Lex.Chat.ContextPromotion;
   if (!LexElement) { console.error('[lex-chat-message] LexElement not loaded'); return; }
+
+  function getArtifactPromotion() {
+    return global.Lex && global.Lex.Chat && global.Lex.Chat.ArtifactPromotion;
+  }
+
+  function getContextPromotion() {
+    return global.Lex && global.Lex.Chat && global.Lex.Chat.ContextPromotion;
+  }
 
   // ---------------------------------------------------------------------------
   // Timestamp formatting — smart relative dates
@@ -392,7 +398,7 @@
     _renderTimestamp() {
       // Auto-stamp on first render if no timestamp was provided
       if (!this.timestamp) {
-        this._props.timestamp = new Date().toISOString();
+        this._props.timestamp = LanaTime.nowIso();
       }
       const ts = formatTimestamp(this.timestamp);
       if (!ts) return '';
@@ -547,6 +553,7 @@
       this.delegate('click', '.lex-chat-artifact-promote', (e, target) => {
         var artifactId = target.dataset.artifactId || '';
         var artifact = this._findArtifact(artifactId);
+        var ArtifactPromotion = getArtifactPromotion();
         var action = ArtifactPromotion && ArtifactPromotion.getSaveToDocumentsAction(artifact);
         if (!artifact || !action) return;
 
@@ -570,6 +577,8 @@
         var promotionId = target.dataset.promotionId || '';
         var kind = target.dataset.contextAction || '';
         var promotion = this._findContextPromotion(promotionId);
+        var ContextPromotion = getContextPromotion();
+        var ArtifactPromotion = getArtifactPromotion();
         var helper = ContextPromotion || ArtifactPromotion;
         var action = null;
         if (kind === 'approve') {
@@ -930,6 +939,8 @@
     _renderArtifactsSection(artifacts) {
       const body = this.querySelector('.lex-chat-msg-agent-body');
       if (!body || body.querySelector('.lex-chat-artifacts-section')) return;
+      const ContextPromotion = getContextPromotion();
+      const ArtifactPromotion = getArtifactPromotion();
 
       const items = artifacts.map(a => {
         const contextPromotion = (ContextPromotion || ArtifactPromotion) &&
@@ -954,6 +965,7 @@
     }
 
     _renderPersistedArtifactCard(artifact, persistence, action) {
+      const ArtifactPromotion = getArtifactPromotion();
       const artifactId = ArtifactPromotion ? ArtifactPromotion.getArtifactId(artifact) : '';
       const type = artifact.artifact_type || artifact.type || 'document';
       const label = artifact.artifact_name || artifact.label || artifact.name || artifact.title || 'Generated document';
@@ -979,6 +991,7 @@
               <span class="lex-chat-artifact-status-dot" aria-hidden="true"></span>
               <span data-artifact-status-message>${ChatFormat.escapeHtml(status.message)}</span>
             </div>
+            ${this._renderArtifactRecallMeta(artifact)}
           </div>
           <div class="lex-chat-artifact-card-actions" data-artifact-actions>
             ${actionButton}
@@ -987,7 +1000,32 @@
         </div>`;
     }
 
+    _renderArtifactRecallMeta(artifact) {
+      const meta = [];
+      const approvals = artifact && artifact.approvals && typeof artifact.approvals === 'object' ? artifact.approvals : {};
+      const created = approvals.created && typeof approvals.created === 'object' ? approvals.created : null;
+      const promoted = approvals.promoted && typeof approvals.promoted === 'object' ? approvals.promoted : null;
+      const inclusions = Array.isArray(artifact && artifact.inclusions) ? artifact.inclusions : [];
+
+      if (created) {
+        meta.push('Created by ' + (created.user_name || created.user_id || 'LANA'));
+      }
+      if (promoted) {
+        meta.push('Approved by ' + (promoted.user_name || promoted.user_id || 'reviewer'));
+      }
+      if (inclusions.length > 0) {
+        meta.push('Includes ' + inclusions.length + ' source' + (inclusions.length === 1 ? '' : 's'));
+      }
+
+      if (meta.length === 0) return '';
+      return '<div class="lex-chat-artifact-recall">' + meta.map(function (item) {
+        return '<span>' + ChatFormat.escapeHtml(item) + '</span>';
+      }).join('') + '</div>';
+    }
+
     _renderContextPromotionCard(artifact, view) {
+      const ContextPromotion = getContextPromotion();
+      const ArtifactPromotion = getArtifactPromotion();
       const helper = ContextPromotion || ArtifactPromotion;
       const promotionId = helper && helper.getContextPromotionId ? helper.getContextPromotionId(artifact) : (view.id || '');
       const approveAction = helper && helper.getApproveContextPromotionAction ? helper.getApproveContextPromotionAction(artifact) : null;
@@ -1027,6 +1065,7 @@
 
     _findArtifact(artifactId) {
       var artifacts = this.artifacts || [];
+      var ArtifactPromotion = getArtifactPromotion();
       for (var i = 0; i < artifacts.length; i += 1) {
         var currentId = ArtifactPromotion
           ? ArtifactPromotion.getArtifactId(artifacts[i])
@@ -1046,6 +1085,8 @@
 
     _findContextPromotion(promotionId) {
       var artifacts = this.artifacts || [];
+      var ContextPromotion = getContextPromotion();
+      var ArtifactPromotion = getArtifactPromotion();
       var helper = ContextPromotion || ArtifactPromotion;
       for (var i = 0; i < artifacts.length; i += 1) {
         var currentId = helper && helper.getContextPromotionId

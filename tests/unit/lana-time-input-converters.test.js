@@ -61,14 +61,26 @@ describe('LanaTime.toLocalDateInputValue', () => {
 
   test('differs from UTC slicing for evening-local instants west of UTC', () => {
     const instant = '2026-08-06T02:00:00.000Z';
-    const local = LanaTime.toLocalDateInputValue(instant);
-    const utcSlice = instant.slice(0, 10);
-    if (new Date(instant).getTimezoneOffset() > 0) {
-      // West of UTC: the local day is the 5th while the UTC slice says the 6th
-      expect(local).not.toBe(utcSlice);
-    } else {
-      expect(local.length).toBe(10);
+    const d = new Date(instant);
+    // Timezone-independent: always assert against Date's own local
+    // components, so a UTC-slicing implementation fails in EVERY zone.
+    const expected = d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+    expect(LanaTime.toLocalDateInputValue(instant)).toBe(expected);
+    if (d.getTimezoneOffset() > 0) {
+      // West of UTC the local day genuinely differs from the UTC slice
+      expect(expected).not.toBe(instant.slice(0, 10));
     }
+  });
+
+  test('undefined defaults to today (documented trap, pinned)', () => {
+    const now = new Date();
+    const expected = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
+    expect(LanaTime.toLocalDateInputValue(undefined)).toBe(expected);
+    expect(LanaTime.toLocalDatetimeInputValue(undefined).slice(0, 10)).toBe(expected);
   });
 
   test('returns empty string for empty and invalid values', () => {

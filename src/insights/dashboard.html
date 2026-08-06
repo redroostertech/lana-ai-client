@@ -974,8 +974,8 @@
       try {
         // Fetch leads from this source
         const orgId = api.user.organization_id;
-        const periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
-        const periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
+        const periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
+        const periodEnd = LanaTime.utcDayEnd(document.getElementById('periodEnd').value);
 
         const response = await api.get(`/api/v1/integrations/connector-data?entity_type=contact&source=${encodeURIComponent(source)}&start_date=${periodStart}&end_date=${periodEnd}&limit=100`);
 
@@ -1047,8 +1047,8 @@
       modal.classList.remove('hidden');
 
       try {
-        const periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
-        const periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
+        const periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
+        const periodEnd = LanaTime.utcDayEnd(document.getElementById('periodEnd').value);
 
         // Different drill-down logic based on metric
         switch(metricKey) {
@@ -5943,10 +5943,10 @@
       }
 
       // Convert dates to ISO format with timezone
-      // Start: beginning of day (00:00:00)
-      // End: end of day (23:59:59)
-      const periodStartISO = LanaTime.toIsoInstant(periodStart + 'T00:00:00Z');
-      const periodEndISO = LanaTime.toIsoInstant(periodEnd + 'T23:59:59Z');
+      // Start: beginning of day (00:00:00.000)
+      // End: end of day (23:59:59.999)
+      const periodStartISO = LanaTime.utcDayStart(periodStart);
+      const periodEndISO = LanaTime.utcDayEnd(periodEnd);
 
       // Show loading state
       const executeBtn = document.getElementById('executeBtn');
@@ -6367,8 +6367,8 @@
       document.getElementById('overrideMetricName').textContent = metricName;
       document.getElementById('overrideMetricDescription').textContent = metricDescription || 'No description available';
       document.getElementById('overridePeriodRange').textContent = formatDateRange(
-        new Date(periodStart + 'T00:00:00Z'),
-        new Date(periodEnd + 'T23:59:59Z')
+        new Date(LanaTime.utcDayStart(periodStart)),
+        new Date(LanaTime.utcDayEnd(periodEnd))
       );
 
       // Update labels based on override type
@@ -6419,8 +6419,8 @@
     // Load existing overrides for a metric
     async function loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd) {
       try {
-        const periodStartISO = LanaTime.toIsoInstant(periodStart + 'T00:00:00Z');
-        const periodEndISO = LanaTime.toIsoInstant(periodEnd + 'T23:59:59Z');
+        const periodStartISO = LanaTime.utcDayStart(periodStart);
+        const periodEndISO = LanaTime.utcDayEnd(periodEnd);
 
         const data = await api.get(`/api/v1/modules/${moduleKey}/data-overrides`, {
           periodStart: periodStartISO,
@@ -6494,8 +6494,8 @@
       }
 
       // Convert to ISO
-      const periodStartISO = LanaTime.toIsoInstant(periodStart + 'T00:00:00Z');
-      const periodEndISO = LanaTime.toIsoInstant(periodEnd + 'T23:59:59Z');
+      const periodStartISO = LanaTime.utcDayStart(periodStart);
+      const periodEndISO = LanaTime.utcDayEnd(periodEnd);
 
       // Show loading state
       const saveBtn = document.getElementById('saveOverrideBtn');

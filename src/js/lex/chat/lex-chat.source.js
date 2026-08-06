@@ -179,7 +179,7 @@
             timestamp: m.created_at || m.timestamp,
             citations: (m.metadata && m.metadata.citations) || m.citations || [],
             references: (m.metadata && m.metadata.references) || m.references || [],
-            artifacts: (m.metadata && m.metadata.artifacts) || m.artifacts || [],
+            artifacts: (m.metadata && (m.metadata.artifacts || m.metadata.agentic_artifacts)) || m.artifacts || [],
             duration: m.duration_ms || null,
             tokenCount: m.token_count || null,
             metadata: m.metadata || {}  // Preserve full metadata for dynamic_cards re-hydration
@@ -225,7 +225,7 @@
         const body = {
           message: content,
           client_request_id: clientRequestId,
-          client_time: new Date().toISOString(),
+          client_time: LanaTime.nowIso(),
           client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
         body.conversation_id = conversationId;

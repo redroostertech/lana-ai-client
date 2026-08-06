@@ -67,17 +67,7 @@
    */
   function timeAgo(dateStr) {
     if (!dateStr) return '-';
-    var diff = Lex.Utils.millisecondsSince(new Date(dateStr).getTime());
-    if (diff < 0) return 'just now';
-    var seconds = Math.floor(diff / Lex.Utils.MS_PER_SECOND);
-    var minutes = Math.floor(seconds / 60);
-    var hours   = Math.floor(minutes / 60);
-    var days    = Math.floor(hours / 24);
-
-    if (days > 0)    return days + 'd ago';
-    if (hours > 0)   return hours + 'h ago';
-    if (minutes > 0) return minutes + 'm ago';
-    return 'just now';
+    return LanaTime.timeAgo(dateStr) || '-';
   }
 
   /**

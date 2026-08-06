@@ -720,8 +720,8 @@
 
     switch (name) {
       case 'lastMonth':
-        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        startDate = LanaTime.startOfLocalMonth(LanaTime.addLocalMonths(today, -1));
+        endDate = LanaTime.endOfLocalMonth(LanaTime.addLocalMonths(today, -1));
         grain = 'monthly';
         break;
       case 'last30days':
@@ -730,8 +730,7 @@
         grain = 'daily';
         break;
       case 'thisQuarter':
-        var currentQuarter = Math.floor(today.getMonth() / 3);
-        startDate = new Date(today.getFullYear(), currentQuarter * 3, 1);
+        startDate = LanaTime.startOfLocalQuarter(today);
         endDate = new Date(today);
         grain = 'monthly';
         break;
@@ -751,13 +750,14 @@
     return { start: fmt(startDate), end: fmt(endDate), grain: grain };
   }
 
-  // ISO conversion: start clamps to 00:00:00, end clamps to 23:59:59 so the
-  // window includes the full end day. Anchored to UTC ('Z') to match the
-  // UTC-day period semantics used by reporting.js and the insights pages.
+  // ISO conversion: start clamps to 00:00:00.000, end clamps to 23:59:59.999
+  // so the window includes the full end day. Anchored to UTC ('Z') to match
+  // the UTC-day period semantics used by reporting.js and the insights pages.
   function playgroundISO(value, endOfDay) {
     if (!value) return '';
     var hasTime = String(value).indexOf('T') !== -1;
-    return LanaTime.toIsoInstant(hasTime ? value : value + (endOfDay ? 'T23:59:59Z' : 'T00:00:00Z')) || '';
+    if (hasTime) return LanaTime.toIsoInstant(value) || '';
+    return (endOfDay ? LanaTime.utcDayEnd(value) : LanaTime.utcDayStart(value)) || '';
   }
 
   function preview() {

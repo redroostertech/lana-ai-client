@@ -467,12 +467,11 @@ window.ActivityPanel = (function() {
    * Format time ago (uses global timeAgo if available)
    */
   function timeAgo(dateString) {
-    if (window.timeAgo) {
-      return window.timeAgo(dateString);
-    }
-
-    // Fallback: canonical relative time with absolute date past a week
-    return LanaTime.timeAgo(dateString, { maxDays: 7 }) || formatDate(dateString);
+    // Canonical relative time with an absolute date past a week. Calling
+    // LanaTime directly (not the window.timeAgo global) keeps this file's
+    // stated policy in effect; parseApiUtcDate handles legacy zone-less
+    // API values.
+    return LanaTime.timeAgo(Lex.Utils.parseApiUtcDate(dateString), { maxDays: 7 }) || formatDate(dateString);
   }
 
   // Public API

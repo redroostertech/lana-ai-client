@@ -214,12 +214,11 @@
         endDate = new Date(today);
         break;
       case 'lastMonth':
-        startDate = Lex.Utils.startOfLocalMonth(Lex.Utils.addUtcMonths(today, -1));
-        endDate = Lex.Utils.endOfLocalMonth(Lex.Utils.addUtcMonths(today, -1));
+        startDate = Lex.Utils.startOfLocalMonth(LanaTime.addLocalMonths(today, -1));
+        endDate = Lex.Utils.endOfLocalMonth(LanaTime.addLocalMonths(today, -1));
         break;
       case 'thisQuarter':
-        var currentQuarter = Math.floor(today.getMonth() / 3);
-        startDate = new Date(today.getFullYear(), currentQuarter * 3, 1);
+        startDate = LanaTime.startOfLocalQuarter(today);
         endDate = new Date(today);
         break;
       case 'thisYear':
@@ -227,8 +226,8 @@
         endDate = new Date(today);
         break;
       case 'lastYear':
-        startDate = Lex.Utils.startOfLocalYear(Lex.Utils.addUtcMonths(today, -12));
-        endDate = Lex.Utils.endOfLocalYear(Lex.Utils.addUtcMonths(today, -12));
+        startDate = Lex.Utils.startOfLocalYear(LanaTime.addLocalMonths(today, -12));
+        endDate = Lex.Utils.endOfLocalYear(LanaTime.addLocalMonths(today, -12));
         break;
       case 'last7days':
       default:

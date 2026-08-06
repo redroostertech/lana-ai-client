@@ -236,6 +236,12 @@
     if (!dateString) return '-';
     var date = parseApiUtcDate(dateString);
     if (!date) return '-';
+    // Delegate to the canonical LanaTime formatter so this global (exported
+    // as window.timeAgo, preferred by several page formatters) can't drift
+    // from the rest of the app.
+    if (global.LanaTime && typeof global.LanaTime.timeAgo === 'function') {
+      return global.LanaTime.timeAgo(date, { style: 'words' }) || '-';
+    }
     var seconds = Math.floor(millisecondsSince(date.getTime()) / MS_PER_SECOND);
     for (var i = 0; i < TIME_INTERVALS.length; i++) {
       var count = Math.floor(seconds / TIME_INTERVALS[i].seconds);

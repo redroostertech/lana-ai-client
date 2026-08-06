@@ -1329,7 +1329,7 @@
 
       container.addEventListener('lex-chat-generation-active', function (e) {
         var detail = e.detail || {};
-        if (detail.active) self._showGenerationBanner(detail.startedAt || new Date().toISOString());
+        if (detail.active) self._showGenerationBanner(detail.startedAt || LanaTime.nowIso());
         else self._hideGenerationBanner();
       });
 

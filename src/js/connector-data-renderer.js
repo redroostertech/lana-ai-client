@@ -297,7 +297,10 @@ function formatDateTime(dateStr) {
   const rel = LanaTime.timeAgo(dateStr, { style: 'words', maxDays: 7 });
   if (rel) return rel;
 
-  return formatDateTime(dateStr);
+  // Absolute fallback. The previous `return formatDateTime(dateStr)` was a
+  // self-call that recursed to stack overflow for anything a week old.
+  const abs = new Date(dateStr);
+  return Number.isFinite(abs.getTime()) ? abs.toLocaleString() : 'N/A';
 }
 
 /**

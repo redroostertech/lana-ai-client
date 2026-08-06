@@ -442,19 +442,7 @@
     }
 
     _relativeTime(dateStr) {
-      if (!dateStr) return '';
-      var now = Date.now();
-      var then = new Date(dateStr).getTime();
-      var diffMs = now - then;
-      var diffMin = Math.floor(diffMs / 60000);
-      if (diffMin < 1) return 'now';
-      if (diffMin < 60) return diffMin + 'm';
-      var diffHr = Math.floor(diffMin / 60);
-      if (diffHr < 24) return diffHr + 'h';
-      var diffDay = Math.floor(diffHr / 24);
-      if (diffDay < 30) return diffDay + 'd';
-      var diffMonth = Math.floor(diffDay / 30);
-      return diffMonth + 'mo';
+      return LanaTime.timeAgo(dateStr, { style: 'tiny' });
     }
   }
 

@@ -7091,8 +7091,8 @@
         const endDate = document.getElementById('runEndDate')?.value || '';
         const payload = {};
 
-        if (startDate) payload.startDate = `${startDate}T00:00:00.000Z`;
-        if (endDate) payload.endDate = `${endDate}T23:59:59.999Z`;
+        if (startDate) payload.startDate = LanaTime.utcDayStart(startDate);
+        if (endDate) payload.endDate = LanaTime.utcDayEnd(endDate);
 
         const overrides = collectRunOptionOverrides();
         if (Object.keys(overrides).length) {

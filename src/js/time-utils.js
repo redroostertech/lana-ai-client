@@ -152,30 +152,59 @@
     return day ? day.split('-').join('') : '';
   }
 
+  // Calendar-aware parse: a date-only 'YYYY-MM-DD' string is a LOCAL
+  // calendar day (new Date('YYYY-MM-DD') would parse it as UTC midnight,
+  // shifting it to the previous evening west of UTC); anything else parses
+  // as an instant. Returns an invalid Date for empty/invalid input.
+  function toLocalCalendarDate(value) {
+    if (value === null || value === undefined || value === '') return new Date(NaN);
+    if (value instanceof Date) return value;
+    var text = String(value);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      return new Date(
+        Number(text.slice(0, 4)),
+        Number(text.slice(5, 7)) - 1,
+        Number(text.slice(8, 10))
+      );
+    }
+    return new Date(text);
+  }
+
   // Days from today (local calendar days) until the given value; negative
-  // when the value is in the past.
+  // when the value is in the past. Date-only strings are treated as local
+  // calendar days. Returns NaN for empty/invalid input (never the epoch).
   function daysUntil(value) {
-    return daysBetween(nowDate(), value);
+    var target = toLocalCalendarDate(value);
+    if (!Number.isFinite(target.getTime())) return NaN;
+    return daysBetween(nowDate(), target);
   }
 
   // Canonical relative-time formatter. Second argument is either a
   // reference-now in ms (legacy) or an options object:
-  //   { now: ms, style: 'compact' | 'words', maxDays: N }
+  //   { now: ms, style: 'compact' | 'words' | 'tiny', maxDays: N }
   // style 'compact' (default): 'Just now', 'Nm ago', 'Nh ago', 'Nd ago',
   //   'Nw ago', 'Nmo ago', 'Ny ago'
   // style 'words': 'Just now', 'N minutes ago', 'N hours ago', 'Yesterday',
   //   'N days ago', 'N weeks ago', 'N months ago', 'N years ago'
+  // style 'tiny' (dense lists): 'now', 'Nm', 'Nh', 'Nd', 'Nw', 'Nmo', 'Ny'
   // maxDays: when set, values that many days old or older return '' so the
   //   caller can fall back to an absolute date format.
-  // Returns '' for empty/invalid values. Future instants clamp to 'Just now'.
+  // Returns '' for empty/invalid values. Future instants clamp to the
+  // smallest tier.
   function timeAgo(value, options) {
-    if (value === null || value === undefined || value === '') return '';
+    if (value === null || value === undefined || value === '' || value === 0) return '';
     var date = value instanceof Date ? value : new Date(value);
     if (!Number.isFinite(date.getTime())) return '';
 
     var opts = typeof options === 'number' ? { now: options } : (options || {});
     var reference = opts.now === undefined ? nowMs() : Number(opts.now);
-    var words = opts.style === 'words';
+    var style = opts.style === 'words' || opts.style === 'tiny' ? opts.style : 'compact';
+
+    function tier(n, unit, wordSingular, wordPlural) {
+      if (style === 'tiny') return n + unit;
+      if (style === 'words') return n + ' ' + (n === 1 ? wordSingular : wordPlural) + ' ago';
+      return n + unit + ' ago';
+    }
 
     var seconds = Math.floor((reference - date.getTime()) / MS_PER_SECOND);
     var minutes = Math.floor(seconds / 60);
@@ -184,21 +213,14 @@
 
     if (opts.maxDays !== undefined && days >= opts.maxDays) return '';
 
-    if (seconds < 60) return 'Just now';
-    if (minutes < 60) return words ? minutes + (minutes === 1 ? ' minute ago' : ' minutes ago') : minutes + 'm ago';
-    if (hours < 24) return words ? hours + (hours === 1 ? ' hour ago' : ' hours ago') : hours + 'h ago';
-    if (words && days === 1) return 'Yesterday';
-    if (days < 7) return words ? days + ' days ago' : days + 'd ago';
-    if (days < 30) {
-      var weeks = Math.floor(days / 7);
-      return words ? weeks + (weeks === 1 ? ' week ago' : ' weeks ago') : weeks + 'w ago';
-    }
-    if (days < 365) {
-      var months = Math.floor(days / 30);
-      return words ? months + (months === 1 ? ' month ago' : ' months ago') : months + 'mo ago';
-    }
-    var years = Math.floor(days / 365);
-    return words ? years + (years === 1 ? ' year ago' : ' years ago') : years + 'y ago';
+    if (seconds < 60) return style === 'tiny' ? 'now' : 'Just now';
+    if (minutes < 60) return tier(minutes, 'm', 'minute', 'minutes');
+    if (hours < 24) return tier(hours, 'h', 'hour', 'hours');
+    if (style === 'words' && days === 1) return 'Yesterday';
+    if (days < 7) return tier(days, 'd', 'day', 'days');
+    if (days < 30) return tier(Math.floor(days / 7), 'w', 'week', 'weeks');
+    if (days < 365) return tier(Math.floor(days / 30), 'mo', 'month', 'months');
+    return tier(Math.floor(days / 365), 'y', 'year', 'years');
   }
 
   // UTC day-window anchors for 'YYYY-MM-DD' picker values: the ISO instants
@@ -288,6 +310,7 @@
     endOfUtcYear: endOfUtcYear,
     addLocalMonths: addLocalMonths,
     formatCompactLocalDate: formatCompactLocalDate,
+    toLocalCalendarDate: toLocalCalendarDate,
     daysUntil: daysUntil,
     timeAgo: timeAgo,
     utcDayStart: utcDayStart,

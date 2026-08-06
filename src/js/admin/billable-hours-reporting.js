@@ -21,7 +21,7 @@
     // Default to this month
     var now = LanaTime.nowDate();
     _dateFrom = LanaTime.toLocalDateInputValue(LanaTime.startOfLocalMonth(now));
-    _dateTo = LanaTime.formatUtcDateOnly(now);
+    _dateTo = LanaTime.toLocalDateInputValue(now);
 
     var fromInput = document.getElementById('bhAdminDateFrom');
     var toInput = document.getElementById('bhAdminDateTo');
@@ -51,18 +51,17 @@
       var from, to;
 
       if (preset === 'last7days') {
-        to = LanaTime.formatUtcDateOnly(now);
-        from = LanaTime.formatUtcDateOnly(LanaTime.addDays(now, -7));
+        to = LanaTime.toLocalDateInputValue(now);
+        from = LanaTime.toLocalDateInputValue(LanaTime.addDays(now, -7));
       } else if (preset === 'last30days') {
-        to = LanaTime.formatUtcDateOnly(now);
-        from = LanaTime.formatUtcDateOnly(LanaTime.addDays(now, -30));
+        to = LanaTime.toLocalDateInputValue(now);
+        from = LanaTime.toLocalDateInputValue(LanaTime.addDays(now, -30));
       } else if (preset === 'thisMonth') {
         from = LanaTime.toLocalDateInputValue(LanaTime.startOfLocalMonth(now));
-        to = LanaTime.formatUtcDateOnly(now);
+        to = LanaTime.toLocalDateInputValue(now);
       } else if (preset === 'thisQuarter') {
-        var qm = Math.floor(now.getMonth() / 3) * 3;
-        from = now.getFullYear() + '-' + String(qm + 1).padStart(2, '0') + '-01';
-        to = LanaTime.formatUtcDateOnly(now);
+        from = LanaTime.toLocalDateInputValue(LanaTime.startOfLocalQuarter(now));
+        to = LanaTime.toLocalDateInputValue(now);
       }
 
       if (from && to) {

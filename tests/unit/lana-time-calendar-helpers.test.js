@@ -65,11 +65,42 @@ describe('addLocalMonths', () => {
 
 describe('daysUntil', () => {
   test('is positive for future days, negative for past days', () => {
-    const tomorrow = LanaTime.addDays(LanaTime.nowDate(), 1);
-    const lastWeek = LanaTime.addDays(LanaTime.nowDate(), -7);
+    // Anchor targets at NOON of the relevant local day: robust across a
+    // midnight boundary mid-test and across DST-shifted 24h steps.
+    const todayNoon = LanaTime.addMilliseconds(LanaTime.startOfLocalDay(), 12 * LanaTime.MS_PER_HOUR);
+    expect(LanaTime.daysUntil(LanaTime.addDays(todayNoon, 1))).toBe(1);
+    expect(LanaTime.daysUntil(LanaTime.addDays(todayNoon, -7))).toBe(-7);
+    expect(LanaTime.daysUntil(todayNoon)).toBe(0);
+  });
+
+  test('date-only strings are LOCAL calendar days, not UTC midnight', () => {
+    const today = LanaTime.toLocalDateInputValue(LanaTime.nowDate());
+    expect(LanaTime.daysUntil(today)).toBe(0);
+    const tomorrow = LanaTime.toLocalDateInputValue(LanaTime.addDays(LanaTime.startOfLocalDay(), 1));
     expect(LanaTime.daysUntil(tomorrow)).toBe(1);
-    expect(LanaTime.daysUntil(lastWeek)).toBe(-7);
-    expect(LanaTime.daysUntil(LanaTime.nowDate())).toBe(0);
+  });
+
+  test('empty and invalid values return NaN, never an epoch diff', () => {
+    expect(Number.isNaN(LanaTime.daysUntil(null))).toBe(true);
+    expect(Number.isNaN(LanaTime.daysUntil(''))).toBe(true);
+    expect(Number.isNaN(LanaTime.daysUntil('junk'))).toBe(true);
+  });
+});
+
+describe('toLocalCalendarDate', () => {
+  test('date-only string anchors to local midnight', () => {
+    const d = LanaTime.toLocalCalendarDate('2026-08-07');
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(7);
+    expect(d.getDate()).toBe(7);
+    expect(d.getHours()).toBe(0);
+  });
+
+  test('instants and Dates pass through; invalid yields invalid Date', () => {
+    const iso = '2026-08-07T02:00:00.000Z';
+    expect(LanaTime.toLocalCalendarDate(iso).getTime()).toBe(new Date(iso).getTime());
+    expect(Number.isNaN(LanaTime.toLocalCalendarDate('junk').getTime())).toBe(true);
+    expect(Number.isNaN(LanaTime.toLocalCalendarDate(null).getTime())).toBe(true);
   });
 });
 
@@ -112,7 +143,31 @@ describe('timeAgo', () => {
   test('maxDays cutoff returns empty string for the caller fallback', () => {
     const D = LanaTime.MS_PER_DAY;
     expect(LanaTime.timeAgo(ago(8 * D), { now: NOW, maxDays: 7 })).toBe('');
+    // Exact boundary: 7 days old is already past the cutoff (matches the
+    // migrated `< 604800`-second fall-throughs)
+    expect(LanaTime.timeAgo(ago(7 * D), { now: NOW, maxDays: 7 })).toBe('');
+    expect(LanaTime.timeAgo(ago(7 * D - 1), { now: NOW, maxDays: 7 })).toBe('6d ago');
     expect(LanaTime.timeAgo(ago(6 * D), { now: NOW, maxDays: 7 })).toBe('6d ago');
+    // Future values never trip the cutoff
+    expect(LanaTime.timeAgo(new Date(NOW + D), { now: NOW, maxDays: 7 })).toBe('Just now');
+  });
+
+  test('tiny style tiers for dense lists', () => {
+    const M = LanaTime.MS_PER_MINUTE;
+    const H = LanaTime.MS_PER_HOUR;
+    const D = LanaTime.MS_PER_DAY;
+    const tiny = (ms) => LanaTime.timeAgo(ago(ms), { now: NOW, style: 'tiny' });
+    expect(tiny(30 * 1000)).toBe('now');
+    expect(tiny(5 * M)).toBe('5m');
+    expect(tiny(3 * H)).toBe('3h');
+    expect(tiny(2 * D)).toBe('2d');
+    expect(tiny(10 * D)).toBe('1w');
+    expect(tiny(60 * D)).toBe('2mo');
+    expect(tiny(400 * D)).toBe('1y');
+  });
+
+  test('numeric zero and epoch-adjacent junk return empty string', () => {
+    expect(LanaTime.timeAgo(0)).toBe('');
   });
 
   test('future instants clamp to Just now', () => {
@@ -132,10 +187,11 @@ describe('utcDayStart / utcDayEnd', () => {
     expect(LanaTime.utcDayEnd('2026-08-06')).toBe('2026-08-06T23:59:59.999Z');
   });
 
-  test('empty and invalid values return null', () => {
+  test('empty, invalid, and near-miss malformed values return null', () => {
     expect(LanaTime.utcDayStart('')).toBeNull();
     expect(LanaTime.utcDayStart(null)).toBeNull();
     expect(LanaTime.utcDayEnd('junk')).toBeNull();
+    expect(LanaTime.utcDayStart('2026-8-6')).toBeNull();
   });
 });
 

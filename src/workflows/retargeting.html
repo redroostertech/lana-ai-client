@@ -398,7 +398,7 @@
         await Workflows.syncRetargetingAudience(audienceId);
         const audience = retargetingConfig.audiences.find(a => a.id === audienceId);
         if (audience) {
-          audience.lastSync = new Date().toISOString();
+          audience.lastSync = LanaTime.nowIso();
           audience.size += Math.floor(Math.random() * 20);
         }
         renderAudiencesTable();
@@ -426,7 +426,7 @@
       Toast.info('Syncing all audiences...');
       const enabledAudiences = retargetingConfig.audiences.filter(a => a.syncEnabled);
       for (const audience of enabledAudiences) {
-        audience.lastSync = new Date().toISOString();
+        audience.lastSync = LanaTime.nowIso();
         audience.size += Math.floor(Math.random() * 20);
       }
       await MockData.delay(2000);

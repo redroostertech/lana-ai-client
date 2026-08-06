@@ -26,8 +26,13 @@ function loadSource(fetchMock, overrides = {}) {
   context.window = context;
   context.globalThis = context;
 
+  // Pages load time-utils.js before the chat stack; mirror that so
+  // LanaTime-dependent paths (client_time stamping) run as they do in-app.
+  const timeUtilsPath = path.join(__dirname, '../../src/js/time-utils.js');
   const domainPath = path.join(__dirname, '../../src/js/lex/chat/lex-chat.conversations-api.js');
   const sourcePath = path.join(__dirname, '../../src/js/lex/chat/lex-chat.source.js');
+  vm.runInNewContext(fs.readFileSync(timeUtilsPath, 'utf8'), context, { filename: timeUtilsPath });
+  context.LanaTime = context.window.LanaTime;
   vm.runInNewContext(fs.readFileSync(domainPath, 'utf8'), context, { filename: domainPath });
   vm.runInNewContext(fs.readFileSync(sourcePath, 'utf8'), context, { filename: sourcePath });
   return { context, Source: context.Lex.Chat.SSEChatSource };

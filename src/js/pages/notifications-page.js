@@ -392,8 +392,9 @@
   }
 
   function timeAgo(dateString) {
-    if (window.timeAgo) return window.timeAgo(dateString);
-    return LanaTime.timeAgo(dateString, { maxDays: 7 }) || formatDate(dateString);
+    // Canonical relative time with an absolute date past a week (direct
+    // LanaTime call; the window.timeAgo global uses words style unbounded).
+    return LanaTime.timeAgo(Lex.Utils.parseApiUtcDate(dateString), { maxDays: 7 }) || formatDate(dateString);
   }
 
   if (document.readyState === 'loading') {

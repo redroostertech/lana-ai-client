@@ -858,7 +858,12 @@
           // First content chunk — hide activity, start streaming message
           if (!responseStarted && this._streamingContent === '') {
             if (this._activityEl) this._activityEl.hide();
-            if (this._threadEl) this._threadEl.startAssistantMessage();
+            if (this._threadEl) {
+              const lastAssistant = this._threadEl.getLastAssistantMessage && this._threadEl.getLastAssistantMessage();
+              if (!lastAssistant || !lastAssistant.streaming) {
+                this._threadEl.startAssistantMessage();
+              }
+            }
           }
 
           this._streamingContent += event.text;
@@ -907,6 +912,7 @@
             this._artifacts = Chat.ArtifactPromotion
               ? Chat.ArtifactPromotion.mergeArtifacts(this._artifacts, event.artifacts)
               : this._artifacts.concat(event.artifacts);
+            this._ensureAssistantMessageForArtifacts();
           }
           this.emit('lex-chat-artifacts', { artifacts: event.artifacts || [] });
           break;
@@ -951,6 +957,7 @@
             this._artifacts = Chat.ArtifactPromotion
               ? Chat.ArtifactPromotion.mergeArtifacts(this._artifacts, event.artifacts)
               : this._artifacts.concat(event.artifacts);
+            this._ensureAssistantMessageForArtifacts();
           }
           this.emit('lex-chat-artifacts', { artifacts: event.artifacts || [] });
           break;
@@ -1094,6 +1101,14 @@
     // ---------------------------------------------------------------------------
     // Internal helpers
     // ---------------------------------------------------------------------------
+
+    _ensureAssistantMessageForArtifacts() {
+      if (!this._threadEl || !this._artifacts || this._artifacts.length === 0) return;
+      const lastAssistant = this._threadEl.getLastAssistantMessage && this._threadEl.getLastAssistantMessage();
+      if (lastAssistant && lastAssistant.streaming) return;
+      if (this._activityEl) this._activityEl.hide();
+      this._threadEl.startAssistantMessage();
+    }
 
     _updateDocumentState(state) {
       this._props.chatMode = state.mode || 'general';
@@ -1622,6 +1637,7 @@
               messageId: m.id,
               timestamp: m.timestamp,
               citations: m.citations,
+              references: m.references,
               artifacts: m.artifacts,
               duration: m.duration || null,
               tokenCount: m.tokenCount || null

@@ -1446,7 +1446,7 @@ async function playSessionOpening(agent) {
 
   try {
     const result = await synthesizeAgentSpeech(openingText, voice);
-    consoleState.turns.push({ role: 'agent', text: openingText, at: new Date().toISOString(), opening: true });
+    consoleState.turns.push({ role: 'agent', text: openingText, at: LanaTime.nowIso(), opening: true });
     await playAgentAudio(result.audio, {
       speakingStatus: 'Agent opening',
       noAudioStatus: 'Listening',
@@ -2008,7 +2008,7 @@ function sendRealtimePlaybackEvent(status, details = {}) {
       duration_ms: Number.isFinite(Number(details.durationMs)) ? Number(details.durationMs) : null,
       current_time_ms: Number.isFinite(Number(details.currentTimeMs)) ? Number(details.currentTimeMs) : null,
       text_length: Number.isFinite(Number(details.textLength)) ? Number(details.textLength) : null,
-      timestamp: new Date().toISOString(),
+      timestamp: LanaTime.nowIso(),
     }));
   } catch (_error) {}
 }
@@ -2176,7 +2176,7 @@ async function processWebVoiceTurnResult(result, recordedMs) {
   state.voiceConsole.interimTranscript = transcript || 'No transcript returned for this turn.';
   state.voiceConsole.streamingResponse = '';
   if (transcript) {
-    state.voiceConsole.turns.push({ role: 'user', text: transcript, at: new Date().toISOString() });
+    state.voiceConsole.turns.push({ role: 'user', text: transcript, at: LanaTime.nowIso() });
   }
   if (result.response?.mode === 'failed') {
     state.voiceConsole.tools = Array.isArray(result.tools) ? result.tools : [];
@@ -2195,7 +2195,7 @@ async function processWebVoiceTurnResult(result, recordedMs) {
     return;
   }
   const reply = result.response?.text || 'The agent did not return a text response.';
-  state.voiceConsole.turns.push({ role: 'agent', text: reply, at: new Date().toISOString() });
+  state.voiceConsole.turns.push({ role: 'agent', text: reply, at: LanaTime.nowIso() });
   state.voiceConsole.tools = Array.isArray(result.tools) ? result.tools : [];
   state.voiceConsole.telemetry = {
     ...(result.telemetry || {}),

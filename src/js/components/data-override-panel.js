@@ -356,8 +356,8 @@ export class DataOverridePanel {
     this.elements.metricName.textContent = metricName;
     this.elements.metricDescription.textContent = metricDescription || 'No description available';
     this.elements.periodRange.textContent = this.formatDateRange(
-      new Date(periodData.periodStart + 'T00:00:00Z'),
-      new Date(periodData.periodEnd + 'T23:59:59Z')
+      new Date(LanaTime.utcDayStart(periodData.periodStart)),
+      new Date(LanaTime.utcDayEnd(periodData.periodEnd))
     );
 
     // Update labels based on override type
@@ -418,8 +418,8 @@ export class DataOverridePanel {
   async _loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd) {
     try {
       // Convert to ISO format
-      const periodStartISO = LanaTime.toIsoInstant(periodStart + 'T00:00:00Z');
-      const periodEndISO = LanaTime.toIsoInstant(periodEnd + 'T23:59:59Z');
+      const periodStartISO = LanaTime.utcDayStart(periodStart);
+      const periodEndISO = LanaTime.utcDayEnd(periodEnd);
 
       // Build endpoint URL using configurable template
       const endpoint = this._buildEndpoint(this.apiEndpoints.overrides, moduleKey);
@@ -515,8 +515,8 @@ export class DataOverridePanel {
     }
 
     // Convert to ISO format
-    const periodStartISO = LanaTime.toIsoInstant(periodStart + 'T00:00:00Z');
-    const periodEndISO = LanaTime.toIsoInstant(periodEnd + 'T23:59:59Z');
+    const periodStartISO = LanaTime.utcDayStart(periodStart);
+    const periodEndISO = LanaTime.utcDayEnd(periodEnd);
 
     // Show loading state
     this._setLoadingState(true);

@@ -284,9 +284,9 @@ function formatDuration(startTimestamp, endTimestamp) {
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return '—';
 
     const diffMs = end.getTime() - start.getTime();
-    const diffSeconds = Math.floor(diffMs / 1000);
-    const diffMinutes = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
+    const diffSeconds = Math.floor(diffMs / LanaTime.MS_PER_SECOND);
+    const diffMinutes = Math.floor(diffMs / LanaTime.MS_PER_MINUTE);
+    const diffHours = Math.floor(diffMs / LanaTime.MS_PER_HOUR);
 
     if (diffSeconds < 60) return `${diffSeconds} second${diffSeconds === 1 ? '' : 's'}`;
     if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'}`;

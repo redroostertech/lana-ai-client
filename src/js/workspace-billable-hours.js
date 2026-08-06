@@ -1429,8 +1429,9 @@
   }
 
   // Convert a Date to the value format expected by <input type="datetime-local">
-  // ("YYYY-MM-DDTHH:MM" in local time). Native toISOString returns UTC, so we
-  // build the string component-wise to keep it in the user's locale.
+  // ("YYYY-MM-DDTHH:MM" in local time). Delegates to
+  // LanaTime.toLocalDatetimeInputValue, which builds the local-wall-clock
+  // string (native toISOString would shift it to UTC).
   function _toDatetimeLocal(d) {
     return LanaTime.toLocalDatetimeInputValue(d);
   }

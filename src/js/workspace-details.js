@@ -53,6 +53,9 @@
   var _docPageSize = 12;
   var _documentsRefreshSeq = 0;
   var _documentsPollTimer = null;
+  var _matterArtifactsCache = [];
+  var _artifactsRefreshSeq = 0;
+  var _artifactDrawerEl = null;
 
   // Shared matter file-list component (window.MatterDocumentsView). The matter
   // Documents tab renders its file list (and all per-row / batch / orphan /
@@ -258,6 +261,7 @@
     'tabContentTasks',
     'tabContentComments',
     'tabContentDocuments',
+    'tabContentArtifacts',
     'tabContentConversations'
   ];
 
@@ -632,7 +636,7 @@
       return;
     }
 
-    var tabs = ['notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'summary', 'docGeneration', 'analytics'];
+    var tabs = ['notes', 'tasks', 'comments', 'documents', 'artifacts', 'conversations', 'billableHours', 'summary', 'docGeneration', 'analytics'];
     var tabBar = document.getElementById('tabBar');
     if (tabBar && tabBar.getAttribute('active') !== tab) {
       tabBar.setAttribute('active', tab);
@@ -659,6 +663,9 @@
       case 'documents':
         renderDocumentsTab(m.matter, m.documents, m.docPagination, m.orphanedFiles);
         refreshDrawerDocuments(_getMatterIdentity(m.matter));
+        break;
+      case 'artifacts':
+        renderArtifactsTab(m.matter);
         break;
       case 'conversations':
         renderConversationsTab(m.matter, m.chats, m.chatPagination, m.pinnedChats || []);
@@ -693,7 +700,7 @@
   }
 
   function getCurrentActiveTab() {
-    var tabs = ['summary', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
+    var tabs = ['summary', 'notes', 'tasks', 'comments', 'documents', 'artifacts', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
     for (var i = 0; i < tabs.length; i++) {
       var content = document.getElementById('tabContent' + tabs[i].charAt(0).toUpperCase() + tabs[i].substring(1));
       if (content && !content.classList.contains('hidden')) return tabs[i];
@@ -4415,12 +4422,13 @@
 
   function formatDueDate(dateString) {
     if (!dateString) return 'No due date';
-    var date = parseApiUtcDate(dateString);
-    var now = LanaTime.nowDate();
     // Compare calendar days, not elapsed hours — a task due yesterday
-    // evening is "Overdue (1 day)", not "Due today". Keeps the badge in
-    // agreement with the Summary's overdue/due-soon bucketing.
-    var diffDays = LanaTime.daysBetween(now, date);
+    // evening is "Overdue (1 day)", not "Due today". daysUntil treats
+    // date-only values as local calendar days (a bare 'YYYY-MM-DD' would
+    // otherwise parse as UTC midnight and shift a day west of UTC) and
+    // returns NaN for invalid input instead of comparing against the epoch.
+    var diffDays = LanaTime.daysUntil(dateString);
+    if (!Number.isFinite(diffDays)) return 'No due date';
 
     if (diffDays < 0) {
       var od = Math.abs(diffDays);
@@ -10270,13 +10278,10 @@
 
     // Last activity card
     if (data.last_activity_at) {
-      var lastDate = new Date(data.last_activity_at);
-      var now = LanaTime.nowDate();
-      var daysSince = Math.floor((now - lastDate) / LanaTime.MS_PER_DAY);
-      var timeAgo = daysSince === 0 ? 'Today' : daysSince === 1 ? 'Yesterday' : String(daysSince) + ' days ago';
+      var lastActivityLabel = Lex.Utils.formatRelativeDate(data.last_activity_at);
       html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;">';
       html += '<p style="font-size:0.75rem;color:#6b7280;margin:0 0 0.25rem 0;">Last Activity</p>';
-      html += '<p style="font-size:1.5rem;font-weight:600;margin:0;color:#111827;">' + escapeHtml(timeAgo) + '</p>';
+      html += '<p style="font-size:1.5rem;font-weight:600;margin:0;color:#111827;">' + escapeHtml(lastActivityLabel) + '</p>';
       html += '</div>';
     }
 

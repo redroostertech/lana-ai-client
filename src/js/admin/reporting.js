@@ -160,17 +160,16 @@
         startDate = utils.startOfUtcMonth(endDate);
         break;
       case 'thisQuarter':
-        var currentQuarter = Math.floor(today.getUTCMonth() / 3);
-        startDate = new Date(Date.UTC(today.getUTCFullYear(), currentQuarter * 3, 1));
+        startDate = LanaTime.startOfUtcQuarter(today);
         endDate = today;
         break;
       case 'thisYear':
-        startDate = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
+        startDate = LanaTime.startOfUtcYear(today);
         endDate = today;
         break;
       case 'lastYear':
-        startDate = new Date(Date.UTC(today.getUTCFullYear() - 1, 0, 1));
-        endDate = new Date(Date.UTC(today.getUTCFullYear() - 1, 11, 31));
+        startDate = LanaTime.startOfUtcYear(LanaTime.addUtcMonths(today, -12));
+        endDate = LanaTime.endOfUtcYear(LanaTime.addUtcMonths(today, -12));
         break;
       default:
         endDate = today;
@@ -463,8 +462,8 @@
     }
 
     // Convert dates to ISO format
-    var periodStartISO = LanaTime.toIsoInstant(startDate + 'T00:00:00Z');
-    var periodEndISO = LanaTime.toIsoInstant(endDate + 'T23:59:59Z');
+    var periodStartISO = LanaTime.utcDayStart(startDate);
+    var periodEndISO = LanaTime.utcDayEnd(endDate);
 
     // Loading state
     if (executeBtn) executeBtn.loading = true;
@@ -669,8 +668,8 @@
     modal.classList.remove('hidden');
 
     try {
-      var periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
-      var periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
+      var periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
+      var periodEnd = LanaTime.utcDayEnd(document.getElementById('periodEnd').value);
 
       var response = await api.get('/api/v1/integrations/connector-data?entity_type=contact&source=' + encodeURIComponent(source) + '&start_date=' + periodStart + '&end_date=' + periodEnd);
 
@@ -712,8 +711,8 @@
 
   async function openGenericDrilldown(metricKey, metricName) {
     try {
-      var periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
-      var periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
+      var periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
+      var periodEnd = LanaTime.utcDayEnd(document.getElementById('periodEnd').value);
       var moduleKey = selectedModuleKey || 'growth-intake-performance';
 
       if (!drilldownRenderer) {
@@ -740,8 +739,8 @@
     try {
       var pipelineId = stageInfo.pipeline_id;
       var position = stageInfo.position !== undefined ? stageInfo.position : 0;
-      var periodStart = document.getElementById('periodStart') ? document.getElementById('periodStart').value + 'T00:00:00Z' : '';
-      var periodEnd = document.getElementById('periodEnd') ? document.getElementById('periodEnd').value + 'T23:59:59Z' : '';
+      var periodStart = document.getElementById('periodStart') ? LanaTime.utcDayStart(document.getElementById('periodStart').value) : '';
+      var periodEnd = document.getElementById('periodEnd') ? LanaTime.utcDayEnd(document.getElementById('periodEnd').value) : '';
       var moduleKey = selectedModuleKey || 'funnel-analysis-attribution';
 
       if (!drilldownRenderer) {
@@ -920,8 +919,8 @@
     if (!modal || !title || !content) return;
 
     try {
-      var periodStart = document.getElementById('periodStart').value + 'T00:00:00Z';
-      var periodEnd = document.getElementById('periodEnd').value + 'T23:59:59Z';
+      var periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
+      var periodEnd = LanaTime.utcDayEnd(document.getElementById('periodEnd').value);
       var moduleKey = selectedModuleKey || 'growth-intake-performance';
 
       var hasGenericDrilldown = await tryGenericDrilldown(content, moduleKey, metricKey, periodStart, periodEnd);

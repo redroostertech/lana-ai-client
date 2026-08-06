@@ -332,18 +332,12 @@
   // ---------------------------------------------------------------------------
 
   function timeAgo(dateString) {
-    if (window.timeAgo) return window.timeAgo(dateString);
-
-    var date = new Date(dateString);
-    var now = new Date();
-    var seconds = Math.floor((now - date) / 1000);
-
-    if (seconds < 60) return 'Just now';
-    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
-    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
-    if (seconds < 604800) return Math.floor(seconds / 86400) + 'd ago';
-
-    return date.toLocaleDateString();
+    var date = window.Lex && window.Lex.Utils
+      ? window.Lex.Utils.parseApiUtcDate(dateString)
+      : new Date(dateString);
+    var rel = window.LanaTime ? LanaTime.timeAgo(date, { maxDays: 7 }) : '';
+    if (rel) return rel;
+    return date && Number.isFinite(date.getTime()) ? date.toLocaleDateString() : '';
   }
 
   // ---------------------------------------------------------------------------

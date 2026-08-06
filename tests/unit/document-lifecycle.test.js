@@ -21,7 +21,13 @@ describe('documentLifecycle utility', () => {
       clearTimeout
     };
     context.window = context;
-    return vm.createContext(context);
+    const vmContext = vm.createContext(context);
+    // Pages load time-utils.js before these utilities; mirror that so
+    // LanaTime-dependent paths (e.g. formatTimestamp) are exercised the way
+    // they run in the app.
+    loadScript(path.join(__dirname, '../../src/js/time-utils.js'), vmContext);
+    context.LanaTime = context.window.LanaTime;
+    return vmContext;
   }
 
   test('derives lifecycle and summary states from document fields', () => {

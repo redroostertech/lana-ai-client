@@ -139,13 +139,10 @@
 
     // Last activity card
     if (data.last_activity_at) {
-      var lastDate = new Date(data.last_activity_at);
-      var now = LanaTime.nowDate();
-      var daysSince = Math.floor((now - lastDate) / LanaTime.MS_PER_DAY);
-      var timeAgo = daysSince === 0 ? 'Today' : daysSince === 1 ? 'Yesterday' : String(daysSince) + ' days ago';
+      var lastActivityLabel = Lex.Utils.formatRelativeDate(data.last_activity_at);
       html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;">';
       html += '<p style="font-size:0.75rem;color:#6b7280;margin:0 0 0.25rem 0;">Last Activity</p>';
-      html += '<p style="font-size:1.5rem;font-weight:600;margin:0;color:#111827;">' + escapeHtml(timeAgo) + '</p>';
+      html += '<p style="font-size:1.5rem;font-weight:600;margin:0;color:#111827;">' + escapeHtml(lastActivityLabel) + '</p>';
       html += '</div>';
     }
 

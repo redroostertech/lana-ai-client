@@ -321,6 +321,10 @@
         msg.content = m.content;
         if (m.messageId) msg.messageId = m.messageId;
         if (m.timestamp) msg.timestamp = m.timestamp;
+        if (m.citations) msg.citations = m.citations;
+        if (m.references) msg.references = m.references;
+        if (m.artifacts) msg.artifacts = m.artifacts;
+        if (m.attachments) msg.attachments = m.attachments;
         if (m.duration != null) msg.duration = m.duration;
         if (m.tokenCount != null) msg.tokenCount = m.tokenCount;
         frag.appendChild(msg);

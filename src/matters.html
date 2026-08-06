@@ -5360,12 +5360,13 @@
     // Helper function to format date
     function formatDueDate(dateString) {
       if (!dateString) return 'No due date';
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'No due date';
       // Calendar-day comparison via LanaTime.daysUntil, matching the
       // workspace board: a task due yesterday evening reads "Overdue",
-      // not "Due today".
-      const diffDays = LanaTime.daysUntil(date);
+      // not "Due today". Date-only values are treated as local calendar
+      // days and invalid input yields NaN rather than an epoch diff.
+      const date = LanaTime.toLocalCalendarDate(dateString);
+      if (isNaN(date.getTime())) return 'No due date';
+      const diffDays = LanaTime.daysUntil(dateString);
 
       if (diffDays < 0) {
         const od = Math.abs(diffDays);

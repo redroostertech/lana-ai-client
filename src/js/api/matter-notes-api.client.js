@@ -340,10 +340,13 @@ class MatterNotesAPIClient {
   formatRelativeDate(dateString) {
     if (!dateString) return '';
 
-    const diffSeconds = Math.floor((new Date() - new Date(dateString)) / 1000);
+    const parsed = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils)
+      ? window.Lex.Utils.parseApiUtcDate(dateString)
+      : new Date(dateString);
+    const diffMs = parsed ? LanaTime.millisecondsSince(parsed.getTime()) : NaN;
 
     // Sub-day: defer to timeAgo for "Just now" / "X minutes ago" / "X hours ago"
-    if (diffSeconds < 86400 && typeof window !== 'undefined' && typeof window.timeAgo === 'function') {
+    if (diffMs < LanaTime.MS_PER_DAY && typeof window !== 'undefined' && typeof window.timeAgo === 'function') {
       return window.timeAgo(dateString);
     }
 

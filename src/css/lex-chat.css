@@ -203,6 +203,25 @@
   font-size: var(--lex-body-xs-size, 0.75rem);
 }
 
+.lex-chat-artifact-recall {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lex-space-1, 4px);
+  margin-top: var(--lex-space-1, 4px);
+  color: var(--lex-chat-text-dim);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+}
+
+.lex-chat-artifact-recall span {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 2px 6px;
+  border: 1px solid var(--lex-chat-border-soft);
+  border-radius: var(--lex-radius-sm, 4px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .lex-chat-artifact-status-dot {
   width: 7px;
   height: 7px;
