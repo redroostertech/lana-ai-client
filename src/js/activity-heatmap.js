@@ -96,7 +96,7 @@ const ActivityHeatmap = (function() {
    */
   function generateDateRange(start, end) {
     const dates = [];
-    const currentDate = new Date(start);
+    let currentDate = new Date(start);
 
     while (currentDate <= end) {
       dates.push(new Date(currentDate));
