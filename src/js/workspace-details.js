@@ -597,6 +597,8 @@
         openManageShareModal(mid);
       } else if (card.id === 'customFieldsCard' && action === 'edit') {
         openEditCustomFieldsModal(mid);
+      } else if (card.id === 'wsumNextCard' && action === 'plus') {
+        openCreateTaskModal(mid);
       } else if (card.id === 'contactsCard' && action === 'plus') {
         openAddContactModal(mid);
       } else if (card.id === 'linkedMattersCard' && action === 'plus') {
@@ -1438,7 +1440,13 @@
     var nextRows = nextList.length
       ? '<div class="wsum-card-list">' + nextList.slice(0, 5).map(wsumTaskRow).join('') + '</div>' +
         (nextList.length > 5 ? '<button class="wsum-more wsum-more-btn" data-wsum-list="next">+' + (nextList.length - 5) + ' more open</button>' : '')
-      : '<p class="wsum-more">No open work remaining.</p>';
+      : '<p class="wsum-more">No open work remaining.</p>' +
+        '<button id="wsumCreateTask" class="wsum-viewall">Create Task</button>';
+
+    // "+" header action to create a task (empty state carries its own button)
+    var nextCardActions = nextList.length
+      ? " actions='" + JSON.stringify([{ icon: 'plus', label: 'Create Task' }]).split('"').join('&quot;') + "'"
+      : '';
 
     var typeRows = typeEntries.slice(0, 6).map(function (e) {
       var pct = typeTotal ? Math.round((e.count / typeTotal) * 100) : 0;
@@ -1468,7 +1476,7 @@
             statusCardInner +
           '</lex-card>' +
           '<lex-card heading="Needs attention" subtitle="Overdue work items">' + overdueRows + '</lex-card>' +
-          '<lex-card heading="What\'s next" subtitle="Upcoming open work">' + nextRows + '</lex-card>' +
+          '<lex-card id="wsumNextCard" heading="What\'s next" subtitle="Upcoming open work"' + nextCardActions + '>' + nextRows + '</lex-card>' +
           priorityCardHtml +
           '<div id="dockPanelDetails"></div>' +
         '</div>' +
@@ -1563,6 +1571,10 @@
       }
       if (e.target.closest('#wsumViewAllActivity')) {
         openActivityDrawer();
+        return;
+      }
+      if (e.target.closest('#wsumCreateTask')) {
+        openCreateTaskModal(matter.matter_id);
         return;
       }
       if (e.target.closest('#wsumViewBoard')) {
