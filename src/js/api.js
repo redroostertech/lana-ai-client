@@ -679,6 +679,24 @@ class ApiClient {
 
     // Parse endpoint to determine response
     const path = endpoint.split('?')[0];
+    const taskSuggestionMatch = path.match(/^\/api\/v1\/matters\/([^/]+)\/tasks\/suggestions$/);
+
+    if (taskSuggestionMatch && method === 'POST') {
+      const description = String((data && data.description) || '').trim();
+      const title = description.length > 90 ? description.slice(0, 87).trim() + '...' : (description || 'New workspace task');
+      return {
+        success: true,
+        matter_id: taskSuggestionMatch[1],
+        suggestions: {
+          title,
+          subtasks: [
+            { title: 'Confirm required facts and proofs', description: 'Review the workspace context and identify anything missing.' },
+            { title: 'Prepare next action draft', description: 'Draft the first document, filing, or follow-up needed for this task.' }
+          ],
+          source: 'demo'
+        }
+      };
+    }
 
     // -------------------- AUTH --------------------
     if (path === '/api/v1/auth/login' && method === 'POST') {
@@ -2412,6 +2430,16 @@ class ApiClient {
    */
   async createTask(matterId, taskData) {
     return this.post(`/api/v1/matters/${matterId}/tasks`, taskData);
+  }
+
+  /**
+   * Ask LANA to suggest a title and subtasks for a new workspace task
+   * @param {string} matterId - The matter ID
+   * @param {Object} payload - Description, task fields, and workspace context
+   * @returns {Promise<Object>} Suggestion response
+   */
+  async suggestWorkspaceTask(matterId, payload) {
+    return this.post(`/api/v1/matters/${matterId}/tasks/suggestions`, payload);
   }
 
   /**
