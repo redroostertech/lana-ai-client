@@ -8552,8 +8552,12 @@
         document.getElementById('taskPriority').value = task.priority || 'normal';
 
         if (task.due_date) {
+          // API instant -> user-local wall time for the datetime-local input
           const date = new Date(task.due_date);
-          document.getElementById('taskDueDate').value = date.toISOString().slice(0, 16);
+          const pad = (n) => (n < 10 ? '0' : '') + n;
+          document.getElementById('taskDueDate').value = isNaN(date.getTime()) ? '' :
+            date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+            'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
         } else {
           document.getElementById('taskDueDate').value = '';
         }
@@ -8641,7 +8645,10 @@
         notes: document.getElementById('taskNotes').value || null,
         status: document.getElementById('taskStatus').value,
         priority: document.getElementById('taskPriority').value,
-        due_date: document.getElementById('taskDueDate').value || null,
+        // datetime-local is user-local wall time; send a UTC instant
+        due_date: document.getElementById('taskDueDate').value
+          ? new Date(document.getElementById('taskDueDate').value).toISOString()
+          : null,
         assigned_to_user_id: document.getElementById('taskAssignedTo').value || null
       };
 
