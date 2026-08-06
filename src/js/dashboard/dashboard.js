@@ -1642,7 +1642,7 @@
               // Date-only input: anchor at local noon and send a UTC instant,
               // matching my-tasks.js and task-plans.js. A bare YYYY-MM-DD is
               // parsed as midnight and shifts a day per server timezone.
-              fields[key] = raw ? new Date(raw + 'T12:00:00').toISOString() : null;
+              fields[key] = raw ? LanaTime.toIsoInstant(raw + 'T12:00:00') : null;
             } else if (key === 'priority' || key === 'assigned_to_user_id') {
               fields[key] = raw === '' ? null : raw;
             } else {

@@ -104,6 +104,39 @@
     return Number.isFinite(date.getTime()) ? date.toISOString().split('T')[0] : '';
   }
 
+  function pad2(n) {
+    return (n < 10 ? '0' : '') + n;
+  }
+
+  // API contract converters: form inputs hold user-local wall time, the API
+  // speaks ISO 8601 UTC instants. These are the only sanctioned bridges.
+
+  // Any date-like value (datetime-local string, ISO string, Date) -> ISO UTC
+  // instant for the API, or null when empty/invalid.
+  function toIsoInstant(value) {
+    if (value === null || value === undefined || value === '') return null;
+    var date = value instanceof Date ? value : new Date(value);
+    return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+  }
+
+  // API instant (or Date; defaults to now) -> the user-local calendar day in
+  // the format a type="date" input expects ('YYYY-MM-DD'), or ''.
+  function toLocalDateInputValue(value) {
+    if (value === null || value === '') return '';
+    var date = value === undefined ? nowDate() : value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    return date.getFullYear() + '-' + pad2(date.getMonth() + 1) + '-' + pad2(date.getDate());
+  }
+
+  // API instant (or Date) -> user-local wall time in the format a
+  // type="datetime-local" input expects ('YYYY-MM-DDTHH:mm'), or ''.
+  function toLocalDatetimeInputValue(value) {
+    if (value === null || value === '') return '';
+    var date = value === undefined ? nowDate() : value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    return toLocalDateInputValue(date) + 'T' + pad2(date.getHours()) + ':' + pad2(date.getMinutes());
+  }
+
   function millisecondsSince(startMs, endMs) {
     return Number(endMs === undefined ? nowMs() : endMs) - Number(startMs);
   }
@@ -139,6 +172,9 @@
     startOfLocalYear: startOfLocalYear,
     endOfLocalYear: endOfLocalYear,
     formatUtcDateOnly: formatUtcDateOnly,
+    toIsoInstant: toIsoInstant,
+    toLocalDateInputValue: toLocalDateInputValue,
+    toLocalDatetimeInputValue: toLocalDatetimeInputValue,
     millisecondsSince: millisecondsSince,
     millisecondsUntil: millisecondsUntil,
     daysBetween: daysBetween

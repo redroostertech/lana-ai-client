@@ -628,16 +628,9 @@
     if (title) title.value = item.title || '';
     if (description) description.value = item.description || '';
     if (priority) priority.value = item.priority || 'medium';
-    if (dueDate) {
-      // Show the LOCAL calendar day of the stored instant; slicing the UTC
-      // string shifts evening-local due dates to the next day.
-      var dueParsed = item.due_date ? new Date(item.due_date) : null;
-      dueDate.value = dueParsed && !isNaN(dueParsed.getTime())
-        ? dueParsed.getFullYear() + '-' +
-          ('0' + (dueParsed.getMonth() + 1)).slice(-2) + '-' +
-          ('0' + dueParsed.getDate()).slice(-2)
-        : '';
-    }
+    // Show the LOCAL calendar day of the stored instant; slicing the UTC
+    // string shifts evening-local due dates to the next day.
+    if (dueDate) dueDate.value = item.due_date ? LanaTime.toLocalDateInputValue(item.due_date) : '';
     if (assignee) assignee.value = item.assigned_to_user_id || '';
     if (modal) modal.open = true;
   }

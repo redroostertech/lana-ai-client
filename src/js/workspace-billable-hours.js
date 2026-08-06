@@ -1138,9 +1138,7 @@
 
       // The user's LOCAL calendar day — toISOString() would send the UTC day,
       // which is tomorrow for evening users west of UTC.
-      var now = new Date();
-      var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-      var today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+      var today = LanaTime.toLocalDateInputValue(LanaTime.nowDate());
       api.post('/api/v1/billable-hours/generate', { date: today })
         .then(function (result) {
           var data = result && result.data;

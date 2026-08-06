@@ -175,25 +175,17 @@
     return new Date(value);
   }
 
-  // Convert a datetime-local input value (user-local wall time) into an ISO
-  // 8601 UTC instant for the API. The backend stores timestamptz, so what we
-  // send must carry the zone.
+  // API contract bridges, delegated to the canonical LanaTime utility:
+  // datetime-local input value -> ISO UTC instant for the API, and API
+  // instant -> user-local wall time for the input. parseApiUtcDate keeps
+  // handling legacy zone-less API values before the local formatting.
   function toApiTimestamp(datetimeLocalValue) {
-    if (!datetimeLocalValue) return null;
-    var d = new Date(datetimeLocalValue);
-    if (isNaN(d.getTime())) return null;
-    return d.toISOString();
+    return window.LanaTime ? LanaTime.toIsoInstant(datetimeLocalValue) : null;
   }
 
-  // Convert an API timestamp (UTC instant) into the user-local wall-time
-  // value a datetime-local input expects, at minute precision.
   function toDatetimeLocalValue(apiTimestamp) {
-    if (!apiTimestamp) return '';
-    var d = parseApiUtcDate(apiTimestamp);
-    if (!d || isNaN(d.getTime())) return '';
-    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-      'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    if (!apiTimestamp || !window.LanaTime) return '';
+    return LanaTime.toLocalDatetimeInputValue(parseApiUtcDate(apiTimestamp));
   }
 
   // NO-REGEX version of formatFieldName
