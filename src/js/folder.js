@@ -437,6 +437,7 @@
 
     // Apply the active view-mode modifier so folders + files share one layout.
     applyViewModeClass();
+    syncFolderActionChrome(totalItems === 0);
 
     if (totalItems === 0) {
       emptyEl && emptyEl.classList.remove('hidden');
@@ -481,6 +482,15 @@
   }
 
   /**
+   * Keep the right-aligned Actions button out of the empty state, where the
+   * centered Create button owns the same menu.
+   */
+  function syncFolderActionChrome(isEmpty) {
+    var actionsBar = document.getElementById('folderActionsBar');
+    if (actionsBar) actionsBar.classList.toggle('hidden', !!isEmpty);
+  }
+
+  /**
    * Mount the MatterDocumentsView component once. The component OWNS the file
    * list rendering and every per-file action (Open / Download / Rename /
    * Delete), and re-fetches via the api after each mutation. Files render into
@@ -509,6 +519,7 @@
         enableTemplateToggle: false,
         enableRetry: false,
         enableReplace: false,
+        enableDocStudio: false,
         // The folder page owns search via its top toolbar (#searchInput), so
         // suppress the component's built-in search bar to avoid a duplicate.
         enableSearch: false
@@ -1047,6 +1058,57 @@
     showContextMenu(menuItems, event);
   }
 
+  function uploadIconPath() {
+    return '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>';
+  }
+
+  function folderIconPath() {
+    return '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>';
+  }
+
+  function docStudioIconPath() {
+    return '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>';
+  }
+
+  /**
+   * Show the folder-level create/action menu.
+   * @param {Event} event
+   */
+  function showFolderActionsMenu(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    if (event && event.stopPropagation) event.stopPropagation();
+
+    showContextMenu([
+      { heading: 'Documents' },
+      {
+        icon: uploadIconPath(),
+        label: 'Upload new file',
+        action: function () {
+          hideContextMenu();
+          triggerFolderFilePicker();
+        }
+      },
+      {
+        icon: docStudioIconPath(),
+        label: 'Create with Doc Studio',
+        action: function () {
+          hideContextMenu();
+          openDocStudioCreate();
+        }
+      },
+      { divider: true },
+      { heading: 'Folders' },
+      {
+        icon: folderIconPath(),
+        label: 'Create folder',
+        action: function () {
+          hideContextMenu();
+          showNewFolderModal();
+        }
+      }
+    ], event);
+  }
+
   /**
    * Build and position a generic context menu from an array of menu item descriptors.
    * Actions are stored as temporary window globals (contextMenuAction_N) to support
@@ -1061,6 +1123,9 @@
     var menuHTML = menuItems.map(function (item, index) {
       if (item.divider) {
         return '<div class="my-1" style="border-top: 1px solid var(--lex-border-default)"></div>';
+      }
+      if (item.heading) {
+        return '<div class="folder-context-heading">' + escapeHtml(item.heading) + '</div>';
       }
 
       // Danger items keep their semantic color; default items use Lex tokens
@@ -1080,7 +1145,7 @@
     menu.innerHTML = menuHTML;
 
     menuItems.forEach(function (item, index) {
-      if (!item.divider) {
+      if (!item.divider && !item.heading) {
         window['contextMenuAction_' + index] = item.action;
       }
     });
@@ -1100,14 +1165,20 @@
         var menuWidth = menu.offsetWidth || 200;
         var menuHeight = menu.offsetHeight || 100;
 
-        var left = rect.left - menuWidth - 10;
-        var top = rect.top;
+        var left = rect.right - menuWidth;
+        var top = rect.bottom + 8;
 
         if (left < 10) {
-          left = rect.right + 10;
+          left = 10;
+        }
+        if (left + menuWidth > window.innerWidth - 10) {
+          left = window.innerWidth - menuWidth - 10;
         }
         if (top + menuHeight > window.innerHeight - 10) {
-          top = window.innerHeight - menuHeight - 10;
+          top = rect.top - menuHeight - 8;
+        }
+        if (top < 10) {
+          top = 10;
         }
 
         menu.style.left = left + 'px';
@@ -1146,8 +1217,8 @@
 
   /**
    * Open the in-page Doc Studio create modal scoped to the current matter.
-   * Used by both the component's onCreateDocStudio callback and the empty-state
-   * "Create using Doc Studio" action. Falls back to navigating to the Doc Studio
+   * Used by both the component's onCreateDocStudio callback and the folder
+   * create/actions menu. Falls back to navigating to the Doc Studio
    * page if the shared modal module is not loaded.
    */
   function openDocStudioCreate() {
@@ -1180,28 +1251,14 @@
    * No source filter - folder.html only shows matter-scoped content.
    */
   function setupEventListeners() {
-    // New Folder button (lex-btn fires native click events)
-    var newFolderBtn = document.getElementById('newFolderBtn');
-    newFolderBtn && newFolderBtn.addEventListener('click', showNewFolderModal);
+    var folderMoreBtn = document.getElementById('folderMoreBtn');
+    folderMoreBtn && folderMoreBtn.addEventListener('click', showFolderActionsMenu);
 
-    // Empty state upload button - lex-empty fires 'action' event
-    var contentEmptyWidget = document.getElementById('contentEmptyWidget');
-    contentEmptyWidget && contentEmptyWidget.addEventListener('action', function () {
-      triggerFolderFilePicker();
-    });
+    var folderActionsBtn = document.getElementById('folderActionsBtn');
+    folderActionsBtn && folderActionsBtn.addEventListener('click', showFolderActionsMenu);
 
-    // Empty state Upload action - reuses the existing file picker / upload flow
-    var emptyUploadBtn = document.getElementById('emptyUploadBtn');
-    emptyUploadBtn && emptyUploadBtn.addEventListener('click', function () {
-      triggerFolderFilePicker();
-    });
-
-    // Empty state Create using Doc Studio action - opens the in-page Doc Studio
-    // create modal (falls back to navigation if the module is unavailable).
-    var emptyDocStudioBtn = document.getElementById('emptyDocStudioBtn');
-    emptyDocStudioBtn && emptyDocStudioBtn.addEventListener('click', function () {
-      openDocStudioCreate();
-    });
+    var emptyCreateBtn = document.getElementById('emptyCreateBtn');
+    emptyCreateBtn && emptyCreateBtn.addEventListener('click', showFolderActionsMenu);
 
     var cancelNewFolderBtn = document.getElementById('cancelNewFolderBtn');
     cancelNewFolderBtn && cancelNewFolderBtn.addEventListener('click', hideNewFolderModal);
@@ -1211,12 +1268,6 @@
 
     // Per-file Rename and Delete (and their modals/confirm dialogs) are owned by
     // the MatterDocumentsView component, so no per-file modal wiring lives here.
-
-    // Upload button triggers file picker (lex-btn fires native click)
-    var uploadBtn = document.getElementById('uploadBtn');
-    uploadBtn && uploadBtn.addEventListener('click', function () {
-      triggerFolderFilePicker();
-    });
 
     // File selection starts the ingestion upload flow
     var fileUploadInput = document.getElementById('fileUploadInput');

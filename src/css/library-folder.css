@@ -7,7 +7,7 @@
    Styles for the Library folder (matter) file-browser empty state.
    Loaded by folder.html. Keep presentation here - no inline styles. */
 
-/* Empty-state action row: Upload + Create using Doc Studio.
+/* Empty-state action row: Create dropdown.
    Centered to match the lex-empty content above it. */
 .folder-empty-actions {
   align-items: center;
@@ -16,6 +16,21 @@
   gap: 0.75rem;
   justify-content: center;
   margin-top: 0.5rem;
+}
+
+.folder-actions-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.folder-context-heading {
+  color: var(--lex-text-tertiary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.375rem 1rem 0.25rem;
+  text-transform: uppercase;
 }
 
 /* Per-file Rename and Delete use the MatterDocumentsView component-owned

@@ -47,11 +47,10 @@
         lana
         lana-context-type="full_chat"
       >
-        <lex-btn id="uploadBtn" variant="secondary" leading-icon="upload">
-          Upload
-        </lex-btn>
-        <lex-btn id="newFolderBtn" variant="primary" leading-icon="plus">
-          New Folder
+        <lex-btn id="folderMoreBtn" variant="primary" icon="true" title="More actions" aria-label="More actions">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
+          </svg>
         </lex-btn>
       </lex-banner>
       <input type="file" id="fileUploadInput" class="hidden" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt">
@@ -109,6 +108,10 @@
         </div>
       </div>
 
+      <div id="folderActionsBar" class="folder-actions-bar hidden">
+        <lex-btn id="folderActionsBtn" variant="primary" leading-icon="plus">Actions</lex-btn>
+      </div>
+
       <!-- Loading State -->
       <div id="contentLoading" class="flex flex-col items-center justify-center py-16 gap-3">
         <lex-spinner size="lg"></lex-spinner>
@@ -137,15 +140,8 @@
           icon="folder"
           id="contentEmptyWidget"
         ></lex-empty>
-        <!-- Dedicated empty-state actions: reuse existing upload flow,
-             plus Create using Doc Studio navigation. -->
         <div id="folderEmptyState" class="folder-empty-actions">
-          <lex-btn id="emptyUploadBtn" variant="primary" leading-icon="upload">
-            Upload Documents
-          </lex-btn>
-          <lex-btn id="emptyDocStudioBtn" variant="secondary" leading-icon="file-plus">
-            Create using Doc Studio
-          </lex-btn>
+          <lex-btn id="emptyCreateBtn" variant="primary" leading-icon="plus">Create</lex-btn>
         </div>
       </div>
     </main>
