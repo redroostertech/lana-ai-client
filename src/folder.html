@@ -47,11 +47,11 @@
         lana
         lana-context-type="full_chat"
       >
-        <lex-btn id="folderMoreBtn" variant="primary" icon="true" title="More actions" aria-label="More actions">
+        <button id="folderMoreBtn" class="folder-banner-more" type="button" title="More actions" aria-label="More actions" onclick="showFolderActionsMenu(event)">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
           </svg>
-        </lex-btn>
+        </button>
       </lex-banner>
       <input type="file" id="fileUploadInput" class="hidden" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt">
 

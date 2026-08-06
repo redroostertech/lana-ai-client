@@ -265,6 +265,7 @@
     // in which case the component's built-in search bar is suppressed to avoid
     // a duplicate control. Defaults on for standalone use (workspace-details).
     var enableSearch = opts.enableSearch !== false;
+    var showEmptyState = opts.showEmptyState !== false;
     // Whether the component renders its own "Create using Doc Studio" button.
     // Hosts that already provide their own Doc Studio entry point (e.g. the
     // workspace-details Matter documents header) pass false to avoid a
@@ -632,9 +633,11 @@
 
       var listHtml;
       if (totalCount === 0) {
-        listHtml = state.search
-          ? '<div class="mdv-empty">No files matching "' + esc(state.search) + '"</div>'
-          : '<div class="mdv-empty">No files in this folder</div>';
+        listHtml = showEmptyState
+          ? (state.search
+            ? '<div class="mdv-empty">No files matching "' + esc(state.search) + '"</div>'
+            : '<div class="mdv-empty">No files in this folder</div>')
+          : '';
       } else if (state.viewMode === 'grid') {
         listHtml = '<div class="mdv-grid">' + pageFiles.map(fileCard).join('') + '</div>';
       } else {

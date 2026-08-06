@@ -56,6 +56,7 @@
 
   // Temporary state for pending file upload
   var pendingUploadFiles = null;
+  var contextMenuAnchor = null;
 
   // Mounted MatterDocumentsView instance (renders the current folder's FILES).
   // folder.js keeps subfolder rendering/navigation; the component owns files.
@@ -520,6 +521,7 @@
         enableRetry: false,
         enableReplace: false,
         enableDocStudio: false,
+        showEmptyState: false,
         // The folder page owns search via its top toolbar (#searchInput), so
         // suppress the component's built-in search bar to avoid a duplicate.
         enableSearch: false
@@ -1120,6 +1122,16 @@
     var menu = document.getElementById('contextMenu');
     if (!menu) return;
 
+    var target = (event && event.currentTarget) || (event && event.target);
+    if (!menu.classList.contains('hidden') && contextMenuAnchor === target) {
+      hideContextMenu();
+      return;
+    }
+    if (contextMenuAnchor && contextMenuAnchor.setAttribute) {
+      contextMenuAnchor.setAttribute('aria-expanded', 'false');
+    }
+    contextMenuAnchor = target || null;
+
     var menuHTML = menuItems.map(function (item, index) {
       if (item.divider) {
         return '<div class="my-1" style="border-top: 1px solid var(--lex-border-default)"></div>';
@@ -1152,8 +1164,10 @@
 
     menu.style.visibility = 'hidden';
     menu.classList.remove('hidden');
+    if (contextMenuAnchor && contextMenuAnchor.setAttribute) {
+      contextMenuAnchor.setAttribute('aria-expanded', 'true');
+    }
 
-    var target = (event && event.currentTarget) || (event && event.target);
     console.log('[Folder] Context menu - event:', event);
     console.log('[Folder] Context menu - target:', target);
 
@@ -1206,6 +1220,10 @@
     if (menu) {
       menu.classList.add('hidden');
     }
+    if (contextMenuAnchor && contextMenuAnchor.setAttribute) {
+      contextMenuAnchor.setAttribute('aria-expanded', 'false');
+    }
+    contextMenuAnchor = null;
     document.removeEventListener('click', hideContextMenu);
   }
 
@@ -1251,9 +1269,6 @@
    * No source filter - folder.html only shows matter-scoped content.
    */
   function setupEventListeners() {
-    var folderMoreBtn = document.getElementById('folderMoreBtn');
-    folderMoreBtn && folderMoreBtn.addEventListener('click', showFolderActionsMenu);
-
     var folderActionsBtn = document.getElementById('folderActionsBtn');
     folderActionsBtn && folderActionsBtn.addEventListener('click', showFolderActionsMenu);
 
@@ -1425,6 +1440,7 @@
     exposeGlobal('navigateToRoot', navigateToRoot);
     exposeGlobal('navigateToMatterBreadcrumb', navigateToMatterBreadcrumb);
     exposeGlobal('showFolderMenu', showFolderMenu);
+    exposeGlobal('showFolderActionsMenu', showFolderActionsMenu);
     exposeGlobal('_navToFileViewer', _navToFileViewer);
     exposeGlobal('triggerFolderFilePicker', triggerFolderFilePicker);
 
