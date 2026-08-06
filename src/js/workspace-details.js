@@ -6439,7 +6439,12 @@
 
     } catch (err) {
       console.error('Save task error:', err);
-      Lex.Toast.error(isEdit ? 'Failed to update task' : 'Failed to create task');
+      // In create mode the first submit generates suggestions; report that
+      // phase accurately instead of claiming task creation failed.
+      var failMsg = isEdit
+        ? 'Failed to update task'
+        : (workspaceTaskSuggestionState ? 'Failed to create task' : 'Failed to generate suggestions');
+      Lex.Toast.error(failMsg);
 
       if (submitBtn) {
         submitBtn.loading = false;
