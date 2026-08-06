@@ -460,18 +460,8 @@
       if (!dateString) return '';
       // Prefer global timeAgo from Lex.Utils if available
       if (typeof timeAgo === 'function') return timeAgo(dateString);
-      // Fallback: simple relative time
-      var now = Date.now();
-      var then = new Date(dateString).getTime();
-      var diffMs = now - then;
-      var diffMin = Math.floor(diffMs / 60000);
-      if (diffMin < 1) return 'just now';
-      if (diffMin < 60) return diffMin + 'm ago';
-      var diffHr = Math.floor(diffMin / 60);
-      if (diffHr < 24) return diffHr + 'h ago';
-      var diffDay = Math.floor(diffHr / 24);
-      if (diffDay < 30) return diffDay + 'd ago';
-      return Math.floor(diffDay / 30) + 'mo ago';
+      // Fallback: canonical relative time
+      return LanaTime.timeAgo(dateString);
     }
 
     async function loadSummaryMetrics() {

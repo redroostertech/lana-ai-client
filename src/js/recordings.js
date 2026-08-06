@@ -384,20 +384,11 @@
   function formatWhen(dateString) {
     if (!dateString) return '';
     var date = new Date(dateString);
-    var now = new Date();
-    var diffMs = now.getTime() - date.getTime();
+    var diffMs = LanaTime.millisecondsSince(date.getTime());
     if (!Number.isFinite(diffMs) || diffMs < 0) {
       return formatAbsolute(dateString);
     }
-    var minutes = Math.floor(diffMs / 60000);
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return minutes + 'm ago';
-    var hours = Math.floor(minutes / 60);
-    if (hours < 24) return hours + 'h ago';
-    var days = Math.floor(hours / 24);
-    if (days === 1) return 'Yesterday';
-    if (days < 7) return days + 'd ago';
-    return formatAbsolute(dateString);
+    return LanaTime.timeAgo(dateString, { maxDays: 7 }) || formatAbsolute(dateString);
   }
 
   function formatAbsolute(dateString) {

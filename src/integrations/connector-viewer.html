@@ -652,17 +652,7 @@
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return String(value);
 
-      const diffMs = LanaTime.millisecondsSince(date.getTime());
-      const minute = LanaTime.MS_PER_MINUTE;
-      const hour = LanaTime.MS_PER_HOUR;
-      const day = LanaTime.MS_PER_DAY;
-      const month = 30 * day;
-
-      if (diffMs < minute) return 'just now';
-      if (diffMs < hour) return `${Math.floor(diffMs / minute)} minute${Math.floor(diffMs / minute) === 1 ? '' : 's'} ago`;
-      if (diffMs < day) return `${Math.floor(diffMs / hour)} hour${Math.floor(diffMs / hour) === 1 ? '' : 's'} ago`;
-      if (diffMs < month) return `${Math.floor(diffMs / day)} day${Math.floor(diffMs / day) === 1 ? '' : 's'} ago`;
-      return `${Math.floor(diffMs / month)} month${Math.floor(diffMs / month) === 1 ? '' : 's'} ago`;
+      return LanaTime.timeAgo(value, { style: 'words' });
     }
 
     function titleCase(value) {

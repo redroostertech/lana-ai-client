@@ -221,24 +221,7 @@ const ArticleSystem = (function() {
    * Format date string
    */
   function formatDate(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 1) {
-      return 'today';
-    } else if (diffDays < 7) {
-      return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-    } else if (diffDays < 30) {
-      const weeks = Math.floor(diffDays / 7);
-      return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
-    } else if (diffDays < 365) {
-      const months = Math.floor(diffDays / 30);
-      return `${months} month${months === 1 ? '' : 's'} ago`;
-    } else {
-      return Lex.Utils.formatDateLong(dateString);
-    }
+    return LanaTime.timeAgo(dateString, { style: 'words', maxDays: 365 }) || Lex.Utils.formatDateLong(dateString);
   }
 
   /**

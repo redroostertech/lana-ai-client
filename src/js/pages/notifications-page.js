@@ -393,14 +393,7 @@
 
   function timeAgo(dateString) {
     if (window.timeAgo) return window.timeAgo(dateString);
-    var date = new Date(dateString);
-    var seconds = Math.floor((LanaTime.nowDate() - date) / 1000);
-    if (!Number.isFinite(seconds)) return '';
-    if (seconds < 60) return 'Just now';
-    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
-    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
-    if (seconds < 604800) return Math.floor(seconds / 86400) + 'd ago';
-    return formatDate(dateString);
+    return LanaTime.timeAgo(dateString, { maxDays: 7 }) || formatDate(dateString);
   }
 
   if (document.readyState === 'loading') {

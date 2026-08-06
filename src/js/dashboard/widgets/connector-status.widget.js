@@ -128,18 +128,7 @@
    * @returns {string} Relative time string
    */
   function formatTimeAgo(dateStr) {
-    if (!dateStr) return '';
-    var date = new Date(dateStr);
-    var now = LanaTime.nowDate();
-    var diffMs = now - date;
-    if (isNaN(diffMs)) return '';
-    var diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return diffMins + 'm ago';
-    var diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return diffHours + 'h ago';
-    var diffDays = Math.floor(diffHours / 24);
-    return diffDays + 'd ago';
+    return LanaTime.timeAgo(dateStr);
   }
 
   /**

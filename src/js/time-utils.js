@@ -158,25 +158,60 @@
     return daysBetween(nowDate(), value);
   }
 
-  // Canonical relative-time formatter: 'just now', 'Nm ago', 'Nh ago',
-  // 'Nd ago', 'Nw ago', 'Nmo ago', 'Ny ago'. Returns '' for empty or
-  // invalid values. Future instants clamp to 'just now'.
-  function timeAgo(value, nowReferenceMs) {
+  // Canonical relative-time formatter. Second argument is either a
+  // reference-now in ms (legacy) or an options object:
+  //   { now: ms, style: 'compact' | 'words', maxDays: N }
+  // style 'compact' (default): 'Just now', 'Nm ago', 'Nh ago', 'Nd ago',
+  //   'Nw ago', 'Nmo ago', 'Ny ago'
+  // style 'words': 'Just now', 'N minutes ago', 'N hours ago', 'Yesterday',
+  //   'N days ago', 'N weeks ago', 'N months ago', 'N years ago'
+  // maxDays: when set, values that many days old or older return '' so the
+  //   caller can fall back to an absolute date format.
+  // Returns '' for empty/invalid values. Future instants clamp to 'Just now'.
+  function timeAgo(value, options) {
     if (value === null || value === undefined || value === '') return '';
     var date = value instanceof Date ? value : new Date(value);
     if (!Number.isFinite(date.getTime())) return '';
-    var reference = nowReferenceMs === undefined ? nowMs() : Number(nowReferenceMs);
+
+    var opts = typeof options === 'number' ? { now: options } : (options || {});
+    var reference = opts.now === undefined ? nowMs() : Number(opts.now);
+    var words = opts.style === 'words';
+
     var seconds = Math.floor((reference - date.getTime()) / MS_PER_SECOND);
-    if (seconds < 60) return 'just now';
     var minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return minutes + 'm ago';
     var hours = Math.floor(minutes / 60);
-    if (hours < 24) return hours + 'h ago';
     var days = Math.floor(hours / 24);
-    if (days < 7) return days + 'd ago';
-    if (days < 30) return Math.floor(days / 7) + 'w ago';
-    if (days < 365) return Math.floor(days / 30) + 'mo ago';
-    return Math.floor(days / 365) + 'y ago';
+
+    if (opts.maxDays !== undefined && days >= opts.maxDays) return '';
+
+    if (seconds < 60) return 'Just now';
+    if (minutes < 60) return words ? minutes + (minutes === 1 ? ' minute ago' : ' minutes ago') : minutes + 'm ago';
+    if (hours < 24) return words ? hours + (hours === 1 ? ' hour ago' : ' hours ago') : hours + 'h ago';
+    if (words && days === 1) return 'Yesterday';
+    if (days < 7) return words ? days + ' days ago' : days + 'd ago';
+    if (days < 30) {
+      var weeks = Math.floor(days / 7);
+      return words ? weeks + (weeks === 1 ? ' week ago' : ' weeks ago') : weeks + 'w ago';
+    }
+    if (days < 365) {
+      var months = Math.floor(days / 30);
+      return words ? months + (months === 1 ? ' month ago' : ' months ago') : months + 'mo ago';
+    }
+    var years = Math.floor(days / 365);
+    return words ? years + (years === 1 ? ' year ago' : ' years ago') : years + 'y ago';
+  }
+
+  // UTC day-window anchors for 'YYYY-MM-DD' picker values: the ISO instants
+  // bracketing that UTC calendar day. The canonical form of the
+  // "value + 'T00:00:00Z'" pattern used by reporting/insights/sync windows.
+  function utcDayStart(dayValue) {
+    if (!dayValue) return null;
+    return toIsoInstant(String(dayValue) + 'T00:00:00.000Z');
+  }
+
+  function utcDayEnd(dayValue) {
+    if (!dayValue) return null;
+    return toIsoInstant(String(dayValue) + 'T23:59:59.999Z');
   }
 
   function pad2(n) {
@@ -255,6 +290,8 @@
     formatCompactLocalDate: formatCompactLocalDate,
     daysUntil: daysUntil,
     timeAgo: timeAgo,
+    utcDayStart: utcDayStart,
+    utcDayEnd: utcDayEnd,
     toIsoInstant: toIsoInstant,
     toLocalDateInputValue: toLocalDateInputValue,
     toLocalDatetimeInputValue: toLocalDatetimeInputValue,

@@ -101,7 +101,11 @@
 
     var text = String(value);
     var hasTime = /T|\s\d{1,2}:\d{2}/.test(text);
-    var parsed = new Date(hasTime ? text : text + (endOfDay ? 'T23:59:59' : 'T00:00:00'));
+    // Date-only picker values anchor to the UTC day, matching the
+    // reporting/insights period semantics (previously local-anchored).
+    var anchored = hasTime ? text : (endOfDay ? LanaTime.utcDayEnd(text) : LanaTime.utcDayStart(text));
+    if (!anchored) return null;
+    var parsed = new Date(anchored);
     return Number.isFinite(parsed.getTime()) ? parsed : null;
   }
 

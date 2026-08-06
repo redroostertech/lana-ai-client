@@ -80,11 +80,11 @@ describe('timeAgo', () => {
     return new Date(NOW - ms);
   }
 
-  test('tiers: just now, minutes, hours, days, weeks, months, years', () => {
+  test('compact tiers: just now, minutes, hours, days, weeks, months, years', () => {
     const M = LanaTime.MS_PER_MINUTE;
     const H = LanaTime.MS_PER_HOUR;
     const D = LanaTime.MS_PER_DAY;
-    expect(LanaTime.timeAgo(ago(30 * 1000), NOW)).toBe('just now');
+    expect(LanaTime.timeAgo(ago(30 * 1000), NOW)).toBe('Just now');
     expect(LanaTime.timeAgo(ago(5 * M), NOW)).toBe('5m ago');
     expect(LanaTime.timeAgo(ago(3 * H), NOW)).toBe('3h ago');
     expect(LanaTime.timeAgo(ago(2 * D), NOW)).toBe('2d ago');
@@ -93,14 +93,49 @@ describe('timeAgo', () => {
     expect(LanaTime.timeAgo(ago(400 * D), NOW)).toBe('1y ago');
   });
 
-  test('future instants clamp to just now', () => {
-    expect(LanaTime.timeAgo(new Date(NOW + 60000), NOW)).toBe('just now');
+  test('words style tiers with singular/plural and Yesterday', () => {
+    const M = LanaTime.MS_PER_MINUTE;
+    const H = LanaTime.MS_PER_HOUR;
+    const D = LanaTime.MS_PER_DAY;
+    const words = (ms) => LanaTime.timeAgo(ago(ms), { now: NOW, style: 'words' });
+    expect(words(30 * 1000)).toBe('Just now');
+    expect(words(1 * M)).toBe('1 minute ago');
+    expect(words(5 * M)).toBe('5 minutes ago');
+    expect(words(1 * H)).toBe('1 hour ago');
+    expect(words(1 * D)).toBe('Yesterday');
+    expect(words(3 * D)).toBe('3 days ago');
+    expect(words(14 * D)).toBe('2 weeks ago');
+    expect(words(65 * D)).toBe('2 months ago');
+    expect(words(800 * D)).toBe('2 years ago');
+  });
+
+  test('maxDays cutoff returns empty string for the caller fallback', () => {
+    const D = LanaTime.MS_PER_DAY;
+    expect(LanaTime.timeAgo(ago(8 * D), { now: NOW, maxDays: 7 })).toBe('');
+    expect(LanaTime.timeAgo(ago(6 * D), { now: NOW, maxDays: 7 })).toBe('6d ago');
+  });
+
+  test('future instants clamp to Just now', () => {
+    expect(LanaTime.timeAgo(new Date(NOW + 60000), NOW)).toBe('Just now');
   });
 
   test('empty and invalid values return empty string', () => {
     expect(LanaTime.timeAgo('')).toBe('');
     expect(LanaTime.timeAgo(null)).toBe('');
     expect(LanaTime.timeAgo('junk')).toBe('');
+  });
+});
+
+describe('utcDayStart / utcDayEnd', () => {
+  test('bracket the UTC calendar day as ISO instants', () => {
+    expect(LanaTime.utcDayStart('2026-08-06')).toBe('2026-08-06T00:00:00.000Z');
+    expect(LanaTime.utcDayEnd('2026-08-06')).toBe('2026-08-06T23:59:59.999Z');
+  });
+
+  test('empty and invalid values return null', () => {
+    expect(LanaTime.utcDayStart('')).toBeNull();
+    expect(LanaTime.utcDayStart(null)).toBeNull();
+    expect(LanaTime.utcDayEnd('junk')).toBeNull();
   });
 });
 
