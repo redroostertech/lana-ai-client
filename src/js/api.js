@@ -507,11 +507,20 @@ class ApiClient {
     }
 
     const url = `${baseUrl}${endpoint}`;
+    const optionHeaders = options.headers instanceof Headers
+      ? Object.fromEntries(options.headers.entries())
+      : (options.headers || {});
     const config = {
       method,
-      headers: this.getHeaders(),
-      ...options
+      ...options,
+      headers: {
+        ...this.getHeaders(),
+        ...optionHeaders
+      }
     };
+    if (method === 'GET') {
+      config.cache = options.cache || 'no-store';
+    }
 
     // Handle different data types
     if (data && method !== 'GET') {
@@ -541,23 +550,34 @@ class ApiClient {
       }
       config.signal = controller.signal;
 
-      const response = await fetch(url, config);
+      let response = await fetch(url, config);
+      if (method === 'GET' && response.status === 304) {
+        const separator = url.indexOf('?') === -1 ? '?' : '&';
+        response = await fetch(url + separator + '_cache_bust=' + encodeURIComponent(String(apiNowMs())), {
+          ...config,
+          cache: 'reload'
+        });
+      }
       clearTimeout(timeoutId);
 
       // Read response as text first, then parse as JSON
       // This avoids "body stream already read" errors
       const text = await response.text();
       let result;
-      try {
-        result = JSON.parse(text);
-      } catch (jsonError) {
-        // If JSON parsing fails, we already have the text for error message
-        console.error('[LanaAPI] Failed to parse JSON response:', text);
-        throw new ApiError(
-          `Server returned invalid response: ${text.substring(0, 100)}`,
-          response.status,
-          null
-        );
+      if (text) {
+        try {
+          result = JSON.parse(text);
+        } catch (jsonError) {
+          // If JSON parsing fails, we already have the text for error message
+          console.error('[LanaAPI] Failed to parse JSON response:', text);
+          throw new ApiError(
+            `Server returned invalid response: ${text.substring(0, 100)}`,
+            response.status,
+            null
+          );
+        }
+      } else {
+        result = {};
       }
 
       if (!response.ok) {
