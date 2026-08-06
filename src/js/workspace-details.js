@@ -867,7 +867,7 @@
       var html = '<lex-card id="connectedDataCard" heading="' + headingText + '" variant="flat" padding="compact" actions=\'' + cardActions + '\'>';
 
       if (totalCount === 0) {
-        html += '<p class="text-sm text-gray-500">No connected data</p>';
+        html += '<lex-empty size="inline" icon="users" message="No connected data" description="Add contacts or connector records."></lex-empty>';
       } else {
         html += '<div class="space-y-3">';
 
@@ -1008,7 +1008,7 @@
       var html = '<lex-card id="linkedMattersCard" heading="Linked Workspaces" variant="flat" padding="compact"' + (linkActions ? ' actions=\'' + linkActions + '\'' : '') + '>';
 
       if (allLinks.length === 0) {
-        html += '<p class="text-sm text-gray-500">No linked workspaces</p>';
+        html += '<lex-empty size="inline" icon="link" message="No linked workspaces" description="Link related workspaces or matters."></lex-empty>';
       } else {
         html += '<div class="flex items-center flex-wrap gap-2">';
         var showCount = Math.min(allLinks.length, 3);
@@ -1322,7 +1322,11 @@
         openCount++;
         var due = t.due_date ? parseApiUtcDate(t.due_date) : null;
         if (due && !isNaN(due.getTime())) {
-          if (due < now) {
+          // Due dates are day-granular: a task is overdue only once its due
+          // DAY has fully passed. Due-today counts as due soon, matching the
+          // "Due today" badge language on the rows.
+          var dueDayEnd = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 23, 59, 59, 999);
+          if (dueDayEnd < now) {
             overdue.push(t);
           } else {
             upcoming.push(t);
@@ -1407,27 +1411,22 @@
 
     var activityRowsHtml = activities.length
       ? '<div class="wsum-card-list">' + activities.slice(0, 6).map(renderActivityRow).join('') + '</div>'
-      : '<p class="wsum-more">No activity yet.</p>';
+      : '<lex-empty size="compact" icon="inbox" message="No activity yet" description="Activity in this workspace will appear here."></lex-empty>';
     var activityCardHtml =
       '<lex-card heading="Recent activity" subtitle="Latest updates across this workspace">' +
         activityRowsHtml +
         '<button id="wsumViewAllActivity" class="wsum-viewall">View all activity</button>' +
       '</lex-card>';
 
-    var statusCardInner;
-    if (total) {
-      statusCardInner =
-        '<lex-chart id="wsumStatusChart" type="doughnut" height="220px" variant="compact"></lex-chart>' +
-        '<div class="wsum-progress-line">' +
-          '<span><span class="wsum-progress-pct">' + pctComplete + '%</span> complete</span>' +
-          '<span>' + statusCounts.done + ' of ' + denominator + ' done</span>' +
-        '</div>' +
-        '<lex-progress-bar id="wsumProgressBar" size="md"></lex-progress-bar>';
-    } else {
-      statusCardInner =
-        '<lex-empty icon="tasks" message="No work items yet" description="Create tasks on the Board to see progress here."></lex-empty>' +
-        '<button id="wsumViewBoard" class="wsum-viewall">Go to Board</button>';
-    }
+    // Chart cards always render their graph; with no data they show a
+    // neutral placeholder ring / zeroed axes instead of an empty-state block.
+    var statusCardInner =
+      '<lex-chart id="wsumStatusChart" type="doughnut" height="220px" variant="compact"></lex-chart>' +
+      '<div class="wsum-progress-line">' +
+        '<span><span class="wsum-progress-pct">' + pctComplete + '%</span> complete</span>' +
+        '<span>' + statusCounts.done + ' of ' + denominator + ' done</span>' +
+      '</div>' +
+      '<lex-progress-bar id="wsumProgressBar" size="md"></lex-progress-bar>';
 
     var nextList = upcoming.length ? upcoming : openNoDue;
     _wsumTaskLists = { overdue: overdue, next: nextList };
@@ -1435,13 +1434,12 @@
     var overdueRows = overdue.length
       ? '<div class="wsum-card-list">' + overdue.slice(0, 5).map(wsumTaskRow).join('') + '</div>' +
         (overdue.length > 5 ? '<button class="wsum-more wsum-more-btn" data-wsum-list="overdue">+' + (overdue.length - 5) + ' more overdue</button>' : '')
-      : '<p class="wsum-more">Nothing overdue — all work is on schedule.</p>';
+      : '<lex-empty size="compact" icon="tasks" message="Nothing overdue" description="All work is on schedule."></lex-empty>';
 
     var nextRows = nextList.length
       ? '<div class="wsum-card-list">' + nextList.slice(0, 5).map(wsumTaskRow).join('') + '</div>' +
         (nextList.length > 5 ? '<button class="wsum-more wsum-more-btn" data-wsum-list="next">+' + (nextList.length - 5) + ' more open</button>' : '')
-      : '<p class="wsum-more">No open work remaining.</p>' +
-        '<button id="wsumCreateTask" class="wsum-viewall">Create Task</button>';
+      : '<lex-empty id="wsumNextEmpty" size="compact" icon="tasks" message="No open work remaining" description="Create a task to plan what\'s next." action-label="Create Task" action-icon="plus"></lex-empty>';
 
     // "+" header action to create a task (empty state carries its own button)
     var nextCardActions = nextList.length
@@ -1459,11 +1457,10 @@
       );
     }).join('');
 
-    var priorityCardHtml = total
-      ? '<lex-card heading="Priority breakdown" subtitle="How work is being prioritized">' +
-          '<lex-chart id="wsumPriorityChart" type="bar" height="220px" variant="compact"></lex-chart>' +
-        '</lex-card>'
-      : '';
+    var priorityCardHtml =
+      '<lex-card heading="Priority breakdown" subtitle="How work is being prioritized">' +
+        '<lex-chart id="wsumPriorityChart" type="bar" height="220px" variant="compact"></lex-chart>' +
+      '</lex-card>';
 
     // Masonry columns: left = Status / Needs attention / What's next + Details
     // cards; right = Information / Recent activity / Types of work + Context
@@ -1484,7 +1481,7 @@
           buildInformationCardHtml(matter) +
           activityCardHtml +
           '<lex-card heading="Types of work" subtitle="Distribution of work items by type">' +
-            (typeRows || '<p class="wsum-more">No type data available.</p>') +
+            (typeRows || '<lex-empty size="inline" icon="chart" message="No type data" description="Work item types will appear here."></lex-empty>') +
           '</lex-card>' +
           '<div id="dockPanelContext"></div>' +
         '</div>' +
@@ -1497,24 +1494,45 @@
     renderDockDetailsPanel(matter, currentMatterData.permissions);
     renderDockContextPanel(matter);
 
+    // Empty-state Create Task action on the What's next card
+    var nextEmpty = document.getElementById('wsumNextEmpty');
+    if (nextEmpty) {
+      nextEmpty.addEventListener('action', function () {
+        openCreateTaskModal(matter.matter_id);
+      });
+    }
+
     // ── Charts ──
-    if (total && window.Chart) {
+    if (window.Chart) {
       var statusChart = document.getElementById('wsumStatusChart');
       if (statusChart) {
         var visibleBuckets = WSUM_STATUS_BUCKETS.filter(function (b) { return statusCounts[b.key] > 0; });
-        statusChart.chartData = {
-          labels: visibleBuckets.map(function (b) { return b.label + ': ' + statusCounts[b.key]; }),
-          datasets: [{
-            data: visibleBuckets.map(function (b) { return statusCounts[b.key]; }),
-            backgroundColor: visibleBuckets.map(function (b) { return b.color; }),
-            borderWidth: 0
-          }]
-        };
-        statusChart.chartOptions = {
-          maintainAspectRatio: false,
-          cutout: '62%',
-          plugins: { legend: { position: 'right' } }
-        };
+        if (visibleBuckets.length) {
+          statusChart.chartData = {
+            labels: visibleBuckets.map(function (b) { return b.label + ': ' + statusCounts[b.key]; }),
+            datasets: [{
+              data: visibleBuckets.map(function (b) { return statusCounts[b.key]; }),
+              backgroundColor: visibleBuckets.map(function (b) { return b.color; }),
+              borderWidth: 0
+            }]
+          };
+          statusChart.chartOptions = {
+            maintainAspectRatio: false,
+            cutout: '62%',
+            plugins: { legend: { position: 'right' } }
+          };
+        } else {
+          // No data: neutral gray ring, no legend/tooltip
+          statusChart.chartData = {
+            labels: ['No work items'],
+            datasets: [{ data: [1], backgroundColor: ['#e5e7eb'], borderWidth: 0 }]
+          };
+          statusChart.chartOptions = {
+            maintainAspectRatio: false,
+            cutout: '62%',
+            plugins: { legend: { display: false }, tooltip: { enabled: false } }
+          };
+        }
       }
 
       var priorityChart = document.getElementById('wsumPriorityChart');
@@ -1535,6 +1553,12 @@
           prData.push(otherCount);
           prColors.push('#6b7280');
         }
+        if (!prData.length) {
+          // No data: zeroed axes across the known priorities
+          prLabels = WSUM_PRIORITY_META.map(function (p) { return p.label; });
+          prData = WSUM_PRIORITY_META.map(function () { return 0; });
+          prColors = WSUM_PRIORITY_META.map(function (p) { return p.color; });
+        }
         priorityChart.chartData = {
           labels: prLabels,
           datasets: [{ data: prData, backgroundColor: prColors, borderRadius: 4 }]
@@ -1542,7 +1566,7 @@
         priorityChart.chartOptions = {
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+          scales: { y: { beginAtZero: true, suggestedMax: 1, ticks: { precision: 0 } } }
         };
       }
     }
@@ -1571,14 +1595,6 @@
       }
       if (e.target.closest('#wsumViewAllActivity')) {
         openActivityDrawer();
-        return;
-      }
-      if (e.target.closest('#wsumCreateTask')) {
-        openCreateTaskModal(matter.matter_id);
-        return;
-      }
-      if (e.target.closest('#wsumViewBoard')) {
-        switchMatterTab('tasks');
       }
     };
   }
@@ -4394,14 +4410,20 @@
     if (!dateString) return 'No due date';
     var date = parseApiUtcDate(dateString);
     var now = new Date();
-    var diffDays = Math.ceil((date - now) / (1000 * 60 * 60 * 24));
+    // Compare calendar days, not elapsed hours — a task due yesterday
+    // evening is "Overdue (1 day)", not "Due today". Keeps the badge in
+    // agreement with the Summary's overdue/due-soon bucketing.
+    var startOfDue = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var diffDays = Math.round((startOfDue - startOfToday) / (1000 * 60 * 60 * 24));
 
     if (diffDays < 0) {
-      return '<span class="text-red-600">Overdue (' + Math.abs(diffDays) + ' days)</span>';
+      var od = Math.abs(diffDays);
+      return '<span class="text-red-600">Overdue (' + od + ' ' + (od === 1 ? 'day' : 'days') + ')</span>';
     } else if (diffDays === 0) {
       return '<span class="text-orange-600">Due today</span>';
     } else if (diffDays <= 7) {
-      return '<span class="text-yellow-600">Due in ' + diffDays + ' days</span>';
+      return '<span class="text-yellow-600">Due in ' + diffDays + ' ' + (diffDays === 1 ? 'day' : 'days') + '</span>';
     } else {
       return Lex.Utils.formatDate(dateString);
     }
@@ -7999,7 +8021,7 @@
     var html = '<lex-card id="customFieldsCard" heading="Custom Fields" variant="flat" padding="compact" actions=\'' + cfActions + '\'>';
 
     if (fieldsToDisplay.length === 0) {
-      html += '<p class="text-sm text-gray-500">No custom fields yet</p>';
+      html += '<lex-empty size="inline" icon="document" message="No custom fields yet" description="Add fields to track matter-specific data."></lex-empty>';
     } else {
       html += '<dl class="space-y-2 text-sm">';
       var showCount = Math.min(fieldsToDisplay.length, 6);
