@@ -1392,7 +1392,7 @@
       var status = String(s.status || 'pending');
       var statusMod = workflowStepStatusMod(status);
       var typeLabel = s.state_type || s.state || '';
-      var startedRel = s.started_at ? timeAgoLite(s.started_at) : '';
+      var startedRel = s.started_at ? LanaTime.timeAgo(s.started_at) : '';
       var dur = (s.started_at && s.completed_at)
         ? formatDurationMs(new Date(s.completed_at).getTime() - new Date(s.started_at).getTime())
         : '';
@@ -1415,16 +1415,6 @@
     if (status === 'errored') return 'agent-run-workflow-step--error';
     if (status === 'skipped') return 'agent-run-workflow-step--skipped';
     return 'agent-run-workflow-step--pending';
-  }
-
-  function timeAgoLite(iso) {
-    var t = new Date(iso).getTime();
-    if (!t || isNaN(t)) return '';
-    var ms = LanaTime.millisecondsSince(t);
-    if (ms < LanaTime.MS_PER_MINUTE) return Math.floor(ms / LanaTime.MS_PER_SECOND) + 's ago';
-    if (ms < LanaTime.MS_PER_HOUR) return Math.floor(ms / LanaTime.MS_PER_MINUTE) + 'm ago';
-    if (ms < LanaTime.MS_PER_DAY) return Math.floor(ms / LanaTime.MS_PER_HOUR) + 'h ago';
-    return Math.floor(ms / LanaTime.MS_PER_DAY) + 'd ago';
   }
 
   function formatDurationMs(ms) {

@@ -5361,15 +5361,19 @@
     function formatDueDate(dateString) {
       if (!dateString) return 'No due date';
       const date = new Date(dateString);
-      const now = LanaTime.nowDate();
-      const diffDays = Math.ceil((date - now) / LanaTime.MS_PER_DAY);
+      if (isNaN(date.getTime())) return 'No due date';
+      // Calendar-day comparison via LanaTime.daysUntil, matching the
+      // workspace board: a task due yesterday evening reads "Overdue",
+      // not "Due today".
+      const diffDays = LanaTime.daysUntil(date);
 
       if (diffDays < 0) {
-        return `<span class="text-red-600">Overdue (${Math.abs(diffDays)} days)</span>`;
+        const od = Math.abs(diffDays);
+        return `<span class="text-red-600">Overdue (${od} ${od === 1 ? 'day' : 'days'})</span>`;
       } else if (diffDays === 0) {
         return `<span class="text-orange-600">Due today</span>`;
       } else if (diffDays <= 7) {
-        return `<span class="text-yellow-600">Due in ${diffDays} days</span>`;
+        return `<span class="text-yellow-600">Due in ${diffDays} ${diffDays === 1 ? 'day' : 'days'}</span>`;
       } else {
         return date.toLocaleDateString();
       }
