@@ -927,6 +927,93 @@
       this._toast('error', 'Could not save this draft to Documents');
     }
 
+    _requestContextPromotionAction(detail) {
+      var self = this;
+      detail = detail || {};
+      var kind = detail.actionKind || '';
+      var run = function () { self._executeContextPromotionAction(detail); };
+
+      if (kind === 'approve') {
+        if (!window.Lex || !window.Lex.Modal || typeof window.Lex.Modal.confirm !== 'function') {
+          self._setContextPromotionError(detail, 'Confirmation is unavailable. The insight was not shared.');
+          return;
+        }
+        window.Lex.Modal.confirm(
+          'Share with this matter?',
+          'This private chat insight will become shared matter context for this workspace.',
+          run,
+          { confirmText: 'Share with Matter', cancelText: 'Keep Private' }
+        );
+        return;
+      }
+
+      run();
+    }
+
+    _executeContextPromotionAction(detail) {
+      var helpers = window.Lex && window.Lex.Chat &&
+        (window.Lex.Chat.ContextPromotion || window.Lex.Chat.ArtifactPromotion);
+      var action = detail.action || {};
+      var kind = detail.actionKind || '';
+      var promotionId = detail.promotionId || '';
+      var messageElement = detail.messageElement;
+      var request;
+
+      if (!helpers || typeof helpers.getContextActionRequest !== 'function' || !window.api || typeof window.api.post !== 'function') {
+        this._setContextPromotionError(detail, 'The context action is unavailable.');
+        return;
+      }
+
+      try {
+        request = helpers.getContextActionRequest(action, kind);
+      } catch (err) {
+        this._setContextPromotionError(detail, err.message);
+        return;
+      }
+
+      if (messageElement && typeof messageElement.updateContextPromotion === 'function') {
+        messageElement.updateContextPromotion(promotionId, {
+          tone: 'pending',
+          message: kind === 'approve' ? 'Sharing with matter...' : 'Dismissing...'
+        });
+      }
+
+      var self = this;
+      window.api.post(request.endpoint, request.body)
+        .then(function (response) {
+          if (typeof helpers.normalizeContextPromotionResponse !== 'function') {
+            throw new Error('The context action response could not be verified.');
+          }
+          var result = helpers.normalizeContextPromotionResponse(response, kind);
+          var approved = kind === 'approve';
+          if (messageElement && typeof messageElement.updateContextPromotion === 'function') {
+            messageElement.updateContextPromotion(promotionId, {
+              tone: approved ? 'success' : 'neutral',
+              status: approved ? 'promoted' : 'dismissed',
+              message: approved ? 'Shared with the matter.' : 'Dismissed. Nothing was shared.'
+            });
+          }
+          self._toast('success', approved
+            ? (result.alreadyPromoted ? 'Insight was already shared' : 'Insight shared with matter')
+            : 'Suggestion dismissed');
+        })
+        .catch(function (err) {
+          console.error('[lex-lana-panel] Context promotion action failed:', err);
+          self._setContextPromotionError(detail, err && err.message ? err.message : 'The request failed.');
+        });
+    }
+
+    _setContextPromotionError(detail, reason) {
+      var messageElement = detail && detail.messageElement;
+      if (messageElement && typeof messageElement.updateContextPromotion === 'function') {
+        messageElement.updateContextPromotion(detail.promotionId || '', {
+          tone: 'error',
+          message: 'Could not update context. ' + reason
+        });
+      }
+      this._toast('error', 'Could not update context suggestion');
+    }
+
     _searchDocuments(query, composerEl) {
       if (!composerEl || typeof composerEl.setDocumentResults !== 'function') return;
       var convId = this._chatEl && this._chatEl.conversationId;
@@ -1200,6 +1287,10 @@
 
       container.addEventListener('lex-chat-artifact-promote', function (e) {
         self._requestArtifactPromotion(e.detail || {});
+      });
+
+      container.addEventListener('lex-chat-context-promotion-action', function (e) {
+        self._requestContextPromotionAction(e.detail || {});
       });
 
       container.addEventListener('lex-chat-manage-documents', function () {

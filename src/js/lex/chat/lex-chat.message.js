@@ -10,6 +10,7 @@
 
   const { LexElement, defineLex, ChatFormat } = global.Lex;
   const ArtifactPromotion = global.Lex.Chat && global.Lex.Chat.ArtifactPromotion;
+  const ContextPromotion = global.Lex.Chat && global.Lex.Chat.ContextPromotion;
   if (!LexElement) { console.error('[lex-chat-message] LexElement not loaded'); return; }
 
   // ---------------------------------------------------------------------------
@@ -210,6 +211,68 @@
       }
       .lex-chat-artifact-btn:hover {
         background: var(--lex-chat-artifact-hover);
+      }
+      .lex-chat-context-card {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--lex-chat-border-soft);
+        border-radius: var(--lex-radius-md, 6px);
+        background: var(--lex-chat-bg-surface);
+      }
+      .lex-chat-context-card-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .lex-chat-context-card-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--lex-chat-text);
+      }
+      .lex-chat-context-card-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        max-width: 52%;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--lex-chat-text-dim);
+        line-height: 1.35;
+      }
+      .lex-chat-context-status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--lex-chat-text-dim);
+      }
+      .lex-chat-context-card[data-tone="success"] .lex-chat-context-status-dot { background: #16a34a; }
+      .lex-chat-context-card[data-tone="error"] .lex-chat-context-status-dot { background: #dc2626; }
+      .lex-chat-context-card[data-tone="pending"] .lex-chat-context-status-dot { background: #d97706; }
+      .lex-chat-context-insight {
+        font-size: 12px;
+        line-height: 1.45;
+        color: var(--lex-chat-text);
+      }
+      .lex-chat-context-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 10.5px;
+        color: var(--lex-chat-text-dim);
+      }
+      .lex-chat-context-meta span {
+        padding: 2px 6px;
+        border: 1px solid var(--lex-chat-border-soft);
+        border-radius: 4px;
+      }
+      .lex-chat-context-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
       }
 
       /* Attachments inside user message */
@@ -500,6 +563,28 @@
           artifactType: 'download',
           entityId: target.dataset.documentId || '',
           entityType: 'document'
+        });
+      });
+
+      this.delegate('click', '.lex-chat-context-action', (e, target) => {
+        var promotionId = target.dataset.promotionId || '';
+        var kind = target.dataset.contextAction || '';
+        var promotion = this._findContextPromotion(promotionId);
+        var helper = ContextPromotion || ArtifactPromotion;
+        var action = null;
+        if (kind === 'approve') {
+          action = helper && helper.getApproveContextPromotionAction(promotion);
+        } else if (kind === 'dismiss') {
+          action = helper && helper.getDismissContextPromotionAction(promotion);
+        }
+        if (!promotion || !action) return;
+
+        this.emit('lex-context-promotion-action', {
+          promotion: promotion,
+          promotionId: promotionId,
+          actionKind: kind,
+          action: action,
+          messageElement: this
         });
       });
 
@@ -847,6 +932,13 @@
       if (!body || body.querySelector('.lex-chat-artifacts-section')) return;
 
       const items = artifacts.map(a => {
+        const contextPromotion = (ContextPromotion || ArtifactPromotion) &&
+          (ContextPromotion || ArtifactPromotion).getContextPromotionView &&
+          (ContextPromotion || ArtifactPromotion).getContextPromotionView(a);
+        if (contextPromotion) {
+          return this._renderContextPromotionCard(a, contextPromotion);
+        }
+
         const persistence = ArtifactPromotion && ArtifactPromotion.getPersistenceView(a);
         const promotionAction = ArtifactPromotion && ArtifactPromotion.getSaveToDocumentsAction(a);
         if (persistence || promotionAction) {
@@ -895,6 +987,44 @@
         </div>`;
     }
 
+    _renderContextPromotionCard(artifact, view) {
+      const helper = ContextPromotion || ArtifactPromotion;
+      const promotionId = helper && helper.getContextPromotionId ? helper.getContextPromotionId(artifact) : (view.id || '');
+      const approveAction = helper && helper.getApproveContextPromotionAction ? helper.getApproveContextPromotionAction(artifact) : null;
+      const dismissAction = helper && helper.getDismissContextPromotionAction ? helper.getDismissContextPromotionAction(artifact) : null;
+      const canAct = view.status === 'pending' && promotionId;
+      const target = view.matterName || view.matterId || 'Matter';
+      const meta = [
+        view.sourceLabel,
+        view.sensitivity,
+        target ? 'Target: ' + target : ''
+      ].filter(Boolean).map(function (item) {
+        return '<span>' + ChatFormat.escapeHtml(String(item)) + '</span>';
+      }).join('');
+
+      const actions = canAct ? [
+        approveAction ? '<lex-btn class="lex-chat-context-action" data-context-action="approve" data-promotion-id="' + ChatFormat.escapeHtml(promotionId) + '" variant="secondary" size="sm">Approve</lex-btn>' : '',
+        dismissAction ? '<lex-btn class="lex-chat-context-action" data-context-action="dismiss" data-promotion-id="' + ChatFormat.escapeHtml(promotionId) + '" variant="ghost" size="sm">Dismiss</lex-btn>' : ''
+      ].join('') : '';
+
+      return `
+        <div class="lex-chat-context-card" data-context-promotion-id="${ChatFormat.escapeHtml(promotionId)}" data-tone="${ChatFormat.escapeHtml(view.tone)}">
+          <div class="lex-chat-context-card-head">
+            <div>
+              <div class="lex-chat-context-card-title">${ChatFormat.escapeHtml(view.title)}</div>
+              ${view.reason ? '<div class="lex-chat-context-meta" style="margin-top:4px;"><span>' + ChatFormat.escapeHtml(view.reason) + '</span></div>' : ''}
+            </div>
+            <div class="lex-chat-context-card-status" data-context-promotion-status role="status" aria-live="polite">
+              <span class="lex-chat-context-status-dot" aria-hidden="true"></span>
+              <span data-context-status-message>${ChatFormat.escapeHtml(view.message)}</span>
+            </div>
+          </div>
+          ${view.insight ? '<div class="lex-chat-context-insight">' + ChatFormat.escapeHtml(view.insight) + '</div>' : ''}
+          ${meta ? '<div class="lex-chat-context-meta">' + meta + '</div>' : ''}
+          ${actions ? '<div class="lex-chat-context-actions" data-context-actions>' + actions + '</div>' : ''}
+        </div>`;
+    }
+
     _findArtifact(artifactId) {
       var artifacts = this.artifacts || [];
       for (var i = 0; i < artifacts.length; i += 1) {
@@ -912,6 +1042,55 @@
         if (String(cards[i].dataset.artifactId || '') === String(artifactId || '')) return cards[i];
       }
       return null;
+    }
+
+    _findContextPromotion(promotionId) {
+      var artifacts = this.artifacts || [];
+      var helper = ContextPromotion || ArtifactPromotion;
+      for (var i = 0; i < artifacts.length; i += 1) {
+        var currentId = helper && helper.getContextPromotionId
+          ? helper.getContextPromotionId(artifacts[i])
+          : (artifacts[i].promotion_id || artifacts[i].id || '');
+        if (String(currentId) === String(promotionId)) return artifacts[i];
+      }
+      return null;
+    }
+
+    _findContextPromotionCard(promotionId) {
+      var cards = this.querySelectorAll('.lex-chat-context-card');
+      for (var i = 0; i < cards.length; i += 1) {
+        if (String(cards[i].dataset.contextPromotionId || '') === String(promotionId || '')) return cards[i];
+      }
+      return null;
+    }
+
+    updateContextPromotion(promotionId, update) {
+      var card = this._findContextPromotionCard(promotionId);
+      if (!card || !update) return;
+
+      var statusEl = card.querySelector('[data-context-promotion-status]');
+      var messageEl = card.querySelector('[data-context-status-message]');
+      var actionsEl = card.querySelector('[data-context-actions]');
+      var buttons = card.querySelectorAll('.lex-chat-context-action');
+
+      if (messageEl) messageEl.textContent = update.message || '';
+      card.dataset.tone = update.tone || 'pending';
+      if (statusEl) statusEl.setAttribute('aria-busy', update.tone === 'pending' ? 'true' : 'false');
+
+      for (var i = 0; i < buttons.length; i += 1) {
+        buttons[i].loading = update.tone === 'pending';
+        buttons[i].disabled = update.tone === 'pending';
+      }
+
+      if ((update.tone === 'success' || update.tone === 'neutral') && actionsEl) {
+        actionsEl.innerHTML = '';
+        var artifact = this._findContextPromotion(promotionId);
+        if (artifact) {
+          var promotion = artifact.context_promotion || artifact.contextPromotion || artifact;
+          promotion.status = update.status || (update.tone === 'success' ? 'promoted' : 'dismissed');
+          promotion.message = update.message || '';
+        }
+      }
     }
 
     updateArtifactPromotion(artifactId, update) {

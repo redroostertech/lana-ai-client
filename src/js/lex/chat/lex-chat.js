@@ -321,6 +321,10 @@
         this.emit('lex-chat-artifact-promote', e.detail);
       });
 
+      this.addEventListener('lex-context-promotion-action', (e) => {
+        this.emit('lex-chat-context-promotion-action', e.detail);
+      });
+
       // Thread scroll-top for pagination
       this.addEventListener('lex-thread-scroll-top', () => {
         this._loadMoreHistory();
