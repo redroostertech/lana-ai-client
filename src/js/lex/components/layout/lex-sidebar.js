@@ -1519,6 +1519,9 @@
     connected() {
       this._hydrateAppItemsFromElectronStorage();
       this._bindDynamicListRefreshEvents();
+      if (this._hasDynamicListAuth() && this._dynamicListRefreshHandler) {
+        this._dynamicListRefreshHandler();
+      }
     }
 
     disconnected() {
@@ -2322,6 +2325,17 @@
       }
     }
 
+    _hasDynamicListAuth() {
+      const client = this._getApiClient();
+      if (client && client.token) return true;
+      if (window.Lex && window.Lex.state && window.Lex.state.isAuthenticated) return true;
+      try {
+        return !!localStorage.getItem('token');
+      } catch (_) {
+        return false;
+      }
+    }
+
     _bindDynamicListRefreshEvents() {
       if (this._dynamicListRefreshHandler) return;
       this._dynamicListRefreshHandler = () => {
@@ -2330,6 +2344,12 @@
         this._pinnedWorkspaceItems = null;
         this._workspaceItems = null;
         this._workspaceHasMore = false;
+        if (this._taskListLoading) {
+          this._taskListRefreshPending = true;
+        }
+        if (this._workspaceListLoading) {
+          this._workspaceListRefreshPending = true;
+        }
         this._initTaskList();
         this._initWorkspaceList();
       };
@@ -2353,8 +2373,16 @@
         return;
       }
 
-      if (this._taskListLoading) return;
+      if (this._taskListLoading) {
+        this._taskListRefreshPending = true;
+        if (!container.innerHTML.trim()) {
+          container.innerHTML = '<div class="lex-sidebar-dynamic-loading">Loading tasks...</div>';
+        }
+        return;
+      }
       this._taskListLoading = true;
+      const requestId = (this._taskListRequestId || 0) + 1;
+      this._taskListRequestId = requestId;
       container.innerHTML = '<div class="lex-sidebar-dynamic-loading">Loading tasks...</div>';
 
       try {
@@ -2379,14 +2407,31 @@
           });
 
         const total = Number(result && (result.total || result.count || (result.pagination && result.pagination.total)) || 0);
-        this._taskItems = rows.slice(0, 10);
-        this._taskHasMore = total > 10 || rows.length > 10;
-        this._renderTaskList(container);
+        if (this._taskListRequestId === requestId && !this._taskListRefreshPending) {
+          this._taskItems = rows.slice(0, 10);
+          this._taskHasMore = total > 10 || rows.length > 10;
+          const liveContainer = this.querySelector('#lexTaskListContainer');
+          if (liveContainer) this._renderTaskList(liveContainer);
+        }
       } catch (error) {
         console.error('[lex-sidebar] Failed to load tasks:', error);
-        container.innerHTML = '<div class="lex-sidebar-dynamic-error">Could not load tasks</div>';
+        if (this._taskListRequestId === requestId && !this._taskListRefreshPending) {
+          const liveContainer = this.querySelector('#lexTaskListContainer');
+          if (liveContainer) {
+            liveContainer.innerHTML = '<div class="lex-sidebar-dynamic-error">Could not load tasks</div>';
+          }
+        }
       } finally {
-        this._taskListLoading = false;
+        if (this._taskListRequestId === requestId) {
+          this._taskListLoading = false;
+          if (this._taskListRefreshPending) {
+            this._taskListRefreshPending = false;
+            this._taskItems = null;
+            this._taskHasMore = false;
+            this._initTaskList();
+            return;
+          }
+        }
         requestAnimationFrame(() => this._updateScrollableFades());
       }
     }
@@ -2581,6 +2626,7 @@
       }
 
       if (this._workspaceListLoading) {
+        this._workspaceListRefreshPending = true;
         if (!container.innerHTML.trim()) {
           container.innerHTML = '<div class="lex-sidebar-dynamic-loading">Loading workspaces...</div>';
         }
@@ -2618,16 +2664,16 @@
         const pinnedIds = new Set(pinnedRows.map((workspace) => this._getWorkspaceId(workspace)).filter(Boolean));
         const recentRows = rows.filter((workspace) => !pinnedIds.has(this._getWorkspaceId(workspace)));
         const total = Number(result.total || result.count || (result.pagination && result.pagination.total) || 0);
-        this._pinnedWorkspaceItems = pinnedRows;
-        this._workspaceItems = recentRows.slice(0, 10);
-        this._workspaceHasMore = total > this._workspaceItems.length + pinnedRows.length || recentRows.length > 10;
-        if (this._workspaceListRequestId === requestId) {
+        if (this._workspaceListRequestId === requestId && !this._workspaceListRefreshPending) {
+          this._pinnedWorkspaceItems = pinnedRows;
+          this._workspaceItems = recentRows.slice(0, 10);
+          this._workspaceHasMore = total > this._workspaceItems.length + pinnedRows.length || recentRows.length > 10;
           const liveContainer = this.querySelector('#lexWorkspaceListContainer');
           if (liveContainer) this._renderWorkspaceList(liveContainer);
         }
       } catch (error) {
         console.error('[lex-sidebar] Failed to load workspaces:', error);
-        if (this._workspaceListRequestId === requestId) {
+        if (this._workspaceListRequestId === requestId && !this._workspaceListRefreshPending) {
           const liveContainer = this.querySelector('#lexWorkspaceListContainer');
           if (liveContainer) {
             liveContainer.innerHTML = '<div class="lex-sidebar-dynamic-error">Could not load workspaces</div>';
@@ -2636,6 +2682,14 @@
       } finally {
         if (this._workspaceListRequestId === requestId) {
           this._workspaceListLoading = false;
+          if (this._workspaceListRefreshPending) {
+            this._workspaceListRefreshPending = false;
+            this._pinnedWorkspaceItems = null;
+            this._workspaceItems = null;
+            this._workspaceHasMore = false;
+            this._initWorkspaceList();
+            return;
+          }
           const liveContainer = this.querySelector('#lexWorkspaceListContainer');
           if (liveContainer && Array.isArray(this._workspaceItems) && !liveContainer.querySelector('.lex-sidebar-workspace-item, .lex-sidebar-dynamic-empty')) {
             this._renderWorkspaceList(liveContainer);
