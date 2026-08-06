@@ -175,6 +175,27 @@
     return new Date(value);
   }
 
+  // Convert a datetime-local input value (user-local wall time) into an ISO
+  // 8601 UTC instant for the API. The backend stores timestamptz, so what we
+  // send must carry the zone.
+  function toApiTimestamp(datetimeLocalValue) {
+    if (!datetimeLocalValue) return null;
+    var d = new Date(datetimeLocalValue);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString();
+  }
+
+  // Convert an API timestamp (UTC instant) into the user-local wall-time
+  // value a datetime-local input expects, at minute precision.
+  function toDatetimeLocalValue(apiTimestamp) {
+    if (!apiTimestamp) return '';
+    var d = parseApiUtcDate(apiTimestamp);
+    if (!d || isNaN(d.getTime())) return '';
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+      'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
   // NO-REGEX version of formatFieldName
   function formatFieldName(name) {
     if (!name) return '';
@@ -6155,7 +6176,7 @@
     }
 
     var priority = (document.getElementById('taskCreatePriority') || {}).value || 'normal';
-    var dueDate = (document.getElementById('taskDueDate') || {}).value || null;
+    var dueDate = toApiTimestamp((document.getElementById('taskDueDate') || {}).value);
     var assigneeId = (document.getElementById('taskAssignedTo') || {}).value || null;
 
     var response = await api.suggestWorkspaceTask(currentTaskMatterId, {
@@ -6280,12 +6301,8 @@
 
       var dueDateEl = document.getElementById('taskDueDate');
       if (dueDateEl) {
-        if (task.due_date) {
-          var d = new Date(task.due_date);
-          dueDateEl.value = d.toISOString().slice(0, 16);
-        } else {
-          dueDateEl.value = '';
-        }
+        // API instant -> user-local wall time for the datetime-local input
+        dueDateEl.value = toDatetimeLocalValue(task.due_date);
       }
 
       await populateTaskAssignees(task.assigned_to_user_id || null);
@@ -6352,7 +6369,7 @@
     var assignedToUserId = (document.getElementById('taskAssignedTo') || {}).value || null;
     var createPriority = (document.getElementById('taskCreatePriority') || {}).value || 'normal';
     var editPriority = (document.getElementById('taskPriority') || {}).value || 'normal';
-    var dueDateValue = (document.getElementById('taskDueDate') || {}).value || null;
+    var dueDateValue = toApiTimestamp((document.getElementById('taskDueDate') || {}).value);
     var suggestedTitleValue = String((document.getElementById('taskSuggestedTitle') || {}).value || '').trim();
 
     var taskData = isEdit
