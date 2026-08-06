@@ -487,12 +487,21 @@
       if (searchInput) {
         this.listen(searchInput, 'input', (e) => {
           this._searchTerm = e.target.value;
+          // The update replaces the input element, so capture the caret now
+          // and restore it after re-focus — otherwise the fresh input leaves
+          // the caret at position 0 and typed text comes out reversed.
+          const caret = e.target.selectionStart;
           this._focusedIdx = -1;
           this._scheduleUpdate();
           // Re-focus search after update
           queueMicrotask(() => {
             const si = this.querySelector('.lex-select-search input');
-            if (si) { si.focus(); si.value = this._searchTerm; }
+            if (si) {
+              si.focus();
+              si.value = this._searchTerm;
+              const pos = (caret === null || caret === undefined) ? si.value.length : caret;
+              try { si.setSelectionRange(pos, pos); } catch (err) {}
+            }
           });
         });
 

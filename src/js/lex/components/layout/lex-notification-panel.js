@@ -853,15 +853,79 @@
 
       this._listEl.innerHTML = html;
 
-      // Bind click handlers for mark-as-read
+      // Bind click handlers: mark as read + navigate to the notification's
+      // subject when it has a resolvable location
       var items = this._listEl.querySelectorAll('.notif-item');
       for (var j = 0; j < items.length; j++) {
         (function (item) {
           item.addEventListener('click', function () {
             var id = item.dataset.notifId;
-            if (id) self._markAsRead(id);
+            if (!id) return;
+            self._markAsRead(id);
+            var n = null;
+            for (var k = 0; k < self._notifications.length; k++) {
+              if (String(self._notifications[k].id) === String(id)) {
+                n = self._notifications[k];
+                break;
+              }
+            }
+            if (n) self._openNotification(n);
           });
         })(items[j]);
+      }
+    }
+
+    /**
+     * Map a notification to a client destination. Producers write action_url
+     * in three shapes: a real client page ("dashboard.html",
+     * "/agentic-task-detail.html?id=.."), an API-style resource path
+     * ("/matters/{id}", "/matters/{id}/documents/{docId}", "/alerts",
+     * "/tasks"), or nothing (fall back to resource_type/resource_id).
+     * Returns an href string or null when there is nowhere to go.
+     */
+    _resolveNotificationTarget(n) {
+      var url = n.action_url || '';
+      var rtype = n.resource_type || '';
+      var rid = n.resource_id || '';
+
+      // Already a client page URL
+      if (url.indexOf('.html') !== -1) {
+        return url.charAt(0) === '/' ? url.substring(1) : url;
+      }
+
+      // "/matters/{matterId}[/documents/{docId}]"
+      if (url.indexOf('/matters/') === 0) {
+        var parts = url.substring(1).split('/');
+        var matterId = parts[1] || '';
+        if (!matterId) return null;
+        if (parts[2] === 'documents' && parts[3]) {
+          return 'workspace-details.html?id=' + encodeURIComponent(matterId) +
+            '&tab=documents&open_file=' + encodeURIComponent(parts[3]);
+        }
+        if (rtype === 'task' && rid) {
+          return 'workspace-details.html?id=' + encodeURIComponent(matterId) +
+            '&task=' + encodeURIComponent(rid);
+        }
+        return 'workspace-details.html?id=' + encodeURIComponent(matterId);
+      }
+
+      if (url === '/alerts') return 'alerts.html';
+      if (url === '/tasks') return 'my-tasks.html';
+
+      // No usable action_url: fall back to the resource reference
+      if (rtype === 'task' && rid) return 'my-tasks.html?task=' + encodeURIComponent(rid);
+      if (rtype === 'alert_instance') return 'alerts.html';
+      return null;
+    }
+
+    _openNotification(n) {
+      var href = this._resolveNotificationTarget(n);
+      if (!href) return;
+      this.close();
+      if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
+        window.Lex.Nav.go(href);
+      } else {
+        window.location.href = href;
       }
     }
   }

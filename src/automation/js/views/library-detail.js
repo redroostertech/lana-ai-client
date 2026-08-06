@@ -238,7 +238,7 @@ function buildMatterDetailUrl(lanaClientUrl, matterId) {
   const baseUrl = String(lanaClientUrl || '').trim().replace(/\/$/, '');
   const id = String(matterId || '').trim();
   if (!baseUrl || !id) return '';
-  return `${baseUrl}/workspace-details.html?id=${encodeURIComponent(id)}&tab=activity`;
+  return `${baseUrl}/workspace-details.html?id=${encodeURIComponent(id)}&tab=summary`;
 }
 
 function buildWorkspaceDetailUrl(lanaClientUrl, matterId, options = {}) {
@@ -351,7 +351,7 @@ function openCreatedResourceUrl(resourceUrl) {
       const value = params.get(key);
       if (value) nextParams.set(key, value);
     }
-    if (!nextParams.get('tab')) nextParams.set('tab', 'activity');
+    if (!nextParams.get('tab')) nextParams.set('tab', 'summary');
 
     // workspace-details.html is a standalone host page, not an automation SPA
     // route. Use a full navigation to the concrete host file so Electron loads

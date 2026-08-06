@@ -1585,11 +1585,11 @@
         if (!matterId) return;
         if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
           Lex.Nav.go('workspace-details.html', {
-            params: { id: matterId, tab: 'activity' },
-            context: { matterId: matterId, tab: 'activity' }
+            params: { id: matterId, tab: 'summary' },
+            context: { matterId: matterId, tab: 'summary' }
           });
         } else {
-          window.location.href = 'workspace-details.html?id=' + encodeURIComponent(matterId) + '&tab=activity';
+          window.location.href = 'workspace-details.html?id=' + encodeURIComponent(matterId) + '&tab=summary';
         }
       });
     }

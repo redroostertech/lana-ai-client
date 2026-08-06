@@ -230,7 +230,7 @@ function buildMatterDetailUrl(lanaClientUrl, matterId) {
   const baseUrl = String(lanaClientUrl || '').trim().replace(/\/$/, '');
   const id = String(matterId || '').trim();
   if (!baseUrl || !id) return '';
-  return `${baseUrl}/workspace-details.html?id=${encodeURIComponent(id)}&tab=activity`;
+  return `${baseUrl}/workspace-details.html?id=${encodeURIComponent(id)}&tab=summary`;
 }
 
 function renderMatterLink(lanaClientUrl, matterId, matterName) {

@@ -32,6 +32,7 @@
   var currentMatterData = null;
   var currentTaskMatterId = null;
   var currentEditingTask = null;
+  var workspaceTaskSuggestionState = null;
   var currentTasksList = [];
   var commentPollInterval = null;
   var currentCommentPage = 1;
@@ -249,14 +250,12 @@
   var _redactIds = [
     'bannerSection',
     'matterBreadcrumb',
-    'tabContentActivity',
+    'summaryOverview',
     'tabContentNotes',
     'tabContentTasks',
     'tabContentComments',
     'tabContentDocuments',
-    'tabContentConversations',
-    'dockPanelDetails',
-    'dockPanelContext'
+    'tabContentConversations'
   ];
 
   function redactPage(on) {
@@ -585,15 +584,6 @@
       });
     }
 
-    // Dock segmented control
-    var dockToggle = document.getElementById('dockToggle');
-    if (dockToggle) {
-      dockToggle.addEventListener('lex-change', function (e) {
-        var val = e.detail && e.detail.value;
-        if (val) switchDockPanel(val);
-      });
-    }
-
     // Card action delegation — single listener handles ALL lex-card action buttons
     trackDocListener('card-action', function (e) {
       if (!e.detail || !e.target) return;
@@ -624,7 +614,15 @@
   // =========================================================================
 
   function switchMatterTab(tab) {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'summary', 'docGeneration', 'analytics'];
+    // The Activity tab was folded into the Summary page — old deep links
+    // (?tab=activity) land on Summary with the activity drawer open.
+    if (tab === 'activity') {
+      switchMatterTab('summary');
+      openActivityDrawer();
+      return;
+    }
+
+    var tabs = ['notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'summary', 'docGeneration', 'analytics'];
     var tabBar = document.getElementById('tabBar');
     if (tabBar && tabBar.getAttribute('active') !== tab) {
       tabBar.setAttribute('active', tab);
@@ -645,10 +643,8 @@
 
     var m = currentMatterData;
     switch (tab) {
-      case 'activity':
-        // Always re-fetch activity data to capture changes from other tabs (notes, tasks, etc.)
-        renderActivityTab(m.matter, m.activities, m.activityPagination);
-        refreshActivityData(m.matter.matter_id);
+      case 'summary':
+        renderSummaryTab();
         break;
       case 'documents':
         renderDocumentsTab(m.matter, m.documents, m.docPagination, m.orphanedFiles);
@@ -687,12 +683,12 @@
   }
 
   function getCurrentActiveTab() {
-    var tabs = ['activity', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
+    var tabs = ['summary', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
     for (var i = 0; i < tabs.length; i++) {
       var content = document.getElementById('tabContent' + tabs[i].charAt(0).toUpperCase() + tabs[i].substring(1));
       if (content && !content.classList.contains('hidden')) return tabs[i];
     }
-    return 'activity';
+    return 'summary';
   }
 
   // =========================================================================
@@ -700,34 +696,21 @@
   // =========================================================================
 
   function switchDockPanel(panel) {
+    // The Details/Context toggle is gone — the Summary tab shows both panels
+    // side by side as one living page. Kept (and exported on window) so any
+    // legacy caller just ensures both panels are visible.
     var detailsPanel = document.getElementById('dockPanelDetails');
     var contextPanel = document.getElementById('dockPanelContext');
-    var toggle = document.getElementById('dockToggle');
-
-    if (panel === 'details') {
-      if (detailsPanel) detailsPanel.classList.remove('hidden');
-      if (contextPanel) contextPanel.classList.add('hidden');
-    } else {
-      if (detailsPanel) detailsPanel.classList.add('hidden');
-      if (contextPanel) contextPanel.classList.remove('hidden');
-    }
-
-    // Sync the segmented control if called programmatically
-    if (toggle && toggle.value !== panel) {
-      toggle.value = panel;
-    }
+    if (detailsPanel) detailsPanel.classList.remove('hidden');
+    if (contextPanel) contextPanel.classList.remove('hidden');
   }
 
-  function renderDockDetailsPanel(matter, permissions) {
-    var panel = document.getElementById('dockPanelDetails');
-    if (!panel) return;
-
-    var html = '<div class="flex flex-col gap-4">';
-
-    // Information card (read-only — edit via header menu).
-    // Description used to live in its own card at the top of the page; we
-    // render it as a stacked block at the bottom of this card so the meta
-    // rows above stay aligned in the label/value columns.
+  // Information card (read-only — edit via header menu). Rendered inside the
+  // Summary overview grid by renderSummaryTab.
+  // Description used to live in its own card at the top of the page; we
+  // render it as a stacked block at the bottom of this card so the meta
+  // rows above stay aligned in the label/value columns.
+  function buildInformationCardHtml(matter) {
     var descriptionText = (matter && matter.description) ? String(matter.description).trim() : '';
     var descriptionBlock = '<div class="pb-2.5 mb-2.5 border-b border-gray-100">' +
         '<div class="flex items-center justify-between gap-3 mb-1.5">' +
@@ -760,7 +743,7 @@
     else if (rawVisibility) visibilityLabel = rawVisibility.charAt(0).toUpperCase() + rawVisibility.slice(1);
     else visibilityLabel = sharing.is_private === false ? 'Organization-wide' : 'Private';
 
-    html += '<lex-card id="infoCard" heading="Information" variant="flat" padding="compact">' +
+    return '<lex-card id="infoCard" heading="Information" variant="flat" padding="compact">' +
       '<div class="space-y-2.5 text-sm">' +
         descriptionBlock +
         '<div class="flex justify-between"><span class="text-gray-500">Client</span><span class="text-gray-900 font-medium">' + escapeHtml(matter.client_name || 'N/A') + '</span></div>' +
@@ -772,9 +755,17 @@
         '<div class="flex justify-between"><span class="text-gray-500">Last Updated</span><span class="text-gray-900">' + formatDate(matter.updated_at) + '</span></div>' +
       '</div>' +
     '</lex-card>';
+  }
 
-    // Shared With card
-    var shareActions = JSON.stringify([{icon:'share',label:'Add'},{icon:'edit',label:'Manage'}]).split('"').join('&quot;');
+  function renderDockDetailsPanel(matter, permissions) {
+    var panel = document.getElementById('dockPanelDetails');
+    if (!panel) return;
+    panel.classList.remove('hidden');
+
+    var html = '<div class="flex flex-col gap-4">';
+
+    // Shared With card (the Information card lives in the Summary overview grid)
+    var shareActions = JSON.stringify([{icon:'plus',label:'Manage sharing'}]).split('"').join('&quot;');
     html += '<lex-card id="sharedWithCard" heading="Shared With" variant="flat" padding="compact" actions=\'' + shareActions + '\'>';
     if (matter.visibility === 'organization') {
       html += '<p class="text-sm text-gray-500">Visible to entire organization</p>';
@@ -805,7 +796,7 @@
     if (swCard) {
       swCard.addEventListener('card-action', function (e) {
         var action = e.detail && e.detail.action;
-        if ((action === 'share' || action === 'edit') && matter && matter.matter_id) {
+        if (action === 'plus' && matter && matter.matter_id) {
           openManageShareModal(matter.matter_id);
         }
       });
@@ -818,6 +809,7 @@
   function renderDockContextPanel(matter) {
     var panel = document.getElementById('dockPanelContext');
     if (!panel) return;
+    panel.classList.remove('hidden');
 
     var html = '<div class="flex flex-col gap-4">';
 
@@ -865,7 +857,7 @@
       var totalCount = contacts.length + records.length;
       var cardActions = JSON.stringify([
         {icon:'plus', label:'Add'},
-        {icon:'maximize-2', label:'View All'}
+        {icon:'eye', label:'View All'}
       ]).split('"').join('&quot;');
 
       var headingText = 'Connected Data' + (totalCount > 0 ? ' (' + totalCount + ')' : '');
@@ -926,7 +918,7 @@
       if (card) {
         card.addEventListener('card-action', function (e) {
           if (!e.detail) return;
-          if (e.detail.action === 'maximize-2') {
+          if (e.detail.action === 'eye') {
             // Navigate to full workspace data visualization page
             window.location.href = 'workspace-data.html?id=' + encodeURIComponent(matter.matter_id);
           } else if (e.detail.action === 'plus') {
@@ -957,8 +949,8 @@
 
   function navigateToMatter(matterId) {
     Lex.Nav.go('workspace-details.html', {
-      params: { id: matterId, tab: 'activity' },
-      context: { matterId: matterId, tab: 'activity' }
+      params: { id: matterId, tab: 'summary' },
+      context: { matterId: matterId, tab: 'summary' }
     });
   }
 
@@ -1011,10 +1003,10 @@
       currentMatterData._allLinks = allLinks;
 
       var linkActions = isWorkspace ? JSON.stringify([{icon:'plus',label:'Add'}]).split('"').join('&quot;') : '';
-      var html = '<lex-card id="linkedMattersCard" heading="Linked Matters" variant="flat" padding="compact"' + (linkActions ? ' actions=\'' + linkActions + '\'' : '') + '>';
+      var html = '<lex-card id="linkedMattersCard" heading="Linked Workspaces" variant="flat" padding="compact"' + (linkActions ? ' actions=\'' + linkActions + '\'' : '') + '>';
 
       if (allLinks.length === 0) {
-        html += '<p class="text-sm text-gray-500">No linked matters</p>';
+        html += '<p class="text-sm text-gray-500">No linked workspaces</p>';
       } else {
         html += '<div class="flex items-center flex-wrap gap-2">';
         var showCount = Math.min(allLinks.length, 3);
@@ -1135,8 +1127,8 @@
   // =========================================================================
 
   async function refreshCurrentMatter() {
-    if (!currentMatterData || !currentMatterData.matter_id) return;
-    var matterId = currentMatterData.matter_id;
+    if (!currentMatterData || !currentMatterData.matter || !currentMatterData.matter.matter_id) return;
+    var matterId = currentMatterData.matter.matter_id;
     var activeTab = getCurrentActiveTab();
 
     // Reset analytics cache so refreshed data is fetched on next visit
@@ -1148,8 +1140,6 @@
     if (currentMatterData) {
       renderBanner(currentMatterData.matter);
       renderDescription(currentMatterData.matter);
-      renderDockDetailsPanel(currentMatterData.matter, currentMatterData.permissions);
-      renderDockContextPanel(currentMatterData.matter);
       switchMatterTab(activeTab);
     }
     redactPage(false);
@@ -1184,83 +1174,450 @@
   // Activity Tab
   // =========================================================================
 
-  function renderActivityTab(matter, activities, pagination) {
-    var container = document.getElementById('tabContentActivity');
+  // =========================================================================
+  // Summary Tab — Jira-style overview (KPIs, insights, charts, what's next)
+  // =========================================================================
 
-    if (!container) {
-      console.warn('[renderActivityTab] Content element not found - tab may not be visible');
-      return;
+  // Status sets mirror lana-ai-chef src/shared/constants/task-status.constants.js
+  var WSUM_DONE_STATUSES = { complete: 1, completed: 1, done: 1 };
+  var WSUM_CANCELLED_STATUSES = { cancelled: 1, canceled: 1, closed: 1 };
+
+  var WSUM_STATUS_BUCKETS = [
+    { key: 'todo',        label: 'To Do',       color: '#9ca3af' },
+    { key: 'in_progress', label: 'In Progress', color: '#3b82f6' },
+    { key: 'in_review',   label: 'In Review',   color: '#f59e0b' },
+    { key: 'done',        label: 'Done',        color: '#22c55e' },
+    { key: 'cancelled',   label: 'Cancelled',   color: '#ef4444' }
+  ];
+
+  var WSUM_PRIORITY_META = [
+    { key: 'high',   label: 'High',   color: '#ef4444' },
+    { key: 'medium', label: 'Medium', color: '#f59e0b' },
+    { key: 'normal', label: 'Normal', color: '#9ca3af' },
+    { key: 'low',    label: 'Low',    color: '#3b82f6' }
+  ];
+
+  // Full task lists behind the "+N more" buttons (set by renderSummaryTab,
+  // read by openSummaryTaskListDrawer)
+  var _wsumTaskLists = { overdue: [], next: [] };
+  var _wsumListDrawerEl = null;
+
+  function wsumNormalizeStatus(status) {
+    if (!status) return 'pending';
+    return String(status).toLowerCase().split(' ').join('_');
+  }
+
+  function wsumStatusBucket(status) {
+    var st = wsumNormalizeStatus(status);
+    if (WSUM_DONE_STATUSES[st]) return 'done';
+    if (WSUM_CANCELLED_STATUSES[st]) return 'cancelled';
+    if (st === 'in_progress') return 'in_progress';
+    if (st === 'in_review') return 'in_review';
+    return 'todo';
+  }
+
+  function wsumPlural(n, singular, plural) {
+    return n === 1 ? singular : plural;
+  }
+
+  function wsumTaskRow(t) {
+    var title = t.title || t.task_name || 'Untitled task';
+    var assignee = t.assigned_to || '';
+    var id = t.id || t.task_id || '';
+    return (
+      '<div class="wsum-task-row" data-wsum-task="' + escapeHtml(String(id)) + '">' +
+        '<span class="wsum-task-title">' + escapeHtml(title) + '</span>' +
+        (assignee ? '<span class="wsum-task-meta">' + escapeHtml(assignee) + '</span>' : '') +
+        getPriorityBadge(t.priority) +
+        '<span class="wsum-task-meta">' + formatDueDate(t.due_date) + '</span>' +
+      '</div>'
+    );
+  }
+
+  function findWorkspaceTaskById(taskId) {
+    var id = String(taskId || '');
+    if (!id) return null;
+    var taskLists = [
+      currentTasksList,
+      currentMatterData && currentMatterData.tasks,
+      currentMatterData && currentMatterData.matter && currentMatterData.matter.tasks
+    ];
+    for (var i = 0; i < taskLists.length; i += 1) {
+      var list = taskLists[i];
+      if (!Array.isArray(list)) continue;
+      var task = list.find(function (item) {
+        return String(item.id || item.task_id || '') === id;
+      });
+      if (task) return task;
     }
+    return null;
+  }
 
-    if (!activities || activities.length === 0) {
-      container.innerHTML =
-        '<lex-empty icon="inbox" message="No activity yet" description="Activity related to this matter will appear here"></lex-empty>';
-      return;
+  function syncWorkspaceTaskDetailProvider() {
+    if (!window.LanaTaskDetails || typeof window.LanaTaskDetails.setProvider !== 'function') return;
+    window.LanaTaskDetails.setProvider(function (taskId) {
+      return findWorkspaceTaskById(taskId);
+    }, {
+      onRefresh: refreshCurrentMatter
+    });
+  }
+
+  function openWorkspaceTaskDetails(taskId) {
+    syncWorkspaceTaskDetailProvider();
+    if (window.LanaTaskDetails && typeof window.LanaTaskDetails.openById === 'function' && window.LanaTaskDetails.openById(taskId, { onRefresh: refreshCurrentMatter })) {
+      return true;
     }
+    _pendingTaskDeepLinkId = String(taskId || '');
+    switchMatterTab('tasks');
+    return false;
+  }
 
-    // Group activities by date
-    var groupedActivities = {};
-    for (var ai = 0; ai < activities.length; ai++) {
-      var activity = activities[ai];
-      var dateLabel = formatDateLong(activity.created_at);
-      if (!groupedActivities[dateLabel]) {
-        groupedActivities[dateLabel] = [];
+  function wsumKpiTile(label, value, status, caption) {
+    return (
+      '<div class="wsum-kpi">' +
+        '<lex-metric label="' + escapeHtml(label) + '" value="' + escapeHtml(String(value)) + '" status="' + status + '" size="md"></lex-metric>' +
+        '<div class="wsum-kpi-caption">' + escapeHtml(caption) + '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderSummaryTab() {
+    var container = document.getElementById('summaryOverview');
+    if (!container || !currentMatterData) return;
+
+    var matter = currentMatterData.matter || {};
+    var tasks = currentMatterData.tasks || [];
+    var activities = currentMatterData.activities || [];
+
+    var DAY = 24 * 60 * 60 * 1000;
+    var now = new Date();
+    var weekAgo = new Date(now.getTime() - 7 * DAY);
+    var weekAhead = new Date(now.getTime() + 7 * DAY);
+
+    var completed7d = 0, created7d = 0, updated7d = 0;
+    var overdue = [], dueSoon = [], upcoming = [], openNoDue = [];
+    var openCount = 0, unassignedOpen = 0;
+    var statusCounts = { todo: 0, in_progress: 0, in_review: 0, done: 0, cancelled: 0 };
+    var priorityCounts = {};
+
+    tasks.forEach(function (t) {
+      var bucket = wsumStatusBucket(t.status);
+      statusCounts[bucket]++;
+      var closed = bucket === 'done' || bucket === 'cancelled';
+
+      var completedAt = t.completed_at ? parseApiUtcDate(t.completed_at) : null;
+      if (completedAt && completedAt >= weekAgo) completed7d++;
+
+      var createdAt = t.created_at ? parseApiUtcDate(t.created_at) : null;
+      if (createdAt && createdAt >= weekAgo) created7d++;
+
+      // Connector tasks carry no updated_at — fall back to their latest known timestamp
+      var updatedRef = t.updated_at || t.completed_at || t.started_at || t.created_at;
+      var updatedAt = updatedRef ? parseApiUtcDate(updatedRef) : null;
+      if (updatedAt && updatedAt >= weekAgo) updated7d++;
+
+      if (!closed) {
+        openCount++;
+        var due = t.due_date ? parseApiUtcDate(t.due_date) : null;
+        if (due && !isNaN(due.getTime())) {
+          if (due < now) {
+            overdue.push(t);
+          } else {
+            upcoming.push(t);
+            if (due <= weekAhead) dueSoon.push(t);
+          }
+        } else {
+          openNoDue.push(t);
+        }
+        if (!t.assigned_to && !t.assigned_to_user_id && !t.assigned_to_id) unassignedOpen++;
       }
-      groupedActivities[dateLabel].push(activity);
+
+      var pr = String(t.priority || 'normal').toLowerCase();
+      priorityCounts[pr] = (priorityCounts[pr] || 0) + 1;
+    });
+
+    var byDueAsc = function (a, b) {
+      return parseApiUtcDate(a.due_date) - parseApiUtcDate(b.due_date);
+    };
+    overdue.sort(byDueAsc);
+    upcoming.sort(byDueAsc);
+
+    var total = tasks.length;
+    var denominator = total - statusCounts.cancelled;
+    var pctComplete = denominator > 0 ? Math.round((statusCounts.done / denominator) * 100) : 0;
+
+    // ── Insight chips ──
+    var chips = [];
+    if (overdue.length) {
+      chips.push({ cls: 'danger', text: overdue.length + ' overdue ' + wsumPlural(overdue.length, 'task needs', 'tasks need') + ' attention' });
+    }
+    if (dueSoon.length) {
+      chips.push({ cls: 'warning', text: dueSoon.length + ' ' + wsumPlural(dueSoon.length, 'task', 'tasks') + ' due in the next 7 days' });
+    }
+    if (openCount > 0 && unassignedOpen / openCount >= 0.5) {
+      chips.push({ cls: 'info', text: Math.round((unassignedOpen / openCount) * 100) + '% of open work is unassigned' });
+    }
+    if (openNoDue.length) {
+      chips.push({ cls: 'neutral', text: openNoDue.length + ' open ' + wsumPlural(openNoDue.length, 'task has', 'tasks have') + ' no due date' });
+    }
+    if (completed7d) {
+      chips.push({ cls: 'success', text: completed7d + ' ' + wsumPlural(completed7d, 'task', 'tasks') + ' completed this week' });
+    }
+    if (!chips.length && total) {
+      chips.push({ cls: 'success', text: 'On track — nothing overdue' });
+    }
+    if (!total) {
+      chips.push({ cls: 'neutral', text: 'No work items yet' });
     }
 
-    var pag = pagination || {};
-    var currentOffset = pag.offset || 0;
-    var limit = pag.limit || 20;
-    var total = pag.total || 0;
-    var hasMore = (currentOffset + activities.length) < total;
-    var currentPage = Math.floor(currentOffset / limit) + 1;
-    var totalPages = Math.ceil(total / limit) || 1;
-
-    var groupHtml = '';
-    var dateKeys = Object.keys(groupedActivities);
-    for (var di = 0; di < dateKeys.length; di++) {
-      var dateKey = dateKeys[di];
-      var dayActivities = groupedActivities[dateKey];
-      var itemsHtml = '';
-      for (var ii = 0; ii < dayActivities.length; ii++) {
-        var act = dayActivities[ii];
-        itemsHtml +=
-          '<div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">' +
-            '<div class="w-8 h-8 ' + getActivityBgColor(act) + ' rounded-full flex items-center justify-center flex-shrink-0">' +
-              getActivityIcon(act) +
-            '</div>' +
-            '<div class="flex-1 min-w-0">' +
-              '<p class="text-sm text-gray-900 leading-relaxed">' + getActivityDescription(act) + '</p>' +
-              '<p class="text-xs text-gray-500 mt-1">' + timeAgo(act.created_at) + '</p>' +
-            '</div>' +
-          '</div>';
-      }
-      groupHtml +=
-        '<lex-card heading="' + escapeHtml(dateKey) + '">' +
-          '<div class="space-y-3">' + itemsHtml + '</div>' +
-        '</lex-card>';
-    }
-
-    var paginationHtml = '';
-    if (total > 0) {
-      paginationHtml = '<lex-pagination id="activityPagination" class="mt-6 border-t pt-4" page="' + currentPage + '" total-pages="' + totalPages + '" total="' + total + '" limit="' + limit + '"></lex-pagination>';
-    }
-
-    container.innerHTML =
-      '<div class="space-y-6">' +
-        groupHtml +
-        paginationHtml +
-      '</div>';
-
-    // Wire up pagination
-    var actPag = document.getElementById('activityPagination');
-    if (actPag) {
-      actPag.addEventListener('page-change', function (e) {
-        var newPage = e.detail && e.detail.page;
-        if (newPage) loadActivityPage(matter.matter_id, (newPage - 1) * limit);
+    // ── Types of work ──
+    // task_type only ships on the full_details matter payload (first 50 tasks);
+    // fall back to a LANA-vs-external split when it's unavailable.
+    var typeCounts = {};
+    if (matter.tasks && matter.tasks.length) {
+      matter.tasks.forEach(function (mt) {
+        var label = mt.task_type ? formatFieldName(mt.task_type) : 'Task';
+        typeCounts[label] = (typeCounts[label] || 0) + 1;
+      });
+    } else {
+      tasks.forEach(function (t) {
+        var label = t.source === 'connector' ? 'External' : 'LANA';
+        typeCounts[label] = (typeCounts[label] || 0) + 1;
       });
     }
+    var typeEntries = Object.keys(typeCounts).map(function (k) {
+      return { label: k, count: typeCounts[k] };
+    }).sort(function (a, b) { return b.count - a.count; });
+    var typeTotal = typeEntries.reduce(function (sum, e) { return sum + e.count; }, 0);
+
+    // ── Markup ──
+    var kpiHtml =
+      '<div class="wsum-kpis">' +
+        wsumKpiTile('Completed', completed7d, completed7d ? 'green' : 'gray', 'in the last 7 days') +
+        wsumKpiTile('Updated', updated7d, updated7d ? 'blue' : 'gray', 'in the last 7 days') +
+        wsumKpiTile('Created', created7d, created7d ? 'blue' : 'gray', 'in the last 7 days') +
+        wsumKpiTile('Due soon', dueSoon.length, dueSoon.length ? 'yellow' : 'gray', 'in the next 7 days') +
+      '</div>';
+
+    var chipsHtml = '<div class="wsum-insights">' + chips.map(function (c) {
+      return '<span class="wsum-chip wsum-chip--' + c.cls + '">' + escapeHtml(c.text) + '</span>';
+    }).join('') + '</div>';
+
+    var activityRowsHtml = activities.length
+      ? '<div class="wsum-card-list">' + activities.slice(0, 6).map(renderActivityRow).join('') + '</div>'
+      : '<p class="wsum-more">No activity yet.</p>';
+    var activityCardHtml =
+      '<lex-card heading="Recent activity" subtitle="Latest updates across this workspace">' +
+        activityRowsHtml +
+        '<button id="wsumViewAllActivity" class="wsum-viewall">View all activity</button>' +
+      '</lex-card>';
+
+    var statusCardInner;
+    if (total) {
+      statusCardInner =
+        '<lex-chart id="wsumStatusChart" type="doughnut" height="220px" variant="compact"></lex-chart>' +
+        '<div class="wsum-progress-line">' +
+          '<span><span class="wsum-progress-pct">' + pctComplete + '%</span> complete</span>' +
+          '<span>' + statusCounts.done + ' of ' + denominator + ' done</span>' +
+        '</div>' +
+        '<lex-progress-bar id="wsumProgressBar" size="md"></lex-progress-bar>';
+    } else {
+      statusCardInner =
+        '<lex-empty icon="tasks" message="No work items yet" description="Create tasks on the Board to see progress here."></lex-empty>' +
+        '<button id="wsumViewBoard" class="wsum-viewall">Go to Board</button>';
+    }
+
+    var nextList = upcoming.length ? upcoming : openNoDue;
+    _wsumTaskLists = { overdue: overdue, next: nextList };
+
+    var overdueRows = overdue.length
+      ? '<div class="wsum-card-list">' + overdue.slice(0, 5).map(wsumTaskRow).join('') + '</div>' +
+        (overdue.length > 5 ? '<button class="wsum-more wsum-more-btn" data-wsum-list="overdue">+' + (overdue.length - 5) + ' more overdue</button>' : '')
+      : '<p class="wsum-more">Nothing overdue — all work is on schedule.</p>';
+
+    var nextRows = nextList.length
+      ? '<div class="wsum-card-list">' + nextList.slice(0, 5).map(wsumTaskRow).join('') + '</div>' +
+        (nextList.length > 5 ? '<button class="wsum-more wsum-more-btn" data-wsum-list="next">+' + (nextList.length - 5) + ' more open</button>' : '')
+      : '<p class="wsum-more">No open work remaining.</p>';
+
+    var typeRows = typeEntries.slice(0, 6).map(function (e) {
+      var pct = typeTotal ? Math.round((e.count / typeTotal) * 100) : 0;
+      return (
+        '<div class="wsum-type-row">' +
+          '<span class="wsum-type-label">' + escapeHtml(e.label) + '</span>' +
+          '<lex-progress-bar class="wsum-type-bar" value="' + pct + '" size="sm" color="accent"></lex-progress-bar>' +
+          '<span class="wsum-type-count">' + pct + '%</span>' +
+        '</div>'
+      );
+    }).join('');
+
+    var priorityCardHtml = total
+      ? '<lex-card heading="Priority breakdown" subtitle="How work is being prioritized">' +
+          '<lex-chart id="wsumPriorityChart" type="bar" height="220px" variant="compact"></lex-chart>' +
+        '</lex-card>'
+      : '';
+
+    // Masonry columns: left = Status / Needs attention / What's next + Details
+    // cards; right = Information / Recent activity / Types of work + Context
+    // cards. The dock panel placeholders are filled by renderDockDetailsPanel /
+    // renderDockContextPanel below so their cards pack into the same columns.
+    var gridHtml =
+      '<div class="wsum-masonry">' +
+        '<div class="wsum-col">' +
+          '<lex-card heading="Status overview" subtitle="Snapshot of ' + total + ' work ' + wsumPlural(total, 'item', 'items') + ' by status">' +
+            statusCardInner +
+          '</lex-card>' +
+          '<lex-card heading="Needs attention" subtitle="Overdue work items">' + overdueRows + '</lex-card>' +
+          '<lex-card heading="What\'s next" subtitle="Upcoming open work">' + nextRows + '</lex-card>' +
+          priorityCardHtml +
+          '<div id="dockPanelDetails"></div>' +
+        '</div>' +
+        '<div class="wsum-col">' +
+          buildInformationCardHtml(matter) +
+          activityCardHtml +
+          '<lex-card heading="Types of work" subtitle="Distribution of work items by type">' +
+            (typeRows || '<p class="wsum-more">No type data available.</p>') +
+          '</lex-card>' +
+          '<div id="dockPanelContext"></div>' +
+        '</div>' +
+      '</div>';
+
+    container.innerHTML = kpiHtml + chipsHtml + gridHtml;
+
+    // Fill the Details/Context placeholders so their cards (Shared With,
+    // Custom Fields, Linked Matters, Connected Data) flow into the columns.
+    renderDockDetailsPanel(matter, currentMatterData.permissions);
+    renderDockContextPanel(matter);
+
+    // ── Charts ──
+    if (total && window.Chart) {
+      var statusChart = document.getElementById('wsumStatusChart');
+      if (statusChart) {
+        var visibleBuckets = WSUM_STATUS_BUCKETS.filter(function (b) { return statusCounts[b.key] > 0; });
+        statusChart.chartData = {
+          labels: visibleBuckets.map(function (b) { return b.label + ': ' + statusCounts[b.key]; }),
+          datasets: [{
+            data: visibleBuckets.map(function (b) { return statusCounts[b.key]; }),
+            backgroundColor: visibleBuckets.map(function (b) { return b.color; }),
+            borderWidth: 0
+          }]
+        };
+        statusChart.chartOptions = {
+          maintainAspectRatio: false,
+          cutout: '62%',
+          plugins: { legend: { position: 'right' } }
+        };
+      }
+
+      var priorityChart = document.getElementById('wsumPriorityChart');
+      if (priorityChart) {
+        var prEntries = WSUM_PRIORITY_META.filter(function (p) { return priorityCounts[p.key]; });
+        // Connector tasks can carry arbitrary priority strings — bucket the rest as Other
+        var knownKeys = {};
+        WSUM_PRIORITY_META.forEach(function (p) { knownKeys[p.key] = 1; });
+        var otherCount = 0;
+        Object.keys(priorityCounts).forEach(function (k) {
+          if (!knownKeys[k]) otherCount += priorityCounts[k];
+        });
+        var prLabels = prEntries.map(function (p) { return p.label; });
+        var prData = prEntries.map(function (p) { return priorityCounts[p.key]; });
+        var prColors = prEntries.map(function (p) { return p.color; });
+        if (otherCount) {
+          prLabels.push('Other');
+          prData.push(otherCount);
+          prColors.push('#6b7280');
+        }
+        priorityChart.chartData = {
+          labels: prLabels,
+          datasets: [{ data: prData, backgroundColor: prColors, borderRadius: 4 }]
+        };
+        priorityChart.chartOptions = {
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        };
+      }
+    }
+
+    // ── Progress bar segments (share of non-cancelled work) ──
+    var progressBar = document.getElementById('wsumProgressBar');
+    if (progressBar && denominator > 0) {
+      progressBar.segments = [
+        { value: (statusCounts.done / denominator) * 100, color: 'success', label: 'Done' },
+        { value: (statusCounts.in_review / denominator) * 100, color: 'warning', label: 'In Review' },
+        { value: (statusCounts.in_progress / denominator) * 100, color: 'info', label: 'In Progress' }
+      ];
+    }
+
+    // ── Click delegation (idempotent — reassigned on each render) ──
+    container.onclick = function (e) {
+      var moreBtn = e.target.closest('[data-wsum-list]');
+      if (moreBtn) {
+        openSummaryTaskListDrawer(moreBtn.getAttribute('data-wsum-list'));
+        return;
+      }
+      var row = e.target.closest('[data-wsum-task]');
+      if (row) {
+        openWorkspaceTaskDetails(row.getAttribute('data-wsum-task'));
+        return;
+      }
+      if (e.target.closest('#wsumViewAllActivity')) {
+        openActivityDrawer();
+        return;
+      }
+      if (e.target.closest('#wsumViewBoard')) {
+        switchMatterTab('tasks');
+      }
+    };
+  }
+
+  // Side drawer with the full task list behind a "+N more" button on the
+  // Needs attention / What's next cards. Rows use the same markup and task
+  // click-through as the cards themselves.
+  function openSummaryTaskListDrawer(kind) {
+    var list = (_wsumTaskLists && _wsumTaskLists[kind]) || [];
+    if (!list.length) return;
+
+    var titles = {
+      overdue: { heading: 'Needs attention', subtitle: 'All overdue work items' },
+      next: { heading: "What's next", subtitle: 'All upcoming open work' }
+    };
+    var t = titles[kind] || { heading: 'Work items', subtitle: '' };
+
+    _wsumListDrawerEl = Lex.Drawer.open({
+      heading: t.heading + ' (' + list.length + ')',
+      subtitle: t.subtitle,
+      width: 'lg',
+      content: '<div class="wsum-card-list">' + list.map(wsumTaskRow).join('') + '</div>',
+      onClose: function () { _wsumListDrawerEl = null; }
+    });
+
+    _wsumListDrawerEl.addEventListener('click', function (e) {
+      var row = e.target.closest('[data-wsum-task]');
+      if (!row) return;
+      var taskId = row.getAttribute('data-wsum-task');
+      if (_wsumListDrawerEl) {
+        _wsumListDrawerEl.remove();
+        _wsumListDrawerEl = null;
+      }
+      openWorkspaceTaskDetails(taskId);
+    });
+  }
+
+  // Shared activity row markup — used by the Activity tab and the Summary
+  // tab's "Recent activity" card.
+  function renderActivityRow(act) {
+    return (
+      '<div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">' +
+        '<div class="w-8 h-8 ' + getActivityBgColor(act) + ' rounded-full flex items-center justify-center flex-shrink-0">' +
+          getActivityIcon(act) +
+        '</div>' +
+        '<div class="flex-1 min-w-0">' +
+          '<p class="text-sm text-gray-900 leading-relaxed">' + getActivityDescription(act) + '</p>' +
+          '<p class="text-xs text-gray-500 mt-1">' + timeAgo(act.created_at) + '</p>' +
+        '</div>' +
+      '</div>'
+    );
   }
 
   // Activity helper: icon SVG for activity type
@@ -1360,36 +1717,103 @@
     return escapeHtml(activity.description || activity.content || 'Activity');
   }
 
-  // Refresh activity data from API (background, non-blocking)
-  async function refreshActivityData(matterId) {
-    try {
-      var result = await api.getMatterActivity(matterId, 20, 0);
-      if (result && result.activities && currentMatterData) {
-        currentMatterData.activities = result.activities;
-        currentMatterData.activityPagination = result.pagination || {};
-        renderActivityTab(currentMatterData.matter, result.activities, result.pagination);
-      }
-    } catch (error) {
-      // Silently fail — cached data is already rendered as fallback
-      console.warn('[refreshActivityData] Failed to refresh:', error.message);
-    }
+  // Activity helper: plain-text version of the activity description (for the
+  // activity drawer table, which escapes cell values)
+  function getActivityText(act) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = getActivityDescription(act);
+    return tmp.textContent || '';
   }
 
-  // Load a specific activity page (for pagination)
-  async function loadActivityPage(matterId, offset) {
-    try {
-      var limit = 20;
-      var result = await api.getMatterActivity(matterId, limit, offset);
+  // ── Activity drawer — full activity history for the workspace ──
+  // Replaces the old Activity tab. Rows deep-link to the artifact that drove
+  // the activity (task → Board with the task open, document → Docs, etc.).
+  var _activityDrawerEl = null;
 
-      if (currentMatterData) {
-        currentMatterData.activities = result.activities || [];
-        currentMatterData.activityPagination = result.pagination || { total: 0, limit: limit, offset: offset };
-        renderActivityTab(currentMatterData.matter, currentMatterData.activities, currentMatterData.activityPagination);
+  async function openActivityDrawer() {
+    if (!currentMatterData || !currentMatterData.matter) return;
+    var matterId = currentMatterData.matter.matter_id;
+
+    _activityDrawerEl = Lex.Drawer.open({
+      heading: 'Activity',
+      subtitle: 'Everything that happened in this workspace',
+      width: 'xl',
+      content:
+        '<div id="activityDrawerBody">' +
+          '<div class="text-center py-8"><lex-spinner></lex-spinner></div>' +
+        '</div>',
+      onClose: function () { _activityDrawerEl = null; }
+    });
+
+    var activities = currentMatterData.activities || [];
+    try {
+      var result = await api.getMatterActivity(matterId, 200, 0);
+      if (result && result.activities) {
+        activities = result.activities;
+        currentMatterData.activities = activities;
+        currentMatterData.activityPagination = result.pagination || {};
       }
     } catch (error) {
-      console.error('[loadActivityPage] Failed to load activity page:', error);
-      Lex.Toast.error('Failed to load activity');
+      console.warn('[openActivityDrawer] Falling back to cached activity:', error.message);
     }
+
+    var body = document.getElementById('activityDrawerBody');
+    if (!body) return; // drawer was closed while loading
+
+    if (!activities.length) {
+      body.innerHTML = '<lex-empty icon="inbox" message="No activity yet" description="Activity in this workspace will appear here"></lex-empty>';
+      return;
+    }
+
+    body.innerHTML = '<lex-table id="activityDrawerTable" columns="message,when" limit="25"></lex-table>';
+    var table = document.getElementById('activityDrawerTable');
+    if (!table || typeof table.setData !== 'function') return;
+
+    var rows = activities.map(function (act, idx) {
+      return {
+        id: act.id != null ? String(act.id) : 'idx-' + idx,
+        message: getActivityText(act),
+        when: timeAgo(act.created_at),
+        _activity: act
+      };
+    });
+    table.setData(rows);
+    table.addEventListener('row-click', function (e) {
+      var row = e.detail && e.detail.row;
+      if (row && row._activity) openActivityArtifact(row._activity);
+    });
+  }
+
+  // Navigate to the artifact behind an activity record. Closes the drawer
+  // only when we have somewhere to take the user.
+  function openActivityArtifact(act) {
+    var rtype = String(act.resource_type || '');
+    var etype = String(act.event_type || '');
+    var details = act.details || {};
+    var go = null;
+
+    if (rtype === 'task' || details.task_id || etype.indexOf('task') !== -1) {
+      var taskId = details.task_id || (rtype === 'task' ? act.resource_id : null);
+      go = function () {
+        if (taskId) _pendingTaskDeepLinkId = String(taskId);
+        switchMatterTab('tasks');
+      };
+    } else if (rtype === 'document' || rtype === 'generated_document' || rtype === 'folder' ||
+               details.file_id || details.document_id ||
+               etype.indexOf('document') !== -1 || etype.indexOf('file') !== -1) {
+      go = function () { switchMatterTab('documents'); };
+    } else if (etype.indexOf('note') !== -1) {
+      go = function () { switchMatterTab('notes'); };
+    } else if (etype.indexOf('comment') !== -1 || etype.indexOf('discussion') !== -1 || act.type === 'comment') {
+      go = function () { switchMatterTab('comments'); };
+    }
+
+    if (!go) return;
+    if (_activityDrawerEl) {
+      _activityDrawerEl.remove();
+      _activityDrawerEl = null;
+    }
+    go();
   }
 
   // =========================================================================
@@ -2781,7 +3205,6 @@
   // Document filter chips, batch select / Select All, and batch delete are now
   // owned by the MatterDocumentsView component (enableTemplates / enableBatch).
 
-  window.loadActivityPage = loadActivityPage;
   window.refreshDrawerDocuments = refreshDrawerDocuments;
   window.openDocxTemplateModal = openDocxTemplateModal;
   window.openCreateDocStudioDocumentModal = openCreateDocStudioDocumentModal;
@@ -2790,7 +3213,7 @@
   window.updateDocStudioLegalReviewStatus = updateDocStudioLegalReviewStatus;
   window.updateDocStudioSignatureStatus = updateDocStudioSignatureStatus;
 
-  ['loadActivityPage', 'refreshDrawerDocuments', 'openDocxTemplateModal',
+  ['refreshDrawerDocuments', 'openDocxTemplateModal',
    'openCreateDocStudioDocumentModal', 'requestDocStudioLegalReview',
    'requestDocStudioSignatures', 'updateDocStudioLegalReviewStatus',
    'updateDocStudioSignatureStatus'].forEach(_trackGlobal);
@@ -3943,9 +4366,11 @@
   function getPriorityBadge(priority) {
     var priorityMap = {
       'high':   { cls: 'bg-red-100 text-red-800',   label: 'High' },
+      'medium': { cls: 'bg-amber-100 text-amber-800', label: 'Medium' },
       'normal': { cls: 'bg-gray-100 text-gray-800',  label: 'Normal' },
       'low':    { cls: 'bg-blue-100 text-blue-800',  label: 'Low' },
       'High':   { cls: 'bg-red-100 text-red-800',   label: 'High' },
+      'Medium': { cls: 'bg-amber-100 text-amber-800', label: 'Medium' },
       'Normal': { cls: 'bg-gray-100 text-gray-800',  label: 'Normal' },
       'Low':    { cls: 'bg-blue-100 text-blue-800',  label: 'Low' }
     };
@@ -3955,7 +4380,7 @@
 
   function formatDueDate(dateString) {
     if (!dateString) return 'No due date';
-    var date = new Date(dateString);
+    var date = parseApiUtcDate(dateString);
     var now = new Date();
     var diffDays = Math.ceil((date - now) / (1000 * 60 * 60 * 24));
 
@@ -3976,6 +4401,7 @@
 
     currentTasksList = tasks || [];
     currentTaskMatterId = matter.matter_id;
+    syncWorkspaceTaskDetailProvider();
 
     if (currentTasksList.length === 0) {
       content.innerHTML =
@@ -4030,14 +4456,10 @@
       '<div class="space-y-4">' +
         '<div class="flex items-center justify-between mb-4">' +
           '<div>' +
-            '<h3 class="text-lg font-semibold text-gray-900">Task Board</h3>' +
+            '<h3 class="text-lg font-semibold text-gray-900">Board</h3>' +
             '<p class="text-sm text-gray-500">' + lanaCount + ' LANA tasks, ' + externalCount + ' external tasks</p>' +
           '</div>' +
           '<div class="flex flex-wrap gap-2">' +
-            '<button onclick="openCreateTaskPlanModal(\'' + matterId + '\')" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2">' +
-              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3 3L22 4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>' +
-              'Task Plan' +
-            '</button>' +
             '<button onclick="openCreateTaskModal(\'' + matterId + '\')" class="px-4 py-2 lex-bg-accent text-white rounded-lg hover:lex-bg-accent transition-colors text-sm font-medium flex items-center gap-2">' +
               '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
               'Create Task' +
@@ -4243,11 +4665,12 @@
     var task = currentTasksList.find(function (t) { return String(t.id) === String(taskId); });
     if (!task) { Lex.Toast.error('Task not found'); return; }
 
-    if (task.source === 'lana') {
-      editTask(taskId);
-    } else {
-      _showTaskReadonlyModal(task);
+    syncWorkspaceTaskDetailProvider();
+    if (window.LanaTaskDetails && typeof window.LanaTaskDetails.open === 'function' && window.LanaTaskDetails.open(task, { onRefresh: refreshCurrentMatter })) {
+      return;
     }
+
+    _showTaskReadonlyModal(task);
   };
 
   function _showTaskReadonlyModal(task) {
@@ -4945,6 +5368,18 @@
     var modal = document.getElementById('createLinkModal');
     if (!modal) return;
 
+    // Drawer X / backdrop close → same cleanup as the Cancel button.
+    // Footer buttons (rendered once from the drawer's `buttons` attribute)
+    // are wired by id here; the drawer element is never recreated.
+    if (!modal._linkCloseBound) {
+      modal.addEventListener('lex-close', function () { closeCreateLinkModal(); });
+      var footerConfirm = document.getElementById('createLinkBtn');
+      if (footerConfirm) footerConfirm.addEventListener('click', function (e) { createLink(e); });
+      var footerCancel = document.getElementById('createLinkCancelBtn');
+      if (footerCancel) footerCancel.addEventListener('click', function () { closeCreateLinkModal(); });
+      modal._linkCloseBound = true;
+    }
+
     var sourceInput = document.getElementById('linkSourceMatterId');
     var searchInput = document.getElementById('linkMatterSearch');
     var submitBtn = document.getElementById('createLinkBtn');
@@ -4957,8 +5392,8 @@
     }
 
     if (isWorkspace) {
-      modal.heading = 'Add Matter to Workspace';
-      modal.subtitle = 'Link an existing matter to this workspace';
+      modal.heading = 'Link Workspace';
+      modal.subtitle = 'Link an existing workspace or matter to this workspace';
       if (linkTypeContainer) linkTypeContainer.style.display = 'none';
       if (linkTypeSelect) linkTypeSelect.value = 'workspace_matter';
     } else {
@@ -5541,6 +5976,190 @@
     }
   }
 
+  function setTaskModalMode(isEdit) {
+    var titleField = document.getElementById('taskTitleField');
+    var notesField = document.getElementById('taskNotesField');
+    var statusPriorityFields = document.getElementById('taskStatusPriorityFields');
+    var createPriorityField = document.getElementById('taskCreatePriorityField');
+    var suggestionsPanel = document.getElementById('taskSuggestionsPanel');
+    var submitBtn = document.getElementById('taskSubmitBtn');
+
+    if (titleField) titleField.classList.toggle('hidden', !isEdit);
+    if (notesField) notesField.classList.toggle('hidden', !isEdit);
+    if (statusPriorityFields) statusPriorityFields.classList.toggle('hidden', !isEdit);
+    if (createPriorityField) createPriorityField.classList.toggle('hidden', isEdit);
+    if (suggestionsPanel) suggestionsPanel.classList.toggle('hidden', isEdit || !workspaceTaskSuggestionState);
+    if (submitBtn && window.Lex && Lex.Utils && Lex.Utils.setLexButtonText) {
+      Lex.Utils.setLexButtonText(submitBtn, isEdit ? 'Save Task' : (workspaceTaskSuggestionState ? 'Create Task' : 'Generate Suggestions'));
+      submitBtn.loading = false;
+      submitBtn.disabled = false;
+    }
+  }
+
+  function setTaskSubmitLoading(label) {
+    var submitBtn = document.getElementById('taskSubmitBtn');
+    if (!submitBtn) return null;
+    if (window.Lex && Lex.Utils && Lex.Utils.setLexButtonText) {
+      Lex.Utils.setLexButtonText(submitBtn, label);
+    }
+    submitBtn.loading = true;
+    submitBtn.disabled = true;
+    return submitBtn;
+  }
+
+  function resetWorkspaceTaskSuggestionState() {
+    workspaceTaskSuggestionState = null;
+    var titleEl = document.getElementById('taskSuggestedTitle');
+    if (titleEl) titleEl.value = '';
+    var list = document.getElementById('taskSuggestedSubtasks');
+    if (list) list.innerHTML = '';
+    var wrap = document.getElementById('taskSuggestedSubtasksWrap');
+    if (wrap) wrap.classList.add('hidden');
+    var panel = document.getElementById('taskSuggestionsPanel');
+    if (panel) panel.classList.add('hidden');
+  }
+
+  function taskFallbackTitle(description) {
+    var text = String(description || '').trim().replace(/\s+/g, ' ');
+    if (!text) return 'New workspace task';
+    return text.length > 90 ? text.slice(0, 87).replace(/\s+\S*$/, '') + '...' : text;
+  }
+
+  function buildWorkspaceTaskContext() {
+    var matter = currentMatterData && currentMatterData.matter ? currentMatterData.matter : {};
+    var contacts = currentMatterData && Array.isArray(currentMatterData.contacts) ? currentMatterData.contacts : [];
+    var documents = currentMatterData && Array.isArray(currentMatterData.documents) ? currentMatterData.documents : [];
+    var tasks = Array.isArray(currentTasksList) ? currentTasksList : [];
+    var activities = currentMatterData && Array.isArray(currentMatterData.activities) ? currentMatterData.activities : [];
+
+    return {
+      matter: {
+        id: matter.matter_id || matter.id || currentTaskMatterId || null,
+        name: matter.matter_name || matter.name || matter.title || '',
+        client_name: matter.client_name || matter.client || matter.company || '',
+        practice_area: matter.practice_area || matter.practiceArea || matter.matter_type || '',
+        status: matter.status || '',
+        description: matter.description_summary || matter.description || matter.summary || ''
+      },
+      counts: {
+        tasks: tasks.length,
+        open_tasks: tasks.filter(function (task) {
+          return ['complete', 'cancelled', 'Complete', 'Cancelled'].indexOf(task.status) === -1;
+        }).length,
+        documents: documents.length,
+        contacts: contacts.length,
+        recent_activity_items: activities.length
+      },
+      recent_tasks: tasks.slice(0, 8).map(function (task) {
+        return {
+          title: task.title || task.task_name || '',
+          status: task.status || '',
+          priority: task.priority || '',
+          due_date: task.due_date || null,
+          source: task.source || ''
+        };
+      }),
+      contacts: contacts.slice(0, 8).map(function (contact) {
+        return {
+          name: contact.name || contact.full_name || contact.display_name || '',
+          role: contact.role || contact.relationship || '',
+          email: contact.email || ''
+        };
+      }),
+      documents: documents.slice(0, 12).map(function (doc) {
+        return {
+          name: doc.original_filename || doc.filename || doc.name || '',
+          type: doc.document_type || doc.mime_type || doc.type || ''
+        };
+      })
+    };
+  }
+
+  function renderTaskSuggestions(suggestions) {
+    suggestions = suggestions || {};
+    var signature = currentTaskSuggestionSignature();
+    workspaceTaskSuggestionState = {
+      title: suggestions.title || '',
+      description: String((document.getElementById('taskDescription') || {}).value || '').trim(),
+      signature: signature,
+      subtasks: Array.isArray(suggestions.subtasks) ? suggestions.subtasks : []
+    };
+
+    var titleEl = document.getElementById('taskSuggestedTitle');
+    if (titleEl) titleEl.value = workspaceTaskSuggestionState.title || taskFallbackTitle((document.getElementById('taskDescription') || {}).value);
+
+    var list = document.getElementById('taskSuggestedSubtasks');
+    var wrap = document.getElementById('taskSuggestedSubtasksWrap');
+    if (list) {
+      if (workspaceTaskSuggestionState.subtasks.length) {
+        list.innerHTML = workspaceTaskSuggestionState.subtasks.map(function (item, index) {
+          var title = item.title || item.name || '';
+          var description = item.description || '';
+          return '<label class="flex items-start gap-3 rounded-md border border-gray-200 bg-white p-3 text-sm">' +
+            '<input type="checkbox" class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600" data-task-suggestion-index="' + index + '" checked>' +
+            '<span class="min-w-0">' +
+              '<span class="block font-medium text-gray-900">' + escapeHtml(title) + '</span>' +
+              (description ? '<span class="block text-gray-500 mt-1">' + escapeHtml(description) + '</span>' : '') +
+            '</span>' +
+          '</label>';
+        }).join('');
+      } else {
+        list.innerHTML = '';
+      }
+    }
+    if (wrap) wrap.classList.toggle('hidden', workspaceTaskSuggestionState.subtasks.length === 0);
+
+    setTaskModalMode(false);
+  }
+
+  async function generateTaskSuggestionsForCreate() {
+    var descriptionEl = document.getElementById('taskDescription');
+    var description = descriptionEl ? String(descriptionEl.value || '').trim() : '';
+    if (!description) {
+      Lex.Toast.error('Describe the task first');
+      return false;
+    }
+
+    var priority = (document.getElementById('taskCreatePriority') || {}).value || 'normal';
+    var dueDate = (document.getElementById('taskDueDate') || {}).value || null;
+    var assigneeId = (document.getElementById('taskAssignedTo') || {}).value || null;
+
+    var response = await api.suggestWorkspaceTask(currentTaskMatterId, {
+      description: description,
+      priority: priority,
+      due_date: dueDate,
+      assigned_to_user_id: assigneeId,
+      workspace_context: buildWorkspaceTaskContext()
+    });
+
+    var suggestions = response && response.suggestions ? response.suggestions : {};
+    if (!suggestions.title) suggestions.title = taskFallbackTitle(description);
+    renderTaskSuggestions(suggestions);
+    Lex.Toast.success('Suggestions ready');
+    return true;
+  }
+
+  function currentTaskSuggestionSignature() {
+    return JSON.stringify({
+      description: String((document.getElementById('taskDescription') || {}).value || '').trim(),
+      priority: (document.getElementById('taskCreatePriority') || {}).value || 'normal',
+      due_date: (document.getElementById('taskDueDate') || {}).value || null,
+      assigned_to_user_id: (document.getElementById('taskAssignedTo') || {}).value || null
+    });
+  }
+
+  function selectedSuggestedSubtasks() {
+    if (!workspaceTaskSuggestionState || !workspaceTaskSuggestionState.subtasks) return [];
+    var selected = [];
+    var boxes = document.querySelectorAll('[data-task-suggestion-index]:checked');
+    for (var i = 0; i < boxes.length; i++) {
+      var index = parseInt(boxes[i].getAttribute('data-task-suggestion-index'), 10);
+      var item = workspaceTaskSuggestionState.subtasks[index];
+      if (item && (item.title || item.name)) selected.push(item);
+    }
+    return selected;
+  }
+
   // Open Create Task Modal
   async function openCreateTaskModal(matterId) {
     currentTaskMatterId = matterId;
@@ -5552,6 +6171,8 @@
     modal.heading = 'Create Task';
     var form = document.getElementById('taskForm');
     if (form) form.reset();
+    resetWorkspaceTaskSuggestionState();
+    setTaskModalMode(false);
     var taskIdEl = document.getElementById('taskId');
     if (taskIdEl) taskIdEl.value = '';
 
@@ -5570,6 +6191,8 @@
     if (taskStatusEl) taskStatusEl.value = 'pending';
     var taskPriorityEl = document.getElementById('taskPriority');
     if (taskPriorityEl) taskPriorityEl.value = 'normal';
+    var taskCreatePriorityEl = document.getElementById('taskCreatePriority');
+    if (taskCreatePriorityEl) taskCreatePriorityEl.value = 'normal';
 
     await populateTaskAssignees(null);
 
@@ -5591,11 +6214,13 @@
       }
 
       currentEditingTask = task;
+      resetWorkspaceTaskSuggestionState();
       var modal = document.getElementById('taskModal');
       if (!modal) return;
 
       modal.heading = 'Edit Task';
       modal.open = true;
+      setTaskModalMode(true);
 
       // Show delete button when editing
       var deleteBtn = document.getElementById('taskDeleteBtn');
@@ -5689,47 +6314,91 @@
     var taskId = taskIdEl ? taskIdEl.value : '';
     var isEdit = !!taskId;
 
-    var taskData = {
-      title: (document.getElementById('taskTitle') || {}).value || '',
-      description: (document.getElementById('taskDescription') || {}).value || null,
-      notes: (document.getElementById('taskNotes') || {}).value || null,
-      status: (document.getElementById('taskStatus') || {}).value || 'pending',
-      priority: (document.getElementById('taskPriority') || {}).value || 'normal',
-      due_date: (document.getElementById('taskDueDate') || {}).value || null,
-      assigned_to_user_id: (document.getElementById('taskAssignedTo') || {}).value || null
-    };
+    var descriptionValue = String((document.getElementById('taskDescription') || {}).value || '').trim();
+    var assignedToUserId = (document.getElementById('taskAssignedTo') || {}).value || null;
+    var createPriority = (document.getElementById('taskCreatePriority') || {}).value || 'normal';
+    var editPriority = (document.getElementById('taskPriority') || {}).value || 'normal';
+    var dueDateValue = (document.getElementById('taskDueDate') || {}).value || null;
+    var suggestedTitleValue = String((document.getElementById('taskSuggestedTitle') || {}).value || '').trim();
 
-    var form = event.target;
-    var submitBtn = form.querySelector('button[type="submit"]');
-    var originalHtml = submitBtn ? submitBtn.innerHTML : '';
+    var taskData = isEdit
+      ? {
+        title: String((document.getElementById('taskTitle') || {}).value || '').trim(),
+        description: descriptionValue || null,
+        notes: (document.getElementById('taskNotes') || {}).value || null,
+        status: (document.getElementById('taskStatus') || {}).value || 'pending',
+        priority: editPriority,
+        due_date: dueDateValue,
+        assigned_to_user_id: assignedToUserId
+      }
+      : {
+        title: suggestedTitleValue || taskFallbackTitle(descriptionValue),
+        description: descriptionValue,
+        notes: null,
+        status: 'pending',
+        priority: createPriority,
+        due_date: dueDateValue,
+        assigned_to_user_id: assignedToUserId,
+        approved_subtasks: []
+      };
 
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      submitBtn.innerHTML =
-        '<svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">' +
-          '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
-          '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>' +
-        '</svg>' +
-        (isEdit ? 'Updating...' : 'Creating...');
+    if (isEdit && !taskData.title) {
+      Lex.Toast.error('Title is required');
+      return;
     }
+
+    if (!isEdit && !descriptionValue) {
+      Lex.Toast.error('Description is required');
+      return;
+    }
+
+    var submitBtn = setTaskSubmitLoading(isEdit ? 'Updating...' : (workspaceTaskSuggestionState ? 'Creating...' : 'Generating...'));
 
     try {
       if (isEdit) {
         await api.updateTask(taskId, taskData);
         Lex.Toast.success('Task updated successfully');
       } else {
-        await api.createTask(currentTaskMatterId, taskData);
-        Lex.Toast.success('Task created successfully');
+        if (!workspaceTaskSuggestionState) {
+          await generateTaskSuggestionsForCreate();
+          if (submitBtn) {
+            setTaskModalMode(false);
+          }
+          return;
+        }
+
+        if (workspaceTaskSuggestionState.signature !== currentTaskSuggestionSignature()) {
+          resetWorkspaceTaskSuggestionState();
+          await generateTaskSuggestionsForCreate();
+          if (submitBtn) {
+            setTaskModalMode(false);
+          }
+          Lex.Toast.error('Task details changed. Review the updated suggestions.');
+          return;
+        }
+
+        taskData.approved_subtasks = selectedSuggestedSubtasks().map(function (item) {
+          return {
+            title: item.title || item.name || '',
+            description: item.description || null
+          };
+        }).filter(function (item) {
+          return item.title;
+        });
+
+        var createdResponse = await api.createTask(currentTaskMatterId, taskData);
+        var createdTask = (createdResponse && (createdResponse.task || createdResponse.data)) || createdResponse;
+        var createdSubtaskCount = createdTask && Array.isArray(createdTask.subtasks) ? createdTask.subtasks.length : 0;
+        Lex.Toast.success(createdSubtaskCount > 0 ? 'Task and subtasks created successfully' : 'Task created successfully');
       }
 
       var modal = document.getElementById('taskModal');
       if (modal) modal.open = false;
+      resetWorkspaceTaskSuggestionState();
 
       if (submitBtn) {
+        submitBtn.loading = false;
         submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        submitBtn.innerHTML = originalHtml;
       }
 
       await refreshCurrentMatter();
@@ -5739,9 +6408,9 @@
       Lex.Toast.error(isEdit ? 'Failed to update task' : 'Failed to create task');
 
       if (submitBtn) {
+        submitBtn.loading = false;
         submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        submitBtn.innerHTML = originalHtml;
+        setTaskModalMode(isEdit);
       }
     }
   }
@@ -5752,6 +6421,7 @@
     if (modal) modal.open = false;
     var form = document.getElementById('taskForm');
     if (form) form.reset();
+    resetWorkspaceTaskSuggestionState();
     currentTaskMatterId = null;
     currentEditingTask = null;
   }
@@ -6207,9 +6877,21 @@
         });
       }
 
-      // Open modal
+      // Open drawer
       var modal = document.getElementById('manageShareModal');
-      if (modal) modal.open = true;
+      if (modal) {
+        // Drawer X / backdrop close → same cleanup as the Cancel button.
+        // Footer buttons (from the drawer's `buttons` attribute) wired by id.
+        if (!modal._shareCloseBound) {
+          modal.addEventListener('lex-close', function () { closeManageShareModal(); });
+          var shareSave = document.getElementById('saveShareButton');
+          if (shareSave) shareSave.addEventListener('click', function () { saveShareSettings(); });
+          var shareCancel = document.getElementById('shareCancelBtn');
+          if (shareCancel) shareCancel.addEventListener('click', function () { closeManageShareModal(); });
+          modal._shareCloseBound = true;
+        }
+        modal.open = true;
+      }
 
     } catch (err) {
       console.error('Error opening share modal:', err);
@@ -6862,6 +7544,16 @@
 
     var modal = document.getElementById('editCustomFieldsModal');
     if (modal) {
+      // Drawer X / backdrop close → same cleanup as the Cancel button.
+      // Footer buttons (from the drawer's `buttons` attribute) wired by id.
+      if (!modal._cfCloseBound) {
+        modal.addEventListener('lex-close', function () { closeEditCustomFieldsModal(); });
+        var cfSave = document.getElementById('cfSaveBtn');
+        if (cfSave) cfSave.addEventListener('click', function () { saveCustomFields(); });
+        var cfCancel = document.getElementById('cfCancelBtn');
+        if (cfCancel) cfCancel.addEventListener('click', function () { closeEditCustomFieldsModal(); });
+        modal._cfCloseBound = true;
+      }
       modal.open = true;
     }
   }
@@ -7190,12 +7882,12 @@
         window.currentViewedMatter = updatedMatter.matter;
         renderCustomFieldsSection(updatedMatter.matter);
 
-        // Refresh activity feed
+        // Refresh cached activity feed (surfaced on the Summary tab)
         var activityResult = await api.getMatterActivity(matterId, 20, 0);
         if (activityResult && activityResult.activities && currentMatterData) {
           currentMatterData.activities = activityResult.activities;
           currentMatterData.activityPagination = activityResult.pagination;
-          renderActivityTab(currentMatterData.matter, activityResult.activities, activityResult.pagination);
+          if (getCurrentActiveTab() === 'summary') renderSummaryTab();
         }
       }
     } catch (error) {
@@ -7291,7 +7983,7 @@
 
     container.style.display = 'block';
 
-    var cfActions = JSON.stringify([{icon:'edit',label:'Edit'}]).split('"').join('&quot;');
+    var cfActions = JSON.stringify([{icon:'plus',label:'Manage fields'}]).split('"').join('&quot;');
     var html = '<lex-card id="customFieldsCard" heading="Custom Fields" variant="flat" padding="compact" actions=\'' + cfActions + '\'>';
 
     if (fieldsToDisplay.length === 0) {
@@ -7315,7 +8007,7 @@
     var cfCard = document.getElementById('customFieldsCard');
     if (cfCard) {
       cfCard.addEventListener('card-action', function (e) {
-        if (e.detail && e.detail.action === 'edit' && matter && matter.matter_id) {
+        if (e.detail && e.detail.action === 'plus' && matter && matter.matter_id) {
           openEditCustomFieldsModal(matter.matter_id);
         }
       });
@@ -9645,7 +10337,7 @@
     // 3. sessionStorage (survives app restart)
     var params = Lex.Nav.getParams();
     var matterId = params.get('id');
-    var defaultTab = params.get('tab') || 'activity';
+    var defaultTab = params.get('tab') || 'summary';
     var requestedTaskId = params.get('task') || params.get('task_id') || null;
     var openFileId = params.get('open_file') || null;
     var uploadTarget = params.get('upload') || null;
@@ -9706,12 +10398,13 @@
     setupHeaderActions(currentMatterData.matter);
     wireEditMatterModal();
 
-    // Render dock panels
-    renderDockDetailsPanel(currentMatterData.matter, currentMatterData.permissions);
-    renderDockContextPanel(currentMatterData.matter);
-    switchDockPanel('details');
+    // Topbar workspace switcher (replaces the static "Matter Details" title)
+    if (window.WorkspaceSwitcher) {
+      window.WorkspaceSwitcher.render(currentMatterData.matter.matter_id);
+    }
 
-    // Render default tab
+    // Render default tab (the Summary tab renders the Details/Context cards
+    // as part of its masonry columns)
     switchMatterTab(defaultTab);
 
     if (defaultTab === 'documents' && uploadTarget === 'documents') {
@@ -9796,9 +10489,16 @@
   }
 
   function onLeave() {
-    // 1. Close any open lex-modals (check both in-page and hoisted)
+    // 0. Put the plain topbar heading back — the lex-app shell (and its
+    // topbar) persists across SPA routes, so the switcher must not leak
+    // onto other pages.
+    if (window.WorkspaceSwitcher) {
+      window.WorkspaceSwitcher.restore();
+    }
+
+    // 1. Close any open lex-modals and lex-drawers (in-page and hoisted)
     try {
-      document.querySelectorAll('lex-modal[open]').forEach(function (el) {
+      document.querySelectorAll('lex-modal[open], lex-drawer[open]').forEach(function (el) {
         el.open = false;
       });
     } catch (e) {}

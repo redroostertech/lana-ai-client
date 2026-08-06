@@ -117,13 +117,15 @@ class NoteListComponent {
           <button id="notesFocusModeToggle" role="switch" aria-checked="false"><span></span></button>
         </div>
 
-        <!--
-          Header — title only. Per design, the create CTA lives in the
-          empty state (and we'll surface a smaller create affordance once
-          there are notes, see render-list logic).
-        -->
-        <div class="flex-shrink-0 mb-4">
+        <!-- Header — title + create CTA (empty state carries its own CTA) -->
+        <div class="flex-shrink-0 mb-4 flex items-center justify-between">
           <h3 class="text-lg font-semibold text-gray-900">Notes</h3>
+          <button id="notesNewBtn" class="px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            New Note
+          </button>
         </div>
 
         <!-- Notes List - Scrollable -->
@@ -255,6 +257,12 @@ class NoteListComponent {
    * Attach event listeners
    */
   attachEventListeners() {
+    // New Note button (header)
+    const newBtn = document.getElementById('notesNewBtn');
+    if (newBtn) {
+      newBtn.addEventListener('click', () => this.startNewNote());
+    }
+
     // Save Note button (regular)
     const saveBtn = document.getElementById('notesSaveBtn');
     if (saveBtn) {
@@ -423,8 +431,7 @@ class NoteListComponent {
     if (!notesList) return;
 
     // Empty state — render a single CTA that takes the user straight into
-    // the focus-mode editor. Wires to the same toggleFocusMode() handler as
-    // the header button.
+    // the focus-mode editor via startNewNote(), same as the header button.
     if (this.filteredNotes.length === 0) {
       notesList.innerHTML = `
         <lex-empty
@@ -438,7 +445,7 @@ class NoteListComponent {
       `;
       const emptyCreateBtn = document.getElementById('notesEmptyCreateBtn');
       if (emptyCreateBtn) {
-        emptyCreateBtn.addEventListener('action', () => this.toggleFocusMode());
+        emptyCreateBtn.addEventListener('action', () => this.startNewNote());
       }
       return;
     }
@@ -815,6 +822,32 @@ class NoteListComponent {
       }
       this.resetFocusSaveButton();
     }
+  }
+
+  /**
+   * Open the focus-mode editor for a brand-new note. Clears any lingering
+   * edit state so the save path POSTs a create instead of PUTting an update
+   * over the previously edited note.
+   */
+  startNewNote() {
+    this.editingNoteId = null;
+
+    const titleInput = document.getElementById('notesTitleInput');
+    if (titleInput) titleInput.value = '';
+    const editorContainer = document.getElementById('notesEditorContainer');
+    if (editorContainer) editorContainer.innerHTML = '';
+
+    const focusTitle = document.getElementById('notesFocusTitleInput');
+    if (focusTitle) focusTitle.value = '';
+    if (this.focusModeEditor) {
+      this.focusModeEditor.commands.clearContent();
+    } else {
+      const focusEditorContainer = document.getElementById('notesFocusEditorContainer');
+      if (focusEditorContainer) focusEditorContainer.innerHTML = '';
+    }
+
+    this.resetFocusSaveButton();
+    this.toggleFocusMode();
   }
 
   resetFocusSaveButton() {

@@ -203,6 +203,11 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         box-shadow: 0 0 0 2px var(--lex-bg-primary), 0 0 0 4px var(--lex-bg-accent);
       }
 
+      .lex-drawer-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
       .lex-drawer-btn--secondary {
         background: var(--lex-color-gray-200);
         color: var(--lex-text-primary);

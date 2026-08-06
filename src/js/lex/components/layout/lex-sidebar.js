@@ -2545,6 +2545,12 @@
       </button>`;
     }
 
+    _findSidebarTask(taskId) {
+      const id = String(taskId || '');
+      if (!id || !Array.isArray(this._taskItems)) return null;
+      return this._taskItems.find((task) => String(task?.id || task?.task_id || '') === id) || null;
+    }
+
     _getTaskMatterName(task) {
       return (
         task?.matter_name ||
@@ -2582,6 +2588,16 @@
     }
 
     _openTask(taskId) {
+      const task = this._findSidebarTask(taskId);
+      if (window.LanaTaskDetails) {
+        if (typeof window.LanaTaskDetails.openById === 'function' && window.LanaTaskDetails.openById(taskId)) {
+          return;
+        }
+        if (task && typeof window.LanaTaskDetails.open === 'function' && window.LanaTaskDetails.open(task)) {
+          return;
+        }
+      }
+
       const href = 'my-tasks.html' + (taskId ? '?task=' + encodeURIComponent(taskId) : '');
       const currentPage = ((window.location && window.location.pathname) || '').split('/').pop();
       if (currentPage === 'my-tasks.html') {
@@ -2777,8 +2793,8 @@
       const href = 'workspace-details.html?id=' + encodeURIComponent(workspaceId);
       if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
         window.Lex.Nav.go('workspace-details.html', {
-          params: { id: workspaceId, tab: 'activity' },
-          context: { matterId: workspaceId, tab: 'activity' }
+          params: { id: workspaceId, tab: 'summary' },
+          context: { matterId: workspaceId, tab: 'summary' }
         });
       } else {
         window.location.href = this._getAppPrefix() + href;

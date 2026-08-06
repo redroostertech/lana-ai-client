@@ -9,6 +9,9 @@
   <link rel="stylesheet" href="css/components/document-metadata.css">
   <link rel="stylesheet" href="css/components/matter-documents-view.css">
   <link rel="stylesheet" href="css/matter-notes.css">
+  <link rel="stylesheet" href="css/workspace-summary.css">
+  <link rel="stylesheet" href="css/workspace-switcher.css">
+  <link rel="stylesheet" href="css/my-tasks.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
@@ -36,7 +39,7 @@
         variant="light"
         heading="Loading..."
         subtitle=""
-        max-actions="1"
+        max-actions="0"
         lana
         lana-context-type="full_chat"
       >
@@ -66,27 +69,15 @@
           <lex-tabs
             id="tabBar"
             class="flex-1"
-            active="activity"
+            active="summary"
             variant="underline"
-            tabs='[{"id":"summary","label":"Summary"},{"id":"activity","label":"Activity"},{"id":"notes","label":"Notes"},{"id":"tasks","label":"Tasks"},{"id":"comments","label":"Discussions"},{"id":"documents","label":"Documents"},{"id":"billableHours","label":"Billable Hours"}]'
+            tabs='[{"id":"summary","label":"Summary"},{"id":"notes","label":"Notes"},{"id":"tasks","label":"Board"},{"id":"comments","label":"Discussions"},{"id":"documents","label":"Docs"},{"id":"billableHours","label":"Billable Hours"}]'
           ></lex-tabs>
         </div>
 
         <!-- Tab content (single column, scrollable) -->
         <div class="flex-1 min-h-0">
           <div class="h-full overflow-y-auto">
-            <div id="tabContentActivity" class="p-6">
-              <!-- Placeholder for redacted shimmer -->
-              <div class="space-y-4">
-                <div class="h-4 bg-gray-100 rounded w-1/3"></div>
-                <div class="space-y-3">
-                  <div class="flex gap-3"><div class="w-8 h-8 bg-gray-100 rounded-full flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-100 rounded w-3/4"></div><div class="h-3 bg-gray-100 rounded w-1/2"></div></div></div>
-                  <div class="flex gap-3"><div class="w-8 h-8 bg-gray-100 rounded-full flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-100 rounded w-2/3"></div><div class="h-3 bg-gray-100 rounded w-5/12"></div></div></div>
-                  <div class="flex gap-3"><div class="w-8 h-8 bg-gray-100 rounded-full flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-100 rounded w-4/5"></div><div class="h-3 bg-gray-100 rounded w-1/3"></div></div></div>
-                  <div class="flex gap-3"><div class="w-8 h-8 bg-gray-100 rounded-full flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-100 rounded w-3/5"></div><div class="h-3 bg-gray-100 rounded w-2/5"></div></div></div>
-                </div>
-              </div>
-            </div>
             <div id="tabContentNotes" class="hidden p-6"></div>
             <div id="tabContentTasks" class="hidden p-6"></div>
             <div id="tabContentComments" class="hidden p-6"></div>
@@ -132,14 +123,12 @@
                  their original IDs so the renderer code in
                  workspace-details.js (which writes to dockPanelDetails /
                  dockPanelContext by id) continues to work unchanged. -->
-            <div id="tabContentSummary" class="hidden">
-              <div class="p-4 border-b border-gray-200">
-                <lex-segmented id="dockToggle" value="details" size="sm"
-                  options='[{"value":"details","label":"Details"},{"value":"context","label":"Context"}]'>
-                </lex-segmented>
-              </div>
-              <div id="dockPanelDetails" class="p-4">
-                <!-- Placeholder shimmer (replaced by detail card render) -->
+            <div id="tabContentSummary">
+              <!-- Living summary page: KPIs, insights, masonry card columns
+                   (incl. the Details/Context cards) — rendered by
+                   renderSummaryTab() in workspace-details.js -->
+              <div id="summaryOverview" class="p-6">
+                <!-- Placeholder shimmer (replaced by summary render) -->
                 <div class="space-y-4">
                   <div class="h-3 bg-gray-100 rounded w-1/3 mb-2"></div>
                   <div class="space-y-2">
@@ -156,7 +145,6 @@
                   </div>
                 </div>
               </div>
-              <div id="dockPanelContext" class="hidden p-4"></div>
             </div>
           </div>
         </div>
@@ -173,13 +161,17 @@
       <form id="taskForm" onsubmit="saveTask(event)" class="p-6 space-y-5">
         <input type="hidden" id="taskId">
 
-        <lex-input id="taskTitle" label="Title" required></lex-input>
+        <div id="taskTitleField">
+          <lex-input id="taskTitle" label="Title"></lex-input>
+        </div>
 
-        <lex-textarea id="taskDescription" label="Description" rows="3" placeholder="Describe the task..."></lex-textarea>
+        <lex-textarea id="taskDescription" label="Description" rows="4" placeholder="Describe the task..."></lex-textarea>
 
-        <lex-textarea id="taskNotes" label="Notes" rows="2" placeholder="Additional notes..."></lex-textarea>
+        <div id="taskNotesField">
+          <lex-textarea id="taskNotes" label="Notes" rows="2" placeholder="Additional notes..."></lex-textarea>
+        </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div id="taskStatusPriorityFields" class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <lex-select id="taskStatus" label="Status"
               options='[{"value":"pending","label":"Pending"},{"value":"in_progress","label":"In Progress"},{"value":"in_review","label":"In Review"},{"value":"complete","label":"Complete"},{"value":"cancelled","label":"Cancelled"}]'>
@@ -192,14 +184,31 @@
           </div>
         </div>
 
+        <div id="taskCreatePriorityField">
+          <lex-select id="taskCreatePriority" label="Priority"
+            options='[{"value":"low","label":"Low"},{"value":"normal","label":"Normal"},{"value":"high","label":"High"}]'>
+          </lex-select>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <lex-input id="taskDueDate" label="Due Date" type="datetime-local"></lex-input>
           </div>
           <div>
-            <lex-select id="taskAssignedTo" label="Assign To" placeholder="Unassigned"
+            <lex-select id="taskAssignedTo" label="Assignee" placeholder="Unassigned"
               options='[{"value":"","label":"Unassigned"}]'>
             </lex-select>
+          </div>
+        </div>
+
+        <div id="taskSuggestionsPanel" class="hidden border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">LANA title suggestion</label>
+            <lex-input id="taskSuggestedTitle" label="" placeholder="Generated title"></lex-input>
+          </div>
+          <div id="taskSuggestedSubtasksWrap" class="hidden">
+            <div class="text-sm font-medium text-gray-700 mb-2">Suggested subtasks</div>
+            <div id="taskSuggestedSubtasks" class="space-y-2"></div>
           </div>
         </div>
 
@@ -216,7 +225,7 @@
           </div>
           <div class="flex gap-3">
             <lex-btn type="button" onclick="closeTaskModal()" variant="secondary">Cancel</lex-btn>
-            <lex-btn type="submit" variant="primary">Save Task</lex-btn>
+            <lex-btn id="taskSubmitBtn" type="submit" variant="primary">Save Task</lex-btn>
           </div>
         </div>
       </form>
@@ -321,20 +330,21 @@
   </lex-modal>
 
   <!-- Create Link Modal -->
-  <lex-modal id="createLinkModal" heading="Link Related Matter" subtitle="Connect this matter to another matter" size="lg" hide-actions>
-      <form onsubmit="createLink(event)" class="p-6 space-y-4">
+  <lex-drawer id="createLinkModal" heading="Link Related Matter" subtitle="Connect this matter to another matter" width="lg"
+    buttons='[{"label":"Cancel","variant":"secondary","id":"createLinkCancelBtn"},{"label":"Create Link","variant":"primary","id":"createLinkBtn"}]'>
+      <form onsubmit="createLink(event)" class="flex flex-col h-full min-h-0 gap-4">
         <input type="hidden" id="linkSourceMatterId" value="">
 
-        <div>
-          <div class="relative">
-            <lex-input
-              id="linkMatterSearch"
-              label="Search for Matter to Link"
-              leading-icon="search"
-              placeholder="Type matter name or ID to search..."
-            ></lex-input>
-            <div id="linkMatterSearchResults" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto"></div>
-          </div>
+        <div class="flex-1 min-h-0 flex flex-col">
+          <lex-input
+            id="linkMatterSearch"
+            label="Search for Matter to Link"
+            leading-icon="search"
+            placeholder="Type matter name or ID to search..."
+          ></lex-input>
+          <!-- In-flow results list; flex-fills the remaining drawer height
+               and scrolls internally -->
+          <div id="linkMatterSearchResults" class="hidden mt-2 bg-white border border-gray-200 rounded-lg overflow-y-auto flex-1 min-h-0"></div>
         </div>
 
         <div id="selectedLinkMatter" class="hidden">
@@ -359,12 +369,8 @@
           <p class="mt-1 text-xs text-gray-500">Choose how these matters are related to each other</p>
         </div>
 
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <lex-btn type="button" onclick="closeCreateLinkModal()" variant="secondary">Cancel</lex-btn>
-          <lex-btn type="submit" id="createLinkBtn" variant="primary" disabled>Create Link</lex-btn>
-        </div>
       </form>
-  </lex-modal>
+  </lex-drawer>
 
   <!-- Orphaned Document Viewer Modal (for untracked files only) -->
   <lex-modal id="documentViewerModal" heading="Document" size="full" hide-actions>
@@ -487,8 +493,9 @@
   </lex-modal>
 
   <!-- Manage Share Modal -->
-  <lex-modal id="manageShareModal" heading="Manage Sharing" subtitle="Control matter visibility and access" size="md" hide-actions close-on-overlay>
-    <div class="p-6 space-y-6">
+  <lex-drawer id="manageShareModal" heading="Manage Sharing" subtitle="Control matter visibility and access" width="md"
+    buttons='[{"label":"Cancel","variant":"secondary","id":"shareCancelBtn"},{"label":"Save Changes","variant":"primary","id":"saveShareButton"}]'>
+    <div class="space-y-6">
         <div>
           <lex-select id="modalMatterVisibility" label="Visibility"
             options='[{"value":"private","label":"Private - Only shared users can access"},{"value":"organization","label":"Organization - All members can access"}]'>
@@ -515,11 +522,7 @@
           <p class="text-xs text-gray-500 mt-2">Select team members to share this matter with</p>
         </div>
     </div>
-    <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
-      <lex-btn onclick="closeManageShareModal()" variant="secondary">Cancel</lex-btn>
-      <lex-btn id="saveShareButton" onclick="saveShareSettings()" variant="primary">Save Changes</lex-btn>
-    </div>
-  </lex-modal>
+  </lex-drawer>
 
   <!-- Shared User Info Modal -->
   <lex-modal id="sharedUserInfoModal" heading="User Details" size="sm" hide-actions close-on-overlay>
@@ -558,7 +561,7 @@
   </lex-modal>
 
   <!-- Linked Matters Drawer -->
-  <lex-modal id="linkedMattersDrawer" heading="Linked Matters" size="sm" hide-actions close-on-overlay>
+  <lex-modal id="linkedMattersDrawer" heading="Linked Workspaces" size="sm" hide-actions close-on-overlay>
     <div class="p-4">
       <div class="flex items-center justify-between mb-4">
         <p class="text-sm text-gray-500">Matters linked to this one</p>
@@ -634,8 +637,9 @@
   </lex-modal>
 
   <!-- Edit Custom Fields Modal -->
-  <lex-modal id="editCustomFieldsModal" heading="Edit Custom Fields" subtitle="Add or modify custom field values for this matter" size="lg" hide-actions close-on-overlay>
-    <div class="p-6">
+  <lex-drawer id="editCustomFieldsModal" heading="Edit Custom Fields" subtitle="Add or modify custom field values for this matter" width="lg"
+    buttons='[{"label":"Cancel","variant":"secondary","id":"cfCancelBtn"},{"label":"Save Changes","variant":"primary","id":"cfSaveBtn"}]'>
+    <div>
       <div id="customFieldsContainer"></div>
       <button
         onclick="addCustomField()"
@@ -647,11 +651,7 @@
         Add Field
       </button>
     </div>
-    <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
-      <lex-btn onclick="closeEditCustomFieldsModal()" variant="secondary">Cancel</lex-btn>
-      <lex-btn onclick="saveCustomFields()" variant="primary">Save Changes</lex-btn>
-    </div>
-  </lex-modal>
+  </lex-drawer>
 
   <!-- Create Skill Modal - Full Screen Skill Builder -->
   <div id="createSkillModal" data-hoist class="fixed inset-0 bg-white hidden flex-col" style="z-index: 10001;">
@@ -1163,6 +1163,9 @@
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
+  <script src="js/lex/components/foundation/lex-progress-bar.js"></script>
+  <script src="js/vendor/chart.js"></script>
+  <script src="js/lex/components/data/lex-chart.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>
@@ -1197,8 +1200,10 @@
 
   <!-- Shared matter file-list component (consumed by workspace-details.js) -->
   <script src="js/components/matter-documents-view.js"></script>
+  <script src="js/components/task-detail-drawer.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/workspace-switcher.js"></script>
   <script src="js/workspace-billable-hours.js"></script>
   <script src="js/workspace-details.js"></script>
 

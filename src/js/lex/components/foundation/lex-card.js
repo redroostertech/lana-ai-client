@@ -361,7 +361,7 @@
           `;
         }
 
-        actionsHtml = `<div class="flex items-center gap-0.5" style="margin:-4px -4px 0 0;">${actionBtns}${overflowHtml}</div>`;
+        actionsHtml = `<div class="flex items-center gap-0.5" style="margin:0 -4px 0 0;">${actionBtns}${overflowHtml}</div>`;
       }
 
       // Header

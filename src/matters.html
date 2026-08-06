@@ -2308,7 +2308,7 @@
     // Store current matter data globally for tab switching
     let currentMatterData = null;
 
-    window.viewMatter = async function(matterId, defaultTab = 'activity', options = {}) {
+    window.viewMatter = async function(matterId, defaultTab = 'summary', options = {}) {
       // Navigate to the dedicated matter details page
       Lex.Nav.go('workspace-details.html', {
         params: { id: matterId, tab: defaultTab },
@@ -9844,7 +9844,7 @@
         // Check for matter_id or open URL parameter and auto-open drawer
         const urlParams = new URLSearchParams(window.location.search);
         const matterId = urlParams.get('matter_id') || urlParams.get('open');
-        const defaultTab = urlParams.get('tab') || 'activity';
+        const defaultTab = urlParams.get('tab') || 'summary';
         if (matterId) {
           // Navigate to dedicated matter details page
           viewMatter(matterId, defaultTab);

@@ -70,7 +70,7 @@ function openWorkspaceResourceUrl(resourceUrl) {
       const value = params.get(key);
       if (value) nextParams.set(key, value);
     }
-    if (!nextParams.get('tab')) nextParams.set('tab', 'activity');
+    if (!nextParams.get('tab')) nextParams.set('tab', 'summary');
 
     window.location.href = new URL(`../workspace-details.html?${nextParams.toString()}`, import.meta.url).href;
     return;

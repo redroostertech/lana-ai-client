@@ -1554,7 +1554,7 @@
     // Store current matter data globally for tab switching
     let currentMatterData = null;
 
-    window.viewMatter = async function(matterId, defaultTab = 'activity', options = {}) {
+    window.viewMatter = async function(matterId, defaultTab = 'summary', options = {}) {
       // Navigate to the dedicated matter details page.
       // Pass matterId in BOTH params AND context — context survives even if
       // history.state params aren't available to the target page init.
@@ -2471,7 +2471,7 @@
         // Check for matter_id or open URL parameter and auto-open drawer
         const urlParams = new URLSearchParams(window.location.search);
         const matterId = urlParams.get('matter_id') || urlParams.get('open');
-        const defaultTab = urlParams.get('tab') || 'activity';
+        const defaultTab = urlParams.get('tab') || 'summary';
         if (matterId) {
           // Matters are now loaded, open the drawer immediately
           viewMatter(matterId, defaultTab);

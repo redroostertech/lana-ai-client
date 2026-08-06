@@ -46,6 +46,9 @@
         'js/lex/components/form/lex-textarea.js',
         'js/lex/components/data/lex-table.js',
         'js/lex/components/data/lex-pagination.js',
+        'js/lex/components/foundation/lex-progress-bar.js',
+        'js/vendor/chart.js',
+        'js/lex/components/data/lex-chart.js',
         'js/services/feature-tracker.js',
         'js/vendor/mammoth.min.js',
         'js/conflict-detection.js',
@@ -59,6 +62,7 @@
         'js/api/matter-notes-api.client.js',
         'js/components/note-list.component.js',
         'js/components/note-editor.component.js',
+        'js/components/task-detail-drawer.js',
         'js/matter-notes.js',
         'js/shared/event-catalog.js',
         'js/shared/event-browser.js',
@@ -67,12 +71,15 @@
         'js/workflow-builder.js',
         'js/vendor/pdf.min.js',
         'js/services/docx-template-modal.js',
+        'js/workspace-switcher.js',
         'js/workspace-billable-hours.js',
         'js/workspace-details.js'
       ],
       stylesheets: [
         'css/components/document-metadata.css',
         'css/matter-notes.css',
+        'css/workspace-summary.css',
+        'css/workspace-switcher.css',
         'https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css',
         'css/lana-ask-btn.css'
       ]
