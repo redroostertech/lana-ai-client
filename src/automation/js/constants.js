@@ -51,7 +51,7 @@ export const SYSTEM_CONNECTORS = [
   {
     id: 'leadly',
     connector_type: 'leadly',
-    name: 'Leadly CRM',
+    name: 'Leadly',
     vendor: 'Leadly',
     category: 'crm',
     auth_type: 'api_key',
