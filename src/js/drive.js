@@ -466,7 +466,7 @@
 
     if (!matterId) {
       console.error('[Drive] No matter ID found in dataset');
-      Lex.Toast.error('Cannot navigate: missing matter ID');
+      Lex.Toast.error('Cannot navigate: missing workspace ID');
       return;
     }
 
@@ -574,7 +574,7 @@
     } else if (storageState.searchQuery || storageState.sourceFilter !== 'all') {
       resultsCountEl.textContent = 'Showing ' + start + '-' + end + ' of ' + total + ' results';
     } else {
-      resultsCountEl.textContent = total + ' matter' + (total !== 1 ? 's' : '');
+      resultsCountEl.textContent = total + ' workspace' + (total !== 1 ? 's' : '');
     }
 
     // Section header count
@@ -604,7 +604,7 @@
       widget.actionLabel = '';
     } else {
       widget.icon = 'folder';
-      widget.message = 'No matters found';
+      widget.message = 'No workspaces found';
       widget.description = 'Create a new folder to get started';
       widget.actionLabel = 'Create Folder';
     }
@@ -2330,10 +2330,10 @@
     try {
       if (isPinned) {
         await api.unpinMatter(matterId, matterSource);
-        Lex.Toast.success('Matter unpinned');
+        Lex.Toast.success('Workspace unpinned');
       } else {
         await api.pinMatter(matterId, matterSource);
-        Lex.Toast.success('Matter pinned');
+        Lex.Toast.success('Workspace pinned');
       }
 
       await Promise.all([
