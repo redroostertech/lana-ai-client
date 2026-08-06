@@ -94,7 +94,7 @@ export class BarChartRenderer {
       colorRule: null,
       onBarClick: null,
       helpText: null,
-      uniqueId: `bar-chart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      uniqueId: `bar-chart-${LanaTime.nowMs()}-${Math.random().toString(36).substr(2, 9)}`,
       ...config,
       // Merge colors properly to preserve defaults
       colors: {

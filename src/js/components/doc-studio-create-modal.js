@@ -648,7 +648,7 @@
     stopDocStudioProgressTimer();
     state.progressPercent = null;
     state.progressSteps = [];
-    state.progressStartedAt = Date.now();
+    state.progressStartedAt = LanaTime.nowMs();
     state.progressTimer = setInterval(renderDocStudioProgress, 1000);
     renderDocStudioProgress();
   }

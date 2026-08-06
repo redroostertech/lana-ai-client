@@ -1394,20 +1394,12 @@
 
     // Set date range helper function
     function setDateRange(days) {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      const endDate = LanaTime.nowDate();
+      const startDate = LanaTime.addDays(endDate, -days);
 
-      // Format dates as YYYY-MM-DD
-      const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-
-      document.getElementById('syncStartDate').value = formatDate(startDate);
-      document.getElementById('syncEndDate').value = formatDate(endDate);
+      // UTC-anchored YYYY-MM-DD, matching connector-viewer's sync window anchoring
+      document.getElementById('syncStartDate').value = LanaTime.formatUtcDateOnly(startDate);
+      document.getElementById('syncEndDate').value = LanaTime.formatUtcDateOnly(endDate);
     }
 
     // Run Manual Sync
@@ -1454,7 +1446,7 @@
             throw new Error('Start date must be before end date');
           }
 
-          if (endDate > new Date()) {
+          if (endDate > LanaTime.nowDate()) {
             throw new Error('End date cannot be in the future');
           }
         }
@@ -1627,7 +1619,7 @@
           Executing...
         `;
 
-        const startTime = Date.now();
+        const startTime = LanaTime.nowMs();
 
         // Call backend to execute the custom request
         const result = await api.post('/api/v1/leadly/custom-request', {
@@ -1637,7 +1629,7 @@
           body
         });
 
-        const duration = Date.now() - startTime;
+        const duration = LanaTime.millisecondsSince(startTime);
 
         // Show response
         responseSection.classList.remove('hidden');
@@ -3655,7 +3647,7 @@
           // Calculate time remaining
           let timeRemaining = '';
           if (progress > 0 && progress < 100 && job.created_at) {
-            const elapsed = (Date.now() - new Date(job.created_at).getTime()) / 1000; // seconds
+            const elapsed = LanaTime.millisecondsSince(new Date(job.created_at).getTime()) / 1000; // seconds
             const estimatedTotal = elapsed / (progress / 100);
             const remaining = Math.max(0, estimatedTotal - elapsed);
 

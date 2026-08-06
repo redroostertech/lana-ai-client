@@ -1054,8 +1054,8 @@
   }
 
   function formatDateForFilename(dateString) {
-    var d = dateString ? new Date(dateString) : new Date();
-    if (!d || isNaN(d.getTime())) d = new Date();
+    var d = dateString ? new Date(dateString) : LanaTime.nowDate();
+    if (!d || isNaN(d.getTime())) d = LanaTime.nowDate();
     var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
     return '' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
   }

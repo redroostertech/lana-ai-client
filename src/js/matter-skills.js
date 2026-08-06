@@ -789,7 +789,7 @@ function addWorkflowStep() {
   if (!container) return;
 
   const stepIndex = skillSteps.length;
-  const stepId = `step-${Date.now()}-${stepIndex}`;
+  const stepId = `step-${LanaTime.nowMs()}-${stepIndex}`;
 
   // Create step data
   const stepData = {

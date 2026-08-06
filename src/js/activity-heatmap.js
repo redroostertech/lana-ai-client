@@ -383,7 +383,7 @@ const ActivityHeatmap = (function() {
    * Format date as YYYY-MM-DD
    */
   function formatDate(date) {
-    return date.toISOString().split('T')[0];
+    return LanaTime.formatUtcDateOnly(date);
   }
 
   /**

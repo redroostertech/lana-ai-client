@@ -501,7 +501,7 @@ function currentBrandKit() {
   const preset = stylePreset(style);
   const designSystem = state.deck.designSystem || {};
   return {
-    id: `kit-${Date.now()}`,
+    id: `kit-${LanaTime.nowMs()}`,
     version: 2,
     name: elements.brandKitName?.value.trim() || state.deck.title || 'Current file',
     style,
@@ -1309,7 +1309,7 @@ function ensureDocumentVersions(documentModel) {
     documentModel.versions = [{
       version: 1,
       label: 'Initial draft',
-      created_at: state.documentLastSavedAt || new Date().toISOString(),
+      created_at: state.documentLastSavedAt || LanaTime.nowIso(),
       summary: 'Generated document draft',
       document: JSON.parse(JSON.stringify(documentModel))
     }];
@@ -1351,7 +1351,7 @@ function recordDocumentSaveActivity(kind = 'save') {
   const nextVersion = versions.length
     ? Math.max(...versions.map(version => Number(version.version) || 0)) + 1
     : 1;
-  const createdAt = new Date().toISOString();
+  const createdAt = LanaTime.nowIso();
   const summary = kind === 'autosave' ? 'Autosaved document edits' : 'Saved document edits';
   versions.push({
     version: nextVersion,
@@ -1848,7 +1848,7 @@ async function loadPresentationFromUrl() {
     clearDocumentDirty();
     state.deck = payload.deck;
     state.presentationId = payload.id || id;
-    state.documentLastSavedAt = payload.updated_at || payload.created_at || new Date().toISOString();
+    state.documentLastSavedAt = payload.updated_at || payload.created_at || LanaTime.nowIso();
     state.critique = null;
     state.selectedSlideIndex = 0;
     resetDocumentHistory();
@@ -2906,7 +2906,7 @@ async function addDocumentComment(bodyOverride = '') {
   ensureDocumentComments(documentModel).push({
     author: currentUserLabel(),
     body,
-    created_at: new Date().toISOString()
+    created_at: LanaTime.nowIso()
   });
   composer?.clear?.();
   markDocumentDirty('Comment added. Save document to persist.');
@@ -3136,8 +3136,8 @@ function captureSignaturePad(index) {
   prepareSignaturePad(canvas);
   block.signature_data_url = canvas.toDataURL('image/png');
   block.signature_image = block.signature_data_url;
-  block.signed_date = block.signed_date || new Date().toISOString().slice(0, 10);
-  block.signed_at = new Date().toISOString();
+  block.signed_date = block.signed_date || LanaTime.toLocalDateInputValue(LanaTime.nowDate());
+  block.signed_at = LanaTime.nowIso();
   delete canvas.dataset.hasDrawing;
   return true;
 }
@@ -3987,8 +3987,8 @@ elements.docView.addEventListener('click', async event => {
     block.signature_text = block.signature_text || block.signed_by || block.party || 'Authorized Signature';
     block.signed_by = block.signed_by || block.signature_text;
     block.signed_title = block.signed_title || block.signatory_title || '[Authorized Signatory]';
-    block.signed_date = block.signed_date || new Date().toISOString().slice(0, 10);
-    block.signed_at = new Date().toISOString();
+    block.signed_date = block.signed_date || LanaTime.toLocalDateInputValue(LanaTime.nowDate());
+    block.signed_at = LanaTime.nowIso();
     markDocumentDirty('Signature captured. Save signatures to persist.');
     render();
     setStatus('Signature captured. Save signatures to persist.');

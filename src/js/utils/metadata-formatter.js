@@ -218,11 +218,10 @@ function formatTimestamp(timestampString) {
     const timestamp = new Date(timestampString);
     if (isNaN(timestamp.getTime())) return '—';
 
-    const now = new Date();
-    const diffMs = now.getTime() - timestamp.getTime();
-    const diffMinutes = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    const diffMs = LanaTime.millisecondsSince(timestamp.getTime());
+    const diffMinutes = Math.floor(diffMs / LanaTime.MS_PER_MINUTE);
+    const diffHours = Math.floor(diffMs / LanaTime.MS_PER_HOUR);
+    const diffDays = Math.floor(diffMs / LanaTime.MS_PER_DAY);
 
     // Relative time for recent timestamps
     if (diffMinutes < 1) return 'Just now';

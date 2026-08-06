@@ -5361,8 +5361,8 @@
     function formatDueDate(dateString) {
       if (!dateString) return 'No due date';
       const date = new Date(dateString);
-      const now = new Date();
-      const diffDays = Math.ceil((date - now) / (1000 * 60 * 60 * 24));
+      const now = LanaTime.nowDate();
+      const diffDays = Math.ceil((date - now) / LanaTime.MS_PER_DAY);
 
       if (diffDays < 0) {
         return `<span class="text-red-600">Overdue (${Math.abs(diffDays)} days)</span>`;
@@ -10556,7 +10556,7 @@
 
     // Add new custom field
     function addCustomField() {
-      const newKey = `field_${Date.now()}`;
+      const newKey = `field_${LanaTime.nowMs()}`;
       customFieldDefinitions.push({
         key: newKey,
         display_name: '',

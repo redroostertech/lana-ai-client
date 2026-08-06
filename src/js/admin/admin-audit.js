@@ -292,13 +292,7 @@
   function _setDefaultDates() {
     var toDate = el('toDate');
     if (toDate) {
-      var today = new Date();
-      var yyyy = today.getFullYear();
-      var mm   = String(today.getMonth() + 1);
-      var dd   = String(today.getDate());
-      if (mm.length < 2) mm = '0' + mm;
-      if (dd.length < 2) dd = '0' + dd;
-      toDate.value = yyyy + '-' + mm + '-' + dd;
+      toDate.value = LanaTime.toLocalDateInputValue(LanaTime.nowDate());
     }
   }
 
@@ -312,11 +306,11 @@
   }
 
   function _dateStartIso(dateValue) {
-    return dateValue ? new Date(dateValue + 'T00:00:00.000').toISOString() : '';
+    return dateValue ? LanaTime.toIsoInstant(dateValue + 'T00:00:00.000') : '';
   }
 
   function _dateEndIso(dateValue) {
-    return dateValue ? new Date(dateValue + 'T23:59:59.999').toISOString() : '';
+    return dateValue ? LanaTime.toIsoInstant(dateValue + 'T23:59:59.999') : '';
   }
 
   // =========================================================================

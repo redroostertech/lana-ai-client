@@ -78,7 +78,7 @@ const SessionTrackingService = {
     const { range = '7d', skipCache = false } = options;
 
     // Check cache
-    const now = Date.now();
+    const now = LanaTime.nowMs();
     if (!skipCache && this.cache.teamAnalytics && now < this.cache.teamAnalyticsExpiry) {
       console.log('[SessionTrackingService] Returning cached team analytics');
       return this.cache.teamAnalytics;

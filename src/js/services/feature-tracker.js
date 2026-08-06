@@ -22,7 +22,7 @@ const FeatureTracker = {
   async trackFeature(featureName, metadata = {}) {
     try {
       // Rate limiting: Don't track same feature too frequently
-      const now = Date.now();
+      const now = LanaTime.nowMs();
       const lastTracked = this.recentEvents.get(featureName);
 
       if (lastTracked && (now - lastTracked) < this.rateLimitMs) {

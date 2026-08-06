@@ -128,12 +128,12 @@ class ApiClient {
 
     // Token refresh management
     this.refreshTimer = null;
-    this.lastActivityTime = Date.now();
+    this.lastActivityTime = LanaTime.nowMs();
     this.isRefreshing = false;
 
     if (this.demoMode) {
       // In demo mode, set up fake authentication
-      this.token = 'demo-token-' + Date.now();
+      this.token = 'demo-token-' + LanaTime.nowMs();
       this.user = this.config.DEMO_USER || { id: 'demo', email: 'demo@lana.ai' };
       localStorage.setItem('token', this.token);
       localStorage.setItem('user', JSON.stringify(this.user));
@@ -234,10 +234,10 @@ class ApiClient {
    * @param {number} thresholdMs - Time before expiration to consider "near" (default: 1 hour)
    * @returns {boolean} True if token expires soon
    */
-  isTokenNearExpiration(thresholdMs = 60 * 60 * 1000) {
+  isTokenNearExpiration(thresholdMs = LanaTime.MS_PER_HOUR) {
     const expiration = this.getTokenExpiration();
     if (!expiration) return false;
-    const now = Date.now();
+    const now = LanaTime.nowMs();
     return (expiration - now) < thresholdMs;
   }
 
@@ -248,7 +248,7 @@ class ApiClient {
   isTokenExpired() {
     const expiration = this.getTokenExpiration();
     if (!expiration) return false;
-    return Date.now() >= expiration;
+    return LanaTime.nowMs() >= expiration;
   }
 
   /**
@@ -266,9 +266,9 @@ class ApiClient {
       return;
     }
 
-    const now = Date.now();
+    const now = LanaTime.nowMs();
     const timeUntilExpiration = expiration - now;
-    const refreshThreshold = 60 * 60 * 1000; // 1 hour
+    const refreshThreshold = LanaTime.MS_PER_HOUR; // 1 hour
 
     // If token expires in less than 1 hour, refresh immediately
     if (timeUntilExpiration < refreshThreshold) {
@@ -339,11 +339,11 @@ class ApiClient {
    */
   setupActivityListener() {
     const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'];
-    const refreshThreshold = 60 * 60 * 1000; // 1 hour
-    const activityCheckInterval = 5 * 60 * 1000; // Check every 5 minutes
+    const refreshThreshold = LanaTime.MS_PER_HOUR; // 1 hour
+    const activityCheckInterval = 5 * LanaTime.MS_PER_MINUTE; // Check every 5 minutes
 
     const handleActivity = () => {
-      this.lastActivityTime = Date.now();
+      this.lastActivityTime = LanaTime.nowMs();
     };
 
     // Add event listeners for user activity
@@ -747,7 +747,7 @@ class ApiClient {
     }
 
     if (path === '/api/v1/admin/users' && method === 'POST') {
-      const newUser = { id: mockLoader.generateId?.('u') || 'u-new', ...data, created_at: new Date().toISOString() };
+      const newUser = { id: mockLoader.generateId?.('u') || 'u-new', ...data, created_at: LanaTime.nowIso() };
       return { user: newUser, message: 'User created (demo mode)' };
     }
 
@@ -803,7 +803,7 @@ class ApiClient {
     }
 
     if (path === '/api/v1/rbac/roles' && method === 'POST') {
-      const newRole = { id: mock.generateId?.('r') || 'r-new', ...data, created_at: new Date().toISOString() };
+      const newRole = { id: mock.generateId?.('r') || 'r-new', ...data, created_at: LanaTime.nowIso() };
       return { role: newRole, message: 'Role created (demo mode)' };
     }
 
@@ -854,7 +854,7 @@ class ApiClient {
       const newMatter = {
         id: mockLoader.generateId?.('m') || 'm-new',
         ...data,
-        created_at: new Date().toISOString(),
+        created_at: LanaTime.nowIso(),
         document_count: 0,
         status: 'active'
       };
@@ -903,8 +903,8 @@ class ApiClient {
           description: 'Draft shell for onboarding a new client and creating native tasks at publish time.',
           status: 'draft',
           source_type: 'manual',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: LanaTime.nowIso(),
+          updated_at: LanaTime.nowIso(),
           items: [
             { title: 'Confirm client identity and contact details' },
             { title: 'Open matter workspace' },
@@ -923,8 +923,8 @@ class ApiClient {
         title: 'Task Plan',
         description: 'Demo task plan detail.',
         status: 'draft',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: LanaTime.nowIso(),
+        updated_at: LanaTime.nowIso(),
         items: []
       };
       return { task_plan: plan };
@@ -935,8 +935,8 @@ class ApiClient {
         id: mock.generateId?.('tp') || 'tp-new',
         ...data,
         status: 'draft',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: LanaTime.nowIso(),
+        updated_at: LanaTime.nowIso(),
         items: []
       };
       return { task_plan: newPlan, message: 'Task plan created (demo mode)' };
@@ -951,8 +951,8 @@ class ApiClient {
           description: data?.description || 'Updated demo task plan.',
           status: data?.status || 'draft',
           source_type: data?.source_type || 'manual',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: LanaTime.nowIso(),
+          updated_at: LanaTime.nowIso(),
           items: data?.items || []
         },
         message: 'Task plan updated (demo mode)'
@@ -970,8 +970,8 @@ class ApiClient {
           ...(data?.metadata || {}),
           draft_instructions: data?.draft_instructions || null
         },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: LanaTime.nowIso(),
+        updated_at: LanaTime.nowIso(),
         items: [
           { title: 'Review draft recommendations', priority: 'medium' },
           { title: 'Confirm matter and assignee details', priority: 'medium' }
@@ -988,8 +988,8 @@ class ApiClient {
           title: data?.title || 'Published Task Plan',
           description: 'Published demo task plan.',
           status: 'published',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: LanaTime.nowIso(),
+          updated_at: LanaTime.nowIso(),
           items: []
         },
         message: 'Task plan published (demo mode)'
@@ -1173,8 +1173,8 @@ class ApiClient {
           roles: currentUser.roles || [],
           status: currentUser.is_active === false ? 'inactive' : 'active',
           is_active: currentUser.is_active !== false,
-          last_login: currentUser.last_login || new Date().toISOString(),
-          created_at: currentUser.created_at || new Date().toISOString(),
+          last_login: currentUser.last_login || LanaTime.nowIso(),
+          created_at: currentUser.created_at || LanaTime.nowIso(),
           bio: mock.profile?.bio || 'Demo workspace profile'
         }
       };
@@ -1494,7 +1494,7 @@ class ApiClient {
           stale: matters.filter(m => m.status === 'on_hold').length
         },
         today_activity: {
-          documents: documents.filter(doc => (doc.updated_at || '').startsWith(new Date().toISOString().slice(0, 10))).length,
+          documents: documents.filter(doc => (doc.updated_at || '').startsWith(LanaTime.formatUtcDateOnly())).length,
           conversations: (mock.conversations || []).length
         },
         focus_items: actionQueue.slice(0, 4),
@@ -1542,7 +1542,7 @@ class ApiClient {
   async login(email, password, mfaToken = null) {
     if (this.demoMode) {
       // Demo mode: accept any credentials
-      this.token = 'demo-token-' + Date.now();
+      this.token = 'demo-token-' + LanaTime.nowMs();
       this.user = this.config.DEMO_USER;
       localStorage.setItem('token', this.token);
       localStorage.setItem('user', JSON.stringify(this.user));
@@ -1848,7 +1848,7 @@ class ApiClient {
     // Build query parameters
     const params = new URLSearchParams();
     if (options.bustCache) {
-      params.append('_t', Date.now().toString());
+      params.append('_t', LanaTime.nowMs().toString());
     }
     // Always request full details (includes tasks, notes, contacts from shadow tables)
     params.append('full_details', 'true');
@@ -1941,7 +1941,7 @@ class ApiClient {
       excludePinned: opts.excludePinned === true,
       sortBy: opts.sortBy || opts.sort_by || 'last_activity',
       sortOrder: opts.sortOrder || opts.sort_order || 'desc',
-      _: Date.now()
+      _: LanaTime.nowMs()
     });
   }
 
@@ -2108,7 +2108,7 @@ class ApiClient {
       pinned: true,
       sortBy: opts.sortBy || opts.sort_by || 'last_activity',
       sortOrder: opts.sortOrder || opts.sort_order || 'desc',
-      _: Date.now()
+      _: LanaTime.nowMs()
     });
   }
 
@@ -2149,8 +2149,8 @@ class ApiClient {
     if (this.demoMode) {
       return {
         success: true,
-        document_id: 'doc-' + Date.now(),
-        job_id: 'job-' + Date.now(),
+        document_id: 'doc-' + LanaTime.nowMs(),
+        job_id: 'job-' + LanaTime.nowMs(),
         filename: file.name,
         file_size: file.size,
         matter_id: matterId
@@ -2222,7 +2222,7 @@ class ApiClient {
       // Simulate batch upload in demo mode
       return {
         status: 'completed',
-        batch_id: 'batch-' + Date.now(),
+        batch_id: 'batch-' + LanaTime.nowMs(),
         stats: {
           scanned: fileArray.length,
           uploaded: fileArray.length,
@@ -2452,7 +2452,7 @@ class ApiClient {
     var params = new URLSearchParams();
     if (options.view) params.append('view', options.view);
     if (options.persist) params.append('persist', 'true');
-    if (options.bustCache) params.append('_t', String(Date.now()));
+    if (options.bustCache) params.append('_t', String(LanaTime.nowMs()));
     var query = params.toString();
     return this.get(`/api/v1/matters/${matterId}/workspace-state${query ? '?' + query : ''}`);
   }

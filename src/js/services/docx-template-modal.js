@@ -132,20 +132,20 @@
 
     // Date namespace
     if (placeholder === 'date.today') {
-      var now = new Date();
+      var now = LanaTime.nowDate();
       return String(now.getMonth() + 1).padStart(2, '0') + '/' + String(now.getDate()).padStart(2, '0') + '/' + now.getFullYear();
     }
     if (placeholder === 'date.today_long') {
       var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-      var d = new Date();
+      var d = LanaTime.nowDate();
       return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
     }
-    if (placeholder === 'date.year') return String(new Date().getFullYear());
+    if (placeholder === 'date.year') return String(LanaTime.nowDate().getFullYear());
     if (placeholder === 'date.month') {
       var ms = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-      return ms[new Date().getMonth()];
+      return ms[LanaTime.nowDate().getMonth()];
     }
-    if (placeholder === 'date.day') return String(new Date().getDate()).padStart(2, '0');
+    if (placeholder === 'date.day') return String(LanaTime.nowDate().getDate()).padStart(2, '0');
 
     // Matter namespace
     if (placeholder.indexOf('matter.') === 0 && matterData) {

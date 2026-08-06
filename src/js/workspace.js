@@ -3061,7 +3061,7 @@
 
     // Add new custom field
     function addCustomField() {
-      const newKey = `field_${Date.now()}`;
+      const newKey = `field_${LanaTime.nowMs()}`;
       customFieldDefinitions.push({
         key: newKey,
         display_name: '',

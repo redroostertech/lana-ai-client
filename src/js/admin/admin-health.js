@@ -56,7 +56,7 @@
       return Promise.resolve(healthCache[key].data);
     }
     return fetchFn().then(function (data) {
-      healthCache[key] = { data: data, timestamp: Date.now() };
+      healthCache[key] = { data: data, timestamp: LanaTime.nowMs() };
       return data;
     });
   }
@@ -243,7 +243,7 @@
       setKv('cpuKvLoad15', String(cpu.load_avg_15min || '-'));
 
       // -- Last updated -------------------------------------------------------
-      setText('lastUpdatedText', 'Updated: ' + Lex.Utils.formatDateTime(new Date()));
+      setText('lastUpdatedText', 'Updated: ' + Lex.Utils.formatDateTime(LanaTime.nowDate()));
 
       // -- Remove shimmers -------------------------------------------------------
       if (typeof Lex !== 'undefined' && Lex.Redact) {
@@ -381,7 +381,7 @@
     var cached = healthCache.tokenUsage[period];
     var fetchFn = function () {
       return api.get('/api/v1/admin/health/token-usage?period=' + period).then(function (data) {
-        healthCache.tokenUsage[period] = { data: data, timestamp: Date.now() };
+        healthCache.tokenUsage[period] = { data: data, timestamp: LanaTime.nowMs() };
         return data;
       });
     };

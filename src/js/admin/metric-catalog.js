@@ -431,7 +431,7 @@
     lastRunByKey[metricKey] = { status: 'pending' };
     renderTable();
 
-    var started = Date.now();
+    var started = LanaTime.nowMs();
     var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     try {
       var response = await runWithTimeout(
@@ -706,7 +706,7 @@
   // stays self-contained. Returns YYYY-MM-DD strings plus the grain the preset
   // implies. Presets carry a calendar grain; manual edits override the grain.
   function presetRange(name) {
-    var today = new Date();
+    var today = LanaTime.nowDate();
     var startDate;
     var endDate;
     var grain = 'monthly';
@@ -736,13 +736,13 @@
         grain = 'monthly';
         break;
       case 'thisYear':
-        startDate = new Date(today.getFullYear(), 0, 1);
+        startDate = LanaTime.startOfLocalYear(today);
         endDate = new Date(today);
         grain = 'monthly';
         break;
       case 'thisMonth':
       default:
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        startDate = LanaTime.startOfLocalMonth(today);
         endDate = new Date(today);
         grain = 'monthly';
         break;
@@ -751,13 +751,13 @@
     return { start: fmt(startDate), end: fmt(endDate), grain: grain };
   }
 
-  // ISO conversion mirroring dashboard-detail.toPeriodISOString: start clamps to
-  // 00:00:00, end clamps to 23:59:59 so the window includes the full end day.
+  // ISO conversion: start clamps to 00:00:00, end clamps to 23:59:59 so the
+  // window includes the full end day. Anchored to UTC ('Z') to match the
+  // UTC-day period semantics used by reporting.js and the insights pages.
   function playgroundISO(value, endOfDay) {
     if (!value) return '';
     var hasTime = String(value).indexOf('T') !== -1;
-    var parsed = new Date(hasTime ? value : value + (endOfDay ? 'T23:59:59' : 'T00:00:00'));
-    return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : '';
+    return LanaTime.toIsoInstant(hasTime ? value : value + (endOfDay ? 'T23:59:59Z' : 'T00:00:00Z')) || '';
   }
 
   function preview() {

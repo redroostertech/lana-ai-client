@@ -442,8 +442,8 @@
      */
     function formatRelativeTime(isoString) {
       if (!isoString) return 'Unknown';
-      const diffMs = Date.now() - new Date(isoString).getTime();
-      const diffMinutes = Math.floor(diffMs / 60000);
+      const diffMs = LanaTime.millisecondsSince(new Date(isoString).getTime());
+      const diffMinutes = Math.floor(diffMs / LanaTime.MS_PER_MINUTE);
       if (diffMinutes < 1) return 'Just now';
       if (diffMinutes < 60) return diffMinutes + ' minute' + (diffMinutes !== 1 ? 's' : '') + ' ago';
       const diffHours = Math.floor(diffMinutes / 60);
@@ -608,24 +608,22 @@
 
     // Period preset selection
     function selectPeriodPreset(preset) {
-      const today = new Date();
+      const today = LanaTime.nowDate();
       let startDate, endDate;
 
       switch (preset) {
         case 'last7days':
           endDate = new Date(today);
-          startDate = new Date(today);
-          startDate.setDate(startDate.getDate() - 6);  // 7 days inclusive (today + 6 prior days)
+          startDate = LanaTime.addDays(today, -6);  // 7 days inclusive (today + 6 prior days)
           break;
 
         case 'last30days':
           endDate = new Date(today);
-          startDate = new Date(today);
-          startDate.setDate(startDate.getDate() - 29);  // 30 days inclusive (today + 29 prior days)
+          startDate = LanaTime.addDays(today, -29);  // 30 days inclusive (today + 29 prior days)
           break;
 
         case 'thisMonth':
-          startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+          startDate = LanaTime.startOfLocalMonth(today);
           endDate = new Date(today);
           break;
 
@@ -641,7 +639,7 @@
           break;
 
         case 'thisYear':
-          startDate = new Date(today.getFullYear(), 0, 1);
+          startDate = LanaTime.startOfLocalYear(today);
           endDate = new Date(today);
           break;
 
@@ -653,17 +651,11 @@
         default:
           // Default: Last 7 days
           endDate = new Date(today);
-          startDate = new Date(today);
-          startDate.setDate(startDate.getDate() - 7);
+          startDate = LanaTime.addDays(today, -7);
       }
 
       // Format dates as YYYY-MM-DD for date inputs
-      const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
+      const formatDate = (date) => LanaTime.toLocalDateInputValue(date);
 
       document.getElementById('periodStart').value = formatDate(startDate);
       document.getElementById('periodEnd').value = formatDate(endDate);
@@ -681,7 +673,7 @@
 
       // Calculate the duration in days
       const durationMs = endDate - startDate;
-      const durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
+      const durationDays = Math.ceil(durationMs / LanaTime.MS_PER_DAY);
 
       // For "Last Year" preset or full year periods (365-366 days), only show monthly
       if (preset === 'lastYear' || (durationDays >= 365 && durationDays <= 366)) {
@@ -5953,8 +5945,8 @@
       // Convert dates to ISO format with timezone
       // Start: beginning of day (00:00:00)
       // End: end of day (23:59:59)
-      const periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
-      const periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
+      const periodStartISO = LanaTime.toIsoInstant(periodStart + 'T00:00:00Z');
+      const periodEndISO = LanaTime.toIsoInstant(periodEnd + 'T23:59:59Z');
 
       // Show loading state
       const executeBtn = document.getElementById('executeBtn');
@@ -5971,7 +5963,7 @@
       document.getElementById('moduleResults').classList.add('hidden');
 
       try {
-        const startTime = Date.now();
+        const startTime = LanaTime.nowMs();
 
         // Call API using api.post() method
         const data = await api.post(`/api/v1/modules/${moduleKey}/execute`, {
@@ -5982,7 +5974,7 @@
           useCache: useCache
         });
 
-        const endTime = Date.now();
+        const endTime = LanaTime.nowMs();
         const executionTimeMs = endTime - startTime;
 
         // Update module header
@@ -6281,7 +6273,7 @@
       });
 
       // Save PDF
-      const fileName = `module-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      const fileName = `module-report-${LanaTime.formatUtcDateOnly()}.pdf`;
       doc.save(fileName);
 
       showInfo(`Report exported to ${fileName}`);
@@ -6321,7 +6313,7 @@
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
-      const fileName = `module-report-${new Date().toISOString().split('T')[0]}.csv`;
+      const fileName = `module-report-${LanaTime.formatUtcDateOnly()}.csv`;
 
       link.setAttribute('href', url);
       link.setAttribute('download', fileName);
@@ -6427,8 +6419,8 @@
     // Load existing overrides for a metric
     async function loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd) {
       try {
-        const periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
-        const periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
+        const periodStartISO = LanaTime.toIsoInstant(periodStart + 'T00:00:00Z');
+        const periodEndISO = LanaTime.toIsoInstant(periodEnd + 'T23:59:59Z');
 
         const data = await api.get(`/api/v1/modules/${moduleKey}/data-overrides`, {
           periodStart: periodStartISO,
@@ -6502,8 +6494,8 @@
       }
 
       // Convert to ISO
-      const periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
-      const periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
+      const periodStartISO = LanaTime.toIsoInstant(periodStart + 'T00:00:00Z');
+      const periodEndISO = LanaTime.toIsoInstant(periodEnd + 'T23:59:59Z');
 
       // Show loading state
       const saveBtn = document.getElementById('saveOverrideBtn');

@@ -108,7 +108,7 @@ export class GroupedBarChartRenderer {
       },
       helpText: null,
       onBarClick: null,
-      uniqueId: `grouped-bar-chart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      uniqueId: `grouped-bar-chart-${LanaTime.nowMs()}-${Math.random().toString(36).substr(2, 9)}`,
       ...config
     };
 

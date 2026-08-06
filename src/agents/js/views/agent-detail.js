@@ -523,8 +523,8 @@
     if (range === '7d')  days = 7;
     if (range === '30d') days = 30;
     if (range === '90d') days = 90;
-    var until = new Date();
-    var since = new Date(until.getTime() - days * 24 * 3600 * 1000);
+    var until = LanaTime.nowDate();
+    var since = LanaTime.addDays(until, -days);
     return { since: since.toISOString(), until: until.toISOString() };
   }
 

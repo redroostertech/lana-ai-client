@@ -41,9 +41,9 @@
       _dateFrom = navFrom;
       _dateTo = navTo;
     } else {
-      var now = new Date();
-      _dateFrom = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
-      _dateTo = now.toISOString().substring(0, 10);
+      var now = LanaTime.nowDate();
+      _dateFrom = LanaTime.toLocalDateInputValue(LanaTime.startOfLocalMonth(now));
+      _dateTo = LanaTime.toLocalDateInputValue(now);
     }
 
     _renderFilters();
@@ -1377,8 +1377,8 @@
             showError('Both start and end are required');
             return;
           }
-          var startIso = new Date(startVal).toISOString();
-          var endIso = new Date(endVal).toISOString();
+          var startIso = LanaTime.toIsoInstant(startVal);
+          var endIso = LanaTime.toIsoInstant(endVal);
           if (new Date(endIso) <= new Date(startIso)) {
             showError('End time must be after start time');
             return;
@@ -1432,9 +1432,7 @@
   // ("YYYY-MM-DDTHH:MM" in local time). Native toISOString returns UTC, so we
   // build the string component-wise to keep it in the user's locale.
   function _toDatetimeLocal(d) {
-    function pad(n) { return String(n).padStart(2, '0'); }
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-      'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    return LanaTime.toLocalDatetimeInputValue(d);
   }
 
   // ═══════════════════════════════════════════════════════════════

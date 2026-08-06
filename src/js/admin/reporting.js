@@ -39,7 +39,7 @@
   function formatDate(date) {
     return window.Lex && window.Lex.Utils
       ? window.Lex.Utils.formatUtcDateOnly(date)
-      : new Date(date).toISOString().split('T')[0];
+      : LanaTime.formatUtcDateOnly(date);
   }
 
   function showInfo(message) {
@@ -195,7 +195,7 @@
 
     var currentValue = periodTypeEl.value;
     var durationMs = endDate - startDate;
-    var durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
+    var durationDays = Math.ceil(durationMs / LanaTime.MS_PER_DAY);
 
     var allOptions = [
       { value: 'daily',     label: 'Daily' },
@@ -463,8 +463,8 @@
     }
 
     // Convert dates to ISO format
-    var periodStartISO = new Date(startDate + 'T00:00:00Z').toISOString();
-    var periodEndISO = new Date(endDate + 'T23:59:59Z').toISOString();
+    var periodStartISO = LanaTime.toIsoInstant(startDate + 'T00:00:00Z');
+    var periodEndISO = LanaTime.toIsoInstant(endDate + 'T23:59:59Z');
 
     // Loading state
     if (executeBtn) executeBtn.loading = true;
@@ -476,7 +476,7 @@
     if (resultsEl) resultsEl.style.display = 'none';
 
     try {
-      var startTime = Date.now();
+      var startTime = LanaTime.nowMs();
 
       var data = await api.post('/api/v1/modules/' + selectedModuleKey + '/execute', {
         periodType: periodType,
@@ -488,7 +488,7 @@
         useCache: false
       });
 
-      var endTime = Date.now();
+      var endTime = LanaTime.nowMs();
       var executionTimeMs = endTime - startTime;
 
       // Store module metadata for Learn More modal
@@ -3069,7 +3069,7 @@
       styles: { fontSize: 9 }
     });
 
-    var fileName = 'module-report-' + new Date().toISOString().split('T')[0] + '.pdf';
+    var fileName = 'module-report-' + LanaTime.formatUtcDateOnly() + '.pdf';
     doc.save(fileName);
     showInfo('Report exported to ' + fileName);
   }
@@ -3107,7 +3107,7 @@
     var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
     var url = URL.createObjectURL(blob);
-    var fileName = 'module-report-' + new Date().toISOString().split('T')[0] + '.csv';
+    var fileName = 'module-report-' + LanaTime.formatUtcDateOnly() + '.csv';
 
     link.setAttribute('href', url);
     link.setAttribute('download', fileName);
@@ -3319,7 +3319,7 @@
     if (resultsEl) resultsEl.style.display = 'none';
 
     try {
-      var startTime = Date.now();
+      var startTime = LanaTime.nowMs();
 
       var result = await api.post('/api/v1/reporting/reports/' + selectedImportedReportId + '/execute', {
         filters: {},

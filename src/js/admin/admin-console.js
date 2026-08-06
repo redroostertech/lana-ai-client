@@ -56,7 +56,7 @@
   }
 
   function nowLabel() {
-    return new Date().toLocaleTimeString([], {
+    return LanaTime.nowDate().toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',

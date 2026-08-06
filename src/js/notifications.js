@@ -201,7 +201,7 @@ window.DesktopNotifications = window.DesktopNotifications || (function() {
   function showSummary(extraCount) {
     if (!isEnabled() || Notification.permission !== 'granted' || extraCount <= 0) return;
 
-    const id = 'lana-notification-summary-' + Date.now();
+    const id = 'lana-notification-summary-' + nowMs();
     const desktopNotification = new Notification('LANA AI notifications', {
       body: extraCount === 1
         ? 'You have 1 more unread notification.'

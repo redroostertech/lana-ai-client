@@ -87,7 +87,7 @@ export class GaugeChartRenderer {
       showRange: true,
       height: DEFAULT_HEIGHT,
       helpText: null,
-      uniqueId: `gauge-chart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      uniqueId: `gauge-chart-${LanaTime.nowMs()}-${Math.random().toString(36).substr(2, 9)}`,
       ...config
     };
 

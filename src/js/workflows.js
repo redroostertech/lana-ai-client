@@ -12,8 +12,8 @@ const WorkflowsMockData = {
       description: 'Automated follow-up sequence for opportunities 0-7 days old',
       status: 'active',
       trigger: { type: 'schedule', config: { cron: '0 9 * * *' } },
-      lastRun: new Date(Date.now() - 3600000).toISOString(),
-      nextRun: new Date(Date.now() + 82800000).toISOString(),
+      lastRun: new Date(LanaTime.nowMs() - 3600000).toISOString(),
+      nextRun: new Date(LanaTime.nowMs() + 82800000).toISOString(),
       successRate: 98.5,
       executionCount: 156,
       createdAt: '2024-09-15T10:00:00Z'
@@ -24,7 +24,7 @@ const WorkflowsMockData = {
       description: 'Automatically reschedule and notify when appointment is marked as no-show',
       status: 'active',
       trigger: { type: 'event', config: { event: 'appointment.no_show' } },
-      lastRun: new Date(Date.now() - 7200000).toISOString(),
+      lastRun: new Date(LanaTime.nowMs() - 7200000).toISOString(),
       nextRun: null,
       successRate: 95.2,
       executionCount: 43,
@@ -36,7 +36,7 @@ const WorkflowsMockData = {
       description: 'Create folder structure when new client is signed',
       status: 'active',
       trigger: { type: 'event', config: { event: 'client.signed' } },
-      lastRun: new Date(Date.now() - 86400000).toISOString(),
+      lastRun: new Date(LanaTime.nowMs() - 86400000).toISOString(),
       nextRun: null,
       successRate: 100,
       executionCount: 28,
@@ -48,7 +48,7 @@ const WorkflowsMockData = {
       description: 'Automated payment reminders for aging invoices',
       status: 'paused',
       trigger: { type: 'schedule', config: { cron: '0 8 * * 1' } },
-      lastRun: new Date(Date.now() - 604800000).toISOString(),
+      lastRun: new Date(LanaTime.nowMs() - 604800000).toISOString(),
       nextRun: null,
       successRate: 92.1,
       executionCount: 89,
@@ -60,7 +60,7 @@ const WorkflowsMockData = {
       description: 'Send welcome emails to new leads',
       status: 'active',
       trigger: { type: 'event', config: { event: 'lead.created' } },
-      lastRun: new Date(Date.now() - 1800000).toISOString(),
+      lastRun: new Date(LanaTime.nowMs() - 1800000).toISOString(),
       nextRun: null,
       successRate: 99.1,
       executionCount: 234,
@@ -72,7 +72,7 @@ const WorkflowsMockData = {
       description: 'Escalate opportunities that have been idle for 15+ days',
       status: 'error',
       trigger: { type: 'schedule', config: { cron: '0 10 * * *' } },
-      lastRun: new Date(Date.now() - 172800000).toISOString(),
+      lastRun: new Date(LanaTime.nowMs() - 172800000).toISOString(),
       nextRun: null,
       successRate: 78.5,
       executionCount: 67,
@@ -157,13 +157,13 @@ const WorkflowsMockData = {
   ],
 
   executionLogs: [
-    { id: 'exec-001', workflowId: 'wf-001', workflowName: 'Follow-up Cadence - Green Zone', status: 'success', startedAt: new Date(Date.now() - 3600000).toISOString(), completedAt: new Date(Date.now() - 3595000).toISOString(), duration: 5000, recordsProcessed: 12, trigger: 'scheduled' },
-    { id: 'exec-002', workflowId: 'wf-005', workflowName: 'Welcome Email Sequence', status: 'success', startedAt: new Date(Date.now() - 1800000).toISOString(), completedAt: new Date(Date.now() - 1798000).toISOString(), duration: 2000, recordsProcessed: 1, trigger: 'event' },
-    { id: 'exec-003', workflowId: 'wf-002', workflowName: 'No-Show Rescheduling', status: 'success', startedAt: new Date(Date.now() - 7200000).toISOString(), completedAt: new Date(Date.now() - 7195000).toISOString(), duration: 5000, recordsProcessed: 2, trigger: 'event' },
-    { id: 'exec-004', workflowId: 'wf-006', workflowName: 'Red Zone Alert', status: 'error', startedAt: new Date(Date.now() - 172800000).toISOString(), completedAt: new Date(Date.now() - 172795000).toISOString(), duration: 5000, recordsProcessed: 0, trigger: 'scheduled', error: 'Email service connection failed' },
-    { id: 'exec-005', workflowId: 'wf-003', workflowName: 'New Client Folder Creation', status: 'success', startedAt: new Date(Date.now() - 86400000).toISOString(), completedAt: new Date(Date.now() - 86397000).toISOString(), duration: 3000, recordsProcessed: 1, trigger: 'event' },
-    { id: 'exec-006', workflowId: 'wf-001', workflowName: 'Follow-up Cadence - Green Zone', status: 'success', startedAt: new Date(Date.now() - 90000000).toISOString(), completedAt: new Date(Date.now() - 89995000).toISOString(), duration: 5000, recordsProcessed: 15, trigger: 'scheduled' },
-    { id: 'exec-007', workflowId: 'wf-005', workflowName: 'Welcome Email Sequence', status: 'success', startedAt: new Date(Date.now() - 108000000).toISOString(), completedAt: new Date(Date.now() - 107998000).toISOString(), duration: 2000, recordsProcessed: 3, trigger: 'event' }
+    { id: 'exec-001', workflowId: 'wf-001', workflowName: 'Follow-up Cadence - Green Zone', status: 'success', startedAt: new Date(LanaTime.nowMs() - 3600000).toISOString(), completedAt: new Date(LanaTime.nowMs() - 3595000).toISOString(), duration: 5000, recordsProcessed: 12, trigger: 'scheduled' },
+    { id: 'exec-002', workflowId: 'wf-005', workflowName: 'Welcome Email Sequence', status: 'success', startedAt: new Date(LanaTime.nowMs() - 1800000).toISOString(), completedAt: new Date(LanaTime.nowMs() - 1798000).toISOString(), duration: 2000, recordsProcessed: 1, trigger: 'event' },
+    { id: 'exec-003', workflowId: 'wf-002', workflowName: 'No-Show Rescheduling', status: 'success', startedAt: new Date(LanaTime.nowMs() - 7200000).toISOString(), completedAt: new Date(LanaTime.nowMs() - 7195000).toISOString(), duration: 5000, recordsProcessed: 2, trigger: 'event' },
+    { id: 'exec-004', workflowId: 'wf-006', workflowName: 'Red Zone Alert', status: 'error', startedAt: new Date(LanaTime.nowMs() - 172800000).toISOString(), completedAt: new Date(LanaTime.nowMs() - 172795000).toISOString(), duration: 5000, recordsProcessed: 0, trigger: 'scheduled', error: 'Email service connection failed' },
+    { id: 'exec-005', workflowId: 'wf-003', workflowName: 'New Client Folder Creation', status: 'success', startedAt: new Date(LanaTime.nowMs() - 86400000).toISOString(), completedAt: new Date(LanaTime.nowMs() - 86397000).toISOString(), duration: 3000, recordsProcessed: 1, trigger: 'event' },
+    { id: 'exec-006', workflowId: 'wf-001', workflowName: 'Follow-up Cadence - Green Zone', status: 'success', startedAt: new Date(LanaTime.nowMs() - 90000000).toISOString(), completedAt: new Date(LanaTime.nowMs() - 89995000).toISOString(), duration: 5000, recordsProcessed: 15, trigger: 'scheduled' },
+    { id: 'exec-007', workflowId: 'wf-005', workflowName: 'Welcome Email Sequence', status: 'success', startedAt: new Date(LanaTime.nowMs() - 108000000).toISOString(), completedAt: new Date(LanaTime.nowMs() - 107998000).toISOString(), duration: 2000, recordsProcessed: 3, trigger: 'event' }
   ],
 
   cadenceConfig: {
@@ -194,10 +194,10 @@ const WorkflowsMockData = {
 
   retargetingConfig: {
     audiences: [
-      { id: 'aud-001', name: 'No-Shows', platform: 'facebook', syncEnabled: true, size: 234, lastSync: new Date(Date.now() - 3600000).toISOString() },
-      { id: 'aud-002', name: 'Stale Leads (15+ days)', platform: 'facebook', syncEnabled: true, size: 567, lastSync: new Date(Date.now() - 7200000).toISOString() },
+      { id: 'aud-001', name: 'No-Shows', platform: 'facebook', syncEnabled: true, size: 234, lastSync: new Date(LanaTime.nowMs() - 3600000).toISOString() },
+      { id: 'aud-002', name: 'Stale Leads (15+ days)', platform: 'facebook', syncEnabled: true, size: 567, lastSync: new Date(LanaTime.nowMs() - 7200000).toISOString() },
       { id: 'aud-003', name: 'Lost Opportunities', platform: 'google', syncEnabled: false, size: 189, lastSync: null },
-      { id: 'aud-004', name: 'Past Clients', platform: 'facebook', syncEnabled: true, size: 892, lastSync: new Date(Date.now() - 86400000).toISOString() }
+      { id: 'aud-004', name: 'Past Clients', platform: 'facebook', syncEnabled: true, size: 892, lastSync: new Date(LanaTime.nowMs() - 86400000).toISOString() }
     ],
     platforms: {
       facebook: { connected: true, accountId: 'act_123456789' },
@@ -256,14 +256,14 @@ const Workflows = {
     if (api.isDemoMode()) {
       await MockData.delay(500);
       const newWorkflow = {
-        id: `wf-${Date.now()}`,
+        id: `wf-${LanaTime.nowMs()}`,
         ...config,
         status: 'active',
         lastRun: null,
         nextRun: null,
         successRate: 100,
         executionCount: 0,
-        createdAt: new Date().toISOString()
+        createdAt: LanaTime.nowIso()
       };
       WorkflowsMockData.workflows.push(newWorkflow);
       result = { success: true, workflow: newWorkflow };
@@ -339,7 +339,7 @@ const Workflows = {
       await MockData.delay(2000);
       const workflow = WorkflowsMockData.workflows.find(w => w.id === workflowId);
       if (workflow) {
-        workflow.lastRun = new Date().toISOString();
+        workflow.lastRun = LanaTime.nowIso();
         workflow.executionCount++;
       }
       result = { success: true, recordsProcessed: Math.floor(Math.random() * 10) + 1 };
@@ -406,7 +406,7 @@ const Workflows = {
       const template = WorkflowsMockData.templates.find(t => t.id === templateId);
       if (template) {
         const newWorkflow = {
-          id: `wf-${Date.now()}`,
+          id: `wf-${LanaTime.nowMs()}`,
           name: template.name,
           description: template.description,
           status: 'active',
@@ -415,7 +415,7 @@ const Workflows = {
           nextRun: null,
           successRate: 100,
           executionCount: 0,
-          createdAt: new Date().toISOString()
+          createdAt: LanaTime.nowIso()
         };
         WorkflowsMockData.workflows.push(newWorkflow);
         return { success: true, workflow: newWorkflow };
@@ -490,7 +490,7 @@ const Workflows = {
       await MockData.delay(2000);
       const audience = WorkflowsMockData.retargetingConfig.audiences.find(a => a.id === audienceId);
       if (audience) {
-        audience.lastSync = new Date().toISOString();
+        audience.lastSync = LanaTime.nowIso();
         audience.size += Math.floor(Math.random() * 20);
       }
       return { success: true };

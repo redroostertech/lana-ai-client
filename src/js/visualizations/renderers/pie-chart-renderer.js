@@ -88,7 +88,7 @@ export class PieChartRenderer {
    * @returns {string} Unique identifier
    */
   _generateUniqueId() {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `${LanaTime.nowMs()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**

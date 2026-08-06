@@ -133,9 +133,9 @@
 
     // Mock matter data
     const mockMatters = [
-      { id: 'mat-001', name: 'Johnson v. Smith', client: 'Robert Johnson', type: 'Personal Injury', status: 'Active', assigned: 'Sarah Martinez', value: 125000, opened: '2024-08-15', lastActivity: new Date(Date.now() - 3600000).toISOString() },
-      { id: 'mat-002', name: 'Acme Corp Formation', client: 'Acme Corporation', type: 'Business Formation', status: 'Active', assigned: 'Michael Chen', value: 5000, opened: '2024-10-01', lastActivity: new Date(Date.now() - 86400000).toISOString() },
-      { id: 'mat-003', name: 'Williams Estate', client: 'The Williams Family', type: 'Estate Planning', status: 'Pending', assigned: 'Sarah Martinez', value: 15000, opened: '2024-09-20', lastActivity: new Date(Date.now() - 172800000).toISOString() }
+      { id: 'mat-001', name: 'Johnson v. Smith', client: 'Robert Johnson', type: 'Personal Injury', status: 'Active', assigned: 'Sarah Martinez', value: 125000, opened: '2024-08-15', lastActivity: LanaTime.addHours(LanaTime.nowDate(), -1).toISOString() },
+      { id: 'mat-002', name: 'Acme Corp Formation', client: 'Acme Corporation', type: 'Business Formation', status: 'Active', assigned: 'Michael Chen', value: 5000, opened: '2024-10-01', lastActivity: LanaTime.addDays(LanaTime.nowDate(), -1).toISOString() },
+      { id: 'mat-003', name: 'Williams Estate', client: 'The Williams Family', type: 'Estate Planning', status: 'Pending', assigned: 'Sarah Martinez', value: 15000, opened: '2024-09-20', lastActivity: LanaTime.addDays(LanaTime.nowDate(), -2).toISOString() }
     ];
 
     const mockTimelines = {
@@ -151,19 +151,19 @@
         { id: 't-009', type: 'communication', title: 'Email to Insurance', description: 'Demand letter sent to State Farm', timestamp: '2024-09-05T10:30:00Z', user: 'Sarah Martinez' },
         { id: 't-010', type: 'document', title: 'Medical Records Received', description: 'Complete records from Memorial Hospital', timestamp: '2024-09-15T16:00:00Z', user: 'System', file: 'medical_records.pdf' },
         { id: 't-011', type: 'status', title: 'Status Updated', description: 'Moved to "Negotiation" stage', timestamp: '2024-10-01T09:00:00Z', user: 'Sarah Martinez' },
-        { id: 't-012', type: 'communication', title: 'Settlement Discussion', description: 'Call with insurance adjuster - initial offer $75,000', timestamp: new Date(Date.now() - 3600000).toISOString(), user: 'Sarah Martinez', duration: '30 min' }
+        { id: 't-012', type: 'communication', title: 'Settlement Discussion', description: 'Call with insurance adjuster - initial offer $75,000', timestamp: LanaTime.addHours(LanaTime.nowDate(), -1).toISOString(), user: 'Sarah Martinez', duration: '30 min' }
       ],
       'mat-002': [
         { id: 't-020', type: 'status', title: 'Matter Opened', description: 'Business formation case initiated', timestamp: '2024-10-01T10:00:00Z', user: 'System' },
         { id: 't-021', type: 'communication', title: 'Kickoff Call', description: 'Discussed business structure options', timestamp: '2024-10-01T14:00:00Z', user: 'Michael Chen', duration: '60 min' },
         { id: 't-022', type: 'document', title: 'Articles of Incorporation Drafted', description: 'Initial draft for client review', timestamp: '2024-10-05T11:00:00Z', user: 'Michael Chen', file: 'articles_draft.pdf' },
-        { id: 't-023', type: 'note', title: 'Client Feedback', description: 'Client requested changes to ownership structure', timestamp: new Date(Date.now() - 86400000).toISOString(), user: 'Michael Chen' }
+        { id: 't-023', type: 'note', title: 'Client Feedback', description: 'Client requested changes to ownership structure', timestamp: LanaTime.addDays(LanaTime.nowDate(), -1).toISOString(), user: 'Michael Chen' }
       ],
       'mat-003': [
         { id: 't-030', type: 'status', title: 'Matter Opened', description: 'Estate planning consultation', timestamp: '2024-09-20T09:00:00Z', user: 'System' },
         { id: 't-031', type: 'appointment', title: 'Initial Consultation', description: 'Discussed estate planning needs', timestamp: '2024-09-25T10:00:00Z', user: 'Sarah Martinez', location: 'Office - Room 101' },
         { id: 't-032', type: 'document', title: 'Asset Inventory Received', description: 'Client submitted financial information', timestamp: '2024-10-01T15:00:00Z', user: 'Client Portal', file: 'asset_inventory.xlsx' },
-        { id: 't-033', type: 'status', title: 'Status Changed to Pending', description: 'Awaiting additional documentation', timestamp: new Date(Date.now() - 172800000).toISOString(), user: 'Sarah Martinez' }
+        { id: 't-033', type: 'status', title: 'Status Changed to Pending', description: 'Awaiting additional documentation', timestamp: LanaTime.addDays(LanaTime.nowDate(), -2).toISOString(), user: 'Sarah Martinez' }
       ]
     };
 

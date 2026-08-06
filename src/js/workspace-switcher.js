@@ -34,7 +34,7 @@
   }
 
   async function loadOptions() {
-    var now = Date.now();
+    var now = LanaTime.nowMs();
     if (_cache && (now - _cacheAt) < CACHE_TTL_MS) return _cache;
 
     var api = window.api;

@@ -150,7 +150,7 @@
     }
     return Math.min(
       MAX_TIMER_DELAY_MS,
-      Math.max(MIN_REFRESH_DELAY_MS, refreshAt - (typeof now === 'number' ? now : Date.now()))
+      Math.max(MIN_REFRESH_DELAY_MS, refreshAt - (typeof now === 'number' ? now : LanaTime.nowMs()))
     );
   }
 

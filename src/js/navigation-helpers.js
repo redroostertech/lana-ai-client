@@ -58,7 +58,7 @@ const NavigationHelpers = {
   queueLanaDockAction(action) {
     if (!action || !window.sessionStorage) return;
     try {
-      const payload = Object.assign({ createdAt: Date.now() }, action);
+      const payload = Object.assign({ createdAt: LanaTime.nowMs() }, action);
       window.sessionStorage.setItem('lana_dock_pending_action', JSON.stringify(payload));
     } catch (e) { /* ignore unavailable storage */ }
   },

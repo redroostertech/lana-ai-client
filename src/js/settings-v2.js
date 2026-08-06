@@ -630,7 +630,7 @@
       var parts = new Intl.DateTimeFormat('en-US', {
         timeZone: value,
         timeZoneName: 'longGeneric'
-      }).formatToParts(new Date());
+      }).formatToParts(LanaTime.nowDate());
       for (var i = 0; i < parts.length; i++) {
         if (parts[i].type === 'timeZoneName' && parts[i].value) {
           return parts[i].value;
@@ -655,7 +655,7 @@
     try {
       var time = new Intl.DateTimeFormat('en-US', {
         timeZone: value || 'UTC', hour: 'numeric', minute: '2-digit', hour12: true
-      }).format(new Date());
+      }).format(LanaTime.nowDate());
       return (isDefault ? 'Browser default · ' : '') + label + ' · Local time ' + time;
     } catch (e) {
       return (isDefault ? 'Browser default · ' : '') + label;

@@ -230,7 +230,7 @@
       author: firstDefined(item.author_name, item.created_by_name, item.user_name, item.author, currentUserName()),
       author_id: String(firstDefined(item.author_id, item.created_by_id, item.user_id, '')),
       content: firstDefined(item.content, item.body, item.text, ''),
-      created_at: firstDefined(item.created_at, item.timestamp, new Date().toISOString()),
+      created_at: firstDefined(item.created_at, item.timestamp, LanaTime.nowIso()),
       is_edited: !!(item.is_edited || item.edited),
       replies: asArray(firstArray(item.replies, item.children, [])).map(normalizeComment)
     };
@@ -569,7 +569,7 @@
     store.activity.unshift({
       label: label,
       author: currentUserName(),
-      created_at: new Date().toISOString()
+      created_at: LanaTime.nowIso()
     });
   }
 
@@ -580,7 +580,7 @@
     if (kind === 'checklist') {
       var checklist = inputValue('checklist');
       if (!checklist) return;
-      store.checklist.push({ id: 'local-check-' + Date.now(), title: checklist, completed: false });
+      store.checklist.push({ id: 'local-check-' + LanaTime.nowMs(), title: checklist, completed: false });
       addActivity(store, 'Added checklist item "' + checklist + '"');
       render();
       return;
@@ -588,7 +588,7 @@
     if (kind === 'subtask') {
       var subtask = inputValue('subtask');
       if (!subtask) return;
-      store.subtasks.push({ id: 'local-subtask-' + Date.now(), title: subtask, status: 'pending' });
+      store.subtasks.push({ id: 'local-subtask-' + LanaTime.nowMs(), title: subtask, status: 'pending' });
       addActivity(store, 'Added subtask "' + subtask + '"');
       render();
       return;
@@ -596,7 +596,7 @@
     if (kind === 'document') {
       var doc = inputValue('document');
       if (!doc) return;
-      store.documents.push({ id: 'local-doc-' + Date.now(), name: doc, type: 'document' });
+      store.documents.push({ id: 'local-doc-' + LanaTime.nowMs(), name: doc, type: 'document' });
       addActivity(store, 'Associated document "' + doc + '"');
       render();
       return;
@@ -605,11 +605,11 @@
       var comment = inputValue('comment');
       if (!comment) return;
       store.comments.unshift({
-        id: 'local-comment-' + Date.now(),
+        id: 'local-comment-' + LanaTime.nowMs(),
         author: currentUserName(),
         author_id: currentUserId(),
         content: comment,
-        created_at: new Date().toISOString(),
+        created_at: LanaTime.nowIso(),
         replies: []
       });
       state.activityTabs[detailKey(task)] = 'comments';
@@ -670,7 +670,7 @@
       var text = textarea ? textarea.value.trim() : '';
       if (!text) return;
       comment.replies = comment.replies || [];
-      comment.replies.push({ id: 'local-reply-' + Date.now(), author: currentUserName(), author_id: currentUserId(), content: text, created_at: new Date().toISOString(), replies: [] });
+      comment.replies.push({ id: 'local-reply-' + LanaTime.nowMs(), author: currentUserName(), author_id: currentUserId(), content: text, created_at: LanaTime.nowIso(), replies: [] });
       addActivity(store, 'Replied to a comment');
       render();
     }

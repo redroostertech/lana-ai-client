@@ -853,7 +853,7 @@ async function handleSubmitMetric(e) {
     const submissionData = {
       value: parseFloat(value),
       notes: notes || null,
-      submission_date: new Date().toISOString().split('T')[0]
+      submission_date: LanaTime.formatUtcDateOnly(LanaTime.nowDate())
     };
 
     await ManagementBoardService.submitMetric(boardId, metricId, submissionData);
@@ -1366,9 +1366,9 @@ function capitalizeFirst(str) {
 
 function formatRelativeTime(dateString) {
   const date = new Date(dateString);
-  const now = new Date();
+  const now = LanaTime.nowDate();
   const diffMs = now - date;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor(diffMs / LanaTime.MS_PER_DAY);
 
   if (diffDays === 0) {
     return 'today';

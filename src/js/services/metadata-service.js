@@ -30,7 +30,7 @@ class MetadataService {
     if (!cached) return null;
 
     // Check if cache entry is expired
-    const now = Date.now();
+    const now = LanaTime.nowMs();
     if (now - cached.timestamp > this.cacheTTL) {
       this.cache.delete(key);
       return null;
@@ -54,7 +54,7 @@ class MetadataService {
    */
   setCached(documentId, metadata) {
     const key = this.getCacheKey(documentId);
-    const now = Date.now();
+    const now = LanaTime.nowMs();
 
     // LRU eviction: if cache is at capacity and this is a new entry, evict oldest
     if (this.cache.size >= this.maxCacheSize && !this.cache.has(key)) {

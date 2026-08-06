@@ -734,7 +734,7 @@
       document.getElementById('dashboardContent').classList.add('hidden');
 
       try {
-        const result = await api.get(`${connectorApi('/summary')}?_=${Date.now()}`);
+        const result = await api.get(`${connectorApi('/summary')}?_=${LanaTime.nowMs()}`);
         dashboardData = result;
 
         // Always show dashboard content with tabs, regardless of configuration status
@@ -1152,8 +1152,8 @@
       if (fileNameEl) fileNameEl.textContent = file.name;
       if (fileSizeEl) fileSizeEl.textContent = ChunkedUploader.formatBytes(file.size);
 
-      const startTime = Date.now();
-      let lastUpdate = Date.now();
+      const startTime = LanaTime.nowMs();
+      let lastUpdate = LanaTime.nowMs();
       let lastBytes = 0;
 
       // Create uploader instance
@@ -1198,7 +1198,7 @@
           if (uploadedBytesEl) uploadedBytesEl.textContent = ChunkedUploader.formatBytes(progress.uploadedBytes);
 
           // Calculate speed (update every 2 seconds)
-          const now = Date.now();
+          const now = LanaTime.nowMs();
           if (now - lastUpdate >= 2000) {
             const timeDiff = (now - lastUpdate) / 1000; // seconds
             const bytesDiff = progress.uploadedBytes - lastBytes;
@@ -1790,7 +1790,7 @@
       content.innerHTML = `
         <div class="space-y-3">
           ${result.records.map(t => {
-            const isOverdue = !t.completed_timestamp && t.due_date && new Date(t.due_date) < new Date();
+            const isOverdue = !t.completed_timestamp && t.due_date && new Date(t.due_date) < LanaTime.nowDate();
             const displayStatus = isOverdue ? 'Overdue' : (t.current_status || 'Pending');
             return `
               <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-lg ${isOverdue ? 'border-l-4 border-red-500' : ''}">
@@ -2802,7 +2802,7 @@
           // Calculate time remaining
           let timeRemaining = '';
           if (progress > 0 && progress < 100 && job.created_at) {
-            const elapsed = (Date.now() - new Date(job.created_at).getTime()) / 1000; // seconds
+            const elapsed = LanaTime.millisecondsSince(new Date(job.created_at).getTime()) / 1000; // seconds
             const estimatedTotal = elapsed / (progress / 100);
             const remaining = Math.max(0, estimatedTotal - elapsed);
 

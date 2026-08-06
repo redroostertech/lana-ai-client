@@ -8,6 +8,7 @@
   <!-- Tailwind -->
   <link rel="stylesheet" href="css/tailwind-output.css">
   <script src="js/tailwind-loader.js"></script>
+  <script src="js/time-utils.js"></script>
 
   <!-- Design Tokens -->
   <link rel="stylesheet" href="css/lex-tokens.css">
@@ -502,7 +503,7 @@
 
     // ── Event logging ───────────────────────────────────────────────────
     function logEvent(type, data) {
-      var now = new Date();
+      var now = LanaTime.nowDate();
       var time = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       var entry = document.createElement('div');

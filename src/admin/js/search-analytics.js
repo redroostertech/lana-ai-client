@@ -519,7 +519,7 @@ class SearchAnalytics {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `search-analytics-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `search-analytics-${LanaTime.formatUtcDateOnly()}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   }

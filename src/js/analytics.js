@@ -94,7 +94,7 @@
         resource_name: details.resource_name || null,
         details: {
           ...details,
-          client_timestamp: new Date().toISOString(),
+          client_timestamp: LanaTime.nowIso(),
           user_agent: navigator.userAgent,
           screen_resolution: `${window.screen.width}x${window.screen.height}`,
           viewport_size: `${window.innerWidth}x${window.innerHeight}`

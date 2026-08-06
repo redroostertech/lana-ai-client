@@ -1,5 +1,15 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
+// navigation-helpers.js uses the LanaTime clock utility, which every page
+// loads from time-utils.js before it — mirror that load order in the sandbox.
+const timeUtilsSrc = fs.readFileSync(
+  path.resolve(__dirname, '../../src/js/time-utils.js'),
+  'utf8'
+);
+
 describe('NavigationHelpers dock-first chat routing', () => {
   let NavigationHelpers;
 
@@ -23,12 +33,15 @@ describe('NavigationHelpers dock-first chat routing', () => {
     };
     global.document = global.window.document;
     global.URLSearchParams = URLSearchParams;
+    new Function('window', timeUtilsSrc)(global.window);
+    global.LanaTime = global.window.LanaTime;
     NavigationHelpers = require('../../src/js/navigation-helpers.js');
   });
 
   afterEach(() => {
     delete global.window;
     delete global.document;
+    delete global.LanaTime;
   });
 
   test('navigateToConversation opens the LANA dock when available', () => {

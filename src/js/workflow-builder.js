@@ -772,7 +772,7 @@ class WorkflowBuilder {
       description: this.workflowDescription,
       nodes: nodes,
       drawflowData: data,
-      createdAt: new Date().toISOString()
+      createdAt: LanaTime.nowIso()
     };
   }
 

@@ -1652,7 +1652,7 @@ function waitForNextPaint(minDelayMs = 120) {
 }
 
 async function showLibraryLoadingState() {
-  const token = Date.now();
+  const token = LanaTime.nowMs();
   state.libraryLoadingToken = token;
   state.libraryLoading = true;
   renderCurrentView();
@@ -1665,7 +1665,7 @@ async function showLibraryLoadingState() {
 }
 
 async function loadLibraryData() {
-  const token = Date.now();
+  const token = LanaTime.nowMs();
   state.libraryLoadingToken = token;
   state.libraryLoading = true;
   renderCurrentView();
@@ -2246,7 +2246,7 @@ async function runAutomationFromHome(automationId) {
 }
 
 function rememberHomeRecentRun(automationId, automationName) {
-  const now = new Date().toISOString();
+  const now = LanaTime.nowIso();
   state.homeRecentRuns = [
     {
       automation_id: automationId,
@@ -3292,9 +3292,9 @@ function scheduleTokenRefresh() {
   const expiresAt = getTokenExpirationMs();
   if (!expiresAt) return;
 
-  const now = Date.now();
-  const oneHour = 60 * 60 * 1000;
-  const fiveMinutes = 5 * 60 * 1000;
+  const now = LanaTime.nowMs();
+  const oneHour = LanaTime.MS_PER_HOUR;
+  const fiveMinutes = 5 * LanaTime.MS_PER_MINUTE;
   const refreshInMs = Math.max(Math.min(expiresAt - now - oneHour, oneHour), fiveMinutes);
 
   state._tokenRefreshTimer = window.setTimeout(() => {
@@ -3328,9 +3328,9 @@ function startAuthLifecycle() {
   if (!state.token) return;
   stopAuthLifecycle();
 
-  state._lastActivityAt = Date.now();
+  state._lastActivityAt = LanaTime.nowMs();
   state._activityHandler = () => {
-    state._lastActivityAt = Date.now();
+    state._lastActivityAt = LanaTime.nowMs();
   };
   window.addEventListener('click', state._activityHandler, { passive: true });
   window.addEventListener('keydown', state._activityHandler, { passive: true });

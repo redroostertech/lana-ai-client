@@ -362,7 +362,7 @@ class ExportComponent {
       // Get filename from Content-Disposition header or generate default
       const contentDisposition = response.headers.get('Content-Disposition');
       const filename = this.extractFilename(contentDisposition) ||
-                      `${this.metric}_drilldown_${this.formatDate(new Date())}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+                      `${this.metric}_drilldown_${this.formatDate(LanaTime.nowDate())}.${format === 'csv' ? 'csv' : 'xlsx'}`;
 
       // Download file
       const blob = await response.blob();
@@ -417,10 +417,7 @@ class ExportComponent {
    * @returns {string} Formatted date
    */
   formatDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return LanaTime.toLocalDateInputValue(date);
   }
 
   /**

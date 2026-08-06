@@ -101,7 +101,7 @@ export class BubbleChartRenderer {
 
     // Canvas element
     this.canvas = null;
-    this.canvasId = `bubble-chart-${containerId}-${Date.now()}`;
+    this.canvasId = `bubble-chart-${containerId}-${LanaTime.nowMs()}`;
   }
 
   /**

@@ -14,7 +14,7 @@ function readStoredUser() {
 function validTimezone(value) {
   if (!value || typeof value !== 'string') return '';
   try {
-    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(LanaTime.nowDate());
     return value;
   } catch (_error) {
     return '';
@@ -108,7 +108,7 @@ export function timeAgo(isoString) {
   if (!isoString) return 'Never';
   const then = new Date(isoString).getTime();
   if (!Number.isFinite(then)) return 'Never';
-  const diffSec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  const diffSec = Math.max(0, Math.floor(LanaTime.millisecondsSince(then) / 1000));
   if (diffSec < 60) return `${diffSec}s ago`;
   const diffMin = Math.floor(diffSec / 60);
   if (diffMin < 60) return `${diffMin}m ago`;

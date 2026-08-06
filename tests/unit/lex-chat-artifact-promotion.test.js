@@ -111,4 +111,93 @@ describe('Lex chat artifact promotion contract', () => {
     expect(result.alreadyPromoted).toBe(true);
     expect(result.document.id).toBe('d-1');
   });
+
+  test('recognizes private insight context promotion suggestions', () => {
+    const artifact = {
+      artifact_type: 'context_promotion',
+      context_promotion: {
+        promotion_id: 'cp-1',
+        title: 'Client prefers email',
+        insight: 'The client asked for written updates only.',
+        matter_name: 'Doe v Smith',
+        status: 'pending'
+      },
+      actions: [
+        { id: 'approve_context_promotion' },
+        { id: 'dismiss_context_promotion' }
+      ]
+    };
+
+    expect(promotion.getContextPromotionId(artifact)).toBe('cp-1');
+    expect(promotion.getContextPromotionView(artifact)).toMatchObject({
+      id: 'cp-1',
+      title: 'Client prefers email',
+      insight: 'The client asked for written updates only.',
+      matterName: 'Doe v Smith',
+      tone: 'pending',
+      message: 'Private insight. Approve to share with the matter.'
+    });
+    expect(promotion.getApproveContextPromotionAction(artifact).id).toBe('approve_context_promotion');
+    expect(promotion.getDismissContextPromotionAction(artifact).id).toBe('dismiss_context_promotion');
+  });
+
+  test('requires explicit approval for context promotion requests', () => {
+    expect(promotion.getContextActionRequest({
+      method: 'POST',
+      endpoint: '/api/v1/context-promotions/cp-1/approve',
+      body: { approved: true }
+    }, 'approve')).toEqual({
+      endpoint: '/api/v1/context-promotions/cp-1/approve',
+      body: { approved: true }
+    });
+
+    expect(() => promotion.getContextActionRequest({
+      method: 'POST',
+      endpoint: '/api/v1/context-promotions/cp-1/approve',
+      body: {}
+    }, 'approve')).toThrow('explicit approval');
+  });
+
+  test('does not allow a dismiss action to carry approval', () => {
+    expect(promotion.getContextActionRequest({
+      method: 'POST',
+      endpoint: '/api/v1/context-promotions/cp-1/dismiss',
+      body: { dismissed: true }
+    }, 'dismiss')).toEqual({
+      endpoint: '/api/v1/context-promotions/cp-1/dismiss',
+      body: { dismissed: true }
+    });
+
+    expect(() => promotion.getContextActionRequest({
+      method: 'POST',
+      endpoint: '/api/v1/context-promotions/cp-1/dismiss',
+      body: { approved: true }
+    }, 'dismiss')).toThrow('cannot contain approval');
+  });
+
+  test('verifies context promotion action responses', () => {
+    expect(promotion.normalizeContextPromotionResponse({
+      data: {
+        promotion_status: 'promoted',
+        matter_id: 'm-1',
+        context_ref: { type: 'matter_state', id: 'ref-1' },
+        state_revision: 'rev-1',
+        already_promoted: false
+      }
+    }, 'approve')).toEqual({
+      promotionStatus: 'promoted',
+      matterId: 'm-1',
+      contextRef: { type: 'matter_state', id: 'ref-1' },
+      stateRevision: 'rev-1',
+      alreadyPromoted: false
+    });
+
+    expect(promotion.normalizeContextPromotionResponse({
+      data: { promotion_status: 'dismissed' }
+    }, 'dismiss')).toEqual({ promotionStatus: 'dismissed' });
+
+    expect(() => promotion.normalizeContextPromotionResponse({
+      data: { promotion_status: 'pending' }
+    }, 'approve')).toThrow('did not confirm');
+  });
 });

@@ -218,7 +218,7 @@
    * resolves matter count.
    */
   function renderZoneA() {
-    var now = new Date();
+    var now = LanaTime.nowDate();
     var banner = el('ccZoneA');
     if (!banner) return;
 
@@ -888,7 +888,7 @@
   function isTaskDueToday(task) {
     if (!task || !task.due_date) return false;
     var due = new Date(task.due_date);
-    var today = new Date();
+    var today = LanaTime.nowDate();
     return due.getFullYear() === today.getFullYear() &&
       due.getMonth() === today.getMonth() &&
       due.getDate() === today.getDate();
@@ -898,10 +898,10 @@
     if (!task || !task.due_date) return 0;
     var due = new Date(task.due_date);
     if (isNaN(due.getTime())) return 0;
-    var today = new Date();
-    var dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
-    var todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-    return Math.floor((todayStart - dueStart) / 86400000);
+    var today = LanaTime.nowDate();
+    var dueStart = LanaTime.startOfLocalDay(due).getTime();
+    var todayStart = LanaTime.startOfLocalDay(today).getTime();
+    return Math.floor((todayStart - dueStart) / LanaTime.MS_PER_DAY);
   }
 
   function isTaskSeverelyDelinquent(task) {
@@ -1322,14 +1322,8 @@
   }
 
   function dueDateInputValue(dateStr) {
-    if (!dateStr) return '';
-    var d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '';
-    // YYYY-MM-DD for <input type="date">
-    var yyyy = d.getFullYear();
-    var mm = String(d.getMonth() + 1).padStart(2, '0');
-    var dd = String(d.getDate()).padStart(2, '0');
-    return yyyy + '-' + mm + '-' + dd;
+    // YYYY-MM-DD for <input type="date"> ('' when empty/invalid)
+    return dateStr ? LanaTime.toLocalDateInputValue(dateStr) : '';
   }
 
   function renderTaskViewBody(task) {
@@ -1998,7 +1992,7 @@
               // "first-of-month → today" filter excludes it, and the user
               // sees an empty entry list even though the draft exists.
               var dDate = d.start_time
-                ? new Date(d.start_time).toISOString().substring(0, 10)
+                ? LanaTime.formatUtcDateOnly(d.start_time)
                 : '';
               draftHtml += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.375rem 0;font-size:0.8rem;">';
               // Hours badge

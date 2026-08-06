@@ -112,7 +112,7 @@
       return { text: '', urgencyClass: '' };
     }
 
-    var now   = Date.now();
+    var now   = LanaTime.nowMs();
     var expMs = new Date(expiresAt).getTime();
     var diffMs = expMs - now;
 

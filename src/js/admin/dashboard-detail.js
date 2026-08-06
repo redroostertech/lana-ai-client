@@ -128,7 +128,7 @@
     var startDate = parseDateInput(start, false);
     var endDate = parseDateInput(end, true);
     if (!startDate || !endDate) return;
-    var durationDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    var durationDays = Math.ceil((endDate - startDate) / LanaTime.MS_PER_DAY);
     var allOptions = [
       { value: 'daily', label: 'Daily' },
       { value: 'weekly', label: 'Weekly' },
@@ -196,7 +196,7 @@
   }
 
   function selectDashboardPeriodPreset(preset, reload) {
-    var today = new Date();
+    var today = LanaTime.nowDate();
     var startDate;
     var endDate;
 

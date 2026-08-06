@@ -652,10 +652,10 @@
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return String(value);
 
-      const diffMs = Date.now() - date.getTime();
-      const minute = 60 * 1000;
-      const hour = 60 * minute;
-      const day = 24 * hour;
+      const diffMs = LanaTime.millisecondsSince(date.getTime());
+      const minute = LanaTime.MS_PER_MINUTE;
+      const hour = LanaTime.MS_PER_HOUR;
+      const day = LanaTime.MS_PER_DAY;
       const month = 30 * day;
 
       if (diffMs < minute) return 'just now';
@@ -6798,14 +6798,14 @@
 
       stopAuthorizationStatusPolling();
 
-      const startedAt = Date.now();
+      const startedAt = LanaTime.nowMs();
       state.authStatusPollTimer = setInterval(async () => {
         if (!state.sourceId || !isOAuthConnector() || isOAuthAuthorized()) {
           stopAuthorizationStatusPolling();
           return;
         }
 
-        if (Date.now() - startedAt > 90000) {
+        if (LanaTime.millisecondsSince(startedAt) > 90000) {
           stopAuthorizationStatusPolling();
           return;
         }
@@ -7045,12 +7045,11 @@
       const endNode = document.getElementById('runEndDate');
       if (!startNode || !endNode) return;
 
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      const endDate = LanaTime.nowDate();
+      const startDate = LanaTime.addDays(endDate, -days);
 
-      startNode.value = startDate.toISOString().slice(0, 10);
-      endNode.value = endDate.toISOString().slice(0, 10);
+      startNode.value = LanaTime.formatUtcDateOnly(startDate);
+      endNode.value = LanaTime.formatUtcDateOnly(endDate);
     }
 
     function collectRunOptionOverrides() {

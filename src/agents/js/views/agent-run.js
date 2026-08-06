@@ -251,7 +251,7 @@
     var update = function () {
       var timerEl = el('agentRunTimer');
       if (!timerEl || state.startTimeMs == null) return;
-      var elapsed = Date.now() - state.startTimeMs;
+      var elapsed = LanaTime.millisecondsSince(state.startTimeMs);
       timerEl.textContent = fmtMs(elapsed);
     };
     update();
@@ -1420,11 +1420,11 @@
   function timeAgoLite(iso) {
     var t = new Date(iso).getTime();
     if (!t || isNaN(t)) return '';
-    var ms = Date.now() - t;
-    if (ms < 60000) return Math.floor(ms / 1000) + 's ago';
-    if (ms < 3600000) return Math.floor(ms / 60000) + 'm ago';
-    if (ms < 86400000) return Math.floor(ms / 3600000) + 'h ago';
-    return Math.floor(ms / 86400000) + 'd ago';
+    var ms = LanaTime.millisecondsSince(t);
+    if (ms < LanaTime.MS_PER_MINUTE) return Math.floor(ms / LanaTime.MS_PER_SECOND) + 's ago';
+    if (ms < LanaTime.MS_PER_HOUR) return Math.floor(ms / LanaTime.MS_PER_MINUTE) + 'm ago';
+    if (ms < LanaTime.MS_PER_DAY) return Math.floor(ms / LanaTime.MS_PER_HOUR) + 'h ago';
+    return Math.floor(ms / LanaTime.MS_PER_DAY) + 'd ago';
   }
 
   function formatDurationMs(ms) {

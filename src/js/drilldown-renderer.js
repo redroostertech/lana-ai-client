@@ -2490,7 +2490,7 @@ class DrilldownRenderer {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${this.currentConfig.metricKey}_${new Date().toISOString().split('T')[0]}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+      a.download = `${this.currentConfig.metricKey}_${LanaTime.formatUtcDateOnly()}.${format === 'csv' ? 'csv' : 'xlsx'}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

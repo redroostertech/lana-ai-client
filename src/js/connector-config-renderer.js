@@ -547,7 +547,7 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
       const timeout = setTimeout(() => {
         cleanup();
         reject(new Error('OAuth flow timed out after 5 minutes'));
-      }, 5 * 60 * 1000); // 5 minute timeout
+      }, 5 * LanaTime.MS_PER_MINUTE); // 5 minute timeout
 
       const handleOAuthCallback = async (data) => {
         console.log('Received OAuth callback:', data);

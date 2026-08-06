@@ -653,7 +653,7 @@
       priority: el('taskPlanItemPriority') ? el('taskPlanItemPriority').value : 'medium',
       status: 'pending',
       assigned_to_user_id: assignee && assignee.value ? assignee.value : null,
-      due_date: dueDate && dueDate.value ? new Date(dueDate.value + 'T12:00:00').toISOString() : null,
+      due_date: dueDate && dueDate.value ? LanaTime.toIsoInstant(dueDate.value + 'T12:00:00') : null,
       checklist_items: [],
       metadata: { edited_in_admin: true },
       is_active: true

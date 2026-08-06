@@ -418,8 +418,8 @@ export class DataOverridePanel {
   async _loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd) {
     try {
       // Convert to ISO format
-      const periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
-      const periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
+      const periodStartISO = LanaTime.toIsoInstant(periodStart + 'T00:00:00Z');
+      const periodEndISO = LanaTime.toIsoInstant(periodEnd + 'T23:59:59Z');
 
       // Build endpoint URL using configurable template
       const endpoint = this._buildEndpoint(this.apiEndpoints.overrides, moduleKey);
@@ -515,8 +515,8 @@ export class DataOverridePanel {
     }
 
     // Convert to ISO format
-    const periodStartISO = new Date(periodStart + 'T00:00:00Z').toISOString();
-    const periodEndISO = new Date(periodEnd + 'T23:59:59Z').toISOString();
+    const periodStartISO = LanaTime.toIsoInstant(periodStart + 'T00:00:00Z');
+    const periodEndISO = LanaTime.toIsoInstant(periodEnd + 'T23:59:59Z');
 
     // Show loading state
     this._setLoadingState(true);

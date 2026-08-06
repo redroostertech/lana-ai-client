@@ -14,7 +14,7 @@ const ConnectorsMockData = {
       description: 'Lead management and tracking platform',
       status: 'connected',
       records: 2847,
-      lastSync: new Date(Date.now() - 1800000).toISOString(),
+      lastSync: new Date(LanaTime.nowMs() - 1800000).toISOString(),
       config: { api_key: '***hidden***', sync_frequency: 'hourly' }
     },
     {
@@ -54,7 +54,7 @@ const ConnectorsMockData = {
       description: 'All-in-one marketing and CRM platform',
       status: 'connected',
       records: 1654,
-      lastSync: new Date(Date.now() - 2400000).toISOString(),
+      lastSync: new Date(LanaTime.nowMs() - 2400000).toISOString(),
       config: { api_key: '***hidden***', sync_frequency: 'hourly' }
     },
     {
@@ -64,7 +64,7 @@ const ConnectorsMockData = {
       description: 'Spreadsheet data and collaboration',
       status: 'connected',
       records: 847,
-      lastSync: new Date(Date.now() - 1500000).toISOString(),
+      lastSync: new Date(LanaTime.nowMs() - 1500000).toISOString(),
       config: { oauth_connected: true, spreadsheets: ['Lead Tracker', 'Client Database'] }
     },
 
@@ -76,7 +76,7 @@ const ConnectorsMockData = {
       description: 'Legal practice management software',
       status: 'connected',
       records: 1523,
-      lastSync: new Date(Date.now() - 3600000).toISOString(),
+      lastSync: new Date(LanaTime.nowMs() - 3600000).toISOString(),
       config: { api_key: '***hidden***', sync_frequency: 'realtime' }
     },
     {
@@ -118,7 +118,7 @@ const ConnectorsMockData = {
       description: 'Accounting and invoicing software',
       status: 'connected',
       records: 4521,
-      lastSync: new Date(Date.now() - 7200000).toISOString(),
+      lastSync: new Date(LanaTime.nowMs() - 7200000).toISOString(),
       config: { oauth_connected: true, sync_frequency: 'daily' }
     },
     {
@@ -128,7 +128,7 @@ const ConnectorsMockData = {
       description: 'Import CSV/Excel financial data',
       status: 'connected',
       records: 892,
-      lastSync: new Date(Date.now() - 86400000).toISOString(),
+      lastSync: new Date(LanaTime.nowMs() - 86400000).toISOString(),
       config: { last_file: 'AR_Report_Nov2024.xlsx' }
     },
     {
@@ -160,7 +160,7 @@ const ConnectorsMockData = {
       description: 'Calendar and scheduling',
       status: 'connected',
       records: 1847,
-      lastSync: new Date(Date.now() - 900000).toISOString(),
+      lastSync: new Date(LanaTime.nowMs() - 900000).toISOString(),
       config: { oauth_connected: true, calendars: ['primary', 'consultations'] }
     },
     {
@@ -180,7 +180,7 @@ const ConnectorsMockData = {
       description: 'SMS and voice communications',
       status: 'connected',
       records: 5234,
-      lastSync: new Date(Date.now() - 600000).toISOString(),
+      lastSync: new Date(LanaTime.nowMs() - 600000).toISOString(),
       config: { account_sid: '***hidden***', sync_frequency: 'realtime' }
     },
     {
@@ -202,7 +202,7 @@ const ConnectorsMockData = {
       description: 'Cloud document storage',
       status: 'connected',
       records: 3456,
-      lastSync: new Date(Date.now() - 1200000).toISOString(),
+      lastSync: new Date(LanaTime.nowMs() - 1200000).toISOString(),
       config: { oauth_connected: true, folders: ['Legal Documents', 'Client Files'] }
     },
     {
@@ -238,13 +238,13 @@ const ConnectorsMockData = {
   ],
 
   syncHistory: [
-    { id: 'sync-001', connector_id: 'crm-leadly', connector_name: 'Leadly', status: 'success', records_synced: 47, started_at: new Date(Date.now() - 1800000).toISOString(), completed_at: new Date(Date.now() - 1795000).toISOString(), duration_ms: 5000 },
-    { id: 'sync-002', connector_id: 'case-actionstep', connector_name: 'ActionStep', status: 'success', records_synced: 23, started_at: new Date(Date.now() - 3600000).toISOString(), completed_at: new Date(Date.now() - 3595000).toISOString(), duration_ms: 5000 },
-    { id: 'sync-003', connector_id: 'fin-quickbooks', connector_name: 'QuickBooks', status: 'success', records_synced: 156, started_at: new Date(Date.now() - 7200000).toISOString(), completed_at: new Date(Date.now() - 7185000).toISOString(), duration_ms: 15000 },
-    { id: 'sync-004', connector_id: 'comm-gcal', connector_name: 'Google Calendar', status: 'success', records_synced: 12, started_at: new Date(Date.now() - 900000).toISOString(), completed_at: new Date(Date.now() - 898000).toISOString(), duration_ms: 2000 },
-    { id: 'sync-005', connector_id: 'comm-twilio', connector_name: 'Twilio SMS', status: 'success', records_synced: 89, started_at: new Date(Date.now() - 600000).toISOString(), completed_at: new Date(Date.now() - 597000).toISOString(), duration_ms: 3000 },
-    { id: 'sync-006', connector_id: 'doc-gdrive', connector_name: 'Google Drive', status: 'success', records_synced: 34, started_at: new Date(Date.now() - 1200000).toISOString(), completed_at: new Date(Date.now() - 1192000).toISOString(), duration_ms: 8000 },
-    { id: 'sync-007', connector_id: 'crm-leadly', connector_name: 'Leadly', status: 'error', records_synced: 0, error_message: 'API rate limit exceeded', started_at: new Date(Date.now() - 86400000).toISOString(), completed_at: new Date(Date.now() - 86399000).toISOString(), duration_ms: 1000 }
+    { id: 'sync-001', connector_id: 'crm-leadly', connector_name: 'Leadly', status: 'success', records_synced: 47, started_at: new Date(LanaTime.nowMs() - 1800000).toISOString(), completed_at: new Date(LanaTime.nowMs() - 1795000).toISOString(), duration_ms: 5000 },
+    { id: 'sync-002', connector_id: 'case-actionstep', connector_name: 'ActionStep', status: 'success', records_synced: 23, started_at: new Date(LanaTime.nowMs() - 3600000).toISOString(), completed_at: new Date(LanaTime.nowMs() - 3595000).toISOString(), duration_ms: 5000 },
+    { id: 'sync-003', connector_id: 'fin-quickbooks', connector_name: 'QuickBooks', status: 'success', records_synced: 156, started_at: new Date(LanaTime.nowMs() - 7200000).toISOString(), completed_at: new Date(LanaTime.nowMs() - 7185000).toISOString(), duration_ms: 15000 },
+    { id: 'sync-004', connector_id: 'comm-gcal', connector_name: 'Google Calendar', status: 'success', records_synced: 12, started_at: new Date(LanaTime.nowMs() - 900000).toISOString(), completed_at: new Date(LanaTime.nowMs() - 898000).toISOString(), duration_ms: 2000 },
+    { id: 'sync-005', connector_id: 'comm-twilio', connector_name: 'Twilio SMS', status: 'success', records_synced: 89, started_at: new Date(LanaTime.nowMs() - 600000).toISOString(), completed_at: new Date(LanaTime.nowMs() - 597000).toISOString(), duration_ms: 3000 },
+    { id: 'sync-006', connector_id: 'doc-gdrive', connector_name: 'Google Drive', status: 'success', records_synced: 34, started_at: new Date(LanaTime.nowMs() - 1200000).toISOString(), completed_at: new Date(LanaTime.nowMs() - 1192000).toISOString(), duration_ms: 8000 },
+    { id: 'sync-007', connector_id: 'crm-leadly', connector_name: 'Leadly', status: 'error', records_synced: 0, error_message: 'API rate limit exceeded', started_at: new Date(LanaTime.nowMs() - 86400000).toISOString(), completed_at: new Date(LanaTime.nowMs() - 86399000).toISOString(), duration_ms: 1000 }
   ],
 
   fieldMappings: {
@@ -406,7 +406,7 @@ const Connectors = {
       if (connector) {
         connector.config = { ...connector.config, ...config };
         connector.status = 'connected';
-        connector.lastSync = new Date().toISOString();
+        connector.lastSync = LanaTime.nowIso();
       }
       result = { success: true, connector };
     } else {
@@ -466,7 +466,7 @@ const Connectors = {
       await MockData.delay(2000);
       const connector = ConnectorsMockData.connectors.find(c => c.id === connectorId);
       if (connector) {
-        connector.lastSync = new Date().toISOString();
+        connector.lastSync = LanaTime.nowIso();
         connector.records += Math.floor(Math.random() * 50);
       }
       return { success: true, records_synced: Math.floor(Math.random() * 100) };
@@ -532,7 +532,7 @@ const Connectors = {
         last_sync: lastSync?.lastSync || null,
         syncs_today: ConnectorsMockData.syncHistory.filter(h => {
           const syncDate = new Date(h.started_at);
-          const today = new Date();
+          const today = LanaTime.nowDate();
           return syncDate.toDateString() === today.toDateString();
         }).length
       };
@@ -592,13 +592,13 @@ const ConnectorRegistry = {
       return {
         connectors: connectors,
         registry_version: data.source || 'local',
-        updated_at: new Date().toISOString()
+        updated_at: LanaTime.nowIso()
       };
     } catch (error) {
       console.error('Failed to fetch connector catalog from backend:', error);
 
       if (api.isDemoMode()) {
-        return { connectors: [], registry_version: '1.0.0', updated_at: new Date().toISOString() };
+        return { connectors: [], registry_version: '1.0.0', updated_at: LanaTime.nowIso() };
       }
 
       throw error;

@@ -130,7 +130,7 @@
   function formatTimeAgo(dateStr) {
     if (!dateStr) return '';
     var date = new Date(dateStr);
-    var now = new Date();
+    var now = LanaTime.nowDate();
     var diffMs = now - date;
     if (isNaN(diffMs)) return '';
     var diffMins = Math.floor(diffMs / 60000);

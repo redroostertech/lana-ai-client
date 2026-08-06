@@ -104,6 +104,81 @@
     return Number.isFinite(date.getTime()) ? date.toISOString().split('T')[0] : '';
   }
 
+  function startOfLocalQuarter(value) {
+    var date = value === undefined ? nowDate() : value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return new Date(NaN);
+    return new Date(date.getFullYear(), Math.floor(date.getMonth() / 3) * 3, 1);
+  }
+
+  function startOfUtcQuarter(value) {
+    var date = value === undefined ? nowDate() : value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return new Date(NaN);
+    return new Date(Date.UTC(date.getUTCFullYear(), Math.floor(date.getUTCMonth() / 3) * 3, 1));
+  }
+
+  function startOfUtcYear(value) {
+    var date = value === undefined ? nowDate() : value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return new Date(NaN);
+    return new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  }
+
+  function endOfUtcYear(value) {
+    var date = value === undefined ? nowDate() : value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return new Date(NaN);
+    return new Date(Date.UTC(date.getUTCFullYear(), 11, 31));
+  }
+
+  // Calendar-safe local-month arithmetic (local analog of addUtcMonths):
+  // Jan 31 + 1 month clamps to the last day of February.
+  function addLocalMonths(value, months) {
+    var date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return new Date(NaN);
+    var targetMonthStart = new Date(date.getFullYear(), date.getMonth() + Number(months || 0), 1);
+    var targetMonthLastDay = new Date(targetMonthStart.getFullYear(), targetMonthStart.getMonth() + 1, 0).getDate();
+    return new Date(
+      targetMonthStart.getFullYear(),
+      targetMonthStart.getMonth(),
+      Math.min(date.getDate(), targetMonthLastDay),
+      date.getHours(),
+      date.getMinutes(),
+      date.getSeconds(),
+      date.getMilliseconds()
+    );
+  }
+
+  // Local calendar day without separators ('YYYYMMDD') for filename stamps.
+  function formatCompactLocalDate(value) {
+    var day = toLocalDateInputValue(value);
+    return day ? day.split('-').join('') : '';
+  }
+
+  // Days from today (local calendar days) until the given value; negative
+  // when the value is in the past.
+  function daysUntil(value) {
+    return daysBetween(nowDate(), value);
+  }
+
+  // Canonical relative-time formatter: 'just now', 'Nm ago', 'Nh ago',
+  // 'Nd ago', 'Nw ago', 'Nmo ago', 'Ny ago'. Returns '' for empty or
+  // invalid values. Future instants clamp to 'just now'.
+  function timeAgo(value, nowReferenceMs) {
+    if (value === null || value === undefined || value === '') return '';
+    var date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    var reference = nowReferenceMs === undefined ? nowMs() : Number(nowReferenceMs);
+    var seconds = Math.floor((reference - date.getTime()) / MS_PER_SECOND);
+    if (seconds < 60) return 'just now';
+    var minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return minutes + 'm ago';
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + 'h ago';
+    var days = Math.floor(hours / 24);
+    if (days < 7) return days + 'd ago';
+    if (days < 30) return Math.floor(days / 7) + 'w ago';
+    if (days < 365) return Math.floor(days / 30) + 'mo ago';
+    return Math.floor(days / 365) + 'y ago';
+  }
+
   function pad2(n) {
     return (n < 10 ? '0' : '') + n;
   }
@@ -172,6 +247,14 @@
     startOfLocalYear: startOfLocalYear,
     endOfLocalYear: endOfLocalYear,
     formatUtcDateOnly: formatUtcDateOnly,
+    startOfLocalQuarter: startOfLocalQuarter,
+    startOfUtcQuarter: startOfUtcQuarter,
+    startOfUtcYear: startOfUtcYear,
+    endOfUtcYear: endOfUtcYear,
+    addLocalMonths: addLocalMonths,
+    formatCompactLocalDate: formatCompactLocalDate,
+    daysUntil: daysUntil,
+    timeAgo: timeAgo,
     toIsoInstant: toIsoInstant,
     toLocalDateInputValue: toLocalDateInputValue,
     toLocalDatetimeInputValue: toLocalDatetimeInputValue,

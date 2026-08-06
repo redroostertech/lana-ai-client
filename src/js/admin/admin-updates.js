@@ -100,7 +100,7 @@
       var data = (resp && resp.data) || {};
       renderStatus(data);
       var when = (typeof Lex !== 'undefined' && Lex.Utils && Lex.Utils.formatDateTime)
-        ? Lex.Utils.formatDateTime(new Date()) : new Date().toLocaleString();
+        ? Lex.Utils.formatDateTime(LanaTime.nowDate()) : LanaTime.nowDate().toLocaleString();
       setText('lastUpdatedText', 'Updated: ' + when);
       return data;
     }).catch(function (err) {
@@ -138,7 +138,7 @@
         return false; // pod recreating → not reachable yet
       }).then(function (done) {
         if (done) return true;
-        if (Date.now() > deadline) return false;
+        if (LanaTime.nowMs() > deadline) return false;
         setProgress('working', 'Applying update and reconnecting to the backend…');
         return sleep(POLL_MS).then(attempt);
       });

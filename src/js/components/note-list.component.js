@@ -65,7 +65,7 @@ class NoteListComponent {
   throttle(func, delay) {
     let lastCall = 0;
     return function(...args) {
-      const now = Date.now();
+      const now = LanaTime.nowMs();
       if (now - lastCall >= delay) {
         lastCall = now;
         return func.apply(this, args);

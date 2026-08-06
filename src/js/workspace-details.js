@@ -227,21 +227,10 @@
   }
 
   function timeAgo(dateStr) {
-    if (!dateStr) return '';
-    var date = parseApiUtcDate(dateStr);
-    if (!date || isNaN(date.getTime())) return '';
-    var now = new Date();
-    var seconds = Math.floor((now - date) / 1000);
-    if (seconds < 60) return 'just now';
-    var minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return minutes + 'm ago';
-    var hours = Math.floor(minutes / 60);
-    if (hours < 24) return hours + 'h ago';
-    var days = Math.floor(hours / 24);
-    if (days < 7) return days + 'd ago';
-    if (days < 30) return Math.floor(days / 7) + 'w ago';
-    if (days < 365) return Math.floor(days / 30) + 'mo ago';
-    return Math.floor(days / 365) + 'y ago';
+    // parseApiUtcDate first so legacy zone-less API values read as UTC;
+    // formatting is the canonical LanaTime.timeAgo.
+    if (!dateStr || !window.LanaTime) return '';
+    return LanaTime.timeAgo(parseApiUtcDate(dateStr));
   }
 
   function formatNumber(num) {
@@ -1310,10 +1299,9 @@
     var tasks = currentMatterData.tasks || [];
     var activities = currentMatterData.activities || [];
 
-    var DAY = 24 * 60 * 60 * 1000;
-    var now = new Date();
-    var weekAgo = new Date(now.getTime() - 7 * DAY);
-    var weekAhead = new Date(now.getTime() + 7 * DAY);
+    var now = LanaTime.nowDate();
+    var weekAgo = LanaTime.addDays(now, -7);
+    var weekAhead = LanaTime.addDays(now, 7);
 
     var completed7d = 0, created7d = 0, updated7d = 0;
     var overdue = [], dueSoon = [], upcoming = [], openNoDue = [];
@@ -2470,7 +2458,7 @@
     stopDocStudioProgressTimer();
     docStudioDocumentState.progressPercent = null;
     docStudioDocumentState.progressSteps = [];
-    docStudioDocumentState.progressStartedAt = Date.now();
+    docStudioDocumentState.progressStartedAt = LanaTime.nowMs();
     docStudioDocumentState.progressTimer = setInterval(renderDocStudioProgress, 1000);
     renderDocStudioProgress();
   }
@@ -4428,13 +4416,11 @@
   function formatDueDate(dateString) {
     if (!dateString) return 'No due date';
     var date = parseApiUtcDate(dateString);
-    var now = new Date();
+    var now = LanaTime.nowDate();
     // Compare calendar days, not elapsed hours — a task due yesterday
     // evening is "Overdue (1 day)", not "Due today". Keeps the badge in
     // agreement with the Summary's overdue/due-soon bucketing.
-    var startOfDue = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    var diffDays = Math.round((startOfDue - startOfToday) / (1000 * 60 * 60 * 24));
+    var diffDays = LanaTime.daysBetween(now, date);
 
     if (diffDays < 0) {
       var od = Math.abs(diffDays);
@@ -7806,7 +7792,7 @@
    * Add a new blank custom field definition.
    */
   function addCustomField() {
-    var newKey = 'field_' + Date.now();
+    var newKey = 'field_' + LanaTime.nowMs();
     customFieldDefinitions.push({
       key: newKey,
       display_name: '',
@@ -10285,8 +10271,8 @@
     // Last activity card
     if (data.last_activity_at) {
       var lastDate = new Date(data.last_activity_at);
-      var now = new Date();
-      var daysSince = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
+      var now = LanaTime.nowDate();
+      var daysSince = Math.floor((now - lastDate) / LanaTime.MS_PER_DAY);
       var timeAgo = daysSince === 0 ? 'Today' : daysSince === 1 ? 'Yesterday' : String(daysSince) + ' days ago';
       html += '<div style="background:white;border:1px solid #e5e7eb;border-radius:0.5rem;padding:1rem;">';
       html += '<p style="font-size:0.75rem;color:#6b7280;margin:0 0 0.25rem 0;">Last Activity</p>';

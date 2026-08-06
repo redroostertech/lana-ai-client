@@ -135,7 +135,7 @@ function isSupportedUrl(url) {
 
 function appendCacheBust(url) {
   const separator = url.indexOf('?') === -1 ? '?' : '&';
-  return `${url}${separator}_cb=${Date.now()}`;
+  return `${url}${separator}_cb=${LanaTime.nowMs()}`;
 }
 
 function rewriteConnectorHtml(html, {

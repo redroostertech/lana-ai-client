@@ -86,7 +86,7 @@ export class MetricGridRenderer {
       onOverrideClick: null,
       onGenericDrilldownClick: null,
       onDistributionSegmentClick: null,
-      uniqueId: `metric-grid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      uniqueId: `metric-grid-${LanaTime.nowMs()}-${Math.random().toString(36).substr(2, 9)}`,
       ...config
     };
 
