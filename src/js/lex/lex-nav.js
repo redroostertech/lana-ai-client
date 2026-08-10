@@ -58,6 +58,7 @@
     'session_expired.html':                   { return: 'string' },
     'error.html':                             { message: 'string', code: 'string', ref: 'string' },
     'login.html':                             { return: 'string' },
+    'vpn-setup.html':                         { server_ref: 'string' },
     'matter-skills.html':                     { matterSkillId: 'string', tab: 'string' },
     'skills.html':                            { category: 'string', id: 'string' },
     'action-queue.html':                      { action_type: 'string', severity: 'string' },

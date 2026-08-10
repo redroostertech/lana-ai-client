@@ -1330,8 +1330,15 @@
           Lex.Toast.error('Invalid server configuration.');
           return;
         }
-        var serverInfoEncoded = btoa(JSON.stringify(serverInfo));
-        Lex.Nav.go('vpn-setup.html', { params: { server: serverInfoEncoded } });
+        var serverRef;
+        try {
+          serverRef = window.LanaVpnSetupHandoff.create(serverInfo);
+        } catch (handoffError) {
+          console.warn('[Settings] Unable to prepare VPN setup handoff:', handoffError && handoffError.message);
+          Lex.Toast.error('Unable to start VPN setup. Please enable browser session storage or contact your administrator.');
+          return;
+        }
+        Lex.Nav.go('vpn-setup.html', { params: { server_ref: serverRef } });
       });
     }
   }
