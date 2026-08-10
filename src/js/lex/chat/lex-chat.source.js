@@ -160,6 +160,10 @@
       return conversationId;
     }
 
+    async ensureConversation(options = {}) {
+      return this._ensureConversation(options);
+    }
+
     /** Load message history for the current conversation. */
     async loadHistory(page, limit) {
       if (!this._conversationId) return { messages: [], pagination: null, hasMore: false };
@@ -427,12 +431,18 @@
           };
 
         case 'progress':
+          // status/phase/heartbeat give liveness heartbeats a stable
+          // identity so the activity drawer can coalesce consecutive
+          // "Still generating..." rows (see lex-chat-progress-events.js).
           return {
             type: 'progress',
             category: data.category,
             stage: data.stage,
             percent: data.percent,
-            message: data.message
+            message: data.message,
+            status: data.status,
+            phase: data.phase,
+            heartbeat: data.heartbeat === true
           };
 
         case 'tool_thinking':

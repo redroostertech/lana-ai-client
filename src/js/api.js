@@ -2050,6 +2050,13 @@ class ApiClient {
     return this.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/activity`);
   }
 
+  async executeConversationSlashCommand(conversationId, command, args = '') {
+    return this.post(`/api/chat/conversations/${encodeURIComponent(conversationId)}/slash-command`, {
+      command,
+      args
+    });
+  }
+
   async stopConversationActivity(conversationId) {
     return this.post(`/api/v1/conversations/${encodeURIComponent(conversationId)}/stop`, {});
   }

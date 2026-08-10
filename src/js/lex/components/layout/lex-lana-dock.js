@@ -48,6 +48,10 @@
   var defineLex = Lex.defineLex;
 
   var COLLAPSED_KEY = 'lana:lanaDock:collapsed';
+  var WIDTH_KEY = 'lana:lanaDock:width';
+  /* Dragging this many px narrower than the minimum width dismisses the
+     dock instead of resizing it (the minimum IS the default width). */
+  var DISMISS_SLACK_PX = 48;
 
   function persistConversationMatter(conversationId, matterId) {
     if (typeof api === 'undefined') return Promise.reject(new Error('api not available'));
@@ -100,6 +104,40 @@
       + '}'
       + 'lex-lana-dock[data-collapsed="true"] {'
       + '  width: var(--lex-lana-dock-collapsed-width, 48px);'
+      + '}'
+
+      /* ── Resize handle: grab strip on the left edge. Hover (or an active
+            drag) lights a 2px accent line so the affordance is visible. ── */
+      + 'lex-lana-dock .lld-resize {'
+      + '  position: absolute;'
+      + '  top: 0; left: 0; bottom: 0;'
+      + '  width: 6px;'
+      + '  cursor: ew-resize;'
+      + '  z-index: 5;'
+      + '  touch-action: none;'
+      + '}'
+      + 'lex-lana-dock .lld-resize::before {'
+      + '  content: "";'
+      + '  position: absolute;'
+      + '  top: 0; left: 0; bottom: 0;'
+      + '  width: 2px;'
+      + '  background: transparent;'
+      + '  transition: background var(--lex-transition-fast, 0.15s);'
+      + '}'
+      + 'lex-lana-dock .lld-resize:hover::before,'
+      + 'lex-lana-dock[data-resizing="true"] .lld-resize::before {'
+      + '  background: var(--lex-chat-accent, #4f46e5);'
+      + '}'
+      + 'lex-lana-dock[data-collapsed="true"] .lld-resize { display: none; }'
+      /* Live drag: kill the slide transitions so dock + page track the
+         pointer 1:1, and keep the resize cursor / no text selection even
+         when the pointer momentarily leaves the strip. */
+      + 'lex-lana-dock[data-resizing="true"] { transition: none; }'
+      + 'html[data-lana-dock-resizing] lex-body { transition: none; }'
+      + 'html[data-lana-dock-resizing], html[data-lana-dock-resizing] body {'
+      + '  cursor: ew-resize !important;'
+      + '  user-select: none !important;'
+      + '  -webkit-user-select: none !important;'
       + '}'
 
       /* ── Expanded header — same height + border as lex-topbar so the
@@ -450,11 +488,14 @@
       this._mattersCache = null;
       this._injectedDocId = null;
       this._boundTriggerClick = this._handleDockTriggerClick.bind(this);
+      this._resizeState = null;   // live pointer-drag bookkeeping
+      this._baseWidthPx = 0;      // resolved default width = resize minimum
     }
 
     connected() {
       injectStyles();
       this._collapsed = this._readStoredCollapsed();
+      this._initResizeWidth();
       this._build();
       this._applyState({ initial: true });
       Lex.LanaDock = Lex.LanaDock || {};
@@ -574,6 +615,104 @@
       collapseBtn.addEventListener('click', function () { self.minimize(); });
       expandBtn.addEventListener('click', function () { self.expand(); });
       railNewBtn.addEventListener('click', function () { self.newChat(); });
+
+      var resizeHandle = document.createElement('div');
+      resizeHandle.className = 'lld-resize';
+      resizeHandle.setAttribute('role', 'separator');
+      resizeHandle.setAttribute('aria-orientation', 'vertical');
+      resizeHandle.setAttribute('aria-label', 'Resize LANA panel');
+      resizeHandle.title = 'Drag to resize · double-click to reset';
+      this.appendChild(resizeHandle);
+      this._bindResize(resizeHandle);
+    }
+
+    // =====================================================================
+    //  Edge resize
+    //
+    //  The default width is the MINIMUM; the dock can grow up to 2x that.
+    //  Dragging DISMISS_SLACK_PX narrower than the minimum dismisses the
+    //  dock (minimize) and resets the width for the next open. All widths
+    //  flow through the --lex-lana-dock-width override on <html>, so the
+    //  existing --lex-lana-dock-current-width page-reflow contract keeps
+    //  working untouched.
+    // =====================================================================
+
+    _initResizeWidth() {
+      var raw = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--lex-lana-dock-width')
+      );
+      // Read the stylesheet default BEFORE applying any stored override —
+      // it is the source of truth for min (1x) and max (2x).
+      this._baseWidthPx = (isFinite(raw) && raw > 0) ? raw : 420;
+      var stored = NaN;
+      try { stored = parseFloat(localStorage.getItem(WIDTH_KEY)); } catch (_) { /* restricted context */ }
+      if (isFinite(stored) && stored > 0) {
+        this._setDockWidth(this._clampWidth(stored), false);
+      }
+    }
+
+    _clampWidth(px) {
+      return Math.min(Math.max(px, this._baseWidthPx), this._baseWidthPx * 2);
+    }
+
+    _setDockWidth(px, persist) {
+      var rounded = Math.round(px);
+      document.documentElement.style.setProperty('--lex-lana-dock-width', rounded + 'px');
+      if (persist) {
+        try { localStorage.setItem(WIDTH_KEY, String(rounded)); } catch (_) { /* restricted context */ }
+      }
+    }
+
+    _bindResize(handle) {
+      var self = this;
+
+      handle.addEventListener('pointerdown', function (e) {
+        if (self._collapsed || self._resizeState) return;
+        e.preventDefault();
+        try { handle.setPointerCapture(e.pointerId); } catch (_) { /* capture is best-effort */ }
+        self._resizeState = {
+          startX: e.clientX,
+          startWidth: self.getBoundingClientRect().width
+        };
+        self.setAttribute('data-resizing', 'true');
+        document.documentElement.setAttribute('data-lana-dock-resizing', '');
+      });
+
+      handle.addEventListener('pointermove', function (e) {
+        var st = self._resizeState;
+        if (!st) return;
+        // Dock is right-anchored: moving the pointer LEFT grows it.
+        var requested = st.startWidth + (st.startX - e.clientX);
+        if (requested < self._baseWidthPx - DISMISS_SLACK_PX) {
+          // Dragged well inside the minimum — the gesture means "get rid
+          // of it". Reset to the default width so the next open starts
+          // clean, then minimize to the icon rail.
+          self._endResize(handle, e.pointerId);
+          self._setDockWidth(self._baseWidthPx, true);
+          self.minimize();
+          return;
+        }
+        self._setDockWidth(self._clampWidth(requested), false);
+      });
+
+      var finish = function (e) {
+        if (!self._resizeState) return;
+        self._endResize(handle, e.pointerId);
+        self._setDockWidth(self._clampWidth(self.getBoundingClientRect().width), true);
+      };
+      handle.addEventListener('pointerup', finish);
+      handle.addEventListener('pointercancel', finish);
+
+      handle.addEventListener('dblclick', function () {
+        self._setDockWidth(self._baseWidthPx, true);
+      });
+    }
+
+    _endResize(handle, pointerId) {
+      this._resizeState = null;
+      try { handle.releasePointerCapture(pointerId); } catch (_) { /* already released */ }
+      this.removeAttribute('data-resizing');
+      document.documentElement.removeAttribute('data-lana-dock-resizing');
     }
 
     /**
@@ -900,6 +1039,17 @@
         if (p._chatEl) {
           if (matterId) p._chatEl.setAttribute('matter-id', matterId);
           else p._chatEl.removeAttribute('matter-id');
+          // Reflect the scope in the composer placeholder — on the welcome
+          // screen this is the only place the applied scope is visible
+          // (the convo-header workspace chip needs a conversation first).
+          var composerEl = typeof p._chatEl.querySelector === 'function'
+            ? p._chatEl.querySelector('lex-chat-composer')
+            : null;
+          if (composerEl && typeof composerEl.setPlaceholder === 'function') {
+            composerEl.setPlaceholder(
+              matterId && matterName ? 'Ask anything about ' + matterName + '...' : null
+            );
+          }
         }
       }
     }
@@ -1022,33 +1172,13 @@
         if (!welcome || welcome.querySelector('.lld-suggest')) return;
 
         var ctx = self._pageContext;
-        var label, apply;
         if (ctx.documentId && ctx.documentId === self._injectedDocId) {
           // This document was already injected via an explicit Ask-LANA
           // click — suggesting it again is noise.
           return;
         }
-        if (ctx.documentId) {
-          label = 'Ask about ' + (ctx.documentName || 'this document');
-          apply = function () {
-            self.openWith({
-              matterId: ctx.matterId || null,
-              matterName: ctx.matterName || null,
-              documentId: ctx.documentId,
-              documentName: ctx.documentName,
-              contextType: 'document_chat'
-            });
-          };
-        } else if (ctx.matterId && ctx.matterId !== self._scopeMatterId) {
-          label = 'Ask about ' + (ctx.matterName || ctx.matterId);
-          apply = function () {
-            self._applyScope(ctx.matterId, ctx.matterName || ctx.matterId);
-            var composerFocus = typeof p._focusComposer === 'function';
-            if (composerFocus) p._focusComposer();
-          };
-        } else {
-          return;
-        }
+        var isDocument = !!ctx.documentId;
+        if (!isDocument && (!ctx.matterId || ctx.matterId === self._scopeMatterId)) return;
 
         var chip = document.createElement('div');
         chip.className = 'lld-suggest';
@@ -1056,17 +1186,41 @@
           + '<button type="button" class="lld-suggest-dismiss" aria-label="Dismiss suggestion">'
           + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
           + '</button>';
-        chip.querySelector('.lld-suggest-label').textContent = label;
+        var labelEl = chip.querySelector('.lld-suggest-label');
+        var dismissBtn = chip.querySelector('.lld-suggest-dismiss');
+
+        var scopeName = ctx.matterName || ctx.matterId;
+        labelEl.textContent = isDocument
+          ? 'Ask about ' + (ctx.documentName || 'this document')
+          : 'Ask about ' + scopeName;
+
+        // Click = adopt the context. Feedback lives in the composer: the
+        // document variant attaches a visible file badge via openWith(),
+        // the workspace variant swaps the composer placeholder to
+        // "Ask anything about <workspace>..." (via _syncScopeLocal).
         chip.addEventListener('click', function (e) {
           if (e.target.closest('.lld-suggest-dismiss')) return;
           chip.remove();
-          apply();
+          if (isDocument) {
+            self.openWith({
+              matterId: ctx.matterId || null,
+              matterName: ctx.matterName || null,
+              documentId: ctx.documentId,
+              documentName: ctx.documentName,
+              contextType: 'document_chat'
+            });
+            return;
+          }
+          self._applyScope(ctx.matterId, scopeName);
+          if (typeof p._focusComposer === 'function') p._focusComposer();
         });
-        chip.querySelector('.lld-suggest-dismiss').addEventListener('click', function (e) {
+
+        dismissBtn.addEventListener('click', function (e) {
           e.stopPropagation();
           self._suggestDismissed = true;
           chip.remove();
         });
+
         welcome.appendChild(chip);
       }, 450);
     }

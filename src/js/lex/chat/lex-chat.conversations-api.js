@@ -173,6 +173,17 @@
       return api.get(`/api/v1/conversations/${encode(conversationId)}/activity`);
     }
 
+    async executeSlashCommand(conversationId, command, args) {
+      const api = this._requireApi();
+      if (typeof api.executeConversationSlashCommand === 'function') {
+        return api.executeConversationSlashCommand(conversationId, command, args);
+      }
+      return api.post(`/api/chat/conversations/${encode(conversationId)}/slash-command`, {
+        command,
+        args: args || ''
+      });
+    }
+
     async stopGeneration(conversationId) {
       const api = this._requireApi();
       if (typeof api.stopConversationActivity === 'function') {

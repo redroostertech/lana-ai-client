@@ -236,8 +236,11 @@
         });
       }
 
-      // Composer send
+      // Composer send. Messages whose first token is a registered slash
+      // command (/help, /summary, ...) use the command fast path; backend-backed
+      // commands still go to Chef, but skip the LLM stream.
       this.addEventListener('lex-composer-send', (e) => {
+        if (this._maybeRunSlashCommand(e.detail.content, { attachments: e.detail.attachments })) return;
         const opts = {};
         if (e.detail.attachments) opts.attachments = e.detail.attachments;
         this.send(e.detail.content, opts);
@@ -480,28 +483,7 @@
       // Emit send event
       this.emit('lex-chat-send', { content, conversationId: this.conversationId });
 
-      // Prepare source options
-      const sendOpts = { ...opts };
-      // Map chat mode to backend context_type enum
-      // Use component state only — no global localStorage that persists across conversations
-      if (this.chatMode === 'agentic') {
-        sendOpts.contextType = 'agentic_mode';
-      } else if (this.chatMode === 'document') {
-        sendOpts.contextType = 'document_chat';
-        // Auto-include pinned documents as attachments in document chat mode
-        if (this._documents && this._documents.length > 0 && !sendOpts.attachments) {
-          sendOpts.attachments = {
-            files: this._documents.map(d => ({ file_id: d.id, name: d.filename || d.name }))
-          };
-        }
-      } else if (this.chatMode === 'insights') {
-        sendOpts.contextType = sendOpts.attachments && sendOpts.attachments.module_context
-          ? 'insights_chat'
-          : 'data_chat';
-      }
-      // Explicit contextType prop takes precedence
-      if (this.contextType && !sendOpts.contextType) sendOpts.contextType = this.contextType;
-      if (this.matterId) sendOpts.matterId = this.matterId;
+      const sendOpts = this._buildSendOptions(opts);
 
       // Fire-and-forget JIT processing for any #filename mentions
       this._processMessageMentions(content);
@@ -559,6 +541,84 @@
         this._threadEl.addMessage('assistant', 'No response received.');
       }
 
+      if (this._composerEl) this._composerEl.focus();
+    }
+
+    _buildSendOptions(opts = {}) {
+      const sendOpts = { ...opts };
+      // Map chat mode to backend context_type enum
+      // Use component state only — no global localStorage that persists across conversations
+      if (this.chatMode === 'agentic') {
+        sendOpts.contextType = 'agentic_mode';
+      } else if (this.chatMode === 'document') {
+        sendOpts.contextType = 'document_chat';
+        // Auto-include pinned documents as attachments in document chat mode
+        if (this._documents && this._documents.length > 0 && !sendOpts.attachments) {
+          sendOpts.attachments = {
+            files: this._documents.map(d => ({ file_id: d.id, name: d.filename || d.name }))
+          };
+        }
+      } else if (this.chatMode === 'insights') {
+        sendOpts.contextType = sendOpts.attachments && sendOpts.attachments.module_context
+          ? 'insights_chat'
+          : 'data_chat';
+      }
+      // Explicit contextType prop takes precedence
+      if (this.contextType && !sendOpts.contextType) sendOpts.contextType = this.contextType;
+      if (this.matterId) sendOpts.matterId = this.matterId;
+      return sendOpts;
+    }
+
+    /**
+     * Fast-path registered slash commands. Backend-backed commands are
+     * dispatched through the command registry endpoint instead of the LLM
+     * stream; unmatched slash text still flows through normal chat.
+     */
+    _maybeRunSlashCommand(content, opts = {}) {
+      const service = (typeof window !== 'undefined' && window.SlashCommandsService) || null;
+      const helpers = global.Lex.Chat && global.Lex.Chat.SlashHelpers;
+      if (!service || !helpers || typeof service.execute !== 'function') return false;
+      if (!helpers.isExactCommand(content, Object.keys(service.commands || {}))) return false;
+      this._runSlashCommand(content, service, this._buildSendOptions(opts));
+      return true;
+    }
+
+    async _runSlashCommand(content, service, sendOpts = {}) {
+      if (this._threadEl) this._threadEl.addMessage('user', content);
+      if (this._composerEl) {
+        this._composerEl.clear();
+        this._composerEl.hideSuggestions();
+        this._composerEl.setGenerating(true);
+      }
+      if (this._activityEl) {
+        this._activityEl.clearReasoning();
+        this._activityEl.show('Running command...');
+      }
+      try {
+        const parsed = service.parseCommand(content);
+        let conversationId = this.conversationId;
+        if (service.requiresBackend(parsed.command)) {
+          if (!this._source.connected) await this._source.connect(this.conversationId);
+          if (!conversationId && this._source && typeof this._source.ensureConversation === 'function') {
+            conversationId = await this._source.ensureConversation(sendOpts);
+            if (conversationId) {
+              this._props.conversationId = conversationId;
+              this.emit('lex-chat-conversation-created', { conversationId });
+            }
+          }
+        }
+        const result = await service.execute(content, {
+          api: global.api,
+          conversationId
+        });
+        const message = (result && result.message) || 'Command produced no output.';
+        if (this._threadEl) this._threadEl.addMessage('assistant', message);
+      } catch (err) {
+        if (this._threadEl) this._threadEl.addMessage('assistant', 'Error executing command: ' + err.message);
+      } finally {
+        if (this._composerEl) this._composerEl.setGenerating(false);
+        if (this._activityEl) this._activityEl.hide();
+      }
       if (this._composerEl) this._composerEl.focus();
     }
 

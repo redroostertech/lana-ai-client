@@ -781,8 +781,13 @@
         label = 'Grounded';
         color = 'green';
       } else if (status === 'partial' || status === 'weak') {
-        label = 'Partially grounded';
-        color = 'yellow';
+        // No "Partially grounded" badge — same reasoning as the suppressed
+        // "Ungrounded" badge below. The backend labels general-knowledge
+        // answers that lean on conversation history as partial/weak, so the
+        // yellow tag showed up on ordinary answers and read as a warning.
+        // Validator findings still surface via "Needs review", and the full
+        // grounding telemetry still flows in debug_context for QA.
+        return;
       } else if (status === 'none') {
         if (evidenceMode === 'grounded_tool') {
           label = 'Tool-verified';

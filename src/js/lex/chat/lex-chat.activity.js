@@ -28,16 +28,14 @@
         display: none !important;
       }
 
+      /* Flat, bubble-less — sits directly on the thread background like a
+         message row; only the icon + status lines mark it as activity. */
       .lex-chat-activity-wrapper {
-        display: inline-flex;
+        display: flex;
         max-width: min(720px, 100%);
         gap: 8px;
         align-items: flex-start;
-        padding: 6px 10px;
-        border: 1px solid var(--lex-chat-border-soft, rgba(0,0,0,0.08));
-        border-radius: 999px;
-        background: color-mix(in srgb, var(--lex-chat-bg-surface, #fff) 82%, transparent);
-        opacity: 0.82;
+        padding: 6px 0;
         animation: lex-chat-fade-in 0.3s ease both;
       }
 

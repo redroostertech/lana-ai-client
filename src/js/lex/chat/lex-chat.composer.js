@@ -559,6 +559,61 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+
+      /* ── /slash-command popover (mirrors mentionpicker layout) ── */
+      .lex-cmp-slashpicker {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        max-width: 400px;
+        background: var(--lex-chat-bg-surface);
+        border: 1px solid var(--lex-chat-border);
+        border-radius: var(--lex-radius-lg, 8px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.16);
+        z-index: 60;
+        opacity: 0;
+        transform: translateY(4px);
+        pointer-events: none;
+        transition: opacity 0.15s ease, transform 0.15s ease;
+      }
+      .lex-cmp-slashpicker--open {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      .lex-cmp-slashpicker-list {
+        max-height: 240px;
+        overflow-y: auto;
+        padding: 6px;
+      }
+      .lex-cmp-slashpicker-item {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: var(--lex-radius-md, 6px);
+        cursor: pointer;
+        transition: background var(--lex-transition-fast, 0.15s);
+      }
+      .lex-cmp-slashpicker-item:hover,
+      .lex-cmp-slashpicker-item--active {
+        background: var(--lex-chat-bg-elevated);
+      }
+      .lex-cmp-slashpicker-item-cmd {
+        font-family: var(--lex-font-mono, monospace);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--lex-chat-text);
+        flex-shrink: 0;
+      }
+      .lex-cmp-slashpicker-item-desc {
+        font-size: 12px;
+        color: var(--lex-chat-text-dim);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -643,6 +698,18 @@
       this._mentionAbortCtrl = null;
       this._mentionFetchSeq = 0;
       this._selectedMentions = [];
+
+      // ── /slash-command picker state (independent from the other pickers) ──
+      // Trigger detection + dropdown reducer live in
+      // lex-chat.composer-slash.js; the command registry lives in
+      // js/services/slash-commands.service.js. Both degrade gracefully when
+      // absent — `/` stays plain text.
+      const slashHelpers = (typeof window !== 'undefined'
+                            && window.Lex
+                            && window.Lex.Chat
+                            && window.Lex.Chat.SlashHelpers) || null;
+      this._slashHelpers = slashHelpers;
+      this._slashState = slashHelpers ? slashHelpers.initialState() : null;
     }
 
     connected() {
@@ -687,6 +754,9 @@
             <div class="lex-cmp-mentionpicker-list" data-mentionpicker-list>
               <div class="lex-cmp-mentionpicker-empty">No matches</div>
             </div>
+          </div>
+          <div class="lex-cmp-slashpicker" data-slashpicker>
+            <div class="lex-cmp-slashpicker-list" data-slashpicker-list></div>
           </div>
           <div class="lex-cmp-doc-badges" data-doc-badges></div>
           <textarea
@@ -747,10 +817,56 @@
         this._autoResize();
         this._checkHashTrigger();
         this._checkAtTrigger();
+        this._checkSlashTrigger();
       });
 
       // Enter → send, Shift+Enter → newline, Escape → close picker
       ta.addEventListener('keydown', (e) => {
+        // ── /slash-command picker priorities (only when open) ──
+        // Never open at the same time as the other pickers: `/` only
+        // triggers at position 0, `@`/`#` only after whitespace.
+        if (this._isSlashOpen()) {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            this._slashDispatch({ type: 'DISMISSED' });
+            this._refreshSlashPopover();
+            return;
+          }
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this._slashDispatch({ type: 'MOVE_DOWN' });
+            this._refreshSlashPopover();
+            return;
+          }
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this._slashDispatch({ type: 'MOVE_UP' });
+            this._refreshSlashPopover();
+            return;
+          }
+          if (e.key === 'Enter' && !e.shiftKey) {
+            // Enter completes the active suggestion — unless the typed
+            // token already IS that command, in which case fall through
+            // to the normal send path so `/help` + Enter executes.
+            const st = this._slashState;
+            const active = st && st.results && st.results[st.activeIndex];
+            if (active && st.prefix.toLowerCase() !== active.command) {
+              e.preventDefault();
+              this._selectSlashCommand(active);
+              return;
+            }
+          }
+          if (e.key === 'Tab') {
+            const st = this._slashState;
+            const active = st && st.results && st.results[st.activeIndex];
+            if (active) {
+              e.preventDefault();
+              this._selectSlashCommand(active);
+              return;
+            }
+          }
+        }
+
         // ── @-mention picker priorities (only when open) ──
         if (this._isMentionOpen()) {
           if (e.key === 'Escape') {
@@ -912,6 +1028,17 @@
           return;
         }
 
+        // /slash-command picker selection
+        const slashEl = e.target.closest('[data-slash-select]');
+        if (slashEl) {
+          const idx = Number(slashEl.dataset.slashSelect);
+          const st = this._slashState;
+          if (st && Array.isArray(st.results) && st.results[idx]) {
+            this._selectSlashCommand(st.results[idx]);
+          }
+          return;
+        }
+
         // Suggestion
         const suggEl = e.target.closest('[data-suggestion]');
         if (suggEl) {
@@ -958,6 +1085,10 @@
       if (this._isMentionOpen() && !this.contains(e.target)) {
         this._mentionDispatch({ type: 'DISMISSED' });
         this._refreshMentionPopover();
+      }
+      if (this._isSlashOpen() && !this.contains(e.target)) {
+        this._slashDispatch({ type: 'DISMISSED' });
+        this._refreshSlashPopover();
       }
     }
 
@@ -1431,6 +1562,92 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // /slash-command picker
+    //
+    // Trigger detection + dropdown reducer live in
+    // lex-chat.composer-slash.js; the command registry (and send-time
+    // execution) lives in js/services/slash-commands.service.js. Both are
+    // resolved lazily and degrade gracefully when absent.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    _isSlashOpen() {
+      return !!(this._slashState && this._slashState.open);
+    }
+
+    _slashDispatch(action) {
+      if (!this._slashHelpers) return;
+      this._slashState = this._slashHelpers.reduce(this._slashState, action);
+    }
+
+    _getSlashService() {
+      return (typeof window !== 'undefined' && window.SlashCommandsService) || null;
+    }
+
+    _checkSlashTrigger() {
+      const service = this._getSlashService();
+      if (!this._slashHelpers || !service || !this._textarea) return;
+      const trigger = this._slashHelpers.detectSlashTrigger(
+        this._textarea.value, this._textarea.selectionStart
+      );
+
+      if (!trigger) {
+        if (this._isSlashOpen()) {
+          this._slashDispatch({ type: 'DISMISSED' });
+          this._refreshSlashPopover();
+        }
+        return;
+      }
+
+      // Registry filtering is local + synchronous, so open and update
+      // carry their results directly (no pending state, no debounce).
+      const results = service.getMatchingCommands(trigger.prefix.toLowerCase());
+      if (!this._isSlashOpen()) {
+        if (results.length === 0) return; // nothing to suggest — stay closed
+        this._slashDispatch({ type: 'OPENED', prefix: trigger.prefix, results });
+        this._closePopovers();
+      } else {
+        this._slashDispatch({ type: 'PREFIX_CHANGED', prefix: trigger.prefix, results });
+      }
+      this._refreshSlashPopover();
+    }
+
+    _selectSlashCommand(entry) {
+      if (!entry || !this._slashHelpers || !this._textarea) return;
+      const patched = this._slashHelpers.applyCommandToValue(
+        this._textarea.value, this._textarea.selectionStart, entry.command
+      );
+      this._textarea.value = patched.value;
+      this._textarea.selectionStart = this._textarea.selectionEnd = patched.caret;
+      this._autoResize();
+      this._slashDispatch({ type: 'CLOSED' });
+      this._refreshSlashPopover();
+      this._textarea.focus();
+    }
+
+    _refreshSlashPopover() {
+      const picker = this.querySelector('[data-slashpicker]');
+      const list = this.querySelector('[data-slashpicker-list]');
+      if (!picker || !list) return;
+
+      const st = this._slashState;
+      if (!st || !st.open || st.results.length === 0) {
+        picker.classList.remove('lex-cmp-slashpicker--open');
+        return;
+      }
+      picker.classList.add('lex-cmp-slashpicker--open');
+
+      list.innerHTML = st.results.map((entry, idx) => {
+        const isActive = idx === st.activeIndex;
+        return `
+          <div class="lex-cmp-slashpicker-item${isActive ? ' lex-cmp-slashpicker-item--active' : ''}"
+               data-slash-select="${idx}">
+            <span class="lex-cmp-slashpicker-item-cmd">${esc(entry.command)}</span>
+            <span class="lex-cmp-slashpicker-item-desc" title="${esc(entry.usage || '')}">${esc(entry.description || '')}</span>
+          </div>`;
+      }).join('');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Textarea helpers
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -1506,6 +1723,17 @@
         this._textarea.value = text;
         this._autoResize();
       }
+    }
+
+    /**
+     * Override the visible placeholder without touching the `placeholder`
+     * prop (which stays the canonical default). Pass a falsy value to
+     * restore the default — used by hosts to reflect transient context,
+     * e.g. the dock's workspace scope.
+     */
+    setPlaceholder(text) {
+      if (!this._textarea) return;
+      this._textarea.placeholder = text || this.placeholder || 'Ask anything...';
     }
 
     /**
