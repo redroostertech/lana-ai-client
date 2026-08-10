@@ -78,6 +78,7 @@ const { checkForUpdates, downloadAndInstallUpdate, showOptionalUpdateDialog, sho
 const { logInfo, logError, exportLogs, getLogFilePath } = require('./electron-logger');
 const SessionTracker = require('./js/session/session-tracker');
 const companionBridge = require('./electron-bridge');
+const { redactUrlForLog } = require('./electron-log-redaction');
 const { BrainchildManager, discover, validateLink, mcpBinForRoot, isAllowedVaultRoot } = require('./src/electron-brainchild-manager');
 const { ElectronScreenVoice } = require('./src/screen-voice/electron-screen-voice');
 const {
@@ -1969,7 +1970,7 @@ app.on('web-contents-created', (event, contents) => {
       // Decode the pathname (handles %3A for : etc.)
       let pathname = decodeURIComponent(parsedUrl.pathname);
 
-      logInfo(`[electron-main] [Navigation] Original URL: ${navigationUrl}`);
+      logInfo(`[electron-main] [Navigation] Original URL: ${redactUrlForLog(navigationUrl)}`);
       logInfo(`[electron-main] [Navigation] Decoded pathname: ${pathname}`);
 
       // Check if this path needs to be fixed to point to public_html
@@ -2038,19 +2039,19 @@ app.on('web-contents-created', (event, contents) => {
         let correctPath = createFileUrl(fullPath);
 
         // Preserve query string and hash from original URL
-        logInfo(`[electron-main] [Navigation] parsedUrl.search: ${parsedUrl.search}`);
-        logInfo(`[electron-main] [Navigation] parsedUrl.hash: ${parsedUrl.hash}`);
+        logInfo(`[electron-main] [Navigation] parsedUrl.search: ${parsedUrl.search ? '[redacted]' : ''}`);
+        logInfo(`[electron-main] [Navigation] parsedUrl.hash: ${parsedUrl.hash ? '[redacted]' : ''}`);
 
         if (parsedUrl.search) {
           correctPath += parsedUrl.search;
-          logInfo(`[electron-main] [Navigation] Added search: ${correctPath}`);
+          logInfo(`[electron-main] [Navigation] Added search: ${redactUrlForLog(correctPath)}`);
         }
         if (parsedUrl.hash) {
           correctPath += parsedUrl.hash;
-          logInfo(`[electron-main] [Navigation] Added hash: ${correctPath}`);
+          logInfo(`[electron-main] [Navigation] Added hash: ${redactUrlForLog(correctPath)}`);
         }
 
-        logInfo(`[electron-main] [Navigation] Final path: ${navigationUrl} -> ${correctPath}`);
+        logInfo(`[electron-main] [Navigation] Final path: ${redactUrlForLog(navigationUrl)} -> ${redactUrlForLog(correctPath)}`);
         navigationEvent.preventDefault();
         contents.loadURL(correctPath);
         return;

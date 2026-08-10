@@ -17,6 +17,7 @@
   <script src="js/time-utils.js"></script>
   <script src="js/api.js"></script>
   <script src="js/notifications.js"></script>
+  <script src="js/vpn-setup-handoff.js"></script>
   <script src="js/utils/rename-conversation.js"></script>
   <script src="js/components.js"></script>
 </head>
@@ -656,8 +657,14 @@
           // Server not reachable - check if VPN is available from discovery
           if (serverInfo.vpn && serverInfo.vpn.enabled) {
             // VPN is available! Redirect to setup page
-            const serverInfoEncoded = btoa(JSON.stringify(serverInfo));
-            window.location.href = `vpn-setup.html?server=${encodeURIComponent(serverInfoEncoded)}`;
+            let serverRef;
+            try {
+              serverRef = window.LanaVpnSetupHandoff.create(serverInfo);
+            } catch (handoffError) {
+              console.warn('[Login] Unable to prepare VPN setup handoff:', handoffError && handoffError.message);
+              throw new Error('Unable to start VPN setup. Please enable browser session storage or contact your administrator.');
+            }
+            window.location.href = `vpn-setup.html?server_ref=${encodeURIComponent(serverRef)}`;
             return;
           }
 
