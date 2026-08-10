@@ -544,7 +544,7 @@ class NoteListComponent {
       meta.appendChild(aiEl);
     }
 
-    content.innerHTML = this.sanitizeNoteContent(note.content || '<p>No content</p>');
+    content.innerHTML = this.renderNoteContent(note.content || '<p>No content</p>');
     editBtn.setAttribute('data-note-id', note.note_id);
     modal.classList.remove('hidden');
   }
@@ -564,22 +564,87 @@ class NoteListComponent {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = html || '';
 
-    const blockedTags = ['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META'];
-    blockedTags.forEach((tag) => {
-      wrapper.querySelectorAll(tag).forEach((node) => node.remove());
-    });
+    const allowedTags = ['P', 'DIV', 'BR', 'H1', 'H2', 'H3', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'A', 'HR', 'SPAN'];
+    const allowedAttributes = {
+      A: ['href', 'title', 'target', 'rel']
+    };
 
     wrapper.querySelectorAll('*').forEach((node) => {
+      if (allowedTags.indexOf(node.tagName) === -1) {
+        node.remove();
+        return;
+      }
+
       Array.from(node.attributes).forEach((attr) => {
         const name = attr.name.toLowerCase();
         const value = String(attr.value || '').trim().toLowerCase();
-        if (name.indexOf('on') === 0 || value.indexOf('javascript:') === 0) {
+        const tagAttributes = allowedAttributes[node.tagName] || [];
+        if (tagAttributes.indexOf(name) === -1 ||
+            name.indexOf('on') === 0 ||
+            value.indexOf('javascript:') === 0 ||
+            (name === 'href' && !this.isSafeNoteHref(attr.value))) {
           node.removeAttribute(attr.name);
         }
       });
+
+      if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
+        node.setAttribute('rel', 'noopener noreferrer');
+      }
     });
 
     return wrapper.innerHTML;
+  }
+
+  isSafeNoteHref(href) {
+    const value = String(href || '').trim().toLowerCase();
+    if (!value) return false;
+    const compact = value.replace(/[\u0000-\u001f\u007f\s]+/g, '');
+    const colonIndex = compact.indexOf(':');
+    const pathStart = compact.search(/[/?#]/);
+
+    if (colonIndex !== -1 && (pathStart === -1 || colonIndex < pathStart)) {
+      const scheme = compact.substring(0, colonIndex + 1);
+      return scheme === 'http:' || scheme === 'https:' || scheme === 'mailto:' || scheme === 'tel:';
+    }
+
+    return true;
+  }
+
+  /**
+   * Render stored note content safely. Existing rich HTML is sanitized;
+   * plain text is escaped and newline runs are preserved as visible breaks.
+   */
+  renderNoteContent(content) {
+    if (!content) return '';
+    const value = String(content);
+    if (this.isHtmlNoteContent(value)) {
+      return this.sanitizeNoteContent(value);
+    }
+
+    const wrapper = document.createElement('div');
+    value.split(/\r\n|\r|\n/).forEach((line, index) => {
+      if (index > 0) wrapper.appendChild(document.createElement('br'));
+      wrapper.appendChild(document.createTextNode(line));
+    });
+    return wrapper.innerHTML;
+  }
+
+  /**
+   * Treat only actual parsed elements as HTML. Text such as "<script>" remains
+   * plain text unless the browser creates an element from it.
+   */
+  isHtmlNoteContent(content) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = content || '';
+    const editorTags = ['P', 'DIV', 'BR', 'H1', 'H2', 'H3', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'A', 'HR', 'SPAN'];
+    const hasTopLevelText = Array.from(wrapper.childNodes).some((node) => {
+      return node.nodeType === 3 && String(node.textContent || '').trim();
+    });
+    if (hasTopLevelText) return false;
+
+    return Array.from(wrapper.childNodes).some((node) => {
+      return node.nodeType === 1 && editorTags.indexOf(node.tagName) !== -1;
+    });
   }
 
   /**
@@ -843,19 +908,19 @@ class NoteListComponent {
     }
 
     // Initialize Tiptap editor if not already created
-    if (!this.focusModeEditor && window.Tiptap) {
+    if (!this.focusModeEditor && window.TiptapEditor) {
       const focusEditorContainer = document.getElementById('notesFocusEditorContainer');
       if (focusEditorContainer) {
         try {
-          this.focusModeEditor = new window.Tiptap.Editor({
+          this.focusModeEditor = new window.TiptapEditor({
             element: focusEditorContainer,
             extensions: [
-              window.Tiptap.StarterKit.configure({
+              window.TiptapStarterKit.configure({
                 heading: {
                   levels: [1, 2, 3]
                 }
               }),
-              window.Tiptap.Placeholder.configure({
+              window.TiptapPlaceholder.configure({
                 placeholder: 'Start writing...'
               })
             ],
@@ -1075,7 +1140,7 @@ class NoteListComponent {
     }
 
     if (editorContainer) {
-      editorContainer.innerHTML = note.content || '';
+      editorContainer.innerHTML = this.renderNoteContent(note.content || '');
     }
 
     // Store the note being edited so we can update instead of create
