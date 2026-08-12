@@ -77,6 +77,11 @@
     const style = document.createElement('style');
     style.id = 'lex-card-styles';
     style.textContent = `
+      @property --lex-card-border-angle {
+        syntax: '<angle>';
+        inherits: false;
+        initial-value: 0deg;
+      }
       lex-card {
         display: block;
         margin-block-end: var(--lex-card-stack-gap, 12px);
@@ -207,18 +212,38 @@
       }
       lex-card[data-lana-card-context] > .rounded-xl {
         position: relative;
-        transition: box-shadow 0.18s ease, transform 0.18s ease;
+        --lex-card-border-angle: 0deg;
+        transition:
+          box-shadow 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+          transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+          --lex-card-border-angle 0.62s cubic-bezier(0.16, 1, 0.3, 1);
       }
       lex-card[data-lana-card-context] .lex-card-footer-visible {
-        display: none;
+        display: flex;
         justify-content: flex-start;
-        padding-top: 0.75rem;
-        margin-top: 0.75rem;
+        max-height: 0;
+        padding-top: 0;
+        margin-top: 0;
         border-top: 0;
+        opacity: 0;
+        overflow: hidden;
+        pointer-events: none;
+        transform: translateY(-4px);
+        transition:
+          max-height 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+          padding-top 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+          margin-top 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+          opacity 0.22s ease,
+          transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
       }
       lex-card[data-lana-card-context]:hover .lex-card-footer-visible,
       lex-card[data-lana-card-context]:focus-within .lex-card-footer-visible {
-        display: flex;
+        max-height: 48px;
+        padding-top: 0.75rem;
+        margin-top: 0.75rem;
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
       }
       lex-card[data-lana-card-context] > .rounded-xl::before {
         content: '';
@@ -226,10 +251,17 @@
         inset: 0;
         padding: 1px;
         border-radius: inherit;
-        background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 40%, #7c3aed 70%, #c026d3 100%);
-        opacity: 0;
+        background:
+          conic-gradient(
+            from -90deg,
+            #1e1b4b 0deg,
+            #4338ca calc(var(--lex-card-border-angle) * 0.4),
+            #7c3aed calc(var(--lex-card-border-angle) * 0.7),
+            #c026d3 var(--lex-card-border-angle),
+            transparent var(--lex-card-border-angle),
+            transparent 360deg
+          );
         pointer-events: none;
-        transition: opacity 0.18s ease;
         -webkit-mask:
           linear-gradient(#000 0 0) content-box,
           linear-gradient(#000 0 0);
@@ -238,11 +270,8 @@
       }
       lex-card[data-lana-card-context]:hover > .rounded-xl,
       lex-card[data-lana-card-context]:focus-within > .rounded-xl {
+        --lex-card-border-angle: 360deg;
         box-shadow: 0 10px 30px rgba(79, 70, 229, 0.12), var(--lex-shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
-      }
-      lex-card[data-lana-card-context]:hover > .rounded-xl::before,
-      lex-card[data-lana-card-context]:focus-within > .rounded-xl::before {
-        opacity: 1;
       }
       .lex-card-lana-talk {
         display: inline-flex;
@@ -271,8 +300,29 @@
         transform: scale(0.98);
       }
       .lex-card-lana-talk svg {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+      }
+      .lex-card-lana-icon {
+        position: relative;
+        display: inline-flex;
         width: 14px;
         height: 14px;
+        flex: 0 0 14px;
+      }
+      .lex-card-lana-icon svg:first-child {
+        top: 0;
+        left: 0;
+      }
+      .lex-card-lana-icon svg:last-child {
+        right: 0;
+        bottom: 0;
+      }
+      .lex-card-lana-talk span:not(.lex-card-lana-icon) {
         flex-shrink: 0;
       }
 
@@ -504,7 +554,10 @@
           data-lana-prefill="${attr(prompt)}"
           data-lana-card-context="${attr(lanaContext)}"
         >
-          ${iconSvg('focus')}
+          <span class="lex-card-lana-icon" aria-hidden="true">
+            <svg width="8" height="8" viewBox="0 0 8 8"><path d="M0 0L8 0M0 0L0 8"/></svg>
+            <svg width="8" height="8" viewBox="0 0 8 8"><path d="M8 8L0 8M8 8L8 0"/></svg>
+          </span>
           <span>Talk about this.</span>
         </button>
       `;
