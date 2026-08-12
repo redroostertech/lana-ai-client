@@ -7,6 +7,7 @@
 
 const HelpSystem = (function() {
   let helpData = null;
+  let faqData = null;
   let searchIndex = null;
 
   /**
@@ -60,6 +61,13 @@ const HelpSystem = (function() {
       helpData = await loadMockHelpData();
     }
 
+    try {
+      faqData = await loadMockFAQData();
+    } catch (error) {
+      console.warn('Failed to load FAQ data for help search:', error);
+      faqData = null;
+    }
+
     // Build search index
     buildSearchIndex();
   }
@@ -78,6 +86,22 @@ const HelpSystem = (function() {
       console.error('Failed to load mock help data:', error);
       throw error;
     }
+  }
+
+  async function loadMockFAQData() {
+    const response = await fetch('mock-data/faq-data.json');
+    if (!response.ok) {
+      throw new Error('Failed to load FAQ data');
+    }
+    return await response.json();
+  }
+
+  function plainTextFromHtmlish(value) {
+    return String(value || '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/[#*_`>\[\]()]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /**
@@ -101,6 +125,25 @@ const HelpSystem = (function() {
         });
       });
     });
+
+    if (faqData && Array.isArray(faqData.categories)) {
+      faqData.categories.forEach(category => {
+        (category.faqs || []).forEach(faq => {
+          var answerText = plainTextFromHtmlish(faq.answer);
+          searchIndex.push({
+            type: 'faq',
+            section: category.title,
+            sectionId: category.id,
+            id: faq.id,
+            title: faq.question,
+            summary: answerText.length > 160 ? answerText.substring(0, 157) + '...' : answerText,
+            content: answerText,
+            tags: faq.tags || [],
+            searchText: `${faq.question} ${answerText} ${(faq.tags || []).join(' ')}`.toLowerCase()
+          });
+        });
+      });
+    }
   }
 
   /**
@@ -356,7 +399,7 @@ const HelpSystem = (function() {
   /**
    * Search help articles
    */
-  function searchArticles(query) {
+  function searchContent(query) {
     if (!query || query.length < 2) {
       return [];
     }
@@ -431,14 +474,14 @@ const HelpSystem = (function() {
       return;
     }
 
-    const results = searchArticles(query);
-    renderSearchResults(results);
+    const results = searchContent(query);
+    renderSearchResults(results, query);
   }
 
   /**
    * Render search results
    */
-  function renderSearchResults(results) {
+  function renderSearchResults(results, query) {
     const container = document.getElementById('helpSections');
     if (!container) return;
 
@@ -458,29 +501,35 @@ const HelpSystem = (function() {
     container.innerHTML = `
       <div class="mb-6">
         <h2 class="text-2xl font-bold text-gray-900 mb-2">Search Results</h2>
-        <p class="text-gray-600">Found ${results.length} article${results.length === 1 ? '' : 's'}</p>
+        <p class="text-gray-600">Found ${results.length} result${results.length === 1 ? '' : 's'}</p>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        ${results.map(article => `
+        ${results.map(item => `
           <button
-            class="text-left bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow article-card"
-            data-article-id="${article.id}"
-            data-section-id="${article.sectionId}"
+            class="text-left bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow search-result-card"
+            data-type="${item.type}"
+            data-item-id="${item.id}"
+            data-section-id="${item.sectionId}"
           >
-            <div class="text-xs text-indigo-600 font-medium mb-2">${article.section}</div>
-            <h3 class="font-semibold text-gray-900 mb-2">${article.title}</h3>
-            <p class="text-sm text-gray-600">${article.summary}</p>
+            <div class="text-xs text-indigo-600 font-medium mb-2">${item.type === 'faq' ? 'FAQ' : item.section}</div>
+            <h3 class="font-semibold text-gray-900 mb-2">${item.title}</h3>
+            <p class="text-sm text-gray-600">${item.summary}</p>
           </button>
         `).join('')}
       </div>
     `;
 
     // Attach click handlers
-    document.querySelectorAll('.article-card').forEach(card => {
+    document.querySelectorAll('.search-result-card').forEach(card => {
       card.addEventListener('click', () => {
         const sectionId = card.dataset.sectionId;
-        const articleId = card.dataset.articleId;
-        showArticleModal(sectionId, articleId);
+        const itemId = card.dataset.itemId;
+        if (card.dataset.type === 'faq') {
+          const faqPath = typeof getPagePath === 'function' ? getPagePath('faq.html') : 'faq.html';
+          window.location.href = `${faqPath}?search=${encodeURIComponent(query || '')}`;
+          return;
+        }
+        showArticleModal(sectionId, itemId);
       });
     });
   }

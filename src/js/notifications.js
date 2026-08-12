@@ -167,6 +167,7 @@ window.DesktopNotifications = window.DesktopNotifications || (function() {
   function openNotificationTarget(notification) {
     const actionUrl = notification && notification.action_url;
     if (!actionUrl) return;
+    if (/^\s*javascript:/i.test(actionUrl)) return;
     window.focus();
     window.location.href = actionUrl;
   }
@@ -708,26 +709,20 @@ window.NotificationPanel = (function() {
 
     elements.list.innerHTML = html;
 
-    // TODO: Implement proper click handling for notifications
-    // For now, click handlers are disabled to prevent navigation while we work on proper UX
-    // The notification items will show full text without truncation
-
     // Add click handlers
-    // document.querySelectorAll('.notification-item').forEach(item => {
-    //   item.addEventListener('click', async () => {
-    //     const notificationId = item.dataset.id;
-    //     const notification = state.notifications.find(n => n.id === notificationId);
-    //
-    //     // Mark as read (even if already read, to ensure sync with server)
-    //     await markAsRead(notificationId);
-    //
-    //     // Navigate to action URL if available
-    //     if (notification && notification.action_url) {
-    //       close();
-    //       window.location.href = notification.action_url;
-    //     }
-    //   });
-    // });
+    document.querySelectorAll('.notification-item').forEach(item => {
+      item.addEventListener('click', async () => {
+        const notificationId = item.dataset.id;
+        const notification = state.notifications.find(n => n.id === notificationId);
+
+        await markAsRead(notificationId);
+
+        if (notification && notification.action_url) {
+          close();
+          openNotificationTarget(notification);
+        }
+      });
+    });
   }
 
   /**

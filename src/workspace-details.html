@@ -193,7 +193,12 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <lex-input id="taskDueDate" label="Due Date" type="datetime-local"></lex-input>
+            <div class="flex items-end gap-2">
+              <div class="flex-1 min-w-0">
+                <lex-input id="taskDueDate" label="Due Date" type="datetime-local"></lex-input>
+              </div>
+              <lex-btn id="taskDueDateDoneBtn" type="button" variant="secondary" size="sm" onclick="confirmTaskDueDate()">Done</lex-btn>
+            </div>
           </div>
           <div>
             <lex-select id="taskAssignedTo" label="Assignee" placeholder="Unassigned"

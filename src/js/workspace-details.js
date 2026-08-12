@@ -6351,10 +6351,21 @@
     return JSON.stringify({
       description: String((document.getElementById('taskDescription') || {}).value || '').trim(),
       priority: (document.getElementById('taskCreatePriority') || {}).value || 'normal',
-      due_date: (document.getElementById('taskDueDate') || {}).value || null,
+      due_date: toApiTimestamp((document.getElementById('taskDueDate') || {}).value),
       assigned_to_user_id: (document.getElementById('taskAssignedTo') || {}).value || null
     });
   }
+
+  function confirmTaskDueDate() {
+    var dueDateEl = document.getElementById('taskDueDate');
+    var innerInput = dueDateEl && dueDateEl.querySelector ? dueDateEl.querySelector('input') : null;
+    if (innerInput && typeof innerInput.blur === 'function') innerInput.blur();
+    else if (dueDateEl && typeof dueDateEl.blur === 'function') dueDateEl.blur();
+
+    var submitBtn = document.getElementById('taskSubmitBtn');
+    if (submitBtn && typeof submitBtn.focus === 'function') submitBtn.focus();
+  }
+  window.confirmTaskDueDate = confirmTaskDueDate;
 
   function selectedSuggestedSubtasks() {
     if (!workspaceTaskSuggestionState || !workspaceTaskSuggestionState.subtasks) return [];
@@ -6619,6 +6630,7 @@
       var failMsg = isEdit
         ? 'Failed to update task'
         : (workspaceTaskSuggestionState ? 'Failed to create task' : 'Failed to generate suggestions');
+      if (err && err.message) failMsg += ': ' + err.message;
       Lex.Toast.error(failMsg);
 
       if (submitBtn) {

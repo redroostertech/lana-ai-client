@@ -3930,11 +3930,9 @@
   }
 
   // Show the customize button when a module is selected.
-  // Customize is hidden until the surface is ready to ship; keep the badge
-  // sync so any pending customization state stays consistent.
   function showCustomizeButton() {
     var btn = document.getElementById('customizeBtn');
-    if (btn) btn.style.display = 'none';
+    if (btn) btn.style.display = '';
     updateCustomizationBadge();
   }
 

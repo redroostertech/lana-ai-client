@@ -19,6 +19,7 @@ const FAQSystem = (function() {
       await loadFAQContent();
       renderFAQContent();
       attachEventListeners();
+      applyInitialSearch();
     } catch (error) {
       console.error('Failed to initialize FAQ system:', error);
       showError();
@@ -526,6 +527,16 @@ const FAQSystem = (function() {
         }
       }
     });
+  }
+
+  function applyInitialSearch() {
+    var params = new URLSearchParams(window.location.search || '');
+    var query = params.get('search');
+    if (!query) return;
+    var searchInput = document.getElementById('faqSearch');
+    if (searchInput) searchInput.value = query;
+    currentSearchQuery = query;
+    performSearch(query);
   }
 
   /**

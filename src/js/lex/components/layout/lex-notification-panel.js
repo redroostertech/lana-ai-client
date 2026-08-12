@@ -696,7 +696,7 @@
     _markAsRead(notificationId) {
       var self = this;
 
-      api.markNotificationRead(notificationId)
+      return api.markNotificationRead(notificationId)
         .then(function () {
           var notification = null;
           for (var i = 0; i < self._notifications.length; i++) {
@@ -855,7 +855,6 @@
           item.addEventListener('click', function () {
             var id = item.dataset.notifId;
             if (!id) return;
-            self._markAsRead(id);
             var n = null;
             for (var k = 0; k < self._notifications.length; k++) {
               if (String(self._notifications[k].id) === String(id)) {
@@ -863,7 +862,9 @@
                 break;
               }
             }
-            if (n) self._openNotification(n);
+            self._markAsRead(id).finally(function () {
+              if (n) self._openNotification(n);
+            });
           });
         })(items[j]);
       }
@@ -881,6 +882,8 @@
       var url = n.action_url || '';
       var rtype = n.resource_type || '';
       var rid = n.resource_id || '';
+
+      if (/^\s*javascript:/i.test(url)) return null;
 
       // Already a client page URL
       if (url.indexOf('.html') !== -1) {

@@ -57,6 +57,39 @@ function apiMsPerMinute() {
   return window.LanaTime.MS_PER_MINUTE;
 }
 
+function extractApiErrorMessage(result, fallback) {
+  const error = result && result.error;
+  const candidates = [
+    error && error.message,
+    result && result.detail,
+    result && result.message,
+    error && error.detail,
+    error && error.reason
+  ];
+
+  if (error && Array.isArray(error.details) && error.details.length > 0) {
+    candidates.push(error.details.map(item => {
+      if (!item) return '';
+      if (typeof item === 'string') return item;
+      return item.message || item.detail || item.path || '';
+    }).filter(Boolean).join('; '));
+  }
+
+  if (Array.isArray(result && result.errors) && result.errors.length > 0) {
+    candidates.push(result.errors.map(item => {
+      if (!item) return '';
+      if (typeof item === 'string') return item;
+      return item.message || item.detail || item.path || '';
+    }).filter(Boolean).join('; '));
+  }
+
+  for (const candidate of candidates) {
+    if (candidate && String(candidate).trim()) return String(candidate).trim();
+  }
+
+  return fallback || 'Request failed';
+}
+
 class ApiClient {
   constructor() {
     // Get configuration from config.js (must be loaded before this script)
@@ -584,7 +617,7 @@ class ApiClient {
         // Check for authentication/session errors - redirect to login
         const errorCode = result.error?.code;
         // Support both error formats: {error: {message: ...}} and {detail: ...}
-        const errorMessage = result.error?.message || result.detail || result.message || '';
+        const errorMessage = extractApiErrorMessage(result, '');
 
         // Don't show session expired modal for login-related requests or on the login page
         const isLoginRequest = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
@@ -604,7 +637,7 @@ class ApiClient {
         }
 
         // Extract error message with comprehensive fallback chain
-        const finalErrorMessage = result.error?.message || result.detail || result.message || 'Request failed';
+        const finalErrorMessage = extractApiErrorMessage(result, 'Request failed');
 
         // Log the error details for debugging
         console.error('[LanaAPI] Request failed:', {
