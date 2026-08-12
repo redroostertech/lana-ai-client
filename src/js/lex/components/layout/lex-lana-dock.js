@@ -413,7 +413,7 @@
             stay available (they fall back to their legacy behavior). ── */
       + '@media (min-width: 1024px) {'
       + '  html[data-lana-dock="expanded"] lex-ask-lana-btn,'
-      + '  html[data-lana-dock="expanded"] [data-lana-dock-trigger] {'
+      + '  html[data-lana-dock="expanded"] [data-lana-dock-trigger]:not(.lex-card-lana-talk) {'
       + '    display: none !important;'
       + '  }'
       + '}'
