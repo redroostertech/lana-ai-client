@@ -77,11 +77,6 @@
     const style = document.createElement('style');
     style.id = 'lex-card-styles';
     style.textContent = `
-      @property --lex-card-border-angle {
-        syntax: '<angle>';
-        inherits: false;
-        initial-value: 0deg;
-      }
       lex-card {
         display: block;
         margin-block-end: var(--lex-card-stack-gap, 12px);
@@ -212,11 +207,9 @@
       }
       lex-card[data-lana-card-context] > .rounded-xl {
         position: relative;
-        --lex-card-border-angle: 0deg;
         transition:
           box-shadow 0.42s cubic-bezier(0.16, 1, 0.3, 1),
-          transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
-          --lex-card-border-angle 0.62s cubic-bezier(0.16, 1, 0.3, 1);
+          transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
       }
       lex-card[data-lana-card-context] .lex-card-footer-visible {
         display: flex;
@@ -245,32 +238,29 @@
         pointer-events: auto;
         transform: translateY(0);
       }
-      lex-card[data-lana-card-context] > .rounded-xl::before {
-        content: '';
+      .lex-card-border-draw {
         position: absolute;
         inset: 0;
-        padding: 1px;
-        border-radius: inherit;
-        background:
-          conic-gradient(
-            from -90deg,
-            #1e1b4b 0deg,
-            #4338ca calc(var(--lex-card-border-angle) * 0.4),
-            #7c3aed calc(var(--lex-card-border-angle) * 0.7),
-            #c026d3 var(--lex-card-border-angle),
-            transparent var(--lex-card-border-angle),
-            transparent 360deg
-          );
+        width: 100%;
+        height: 100%;
         pointer-events: none;
-        -webkit-mask:
-          linear-gradient(#000 0 0) content-box,
-          linear-gradient(#000 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
+        overflow: visible;
+      }
+      .lex-card-border-path {
+        fill: none;
+        stroke-width: 1.5;
+        vector-effect: non-scaling-stroke;
+        stroke-linecap: round;
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        transition: stroke-dashoffset 0.72s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      lex-card[data-lana-card-context]:hover .lex-card-border-path,
+      lex-card[data-lana-card-context]:focus-within .lex-card-border-path {
+        stroke-dashoffset: 0;
       }
       lex-card[data-lana-card-context]:hover > .rounded-xl,
       lex-card[data-lana-card-context]:focus-within > .rounded-xl {
-        --lex-card-border-angle: 360deg;
         box-shadow: 0 10px 30px rgba(79, 70, 229, 0.12), var(--lex-shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
       }
       .lex-card-lana-talk {
@@ -415,6 +405,11 @@
       };
     }
 
+    constructor() {
+      super();
+      this._lanaBorderGradientId = 'lex-card-lana-border-' + Math.random().toString(36).slice(2);
+    }
+
     render() {
       injectStyles();
 
@@ -523,6 +518,7 @@
       // Body — wrap in collapsible div when expandable
       let bodyHtml;
       const lanaTalkHtml = hasLanaContext ? this._renderLanaTalkAction(lanaContext) : '';
+      const lanaBorderHtml = hasLanaContext ? this._renderLanaBorder() : '';
       if (isExpandable) {
         const collapseCls = 'lex-card-collapsible' + (isExpanded ? ' lex-card-collapsible--open' : '');
         bodyHtml = `<div class="${collapseCls}"><div style="padding-top:1rem;"><slot-content></slot-content></div><div class="lex-card-footer${hasLanaContext ? ' lex-card-footer-visible' : ''}">${lanaTalkHtml}</div></div>`;
@@ -532,9 +528,27 @@
 
       return `
         <div class="rounded-xl ${variantClass} ${paddingClass}" style="${bgStyle}${cardVars}">
+          ${lanaBorderHtml}
           ${headerHtml}
           ${bodyHtml}
         </div>
+      `;
+    }
+
+    _renderLanaBorder() {
+      const gradientId = attr(this._lanaBorderGradientId);
+      return `
+        <svg class="lex-card-border-draw" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1e1b4b"></stop>
+              <stop offset="40%" stop-color="#4338ca"></stop>
+              <stop offset="70%" stop-color="#7c3aed"></stop>
+              <stop offset="100%" stop-color="#c026d3"></stop>
+            </linearGradient>
+          </defs>
+          <rect class="lex-card-border-path" x="0.9" y="0.9" width="98.2" height="98.2" rx="2" ry="2" pathLength="1" stroke="url(#${gradientId})"></rect>
+        </svg>
       `;
     }
 
