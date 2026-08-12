@@ -550,7 +550,10 @@
       var self = this;
       // Composer may not be ready immediately — retry briefly
       function tryAttach(attempts) {
-        if (!self._chatEl) return;
+        if (!self._chatEl) {
+          if (attempts > 0) setTimeout(function () { tryAttach(attempts - 1); }, 100);
+          return;
+        }
         var composer = self._chatEl.querySelector('lex-chat-composer');
         if (composer && typeof composer.attachDocument === 'function') {
           composer.attachDocument(fileId, filename);
@@ -564,7 +567,10 @@
     attachModuleContext(moduleContext) {
       var self = this;
       function tryAttach(attempts) {
-        if (!self._chatEl) return;
+        if (!self._chatEl) {
+          if (attempts > 0) setTimeout(function () { tryAttach(attempts - 1); }, 100);
+          return;
+        }
         var composer = self._chatEl.querySelector('lex-chat-composer');
         if (composer && typeof composer.attachModuleContext === 'function') {
           composer.attachModuleContext(moduleContext);

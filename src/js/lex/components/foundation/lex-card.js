@@ -241,23 +241,21 @@
       .lex-card-border-draw {
         position: absolute;
         inset: 0;
-        width: 100%;
-        height: 100%;
+        padding: 1.5px;
+        border-radius: inherit;
+        background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 40%, #7c3aed 70%, #c026d3 100%);
+        opacity: 0;
         pointer-events: none;
-        overflow: visible;
+        transition: opacity 0.24s ease;
+        -webkit-mask:
+          linear-gradient(#000 0 0) content-box,
+          linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
       }
-      .lex-card-border-path {
-        fill: none;
-        stroke-width: 1.5;
-        vector-effect: non-scaling-stroke;
-        stroke-linecap: round;
-        stroke-dasharray: 1;
-        stroke-dashoffset: 1;
-        transition: stroke-dashoffset 0.72s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      lex-card[data-lana-card-context]:hover .lex-card-border-path,
-      lex-card[data-lana-card-context]:focus-within .lex-card-border-path {
-        stroke-dashoffset: 0;
+      lex-card[data-lana-card-context]:hover .lex-card-border-draw,
+      lex-card[data-lana-card-context]:focus-within .lex-card-border-draw {
+        opacity: 1;
       }
       lex-card[data-lana-card-context]:hover > .rounded-xl,
       lex-card[data-lana-card-context]:focus-within > .rounded-xl {
@@ -405,11 +403,6 @@
       };
     }
 
-    constructor() {
-      super();
-      this._lanaBorderGradientId = 'lex-card-lana-border-' + Math.random().toString(36).slice(2);
-    }
-
     render() {
       injectStyles();
 
@@ -536,19 +529,8 @@
     }
 
     _renderLanaBorder() {
-      const gradientId = attr(this._lanaBorderGradientId);
       return `
-        <svg class="lex-card-border-draw" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#1e1b4b"></stop>
-              <stop offset="40%" stop-color="#4338ca"></stop>
-              <stop offset="70%" stop-color="#7c3aed"></stop>
-              <stop offset="100%" stop-color="#c026d3"></stop>
-            </linearGradient>
-          </defs>
-          <rect class="lex-card-border-path" x="0.9" y="0.9" width="98.2" height="98.2" rx="2" ry="2" pathLength="1" stroke="url(#${gradientId})"></rect>
-        </svg>
+        <span class="lex-card-border-draw" aria-hidden="true"></span>
       `;
     }
 

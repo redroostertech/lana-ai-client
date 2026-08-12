@@ -760,10 +760,12 @@
     else visibilityLabel = sharing.is_private === false ? 'Organization-wide' : 'Private';
 
     return '<lex-card id="infoCard" heading="Information" variant="flat" padding="compact"' + wsumLanaCardAttrs('information', 'Information', {
+      description: matter.description || '',
       client: matter.client_name || '',
       type: matter.matter_type === 'workspace' ? 'Workspace' : 'Matter',
       status: matter.status || 'active',
       visibility: visibilityLabel,
+      created: matter.created_at || '',
       created_by: creatorName,
       last_updated: matter.updated_at || ''
     }) + '>' +
