@@ -64,6 +64,16 @@
     return Promise.reject(new Error('conversation scope API not available'));
   }
 
+  function parseCardContext(raw) {
+    if (!raw) return null;
+    try {
+      var parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /* Minimize chevrons (slide the dock away to the right edge). */
   var CHEVRONS_RIGHT_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" '
     + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
@@ -747,6 +757,17 @@
               .catch(function () { /* pending-attach path handles new threads */ });
           }
         }
+        if (opts.cardContext && typeof p.attachModuleContext === 'function') {
+          p.attachModuleContext(opts.cardContext);
+        }
+        if (opts.prefillPrompt && p._chatEl) {
+          var composer = typeof p._chatEl.querySelector === 'function'
+            ? p._chatEl.querySelector('lex-chat-composer')
+            : null;
+          if (composer && typeof composer.getValue === 'function' && typeof composer.setValue === 'function' && !composer.getValue()) {
+            composer.setValue(opts.prefillPrompt);
+          }
+        }
         if (opts.initialPrompt && p._chatEl && typeof p._chatEl.send === 'function') {
           p._chatEl.send(opts.initialPrompt);
         }
@@ -846,7 +867,9 @@
         matterId: trigger.getAttribute('data-lana-matter-id') || trigger.getAttribute('matter-id') || null,
         matterName: trigger.getAttribute('data-lana-matter-name') || trigger.getAttribute('matter-name') || null,
         documentId: trigger.getAttribute('data-lana-document-id') || trigger.getAttribute('document-id') || null,
-        documentName: trigger.getAttribute('data-lana-document-name') || trigger.getAttribute('document-name') || null
+        documentName: trigger.getAttribute('data-lana-document-name') || trigger.getAttribute('document-name') || null,
+        prefillPrompt: trigger.getAttribute('data-lana-prefill') || null,
+        cardContext: parseCardContext(trigger.getAttribute('data-lana-card-context') || '')
       });
     }
 

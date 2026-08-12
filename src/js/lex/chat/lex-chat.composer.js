@@ -1006,7 +1006,9 @@
           this._moduleContext = null;
           this._renderDocBadges();
           this.emit('lex-composer-module-context-remove', { moduleContext: previous });
-          this.emit('lex-composer-tool-dismiss', { toolId: 'insights_chat' });
+          if (!previous || previous.type !== 'ui_card') {
+            this.emit('lex-composer-tool-dismiss', { toolId: 'insights_chat' });
+          }
           return;
         }
 
@@ -1195,11 +1197,18 @@
         container.innerHTML = '';
         return;
       }
+      const moduleLabel = this._moduleContext
+        ? (this._moduleContext.ui_label
+          || this._moduleContext.card_title
+          || this._moduleContext.module_name
+          || this._moduleContext.module_key
+          || 'Report')
+        : '';
       const moduleBadges = this._moduleContext ? [`
         <div class="lex-cmp-doc-badge lex-cmp-doc-badge--module">
           ${ICON_EYE}
-          <span>${esc(this._moduleContext.module_name || this._moduleContext.module_key || 'Report')}</span>
-          <button class="lex-cmp-doc-badge-x" data-dismiss-module-context title="Remove report context">${ICON_CLOSE}</button>
+          <span>${esc(moduleLabel)}</span>
+          <button class="lex-cmp-doc-badge-x" data-dismiss-module-context title="Remove attached context">${ICON_CLOSE}</button>
         </div>`] : [];
       const docBadges = this._attachedDocs.map(doc => {
         return `
@@ -1836,9 +1845,11 @@
       if (!moduleContext) return;
       this._moduleContext = { ...moduleContext };
       this._renderDocBadges();
-      const active = new Set(this.activeTools || []);
-      active.add('insights_chat');
-      this.setActiveTools(Array.from(active));
+      if (moduleContext.type !== 'ui_card') {
+        const active = new Set(this.activeTools || []);
+        active.add('insights_chat');
+        this.setActiveTools(Array.from(active));
+      }
     }
 
     clearModuleContext() {

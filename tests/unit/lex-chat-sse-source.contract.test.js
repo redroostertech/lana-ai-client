@@ -183,6 +183,54 @@ describe('SSEChatSource contract', () => {
     ]);
   });
 
+  test('normalizes unified context and retrieval progress events', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(responseFromChunks([
+      'event: tool_progress\ndata: {"tool_name":"attachment_rag","message":"Searching the attached document embeddings for relevant evidence...","scan_type":"embedding","file_count":2,"chunks_found":4}\n\n',
+      'event: rag_complete\ndata: {"chunks_found":4,"documents_searched":2,"rag_time_ms":175}\n\n',
+      'event: conversation_compaction\ndata: {"status":"applied","reason":"token_budget","before_tokens":42000,"after_tokens":18000,"budget_tokens":24000,"before_message_count":42,"after_message_count":16,"dropped_message_count":26,"has_rolling_summary":true,"has_structured_state":true,"history_strategy":"compact"}\n\n',
+      'event: done\ndata: {"thread_id":"thread-1","generation_id":"generation-1","message_id":"assistant-1"}\n\n'
+    ]));
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
+
+    const events = [];
+    for await (const event of source.send('summarize the attachment')) events.push(event);
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'tool_progress',
+        tool: 'attachment_rag',
+        toolName: 'attachment_rag',
+        message: 'Searching the attached document embeddings for relevant evidence...',
+        scanType: 'embedding',
+        fileCount: 2,
+        chunksFound: 4
+      }),
+      expect.objectContaining({
+        type: 'rag_complete',
+        chunksFound: 4,
+        documentsSearched: 2,
+        ragTimeMs: 175
+      }),
+      expect.objectContaining({
+        type: 'conversation_compaction',
+        status: 'applied',
+        reason: 'token_budget',
+        beforeTokens: 42000,
+        afterTokens: 18000,
+        budgetTokens: 24000,
+        beforeMessageCount: 42,
+        afterMessageCount: 16,
+        droppedMessageCount: 26,
+        hasRollingSummary: true,
+        hasStructuredState: true,
+        historyStrategy: 'compact'
+      }),
+      expect.objectContaining({ type: 'done', messageId: 'assistant-1', generationId: 'generation-1' })
+    ]);
+  });
+
   test('reports a terminal error when canonical conversation creation is unavailable', async () => {
     const fetchMock = jest.fn();
     const { Source } = loadSource(fetchMock);

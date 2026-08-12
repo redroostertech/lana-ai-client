@@ -52,6 +52,7 @@
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/>',
     download: '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
     share:    '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
+    focus:    '<path d="M8 3H5a2 2 0 00-2 2v3"/><path d="M16 3h3a2 2 0 012 2v3"/><path d="M21 16v3a2 2 0 01-2 2h-3"/><path d="M8 21H5a2 2 0 01-2-2v-3"/>',
     link:     '<path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>',
     copy:     '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>',
     pin:      '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>',
@@ -198,10 +199,81 @@
       .lex-card-footer.lex-card-footer-visible {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 0.5rem;
         padding-top: 1rem;
         margin-top: 1rem;
         border-top: 1px solid var(--_card-border-color);
+      }
+      lex-card[data-lana-card-context] > .rounded-xl {
+        position: relative;
+        transition: box-shadow 0.18s ease, transform 0.18s ease;
+      }
+      lex-card[data-lana-card-context] .lex-card-footer-visible {
+        display: none;
+        justify-content: flex-start;
+        padding-top: 0.75rem;
+        margin-top: 0.75rem;
+        border-top: 0;
+      }
+      lex-card[data-lana-card-context]:hover .lex-card-footer-visible,
+      lex-card[data-lana-card-context]:focus-within .lex-card-footer-visible {
+        display: flex;
+      }
+      lex-card[data-lana-card-context] > .rounded-xl::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        padding: 1px;
+        border-radius: inherit;
+        background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 40%, #7c3aed 70%, #c026d3 100%);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s ease;
+        -webkit-mask:
+          linear-gradient(#000 0 0) content-box,
+          linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+      }
+      lex-card[data-lana-card-context]:hover > .rounded-xl,
+      lex-card[data-lana-card-context]:focus-within > .rounded-xl {
+        box-shadow: 0 10px 30px rgba(79, 70, 229, 0.12), var(--lex-shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+      }
+      lex-card[data-lana-card-context]:hover > .rounded-xl::before,
+      lex-card[data-lana-card-context]:focus-within > .rounded-xl::before {
+        opacity: 1;
+      }
+      .lex-card-lana-talk {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.38rem;
+        min-height: 31px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 9999px;
+        background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 40%, #7c3aed 70%, #c026d3 100%);
+        background-size: 200% 200%;
+        color: #fff;
+        font: inherit;
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 4px 12px rgba(99,102,241,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+        transition: background-position 0.24s ease, transform 0.1s ease, box-shadow 0.18s ease;
+      }
+      .lex-card-lana-talk:hover {
+        color: #fff;
+        background-position: 100% 100%;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.14), 0 8px 18px rgba(99,102,241,0.28), inset 0 1px 0 rgba(255,255,255,0.16);
+      }
+      .lex-card-lana-talk:active {
+        transform: scale(0.98);
+      }
+      .lex-card-lana-talk svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
       }
 
       /* ── Expandable (collapsible body) ───────────────────── */
@@ -267,6 +339,14 @@
     return `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">${path}</svg>`;
   }
 
+  function attr(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
   // -----------------------------------------------------------------------
   // LexCard
   // -----------------------------------------------------------------------
@@ -292,6 +372,8 @@
       const actions = this.actions || [];
       const isExpandable = !!this.expandable;
       const isExpanded = !!this.expanded;
+      const lanaContext = this.getAttribute('data-lana-card-context') || '';
+      const hasLanaContext = !!lanaContext;
 
       const variants = {
         default:  `${isDark ? '' : 'border lex-border-subtle'} shadow-sm`,
@@ -390,11 +472,12 @@
 
       // Body — wrap in collapsible div when expandable
       let bodyHtml;
+      const lanaTalkHtml = hasLanaContext ? this._renderLanaTalkAction(lanaContext) : '';
       if (isExpandable) {
         const collapseCls = 'lex-card-collapsible' + (isExpanded ? ' lex-card-collapsible--open' : '');
-        bodyHtml = `<div class="${collapseCls}"><div style="padding-top:1rem;"><slot-content></slot-content></div><div class="lex-card-footer"></div></div>`;
+        bodyHtml = `<div class="${collapseCls}"><div style="padding-top:1rem;"><slot-content></slot-content></div><div class="lex-card-footer${hasLanaContext ? ' lex-card-footer-visible' : ''}">${lanaTalkHtml}</div></div>`;
       } else {
-        bodyHtml = `<slot-content></slot-content><div class="lex-card-footer"></div>`;
+        bodyHtml = `<slot-content></slot-content><div class="lex-card-footer${hasLanaContext ? ' lex-card-footer-visible' : ''}">${lanaTalkHtml}</div>`;
       }
 
       return `
@@ -402,6 +485,28 @@
           ${headerHtml}
           ${bodyHtml}
         </div>
+      `;
+    }
+
+    _renderLanaTalkAction(lanaContext) {
+      const contextType = this.getAttribute('data-lana-context-type') || this.getAttribute('context-type') || '';
+      const matterId = this.getAttribute('data-lana-matter-id') || this.getAttribute('matter-id') || '';
+      const matterName = this.getAttribute('data-lana-matter-name') || this.getAttribute('matter-name') || '';
+      const prompt = this.getAttribute('data-lana-prefill') || 'Talk about this with LANA.';
+      return `
+        <button
+          type="button"
+          class="lex-card-lana-talk"
+          data-lana-dock-trigger
+          data-lana-context-type="${attr(contextType)}"
+          data-lana-matter-id="${attr(matterId)}"
+          data-lana-matter-name="${attr(matterName)}"
+          data-lana-prefill="${attr(prompt)}"
+          data-lana-card-context="${attr(lanaContext)}"
+        >
+          ${iconSvg('focus')}
+          <span>Talk about this.</span>
+        </button>
       `;
     }
 

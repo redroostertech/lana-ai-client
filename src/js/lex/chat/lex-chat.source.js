@@ -56,6 +56,21 @@
       .replace(/\b\w/g, function (letter) { return letter.toUpperCase(); });
   }
 
+  function firstValue() {
+    for (var i = 0; i < arguments.length; i += 1) {
+      var value = arguments[i];
+      if (value !== undefined && value !== null) return value;
+    }
+    return null;
+  }
+
+  function numberValue() {
+    var value = firstValue.apply(null, arguments);
+    if (value === null || value === '') return null;
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   // =========================================================================
   // ChatSource — abstract base
   // =========================================================================
@@ -464,7 +479,15 @@
             type: 'tool_progress',
             tool: data.tool || data.tool_name || '',
             toolName: data.tool_name || data.tool || '',
-            message: data.message || ''
+            message: data.message || '',
+            status: data.status || null,
+            phase: data.phase || data.stage || null,
+            scanType: data.scan_type || data.scanType || null,
+            filename: data.filename || data.file_name || null,
+            fileCount: numberValue(data.file_count, data.fileCount),
+            completed: data.completed === true,
+            chunksFound: numberValue(data.chunks_found, data.chunksFound),
+            heartbeat: data.heartbeat === true
           };
 
         case 'tool_end':
@@ -512,6 +535,16 @@
 
         case 'references':
           return { type: 'references', references: data.references || [] };
+
+        case 'rag_complete':
+          return {
+            type: 'rag_complete',
+            message: data.message || '',
+            chunksFound: numberValue(data.chunks_found, data.chunksFound),
+            documentsSearched: numberValue(data.documents_searched, data.documentsSearched),
+            ragTimeMs: numberValue(data.rag_time_ms, data.ragTimeMs),
+            source: data.source || data.provider || null
+          };
 
         case 'context_usage':
           return {
@@ -611,6 +644,23 @@
             newPercentUsed: data.new_percent_used,
             tokensSaved: data.tokens_saved,
             durationMs: data.duration_ms
+          };
+
+        case 'conversation_compaction':
+          return {
+            type: 'conversation_compaction',
+            status: data.status || 'applied',
+            reason: data.reason || null,
+            message: data.message || '',
+            beforeTokens: numberValue(data.before_tokens, data.beforeTokens),
+            afterTokens: numberValue(data.after_tokens, data.afterTokens),
+            budgetTokens: numberValue(data.budget_tokens, data.budgetTokens),
+            beforeMessageCount: numberValue(data.before_message_count, data.beforeMessageCount),
+            afterMessageCount: numberValue(data.after_message_count, data.afterMessageCount),
+            droppedMessageCount: numberValue(data.dropped_message_count, data.droppedMessageCount),
+            hasRollingSummary: firstValue(data.has_rolling_summary, data.hasRollingSummary) === true,
+            hasStructuredState: firstValue(data.has_structured_state, data.hasStructuredState) === true,
+            historyStrategy: data.history_strategy || data.historyStrategy || null
           };
 
         case 'phase':

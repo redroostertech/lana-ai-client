@@ -30,9 +30,13 @@
     var status = stringPart(event.status);
     var step = stepPart(event);
     var task = stringPart(event.taskId ?? event.task_id);
+    var tool = stringPart(event.toolName || event.tool_name || event.tool);
     var isProgressLike = type === 'agentic_progress'
       || type === 'progress'
       || type === 'document_progress'
+      || type === 'tool_progress'
+      || type === 'rag_complete'
+      || type === 'conversation_compaction'
       || event.heartbeat === true
       || Boolean(phase || status || step || task);
 
@@ -43,7 +47,7 @@
     var copyIdentity = event.heartbeat === true
       ? 'heartbeat'
       : stringPart(event.message || event.content).trim().replace(/\s+/g, ' ');
-    return [type || 'progress', task, step, phase, status, copyIdentity].join('|');
+    return [type || 'progress', task, step, tool, phase, status, copyIdentity].join('|');
   }
 
   function shouldReplaceConsecutive(previousKey, event) {

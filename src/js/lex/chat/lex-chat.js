@@ -78,6 +78,72 @@
     }
   }
 
+  function pluralize(count, singular, plural) {
+    return count === 1 ? singular : (plural || `${singular}s`);
+  }
+
+  function formatRagComplete(event) {
+    const chunks = Number(event.chunksFound);
+    const docs = Number(event.documentsSearched);
+    if (Number.isFinite(chunks) && chunks > 0 && Number.isFinite(docs) && docs > 0) {
+      return `Found ${chunks} relevant ${pluralize(chunks, 'excerpt')} across ${docs} ${pluralize(docs, 'document')}.`;
+    }
+    if (Number.isFinite(chunks) && chunks > 0) {
+      return `Found ${chunks} relevant ${pluralize(chunks, 'excerpt')}.`;
+    }
+    return 'Document retrieval complete.';
+  }
+
+  function formatToolProgress(event) {
+    const toolName = String(event.toolName || event.tool || '').trim();
+    const phase = String(event.phase || '').toLowerCase();
+    const scanType = String(event.scanType || '').toLowerCase();
+    const status = String(event.status || '').toLowerCase();
+
+    if (toolName === 'document_retrieval' || toolName === 'attachment_rag') {
+      if (event.completed === true || status === 'completed' || status === 'complete') {
+        return 'Attached document retrieval complete.';
+      }
+      if (scanType === 'embedding' || phase === 'embedding_search' || phase === 'searching') {
+        return 'Searching attached document embeddings...';
+      }
+      if (scanType === 'direct' || scanType === 'direct_content' || phase === 'scanning') {
+        return 'Scanning attached document content...';
+      }
+      if (event.filename) {
+        return 'Analyzing attached document...';
+      }
+      return 'Retrieving attached document content...';
+    }
+
+    if (status === 'completed' || status === 'complete') {
+      return 'Tool finished.';
+    }
+    return humanizeToolStart(toolName, {}) || 'Running tool...';
+  }
+
+  function formatConversationCompaction(event) {
+    const status = String(event.status || 'applied').toLowerCase();
+    if (status === 'skipped') {
+      return 'Context compaction was not needed.';
+    }
+    if (status !== 'applied') {
+      return 'Context compaction status updated.';
+    }
+    return 'Context compacted to keep this conversation within budget.';
+  }
+
+  function formatConversationCompactionDetails(event) {
+    const parts = [formatConversationCompaction(event)];
+    if (Number.isFinite(Number(event.beforeTokens)) && Number.isFinite(Number(event.afterTokens))) {
+      parts.push(`${event.beforeTokens} to ${event.afterTokens} tokens`);
+    }
+    if (Number.isFinite(Number(event.droppedMessageCount)) && Number(event.droppedMessageCount) > 0) {
+      parts.push(`${event.droppedMessageCount} older ${pluralize(Number(event.droppedMessageCount), 'message')} summarized or trimmed`);
+    }
+    return parts.join(' ');
+  }
+
   let stylesInjected = false;
 
   function injectStyles() {
@@ -884,20 +950,52 @@
           break;
 
         case 'tool_progress':
-          // Prefer the server-supplied friendly progress string (e.g.
-          // "Looking up matter documents…"). If the server didn't send
-          // one, leave the existing primary line in place.
+          // Render allowlisted progress copy from structured fields instead
+          // of trusting arbitrary backend message text.
           if (this._activityEl) {
-            const progressMsg = String(event.message || '').trim();
+            const progressMsg = formatToolProgress(event);
             if (progressMsg) {
               this._activityEl.update({
                 primary: progressMsg,
                 message: 'Working...',
                 phase: ''
               });
+              this._activityEl.addReasoningEntry({
+                type: event.type,
+                tool: event.tool || '',
+                toolName: event.toolName || event.tool || '',
+                message: progressMsg,
+                phase: event.phase || event.scanType || 'tool',
+                status: event.status || null,
+                heartbeat: event.heartbeat === true
+              });
             }
           }
           break;
+
+        case 'rag_complete': {
+          const ragMessage = formatRagComplete(event);
+          if (this._activityEl) {
+            this._activityEl.update({
+              primary: ragMessage,
+              message: 'Working...',
+              phase: ''
+            });
+            this._activityEl.addReasoningEntry({
+              type: event.type,
+              message: ragMessage,
+              phase: 'retrieval',
+              status: 'completed'
+            });
+          }
+          this.emit('lex-chat-rag-complete', {
+            chunksFound: event.chunksFound,
+            documentsSearched: event.documentsSearched,
+            ragTimeMs: event.ragTimeMs,
+            source: event.source || null
+          });
+          break;
+        }
 
         case 'tool_end':
         case 'tool_call_complete':
@@ -1058,6 +1156,37 @@
             percentUntilCompact: null
           });
           break;
+
+        case 'conversation_compaction': {
+          const compactionMessage = formatConversationCompaction(event);
+          if (this._activityEl) {
+            this._activityEl.update({
+              primary: compactionMessage,
+              message: 'Working...',
+              phase: ''
+            });
+            this._activityEl.addReasoningEntry({
+              type: event.type,
+              message: formatConversationCompactionDetails(event),
+              phase: 'context',
+              status: event.status || 'applied'
+            });
+          }
+          this.emit('lex-chat-conversation-compaction', {
+            status: event.status || 'applied',
+            reason: event.reason || null,
+            beforeTokens: event.beforeTokens,
+            afterTokens: event.afterTokens,
+            budgetTokens: event.budgetTokens,
+            beforeMessageCount: event.beforeMessageCount,
+            afterMessageCount: event.afterMessageCount,
+            droppedMessageCount: event.droppedMessageCount,
+            hasRollingSummary: event.hasRollingSummary === true,
+            hasStructuredState: event.hasStructuredState === true,
+            historyStrategy: event.historyStrategy || null
+          });
+          break;
+        }
 
         case 'done':
           // Finalize the streaming message

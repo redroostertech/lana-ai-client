@@ -15,7 +15,7 @@ describe('Lex chat progress event coalescing', () => {
     };
     const key = progressEvents.getProgressEventKey(heartbeat);
 
-    expect(key).toBe('agentic_progress|task-1|2|execution|still_working|heartbeat');
+    expect(key).toBe('agentic_progress|task-1|2||execution|still_working|heartbeat');
     expect(progressEvents.shouldReplaceConsecutive(key, {
       ...heartbeat,
       message: 'Still working on the reviewed draft'
@@ -52,5 +52,56 @@ describe('Lex chat progress event coalescing', () => {
       type: 'agentic_progress', taskId: 'task-1', currentStep: 2,
       phase: 'execution', status: 'in_progress', message: 'Reviewing draft'
     })).toBe(false);
+  });
+
+  test('coalesces tool progress heartbeats but preserves retrieval milestones', () => {
+    const heartbeat = {
+      type: 'tool_progress',
+      toolName: 'document_retrieval',
+      phase: 'retrieval',
+      status: 'searching',
+      message: 'Searching the attached document embeddings for relevant evidence...',
+      heartbeat: true
+    };
+    const key = progressEvents.getProgressEventKey(heartbeat);
+
+    expect(key).toBe('tool_progress|||document_retrieval|retrieval|searching|heartbeat');
+    expect(progressEvents.shouldReplaceConsecutive(key, {
+      ...heartbeat,
+      message: 'Still searching attached document embeddings...'
+    })).toBe(true);
+
+    expect(progressEvents.shouldReplaceConsecutive(progressEvents.getProgressEventKey({
+      type: 'tool_progress',
+      toolName: 'document_retrieval',
+      phase: 'retrieval',
+      message: 'Scanning the attached document content directly for relevant sections...'
+    }), {
+      type: 'tool_progress',
+      toolName: 'document_retrieval',
+      phase: 'retrieval',
+      message: 'Searching the attached document embeddings for relevant evidence...'
+    })).toBe(false);
+
+    expect(progressEvents.shouldReplaceConsecutive(key, {
+      ...heartbeat,
+      toolName: 'query_analytics_data'
+    })).toBe(false);
+  });
+
+  test('gives retrieval completion and context compaction stable progress identities', () => {
+    expect(progressEvents.getProgressEventKey({
+      type: 'rag_complete',
+      phase: 'retrieval',
+      status: 'completed',
+      message: 'Found 4 relevant excerpts across 2 documents.'
+    })).toBe('rag_complete||||retrieval|completed|Found 4 relevant excerpts across 2 documents.');
+
+    expect(progressEvents.getProgressEventKey({
+      type: 'conversation_compaction',
+      phase: 'context',
+      status: 'applied',
+      message: 'Context compacted to keep this conversation within budget.'
+    })).toBe('conversation_compaction||||context|applied|Context compacted to keep this conversation within budget.');
   });
 });

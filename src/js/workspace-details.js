@@ -759,7 +759,14 @@
     else if (rawVisibility) visibilityLabel = rawVisibility.charAt(0).toUpperCase() + rawVisibility.slice(1);
     else visibilityLabel = sharing.is_private === false ? 'Organization-wide' : 'Private';
 
-    return '<lex-card id="infoCard" heading="Information" variant="flat" padding="compact">' +
+    return '<lex-card id="infoCard" heading="Information" variant="flat" padding="compact"' + wsumLanaCardAttrs('information', 'Information', {
+      client: matter.client_name || '',
+      type: matter.matter_type === 'workspace' ? 'Workspace' : 'Matter',
+      status: matter.status || 'active',
+      visibility: visibilityLabel,
+      created_by: creatorName,
+      last_updated: matter.updated_at || ''
+    }) + '>' +
       '<div class="space-y-2.5 text-sm">' +
         descriptionBlock +
         '<div class="flex justify-between"><span class="text-gray-500">Client</span><span class="text-gray-900 font-medium">' + escapeHtml(matter.client_name || 'N/A') + '</span></div>' +
@@ -782,7 +789,10 @@
 
     // Shared With card (the Information card lives in the Summary overview grid)
     var shareActions = JSON.stringify([{icon:'plus',label:'Manage sharing'}]).split('"').join('&quot;');
-    html += '<lex-card id="sharedWithCard" heading="Shared With" variant="flat" padding="compact" actions=\'' + shareActions + '\'>';
+    html += '<lex-card id="sharedWithCard" heading="Shared With" variant="flat" padding="compact" actions=\'' + shareActions + '\'' + wsumLanaCardAttrs('shared_with', 'Shared With', {
+      visibility: matter.visibility || '',
+      permission_count: Array.isArray(permissions) ? permissions.length : 0
+    }) + '>';
     if (matter.visibility === 'organization') {
       html += '<p class="text-sm text-gray-500">Visible to entire organization</p>';
     } else if (permissions && permissions.length > 0) {
@@ -878,7 +888,21 @@
 
       var headingText = 'Connected Data' + (totalCount > 0 ? ' (' + totalCount + ')' : '');
 
-      var html = '<lex-card id="connectedDataCard" heading="' + headingText + '" variant="flat" padding="compact" actions=\'' + cardActions + '\'>';
+      var html = '<lex-card id="connectedDataCard" heading="' + headingText + '" variant="flat" padding="compact" actions=\'' + cardActions + '\'' + wsumLanaCardAttrs('connected_data', 'Connected Data', {
+        total_count: totalCount,
+        contacts_count: contacts.length,
+        connector_record_count: records.length,
+        visible_contacts: contacts.slice(0, 3).map(function (contact) {
+          return contact.name || contact.display_name || contact.email || '';
+        }).filter(Boolean),
+        visible_records: records.slice(0, 5).map(function (record) {
+          return {
+            connector: record.connector_name || '',
+            entity_type: record.entity_type || '',
+            label: record.data && (record.data.name || record.data.title) || record.external_id || ''
+          };
+        })
+      }) + '>';
 
       if (totalCount === 0) {
         html += '<lex-empty size="inline" icon="users" message="No connected data" description="Add contacts or connector records."></lex-empty>';
@@ -1019,7 +1043,12 @@
       currentMatterData._allLinks = allLinks;
 
       var linkActions = isWorkspace ? JSON.stringify([{icon:'plus',label:'Add'}]).split('"').join('&quot;') : '';
-      var html = '<lex-card id="linkedMattersCard" heading="Linked Workspaces" variant="flat" padding="compact"' + (linkActions ? ' actions=\'' + linkActions + '\'' : '') + '>';
+      var html = '<lex-card id="linkedMattersCard" heading="Linked Workspaces" variant="flat" padding="compact"' + (linkActions ? ' actions=\'' + linkActions + '\'' : '') + wsumLanaCardAttrs('linked_workspaces', 'Linked Workspaces', {
+        linked_count: allLinks.length,
+        visible_links: allLinks.slice(0, 3).map(function (link) {
+          return link.name || link.matter_name || link.title || link.id || '';
+        }).filter(Boolean)
+      }) + '>';
 
       if (allLinks.length === 0) {
         html += '<lex-empty size="inline" icon="link" message="No linked workspaces" description="Link related workspaces or matters."></lex-empty>';
@@ -1297,6 +1326,44 @@
     );
   }
 
+  function wsumLanaCardAttrs(cardKey, title, details) {
+    var matter = currentMatterData && currentMatterData.matter ? currentMatterData.matter : {};
+    var matterId = matter.matter_id || matter.id || '';
+    var matterName = matter.matter_name || matter.name || matter.title || '';
+    var context = {
+      type: 'ui_card',
+      ui_label: title,
+      source: 'workspace_details_summary',
+      card_key: cardKey,
+      card_title: title,
+      page: {
+        route: 'workspace-details',
+        tab: 'summary',
+        matter_id: matterId,
+        matter_name: matterName,
+        matter_type: matter.matter_type || matter.type || ''
+      },
+      details: details || {}
+    };
+    return ' data-lana-card-context="' + escapeAttr(JSON.stringify(context)) + '"' +
+      ' data-lana-context-type="full_chat"' +
+      ' data-lana-matter-id="' + escapeAttr(matterId) + '"' +
+      ' data-lana-matter-name="' + escapeAttr(matterName) + '"' +
+      ' data-lana-prefill="' + escapeAttr('Help me understand the ' + title + ' card.') + '"';
+  }
+
+  function wsumTaskContextRows(tasks, limit) {
+    return (tasks || []).slice(0, limit || 5).map(function (task) {
+      return {
+        title: task.title || task.task_name || 'Untitled task',
+        status: task.status || '',
+        priority: task.priority || '',
+        due_date: task.due_date || '',
+        assignee: task.assigned_to || task.assigned_to_name || ''
+      };
+    });
+  }
+
   function renderSummaryTab() {
     var container = document.getElementById('summaryOverview');
     if (!container || !currentMatterData) return;
@@ -1426,7 +1493,16 @@
       ? '<div class="wsum-card-list">' + activities.slice(0, 6).map(renderActivityRow).join('') + '</div>'
       : '<lex-empty size="compact" icon="inbox" message="No activity yet" description="Activity in this workspace will appear here."></lex-empty>';
     var activityCardHtml =
-      '<lex-card heading="Recent activity" subtitle="Latest updates across this workspace">' +
+      '<lex-card heading="Recent activity" subtitle="Latest updates across this workspace"' + wsumLanaCardAttrs('recent_activity', 'Recent activity', {
+        activity_count: activities.length,
+        visible_activities: activities.slice(0, 6).map(function (activity) {
+          return {
+            type: activity.type || activity.activity_type || '',
+            title: activity.title || activity.description || activity.summary || '',
+            created_at: activity.created_at || activity.timestamp || ''
+          };
+        })
+      }) + '>' +
         activityRowsHtml +
         '<button id="wsumViewAllActivity" class="wsum-viewall">View all activity</button>' +
       '</lex-card>';
@@ -1471,7 +1547,9 @@
     }).join('');
 
     var priorityCardHtml =
-      '<lex-card heading="Priority breakdown" subtitle="How work is being prioritized">' +
+      '<lex-card heading="Priority breakdown" subtitle="How work is being prioritized"' + wsumLanaCardAttrs('priority_breakdown', 'Priority breakdown', {
+        priority_counts: priorityCounts
+      }) + '>' +
         '<lex-chart id="wsumPriorityChart" type="bar" height="220px" variant="compact"></lex-chart>' +
       '</lex-card>';
 
@@ -1482,18 +1560,32 @@
     var gridHtml =
       '<div class="wsum-masonry">' +
         '<div class="wsum-col">' +
-          '<lex-card heading="Status overview" subtitle="Snapshot of ' + total + ' work ' + wsumPlural(total, 'item', 'items') + ' by status">' +
+          '<lex-card heading="Status overview" subtitle="Snapshot of ' + total + ' work ' + wsumPlural(total, 'item', 'items') + ' by status"' + wsumLanaCardAttrs('status_overview', 'Status overview', {
+            total_work_items: total,
+            denominator: denominator,
+            percent_complete: pctComplete,
+            status_counts: statusCounts
+          }) + '>' +
             statusCardInner +
           '</lex-card>' +
-          '<lex-card heading="Needs attention" subtitle="Overdue work items">' + overdueRows + '</lex-card>' +
-          '<lex-card id="wsumNextCard" heading="What\'s next" subtitle="Upcoming open work"' + nextCardActions + '>' + nextRows + '</lex-card>' +
+          '<lex-card heading="Needs attention" subtitle="Overdue work items"' + wsumLanaCardAttrs('needs_attention', 'Needs attention', {
+            overdue_count: overdue.length,
+            visible_tasks: wsumTaskContextRows(overdue, 5)
+          }) + '>' + overdueRows + '</lex-card>' +
+          '<lex-card id="wsumNextCard" heading="What\'s next" subtitle="Upcoming open work"' + nextCardActions + wsumLanaCardAttrs('whats_next', 'What\'s next', {
+            next_count: nextList.length,
+            visible_tasks: wsumTaskContextRows(nextList, 5)
+          }) + '>' + nextRows + '</lex-card>' +
           priorityCardHtml +
           '<div id="dockPanelDetails"></div>' +
         '</div>' +
         '<div class="wsum-col">' +
           buildInformationCardHtml(matter) +
           activityCardHtml +
-          '<lex-card heading="Types of work" subtitle="Distribution of work items by type">' +
+          '<lex-card heading="Types of work" subtitle="Distribution of work items by type"' + wsumLanaCardAttrs('types_of_work', 'Types of work', {
+            type_counts: typeCounts,
+            type_total: typeTotal
+          }) + '>' +
             (typeRows || '<lex-empty size="inline" icon="chart" message="No type data" description="Work item types will appear here."></lex-empty>') +
           '</lex-card>' +
           '<div id="dockPanelContext"></div>' +
@@ -8104,7 +8196,17 @@
     container.style.display = 'block';
 
     var cfActions = JSON.stringify([{icon:'plus',label:'Manage fields'}]).split('"').join('&quot;');
-    var html = '<lex-card id="customFieldsCard" heading="Custom Fields" variant="flat" padding="compact" actions=\'' + cfActions + '\'>';
+    var html = '<lex-card id="customFieldsCard" heading="Custom Fields" variant="flat" padding="compact" actions=\'' + cfActions + '\'' + wsumLanaCardAttrs('custom_fields', 'Custom Fields', {
+      field_count: fieldsToDisplay.length,
+      visible_fields: fieldsToDisplay.slice(0, 6).map(function (field) {
+        return {
+          key: field.key || '',
+          label: field.displayName || field.key || '',
+          value: field.value == null ? '' : String(field.value),
+          type: field.type || ''
+        };
+      })
+    }) + '>';
 
     if (fieldsToDisplay.length === 0) {
       html += '<lex-empty size="inline" icon="document" message="No custom fields yet" description="Add fields to track matter-specific data."></lex-empty>';
@@ -8340,7 +8442,11 @@
       var actionsAttr = refreshAction ? ' actions=\'' + refreshAction + '\'' : '';
 
       container.innerHTML =
-        '<lex-card id="matterProfileCard" heading="Matter Intelligence" variant="outlined" padding="compact"' + actionsAttr + '>' +
+        '<lex-card id="matterProfileCard" heading="Matter Intelligence" variant="outlined" padding="compact"' + actionsAttr + wsumLanaCardAttrs('matter_intelligence', 'Matter Intelligence', {
+          has_content: hasContent,
+          brand_voice_keys: brandVoiceItems.map(function (entry) { return entry[0]; }),
+          themes: themes.slice(0, 12)
+        }) + '>' +
           cardBody +
         '</lex-card>';
 
