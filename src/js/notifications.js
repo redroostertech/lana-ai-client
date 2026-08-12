@@ -10,6 +10,56 @@
  *   3. Call NotificationPanel.init() after DOM is ready
  */
 
+window.LanaDisplay = window.LanaDisplay || (function() {
+  const LABEL_OVERRIDES = {
+    contact_coverage_gaps: 'Contact coverage gaps',
+    new_contacts_unlinked: 'New contacts unlinked',
+    crm_intelligence: 'CRM Intelligence',
+    approval_requested: 'Approval requested',
+    approval_escalated: 'Approval escalated',
+    approval_reminder: 'Approval reminder',
+    approval_decided: 'Approval decided'
+  };
+
+  function replaceAllLiteral(value, search, replacement) {
+    return String(value || '').split(search).join(replacement);
+  }
+
+  function machineIdentifierToLabel(value) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    if (LABEL_OVERRIDES[text]) return LABEL_OVERRIDES[text];
+    return text;
+  }
+
+  function formatText(value) {
+    let text = String(value || '');
+    const exactLabel = machineIdentifierToLabel(text);
+    if (exactLabel !== text) return exactLabel;
+
+    for (let i = 0; i <= 100; i += 1) {
+      text = replaceAllLiteral(text, i + ' finding(s)', i + (i === 1 ? ' finding' : ' findings'));
+      text = replaceAllLiteral(text, i + ' task(s)', i + (i === 1 ? ' task' : ' tasks'));
+      text = replaceAllLiteral(text, i + ' record(s)', i + (i === 1 ? ' record' : ' records'));
+    }
+
+    const quoteParts = text.split("'");
+    if (quoteParts.length > 2) {
+      for (let i = 1; i < quoteParts.length; i += 2) {
+        quoteParts[i] = machineIdentifierToLabel(quoteParts[i]);
+      }
+      text = quoteParts.join("'");
+    }
+
+    return text;
+  }
+
+  return {
+    formatText,
+    machineIdentifierToLabel
+  };
+})();
+
 window.DesktopNotifications = window.DesktopNotifications || (function() {
   const ENABLED_KEY = 'lana.desktopNotifications.enabled';
   const SEEN_KEY = 'lana.desktopNotifications.seenIds';
@@ -150,6 +200,68 @@ window.DesktopNotifications = window.DesktopNotifications || (function() {
     return true;
   }
 
+  function formatDisplayText(value) {
+    return window.LanaDisplay && typeof window.LanaDisplay.formatText === 'function'
+      ? window.LanaDisplay.formatText(value)
+      : String(value || '');
+  }
+
+  function readPath(object, path) {
+    let current = object;
+    for (let i = 0; i < path.length; i++) {
+      if (!current || typeof current !== 'object') return '';
+      current = current[path[i]];
+    }
+    return current || '';
+  }
+
+  function firstValue(values) {
+    for (let i = 0; i < values.length; i++) {
+      if (values[i]) return values[i];
+    }
+    return '';
+  }
+
+  function idFromPath(url, prefix) {
+    if (!url || url.indexOf(prefix) !== 0) return '';
+    const rest = url.substring(prefix.length);
+    return rest.split('?')[0].split('/')[0] || '';
+  }
+
+  function approvalIdFromNotification(notification) {
+    return firstValue([
+      notification.approval_id,
+      notification.approvalId,
+      readPath(notification, ['approval', 'id']),
+      readPath(notification, ['data', 'approval_id']),
+      readPath(notification, ['data', 'approvalId']),
+      readPath(notification, ['data', 'approval', 'id']),
+      readPath(notification, ['details', 'approval_id']),
+      readPath(notification, ['details', 'approvalId']),
+      readPath(notification, ['metadata', 'approval_id']),
+      readPath(notification, ['metadata', 'approvalId'])
+    ]);
+  }
+
+  function resolveNotificationTarget(notification) {
+    if (!notification) return '';
+    const actionUrl = notification.action_url || '';
+    let approvalId = approvalIdFromNotification(notification)
+      || idFromPath(actionUrl, '/api/v1/approvals/')
+      || idFromPath(actionUrl, '/api/approvals/')
+      || idFromPath(actionUrl, '/approvals/');
+
+    if (!approvalId && (notification.resource_type === 'approval_request' || notification.resource_type === 'approval')) {
+      approvalId = notification.resource_id || '';
+    }
+
+    if (approvalId) {
+      return 'approval-detail.html?id=' + encodeURIComponent(approvalId);
+    }
+
+    return actionUrl;
+  }
+
   async function requestPermissionAndTest() {
     const granted = await enableFromUserGesture();
     if (granted) {
@@ -165,7 +277,7 @@ window.DesktopNotifications = window.DesktopNotifications || (function() {
   }
 
   function openNotificationTarget(notification) {
-    const actionUrl = notification && notification.action_url;
+    const actionUrl = resolveNotificationTarget(notification);
     if (!actionUrl) return;
     if (/^\s*javascript:/i.test(actionUrl)) return;
     window.focus();
@@ -178,8 +290,8 @@ window.DesktopNotifications = window.DesktopNotifications || (function() {
     const id = notification.id || '';
     if (id && getSeenIds().has(id)) return false;
 
-    const title = notification.title || 'LANA AI notification';
-    const body = notification.body || notification.message || '';
+    const title = formatDisplayText(notification.display_title || notification.title || 'LANA AI notification');
+    const body = formatDisplayText(notification.display_message || notification.body || notification.message || '');
     const desktopNotification = new Notification(title, {
       body,
       tag: id || undefined,

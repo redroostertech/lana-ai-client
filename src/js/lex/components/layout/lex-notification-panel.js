@@ -327,6 +327,65 @@
     return div.innerHTML;
   }
 
+  function fallbackMachineIdentifierToLabel(value) {
+    return String(value || '').trim();
+  }
+
+  function formatDisplayText(value) {
+    if (window.LanaDisplay && typeof window.LanaDisplay.formatText === 'function') {
+      return window.LanaDisplay.formatText(value);
+    }
+
+    var text = String(value || '');
+    var quoteParts = text.split("'");
+    if (quoteParts.length > 2) {
+      for (var i = 1; i < quoteParts.length; i += 2) {
+        if (quoteParts[i].indexOf('_') !== -1 || quoteParts[i].indexOf('-') !== -1 || quoteParts[i].indexOf('.') !== -1) {
+          quoteParts[i] = fallbackMachineIdentifierToLabel(quoteParts[i]);
+        }
+      }
+      return quoteParts.join("'");
+    }
+    return text;
+  }
+
+  function readPath(object, path) {
+    var current = object;
+    for (var i = 0; i < path.length; i++) {
+      if (!current || typeof current !== 'object') return '';
+      current = current[path[i]];
+    }
+    return current || '';
+  }
+
+  function firstValue(values) {
+    for (var i = 0; i < values.length; i++) {
+      if (values[i]) return values[i];
+    }
+    return '';
+  }
+
+  function idFromPath(url, prefix) {
+    if (!url || url.indexOf(prefix) !== 0) return '';
+    var rest = url.substring(prefix.length);
+    return rest.split('?')[0].split('/')[0] || '';
+  }
+
+  function approvalIdFromNotification(n) {
+    return firstValue([
+      n.approval_id,
+      n.approvalId,
+      readPath(n, ['approval', 'id']),
+      readPath(n, ['data', 'approval_id']),
+      readPath(n, ['data', 'approvalId']),
+      readPath(n, ['data', 'approval', 'id']),
+      readPath(n, ['details', 'approval_id']),
+      readPath(n, ['details', 'approvalId']),
+      readPath(n, ['metadata', 'approval_id']),
+      readPath(n, ['metadata', 'approvalId'])
+    ]);
+  }
+
   // ---------------------------------------------------------------------------
   // Helper: timeAgo
   // ---------------------------------------------------------------------------
@@ -822,13 +881,14 @@
         var isUnread = !n.read && !n.is_read;
         var style = getTypeStyle(n.type);
         var iconSvg = getIconSvg(n.type);
-        var body = n.body || n.message || '';
+        var title = formatDisplayText(n.display_title || n.title || 'Notification');
+        var body = formatDisplayText(n.display_message || n.body || n.message || '');
 
         html += '<div class="notif-item' + (isUnread ? ' notif-item--unread' : '') + '" data-notif-id="' + escapeHtml(n.id) + '">';
         html += '  <div class="notif-icon" style="background:' + style.bg + ';color:' + style.text + ';">' + iconSvg + '</div>';
         html += '  <div class="notif-content">';
         html += '    <div class="notif-content-header">';
-        html += '      <p class="notif-title">' + escapeHtml(n.title) + '</p>';
+        html += '      <p class="notif-title">' + escapeHtml(title) + '</p>';
         if (isUnread) {
           html += '      <span class="notif-dot"></span>';
         }
@@ -882,12 +942,26 @@
       var url = n.action_url || '';
       var rtype = n.resource_type || '';
       var rid = n.resource_id || '';
+      var approvalId = approvalIdFromNotification(n);
 
       if (/^\s*javascript:/i.test(url)) return null;
 
       // Already a client page URL
       if (url.indexOf('.html') !== -1) {
         return url.charAt(0) === '/' ? url.substring(1) : url;
+      }
+
+      approvalId = approvalId
+        || idFromPath(url, '/api/v1/approvals/')
+        || idFromPath(url, '/api/approvals/')
+        || idFromPath(url, '/approvals/');
+
+      if (!approvalId && (rtype === 'approval_request' || rtype === 'approval')) {
+        approvalId = rid;
+      }
+
+      if (approvalId) {
+        return 'approval-detail.html?id=' + encodeURIComponent(approvalId);
       }
 
       // "/matters/{matterId}[/documents/{docId}]"

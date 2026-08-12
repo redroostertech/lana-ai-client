@@ -563,7 +563,10 @@
     hide('apdError');
 
     loadApproval(_detail.approvalId).then(function (res) {
-      var approval = (res && res.data) || res;
+      var approval = (res && res.approval)
+        || (res && res.data && res.data.approval)
+        || (res && res.data)
+        || res;
       if (!approval || !approval.id) {
         hide('apdLoading');
         show('apdError');

@@ -117,7 +117,7 @@
       .then(function (result) {
         var types = result && Array.isArray(result.types) ? result.types : [];
         types.forEach(function (item) {
-          addTypeOption(item.type, formatTypeLabel(item.type), item.description);
+          addTypeOption(item.type, item.display_type || formatTypeLabel(item.type), item.description);
         });
         renderTypeOptions();
       })
@@ -220,7 +220,7 @@
         return;
       }
 
-      var href = normalizeActionUrl(notification.action_url);
+      var href = resolveNotificationTarget(notification);
       if (!href) {
         render();
         return;
@@ -239,6 +239,84 @@
     if (url === '/alerts' || url === '/alerts/') return 'notifications.html';
     if (url.indexOf('/') === 0) return url.substring(1);
     return url;
+  }
+
+  function readPath(object, path) {
+    var current = object;
+    for (var i = 0; i < path.length; i++) {
+      if (!current || typeof current !== 'object') return '';
+      current = current[path[i]];
+    }
+    return current || '';
+  }
+
+  function firstValue(values) {
+    for (var i = 0; i < values.length; i++) {
+      if (values[i]) return values[i];
+    }
+    return '';
+  }
+
+  function idFromPath(url, prefix) {
+    if (!url || url.indexOf(prefix) !== 0) return '';
+    var rest = url.substring(prefix.length);
+    return rest.split('?')[0].split('/')[0] || '';
+  }
+
+  function approvalIdFromNotification(notification) {
+    return firstValue([
+      notification.approval_id,
+      notification.approvalId,
+      readPath(notification, ['approval', 'id']),
+      readPath(notification, ['data', 'approval_id']),
+      readPath(notification, ['data', 'approvalId']),
+      readPath(notification, ['data', 'approval', 'id']),
+      readPath(notification, ['details', 'approval_id']),
+      readPath(notification, ['details', 'approvalId']),
+      readPath(notification, ['metadata', 'approval_id']),
+      readPath(notification, ['metadata', 'approvalId'])
+    ]);
+  }
+
+  function resolveNotificationTarget(notification) {
+    if (!notification) return '';
+    var url = notification.action_url || '';
+    var approvalId = approvalIdFromNotification(notification)
+      || idFromPath(url, '/api/v1/approvals/')
+      || idFromPath(url, '/api/approvals/')
+      || idFromPath(url, '/approvals/');
+
+    if (!approvalId && (notification.resource_type === 'approval_request' || notification.resource_type === 'approval')) {
+      approvalId = notification.resource_id || '';
+    }
+
+    if (approvalId) {
+      return 'approval-detail.html?id=' + encodeURIComponent(approvalId);
+    }
+
+    return normalizeActionUrl(url);
+  }
+
+  function fallbackMachineIdentifierToLabel(value) {
+    return String(value || '').trim();
+  }
+
+  function formatDisplayText(value) {
+    if (window.LanaDisplay && typeof window.LanaDisplay.formatText === 'function') {
+      return window.LanaDisplay.formatText(value);
+    }
+
+    var text = String(value || '');
+    var quoteParts = text.split("'");
+    if (quoteParts.length > 2) {
+      for (var i = 1; i < quoteParts.length; i += 2) {
+        if (quoteParts[i].indexOf('_') !== -1 || quoteParts[i].indexOf('-') !== -1 || quoteParts[i].indexOf('.') !== -1) {
+          quoteParts[i] = fallbackMachineIdentifierToLabel(quoteParts[i]);
+        }
+      }
+      return quoteParts.join("'");
+    }
+    return text;
   }
 
   function renderLoading() {
@@ -291,14 +369,15 @@
     var unread = !notification.read && !notification.is_read;
     var type = notification.type || 'info';
     var style = TYPE_STYLES[type] || { bg: 'var(--lex-bg-tertiary)', text: 'var(--lex-text-secondary)' };
-    var message = notification.body || notification.message || '';
+    var title = formatDisplayText(notification.display_title || notification.title || 'Notification');
+    var message = formatDisplayText(notification.display_message || notification.body || notification.message || '');
 
     return [
       '<button type="button" class="notifications-item' + (unread ? ' notifications-item--unread' : '') + '" data-notification-id="' + escapeHtml(notification.id) + '">',
       '  <span class="notifications-item__icon" style="background:' + style.bg + ';color:' + style.text + ';">' + getIcon(type) + '</span>',
       '  <span class="notifications-item__body">',
       '    <span class="notifications-item__header">',
-      '      <span class="notifications-item__title">' + escapeHtml(notification.title || 'Notification') + '</span>',
+      '      <span class="notifications-item__title">' + escapeHtml(title) + '</span>',
       unread ? '      <span class="notifications-item__dot"></span>' : '',
       '    </span>',
       message ? '    <span class="notifications-item__message">' + escapeHtml(message) + '</span>' : '',
@@ -344,13 +423,10 @@
 
   function formatTypeLabel(type) {
     if (!type) return 'All types';
-    return String(type)
-      .split('_')
-      .filter(Boolean)
-      .map(function (part) {
-        return part.charAt(0).toUpperCase() + part.slice(1);
-      })
-      .join(' ');
+    if (window.LanaDisplay && typeof window.LanaDisplay.machineIdentifierToLabel === 'function') {
+      return window.LanaDisplay.machineIdentifierToLabel(type);
+    }
+    return String(type);
   }
 
   function syncUrl() {
