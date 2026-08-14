@@ -313,39 +313,42 @@ backup_config() {
 update_config() {
     print_step "Updating configuration..."
 
+    # NOTE: These keys are rewritten with scripts/set-client-config.js, not sed.
+    # A line-oriented sed cannot handle a key whose value spans several lines --
+    # API_BASE_URL is an IIFE, and `s|API_BASE_URL:.*|...|` replaced only its
+    # `(function () {` opener, orphaning the body and producing a config.js that
+    # does not parse. The packaged app then booted with LanaConfig undefined.
+    local CONFIG_ASSIGNMENTS=()
+
     if [ "$DEMO_MODE" = true ]; then
         print_info "Configuring for DEMO mode (no backend connection)"
-        
-        # Update config for demo mode
-        sed -i.tmp "s|API_BASE_URL:.*|API_BASE_URL: '',|" "$CONFIG_FILE"
-        sed -i.tmp "s|DEMO_MODE:.*|DEMO_MODE: true,|" "$CONFIG_FILE"
-        
-        print_success "Config updated for demo mode"
+        CONFIG_ASSIGNMENTS+=("API_BASE_URL=''" "DEMO_MODE=true")
     elif [ "$AUTO_DISCOVERY_MODE" = true ]; then
         print_info "Configuring for AUTO-DISCOVERY mode (Electron will discover server)"
-        
-        # Update config for auto-discovery mode (empty API_BASE_URL)
-        sed -i.tmp "s|API_BASE_URL:.*|API_BASE_URL: '',|" "$CONFIG_FILE"
-        sed -i.tmp "s|DEMO_MODE:.*|DEMO_MODE: false,|" "$CONFIG_FILE"
-        
-        print_success "Config updated for auto-discovery mode"
+        CONFIG_ASSIGNMENTS+=("API_BASE_URL=''" "DEMO_MODE=false")
     else
         print_info "Configuring for TRADITIONAL mode with backend URL: http://$BACKEND_IP/"
-        
-        # Update API_BASE_URL for traditional mode (hardcoded IP)
-        sed -i.tmp "s|API_BASE_URL:.*|API_BASE_URL: 'http://$BACKEND_IP',|" "$CONFIG_FILE"
-        sed -i.tmp "s|DEMO_MODE:.*|DEMO_MODE: false,|" "$CONFIG_FILE"
-        
-        print_success "Config updated with backend IP: $BACKEND_IP"
+        CONFIG_ASSIGNMENTS+=("API_BASE_URL='http://$BACKEND_IP'" "DEMO_MODE=false")
     fi
 
     # Disable debug mode for production builds
     if [ "$DEV_MODE" = false ]; then
-        sed -i.tmp "s|DEBUG_MODE:.*|DEBUG_MODE: false,|" "$CONFIG_FILE"
+        CONFIG_ASSIGNMENTS+=("DEBUG_MODE=false")
     fi
 
-    # Clean up temp files
-    rm -f "$CONFIG_FILE.tmp"
+    if ! node "$SCRIPT_DIR/set-client-config.js" "$CONFIG_FILE" "${CONFIG_ASSIGNMENTS[@]}"; then
+        print_error "Failed to rewrite $CONFIG_FILE"
+        exit 1
+    fi
+
+    # Guard: never package a config.js that does not parse. Without this the
+    # build succeeds and ships a client that cannot boot.
+    if ! node --check "$CONFIG_FILE" 2>&1; then
+        print_error "config.js is not valid JavaScript after rewrite - aborting build"
+        exit 1
+    fi
+
+    print_success "Config updated and validated"
 }
 
 restore_config() {
