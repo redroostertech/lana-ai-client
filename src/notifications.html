@@ -26,20 +26,16 @@
 
   <template id="page-content">
     <main class="notifications-page">
-      <header class="notifications-page__header">
-        <div>
-          <h1 class="notifications-page__title">Notifications</h1>
-          <div id="notificationsUnreadMeta" class="notifications-page__meta">0 unread notifications</div>
-        </div>
-        <div class="notifications-page__actions">
-          <lex-btn id="notificationsMarkAll" variant="ghost" size="sm" hidden>Mark all read</lex-btn>
-          <lex-btn id="notificationsRefresh" variant="ghost" size="sm" icon="true" title="Refresh" aria-label="Refresh notifications">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </lex-btn>
-        </div>
-      </header>
+      <lex-banner
+        id="notificationsBanner"
+        variant="light"
+        corners
+        heading="Notifications"
+        subtitle="0 unread notifications"
+        max-actions="1"
+      >
+        <lex-btn id="notificationsMarkAll" variant="primary" size="sm" hidden>Mark all read</lex-btn>
+      </lex-banner>
 
       <div class="notifications-page__toolbar">
         <div class="notifications-page__filters">
@@ -105,6 +101,7 @@
   <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>

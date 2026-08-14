@@ -54,9 +54,8 @@
       list: document.getElementById('notificationsList'),
       state: document.getElementById('notificationsState'),
       count: document.getElementById('notificationsCount'),
-      unreadMeta: document.getElementById('notificationsUnreadMeta'),
+      banner: document.getElementById('notificationsBanner'),
       loadMore: document.getElementById('notificationsLoadMore'),
-      refresh: document.getElementById('notificationsRefresh'),
       markAll: document.getElementById('notificationsMarkAll')
     };
 
@@ -84,15 +83,6 @@
         state.type = e.detail && e.detail.value || '';
         syncUrl();
         loadNotifications(true);
-      });
-    }
-
-    if (els.refresh) {
-      els.refresh.addEventListener('click', function () {
-        els.refresh.loading = true;
-        loadNotifications(true).finally(function () {
-          setTimeout(function () { els.refresh.loading = false; }, 250);
-        });
       });
     }
 
@@ -391,8 +381,8 @@
     if (els.count) {
       els.count.textContent = state.notifications.length + (state.notifications.length === 1 ? ' notification shown' : ' notifications shown');
     }
-    if (els.unreadMeta) {
-      els.unreadMeta.textContent = state.unreadCount + (state.unreadCount === 1 ? ' unread notification' : ' unread notifications');
+    if (els.banner) {
+      els.banner.setAttribute('subtitle', state.unreadCount + (state.unreadCount === 1 ? ' unread notification' : ' unread notifications'));
     }
     if (els.markAll) {
       els.markAll.hidden = state.unreadCount === 0;
