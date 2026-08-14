@@ -1,7 +1,8 @@
 .notifications-page {
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 24px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 0;
 }
 
 .notifications-page__toolbar {
@@ -9,7 +10,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 0;
+  padding: 16px 24px;
 }
 
 .notifications-page__filters {
@@ -30,6 +31,7 @@
 
 .notifications-list {
   border-top: 1px solid var(--lex-border-subtle, rgba(0, 0, 0, 0.08));
+  padding: 0 24px;
 }
 
 .notifications-item {
@@ -111,23 +113,27 @@
 }
 
 .notifications-page__state {
-  padding: 48px 0;
+  padding: 48px 24px;
 }
 
 .notifications-page__footer {
   display: flex;
   justify-content: center;
-  padding: 20px 0 0;
+  padding: 20px 24px 0;
 }
 
 @media (max-width: 640px) {
-  .notifications-page {
-    padding: 18px 16px 40px;
-  }
-
   .notifications-page__toolbar {
     align-items: stretch;
     flex-direction: column;
+    padding: 16px;
+  }
+
+  .notifications-list,
+  .notifications-page__state,
+  .notifications-page__footer {
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   .notifications-page__filters lex-select {
