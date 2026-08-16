@@ -914,6 +914,7 @@
       if (this.composerTools && this.composerTools.length > 0) {
         panel.setAttribute('composer-tools', JSON.stringify(this.composerTools));
       }
+      this._bindPageContextSend(panel);
       this.querySelector('.lld-body').appendChild(panel);
       this._panelEl = panel;
       // Column-mode panels display only when [open]; the dock controls
@@ -926,6 +927,36 @@
       if (this._pageContext && this._pageContext.matterId) {
         this.setPageContext(this._pageContext);
       }
+    }
+
+    _bindPageContextSend(panel) {
+      var self = this;
+      panel.addEventListener('lex-lana-before-send', function (event) {
+        var ctx = self._pageContext;
+        if (!ctx || !ctx.documentId) return;
+
+        var detail = event.detail || {};
+        var opts = detail.opts || {};
+        detail.opts = opts;
+        opts.attachments = opts.attachments || {};
+        opts.attachments.files = opts.attachments.files || [];
+
+        var exists = opts.attachments.files.some(function (file) {
+          return file && String(file.file_id || file.id || '') === String(ctx.documentId);
+        });
+        if (!exists) {
+          opts.attachments.files.push({
+            file_id: ctx.documentId,
+            name: ctx.documentName || 'Document'
+          });
+        }
+        if (ctx.matterId && !opts.matterId) {
+          opts.matterId = ctx.matterId;
+        }
+        if (!opts.contextType || opts.contextType === 'full_chat') {
+          opts.contextType = 'document_chat';
+        }
+      });
     }
 
     /**
