@@ -763,8 +763,23 @@
       return;
     }
     if (action === 'like') {
-      comment.liked = !comment.liked;
-      comment.like_count = Math.max(0, Number(comment.like_count || 0) + (comment.liked ? 1 : -1));
+      var nextLiked = !comment.liked;
+      if (isSynced(store, commentId) && api.likeComment && api.unlikeComment) {
+        try {
+          var likeResponse = nextLiked ? await api.likeComment(commentId) : await api.unlikeComment(commentId);
+          var likeState = likeResponse && likeResponse.data ? likeResponse.data : likeResponse;
+          comment.liked = likeState && likeState.liked !== undefined ? !!likeState.liked : nextLiked;
+          comment.like_count = likeState && likeState.like_count !== undefined
+            ? Number(likeState.like_count) || 0
+            : Math.max(0, Number(comment.like_count || 0) + (nextLiked ? 1 : -1));
+        } catch (error) {
+          toastError(error.message || 'Failed to update like');
+          return;
+        }
+      } else {
+        comment.liked = nextLiked;
+        comment.like_count = Math.max(0, Number(comment.like_count || 0) + (nextLiked ? 1 : -1));
+      }
       render();
       return;
     }

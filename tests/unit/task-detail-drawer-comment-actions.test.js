@@ -272,6 +272,14 @@ describe('shared drawer comment persistence', () => {
       }),
       updateComment: jest.fn().mockResolvedValue({ status: 'success' }),
       deleteComment: jest.fn().mockResolvedValue({ status: 'success' }),
+      likeComment: jest.fn().mockResolvedValue({
+        status: 'success',
+        data: { comment_id: COMMENT_UUID, liked: true, like_count: 5 },
+      }),
+      unlikeComment: jest.fn().mockResolvedValue({
+        status: 'success',
+        data: { comment_id: COMMENT_UUID, liked: false, like_count: 4 },
+      }),
     }, overrides);
   }
 
@@ -323,6 +331,55 @@ describe('shared drawer comment persistence', () => {
     await flush();
     expect(api.deleteComment).toHaveBeenCalledWith(COMMENT_UUID);
     expect(contentStub.innerHTML).not.toContain('Server comment');
+  });
+
+  test('server liked_by_me and like_count render as active state on load', async () => {
+    const api = makeApi({
+      getResourceComments: jest.fn().mockResolvedValue({
+        status: 'success',
+        data: {
+          comments: [{ id: COMMENT_UUID, author_name: 'Ron', author_id: 'user-2', content: 'Popular comment', created_at: '2026-08-16T02:00:00.000Z', liked_by_me: true, like_count: 7, replies: [] }],
+          total: 1,
+          hasMore: false,
+        },
+      }),
+    });
+    const { drawer, contentStub } = loadDrawer({ api });
+    drawer.open(makeTask([], TASK_UUID));
+    await flush();
+    expect(contentStub.innerHTML).toContain('is-active');
+    expect(contentStub.innerHTML).toContain('<span>7</span>');
+  });
+
+  test('like and unlike persist through the like endpoints for synced comments', async () => {
+    const api = makeApi();
+    const { drawer, listeners, contentStub } = loadDrawer({ api });
+    drawer.open(makeTask([], TASK_UUID));
+    await flush();
+
+    clickAction(listeners, 'like', COMMENT_UUID);
+    await flush();
+    expect(api.likeComment).toHaveBeenCalledWith(COMMENT_UUID);
+    expect(contentStub.innerHTML).toContain('is-active');
+    expect(contentStub.innerHTML).toContain('<span>5</span>');
+
+    clickAction(listeners, 'like', COMMENT_UUID);
+    await flush();
+    expect(api.unlikeComment).toHaveBeenCalledWith(COMMENT_UUID);
+    expect(contentStub.innerHTML).not.toContain('is-active');
+    expect(contentStub.innerHTML).toContain('<span>4</span>');
+  });
+
+  test('a failed like keeps the previous state', async () => {
+    const api = makeApi({ likeComment: jest.fn().mockRejectedValue(new Error('nope')) });
+    const { drawer, listeners, contentStub, Lex } = loadDrawer({ api });
+    drawer.open(makeTask([], TASK_UUID));
+    await flush();
+
+    clickAction(listeners, 'like', COMMENT_UUID);
+    await flush();
+    expect(Lex.Toast.error).toHaveBeenCalled();
+    expect(contentStub.innerHTML).not.toContain('is-active');
   });
 
   test('post-reply persists through api.replyToComment for synced comments', async () => {
