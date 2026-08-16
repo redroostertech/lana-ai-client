@@ -2629,6 +2629,34 @@ class ApiClient {
   }
 
   /**
+   * Get comments for any resource via the generic comments service
+   * @param {string} resourceType - Resource type (document, matter, task, note)
+   * @param {string} resourceId - The resource UUID
+   * @param {Object} options - Query options (limit, cursor, include_replies)
+   * @returns {Promise<Object>} Comments response ({ comments, total, hasMore })
+   */
+  async getResourceComments(resourceType, resourceId, options = {}) {
+    const params = new URLSearchParams();
+    params.append('resource_type', resourceType);
+    params.append('resource_id', resourceId);
+    if (options.limit !== undefined) params.append('limit', options.limit);
+    if (options.cursor) params.append('cursor', options.cursor);
+    if (options.include_replies !== undefined) params.append('include_replies', String(options.include_replies));
+    return this.get(`/api/v1/comments?${params.toString()}`);
+  }
+
+  /**
+   * Create a comment on any resource via the generic comments service
+   * @param {string} resourceType - Resource type (document, matter, task, note)
+   * @param {string} resourceId - The resource UUID
+   * @param {Object} data - Comment data (content, mentions, parent_id)
+   * @returns {Promise<Object>} Created comment
+   */
+  async createResourceComment(resourceType, resourceId, data) {
+    return this.post('/api/v1/comments', { resource_type: resourceType, resource_id: resourceId, ...data });
+  }
+
+  /**
    * Reply to a comment
    * @param {string} commentId - The parent comment ID
    * @param {Object} data - Reply data (content, mentions)
