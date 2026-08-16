@@ -32,6 +32,9 @@
     metadataMode: 'view',
     metadataChanged: false,
     originalMetadata: {},
+    editorInstance: null,
+    editorModulePromise: null,
+    editorImportMapBase: null,
     // askLanaDrawer/askLanaChatEl/askLanaThreadsEl removed — managed by lex-lana-panel
     _lanaSessionBootstrapped: false
   };
@@ -119,6 +122,102 @@
 
   function getFileMatterId(file) {
     return file && (file.client_matter || file.matter_id || file.matterId || file.clientMatter || '');
+  }
+
+  function normalizeBaseUrl(value) {
+    value = String(value || '').trim();
+    if (!value) return '';
+    return value.replace(/\/+$/, '');
+  }
+
+  function getEditorServiceBase() {
+    var fromWindow = normalizeBaseUrl(window.LANA_EDITOR_SERVICE);
+    if (fromWindow) return fromWindow;
+
+    var fromConfig = normalizeBaseUrl(window.LanaConfig && window.LanaConfig.LANA_EDITOR_SERVICE_URL);
+    if (fromConfig) return fromConfig;
+
+    try {
+      var fromStorage = normalizeBaseUrl(window.localStorage && window.localStorage.getItem('lana-editor-service'));
+      if (fromStorage) return fromStorage;
+    } catch (_) {}
+
+    return 'http://127.0.0.1:4710';
+  }
+
+  function isEditorEnabled() {
+    return !(window.LanaConfig && window.LanaConfig.LANA_EDITOR_ENABLED === false);
+  }
+
+  function isEditorDocx(file) {
+    var mimeType = String((file && (file.content_type || file.mime_type)) || '').toLowerCase();
+    var filename = String((file && file.filename) || '').toLowerCase();
+    return mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      filename.endsWith('.docx');
+  }
+
+  function shutdownEditorInstance() {
+    if (state.editorInstance && typeof state.editorInstance.shutdown === 'function') {
+      try {
+        state.editorInstance.shutdown();
+      } catch (error) {
+        console.warn('[FileViewerPage] Editor shutdown failed:', error);
+      }
+    }
+    state.editorInstance = null;
+  }
+
+  function ensureEditorImportMap(baseUrl) {
+    if (state.editorImportMapBase === baseUrl) return;
+
+    var existing = document.getElementById('lana-editor-import-map');
+    if (existing) {
+      if (state.editorImportMapBase && state.editorImportMapBase !== baseUrl) {
+        throw new Error('Editor service URL changed after editor modules loaded; reload the page to use the new service.');
+      }
+      state.editorImportMapBase = baseUrl;
+      return;
+    }
+
+    if (window.HTMLScriptElement && typeof window.HTMLScriptElement.supports === 'function' &&
+        !window.HTMLScriptElement.supports('importmap')) {
+      throw new Error('This browser does not support import maps required by LANA Editor.');
+    }
+
+    var script = document.createElement('script');
+    script.id = 'lana-editor-import-map';
+    script.type = 'importmap';
+    script.textContent = JSON.stringify({
+      imports: {
+        '@lana/ooxml-kernel/browser': baseUrl + '/kernel/browser.js',
+        '@lana/editor': baseUrl + '/editor/index.js',
+        '@lana/editor-embed': baseUrl + '/embed/index.js',
+        'pdfjs-dist': baseUrl + '/pdfjs/pdf.min.mjs'
+      }
+    });
+    document.head.appendChild(script);
+    state.editorImportMapBase = baseUrl;
+  }
+
+  async function loadEditorModule(baseUrl) {
+    ensureEditorImportMap(baseUrl);
+    if (!state.editorModulePromise) {
+      state.editorModulePromise = import('@lana/editor-embed');
+    }
+    return state.editorModulePromise;
+  }
+
+  function trackEditorEvent(eventType, file, details) {
+    if (!window.LanaActivityEvents || typeof window.LanaActivityEvents.editorEvent !== 'function') return;
+    window.LanaActivityEvents.editorEvent(eventType, {
+      resource_type: 'editor',
+      resource_id: file && file.id,
+      resource_name: file && file.filename,
+      matter_id: getFileMatterId(file) || null,
+      surface: 'file_viewer_editor',
+      visibility: getFileMatterId(file) ? 'workspace' : 'private',
+      details: details || {}
+    });
   }
 
   function getFileDownloadUrl(fileOrId) {
@@ -368,7 +467,7 @@
   }
 
   function hideAllViewers() {
-    var ids = ['viewerLoading', 'viewerError', 'viewerIframe', 'viewerText', 'viewerImage', 'viewerDocx'];
+    var ids = ['viewerLoading', 'viewerError', 'viewerIframe', 'viewerText', 'viewerImage', 'viewerEditor', 'viewerDocx'];
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);
       if (el) el.classList.add('hidden');
@@ -477,6 +576,9 @@
       // Load content + metadata
       await loadFileContent(response);
       loadMetadata(response);
+      if (window.LanaActivityEvents && typeof window.LanaActivityEvents.documentOpened === 'function') {
+        window.LanaActivityEvents.documentOpened(response, { surface: 'file_viewer' });
+      }
 
       var lifecycleBadge = document.getElementById('metaLifecycleBadge');
       if (lifecycleBadge && lifecycleDisplay) {
@@ -504,6 +606,7 @@
   // =========================================================================
 
   async function loadFileContent(file) {
+    shutdownEditorInstance();
     hideAllViewers();
     var mimeType = file.content_type || '';
     var ext = file.filename.split('.').pop().toLowerCase();
@@ -619,14 +722,21 @@
       return;
     }
 
-    if (typeof mammoth === 'undefined') {
-      throw new Error('Mammoth library not loaded');
-    }
     var response = await fetch(getFileDownloadUrl(file), {
       headers: getAuthHeaders()
     });
     await assertFetchOk(response, 'Failed to fetch file');
     var arrayBuffer = await response.arrayBuffer();
+
+    if (isEditorEnabled() && isEditorDocx(file)) {
+      var renderedWithEditor = await loadDOCXInEditor(file, arrayBuffer);
+      if (renderedWithEditor) return;
+    }
+
+    if (typeof mammoth === 'undefined') {
+      throw new Error('Mammoth library not loaded');
+    }
+
     var container = document.getElementById('viewerDocx');
     var result = await mammoth.convertToHtml({
       arrayBuffer: arrayBuffer,
@@ -650,6 +760,94 @@
     hideLoading();
   }
 
+  async function loadDOCXInEditor(file, arrayBuffer) {
+    var baseUrl = getEditorServiceBase();
+    var host = document.getElementById('viewerEditor');
+    if (!baseUrl || !host) return false;
+
+    try {
+      var health = await fetch(baseUrl + '/v1/health', { method: 'GET' });
+      if (!health.ok) throw new Error('editor service unavailable');
+
+      var mod = await loadEditorModule(baseUrl);
+      if (!mod || !mod.LanaEditor || typeof mod.LanaEditor.mount !== 'function') {
+        throw new Error('editor embed module unavailable');
+      }
+
+      host.innerHTML = '';
+      host.classList.remove('hidden');
+      var editor = mod.LanaEditor.mount(host, {
+        api: baseUrl,
+        fontsUrl: baseUrl + '/editor-fonts',
+        pdfWorkerUrl: baseUrl + '/pdfjs/pdf.worker.min.mjs'
+      });
+      state.editorInstance = editor;
+
+      editor.on('document-loaded', function (event) {
+        trackEditorEvent('document_loaded', file, {
+          document_id: file.id,
+          document_name: file.filename,
+          mode: event && event.mode,
+          counts: event && event.counts ? {
+            pages: event.counts.pages,
+            paragraphs: event.counts.paragraphs,
+            tables: event.counts.tables,
+            revisions: event.counts.revisions,
+            comments: event.counts.comments
+          } : null
+        });
+      });
+      editor.on('change-applied', function (event) {
+        trackEditorEvent('edit_applied', file, {
+          document_id: file.id,
+          document_name: file.filename,
+          ops: event && event.ops
+        });
+      });
+      editor.on('change-decision', function (event) {
+        var decisions = event && Array.isArray(event.decisions) ? event.decisions : [];
+        var hasReject = event && event.mode === 'reject_all';
+        for (var i = 0; i < decisions.length; i++) {
+          if (decisions[i] && decisions[i].action === 'reject') {
+            hasReject = true;
+            break;
+          }
+        }
+        trackEditorEvent(hasReject ? 'revision_rejected' : 'revision_accepted', file, {
+          document_id: file.id,
+          document_name: file.filename,
+          decision_count: decisions.length,
+          mode: event && event.mode
+        });
+      });
+      editor.on('save', function () {
+        trackEditorEvent('document_saved', file, {
+          document_id: file.id,
+          document_name: file.filename
+        });
+      });
+      editor.on('error', function (event) {
+        console.warn('[FileViewerPage] LANA Editor event error:', event);
+      });
+
+      var bytes = new Uint8Array(arrayBuffer);
+      await editor.open_file(new File([bytes], file.filename || 'document.docx', {
+        type: file.content_type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }));
+      hideLoading();
+      return true;
+    } catch (error) {
+      state.editorModulePromise = null;
+      shutdownEditorInstance();
+      if (host) {
+        host.innerHTML = '';
+        host.classList.add('hidden');
+      }
+      console.warn('[FileViewerPage] LANA Editor unavailable; falling back to DOCX preview:', error && error.message ? error.message : error);
+      return false;
+    }
+  }
+
   // =========================================================================
   // Download
   // =========================================================================
@@ -667,6 +865,13 @@
         document.body.removeChild(demoLink);
         URL.revokeObjectURL(demoUrl);
         notify('Demo document downloaded', 'success');
+        if (window.LanaActivityEvents && typeof window.LanaActivityEvents.documentDownloaded === 'function') {
+          window.LanaActivityEvents.documentDownloaded(state.currentFile || { id: fileId, filename: filename }, {
+            surface: 'file_viewer',
+            downloaded_as: filename || (state.currentFile && state.currentFile.filename) || null,
+            demo_mode: true
+          });
+        }
         return;
       }
 
@@ -684,6 +889,12 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       notify('Download started', 'success');
+      if (window.LanaActivityEvents && typeof window.LanaActivityEvents.documentDownloaded === 'function') {
+        window.LanaActivityEvents.documentDownloaded(state.currentFile || { id: fileId, filename: filename }, {
+          surface: 'file_viewer',
+          downloaded_as: filename || (state.currentFile && state.currentFile.filename) || null
+        });
+      }
     } catch (error) {
       console.error('[FileViewerPage] Download error:', error);
       notify(error.message || 'Failed to download file', 'error');
@@ -851,6 +1062,9 @@
         tags: document.getElementById('metaTags').value,
         notes: document.getElementById('metaNotes').value
       };
+      var changedFields = Object.keys(metadata).filter(function (key) {
+        return metadata[key] !== state.originalMetadata[key];
+      });
 
       var response = await api.patch(
         '/api/v1/storage/files/' + state.currentFile.id + '/metadata',
@@ -868,6 +1082,12 @@
         document.getElementById('metaNotesView').textContent = metadata.notes || 'No notes';
 
         notify('Metadata saved successfully', 'success');
+        if (window.LanaActivityEvents && typeof window.LanaActivityEvents.documentMetadataUpdated === 'function') {
+          window.LanaActivityEvents.documentMetadataUpdated(state.currentFile, {
+            surface: 'file_viewer',
+            changed_fields: changedFields
+          });
+        }
         setMetadataMode('view');
       } else {
         throw new Error(response.error || 'Failed to save metadata');
@@ -902,6 +1122,9 @@
       var file = state.currentFile;
       if (file && file.id) {
         panel.attachFile(file.id, file.filename);
+        if (window.LanaActivityEvents && typeof window.LanaActivityEvents.lanaOpenedForDocument === 'function') {
+          window.LanaActivityEvents.lanaOpenedForDocument(file, { surface: 'file_viewer' });
+        }
       }
     });
 
@@ -930,6 +1153,13 @@
       // Ensure matter context reaches the SSE request
       if (matterId) {
         opts.matterId = matterId;
+      }
+
+      if (window.LanaActivityEvents && typeof window.LanaActivityEvents.lanaMessageSentForDocument === 'function') {
+        window.LanaActivityEvents.lanaMessageSentForDocument(file, {
+          surface: 'file_viewer',
+          message_length: String(e.detail.content || '').length
+        });
       }
 
       // First message: create canonical conversation + register document before send.
@@ -1058,11 +1288,18 @@
     }
 
     try {
+      var nextTemplateState = !file.is_template;
       await DocxTemplateModal.toggleTemplate(file.id, matterId, !file.is_template, {
         onSuccess: function (msg) {
-          state.currentFile.is_template = !file.is_template;
+          state.currentFile.is_template = nextTemplateState;
           _updateTemplateButtons();
           notify(msg, 'success');
+          if (window.LanaActivityEvents && typeof window.LanaActivityEvents.documentTemplateToggled === 'function') {
+            window.LanaActivityEvents.documentTemplateToggled(state.currentFile, {
+              surface: 'file_viewer',
+              is_template: nextTemplateState
+            });
+          }
         },
         onError: function (msg) { notify(msg, 'error'); }
       });

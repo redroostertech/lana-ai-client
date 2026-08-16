@@ -53,7 +53,6 @@
   var _docPageSize = 12;
   var _documentsRefreshSeq = 0;
   var _documentsPollTimer = null;
-  var _matterArtifactsViewInstance = null;
   var _pendingArtifactDeepLinkId = null;
 
   // Shared matter file-list component (window.MatterDocumentsView). The matter
@@ -260,7 +259,6 @@
     'tabContentTasks',
     'tabContentComments',
     'tabContentDocuments',
-    'tabContentArtifacts',
     'tabContentConversations'
   ];
 
@@ -635,7 +633,14 @@
       return;
     }
 
-    var tabs = ['notes', 'tasks', 'comments', 'documents', 'artifacts', 'conversations', 'billableHours', 'summary', 'docGeneration', 'analytics'];
+    // Generated artifacts now live inside Documents as generated work product.
+    // Keep old artifact deep links functional by routing them to the
+    // consolidated document surface.
+    if (tab === 'artifacts') {
+      tab = 'documents';
+    }
+
+    var tabs = ['notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'summary', 'docGeneration', 'analytics'];
     var tabBar = document.getElementById('tabBar');
     if (tabBar && tabBar.getAttribute('active') !== tab) {
       tabBar.setAttribute('active', tab);
@@ -662,9 +667,6 @@
       case 'documents':
         renderDocumentsTab(m.matter, m.documents, m.docPagination, m.orphanedFiles);
         refreshDrawerDocuments(_getMatterIdentity(m.matter));
-        break;
-      case 'artifacts':
-        renderArtifactsTab(m.matter);
         break;
       case 'conversations':
         renderConversationsTab(m.matter, m.chats, m.chatPagination, m.pinnedChats || []);
@@ -699,7 +701,7 @@
   }
 
   function getCurrentActiveTab() {
-    var tabs = ['summary', 'notes', 'tasks', 'comments', 'documents', 'artifacts', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
+    var tabs = ['summary', 'notes', 'tasks', 'comments', 'documents', 'conversations', 'billableHours', 'docGeneration', 'analytics'];
     for (var i = 0; i < tabs.length; i++) {
       var content = document.getElementById('tabContent' + tabs[i].charAt(0).toUpperCase() + tabs[i].substring(1));
       if (content && !content.classList.contains('hidden')) return tabs[i];
@@ -1950,7 +1952,7 @@
       var artifactId = details.artifact_id || (rtype === 'agentic_artifact' || rtype === 'artifact' ? act.resource_id : null);
       go = function () {
         if (artifactId) _pendingArtifactDeepLinkId = String(artifactId);
-        switchMatterTab('artifacts');
+        switchMatterTab('documents');
         openPendingArtifactDeepLink();
       };
     } else if (rtype === 'task' || details.task_id || etype.indexOf('task') !== -1) {
@@ -2034,20 +2036,16 @@
     destroyMatterDocsView();
 
     // Empty state: no matter documents and no orphaned files. Render the host
-    // chrome (header + Create with Doc Studio + upload drop zone + empty
-    // placeholder) only; the component is not mounted until there is data.
+    // chrome and mount the shared component so generated work product can still
+    // appear in the unified table.
     if (documents.length === 0 && orphanedFiles.length === 0) {
       container.innerHTML =
-        '<div class="py-6">' +
+        '<div class="workspace-documents-panel space-y-4">' +
           '<div class="flex items-center justify-between gap-4 mb-4">' +
             '<div>' +
               '<h4 class="text-sm font-semibold text-gray-900">Workspace documents</h4>' +
-              '<p class="text-xs text-gray-500 mt-0.5">Upload source files or create a new document from this workspace.</p>' +
+              '<p class="text-xs text-gray-500 mt-0.5">Upload source files and review generated work product for this workspace.</p>' +
             '</div>' +
-            '<button type="button" onclick="openCreateDocStudioDocumentModal()" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white transition-colors" style="background: var(--lex-bg-accent);">' +
-              '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
-              'Create with Doc Studio' +
-            '</button>' +
           '</div>' +
           '<div id="drawerEmptyDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:lex-border-accent transition-colors cursor-pointer mb-6">' +
             '<input type="file" id="drawerEmptyFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">' +
@@ -2061,27 +2059,24 @@
               '<p class="mt-1 text-xs text-gray-500">PDF, Word, Excel, Images up to 50MB</p>' +
             '</div>' +
           '</div>' +
-          '<lex-empty size="compact" icon="document" message="No documents yet" description="Upload documents to this workspace to enable AI-powered search and analysis"></lex-empty>' +
+          '<div id="matterDocsViewHost"></div>' +
         '</div>';
       setupDrawerUpload(matter, 'drawerEmptyDropZone', 'drawerEmptyFileInput');
+      mountMatterDocumentsView(matter, documents, orphanedFiles);
       return;
     }
 
-    // Populated state: render the host chrome (header + Create with Doc Studio
-    // button + upload drop zone) and mount the shared MatterDocumentsView into
+    // Populated state: render the host chrome and mount the shared
+    // MatterDocumentsView into
     // #matterDocsViewHost. The component owns the entire file list and every
     // per-row / batch / orphan / workflow action via the injected api.
     container.innerHTML =
-      '<div class="space-y-4">' +
+      '<div class="workspace-documents-panel space-y-4">' +
         '<div class="flex items-center justify-between gap-4">' +
           '<div>' +
             '<h4 class="text-sm font-semibold text-gray-900">Workspace documents</h4>' +
-            '<p class="text-xs text-gray-500 mt-0.5">Manage uploaded files and generate workspace-specific drafts with Doc Studio.</p>' +
+            '<p class="text-xs text-gray-500 mt-0.5">Manage uploaded files, templates, and generated work product.</p>' +
           '</div>' +
-          '<button type="button" onclick="openCreateDocStudioDocumentModal()" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white transition-colors" style="background: var(--lex-bg-accent);">' +
-            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' +
-            'Create with Doc Studio' +
-          '</button>' +
         '</div>' +
         '<div id="drawerDocDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:lex-border-accent transition-colors cursor-pointer">' +
           '<input type="file" id="drawerDocFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">' +
@@ -2100,7 +2095,10 @@
       '</div>';
 
     setupDrawerUpload(matter, 'drawerDocDropZone', 'drawerDocFileInput');
+    mountMatterDocumentsView(matter, documents, orphanedFiles);
+  }
 
+  function mountMatterDocumentsView(matter, documents, orphanedFiles) {
     var host = document.getElementById('matterDocsViewHost');
     if (!host) return;
 
@@ -2113,6 +2111,7 @@
 
     _matterDocsViewInstance = window.MatterDocumentsView.mount(host, {
       api: api,
+      matter: matter,
       matterId: matter.matter_id,
       matterDisplayId: matter.matter_id,
       files: documents,
@@ -2131,59 +2130,27 @@
       enableTemplateToggle: true,
       enableRetry: true,
       enableReplace: true,
+      enableArtifacts: true,
+      onArtifactPromoted: function (detail) {
+        refreshDrawerDocuments(detail && detail.matterId);
+      },
       // The Matter documents header already renders its own "Create with Doc
       // Studio" button, so suppress the component's duplicate one here.
       enableDocStudio: false
     });
-  }
-
-  function destroyMatterArtifactsView() {
-    if (_matterArtifactsViewInstance) {
-      try { _matterArtifactsViewInstance.destroy(); } catch (e) {}
-      _matterArtifactsViewInstance = null;
-    }
+    openPendingArtifactDeepLink();
   }
 
   function openPendingArtifactDeepLink() {
-    if (!_pendingArtifactDeepLinkId || !_matterArtifactsViewInstance ||
-        typeof _matterArtifactsViewInstance.openArtifact !== 'function') {
+    if (!_pendingArtifactDeepLinkId || !_matterDocsViewInstance ||
+        typeof _matterDocsViewInstance.openArtifact !== 'function') {
       return;
     }
     var artifactId = _pendingArtifactDeepLinkId;
     _pendingArtifactDeepLinkId = null;
-    _matterArtifactsViewInstance.openArtifact(artifactId).catch(function (error) {
+    _matterDocsViewInstance.openArtifact(artifactId).catch(function (error) {
       if (window.Lex && Lex.Toast) Lex.Toast.error(error.message || 'Failed to open artifact');
     });
-  }
-
-  function renderArtifactsTab(matter) {
-    var container = document.getElementById('tabContentArtifacts');
-    if (!container) return;
-
-    destroyMatterArtifactsView();
-
-    if (!window.WorkspaceArtifactsView || typeof window.WorkspaceArtifactsView.mount !== 'function') {
-      container.innerHTML = '<div class="text-center py-8"><p class="text-sm text-gray-500">Artifact list unavailable. Please reload.</p></div>';
-      return;
-    }
-
-    _matterArtifactsViewInstance = window.WorkspaceArtifactsView.mount(container, {
-      api: api,
-      matter: matter,
-      Lex: window.Lex,
-      escapeHtml: escapeHtml,
-      formatDate: formatDate,
-      onOpenDocument: function (fileId) { _navToFileViewer(fileId); },
-      onPromoted: function (detail) {
-        refreshDrawerDocuments(detail && detail.matterId);
-      }
-    });
-
-    _matterArtifactsViewInstance.render(matter)
-      .then(openPendingArtifactDeepLink)
-      .catch(function (error) {
-        if (window.Lex && Lex.Toast) Lex.Toast.error(error.message || 'Failed to load artifacts');
-      });
   }
 
   // Setup drag-and-drop / click-to-upload handlers for a drop zone
@@ -10576,6 +10543,7 @@
     var matterId = params.get('id');
     var defaultTab = params.get('tab') || 'summary';
     var requestedTaskId = params.get('task') || params.get('task_id') || null;
+    var requestedArtifactId = params.get('artifact') || params.get('artifact_id') || null;
     var openFileId = params.get('open_file') || null;
     var uploadTarget = params.get('upload') || null;
 
@@ -10589,11 +10557,18 @@
       defaultTab = ctx.tab || defaultTab;
       uploadTarget = ctx.upload || uploadTarget;
       requestedTaskId = ctx.taskId || ctx.task_id || requestedTaskId;
+      requestedArtifactId = ctx.artifactId || ctx.artifact_id || ctx.artifact || requestedArtifactId;
     }
 
     if (requestedTaskId) {
       defaultTab = 'tasks';
       _pendingTaskDeepLinkId = requestedTaskId;
+    }
+    if (requestedArtifactId) {
+      defaultTab = 'documents';
+      _pendingArtifactDeepLinkId = requestedArtifactId;
+    } else if (defaultTab === 'artifacts') {
+      defaultTab = 'documents';
     }
 
     // Fallback 2: check sessionStorage (persists across router timing gaps)

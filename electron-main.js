@@ -369,7 +369,7 @@ function openScreenVoiceSettings() {
 }
 
 const SCREEN_VOICE_CLIENT_ROUTES = new Set([
-  'dashboard.html', 'matters.html', 'workspace-details.html', 'integrations/connectors.html', 'notifications.html'
+  'dashboard.html', 'matters.html', 'workspace-details.html', 'file-viewer.html', 'approval-detail.html', 'integrations/connectors.html', 'notifications.html'
 ]);
 
 async function navigateScreenVoiceClient(input = {}) {
@@ -383,6 +383,291 @@ async function navigateScreenVoiceClient(input = {}) {
     if (route === 'workspace-details.html') target.searchParams.set('id', matterId);
     else target.searchParams.set('matter', matterId);
   }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  await mainWindow.loadURL(target.toString());
+  return true;
+}
+
+const DEEP_LINK_CLIENT_ROUTES = Object.freeze({
+  'action-queue.html': ['action_type', 'severity'],
+  'admin/alerts.html': ['id', 'status', 'severity'],
+  'admin/analytics.html': ['tab'],
+  'admin/audit.html': ['id', 'actor', 'event_type'],
+  'admin/billable-hours.html': ['matter_id', 'user_id', 'status'],
+  'admin/block-billing-rules.html': ['id', 'matter_id'],
+  'admin/communications.html': ['id', 'type'],
+  'admin/console.html': ['tab'],
+  'admin/dashboard-builder.html': ['id'],
+  'admin/dashboard-detail.html': ['id'],
+  'admin/dashboard-library.html': ['id'],
+  'admin/dashboard.html': ['id'],
+  'admin/data-visualization.html': ['id', 'metric_id'],
+  'admin/health.html': ['service'],
+  'admin/index.html': ['tab'],
+  'admin/integrations.html': ['connector', 'source'],
+  'admin/management-boards.html': ['id', 'board'],
+  'admin/metric-catalog.html': ['id', 'q'],
+  'admin/metric_detail.html': ['id'],
+  'admin/onboarding_management.html': ['id'],
+  'admin/organizations.html': ['id', 'q'],
+  'admin/plugins.html': ['id', 'plugin'],
+  'admin/relevance-labeling.html': ['id'],
+  'admin/reporting.html': ['id', 'report'],
+  'admin/roles.html': ['id'],
+  'admin/roles_manager.html': ['id'],
+  'admin/search-analytics.html': ['q'],
+  'admin/session-details.html': ['sessionId'],
+  'admin/sessions.html': ['sessionId', 'userId'],
+  'admin/settings.html': ['section'],
+  'admin/task-plans.html': ['id'],
+  'admin/traces.html': ['id', 'trace_id'],
+  'admin/updates.html': ['id'],
+  'admin/user-details.html': ['userId'],
+  'admin/users.html': ['userId', 'q'],
+  'admin/workspace-analytics.html': ['matter_id', 'id'],
+  'agents/index.html': [],
+  'alerts.html': ['id', 'severity', 'status'],
+  'approval-detail.html': ['id'],
+  'approvals.html': ['status', 'priority', 'source', 'q'],
+  'article.html': ['section', 'id'],
+  'automation/index.html': ['automationId'],
+  'brainchild/index.html': ['vault', 'path'],
+  'dashboard.html': [],
+  'data-connectors.html': ['connector', 'source', 'matter_id'],
+  'deck-studio/index.html': ['id', 'deck_id', 'matter_id', 'matter_name', 'view'],
+  'doc-studio/index.html': ['id', 'view', 'editor', 'file_id', 'file_name', 'matter_id', 'matter_name'],
+  'docs/api-documentation.html': ['section'],
+  'document-studio-templates.html': ['matter_id', 'template_id', 'kind', 'tab'],
+  'drive.html': ['matter_id', 'matter_name', 'folder_id', 'tab'],
+  'faq.html': ['section'],
+  'file-viewer.html': ['id'],
+  'folder.html': ['matter_id', 'matter_name', 'folder_id', 'tab'],
+  'help.html': ['section'],
+  'insights/dashboard.html': ['matter_id', 'module', 'tab'],
+  'insights/module-execution.html': ['id', 'module', 'matter_id'],
+  'insights/predictions.html': ['matter_id', 'type', 'tab'],
+  'integrations/actionstep.html': ['matter_id', 'source'],
+  'integrations/connector-case.html': ['connectorId', 'sourceId', 'matter_id'],
+  'integrations/connector-communications.html': ['connectorId', 'sourceId', 'matter_id'],
+  'integrations/connector-crm.html': ['connectorId', 'sourceId', 'matter_id'],
+  'integrations/connector-documents.html': ['connectorId', 'sourceId', 'matter_id'],
+  'integrations/connector-financial.html': ['connectorId', 'sourceId', 'matter_id'],
+  'integrations/connector-viewer.html': ['ui', 'name', 'tab', 'connectorId', 'connectorType', 'sourceId', 'connectorScope'],
+  'integrations/connectors.html': ['connector', 'source', 'matter_id'],
+  'integrations/data_connectors.html': ['connector', 'source', 'matter_id'],
+  'integrations/integration-config.html': ['connectorId', 'sourceId'],
+  'integrations/leadly.html': ['matter_id', 'source'],
+  'integrations/sync-status.html': ['connectorId', 'sourceId', 'status'],
+  'matter-skills.html': ['matterSkillId', 'tab'],
+  'matters.html': ['matter_id', 'open', 'tab', 'action', 'status', 'sort_by', 'sort_order'],
+  'matters/timeline.html': ['id'],
+  'model-pricing.html': ['model', 'provider'],
+  'my-tasks.html': ['task', 'task_id', 'status', 'assignee', 'matter_id'],
+  'notifications.html': ['id', 'filter', 'type'],
+  'recording-detail.html': ['id'],
+  'recordings.html': ['id', 'q'],
+  'search-conversations.html': ['q', 'conversation_id'],
+  'search-results.html': ['q'],
+  'settings-v2.html': ['capability', 'section'],
+  'skills.html': ['category', 'id'],
+  'skills-marketplace.html': ['category', 'id'],
+  'workflows/active.html': ['id', 'status'],
+  'workflows/builder.html': ['id', 'template'],
+  'workflows/dashboard.html': ['id'],
+  'workflows/execution-logs.html': ['id', 'execution_id'],
+  'workflows/follow-up-cadences.html': ['id'],
+  'workflows/retargeting.html': ['id'],
+  'workflows/templates.html': ['id', 'template'],
+  'workspace-data.html': ['id', 'matter_id', 'tab'],
+  'workspace-details.html': ['id', 'matter', 'tab', 'task', 'task_id', 'upload', 'open_file', 'artifact', 'artifact_id', 'activity'],
+  'workspaces.html': ['action', 'search', 'status']
+});
+
+const DEEP_LINK_AGENT_HASH_VIEWS = Object.freeze(new Set([
+  'catalog',
+  'activity',
+  'create',
+  'tools/browse',
+  'tools'
+]));
+
+const DEEP_LINK_AUTOMATION_HASH_VIEWS = Object.freeze(new Set([
+  'home',
+  'library',
+  'library-detail',
+  'builder',
+  'runs',
+  'approvals',
+  'connectors',
+  'connector-detail'
+]));
+
+const DEEP_LINK_SETTINGS_SECTIONS = Object.freeze(new Set([
+  'account',
+  'profile',
+  'organization',
+  'billing',
+  'security',
+  'capabilities',
+  'screen-diction',
+  'notifications',
+  'integrations'
+]));
+
+const DEEP_LINK_ALIASES = Object.freeze({
+  approval: { route: 'approval-detail.html', idParam: 'id' },
+  approvals: { route: 'approvals.html' },
+  document: { route: 'file-viewer.html', idParam: 'id' },
+  file: { route: 'file-viewer.html', idParam: 'id' },
+  matter: { route: 'workspace-details.html', idParam: 'id' },
+  notification: { route: 'notifications.html', idParam: 'id' },
+  notifications: { route: 'notifications.html' },
+  task: { route: 'my-tasks.html', idParam: 'task' },
+  workspace: { route: 'workspace-details.html', idParam: 'id' }
+});
+
+function stripLeadingSlashes(value) {
+  let result = String(value || '');
+  while (result.charAt(0) === '/') {
+    result = result.slice(1);
+  }
+  return result;
+}
+
+function firstDeepLinkSegment(urlObj) {
+  return decodeURIComponent(stripLeadingSlashes(urlObj.pathname || '')).trim();
+}
+
+function rejectUnsafeFragment(value, label = 'hash') {
+  const fragment = String(value || '').trim();
+  if (!fragment) return '';
+  if (fragment.length > 300 || fragment.includes('\n') || fragment.includes('\r')) {
+    throw new Error(`Invalid ${label} parameter`);
+  }
+  return fragment.charAt(0) === '#' ? fragment.slice(1) : fragment;
+}
+
+function setSafeHash(target, fragment) {
+  const safe = rejectUnsafeFragment(fragment);
+  if (safe) target.hash = safe;
+}
+
+function prefixedHash(prefix, value) {
+  const id = String(value || '').trim();
+  if (!id) return '';
+  if (id.length > 200 || id.includes('\n') || id.includes('\r')) {
+    throw new Error('Invalid deep-link identifier');
+  }
+  return prefix + id;
+}
+
+function sanitizeClientRoute(route) {
+  const value = stripLeadingSlashes(route).trim();
+  if (!Object.prototype.hasOwnProperty.call(DEEP_LINK_CLIENT_ROUTES, value)) {
+    throw new Error('Unsupported LANA destination');
+  }
+  return value;
+}
+
+function addSafeDeepLinkParams(target, sourceParams, allowedKeys) {
+  for (const key of allowedKeys) {
+    const value = sourceParams.get(key);
+    if (value === null || value === '') continue;
+    if (String(value).length > 500) throw new Error(`Invalid ${key} parameter`);
+    target.searchParams.set(key, value);
+  }
+}
+
+async function navigateClientDeepLink(urlObj) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+  }
+
+  let route = urlObj.searchParams.get('route');
+  const params = new URLSearchParams(urlObj.searchParams);
+  const host = String(urlObj.hostname || '').trim();
+  const firstSegment = firstDeepLinkSegment(urlObj);
+  let hash = urlObj.searchParams.get('hash') || urlObj.hash || '';
+
+  if (!route && DEEP_LINK_ALIASES[host]) {
+    const alias = DEEP_LINK_ALIASES[host];
+    route = alias.route;
+    if (alias.idParam && firstSegment) params.set(alias.idParam, firstSegment);
+  }
+
+  if (!route && host === 'agent') {
+    route = 'agents/index.html';
+    if (firstSegment) hash = prefixedHash('#agent/', firstSegment);
+  }
+
+  if (!route && host === 'agent-run') {
+    route = 'agents/index.html';
+    if (firstSegment) hash = prefixedHash('#run/', firstSegment);
+  }
+
+  if (!route && host === 'agent-activity') {
+    route = 'agents/index.html';
+    if (firstSegment) hash = prefixedHash('#activity/', firstSegment);
+  }
+
+  if (!route && host === 'agents') {
+    route = 'agents/index.html';
+    const view = firstSegment || urlObj.searchParams.get('view') || 'catalog';
+    if (!DEEP_LINK_AGENT_HASH_VIEWS.has(view)) throw new Error('Unsupported agents destination');
+    hash = '#' + view;
+  }
+
+  if (!route && host === 'automation') {
+    route = 'automation/index.html';
+    if (firstSegment) hash = '#automation/' + encodeURIComponent(firstSegment);
+  }
+
+  if (!route && host === 'automations') {
+    route = 'automation/index.html';
+    const view = firstSegment || urlObj.searchParams.get('view') || 'library';
+    if (!DEEP_LINK_AUTOMATION_HASH_VIEWS.has(view)) throw new Error('Unsupported automation destination');
+    hash = '#' + view;
+  }
+
+  if (!route && host === 'doc-studio') {
+    route = 'doc-studio/index.html';
+    if (firstSegment) params.set('id', firstSegment);
+  }
+
+  if (!route && host === 'deck') {
+    route = 'deck-studio/index.html';
+    if (firstSegment) params.set('id', firstSegment);
+  }
+
+  if (!route && host === 'settings') {
+    route = 'settings-v2.html';
+    const section = firstSegment || urlObj.searchParams.get('section') || '';
+    if (section) {
+      if (!DEEP_LINK_SETTINGS_SECTIONS.has(section)) throw new Error('Unsupported settings destination');
+      hash = '#' + section;
+    }
+  }
+
+  if (!route && host === 'insights') {
+    const view = firstSegment || 'dashboard';
+    if (view === 'dashboard') route = 'insights/dashboard.html';
+    else if (view === 'predictions') route = 'insights/predictions.html';
+    else if (view === 'module-execution') route = 'insights/module-execution.html';
+    else throw new Error('Unsupported insights destination');
+  }
+
+  if (!route && host === 'connector') {
+    route = 'integrations/connector-viewer.html';
+    if (firstSegment) params.set('connectorId', firstSegment);
+  }
+
+  route = sanitizeClientRoute(route);
+  const target = new URL(createFileUrl(path.join(__dirname, 'public_html', route)));
+  addSafeDeepLinkParams(target, params, DEEP_LINK_CLIENT_ROUTES[route]);
+  setSafeHash(target, hash);
+
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
@@ -437,9 +722,10 @@ if (process.env.NODE_ENV === 'development') {
 //   - macOS dev (process.defaultApp + darwin):
 //       SKIP registration entirely. Calling setAsDefaultProtocolClient here
 //       (and especially the removeAsDefaultProtocolClient calls that precede
-//       it) wipes the LanaAIDevHelper.app entry installed by install.sh,
-//       handing routing back to the bare Electron.app which spawns a
-//       welcome-screen window. The helper owns lana-ai:// in dev.
+//       it) can replace the deterministic LanaAIDevHelper.app entry installed
+//       by install.sh. The helper owns lana-ai:// in dev and launches this
+//       checkout's Electron entry with the URL, which lets the single-instance
+//       handler deliver it to the running dev app.
 //   - Windows / Linux dev:
 //       setAsDefaultProtocolClient(protocol, execPath, [appEntry]) writes
 //       registry entries (Windows) or a .desktop record that include the
@@ -448,7 +734,7 @@ if (process.env.NODE_ENV === 'development') {
 //   - Packaged builds (process.defaultApp = false):
 //       The protocol is declared in Info.plist (mac) / NSIS install (win) /
 //       .desktop file (linux) by electron-builder. The runtime call here is
-//       a defensive no-op that confirms the registration.
+//       a defensive confirmation that production builds own lana-ai:// directly.
 function registerDeepLinkProtocol() {
   const protocol = 'lana-ai';
 
@@ -1598,6 +1884,12 @@ ipcMain.handle('settings:revoke-bridge-consent', async (_event, payload) => {
  * Supported routes:
  *   lana-ai://connect/<org-id>           — Pre-fill org on login
  *   lana-ai://oauth/callback?provider=X  — OAuth redirect callback
+ *   lana-ai://open?route=<client-route>&... — Open an allowlisted client page
+ *   lana-ai://file/<file-id>                — Open file viewer
+ *   lana-ai://workspace/<matter-id>         — Open workspace detail
+ *   lana-ai://approval/<approval-id>        — Open approval detail
+ *   lana-ai://agent-run/<run-id>            — Open agent run
+ *   lana-ai://automation/<automation-id>    — Open automation detail
  */
 const handleDeepLink = async (deepLinkUrl) => {
   logInfo(`Deep link received: ${deepLinkUrl}`);
@@ -1614,6 +1906,11 @@ const handleDeepLink = async (deepLinkUrl) => {
         break;
       case 'connect':
         handleConnectLink(urlObj);
+        break;
+      case 'open':
+      case 'file':
+      case 'workspace':
+        await navigateClientDeepLink(urlObj);
         break;
       default:
         logInfo(`Unknown deep link route: ${route}`);

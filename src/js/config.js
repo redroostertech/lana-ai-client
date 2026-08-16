@@ -62,6 +62,19 @@ window.LanaConfig = {
     return 'http://localhost:8080';
   })(),
 
+  /**
+   * LANA document editor/redline service URL.
+   *
+   * Empty string means the file viewer will use, in order:
+   *   1. window.LANA_EDITOR_SERVICE
+   *   2. localStorage["lana-editor-service"]
+   *   3. http://127.0.0.1:4710
+   *
+   * Production builds can inject window.LANA_EDITOR_SERVICE before this file
+   * loads, or set this value during packaging.
+   */
+  LANA_EDITOR_SERVICE_URL: '',
+
   // ============================================================
   // DEMO MODE CONFIGURATION
   // ============================================================

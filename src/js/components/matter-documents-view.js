@@ -96,6 +96,29 @@
     return '<svg class="mdv-file-icon-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
   }
 
+  function artifactIconHtml(artifact) {
+    var type = String((artifact && (artifact.artifact_type || artifact.type)) || '').toLowerCase();
+    var title = String(
+      artifact && (artifact.artifact_name || artifact.title || artifact.name || artifact.label) || 'Generated work product'
+    ).toLowerCase();
+    var contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    if (type.indexOf('presentation') !== -1 || type.indexOf('deck') !== -1 || title.indexOf('presentation') !== -1 || title.indexOf('deck') !== -1) {
+      contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    } else if (type.indexOf('csv') !== -1 || type.indexOf('spreadsheet') !== -1 || title.indexOf('spreadsheet') !== -1) {
+      contentType = 'text/csv';
+    } else if (type.indexOf('text') !== -1 || type.indexOf('transcript') !== -1) {
+      contentType = 'text/plain';
+    } else if (type.indexOf('pdf') !== -1 || title.indexOf('.pdf') !== -1) {
+      contentType = 'application/pdf';
+    }
+
+    return fileIconHtml({
+      filename: title + '.docx',
+      content_type: contentType
+    });
+  }
+
   // -- Lifecycle / status helpers (ported from workspace-details) ----------
 
   function parseDocumentMetadata(doc) {
@@ -248,10 +271,12 @@
     var api = opts.api || window.api;
     var matterId = opts.matterId || null;
     var matterDisplayId = opts.matterDisplayId || matterId;
+    var matter = opts.matter || (matterId ? { matter_id: matterId } : null);
     var toast = opts.toast || (window.Lex && window.Lex.Toast) || null;
     var confirmFn = opts.confirm || (window.Lex && window.Lex.Modal && window.Lex.Modal.confirm) || null;
     var onFileOpen = typeof opts.onFileOpen === 'function' ? opts.onFileOpen : null;
     var onCreateDocStudio = typeof opts.onCreateDocStudio === 'function' ? opts.onCreateDocStudio : null;
+    var onArtifactPromoted = typeof opts.onArtifactPromoted === 'function' ? opts.onArtifactPromoted : null;
 
     var enableTemplates = opts.enableTemplates === true;
     var enableOrphans = opts.enableOrphans === true;
@@ -261,6 +286,7 @@
     var enableTemplateToggle = opts.enableTemplateToggle === true;
     var enableRetry = opts.enableRetry === true;
     var enableReplace = opts.enableReplace === true;
+    var enableArtifacts = opts.enableArtifacts === true;
     // Host may own search via its own toolbar (e.g. the Library folder view),
     // in which case the component's built-in search bar is suppressed to avoid
     // a duplicate control. Defaults on for standalone use (workspace-details).
@@ -276,12 +302,14 @@
     // Instance-local state.
     var state = {
       files: Array.isArray(opts.files) ? opts.files.slice() : [],
+      artifacts: Array.isArray(opts.artifacts) ? opts.artifacts.slice() : [],
       orphans: Array.isArray(opts.orphanedFiles) ? opts.orphanedFiles.slice() : [],
       search: '',
       page: 1,
       filter: 'all',
       openMenuId: null,
       selected: {},
+      artifactLoadError: null,
       viewMode: opts.viewMode === 'grid' ? 'grid' : 'list'
     };
 
@@ -291,6 +319,8 @@
     var changeHandler = null;
     var pageChangeHandler = null;
     var documentClickHandler = null;
+    var viewportChangeHandler = null;
+    var artifactController = null;
     var destroyed = false;
 
     function toastError(message) {
@@ -328,6 +358,55 @@
       return null;
     }
 
+    function artifactHelpers() {
+      return window.WorkspaceArtifactsView || {};
+    }
+
+    function artifactId(artifact) {
+      var helper = artifactHelpers();
+      if (helper.getArtifactId) return helper.getArtifactId(artifact);
+      return artifact && (artifact.artifact_id || artifact.id || '');
+    }
+
+    function artifactTitle(artifact) {
+      var helper = artifactHelpers();
+      if (helper.getArtifactTitle) return helper.getArtifactTitle(artifact);
+      return artifact && (artifact.artifact_name || artifact.title || artifact.name || artifact.label) || 'Generated work product';
+    }
+
+    function artifactPersistence(artifact) {
+      var helper = artifactHelpers();
+      if (helper.getArtifactPersistence) return helper.getArtifactPersistence(artifact);
+      return { status: 'unknown', tone: 'neutral', message: 'Status unavailable' };
+    }
+
+    function artifactPromotionAction(artifact) {
+      var helper = artifactHelpers();
+      if (helper.getArtifactPromotionAction) return helper.getArtifactPromotionAction(artifact);
+      return null;
+    }
+
+    function artifactDocument(artifact) {
+      var helper = artifactHelpers();
+      if (helper.getArtifactDocument) return helper.getArtifactDocument(artifact);
+      return artifact && (artifact.document || artifact.canonical_document || null);
+    }
+
+    function findArtifact(id) {
+      for (var i = 0; i < state.artifacts.length; i++) {
+        if (String(artifactId(state.artifacts[i])) === String(id)) return state.artifacts[i];
+      }
+      return null;
+    }
+
+    function fileSelectKey(fileId) {
+      return 'file:' + String(fileId);
+    }
+
+    function artifactSelectKey(id) {
+      return 'artifact:' + String(id);
+    }
+
     function findOrphan(storageKey) {
       for (var i = 0; i < state.orphans.length; i++) {
         if (String(state.orphans[i].storage_key) === String(storageKey)) return state.orphans[i];
@@ -338,22 +417,38 @@
     // -- Filtering / pagination computation ---------------------------------
 
     function applyFilters() {
+      var items = [];
       var files = state.files.slice();
 
       if (enableTemplates && state.filter === 'template') {
         files = files.filter(function (f) { return !!f.is_template; });
       } else if (enableTemplates && state.filter === 'document') {
         files = files.filter(function (f) { return !f.is_template; });
+      } else if (enableArtifacts && state.filter === 'artifact') {
+        files = [];
+      }
+
+      for (var i = 0; i < files.length; i++) {
+        items.push({ kind: 'file', file: files[i] });
+      }
+
+      if (enableArtifacts && state.filter !== 'template' && state.filter !== 'document') {
+        for (var a = 0; a < state.artifacts.length; a++) {
+          items.push({ kind: 'artifact', artifact: state.artifacts[a] });
+        }
       }
 
       if (state.search) {
         var needle = state.search.toLowerCase();
-        files = files.filter(function (f) {
-          return fileName(f).toLowerCase().indexOf(needle) !== -1;
+        items = items.filter(function (item) {
+          if (item.kind === 'artifact') {
+            return artifactTitle(item.artifact).toLowerCase().indexOf(needle) !== -1;
+          }
+          return fileName(item.file).toLowerCase().indexOf(needle) !== -1;
         });
       }
 
-      return files;
+      return items;
     }
 
     function isDocxOrPdf(doc) {
@@ -431,6 +526,30 @@
       return '<div class="mdv-menu' + (open ? ' mdv-menu--open' : '') + '" data-menu-for="' + esc(file.id) + '">' + items + '</div>';
     }
 
+    function artifactMenu(artifact) {
+      var id = artifactId(artifact);
+      var menuId = 'artifact:' + id;
+      var open = String(state.openMenuId) === String(menuId);
+      var savedDocument = artifactDocument(artifact);
+      var canPromote = !!artifactPromotionAction(artifact);
+      var items = '';
+
+      function item(action, icon, label, attrs) {
+        return '<button type="button" class="mdv-menu-item" data-action="' + action + '" data-artifact-id="' + esc(id) + '"' + (attrs || '') + '>' +
+          icon + '<span>' + esc(label) + '</span></button>';
+      }
+
+      items += item('artifact-view', ICON_OPEN, 'View');
+      if (canPromote) {
+        items += item('artifact-promote', ICON_DOWNLOAD, 'Save to Documents');
+      }
+      if (savedDocument && savedDocument.id) {
+        items += item('artifact-open-document', ICON_OPEN, 'Open Document', ' data-document-id="' + esc(savedDocument.id) + '"');
+      }
+
+      return '<div class="mdv-menu' + (open ? ' mdv-menu--open' : '') + '" data-menu-for="' + esc(menuId) + '">' + items + '</div>';
+    }
+
     function workflowBadgesHtml(file) {
       if (!enableWorkflow) return '';
       return docStudioWorkflowBadges(file);
@@ -444,8 +563,17 @@
 
     function selectCheckbox(file) {
       if (!enableBatch) return '';
-      var checked = state.selected[file.id] ? ' checked' : '';
-      return '<input type="checkbox" class="mdv-select-cb" data-action="select" data-doc-id="' + esc(file.id) + '"' + checked + ' aria-label="Select file">';
+      var key = fileSelectKey(file.id);
+      var checked = state.selected[key] ? ' checked' : '';
+      return '<input type="checkbox" class="mdv-select-cb" data-action="select" data-select-key="' + esc(key) + '" data-doc-id="' + esc(file.id) + '"' + checked + ' aria-label="Select file">';
+    }
+
+    function artifactCheckbox(artifact) {
+      if (!enableBatch) return '';
+      var id = artifactId(artifact);
+      var key = artifactSelectKey(id);
+      var checked = state.selected[key] ? ' checked' : '';
+      return '<input type="checkbox" class="mdv-select-cb" data-action="select" data-select-key="' + esc(key) + '" data-artifact-id="' + esc(id) + '"' + checked + ' aria-label="Select artifact">';
     }
 
     // -- List row renderer ---------------------------------------------------
@@ -522,6 +650,54 @@
       ].join('');
     }
 
+    function artifactStatusBadge(artifact) {
+      var status = artifactPersistence(artifact);
+      var cls = status.tone === 'success'
+        ? 'mdv-badge--ready'
+        : status.tone === 'error'
+          ? 'mdv-badge--attention'
+          : 'mdv-badge--uploaded';
+      return '<span class="mdv-status-badge ' + cls + '">' + esc(status.message || status.status || 'Draft') + '</span>';
+    }
+
+    function artifactRow(artifact) {
+      var id = artifactId(artifact);
+      var title = artifactTitle(artifact);
+      var type = artifact.artifact_type || artifact.type || 'artifact';
+      var version = artifact.version || artifact.current_version || 1;
+      var createdAt = artifact.updated_at || artifact.created_at || artifact.createdAt || '';
+
+      return [
+        '<div class="mdv-file-row mdv-artifact-row" data-artifact-id="' + esc(id) + '" data-doc-type="artifact">',
+        (enableBatch ? '  <div class="mdv-file-select">' + artifactCheckbox(artifact) + '</div>' : ''),
+        '  <div class="mdv-file-icon mdv-file-icon--artifact">' + artifactIconHtml(artifact) + '</div>',
+        '  <div class="mdv-file-main">',
+        '    <div class="mdv-file-top">',
+        '      <button type="button" class="mdv-file-name" data-action="artifact-view" data-artifact-id="' + esc(id) + '" title="' + esc(title) + '">' + esc(title) + '</button>',
+        '      <div class="mdv-file-tags">',
+        '        <span class="mdv-template-badge">Generated</span>',
+        '        ' + artifactStatusBadge(artifact),
+        '      </div>',
+        '    </div>',
+        '    <div class="mdv-file-meta">',
+        '      <span>' + esc(type) + '</span>',
+        '      <span class="mdv-meta-sep">|</span>',
+        '      <span>Version ' + esc(String(version)) + '</span>',
+        (createdAt ? '      <span class="mdv-meta-sep">|</span><span>' + esc(timeAgo(createdAt)) + '</span>' : ''),
+        '    </div>',
+        '  </div>',
+        '  <div class="mdv-file-actions">',
+        '    <button type="button" class="mdv-kebab" data-action="artifact-menu" data-artifact-id="' + esc(id) + '" title="Artifact actions" aria-haspopup="true">' + ICON_KEBAB + '</button>',
+        '    ' + artifactMenu(artifact),
+        '  </div>',
+        '</div>'
+      ].join('');
+    }
+
+    function renderItem(item) {
+      return item.kind === 'artifact' ? artifactRow(item.artifact) : fileRow(item.file);
+    }
+
     // -- Orphaned files section ---------------------------------------------
 
     function orphanRow(file) {
@@ -575,15 +751,17 @@
       var totalPages = Math.ceil(totalCount / pageSize) || 1;
       if (state.page > totalPages) state.page = 1;
       var startIdx = (state.page - 1) * pageSize;
-      var pageFiles = filtered.slice(startIdx, startIdx + pageSize);
+      var pageItems = filtered.slice(startIdx, startIdx + pageSize);
 
       var templateCount = 0;
       if (enableTemplates) {
-        for (var i = 0; i < filtered.length; i++) {
-          if (filtered[i].is_template) templateCount++;
+        for (var i = 0; i < state.files.length; i++) {
+          if (state.files[i].is_template) templateCount++;
         }
       }
-      var documentCount = totalCount - templateCount;
+      var artifactCount = enableArtifacts ? state.artifacts.length : 0;
+      var documentCount = state.files.length - templateCount;
+      var allCount = state.files.length + artifactCount;
 
       var headerHtml = '';
       if (onCreateDocStudio && enableDocStudio) {
@@ -604,16 +782,22 @@
 
       var controlsHtml = '';
       var filtersHtml = '';
-      if (enableTemplates) {
+      if (enableTemplates || enableArtifacts) {
         filtersHtml =
-          filterChip('all', 'All ' + totalCount) +
+          filterChip('all', 'All ' + allCount) +
           (templateCount > 0 ? filterChip('template', 'Templates ' + templateCount) : '') +
-          (documentCount > 0 ? filterChip('document', 'Documents ' + documentCount) : '');
+          (documentCount > 0 ? filterChip('document', 'Documents ' + documentCount) : '') +
+          (artifactCount > 0 ? filterChip('artifact', 'Artifacts ' + artifactCount) : '');
       }
       var batchHtml = '';
       if (enableBatch) {
         var selectedCount = countSelected();
-        var allChecked = totalCount > 0 && pageFiles.every(function (f) { return state.selected[f.id]; });
+        var pageSelectable = pageItems.map(function (item) {
+          return item.kind === 'artifact'
+            ? artifactSelectKey(artifactId(item.artifact))
+            : fileSelectKey(item.file.id);
+        });
+        var allChecked = pageSelectable.length > 0 && pageSelectable.every(function (key) { return state.selected[key]; });
         batchHtml =
           '<label class="mdv-select-all">' +
             '<input type="checkbox" data-action="select-all"' + (allChecked ? ' checked' : '') + '>' +
@@ -635,17 +819,21 @@
       if (totalCount === 0) {
         listHtml = showEmptyState
           ? (state.search
-            ? '<div class="mdv-empty">No files matching "' + esc(state.search) + '"</div>'
-            : '<div class="mdv-empty">No files in this folder</div>')
+            ? '<div class="mdv-empty">No documents matching "' + esc(state.search) + '"</div>'
+            : '<div class="mdv-empty">No documents in this workspace</div>')
           : '';
       } else if (state.viewMode === 'grid') {
-        listHtml = '<div class="mdv-grid">' + pageFiles.map(fileCard).join('') + '</div>';
+        var gridFiles = pageItems.filter(function (item) { return item.kind === 'file'; }).map(function (item) { return item.file; });
+        listHtml = '<div class="mdv-grid">' + gridFiles.map(fileCard).join('') + '</div>';
       } else {
-        listHtml = '<div class="mdv-list">' + pageFiles.map(fileRow).join('') + '</div>';
+        listHtml = '<div class="mdv-list">' + pageItems.map(renderItem).join('') + '</div>';
       }
 
       var paginationHtml = totalPages > 1
         ? '<lex-pagination class="mdv-pagination" data-mdv-pagination page="' + state.page + '" total-pages="' + totalPages + '" total="' + totalCount + '" limit="' + pageSize + '"></lex-pagination>'
+        : '';
+      var artifactErrorHtml = state.artifactLoadError
+        ? '<div class="mdv-inline-error">Generated work product could not be loaded. ' + esc(state.artifactLoadError) + '</div>'
         : '';
 
       containerEl.innerHTML =
@@ -655,6 +843,7 @@
           controlsHtml +
           listHtml +
           paginationHtml +
+          artifactErrorHtml +
           orphansHtml() +
         '</div>';
 
@@ -696,7 +885,62 @@
         var id = menus[m].getAttribute('data-menu-for');
         var open = String(id) === String(state.openMenuId);
         menus[m].classList.toggle('mdv-menu--open', open);
+        if (open) {
+          positionMenu(id, menus[m]);
+        } else {
+          menus[m].style.left = '';
+          menus[m].style.top = '';
+          menus[m].style.right = '';
+        }
       }
+    }
+
+    function findKebabByMenuId(menuId) {
+      var artifactPrefix = 'artifact:';
+      if (String(menuId).indexOf(artifactPrefix) === 0) {
+        var artifactIdValue = String(menuId).slice(artifactPrefix.length);
+        var artifactButtons = containerEl.querySelectorAll('.mdv-kebab[data-artifact-id]');
+        for (var a = 0; a < artifactButtons.length; a++) {
+          if (String(artifactButtons[a].getAttribute('data-artifact-id')) === artifactIdValue) {
+            return artifactButtons[a];
+          }
+        }
+        return null;
+      }
+
+      var buttons = containerEl.querySelectorAll('.mdv-kebab[data-doc-id]');
+      for (var i = 0; i < buttons.length; i++) {
+        if (String(buttons[i].getAttribute('data-doc-id')) === String(menuId)) {
+          return buttons[i];
+        }
+      }
+      return null;
+    }
+
+    function positionMenu(menuId, menu) {
+      if (!menu) return;
+      var trigger = findKebabByMenuId(menuId);
+      if (!trigger) return;
+
+      var triggerRect = trigger.getBoundingClientRect();
+      var menuRect = menu.getBoundingClientRect();
+      var gap = 6;
+      var margin = 12;
+      var menuWidth = menuRect.width || 176;
+      var menuHeight = menuRect.height || 220;
+
+      var left = triggerRect.right - menuWidth;
+      left = Math.max(margin, Math.min(left, window.innerWidth - menuWidth - margin));
+
+      var top = triggerRect.bottom + gap;
+      if (top + menuHeight + margin > window.innerHeight) {
+        top = triggerRect.top - menuHeight - gap;
+      }
+      top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin));
+
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
+      menu.style.right = 'auto';
     }
 
     function closeMenu() {
@@ -947,11 +1191,12 @@
 
     // -- Batch select / delete ----------------------------------------------
 
-    function toggleSelect(fileId, checked) {
+    function toggleSelect(selectKey, checked) {
+      if (!selectKey) return;
       if (checked) {
-        state.selected[fileId] = true;
+        state.selected[selectKey] = true;
       } else {
-        delete state.selected[fileId];
+        delete state.selected[selectKey];
       }
       updateBatchUi();
     }
@@ -959,10 +1204,13 @@
     function toggleSelectAll(checked) {
       var filtered = applyFilters();
       var startIdx = (state.page - 1) * pageSize;
-      var pageFiles = filtered.slice(startIdx, startIdx + pageSize);
-      pageFiles.forEach(function (f) {
-        if (checked) state.selected[f.id] = true;
-        else delete state.selected[f.id];
+      var pageItems = filtered.slice(startIdx, startIdx + pageSize);
+      pageItems.forEach(function (item) {
+        var key = item.kind === 'artifact'
+          ? artifactSelectKey(artifactId(item.artifact))
+          : fileSelectKey(item.file.id);
+        if (checked) state.selected[key] = true;
+        else delete state.selected[key];
       });
       render();
     }
@@ -977,34 +1225,44 @@
     }
 
     function batchDelete() {
-      var ids = Object.keys(state.selected).filter(function (k) { return state.selected[k]; });
-      if (ids.length === 0) return;
-      var count = ids.length;
+      var keys = Object.keys(state.selected).filter(function (k) { return state.selected[k]; });
+      if (keys.length === 0) return;
+      var fileIds = keys.filter(function (key) { return key.indexOf('file:') === 0; }).map(function (key) { return key.slice(5); });
+      var artifactIds = keys.filter(function (key) { return key.indexOf('artifact:') === 0; }).map(function (key) { return key.slice(9); });
+      var count = fileIds.length + artifactIds.length;
       function run() {
         (async function () {
           var deleted = 0;
           var failed = 0;
-          for (var i = 0; i < ids.length; i++) {
+          for (var i = 0; i < fileIds.length; i++) {
             try {
               if (api && api.deleteDocument) {
-                await api.deleteDocument(ids[i]);
+                await api.deleteDocument(fileIds[i]);
               } else {
-                await api.delete('/api/v1/storage/files/' + ids[i] + (matterId ? '?matter_id=' + encodeURIComponent(matterId) : ''));
+                await api.delete('/api/v1/storage/files/' + fileIds[i] + (matterId ? '?matter_id=' + encodeURIComponent(matterId) : ''));
               }
               deleted++;
             } catch (e) {
               failed++;
             }
           }
-          if (deleted > 0) toastSuccess(deleted + ' document' + (deleted !== 1 ? 's' : '') + ' deleted');
-          if (failed > 0) toastError(failed + ' failed to delete');
+          for (var a = 0; a < artifactIds.length; a++) {
+            try {
+              await api.delete('/api/v1/matters/' + encodeURIComponent(matterId) + '/artifacts/' + encodeURIComponent(artifactIds[a]));
+              deleted++;
+            } catch (e) {
+              failed++;
+            }
+          }
+          if (deleted > 0) toastSuccess(deleted + ' item' + (deleted !== 1 ? 's' : '') + ' deleted');
+          if (failed > 0) toastError(failed + ' item' + (failed !== 1 ? 's' : '') + ' failed to delete');
           state.selected = {};
           await refresh();
         })();
       }
       doConfirm(
-        'Delete ' + count + ' Document' + (count !== 1 ? 's' : ''),
-        'Are you sure you want to delete ' + count + ' document' + (count !== 1 ? 's' : '') + '? This action cannot be undone.',
+        'Delete ' + count + ' Item' + (count !== 1 ? 's' : ''),
+        'Delete ' + count + ' selected workspace item' + (count !== 1 ? 's' : '') + '? Documents are removed through the document delete path; artifacts are archived with provenance.',
         run,
         'Delete',
         'danger'
@@ -1060,6 +1318,69 @@
         })();
       }
       doConfirm('Delete File', 'Permanently delete "' + name + '" from storage? This action cannot be undone.', run, 'Delete', 'danger');
+    }
+
+    function ensureArtifactController() {
+      if (!enableArtifacts || !window.WorkspaceArtifactsView || typeof window.WorkspaceArtifactsView.mount !== 'function') {
+        return null;
+      }
+      if (!artifactController) {
+        artifactController = window.WorkspaceArtifactsView.mount(document.createElement('div'), {
+          api: api,
+          matter: matter,
+          Lex: window.Lex,
+          escapeHtml: esc,
+          formatDate: timeAgo,
+          onOpenDocument: function (fileId) {
+            if (onFileOpen) onFileOpen(fileId);
+          },
+          onPromoted: function (detail) {
+            if (onArtifactPromoted) onArtifactPromoted(detail);
+            refresh();
+          }
+        });
+      }
+      artifactController.matter = matter;
+      artifactController.artifacts = state.artifacts.slice();
+      return artifactController;
+    }
+
+    async function loadArtifacts() {
+      if (!enableArtifacts || !api || !matterId) return;
+      if (!api.get) return;
+      try {
+        var helper = artifactHelpers();
+        var query = helper.buildQuery
+          ? helper.buildQuery({ limit: 25, offset: 0, sort_by: 'updated_at', sort_dir: 'desc' })
+          : 'limit=25&offset=0&sort_by=updated_at&sort_dir=desc';
+        var result = await api.get('/api/v1/matters/' + encodeURIComponent(matterId) + '/artifacts?' + query);
+        var extracted = helper.extractArtifactList
+          ? helper.extractArtifactList(result)
+          : { artifacts: [], pagination: null };
+        state.artifacts = extracted.artifacts || [];
+        state.artifactLoadError = null;
+      } catch (error) {
+        state.artifacts = [];
+        state.artifactLoadError = error && error.message ? error.message : 'Artifact API request failed.';
+      }
+    }
+
+    async function viewArtifact(id) {
+      var controller = ensureArtifactController();
+      if (!controller || typeof controller.openArtifact !== 'function') {
+        toastError('Generated work product viewer is unavailable.');
+        return;
+      }
+      await controller.openArtifact(id);
+    }
+
+    function promoteArtifact(id) {
+      var controller = ensureArtifactController();
+      if (!controller || typeof controller.promote !== 'function') {
+        toastError('Save to Documents is unavailable.');
+        return;
+      }
+      controller.promote(matterId, id);
     }
 
     // -- Rename (component-owned Lex modal) ---------------------------------
@@ -1177,6 +1498,7 @@
 
       var action = actionEl.getAttribute('data-action');
       var fileId = actionEl.getAttribute('data-doc-id');
+      var artifactIdValue = actionEl.getAttribute('data-artifact-id');
       var orphanKey = actionEl.getAttribute('data-orphan-key');
 
       switch (action) {
@@ -1198,6 +1520,11 @@
           event.stopPropagation();
           toggleMenu(fileId);
           return;
+        case 'artifact-menu':
+          event.preventDefault();
+          event.stopPropagation();
+          toggleMenu('artifact:' + artifactIdValue);
+          return;
         case 'select':
           // Checkbox toggle handled by change listener; just stop bubbling.
           event.stopPropagation();
@@ -1214,6 +1541,21 @@
           event.preventDefault();
           closeMenu();
           if (onFileOpen) onFileOpen(fileId);
+          return;
+        case 'artifact-view':
+          event.preventDefault();
+          closeMenu();
+          viewArtifact(artifactIdValue);
+          return;
+        case 'artifact-promote':
+          event.preventDefault();
+          closeMenu();
+          promoteArtifact(artifactIdValue);
+          return;
+        case 'artifact-open-document':
+          event.preventDefault();
+          closeMenu();
+          if (onFileOpen) onFileOpen(actionEl.getAttribute('data-document-id') || '');
           return;
         case 'download':
           event.preventDefault();
@@ -1295,7 +1637,7 @@
       if (!el || !containerEl.contains(el)) return;
       var action = el.getAttribute('data-action');
       if (action === 'select') {
-        toggleSelect(el.getAttribute('data-doc-id'), el.checked);
+        toggleSelect(el.getAttribute('data-select-key'), el.checked);
       } else if (action === 'select-all') {
         toggleSelectAll(el.checked);
       }
@@ -1331,9 +1673,13 @@
       closeMenu();
     }
 
+    function handleViewportChange() {
+      closeMenu();
+    }
+
     // -- Public methods ------------------------------------------------------
 
-    async function refresh(files, orphanedFiles) {
+    async function refresh(files, orphanedFiles, artifacts) {
       if (destroyed) return;
 
       // Explicit arrays => host-driven refresh. Otherwise re-fetch from the api
@@ -1364,15 +1710,31 @@
         }
       }
 
+      if (Array.isArray(artifacts)) {
+        state.artifacts = artifacts.slice();
+      } else {
+        await loadArtifacts();
+      }
+
       state.openMenuId = null;
       // Prune selections for files that no longer exist.
       var present = {};
-      state.files.forEach(function (f) { present[f.id] = true; });
+      state.files.forEach(function (f) { present[fileSelectKey(f.id)] = true; });
+      state.artifacts.forEach(function (artifact) { present[artifactSelectKey(artifactId(artifact))] = true; });
       Object.keys(state.selected).forEach(function (id) {
         if (!present[id]) delete state.selected[id];
       });
 
       render();
+    }
+
+    async function openArtifact(id) {
+      if (!id) return;
+      if (!findArtifact(id)) {
+        await loadArtifacts();
+        render();
+      }
+      await viewArtifact(id);
     }
 
     function setViewMode(mode) {
@@ -1389,12 +1751,18 @@
       containerEl.removeEventListener('input', inputHandler);
       containerEl.removeEventListener('change', changeHandler);
       document.removeEventListener('click', documentClickHandler);
+      window.removeEventListener('resize', viewportChangeHandler);
+      window.removeEventListener('scroll', viewportChangeHandler, true);
 
       var pag = containerEl.querySelector('[data-mdv-pagination]');
       if (pag && pageChangeHandler) {
         pag.removeEventListener('page-change', pageChangeHandler);
       }
 
+      if (artifactController && typeof artifactController.destroy === 'function') {
+        artifactController.destroy();
+      }
+      artifactController = null;
       containerEl.innerHTML = '';
     }
 
@@ -1405,17 +1773,24 @@
     changeHandler = handleChange;
     pageChangeHandler = handlePageChange;
     documentClickHandler = handleDocumentClick;
+    viewportChangeHandler = handleViewportChange;
 
     containerEl.addEventListener('click', clickHandler);
     containerEl.addEventListener('input', inputHandler);
     containerEl.addEventListener('change', changeHandler);
     document.addEventListener('click', documentClickHandler);
+    window.addEventListener('resize', viewportChangeHandler);
+    window.addEventListener('scroll', viewportChangeHandler, true);
 
     render();
+    if (enableArtifacts) {
+      refresh(state.files, state.orphans);
+    }
 
     return {
       refresh: refresh,
       render: render,
+      openArtifact: openArtifact,
       setViewMode: setViewMode,
       destroy: destroy,
       matterId: matterId,
