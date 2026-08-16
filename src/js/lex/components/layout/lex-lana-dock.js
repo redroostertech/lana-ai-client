@@ -933,11 +933,18 @@
       var self = this;
       panel.addEventListener('lex-lana-before-send', function (event) {
         var ctx = self._pageContext;
-        if (!ctx || !ctx.documentId) return;
+        if (!ctx) return;
 
         var detail = event.detail || {};
         var opts = detail.opts || {};
         detail.opts = opts;
+
+        if (ctx.matterId && !opts.matterId) {
+          opts.matterId = ctx.matterId;
+        }
+
+        if (!ctx.documentId) return;
+
         opts.attachments = opts.attachments || {};
         opts.attachments.files = opts.attachments.files || [];
 
@@ -949,9 +956,6 @@
             file_id: ctx.documentId,
             name: ctx.documentName || 'Document'
           });
-        }
-        if (ctx.matterId && !opts.matterId) {
-          opts.matterId = ctx.matterId;
         }
         if (!opts.contextType || opts.contextType === 'full_chat') {
           opts.contextType = 'document_chat';
@@ -1053,8 +1057,9 @@
     }
 
     /**
-     * Where the user is standing. Never binds the conversation — it feeds
-     * the RECENTS "This workspace" group and the suggestion bubble.
+     * Where the user is standing. Feeds the RECENTS "This workspace" group,
+     * the suggestion bubble, and fresh dock sends that have not selected an
+     * explicit conversation scope yet.
      * @param {Object} ctx - { matterId, matterName, documentId, documentName }
      */
     setPageContext(ctx) {

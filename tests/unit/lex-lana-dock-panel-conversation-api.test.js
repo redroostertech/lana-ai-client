@@ -282,6 +282,66 @@ describe('LANA dock/panel conversation API routing', () => {
     expect(dock._panelEl._focusComposer).toHaveBeenCalledTimes(1);
   });
 
+  test('dock page context adds workspace matter scope before fresh sends', () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    let beforeSend;
+    const panel = {
+      addEventListener: jest.fn((name, handler) => {
+        if (name === 'lex-lana-before-send') beforeSend = handler;
+      })
+    };
+    dock._pageContext = {
+      matterId: 'matter-1',
+      matterName: 'Matter One'
+    };
+
+    dock._bindPageContextSend(panel);
+    const event = { detail: { content: 'Summarize this workspace', opts: { contextType: 'full_chat' } } };
+    beforeSend(event);
+
+    expect(event.detail.opts).toEqual({
+      contextType: 'full_chat',
+      matterId: 'matter-1'
+    });
+  });
+
+  test('dock page context keeps document attachment injection before sends', () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    let beforeSend;
+    const panel = {
+      addEventListener: jest.fn((name, handler) => {
+        if (name === 'lex-lana-before-send') beforeSend = handler;
+      })
+    };
+    dock._pageContext = {
+      matterId: 'matter-1',
+      documentId: 'doc-1',
+      documentName: 'affidavit-template.docx'
+    };
+
+    dock._bindPageContextSend(panel);
+    const event = { detail: { content: 'What fields are incomplete?', opts: { contextType: 'full_chat' } } };
+    beforeSend(event);
+
+    expect(event.detail.opts).toEqual({
+      contextType: 'document_chat',
+      matterId: 'matter-1',
+      attachments: {
+        files: [{ file_id: 'doc-1', name: 'affidavit-template.docx' }]
+      }
+    });
+  });
+
   test('dock consumes queued conversation navigation intent from sessionStorage', async () => {
     const { context, Component } = loadComponent(
       'src/js/lex/components/layout/lex-lana-dock.js',
