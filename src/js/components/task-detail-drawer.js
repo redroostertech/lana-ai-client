@@ -225,6 +225,9 @@
   function normalizeComment(item, index) {
     if (typeof item === 'string') item = { content: item };
     item = item || {};
+    var reactions = firstArray(item.reactions, item.comment_reactions, []);
+    var likes = firstDefined(item.like_count, item.likes_count, item.likes, item.upvotes, 0);
+    var reactionCount = firstDefined(item.reaction_count, item.reactions_count, reactions.length, 0);
     return {
       id: String(firstDefined(item.id, item.comment_id, 'comment-' + index)),
       author: firstDefined(item.author_name, item.created_by_name, item.user_name, item.author, currentUserName()),
@@ -232,6 +235,9 @@
       content: firstDefined(item.content, item.body, item.text, ''),
       created_at: firstDefined(item.created_at, item.timestamp, LanaTime.nowIso()),
       is_edited: !!(item.is_edited || item.edited),
+      liked: !!(item.liked || item.liked_by_me || item.user_liked),
+      like_count: Number(likes) || 0,
+      reaction_count: Number(reactionCount) || 0,
       replies: asArray(firstArray(item.replies, item.children, [])).map(normalizeComment)
     };
   }
@@ -381,22 +387,43 @@
     return esc(content).split('\n').join('<br>');
   }
 
-  function renderComment(comment) {
+  function renderCommentActions(comment, isReply) {
     var isAuthor = comment.author_id && String(comment.author_id) === currentUserId();
+    return [
+      '<div class="my-task-comment-actions">',
+      !isReply ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="reply" data-comment-id="' + esc(comment.id) + '" title="Reply" aria-label="Reply">' + iconHtml('corner-up-left') + '</button>' : '',
+      '  <button type="button" class="my-task-comment-action' + (comment.liked ? ' is-active' : '') + '" data-shared-comment-action="like" data-comment-id="' + esc(comment.id) + '" title="Like" aria-label="Like">' + iconHtml('thumbs-up') + (comment.like_count ? '<span>' + esc(comment.like_count) + '</span>' : '') + '</button>',
+      '  <button type="button" class="my-task-comment-action" data-shared-comment-action="react" data-comment-id="' + esc(comment.id) + '" title="Add reaction" aria-label="Add reaction">' + iconHtml('message-circle') + (comment.reaction_count ? '<span>' + esc(comment.reaction_count) + '</span>' : '') + '</button>',
+      isAuthor ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="edit" data-comment-id="' + esc(comment.id) + '" title="Edit" aria-label="Edit">' + iconHtml('edit-2') + '</button>' : '',
+      '</div>'
+    ].join('');
+  }
+
+  function renderCommentReply(reply) {
+    return [
+      '<article class="my-task-comment-thread my-task-comment-thread--reply" data-shared-comment-id="' + esc(reply.id) + '">',
+      '  <div class="my-task-avatar my-task-avatar--sm">' + esc(initialsFor(reply.author)) + '</div>',
+      '  <div class="my-task-comment-thread__body">',
+      '    <div class="my-task-activity-item__meta"><strong>' + esc(reply.author) + '</strong><span>' + esc(formatDateTime(reply.created_at)) + '</span>' + (reply.is_edited ? '<span>edited</span>' : '') + '</div>',
+      '    <div class="my-task-comment-content" data-shared-comment-content="' + esc(reply.id) + '">' + renderCommentContent(reply.content) + '</div>',
+      renderCommentActions(reply, true),
+      '  </div>',
+      '</article>'
+    ].join('');
+  }
+
+  function renderComment(comment) {
+    var replies = asArray(comment.replies);
     return [
       '<article class="my-task-comment-thread" data-shared-comment-id="' + esc(comment.id) + '">',
       '  <div class="my-task-comment-thread__row">',
       '    <div class="my-task-avatar">' + esc(initialsFor(comment.author)) + '</div>',
       '    <div class="my-task-comment-thread__body">',
       '      <div class="my-task-activity-item__meta"><strong>' + esc(comment.author) + '</strong><span>' + esc(formatDateTime(comment.created_at)) + '</span>' + (comment.is_edited ? '<span>edited</span>' : '') + '</div>',
-      '      <div class="my-task-comment-content">' + renderCommentContent(comment.content) + '</div>',
-      '      <div class="my-task-comment-actions">',
-      '        <button type="button" class="my-task-comment-action" data-shared-comment-action="reply" data-comment-id="' + esc(comment.id) + '">' + iconHtml('corner-up-left') + '</button>',
-      '        <button type="button" class="my-task-comment-action" data-shared-comment-action="like" data-comment-id="' + esc(comment.id) + '">' + iconHtml('thumbs-up') + '</button>',
-      '        <button type="button" class="my-task-comment-action" data-shared-comment-action="react" data-comment-id="' + esc(comment.id) + '">' + iconHtml('message-circle') + '</button>',
-      isAuthor ? '        <button type="button" class="my-task-comment-action" data-shared-comment-action="edit" data-comment-id="' + esc(comment.id) + '">' + iconHtml('edit-2') + '</button>' : '',
-      '      </div>',
+      '      <div class="my-task-comment-content" data-shared-comment-content="' + esc(comment.id) + '">' + renderCommentContent(comment.content) + '</div>',
+      renderCommentActions(comment, false),
       '      <div class="my-task-reply-editor hidden" data-shared-reply-editor="' + esc(comment.id) + '"><textarea rows="2" placeholder="Write a reply..."></textarea><div class="my-task-reply-editor__actions"><button type="button" class="my-task-comment-action" data-shared-comment-action="cancel-reply" data-comment-id="' + esc(comment.id) + '">Cancel</button><button type="button" class="my-task-comment-action my-task-comment-action--primary" data-shared-comment-action="post-reply" data-comment-id="' + esc(comment.id) + '">' + iconHtml('send') + '<span>Reply</span></button></div></div>',
+      replies.length ? '      <div class="my-task-comment-replies">' + replies.map(renderCommentReply).join('') + '</div>' : '',
       '    </div>',
       '  </div>',
       '</article>'
@@ -673,6 +700,59 @@
       comment.replies.push({ id: 'local-reply-' + LanaTime.nowMs(), author: currentUserName(), author_id: currentUserId(), content: text, created_at: LanaTime.nowIso(), replies: [] });
       addActivity(store, 'Replied to a comment');
       render();
+      return;
+    }
+    if (action === 'like') {
+      comment.liked = !comment.liked;
+      comment.like_count = Math.max(0, Number(comment.like_count || 0) + (comment.liked ? 1 : -1));
+      render();
+      return;
+    }
+    if (action === 'react') {
+      comment.reaction_count = Number(comment.reaction_count || 0) + 1;
+      render();
+      return;
+    }
+    if (action === 'edit') {
+      startCommentEdit(comment);
+      return;
+    }
+    if (action === 'cancel-edit') {
+      render();
+      return;
+    }
+    if (action === 'save-edit') {
+      var editBox = actionEl.closest('.my-task-comment-edit');
+      var editTextarea = editBox && editBox.querySelector('textarea');
+      var editedContent = editTextarea ? editTextarea.value.trim() : '';
+      if (!editedContent) {
+        if (window.Lex && Lex.Toast) Lex.Toast.warning('Comment cannot be empty');
+        return;
+      }
+      comment.content = editedContent;
+      comment.is_edited = true;
+      addActivity(store, 'Edited a comment');
+      render();
+    }
+  }
+
+  function startCommentEdit(comment) {
+    var content = contentEl();
+    var target = content && content.querySelector('[data-shared-comment-content="' + comment.id + '"]');
+    if (!target) return;
+    target.innerHTML = [
+      '<div class="my-task-comment-edit">',
+      '  <textarea rows="3">' + esc(comment.content || '') + '</textarea>',
+      '  <div class="my-task-reply-editor__actions">',
+      '    <button type="button" class="my-task-comment-action" data-shared-comment-action="cancel-edit" data-comment-id="' + esc(comment.id) + '">Cancel</button>',
+      '    <button type="button" class="my-task-comment-action my-task-comment-action--primary" data-shared-comment-action="save-edit" data-comment-id="' + esc(comment.id) + '">' + iconHtml('send') + '<span>Save</span></button>',
+      '  </div>',
+      '</div>'
+    ].join('');
+    var textarea = target.querySelector('textarea');
+    if (textarea) {
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     }
   }
 
