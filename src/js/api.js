@@ -2657,6 +2657,24 @@ class ApiClient {
   }
 
   /**
+   * Like a comment for the current user (idempotent)
+   * @param {string} commentId - The comment ID
+   * @returns {Promise<Object>} { comment_id, liked, like_count }
+   */
+  async likeComment(commentId) {
+    return this.post(`/api/v1/comments/${commentId}/like`);
+  }
+
+  /**
+   * Remove the current user's like from a comment (idempotent)
+   * @param {string} commentId - The comment ID
+   * @returns {Promise<Object>} { comment_id, liked, like_count }
+   */
+  async unlikeComment(commentId) {
+    return this.delete(`/api/v1/comments/${commentId}/like`);
+  }
+
+  /**
    * Reply to a comment
    * @param {string} commentId - The parent comment ID
    * @param {Object} data - Reply data (content, mentions)
