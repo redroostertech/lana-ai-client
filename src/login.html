@@ -778,15 +778,13 @@
 
         Toast.success('Login successful! Redirecting...');
 
+        // Ensure desktop notification permission quietly: the success toast
+        // above is the only user-visible message on login. No status toasts
+        // and no test notification here — outcomes go to the console only.
         if (window.DesktopNotifications && window.DesktopNotifications.isSupported()) {
           try {
-            Toast.info('Checking desktop notification permission...');
-            const notificationResult = await window.DesktopNotifications.requestPermissionAndTest();
-            if (notificationResult.granted) {
-              Toast.success('Desktop notifications enabled.');
-            } else if (notificationResult.permission === 'denied') {
-              Toast.info(notificationResult.blockedMessage);
-            }
+            const notificationsGranted = await window.DesktopNotifications.enableFromUserGesture();
+            console.log('[Login] Desktop notification permission:', notificationsGranted ? 'granted' : 'not granted');
           } catch (notificationError) {
             console.warn('[Login] Desktop notification permission check failed:', notificationError);
           }
