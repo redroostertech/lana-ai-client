@@ -13,10 +13,28 @@
    dedicated container without leaking styles.
    ---------------------------------------------------------------------- */
 
+.workspace-documents-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(30rem, calc(100vh - 18rem), 52rem);
+}
+
+.workspace-documents-panel #matterDocsViewHost {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.workspace-documents-panel #matterDocsViewHost > .mdv-root {
+  flex: 1;
+  width: 100%;
+}
+
 .mdv-root {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-height: 100%;
 }
 
 .mdv-header {
@@ -111,8 +129,10 @@
 /* File list */
 .mdv-list {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 0.5rem;
+  min-height: 0;
 }
 
 .mdv-empty {
@@ -120,6 +140,15 @@
   font-size: 0.875rem;
   padding: 2rem 0;
   text-align: center;
+}
+
+.mdv-inline-error {
+  background: var(--lex-status-warning-bg, #fef9c3);
+  border: 1px solid var(--lex-status-warning-border, #fde68a);
+  border-radius: 0.5rem;
+  color: var(--lex-status-warning-text, #92400e);
+  font-size: 0.8125rem;
+  padding: 0.625rem 0.75rem;
 }
 
 .mdv-file-row {
@@ -146,6 +175,10 @@
   height: 2.5rem;
   justify-content: center;
   width: 2.5rem;
+}
+
+.mdv-file-icon--artifact {
+  color: var(--lex-text-accent);
 }
 
 .mdv-file-main {
@@ -286,10 +319,8 @@
   display: none;
   min-width: 11rem;
   padding: 0.25rem 0;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 0.25rem);
-  z-index: 50;
+  position: fixed;
+  z-index: var(--lex-z-popover, 1000);
 }
 
 .mdv-menu--open {
@@ -394,6 +425,10 @@
   align-items: flex-start;
   display: flex;
   padding-top: 0.5rem;
+}
+
+.mdv-file-select--placeholder {
+  width: 0.8125rem;
 }
 
 .mdv-card-select {

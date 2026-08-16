@@ -125,13 +125,13 @@ install_cli() {
 # ============================================================================
 # lana-ai:// protocol handler (dev + live)
 #
-# macOS LaunchServices won't reliably route lana-ai:// to a running Electron:
-# for the dev build it tends to launch a fresh stock Electron with the welcome
-# screen, and when only the packaged app registers the scheme, a dev-only
-# handler dead-ends (and vice-versa). Because this machine frequently runs BOTH
-# the dev build and the live/packaged app, we install one small .app bundle as
-# the single default handler for lana-ai:// that forwards the URL to whichever
-# Lana app is running (Apple Event "open location" -> app.on('open-url', ...)).
+# macOS LaunchServices won't reliably route lana-ai:// to a dev Electron app:
+# the generic Electron bundle id can point at the wrong Electron process or
+# launch a bare Electron welcome screen. Packaged production builds own the
+# scheme through electron-builder. For development, install one small .app
+# helper as the default handler. It prefers a running packaged Lana app, and
+# otherwise launches this checkout's Electron entry with the deep-link URL so
+# requestSingleInstanceLock delivers it to the running dev app when present.
 #
 # Skipped on non-macOS. Idempotent.
 # ============================================================================
@@ -162,31 +162,32 @@ install_dev_url_handler() {
 
     print_step "Installing lana-ai:// URL handler (dev + live)…"
 
-    # Write the AppleScript handler. When macOS opens a lana-ai:// URL, it
-    # delivers a "GetURL" Apple Event to the registered .app — this script
-    # catches it and re-emits the same event to whichever Lana app is running:
-    #   * dev build  -> stock Electron (npm run electron:dev / lana-client run dev)
-    #   * live build -> packaged "Lana AI Client.app" (com.redroostertech.lana-ai-client)
-    # Both re-emit fires app.on('open-url', ...) in electron-main.js. No new windows.
-    #
-    # Tiebreak when BOTH are running: prefer the live/packaged app, since a real
-    # lana-ai:// OAuth code is most often a production connector action. To prefer
-    # the dev build instead, swap the prodRunning / devRunning branches below.
-    cat > "${applescript_src}" <<'APPLESCRIPT'
+    local dev_electron="${SCRIPT_DIR}/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron"
+    local dev_entry="${SCRIPT_DIR}/electron-main.js"
+
+    if [ ! -x "${dev_electron}" ]; then
+        print_warn "Electron binary not found at ${dev_electron}; run npm install before installing the dev URL handler"
+        return 0
+    fi
+
+    # Write the AppleScript handler. macOS delivers a GetURL Apple Event to
+    # this helper. Production installs normally own lana-ai:// directly; this
+    # helper is for dev installs and machines that switch between dev/live.
+    cat > "${applescript_src}" <<APPLESCRIPT
 on open location URL_arg
-    set devId to "com.github.Electron"
     set prodId to "com.redroostertech.lana-ai-client"
+    set devElectron to "${dev_electron}"
+    set devEntry to "${dev_entry}"
     tell application "System Events"
-        set devRunning to (exists (processes whose bundle identifier is devId))
         set prodRunning to (exists (processes whose bundle identifier is prodId))
     end tell
     if prodRunning then
-        tell application id prodId to open location URL_arg
-    else if devRunning then
-        tell application id devId to open location URL_arg
-    else
-        display alert "Lana AI is not running" message "Open the Lana AI desktop app (live build), or start the dev build with: lana-client run dev — then click “Open LANA AI” again." buttons {"OK"} default button 1
+        try
+            tell application id prodId to open location URL_arg
+            return
+        end try
     end if
+    do shell script "nohup " & quoted form of devElectron & " " & quoted form of devEntry & " " & quoted form of URL_arg & " >/dev/null 2>&1 &"
 end open location
 APPLESCRIPT
 
@@ -277,6 +278,10 @@ print_next_steps() {
 
 main() {
     print_header
+    if [ "${INSTALL_DEV_URL_HANDLER_ONLY:-}" = "1" ]; then
+        install_dev_url_handler
+        return 0
+    fi
     check_node
     check_npm
     check_git
