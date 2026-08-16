@@ -2112,11 +2112,17 @@
     }
 
     if (action === 'delete') {
-      if (!window.confirm('Delete this comment? This cannot be undone.')) return;
-      if (removeTaskComment(store.comments, commentId)) {
-        addDetailActivity(task, 'history', 'Deleted a comment');
-        rerenderTaskDetails();
-      }
+      Lex.Modal.confirm(
+        'Delete Comment',
+        'Are you sure you want to delete this comment? This action cannot be undone.',
+        function () {
+          if (removeTaskComment(store.comments, commentId)) {
+            addDetailActivity(task, 'history', 'Deleted a comment');
+            rerenderTaskDetails();
+          }
+        },
+        { variant: 'danger', confirmText: 'Delete' }
+      );
     }
   }
 

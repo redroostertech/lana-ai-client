@@ -389,12 +389,13 @@
 
   function renderCommentActions(comment, isReply) {
     var isAuthor = comment.author_id && String(comment.author_id) === currentUserId();
+    var replyCount = asArray(comment.replies).length;
     return [
       '<div class="my-task-comment-actions">',
-      !isReply ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="reply" data-comment-id="' + esc(comment.id) + '" title="Reply" aria-label="Reply">' + iconHtml('corner-up-left') + '</button>' : '',
+      !isReply ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="reply" data-comment-id="' + esc(comment.id) + '" title="Reply" aria-label="Reply">' + iconHtml('message-circle') + (replyCount ? '<span>' + esc(replyCount) + '</span>' : '') + '</button>' : '',
       '  <button type="button" class="my-task-comment-action' + (comment.liked ? ' is-active' : '') + '" data-shared-comment-action="like" data-comment-id="' + esc(comment.id) + '" title="Like" aria-label="Like">' + iconHtml('thumbs-up') + (comment.like_count ? '<span>' + esc(comment.like_count) + '</span>' : '') + '</button>',
-      '  <button type="button" class="my-task-comment-action" data-shared-comment-action="react" data-comment-id="' + esc(comment.id) + '" title="Add reaction" aria-label="Add reaction">' + iconHtml('message-circle') + (comment.reaction_count ? '<span>' + esc(comment.reaction_count) + '</span>' : '') + '</button>',
       isAuthor ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="edit" data-comment-id="' + esc(comment.id) + '" title="Edit" aria-label="Edit">' + iconHtml('edit-2') + '</button>' : '',
+      isAuthor ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="delete" data-comment-id="' + esc(comment.id) + '" title="Delete" aria-label="Delete">' + iconHtml('trash') + '</button>' : '',
       '</div>'
     ].join('');
   }
@@ -600,7 +601,7 @@
     });
   }
 
-  function addItem(kind) {
+  async function addItem(kind) {
     var task = state.task;
     if (!task) return;
     var store = getStore(task);
@@ -631,14 +632,24 @@
     if (kind === 'comment') {
       var comment = inputValue('comment');
       if (!comment) return;
-      store.comments.unshift({
-        id: 'local-comment-' + LanaTime.nowMs(),
-        author: currentUserName(),
-        author_id: currentUserId(),
-        content: comment,
-        created_at: LanaTime.nowIso(),
-        replies: []
-      });
+      if (store.remote && window.api && api.createResourceComment) {
+        try {
+          var response = await api.createResourceComment('task', taskId(task), { content: comment });
+          store.comments.unshift(normalizeComment(response && response.data ? response.data : response));
+        } catch (error) {
+          toastError(error.message || 'Failed to post comment');
+          return;
+        }
+      } else {
+        store.comments.unshift({
+          id: 'local-comment-' + LanaTime.nowMs(),
+          author: currentUserName(),
+          author_id: currentUserId(),
+          content: comment,
+          created_at: LanaTime.nowIso(),
+          replies: []
+        });
+      }
       state.activityTabs[detailKey(task)] = 'comments';
       render();
     }
@@ -672,7 +683,46 @@
     return null;
   }
 
-  function handleCommentAction(action, commentId, actionEl) {
+  function removeComment(comments, commentId) {
+    comments = asArray(comments);
+    for (var i = 0; i < comments.length; i += 1) {
+      if (String(comments[i].id) === String(commentId)) {
+        comments.splice(i, 1);
+        return true;
+      }
+      if (removeComment(comments[i].replies, commentId)) return true;
+    }
+    return false;
+  }
+
+  function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''));
+  }
+
+  function isSynced(store, commentId) {
+    return !!(store.remote && window.api && isUuid(commentId));
+  }
+
+  function toastError(message) {
+    if (window.Lex && Lex.Toast) Lex.Toast.error(message);
+  }
+
+  async function loadComments(task) {
+    if (!window.api || !api.getResourceComments || !isUuid(taskId(task))) return;
+    var store = getStore(task);
+    try {
+      var response = await api.getResourceComments('task', taskId(task), { limit: 100, include_replies: true });
+      var payload = response && response.data ? response.data : response;
+      store.comments = asArray(payload && payload.comments).map(normalizeComment);
+      store.remote = true;
+      if (state.task && detailKey(state.task) === detailKey(task)) render();
+    } catch (error) {
+      // Leave metadata/local comments in place; the drawer still works offline.
+      console.warn('[TaskDetails] Failed to load comments:', error && error.message);
+    }
+  }
+
+  async function handleCommentAction(action, commentId, actionEl) {
     var task = state.task;
     var store = task && getStore(task);
     var comment = store && findComment(store.comments, commentId);
@@ -697,7 +747,17 @@
       var text = textarea ? textarea.value.trim() : '';
       if (!text) return;
       comment.replies = comment.replies || [];
-      comment.replies.push({ id: 'local-reply-' + LanaTime.nowMs(), author: currentUserName(), author_id: currentUserId(), content: text, created_at: LanaTime.nowIso(), replies: [] });
+      if (isSynced(store, commentId)) {
+        try {
+          var replyResponse = await api.replyToComment(commentId, { content: text });
+          comment.replies.push(normalizeComment(replyResponse && replyResponse.data ? replyResponse.data : replyResponse));
+        } catch (error) {
+          toastError(error.message || 'Failed to post reply');
+          return;
+        }
+      } else {
+        comment.replies.push({ id: 'local-reply-' + LanaTime.nowMs(), author: currentUserName(), author_id: currentUserId(), content: text, created_at: LanaTime.nowIso(), replies: [] });
+      }
       addActivity(store, 'Replied to a comment');
       render();
       return;
@@ -705,11 +765,6 @@
     if (action === 'like') {
       comment.liked = !comment.liked;
       comment.like_count = Math.max(0, Number(comment.like_count || 0) + (comment.liked ? 1 : -1));
-      render();
-      return;
-    }
-    if (action === 'react') {
-      comment.reaction_count = Number(comment.reaction_count || 0) + 1;
       render();
       return;
     }
@@ -729,11 +784,44 @@
         if (window.Lex && Lex.Toast) Lex.Toast.warning('Comment cannot be empty');
         return;
       }
+      if (isSynced(store, commentId)) {
+        try {
+          await api.updateComment(commentId, { content: editedContent });
+        } catch (error) {
+          toastError(error.message || 'Failed to update comment');
+          return;
+        }
+      }
       comment.content = editedContent;
       comment.is_edited = true;
       addActivity(store, 'Edited a comment');
       render();
+      return;
     }
+    if (action === 'delete') {
+      confirmDelete('Delete Comment', 'Are you sure you want to delete this comment? This action cannot be undone.', async function () {
+        if (isSynced(store, commentId)) {
+          try {
+            await api.deleteComment(commentId);
+          } catch (error) {
+            toastError(error.message || 'Failed to delete comment');
+            return;
+          }
+        }
+        if (removeComment(store.comments, commentId)) {
+          addActivity(store, 'Deleted a comment');
+          render();
+        }
+      });
+    }
+  }
+
+  function confirmDelete(title, message, onConfirm) {
+    if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
+      Lex.Modal.confirm(title, message, onConfirm, { variant: 'danger', confirmText: 'Delete' });
+      return;
+    }
+    if (window.confirm(message)) onConfirm();
   }
 
   function startCommentEdit(comment) {
@@ -844,7 +932,9 @@
     if (!task) return false;
     state.task = task;
     state.options = options || state.options || {};
-    return render();
+    var opened = render();
+    if (opened) loadComments(task);
+    return opened;
   }
 
   function openById(id, options) {
