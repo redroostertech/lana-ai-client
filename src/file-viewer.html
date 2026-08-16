@@ -39,8 +39,17 @@
         subtitle=""
         max-actions="1"
       >
+        <div id="viewerCanvasMode" class="file-viewer-mode-strip" data-banner-meta>
+          <span id="viewerReadOnlyBadge" class="file-viewer-mode-badge file-viewer-mode-badge--active">View / Read-only</span>
+          <button id="viewerReviewModeBadge" type="button" class="file-viewer-mode-badge hidden">Enter Review Mode</button>
+        </div>
         <!-- Visible action: LANA -->
         <lex-ask-lana-btn id="askLanaBtn" panel="fileViewerLana" size="sm"></lex-ask-lana-btn>
+        <!-- Overflow action: File Info -->
+        <button id="viewerFileInfoBtn" type="button" class="hidden file-viewer-overflow-item" role="menuitem">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 3a9 9 0 110 18 9 9 0 010-18z"></path></svg>
+          View File Info
+        </button>
         <!-- Overflow action: Open in Doc Studio -->
         <button id="openDocStudioBtn" type="button" class="hidden file-viewer-overflow-item" role="menuitem">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18 3h3m0 0v3m0-3L10 14"></path></svg>
@@ -120,6 +129,7 @@
         <pre id="viewerText" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto text-sm font-mono whitespace-pre-wrap"></pre>
         <img id="viewerImage" class="hidden max-w-full max-h-full mx-auto rounded-lg shadow-sm object-contain">
         <div id="viewerEditor" class="hidden file-viewer-editor-host"></div>
+        <div id="viewerDiff" class="hidden file-viewer-diff-viewer" aria-live="polite"></div>
         <div id="viewerDocx" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto prose prose-sm max-w-none">
           <style>
             #viewerDocx table.docx-table { width: 100%; border-collapse: collapse; margin: 1em 0; border: 1px solid var(--lex-border-default); }
@@ -131,11 +141,61 @@
         </div>
       </div>
 
-      <!-- Right: Metadata Sidebar (collapsible) -->
-      <div id="metadataSidebar" class="w-96 bg-white border-l flex flex-col overflow-hidden flex-shrink-0 transition-all duration-300" style="border-color: var(--lex-border-default)">
+      <!-- Right: DOCX review rail -->
+      <aside id="reviewRail" class="hidden file-viewer-review-rail" aria-label="Document review">
+        <div class="file-viewer-review-header">
+          <div>
+            <h4 class="file-viewer-review-title">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M8 4h8l4 4v10a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2z"></path></svg>
+              Review
+            </h4>
+            <p class="file-viewer-review-subtitle">View / Read-only</p>
+          </div>
+          <button id="reviewRailInfoBtn" type="button" class="file-viewer-icon-btn" aria-label="View file info" title="View file info">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 3a9 9 0 110 18 9 9 0 010-18z"></path></svg>
+          </button>
+        </div>
+
+        <div class="file-viewer-review-tabs">
+          <lex-segmented
+            id="reviewTabs"
+            value="changes"
+            size="sm"
+            options='[{"value":"changes","label":"Change History"},{"value":"releases","label":"Versions"}]'>
+          </lex-segmented>
+        </div>
+
+        <div class="file-viewer-review-body">
+          <section id="reviewPanelChanges" class="file-viewer-review-panel" role="tabpanel" aria-labelledby="reviewTabChanges">
+            <div class="file-viewer-review-empty">
+              <h5>No changes</h5>
+              <p id="reviewChangesEmptyText">No tracked changes reported by the editor.</p>
+            </div>
+            <div id="reviewChangesList" class="file-viewer-review-list"></div>
+          </section>
+          <section id="reviewPanelReleases" class="hidden file-viewer-review-panel" role="tabpanel" aria-labelledby="reviewTabReleases">
+            <div id="reviewReleasesList" class="file-viewer-review-releases__list">
+              <p class="file-viewer-review-releases__empty">No released versions yet.</p>
+            </div>
+          </section>
+        </div>
+
+        <div class="file-viewer-review-workflow" aria-label="Review workflow">
+          <div class="file-viewer-review-workflow__status">
+            <span id="reviewBatchStatus">No saved review draft.</span>
+          </div>
+          <div class="file-viewer-review-workflow__actions">
+            <button id="reviewSaveDraftBtn" type="button" class="file-viewer-review-action file-viewer-review-action--secondary">Save Draft</button>
+            <button id="reviewReleaseBtn" type="button" class="file-viewer-review-action file-viewer-review-action--primary">Release Version</button>
+          </div>
+        </div>
+      </aside>
+
+      <lex-drawer id="fileInfoDrawer" heading="File Info" width="md" close-on-overlay data-hoist>
+      <div id="metadataSidebar" class="file-viewer-file-info">
         <div class="px-4 py-3 border-b" style="border-color: var(--lex-border-default); background-color: var(--lex-bg-secondary)">
           <div class="flex items-center justify-between">
-            <h4 class="text-sm font-semibold" style="color: var(--lex-text-primary)">Document Details</h4>
+            <h4 class="text-sm font-semibold" style="color: var(--lex-text-primary)">File Metadata</h4>
             <lex-segmented id="metaModeToggle" value="view" size="sm"
               options='[{"value":"view","label":"View"},{"value":"edit","label":"Edit"}]'>
             </lex-segmented>
@@ -228,7 +288,7 @@
         </div>
 
         <!-- Metadata Actions Footer (Edit Mode Only) -->
-        <div id="metaActionsFooter" class="hidden px-4 py-3 border-t flex items-center justify-between gap-2" style="border-color: var(--lex-border-default); background-color: var(--lex-bg-secondary)">
+        <div id="metaActionsFooter" data-slot="footer" class="hidden w-full items-center justify-between gap-2">
           <lex-btn id="metaDeleteBtn" variant="danger">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3"></path></svg>
             Delete
@@ -239,6 +299,7 @@
           </div>
         </div>
       </div>
+      </lex-drawer>
 
     </div>
 
