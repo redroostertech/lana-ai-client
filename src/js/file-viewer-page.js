@@ -6,7 +6,8 @@
  *
  * Features:
  *   - Full-page file preview (PDF, DOCX, image, text)
- *   - Metadata sidebar (view/edit) with save
+ *   - File info drawer (metadata view/edit) with save
+ *   - DOCX editor review rail foundation (changes/comments)
  *   - "Ask LANA" document context drawer
  *   - Back navigation via Lex.Nav context referrer
  *
@@ -28,13 +29,32 @@
     fileId: null,
     currentFile: null,
     referrerPage: null,
-    metadataSidebarVisible: true,
     metadataMode: 'view',
     metadataChanged: false,
     originalMetadata: {},
     editorInstance: null,
     editorModulePromise: null,
     editorImportMapBase: null,
+    editorMode: 'view',
+    reviewState: null,
+    reviewTab: 'changes',
+    reviewCounts: { changes: 0, comments: 0 },
+    reviewBatches: [],
+    currentReviewBatch: null,
+    reviewReleases: [],
+    selectedReviewReleaseId: null,
+    selectedReviewReleaseDocumentId: null,
+    releaseChangeGroups: [],
+    releaseChangeHistory: [],
+    releaseHistoryFilters: { user: 'all', date: 'all' },
+    releaseComparison: null,
+    releaseComparisonLoading: false,
+    editorFocusedContext: null,
+    workspaceFieldCatalog: null,
+    workspaceFieldCatalogMatterId: null,
+    reviewDirty: false,
+    reviewSaving: false,
+    reviewReleasing: false,
     // askLanaDrawer/askLanaChatEl/askLanaThreadsEl removed — managed by lex-lana-panel
     _lanaSessionBootstrapped: false
   };
@@ -62,6 +82,210 @@
   function notify(message, type) {
     if (typeof Lex !== 'undefined' && Lex.Toast && typeof Lex.Toast[type] === 'function') {
       Lex.Toast[type](message);
+    }
+  }
+
+  function truncateContextText(text, limit) {
+    var value = String(text || '').replace(/\s+/g, ' ').trim();
+    var max = limit || 2000;
+    return value.length > max ? value.slice(0, max - 1) + '\u2026' : value;
+  }
+
+  function humanizeFieldPath(path) {
+    return String(path || '')
+      .split('.')
+      .map(function (part) {
+        return part
+          .split('_')
+          .map(function (word) {
+            return word ? word.charAt(0).toUpperCase() + word.slice(1) : '';
+          })
+          .join(' ');
+      })
+      .join(' / ');
+  }
+
+  function fieldPreview(value) {
+    if (value === null || value === undefined || value === '') return 'No value currently set';
+    if (typeof value === 'object') return 'Structured workspace data';
+    return truncateContextText(String(value), 100);
+  }
+
+  function flattenMergeFields(source, prefix, out) {
+    if (!source || typeof source !== 'object') return;
+    Object.keys(source).sort().forEach(function (key) {
+      if (key === 'field_definitions') return;
+      var value = source[key];
+      var path = prefix ? prefix + '.' + key : key;
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        flattenMergeFields(value, path, out);
+        return;
+      }
+      out.push({
+        name: path,
+        label: humanizeFieldPath(path),
+        token: '{{' + path + '}}',
+        value: value,
+        description: fieldPreview(value)
+      });
+    });
+  }
+
+  async function loadWorkspaceFieldCatalog(matterId) {
+    if (!matterId) return [];
+    if (state.workspaceFieldCatalogMatterId === matterId && Array.isArray(state.workspaceFieldCatalog)) {
+      return state.workspaceFieldCatalog;
+    }
+    var response = await api.get('/api/v1/matters/' + encodeURIComponent(matterId) + '/merge-fields');
+    var fields = [];
+    flattenMergeFields(response && response.merge_fields ? response.merge_fields : {}, '', fields);
+    state.workspaceFieldCatalog = fields;
+    state.workspaceFieldCatalogMatterId = matterId;
+    return fields;
+  }
+
+  function buildEditorModuleContext(file, focusedContext, typeOverride, extras) {
+    var matterId = file && (file.client_matter || file.matter_id);
+    var base = {
+      type: typeOverride || (focusedContext && focusedContext.kind === 'revision' ? 'editor_revision' : 'editor_selection'),
+      ui_label: focusedContext && focusedContext.kind === 'revision' ? 'Tracked change' : 'Document selection',
+      source: 'file_viewer',
+      document: {
+        id: file && file.id,
+        name: file && file.filename,
+        matter_id: matterId || null,
+        content_type: file && (file.content_type || file.mime_type || '')
+      },
+      editor_mode: focusedContext && focusedContext.editorMode,
+      document_mode: focusedContext && focusedContext.documentMode,
+      page: {
+        route: 'file-viewer',
+        matter_id: matterId || null,
+        document_id: file && file.id,
+        document_name: file && file.filename
+      }
+    };
+    if (focusedContext && focusedContext.kind === 'selection') {
+      base.selection = {
+        text: truncateContextText(focusedContext.text, 2000),
+        ranges: Array.isArray(focusedContext.ranges)
+          ? focusedContext.ranges.slice(0, 12).map(function (range) {
+            return {
+              paragraph: range.paragraph,
+              start: range.start,
+              end: range.end,
+              text: truncateContextText(range.text, 500)
+            };
+          })
+          : []
+      };
+    }
+    if (focusedContext && focusedContext.kind === 'revision') {
+      base.revision = focusedContext.revision || {};
+    }
+    return Object.assign(base, extras || {});
+  }
+
+  function openLanaForEditorContext(detail) {
+    var file = state.currentFile;
+    if (!file || !detail || !detail.context) return;
+    var panel = document.getElementById('fileViewerLana');
+    if (!panel) return;
+    var prompt = detail.prompt || 'Help me review this document selection.';
+    var moduleContext = buildEditorModuleContext(file, detail.context);
+    state.editorFocusedContext = moduleContext;
+    if (typeof panel.show === 'function') panel.show();
+    setTimeout(function () {
+      if (typeof panel.attachFile === 'function') panel.attachFile(file.id, file.filename || 'Document');
+      if (typeof panel.attachModuleContext === 'function') panel.attachModuleContext(moduleContext);
+      if (typeof panel.send === 'function') {
+        panel.send(prompt, {
+          contextType: 'document_chat',
+          matterId: file.client_matter || file.matter_id || null,
+          attachments: {
+            module_context: moduleContext
+          }
+        });
+      }
+    }, 80);
+  }
+
+  function fieldOptionsAttribute(fields) {
+    return escapeHtml(JSON.stringify(fields.map(function (field) {
+      return {
+        value: field.name,
+        label: field.label,
+        description: field.description
+      };
+    })));
+  }
+
+  async function openWorkspaceFieldPicker(detail) {
+    var file = state.currentFile;
+    var editor = state.editorInstance;
+    var matterId = file && (file.client_matter || file.matter_id);
+    if (!file || !editor || !matterId) {
+      notify('This document is not associated with a workspace.', 'error');
+      return;
+    }
+    try {
+      var fields = await loadWorkspaceFieldCatalog(matterId);
+      if (!fields.length) {
+        notify('No workspace fields are available for this document.', 'error');
+        return;
+      }
+      var selected = fields[0].name;
+      var modal = typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.open === 'function'
+        ? Lex.Modal.open({
+          heading: 'Insert Workspace Field',
+          size: 'sm',
+          hideActions: false,
+          confirmText: 'Insert Field',
+          cancelText: 'Cancel',
+          content: '<div style="display:flex;flex-direction:column;gap:12px;">' +
+            '<p style="margin:0;color:var(--lex-text-secondary);font-size:var(--lex-body-sm-size);">Choose a workspace field token to insert as a tracked edit.</p>' +
+            '<lex-select data-editor-field-select searchable="true" label="Field" value="' + escapeHtml(selected) + '" options=\'' + fieldOptionsAttribute(fields) + '\'></lex-select>' +
+            '</div>'
+        })
+        : null;
+      if (!modal) return;
+      modal.addEventListener('lex-change', function (event) {
+        if (event && event.detail && event.detail.value) selected = event.detail.value;
+      });
+      modal.addEventListener('lex-confirm', async function () {
+        var field = fields.find(function (candidate) { return candidate.name === selected; });
+        if (!field) {
+          if (modal && typeof modal.remove === 'function') modal.remove();
+          return;
+        }
+        try {
+          await editor.insertWorkspaceField(field.token);
+          state.editorFocusedContext = buildEditorModuleContext(file, detail && detail.context, 'editor_field_insert', {
+            field: {
+              name: field.name,
+              label: field.label,
+              token: field.token
+            }
+          });
+          notify('Workspace field inserted', 'success');
+          if (window.LanaActivityEvents && typeof window.LanaActivityEvents.editorEvent === 'function') {
+            window.LanaActivityEvents.editorEvent('editor.edit_applied', {
+              surface: 'file_viewer',
+              document_id: file.id,
+              document_name: file.filename,
+              operation: 'insert_workspace_field',
+              field_name: field.name
+            });
+          }
+        } catch (error) {
+          notify((error && error.message) || 'Failed to insert workspace field', 'error');
+        } finally {
+          if (modal && typeof modal.remove === 'function') modal.remove();
+        }
+      });
+    } catch (error) {
+      console.error('[FileViewerPage] Failed to load workspace fields:', error);
+      notify((error && error.message) || 'Failed to load workspace fields', 'error');
     }
   }
 
@@ -124,6 +348,10 @@
     return file && (file.client_matter || file.matter_id || file.matterId || file.clientMatter || '');
   }
 
+  function getCurrentMatterId() {
+    return getFileMatterId(state.currentFile);
+  }
+
   function normalizeBaseUrl(value) {
     value = String(value || '').trim();
     if (!value) return '';
@@ -154,6 +382,20 @@
     var filename = String((file && file.filename) || '').toLowerCase();
     return mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       filename.endsWith('.docx');
+  }
+
+  function isEditorPreviewFile(file) {
+    var mimeType = String((file && (file.content_type || file.mime_type)) || '').toLowerCase();
+    var filename = String((file && file.filename) || '').toLowerCase();
+    return isEditorDocx(file) ||
+      mimeType === 'application/pdf' ||
+      mimeType.indexOf('text/') === 0 ||
+      filename.endsWith('.pdf') ||
+      filename.endsWith('.txt') ||
+      filename.endsWith('.text') ||
+      filename.endsWith('.md') ||
+      filename.endsWith('.markdown') ||
+      filename.endsWith('.log');
   }
 
   function shutdownEditorInstance() {
@@ -379,23 +621,806 @@
   }
 
   // =========================================================================
-  // Sidebar Toggle
+  // File info + review rail
   // =========================================================================
 
-  function toggleMetadataSidebar() {
-    var sidebar = document.getElementById('metadataSidebar');
-    if (!sidebar) return;
+  function openFileInfoDrawer() {
+    var drawer = document.getElementById('fileInfoDrawer');
+    if (!drawer) return;
+    drawer.heading = 'File Info';
+    drawer.subtitle = state.currentFile && state.currentFile.filename ? state.currentFile.filename : '';
+    drawer.open = true;
 
-    var currentlyVisible = sidebar.offsetWidth > 0 && sidebar.style.width !== '0px';
-    state.metadataSidebarVisible = !currentlyVisible;
-    if (state.metadataSidebarVisible) {
-      sidebar.style.width = '';
-      sidebar.style.borderLeftWidth = '';
-      sidebar.style.overflow = '';
+    var toggle = document.getElementById('metaModeToggle');
+    if (toggle && typeof toggle._positionIndicator === 'function') {
+      requestAnimationFrame(function () { toggle._positionIndicator(); });
+    }
+  }
+
+  function setCanvasModeDisplay(reviewAvailable) {
+    var readOnlyBadges = document.querySelectorAll('#viewerReadOnlyBadge');
+    var reviewBadges = document.querySelectorAll('#viewerReviewModeBadge');
+    var isReview = state.editorMode === 'review';
+    readOnlyBadges.forEach(function (readOnlyBadge) {
+      readOnlyBadge.textContent = isReview ? 'View / Read-only available' : 'View / Read-only';
+      readOnlyBadge.classList.toggle('file-viewer-mode-badge--active', !isReview);
+    });
+    reviewBadges.forEach(function (reviewBadge) {
+      reviewBadge.textContent = isReview ? 'Exit Review Mode' : 'Enter Review Mode';
+      reviewBadge.classList.toggle('file-viewer-mode-badge--active', isReview);
+      reviewBadge.classList.toggle('hidden', !reviewAvailable);
+    });
+    var subtitle = document.querySelector('.file-viewer-review-subtitle');
+    if (subtitle) subtitle.textContent = isReview ? 'Review / Redline active' : 'View / Read-only';
+  }
+
+  function setReviewRailVisible(visible) {
+    var rail = document.getElementById('reviewRail');
+    if (rail) rail.classList.toggle('hidden', !visible);
+    setCanvasModeDisplay(visible);
+    if (visible) {
+      requestAnimationFrame(function () {
+        var tabs = document.getElementById('reviewTabs');
+        if (tabs && tabs.value !== state.reviewTab) {
+          tabs.value = state.reviewTab;
+        }
+        if (tabs && typeof tabs._positionIndicator === 'function') {
+          tabs._positionIndicator();
+        }
+      });
+    }
+  }
+
+  function setReviewTab(tab) {
+    state.reviewTab = tab === 'releases' ? tab : 'changes';
+    var tabs = document.getElementById('reviewTabs');
+    var changesPanel = document.getElementById('reviewPanelChanges');
+    var releasesPanel = document.getElementById('reviewPanelReleases');
+    var isChanges = state.reviewTab === 'changes';
+    var isReleases = state.reviewTab === 'releases';
+
+    if (tabs && tabs.value !== state.reviewTab) {
+      tabs.value = state.reviewTab;
+    }
+    if (tabs && typeof tabs._positionIndicator === 'function') {
+      requestAnimationFrame(function () { tabs._positionIndicator(); });
+    }
+    if (changesPanel) changesPanel.classList.toggle('hidden', !isChanges);
+    if (releasesPanel) releasesPanel.classList.toggle('hidden', !isReleases);
+    if (isChanges && state.releaseComparison && state.editorInstance) {
+      state.selectedReviewReleaseId = null;
+      state.selectedReviewReleaseDocumentId = null;
+      state.releaseComparison = null;
+      state.releaseComparisonLoading = false;
+      hideAllViewers();
+      var editorEl = document.getElementById('viewerEditor');
+      if (editorEl) editorEl.classList.remove('hidden');
+      renderReviewWorkflow();
+      updateReviewRailCounts(state.reviewState || {});
+    }
+  }
+
+  function updateReviewRailCounts(countsOrState) {
+    var next = countsOrState || {};
+    var revisions = Array.isArray(next.revisions) ? next.revisions : null;
+    var comments = Array.isArray(next.comments) ? next.comments : null;
+    var selectedVersionChanges = state.selectedReviewReleaseId ? state.releaseChangeHistory : null;
+    var draftBatchChanges = state.currentReviewBatch && Array.isArray(state.currentReviewBatch.changes)
+      ? state.currentReviewBatch.changes
+      : [];
+    var pendingChangeCount = revisions ? revisions.length : (draftBatchChanges.length || Number(next.revisions || next.changes || 0) || 0);
+    var releasedChangeCount = state.releaseChangeGroups.reduce(function (total, group) {
+      return total + (Array.isArray(group.changes) ? group.changes.length : 0);
+    }, 0);
+    var displayedReleasedChangeCount = selectedVersionChanges ? selectedVersionChanges.length : releasedChangeCount;
+    state.reviewCounts = {
+      changes: displayedReleasedChangeCount + pendingChangeCount,
+      comments: comments ? comments.length : (Number(next.comments || 0) || 0)
+    };
+
+    renderChangeHistory(selectedVersionChanges || revisions || []);
+    var changesEmpty = document.getElementById('reviewChangesEmptyText');
+    var changesEmptyBox = changesEmpty && changesEmpty.closest ? changesEmpty.closest('.file-viewer-review-empty') : null;
+    if (changesEmptyBox) changesEmptyBox.classList.toggle('hidden', state.reviewCounts.changes > 0);
+    if (changesEmpty) {
+      changesEmpty.textContent = state.reviewCounts.changes
+        ? state.reviewCounts.changes + ' change' + (state.reviewCounts.changes === 1 ? '' : 's') + (state.selectedReviewReleaseId ? ' shipped in the selected version.' : ' reported by the editor.')
+        : (state.selectedReviewReleaseId ? 'No persisted changes are attached to the selected version.' : 'No tracked changes reported by the editor.');
+    }
+    renderReviewWorkflow();
+  }
+
+  function markReviewDirty(reviewState) {
+    if (reviewState) {
+      state.reviewState = reviewState;
     } else {
-      sidebar.style.width = '0';
-      sidebar.style.borderLeftWidth = '0';
-      sidebar.style.overflow = 'hidden';
+      currentReviewState();
+    }
+    state.reviewDirty = true;
+    updateReviewRailCounts(state.reviewState || {});
+  }
+
+  function reviewItemLabel(type, item) {
+    if (type === 'comments') return 'Comment';
+    if (item && item.released_in && item.released_in.release_number) {
+      return 'Version ' + item.released_in.release_number + ' change';
+    }
+    if (item && item.operation) {
+      return String(item.operation).charAt(0).toUpperCase() + String(item.operation).slice(1);
+    }
+    if (item && item.type === 'del') return 'Deletion';
+    if (item && item.type === 'ins') return 'Insertion';
+    return 'Change';
+  }
+
+  function reviewItemText(item) {
+    if (!item) return '';
+    return item.text || item.proposed_text || item.original_text || item.reviewer_notes || item.summary || '';
+  }
+
+  function lexOptionsAttribute(options) {
+    return escapeHtml(JSON.stringify(Array.isArray(options) ? options : []));
+  }
+
+  function reviewStatus(item, type) {
+    if (type === 'comments') return null;
+    if (item && item.released_in && item.released_in.release_number) {
+      return { label: 'Released', tone: 'released' };
+    }
+    var status = item && item.status ? String(item.status) : 'proposed';
+    if (status === 'accepted') return { label: 'Accepted', tone: 'accepted' };
+    if (status === 'rejected') return { label: 'Rejected', tone: 'rejected' };
+    return { label: 'Pending', tone: 'pending' };
+  }
+
+  function renderReviewStatusBadge(status) {
+    if (!status) return '';
+    return '<span class="file-viewer-review-status file-viewer-review-status--' + escapeHtml(status.tone) + '">' +
+      escapeHtml(status.label) +
+    '</span>';
+  }
+
+  function reviewChangeKind(change) {
+    var operation = String((change && change.operation) || (change && change.type) || '').toLowerCase();
+    if (operation === 'delete' || operation === 'del' || operation === 'remove' || operation === 'removed') return 'removed';
+    if (operation === 'insert' || operation === 'ins' || operation === 'add' || operation === 'added') return 'added';
+    if (change && change.original_text && change.proposed_text && change.original_text !== change.proposed_text) return 'modified';
+    if (change && change.original_text && !change.proposed_text) return 'removed';
+    return 'added';
+  }
+
+  function renderReviewChangeDiff(change) {
+    if (!change) return '';
+    var original = change.original_text ? String(change.original_text) : '';
+    var proposed = change.proposed_text ? String(change.proposed_text) : '';
+    var fallback = String(reviewItemText(change) || 'No preview available');
+    var kind = reviewChangeKind(change);
+    var lines = [];
+    if (original && proposed && original !== proposed) {
+      lines.push({ mark: '-', tone: 'removed', text: original });
+      lines.push({ mark: '+', tone: 'added', text: proposed });
+    } else if (kind === 'removed' && original) {
+      lines.push({ mark: '-', tone: 'removed', text: original });
+    } else {
+      lines.push({ mark: '+', tone: kind === 'removed' ? 'removed' : 'added', text: proposed || fallback });
+    }
+    return '<span class="file-viewer-review-history-row__diff">' + lines.map(function (line) {
+      return '<span class="file-viewer-review-history-row__diff-line file-viewer-review-history-row__diff-line--' + line.tone + '">' +
+        '<span class="file-viewer-review-history-row__diff-mark">' + escapeHtml(line.mark) + '</span>' +
+        '<span>' + escapeHtml(line.text) + '</span>' +
+      '</span>';
+    }).join('') + '</span>';
+  }
+
+  function renderReviewList(type, items) {
+    var target = document.getElementById(type === 'comments' ? 'reviewCommentsList' : 'reviewChangesList');
+    if (!target) return;
+    if (!items || !items.length) {
+      target.innerHTML = '';
+      return;
+    }
+    target.innerHTML = items.map(function (item, index) {
+      var author = item && item.author ? item.author : 'Unknown';
+      var date = item && item.date ? item.date : (item && item.released_in && item.released_in.released_at ? formatDate(item.released_in.released_at) : '');
+      var text = String(reviewItemText(item));
+      var releasedIn = item && item.released_in && item.released_in.release_number
+        ? 'Released in Version ' + item.released_in.release_number
+        : '';
+      var badge = renderReviewStatusBadge(reviewStatus(item, type));
+      return '<button type="button" class="file-viewer-review-item" data-review-item-type="' + type + '" data-review-item-index="' + index + '">' +
+        '<span class="file-viewer-review-item-meta"><span>' + escapeHtml(author) + '</span><span>' + escapeHtml(date) + '</span></span>' +
+        '<span class="file-viewer-review-item-title-row"><span class="file-viewer-review-item-title">' + escapeHtml(reviewItemLabel(type, item)) + '</span>' + badge + '</span>' +
+        '<span class="file-viewer-review-item-text">' + escapeHtml(text || 'No preview available') + '</span>' +
+        (releasedIn ? '<span class="file-viewer-review-item-version">' + escapeHtml(releasedIn) + '</span>' : '') +
+        '</button>';
+    }).join('');
+  }
+
+  function releaseGroupForRelease(release) {
+    var changes = [];
+    for (var i = 0; i < state.releaseChangeGroups.length; i++) {
+      if (state.releaseChangeGroups[i].release_id === release.id) {
+        changes = state.releaseChangeGroups[i].changes || [];
+        break;
+      }
+    }
+    return {
+      release: release,
+      changes: changes
+    };
+  }
+
+  function selectedReleaseGroups() {
+    if (!state.reviewReleases.length) return [];
+    if (state.selectedReviewReleaseId) {
+      return state.reviewReleases
+        .filter(function (release) { return release.id === state.selectedReviewReleaseId; })
+        .map(releaseGroupForRelease);
+    }
+    return state.reviewReleases.map(releaseGroupForRelease);
+  }
+
+  function renderChangeHistory(editorItems) {
+    var target = document.getElementById('reviewChangesList');
+    if (!target) return;
+    var groups = selectedReleaseGroups();
+    var editorChanges = Array.isArray(editorItems) ? editorItems : [];
+    var draftBatchChanges = state.currentReviewBatch && Array.isArray(state.currentReviewBatch.changes)
+      ? state.currentReviewBatch.changes
+      : [];
+    var unreleasedChanges = editorChanges.length ? editorChanges : draftBatchChanges;
+    if (!groups.length && !unreleasedChanges.length) {
+      renderReviewList('changes', editorItems || []);
+      return;
+    }
+
+    var filteredGroups = groups.map(function (group) {
+      return {
+        release: group.release,
+        changes: filterHistoryChanges(group.changes || [], group.release)
+      };
+    });
+    var controls = groups.length ? renderHistoryFilters(groups) : '';
+    function renderHistorySection(options) {
+      var changes = Array.isArray(options.changes) ? options.changes : [];
+      var rows = changes.length
+        ? changes.map(function (change, index) {
+            var badge = renderReviewStatusBadge(reviewStatus(change, 'changes'));
+            var releaseAttr = options.releaseId ? ' data-review-history-release="' + escapeHtml(options.releaseId) + '"' : '';
+            return '<button type="button" class="file-viewer-review-history-row"' + releaseAttr + ' data-review-item-type="changes" data-review-item-index="' + index + '">' +
+              '<span class="file-viewer-review-history-row__heading"><span class="file-viewer-review-history-row__title">' + escapeHtml(reviewItemLabel('changes', change)) + '</span>' + badge + '</span>' +
+              renderReviewChangeDiff(change) +
+            '</button>';
+          }).join('')
+        : '<div class="file-viewer-review-history-empty">' + escapeHtml(options.emptyText || 'No changes in this section.') + '</div>';
+      return '<section class="file-viewer-review-history-group' + (options.unreleased ? ' file-viewer-review-history-group--unreleased' : '') + '">' +
+        '<header class="file-viewer-review-history-header">' +
+          '<h5>' + escapeHtml(options.title) + '</h5>' +
+          '<span>' + changes.length + ' change' + (changes.length === 1 ? '' : 's') + '</span>' +
+        '</header>' +
+        '<div class="file-viewer-review-history-rows">' + rows + '</div>' +
+      '</section>';
+    }
+    var unreleasedHtml = unreleasedChanges.length
+      ? renderHistorySection({
+          title: 'Unreleased',
+          changes: unreleasedChanges,
+          unreleased: true
+        })
+      : '';
+    var groupHtml = filteredGroups.map(function (group) {
+      var release = group.release || {};
+      var changes = Array.isArray(group.changes) ? group.changes : [];
+      return renderHistorySection({
+        title: 'Version ' + (release.release_number || ''),
+        changes: changes,
+        releaseId: release.id || '',
+        emptyText: 'No persisted changes attached to this version.'
+      });
+    }).join('');
+    target.innerHTML = controls + unreleasedHtml + groupHtml;
+  }
+
+  function historyChangeUser(change) {
+    if (!change) return 'Unknown';
+    return change.decided_by_name || (change.metadata && change.metadata.author) || change.author || change.decided_by || change.updated_by || change.created_by || 'Unknown';
+  }
+
+  function historyChangeDate(change, release) {
+    return (change && (change.released_at || change.decided_at || change.updated_at || change.created_at)) ||
+      (release && release.released_at) ||
+      '';
+  }
+
+  function historyDateBucket(value) {
+    var date = value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) return 'all';
+    var now = new Date();
+    var diffMs = now.getTime() - date.getTime();
+    if (diffMs <= 7 * 24 * 60 * 60 * 1000) return '7d';
+    if (diffMs <= 30 * 24 * 60 * 60 * 1000) return '30d';
+    return 'older';
+  }
+
+  function filterHistoryChanges(changes, release) {
+    return (Array.isArray(changes) ? changes : []).filter(function (change) {
+      var user = historyChangeUser(change);
+      if (state.releaseHistoryFilters.user !== 'all' && user !== state.releaseHistoryFilters.user) return false;
+      if (state.releaseHistoryFilters.date !== 'all' && historyDateBucket(historyChangeDate(change, release)) !== state.releaseHistoryFilters.date) return false;
+      return true;
+    });
+  }
+
+  function renderHistoryFilters(groups) {
+    var users = [];
+    for (var i = 0; i < groups.length; i++) {
+      var changes = groups[i].changes || [];
+      for (var j = 0; j < changes.length; j++) {
+        var user = historyChangeUser(changes[j]);
+        if (users.indexOf(user) === -1) users.push(user);
+      }
+    }
+    users.sort();
+    var userOptions = [{ value: 'all', label: 'All users' }].concat(users.map(function (user) {
+      return { value: user, label: user };
+    }));
+    var dateOptions = [
+      { value: 'all', label: 'All time' },
+      { value: '7d', label: 'Last 7 days' },
+      { value: '30d', label: 'Last 30 days' },
+      { value: 'older', label: 'Older' }
+    ];
+    var date = state.releaseHistoryFilters.date;
+    return '<div class="file-viewer-review-history-filters" aria-label="Change history filters">' +
+      '<lex-select label="User" size="sm" value="' + escapeHtml(state.releaseHistoryFilters.user || 'all') + '" data-review-history-filter="user" options=\'' + lexOptionsAttribute(userOptions) + '\'></lex-select>' +
+      '<lex-select label="Date" size="sm" value="' + escapeHtml(date || 'all') + '" data-review-history-filter="date" options=\'' + lexOptionsAttribute(dateOptions) + '\'></lex-select>' +
+    '</div>';
+  }
+
+  function releaseDocumentId(release) {
+    if (!release) return '';
+    return release.released_document_id || release.releasedDocumentId || '';
+  }
+
+  function releaseIsSelected(release) {
+    return Boolean(release && state.selectedReviewReleaseId && release.id === state.selectedReviewReleaseId);
+  }
+
+  function selectedReleaseLabel() {
+    for (var i = 0; i < state.reviewReleases.length; i++) {
+      var release = state.reviewReleases[i];
+      if (releaseIsSelected(release)) {
+        return release.released_document_filename || ('Version ' + release.release_number);
+      }
+    }
+    return '';
+  }
+
+  function renderDiffComparison(comparison) {
+    var target = document.getElementById('viewerDiff');
+    if (!target) return;
+    var parts = Array.isArray(comparison && comparison.parts) ? comparison.parts : [];
+    var originalName = comparison && comparison.original_document ? comparison.original_document.filename : 'Source document';
+    var newName = comparison && comparison.new_document ? comparison.new_document.filename : 'Selected version';
+    var meta = (comparison && Number(comparison.changes || 0)) + ' changed segment' + (Number(comparison && comparison.changes || 0) === 1 ? '' : 's');
+    var body = parts.length
+      ? parts.map(function (part) {
+          var kind = part.kind === 'added' || part.kind === 'removed' ? part.kind : 'unchanged';
+          return '<span class="file-viewer-diff-part file-viewer-diff-part--' + kind + '">' + escapeHtml(part.text || '') + '</span>';
+        }).join('')
+      : '<p class="file-viewer-review-releases__empty">No textual differences detected.</p>';
+
+    target.innerHTML =
+      '<div class="file-viewer-diff-header">' +
+        '<div>' +
+          '<h4 class="file-viewer-diff-title">' + escapeHtml(originalName || 'Source document') + ' vs ' + escapeHtml(newName || 'Selected version') + '</h4>' +
+          '<p class="file-viewer-diff-meta">' + escapeHtml(meta) + '</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="file-viewer-diff-document">' + body + '</div>';
+    hideAllViewers();
+    target.classList.remove('hidden');
+  }
+
+  async function clearReleaseComparison() {
+    state.selectedReviewReleaseId = null;
+    state.selectedReviewReleaseDocumentId = null;
+    state.releaseChangeHistory = [];
+    state.releaseChangeGroups = [];
+    state.releaseComparison = null;
+    state.releaseComparisonLoading = false;
+    renderReviewWorkflow();
+    setReviewTab('releases');
+    if (state.currentFile) {
+      await loadFileContent(state.currentFile);
+    }
+  }
+
+  async function selectReleaseForComparison(index) {
+    var release = state.reviewReleases && state.reviewReleases[index];
+    if (!release) return;
+    if (releaseIsSelected(release)) {
+      await clearReleaseComparison();
+      return;
+    }
+    var documentId = releaseDocumentId(release);
+    if (!documentId) {
+      notify('This release does not have an attached document.', 'error');
+      return;
+    }
+
+    state.selectedReviewReleaseId = release.id;
+    state.selectedReviewReleaseDocumentId = documentId;
+    state.releaseChangeHistory = [];
+    state.releaseChangeGroups = [];
+    state.releaseComparison = null;
+    state.releaseComparisonLoading = true;
+    renderReviewWorkflow('Loading selected version...');
+    setReviewTab('releases');
+    showLoading();
+
+    try {
+      if (release.edit_batch_id) {
+        var batchResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(release.edit_batch_id)));
+        var batch = batchResponse && batchResponse.data ? batchResponse.data : batchResponse;
+        state.releaseChangeHistory = Array.isArray(batch && batch.changes) ? batch.changes : [];
+        state.releaseChangeGroups = [{
+          release_id: release.id,
+          release: release,
+          changes: state.releaseChangeHistory
+        }];
+        updateReviewRailCounts(state.reviewState || {});
+      }
+      var comparisonResponse = await api.post(
+        reviewEndpoint('/documents/' + encodeURIComponent(state.currentFile.id) + '/compare'),
+        { comparison_document_id: documentId }
+      );
+      state.releaseComparison = comparisonResponse && comparisonResponse.data ? comparisonResponse.data : comparisonResponse;
+      renderDiffComparison(state.releaseComparison);
+    } catch (error) {
+      console.error('[FileViewerPage] Release comparison failed:', error);
+      notify((error && error.message) || 'Failed to compare selected version', 'error');
+      hideLoading();
+      var editorEl = document.getElementById('viewerEditor');
+      if (editorEl && state.editorInstance) editorEl.classList.remove('hidden');
+    } finally {
+      state.releaseComparisonLoading = false;
+      renderReviewWorkflow();
+    }
+  }
+
+  function setEditorInteractionMode(mode) {
+    var nextMode = mode === 'review' ? 'review' : 'view';
+    state.editorMode = nextMode;
+    if (state.editorInstance && typeof state.editorInstance.setMode === 'function') {
+      state.editorInstance.setMode(nextMode);
+    }
+    setCanvasModeDisplay(Boolean(state.editorInstance));
+  }
+
+  function focusReviewItem(type, index) {
+    var reviewState = state.reviewState || {};
+    var collection = type === 'comments' ? reviewState.comments : reviewState.revisions;
+    var item = Array.isArray(collection) ? collection[index] : null;
+    if (!item || !item.element || !state.editorInstance || typeof state.editorInstance.jumpTo !== 'function') return;
+    state.editorInstance.jumpTo(item.element);
+  }
+
+  function bytesToBase64(bytes) {
+    var binary = '';
+    for (var i = 0; i < bytes.length; i += 0x8000) {
+      var chunk = bytes.subarray(i, i + 0x8000);
+      binary += String.fromCharCode.apply(null, chunk);
+    }
+    return btoa(binary);
+  }
+
+  function reviewEndpoint(path) {
+    var matterId = getCurrentMatterId();
+    if (!matterId) throw new Error('This file is not associated with a workspace.');
+    return '/api/v1/matters/' + encodeURIComponent(matterId) + path;
+  }
+
+  function currentReviewState() {
+    if (state.editorInstance && typeof state.editorInstance.reviewState === 'function') {
+      try {
+        state.reviewState = state.editorInstance.reviewState();
+      } catch (_) {}
+    }
+    return state.reviewState || {};
+  }
+
+  function normalizeReviewChanges(reviewState) {
+    var revisions = Array.isArray(reviewState && reviewState.revisions) ? reviewState.revisions : [];
+    return revisions.map(function (revision, index) {
+      var id = revision && revision.id ? String(revision.id) : String(index + 1);
+      var type = revision && revision.type ? String(revision.type) : 'change';
+      var text = revision && revision.text ? String(revision.text) : '';
+      return {
+        change_key: 'revision:' + id,
+        status: 'proposed',
+        operation: type === 'del' ? 'delete' : (type === 'ins' ? 'insert' : type),
+        original_text: type === 'del' ? text : null,
+        proposed_text: type === 'ins' ? text : null,
+        anchor: {
+          type: 'editor_revision',
+          revision_id: id,
+          revision_type: type,
+          index: index
+        },
+        metadata: {
+          author: revision && revision.author ? revision.author : null,
+          date: revision && revision.date ? revision.date : null
+        }
+      };
+    });
+  }
+
+  function reviewMetadata(reviewState) {
+    var comments = Array.isArray(reviewState && reviewState.comments) ? reviewState.comments : [];
+    return {
+      source: 'file_viewer',
+      editor_mode: state.editorMode,
+      document_name: (reviewState && reviewState.documentName) || (state.currentFile && state.currentFile.filename) || null,
+      counts: state.reviewCounts,
+      comments: comments.map(function (comment, index) {
+        return {
+          id: comment && comment.id ? String(comment.id) : String(index + 1),
+          author: comment && comment.author ? comment.author : null,
+          date: comment && comment.date ? comment.date : null,
+          text: comment && comment.text ? comment.text : ''
+        };
+      })
+    };
+  }
+
+  function draftBatchTitle() {
+    var name = state.currentFile && state.currentFile.filename ? state.currentFile.filename : 'Document';
+    return 'Review draft: ' + name;
+  }
+
+  function releaseFilename() {
+    var name = state.currentFile && state.currentFile.filename ? state.currentFile.filename : 'released-document.docx';
+    if (/\.docx$/i.test(name)) return name.replace(/\.docx$/i, ' - released.docx');
+    var match = /^(.+?)(\.[^.]+)$/.exec(name);
+    if (match) return match[1] + ' - released' + match[2];
+    return name + ' - released';
+  }
+
+  function activeDraftBatchFromList(list) {
+    var batches = Array.isArray(list) ? list : [];
+    for (var i = 0; i < batches.length; i++) {
+      if (batches[i] && batches[i].status !== 'released' && batches[i].status !== 'cancelled') {
+        return batches[i];
+      }
+    }
+    return null;
+  }
+
+  async function loadReviewWorkflow(file) {
+    state.reviewBatches = [];
+    state.currentReviewBatch = null;
+    state.reviewReleases = [];
+    state.selectedReviewReleaseId = null;
+    state.selectedReviewReleaseDocumentId = null;
+    state.releaseChangeHistory = [];
+    state.releaseComparison = null;
+    state.releaseComparisonLoading = false;
+    state.editorFocusedContext = null;
+    state.workspaceFieldCatalog = null;
+    state.workspaceFieldCatalogMatterId = null;
+    state.reviewDirty = false;
+    renderReviewWorkflow();
+
+    var matterId = getFileMatterId(file);
+    if (!matterId || !file || !file.id) {
+      renderReviewWorkflow('Workspace association required to save review drafts.');
+      return;
+    }
+
+    try {
+      var query = '?document_id=' + encodeURIComponent(file.id) + '&limit=20&sort_by=updated_at&sort_dir=desc';
+      var batchesResponse = await api.get(reviewEndpoint('/document-edit-batches' + query));
+      state.reviewBatches = Array.isArray(batchesResponse && batchesResponse.data) ? batchesResponse.data : [];
+      state.currentReviewBatch = activeDraftBatchFromList(state.reviewBatches);
+      if (state.currentReviewBatch && state.currentReviewBatch.id) {
+        try {
+          var draftResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(state.currentReviewBatch.id)));
+          state.currentReviewBatch = draftResponse && draftResponse.data ? draftResponse.data : draftResponse;
+        } catch (draftError) {
+          console.warn('[FileViewerPage] Draft review batch detail load failed:', draftError);
+        }
+      }
+
+      var releasesResponse = await api.get(reviewEndpoint('/documents/' + encodeURIComponent(file.id) + '/releases?limit=20'));
+      state.reviewReleases = Array.isArray(releasesResponse && releasesResponse.data) ? releasesResponse.data : [];
+      state.releaseChangeGroups = await loadReleaseChangeGroups(state.reviewReleases);
+      state.releaseChangeHistory = state.selectedReviewReleaseId
+        ? (state.releaseChangeGroups.find(function (group) { return group.release_id === state.selectedReviewReleaseId; }) || {}).changes || []
+        : [];
+      renderReviewWorkflow();
+      updateReviewRailCounts(state.reviewState || {});
+    } catch (error) {
+      console.warn('[FileViewerPage] Review workflow load failed:', error);
+      renderReviewWorkflow('Unable to load review history.');
+    }
+  }
+
+  async function loadReleaseChangeGroups(releases) {
+    var items = Array.isArray(releases) ? releases : [];
+    var groups = await Promise.all(items.map(async function (release) {
+      if (!release || !release.edit_batch_id) {
+        return {
+          release_id: release && release.id,
+          release: release,
+          changes: []
+        };
+      }
+      try {
+        var batchResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(release.edit_batch_id)));
+        var batch = batchResponse && batchResponse.data ? batchResponse.data : batchResponse;
+        return {
+          release_id: release.id,
+          release: release,
+          changes: Array.isArray(batch && batch.changes) ? batch.changes : []
+        };
+      } catch (error) {
+        console.warn('[FileViewerPage] Release change group load failed:', error);
+        return {
+          release_id: release.id,
+          release: release,
+          changes: []
+        };
+      }
+    }));
+    return groups;
+  }
+
+  function renderReviewWorkflow(message) {
+    var statusEl = document.getElementById('reviewBatchStatus');
+    var saveBtn = document.getElementById('reviewSaveDraftBtn');
+    var releaseBtn = document.getElementById('reviewReleaseBtn');
+    var releasesEl = document.getElementById('reviewReleasesList');
+    var matterId = getCurrentMatterId();
+    var hasEditor = !!state.editorInstance;
+    var canUseWorkflow = !!(matterId && state.currentFile && state.currentFile.id && hasEditor);
+    var changeCount = state.reviewCounts.changes || 0;
+    var hasReviewWork = changeCount > 0 || !!state.currentReviewBatch;
+
+    if (statusEl) {
+      if (message) {
+        statusEl.textContent = message;
+      } else if (state.selectedReviewReleaseId) {
+        statusEl.textContent = 'Comparing source document with ' + (selectedReleaseLabel() || 'selected version') + '.';
+      } else if (!matterId) {
+        statusEl.textContent = 'Workspace association required to save review drafts.';
+      } else if (state.currentReviewBatch) {
+        statusEl.textContent = (state.reviewDirty ? 'Unsaved changes to ' : 'Saved ') + (state.currentReviewBatch.title || 'review draft') + '.';
+      } else if (changeCount > 0) {
+        statusEl.textContent = changeCount + ' pending change' + (changeCount === 1 ? '' : 's') + ' not saved yet.';
+      } else {
+        statusEl.textContent = 'No saved review draft.';
+      }
+    }
+
+    if (saveBtn) {
+      saveBtn.disabled = !canUseWorkflow || !hasReviewWork || state.reviewSaving;
+      saveBtn.textContent = state.reviewSaving ? 'Saving...' : 'Save Draft';
+    }
+    if (releaseBtn) {
+      releaseBtn.disabled = !canUseWorkflow || !hasReviewWork || state.reviewSaving || state.reviewReleasing;
+      releaseBtn.textContent = state.reviewReleasing ? 'Releasing...' : 'Release Version';
+    }
+
+    if (releasesEl) {
+      if (!state.reviewReleases.length) {
+        releasesEl.innerHTML = '<p class="file-viewer-review-releases__empty">No versions yet.</p>';
+      } else {
+        releasesEl.innerHTML = state.reviewReleases.map(function (release, index) {
+          var label = release.released_document_filename || ('Version ' + release.release_number);
+          var releasedAt = release.released_at ? formatDate(release.released_at) : '';
+          var documentId = releaseDocumentId(release);
+          var selected = releaseIsSelected(release);
+          var attrs = documentId
+            ? ' type="button" data-review-release-compare-index="' + index + '" aria-pressed="' + (selected ? 'true' : 'false') + '" aria-label="' + (selected ? 'Clear comparison for ' : 'Compare source against ') + escapeHtml(label) + '"'
+            : '';
+          var tag = documentId ? 'button' : 'div';
+          var selectedClass = selected ? ' file-viewer-review-release--selected' : '';
+          return '<' + tag + ' class="file-viewer-review-release' + selectedClass + '"' + attrs + '>' +
+            '<span class="file-viewer-review-release__copy">' +
+              '<span class="file-viewer-review-release__title">' + escapeHtml(label) + '</span>' +
+              '<span class="file-viewer-review-release__meta">Version ' + escapeHtml(release.release_number || '') + (releasedAt ? ' &middot; ' + escapeHtml(releasedAt) : '') + (selected ? ' &middot; Selected for compare' : '') + '</span>' +
+            '</span>' +
+            '<span class="file-viewer-review-release__compare" aria-hidden="true">' +
+              '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"></path></svg>' +
+            '</span>' +
+            '</' + tag + '>';
+        }).join('');
+      }
+    }
+  }
+
+  async function saveReviewBatch(options) {
+    options = options || {};
+    if (!state.currentFile || !state.editorInstance) throw new Error('No editable document is open.');
+    var reviewState = currentReviewState();
+    var changes = normalizeReviewChanges(reviewState);
+    var payload = {
+      title: draftBatchTitle(),
+      summary: changes.length + ' tracked change' + (changes.length === 1 ? '' : 's') + ' captured from File Viewer.',
+      status: 'draft',
+      changes: changes,
+      review_metadata: reviewMetadata(reviewState)
+    };
+
+    state.reviewSaving = true;
+    renderReviewWorkflow();
+    try {
+      var response;
+      if (state.currentReviewBatch && state.currentReviewBatch.id && state.currentReviewBatch.status !== 'released') {
+        response = await api.patch(
+          reviewEndpoint('/document-edit-batches/' + encodeURIComponent(state.currentReviewBatch.id)),
+          payload
+        );
+      } else {
+        response = await api.post(
+          reviewEndpoint('/documents/' + encodeURIComponent(state.currentFile.id) + '/edit-batches'),
+          payload
+        );
+      }
+      state.currentReviewBatch = response && response.data ? response.data : response;
+      state.reviewDirty = false;
+      await loadReviewWorkflow(state.currentFile);
+      if (!options.silent) notify('Review draft saved', 'success');
+      return state.currentReviewBatch;
+    } finally {
+      state.reviewSaving = false;
+      renderReviewWorkflow();
+    }
+  }
+
+  async function releaseReviewVersion() {
+    if (!state.currentFile || !state.editorInstance) return;
+    var run = async function () {
+      state.reviewReleasing = true;
+      renderReviewWorkflow();
+      try {
+        var batch = state.currentReviewBatch && !state.reviewDirty
+          ? state.currentReviewBatch
+          : await saveReviewBatch({ silent: true });
+        if (!batch || !batch.id) throw new Error('Review draft could not be saved.');
+        if (typeof state.editorInstance.bytes !== 'function') throw new Error('Editor bytes are unavailable.');
+        var bytes = state.editorInstance.bytes();
+        if (!bytes) throw new Error('No document bytes are available to release.');
+        var response = await api.post(
+          reviewEndpoint('/document-edit-batches/' + encodeURIComponent(batch.id) + '/release'),
+          {
+            approved: true,
+            filename: releaseFilename(),
+            content_type: state.currentFile.content_type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            content_base64: bytesToBase64(bytes),
+            release_notes: 'Released from File Viewer review workflow.'
+          }
+        );
+        state.currentReviewBatch = null;
+        state.reviewDirty = false;
+        await loadReviewWorkflow(state.currentFile);
+        var released = response && response.data && response.data.document;
+        notify('Released version' + (released && released.filename ? ': ' + released.filename : ''), 'success');
+      } catch (error) {
+        console.error('[FileViewerPage] Release version failed:', error);
+        notify((error && error.message) || 'Failed to release version', 'error');
+      } finally {
+        state.reviewReleasing = false;
+        renderReviewWorkflow();
+      }
+    };
+
+    var message = 'Release the current document as a new version? This creates an immutable release record and saves a new workspace document.';
+    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
+      Lex.Modal.confirm('Release Version', message, run);
+    } else if (window.confirm(message)) {
+      run();
     }
   }
 
@@ -406,7 +1431,8 @@
       if (!node || node.nodeType !== 1) continue;
       if (node.dataset && node.dataset.viewerAction) return node;
       if (node.id && (
-        node.id === 'toggleSidebarBtn' ||
+        node.id === 'viewerFileInfoBtn' ||
+        node.id === 'viewerReviewModeBadge' ||
         node.id === 'openDocStudioBtn' ||
         node.id === 'viewerDownloadBtn' ||
         node.id === 'viewerTemplateBtn' ||
@@ -461,13 +1487,16 @@
     var askBtn = document.getElementById('askLanaBtn');
     var dlBtn = document.getElementById('viewerDownloadBtn');
     var docStudioBtn = document.getElementById('openDocStudioBtn');
+    var fileInfoBtn = document.getElementById('viewerFileInfoBtn');
     if (askBtn) askBtn.disabled = true;
     if (dlBtn) dlBtn.classList.add('hidden');
     if (docStudioBtn) docStudioBtn.classList.add('hidden');
+    if (fileInfoBtn) fileInfoBtn.classList.add('hidden');
+    setReviewRailVisible(false);
   }
 
   function hideAllViewers() {
-    var ids = ['viewerLoading', 'viewerError', 'viewerIframe', 'viewerText', 'viewerImage', 'viewerEditor', 'viewerDocx'];
+    var ids = ['viewerLoading', 'viewerError', 'viewerIframe', 'viewerText', 'viewerImage', 'viewerEditor', 'viewerDiff', 'viewerDocx'];
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);
       if (el) el.classList.add('hidden');
@@ -572,6 +1601,8 @@
       await Promise.resolve();
 
       updateDocStudioButton(response);
+      var fileInfoBtn = document.getElementById('viewerFileInfoBtn');
+      if (fileInfoBtn) fileInfoBtn.classList.remove('hidden');
 
       // Load content + metadata
       await loadFileContent(response);
@@ -608,6 +1639,16 @@
   async function loadFileContent(file) {
     shutdownEditorInstance();
     hideAllViewers();
+    state.editorMode = 'view';
+    state.reviewState = null;
+    state.reviewBatches = [];
+    state.currentReviewBatch = null;
+    state.reviewReleases = [];
+    state.reviewDirty = false;
+    state.reviewSaving = false;
+    state.reviewReleasing = false;
+    setReviewRailVisible(false);
+    updateReviewRailCounts({ revisions: 0, comments: 0 });
     var mimeType = file.content_type || '';
     var ext = file.filename.split('.').pop().toLowerCase();
 
@@ -650,7 +1691,12 @@
       headers: getAuthHeaders()
     });
     await assertFetchOk(response, 'Failed to fetch PDF');
-    var blob = await response.blob();
+    var arrayBuffer = await response.arrayBuffer();
+    if (isEditorEnabled() && isEditorPreviewFile(file)) {
+      var renderedWithEditor = await loadFileInEditor(file, arrayBuffer);
+      if (renderedWithEditor) return;
+    }
+    var blob = new Blob([arrayBuffer], { type: file.content_type || 'application/pdf' });
     var objectUrl = URL.createObjectURL(blob);
     var iframe = document.getElementById('viewerIframe');
     iframe.src = objectUrl;
@@ -706,7 +1752,12 @@
       headers: getAuthHeaders()
     });
     await assertFetchOk(response, 'Failed to fetch file');
-    var text = await response.text();
+    var arrayBuffer = await response.arrayBuffer();
+    if (isEditorEnabled() && isEditorPreviewFile(file)) {
+      var renderedWithEditor = await loadFileInEditor(file, arrayBuffer);
+      if (renderedWithEditor) return;
+    }
+    var text = new TextDecoder('utf-8').decode(arrayBuffer);
     var pre = document.getElementById('viewerText');
     pre.textContent = text;
     pre.classList.remove('hidden');
@@ -729,7 +1780,7 @@
     var arrayBuffer = await response.arrayBuffer();
 
     if (isEditorEnabled() && isEditorDocx(file)) {
-      var renderedWithEditor = await loadDOCXInEditor(file, arrayBuffer);
+      var renderedWithEditor = await loadFileInEditor(file, arrayBuffer);
       if (renderedWithEditor) return;
     }
 
@@ -760,7 +1811,7 @@
     hideLoading();
   }
 
-  async function loadDOCXInEditor(file, arrayBuffer) {
+  async function loadFileInEditor(file, arrayBuffer) {
     var baseUrl = getEditorServiceBase();
     var host = document.getElementById('viewerEditor');
     if (!baseUrl || !host) return false;
@@ -779,11 +1830,14 @@
       var editor = mod.LanaEditor.mount(host, {
         api: baseUrl,
         fontsUrl: baseUrl + '/editor-fonts',
-        pdfWorkerUrl: baseUrl + '/pdfjs/pdf.worker.min.mjs'
+        pdfWorkerUrl: baseUrl + '/pdfjs/pdf.worker.min.mjs',
+        mode: 'view'
       });
       state.editorInstance = editor;
+      state.editorMode = 'view';
 
       editor.on('document-loaded', function (event) {
+        updateReviewRailCounts(event && event.counts ? event.counts : null);
         trackEditorEvent('document_loaded', file, {
           document_id: file.id,
           document_name: file.filename,
@@ -798,6 +1852,7 @@
         });
       });
       editor.on('change-applied', function (event) {
+        markReviewDirty(event && event.reviewState ? event.reviewState : null);
         trackEditorEvent('edit_applied', file, {
           document_id: file.id,
           document_name: file.filename,
@@ -805,6 +1860,7 @@
         });
       });
       editor.on('change-decision', function (event) {
+        markReviewDirty(event && event.reviewState ? event.reviewState : null);
         var decisions = event && Array.isArray(event.decisions) ? event.decisions : [];
         var hasReject = event && event.mode === 'reject_all';
         for (var i = 0; i < decisions.length; i++) {
@@ -829,11 +1885,25 @@
       editor.on('error', function (event) {
         console.warn('[FileViewerPage] LANA Editor event error:', event);
       });
+      editor.on('review-state-changed', function (reviewState) {
+        state.reviewState = reviewState || null;
+        state.editorMode = reviewState && reviewState.editorMode ? reviewState.editorMode : state.editorMode;
+        updateReviewRailCounts(reviewState || null);
+        setCanvasModeDisplay(true);
+      });
+      editor.on('lana-context-requested', openLanaForEditorContext);
+      editor.on('workspace-field-requested', openWorkspaceFieldPicker);
 
       var bytes = new Uint8Array(arrayBuffer);
-      await editor.open_file(new File([bytes], file.filename || 'document.docx', {
+      await editor.open_file(new File([bytes], file.filename || 'document', {
         type: file.content_type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       }));
+      if (typeof editor.reviewState === 'function') {
+        state.reviewState = editor.reviewState();
+        updateReviewRailCounts(state.reviewState);
+      }
+      setReviewRailVisible(editor.documentMode && editor.documentMode() !== 'pdf');
+      await loadReviewWorkflow(file);
       hideLoading();
       return true;
     } catch (error) {
@@ -1015,6 +2085,7 @@
     var viewPanel = document.getElementById('metaViewMode');
     var editPanel = document.getElementById('metaEditMode');
     var footer = document.getElementById('metaActionsFooter');
+    var footerShell = footer && footer.closest ? footer.closest('.lex-drawer-footer') : null;
 
     if (toggle && toggle.value !== mode) {
       toggle.value = mode;
@@ -1024,10 +2095,12 @@
       viewPanel.classList.remove('hidden');
       editPanel.classList.add('hidden');
       footer.classList.add('hidden');
+      if (footerShell) footerShell.classList.add('hidden');
     } else {
       viewPanel.classList.add('hidden');
       editPanel.classList.remove('hidden');
       footer.classList.remove('hidden');
+      if (footerShell) footerShell.classList.remove('hidden');
     }
   }
 
@@ -1150,6 +2223,9 @@
         name: file.filename,
         type: file.content_type || file.mime_type || ''
       }];
+      if (state.editorFocusedContext && !opts.attachments.module_context) {
+        opts.attachments.module_context = state.editorFocusedContext;
+      }
       // Ensure matter context reaches the SSE request
       if (matterId) {
         opts.matterId = matterId;
@@ -1365,9 +2441,11 @@
         if (!target) return;
         var action = target.dataset && target.dataset.viewerAction;
         switch (action || target.id) {
-          case 'toggle-sidebar':
-          case 'toggleSidebarBtn':
-            toggleMetadataSidebar();
+          case 'viewerReviewModeBadge':
+            setEditorInteractionMode(state.editorMode === 'review' ? 'view' : 'review');
+            break;
+          case 'viewerFileInfoBtn':
+            openFileInfoDrawer();
             break;
           case 'openDocStudioBtn':
             openCurrentFileInDocStudio();
@@ -1392,6 +2470,56 @@
 
     var errorDeleteBtn = document.getElementById('viewerErrorDelete');
     if (errorDeleteBtn) errorDeleteBtn.addEventListener('click', deleteFile);
+    var reviewRailInfoBtn = document.getElementById('reviewRailInfoBtn');
+    if (reviewRailInfoBtn) reviewRailInfoBtn.addEventListener('click', openFileInfoDrawer);
+    var reviewTabs = document.getElementById('reviewTabs');
+    if (reviewTabs) {
+      reviewTabs.addEventListener('lex-change', function (event) {
+        setReviewTab(event.detail && event.detail.value);
+      });
+    }
+    var reviewRail = document.getElementById('reviewRail');
+    if (reviewRail) {
+      reviewRail.addEventListener('lex-change', function (event) {
+        var historyFilter = event.target && event.target.closest ? event.target.closest('[data-review-history-filter]') : null;
+        if (!historyFilter) return;
+        var filterName = historyFilter.getAttribute('data-review-history-filter');
+        state.releaseHistoryFilters[filterName] = (event.detail && event.detail.value) || historyFilter.value || 'all';
+        updateReviewRailCounts(state.reviewState || {});
+      });
+      reviewRail.addEventListener('change', function (event) {
+        var historyFilter = event.target && event.target.closest ? event.target.closest('[data-review-history-filter]') : null;
+        if (!historyFilter) return;
+        state.releaseHistoryFilters[historyFilter.getAttribute('data-review-history-filter')] = historyFilter.value || 'all';
+        updateReviewRailCounts(state.reviewState || {});
+      });
+      reviewRail.addEventListener('click', function (event) {
+        var saveButton = event.target && event.target.closest ? event.target.closest('#reviewSaveDraftBtn') : null;
+        if (saveButton) {
+          saveReviewBatch().catch(function (error) {
+            console.error('[FileViewerPage] Save review draft failed:', error);
+            notify((error && error.message) || 'Failed to save review draft', 'error');
+          });
+          return;
+        }
+        var releaseButton = event.target && event.target.closest ? event.target.closest('#reviewReleaseBtn') : null;
+        if (releaseButton) {
+          releaseReviewVersion();
+          return;
+        }
+        var releaseItem = event.target && event.target.closest ? event.target.closest('[data-review-release-compare-index]') : null;
+        if (releaseItem) {
+          selectReleaseForComparison(parseInt(releaseItem.getAttribute('data-review-release-compare-index') || '0', 10));
+          return;
+        }
+        var item = event.target && event.target.closest ? event.target.closest('[data-review-item-index]') : null;
+        if (!item) return;
+        focusReviewItem(
+          item.getAttribute('data-review-item-type'),
+          parseInt(item.getAttribute('data-review-item-index') || '0', 10)
+        );
+      });
+    }
     var metaDeleteBtn = document.getElementById('metaDeleteBtn');
     if (metaDeleteBtn) metaDeleteBtn.addEventListener('click', deleteFile);
 
@@ -1416,9 +2544,14 @@
         // If Ask LANA panel drawer is open, let it handle Escape
         var lanaPanel = document.getElementById('fileViewerLana');
         if (lanaPanel && lanaPanel.open) return;
+        var fileInfoDrawer = document.getElementById('fileInfoDrawer');
+        if (fileInfoDrawer && fileInfoDrawer.open) return;
         navigateBack();
       }
     });
+
+    setCanvasModeDisplay(false);
+    setReviewTab('changes');
 
     // Load the file
     loadFile(state.fileId);

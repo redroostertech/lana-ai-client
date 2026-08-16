@@ -472,6 +472,17 @@
     }
 
     /**
+     * Send through the wrapped chat path so page-level before-send hooks can
+     * attach active document, workspace, and module context.
+     */
+    send(content, opts) {
+      if (this._chatEl && typeof this._chatEl.send === 'function') {
+        return this._chatEl.send(content, opts || {});
+      }
+      return null;
+    }
+
+    /**
      * Dynamically change the context-type on the internal lex-chat.
      */
     setContextType(type) {

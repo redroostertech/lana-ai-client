@@ -182,6 +182,12 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         background: var(--lex-bg-secondary);
         flex-shrink: 0;
       }
+      .lex-drawer-footer:empty {
+        display: none;
+      }
+      .lex-drawer-footer.hidden {
+        display: none;
+      }
 
       .lex-drawer-btn {
         display: inline-flex;
@@ -372,6 +378,8 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         }
         html += `<button type="button" class="lex-drawer-btn lex-drawer-btn--primary" data-action="confirm">${this.escapeHtml(this.confirmText)}</button>`;
         html += `</div>`;
+      } else {
+        html += `<div class="lex-drawer-footer"></div>`;
       }
 
       html += `</div></div>`;
@@ -401,6 +409,15 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         if (subEl) {
           subEl.textContent = this.subtitle;
           subEl.style.display = this.subtitle ? '' : 'none';
+        }
+      }
+
+      const slotContent = this.querySelector('.lex-drawer-body slot-content');
+      const footerContainer = this.querySelector('.lex-drawer-footer');
+      if (slotContent && footerContainer) {
+        const footerChildren = slotContent.querySelectorAll('[data-slot="footer"]');
+        for (const child of footerChildren) {
+          footerContainer.appendChild(child);
         }
       }
 
