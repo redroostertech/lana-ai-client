@@ -778,10 +778,9 @@
     var replyCount = asArray(comment.replies).length;
     return [
       '<div class="my-task-comment-actions">',
-      !isReply ? '<button type="button" class="my-task-comment-action" data-task-comment-action="reply" data-comment-id="' + esc(comment.id) + '" title="Reply" aria-label="Reply">' + iconHtml('message-circle') + (replyCount ? '<span>' + esc(replyCount) + '</span>' : '') + '</button>' : '',
       '<button type="button" class="my-task-comment-action' + (comment.liked ? ' is-active' : '') + '" data-task-comment-action="like" data-comment-id="' + esc(comment.id) + '" title="Like" aria-label="Like">' + iconHtml('thumbs-up') + (comment.like_count ? '<span>' + esc(comment.like_count) + '</span>' : '') + '</button>',
+      !isReply ? '<button type="button" class="my-task-comment-action" data-task-comment-action="reply" data-comment-id="' + esc(comment.id) + '" title="Comment" aria-label="Comment">' + iconHtml('message-circle') + (replyCount ? '<span>' + esc(replyCount) + '</span>' : '') + '</button>' : '',
       isAuthor ? '<button type="button" class="my-task-comment-action" data-task-comment-action="edit" data-comment-id="' + esc(comment.id) + '" title="Edit" aria-label="Edit">' + iconHtml('edit-2') + '</button>' : '',
-      '<button type="button" class="my-task-comment-action" data-task-comment-action="pin" data-comment-id="' + esc(comment.id) + '" title="' + (comment.is_pinned ? 'Unpin' : 'Pin') + '" aria-label="' + (comment.is_pinned ? 'Unpin' : 'Pin') + '">' + iconHtml('pin') + '</button>',
       isAuthor ? '<button type="button" class="my-task-comment-action" data-task-comment-action="delete" data-comment-id="' + esc(comment.id) + '" title="Delete" aria-label="Delete">' + iconHtml('trash') + '</button>' : '',
       '</div>'
     ].join('');
@@ -2128,13 +2127,6 @@
         comment.liked = nextLiked;
         comment.like_count = Math.max(0, Number(comment.like_count || 0) + (nextLiked ? 1 : -1));
       }
-      rerenderTaskDetails();
-      return;
-    }
-
-    if (action === 'pin') {
-      comment.is_pinned = !comment.is_pinned;
-      addDetailActivity(task, 'history', (comment.is_pinned ? 'Pinned' : 'Unpinned') + ' a comment');
       rerenderTaskDetails();
       return;
     }

@@ -392,8 +392,8 @@
     var replyCount = asArray(comment.replies).length;
     return [
       '<div class="my-task-comment-actions">',
-      !isReply ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="reply" data-comment-id="' + esc(comment.id) + '" title="Reply" aria-label="Reply">' + iconHtml('message-circle') + (replyCount ? '<span>' + esc(replyCount) + '</span>' : '') + '</button>' : '',
       '  <button type="button" class="my-task-comment-action' + (comment.liked ? ' is-active' : '') + '" data-shared-comment-action="like" data-comment-id="' + esc(comment.id) + '" title="Like" aria-label="Like">' + iconHtml('thumbs-up') + (comment.like_count ? '<span>' + esc(comment.like_count) + '</span>' : '') + '</button>',
+      !isReply ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="reply" data-comment-id="' + esc(comment.id) + '" title="Comment" aria-label="Comment">' + iconHtml('message-circle') + (replyCount ? '<span>' + esc(replyCount) + '</span>' : '') + '</button>' : '',
       isAuthor ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="edit" data-comment-id="' + esc(comment.id) + '" title="Edit" aria-label="Edit">' + iconHtml('edit-2') + '</button>' : '',
       isAuthor ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="delete" data-comment-id="' + esc(comment.id) + '" title="Delete" aria-label="Delete">' + iconHtml('trash') + '</button>' : '',
       '</div>'
