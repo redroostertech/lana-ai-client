@@ -939,7 +939,13 @@
         var opts = detail.opts || {};
         detail.opts = opts;
 
-        if (ctx.matterId && !opts.matterId) {
+        // Only steer page matter into sends that will CREATE a conversation.
+        // An existing conversation's scope is owned by its thread row — the
+        // backend rejects a mismatched matter_id with a 409, so injecting
+        // into an already-created (possibly unscoped) conversation breaks it.
+        var chatEl = self._panelEl && self._panelEl._chatEl;
+        var creatingConversation = !chatEl || !chatEl.conversationId;
+        if (ctx.matterId && !opts.matterId && creatingConversation) {
           opts.matterId = ctx.matterId;
         }
 
@@ -1009,6 +1015,7 @@
       // A fresh conversation registers on first response — show it, then
       // pick up the generated title once the backend has named it.
       this.addEventListener('lex-chat-conversation-created', function (e) {
+        self._adoptPageScopeOnCreate();
         if (!self._convoEl.dataset.visible || self._convoEl.dataset.visible !== 'true') {
           self._setConvo('New Chat', self._workspaceName || '');
         }
@@ -1085,6 +1092,20 @@
      * conversation from RECENTS (its stored matter IS the scope) and
      * starting a fresh chat (unscoped).
      */
+    /**
+     * A conversation born on a workspace page was created with that matter
+     * (the before-send hook injects it into the create payload), so adopt
+     * the scope locally — otherwise the chip keeps showing "Add to
+     * workspace" and the scope suggestion re-offers a scope the thread
+     * already has. No-op when a scope is already applied.
+     */
+    _adoptPageScopeOnCreate() {
+      var ctx = this._pageContext;
+      if (!ctx || !ctx.matterId || this._scopeMatterId) return false;
+      this._syncScopeLocal(ctx.matterId, ctx.matterName || '');
+      return true;
+    }
+
     _syncScopeLocal(matterId, matterName) {
       this._scopeMatterId = matterId || '';
       this._workspaceName = matterName || '';
