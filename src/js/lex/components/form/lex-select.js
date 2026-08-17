@@ -288,7 +288,8 @@
         multiple:    { type: Boolean, default: false },
         searchable:  { type: Boolean, default: false },
         placeholder: { type: String, default: 'Select...' },
-        clearable:   { type: Boolean, default: false }
+        clearable:   { type: Boolean, default: false },
+        visibleLimit:{ type: Number, default: 0, attribute: 'visible-limit' }
       };
     }
 
@@ -415,7 +416,10 @@
 
     _getFilteredOptions() {
       const opts = this.options || [];
-      if (!this._searchTerm) return opts;
+      if (!this._searchTerm) {
+        const limit = Number(this.visibleLimit || 0);
+        return Number.isFinite(limit) && limit > 0 ? opts.slice(0, limit) : opts;
+      }
       const term = this._searchTerm.toLowerCase();
       return opts.filter(o =>
         o.label.toLowerCase().includes(term) ||

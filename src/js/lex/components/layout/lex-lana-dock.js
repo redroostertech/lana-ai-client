@@ -769,7 +769,22 @@
           }
         }
         if (opts.initialPrompt && p._chatEl && typeof p._chatEl.send === 'function') {
-          p._chatEl.send(opts.initialPrompt);
+          var sendOpts = {};
+          if (opts.contextType) sendOpts.contextType = opts.contextType;
+          if (opts.matterId) sendOpts.matterId = opts.matterId;
+          if (opts.documentId || opts.cardContext) {
+            sendOpts.attachments = {};
+            if (opts.documentId) {
+              sendOpts.attachments.files = [{
+                file_id: opts.documentId,
+                name: opts.documentName || 'Document'
+              }];
+            }
+            if (opts.cardContext) {
+              sendOpts.attachments.module_context = opts.cardContext;
+            }
+          }
+          p._chatEl.send(opts.initialPrompt, sendOpts);
         }
         if (typeof p._focusComposer === 'function') p._focusComposer();
       }, 300);
@@ -869,6 +884,7 @@
         documentId: trigger.getAttribute('data-lana-document-id') || trigger.getAttribute('document-id') || null,
         documentName: trigger.getAttribute('data-lana-document-name') || trigger.getAttribute('document-name') || null,
         prefillPrompt: trigger.getAttribute('data-lana-prefill') || null,
+        initialPrompt: trigger.getAttribute('data-lana-initial-prompt') || null,
         cardContext: parseCardContext(trigger.getAttribute('data-lana-card-context') || '')
       });
     }

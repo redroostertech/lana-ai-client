@@ -230,6 +230,52 @@ describe('LANA dock/panel conversation API routing', () => {
     ]);
   });
 
+  test('panel prefillPrompt writes composer draft without sending', () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/chat/lex-lana-panel.js',
+      {},
+      'lex-lana-panel'
+    );
+    const composer = {
+      getValue: jest.fn(() => ''),
+      setValue: jest.fn(),
+      querySelector: jest.fn(() => ({ focus: jest.fn() }))
+    };
+    const panel = new Component();
+    panel._chatEl = {
+      querySelector: jest.fn(() => composer),
+      send: jest.fn()
+    };
+
+    panel.prefillPrompt('Review this tracked change');
+
+    expect(composer.setValue).toHaveBeenCalledWith('Review this tracked change');
+    expect(panel._chatEl.send).not.toHaveBeenCalled();
+  });
+
+  test('panel prefillPrompt does not overwrite an existing composer draft', () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/chat/lex-lana-panel.js',
+      {},
+      'lex-lana-panel'
+    );
+    const composer = {
+      getValue: jest.fn(() => 'Existing draft'),
+      setValue: jest.fn(),
+      querySelector: jest.fn(() => ({ focus: jest.fn() }))
+    };
+    const panel = new Component();
+    panel._chatEl = {
+      querySelector: jest.fn(() => composer),
+      send: jest.fn()
+    };
+
+    panel.prefillPrompt('Review this tracked change');
+
+    expect(composer.setValue).not.toHaveBeenCalled();
+    expect(panel._chatEl.send).not.toHaveBeenCalled();
+  });
+
   test('dock openConversation delegates to the panel and updates conversation header', async () => {
     const { Component } = loadComponent(
       'src/js/lex/components/layout/lex-lana-dock.js',
@@ -278,8 +324,95 @@ describe('LANA dock/panel conversation API routing', () => {
 
     expect(dock.expand).toHaveBeenCalledTimes(1);
     expect(dock._applyScope).toHaveBeenCalledWith('matter-1', 'Matter One');
-    expect(dock._panelEl._chatEl.send).toHaveBeenCalledWith('Discuss this task');
+    expect(dock._panelEl._chatEl.send).toHaveBeenCalledWith('Discuss this task', {
+      matterId: 'matter-1'
+    });
     expect(dock._panelEl._focusComposer).toHaveBeenCalledTimes(1);
+  });
+
+  test('dock trigger supports initial prompt and card context send payload', () => {
+    const { context, Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    dock.openWith = jest.fn();
+    context.document.contains = jest.fn(() => true);
+
+    const attrs = {
+      'data-lana-context-type': 'document_chat',
+      'data-lana-matter-id': 'matter-1',
+      'data-lana-document-id': 'file-1',
+      'data-lana-document-name': 'affidavit.docx',
+      'data-lana-prefill': 'Prefill this',
+      'data-lana-initial-prompt': 'Send this',
+      'data-lana-card-context': '{"type":"tracked_change","summary":"Replacement: replace A with B."}'
+    };
+    const trigger = {
+      getAttribute: jest.fn(name => attrs[name] || null),
+      closest: jest.fn(() => null)
+    };
+    const event = {
+      target: { closest: jest.fn(() => trigger) },
+      preventDefault: jest.fn()
+    };
+
+    dock._handleDockTriggerClick(event);
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(dock.openWith).toHaveBeenCalledWith(expect.objectContaining({
+      contextType: 'document_chat',
+      matterId: 'matter-1',
+      documentId: 'file-1',
+      documentName: 'affidavit.docx',
+      prefillPrompt: 'Prefill this',
+      initialPrompt: 'Send this',
+      cardContext: expect.objectContaining({
+        type: 'tracked_change',
+        summary: 'Replacement: replace A with B.'
+      })
+    }));
+  });
+
+  test('dock openWith includes document and card context in initial prompt send', async () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    dock.expand = jest.fn();
+    dock._panelEl = {
+      _chatEl: { send: jest.fn() },
+      _focusComposer: jest.fn(),
+      attachFile: jest.fn(),
+      attachModuleContext: jest.fn()
+    };
+
+    const cardContext = {
+      type: 'tracked_change',
+      summary: 'Replacement: replace A with B.'
+    };
+
+    dock.openWith({
+      contextType: 'document_chat',
+      documentId: 'file-1',
+      documentName: 'affidavit.docx',
+      cardContext,
+      initialPrompt: 'Review this change'
+    });
+    await new Promise(resolve => setTimeout(resolve, 320));
+
+    expect(dock._panelEl.attachFile).toHaveBeenCalledWith('file-1', 'affidavit.docx');
+    expect(dock._panelEl.attachModuleContext).toHaveBeenCalledWith(cardContext);
+    expect(dock._panelEl._chatEl.send).toHaveBeenCalledWith('Review this change', {
+      contextType: 'document_chat',
+      attachments: {
+        files: [{ file_id: 'file-1', name: 'affidavit.docx' }],
+        module_context: cardContext
+      }
+    });
   });
 
   test('dock page context adds workspace matter scope before fresh sends', () => {

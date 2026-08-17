@@ -125,11 +125,31 @@
         </div>
 
         <!-- Content viewers -->
+        <div id="viewerFormatNotice" class="hidden file-viewer-format-notice" role="status" aria-live="polite"></div>
         <iframe id="viewerIframe" class="hidden w-full h-full bg-white rounded-lg shadow-sm"></iframe>
         <pre id="viewerText" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto text-sm font-mono whitespace-pre-wrap"></pre>
         <img id="viewerImage" class="hidden max-w-full max-h-full mx-auto rounded-lg shadow-sm object-contain">
-        <div id="viewerEditor" class="hidden file-viewer-editor-host"></div>
-        <div id="viewerDiff" class="hidden file-viewer-diff-viewer" aria-live="polite"></div>
+        <div id="viewerDocumentCard" class="hidden file-viewer-document-card">
+          <div id="viewerDisplayControls" class="hidden file-viewer-display-controls" aria-label="Document display options">
+            <span class="file-viewer-display-controls__label">Display</span>
+            <lex-select
+              id="viewerVersionSelect"
+              class="file-viewer-version-select"
+              size="sm"
+              searchable="true"
+              visible-limit="11"
+              placeholder="Select version"
+              options='[]'>
+            </lex-select>
+            <label class="file-viewer-change-toggle" for="viewerChangeDisplayToggle">
+              <input id="viewerChangeDisplayToggle" class="file-viewer-change-toggle__input" type="checkbox" checked>
+              <span class="file-viewer-change-toggle__radio" aria-hidden="true"></span>
+              <span class="file-viewer-change-toggle__text">Show changes</span>
+            </label>
+          </div>
+          <div id="viewerEditor" class="hidden file-viewer-editor-host"></div>
+          <div id="viewerDiff" class="hidden file-viewer-diff-viewer" aria-live="polite"></div>
+        </div>
         <div id="viewerDocx" class="hidden w-full h-full bg-white rounded-lg shadow-sm p-6 overflow-auto prose prose-sm max-w-none">
           <style>
             #viewerDocx table.docx-table { width: 100%; border-collapse: collapse; margin: 1em 0; border: 1px solid var(--lex-border-default); }
@@ -202,7 +222,7 @@
           </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div class="file-viewer-file-info__body flex-1 overflow-y-auto p-4 space-y-4">
           <!-- File Info Card -->
           <div class="rounded-lg p-4 border shadow-sm" style="background: linear-gradient(to bottom right, var(--lex-bg-accent-soft), var(--lex-bg-accent-muted)); border-color: var(--lex-border-accent)">
             <div class="space-y-3 text-sm">
@@ -238,7 +258,7 @@
           </div>
 
           <!-- View Mode -->
-          <div id="metaViewMode" class="space-y-4">
+          <div id="metaViewMode" class="file-viewer-file-info__view space-y-4">
             <div>
               <label class="block text-sm font-medium mb-1" style="color: var(--lex-text-primary)">Document Type</label>
               <div id="metaDocTypeView" class="text-sm" style="color: var(--lex-text-primary)">--</div>
@@ -251,12 +271,12 @@
               <label class="block text-sm font-medium mb-1" style="color: var(--lex-text-primary)">Notes</label>
               <div id="metaNotesView" class="text-sm whitespace-pre-wrap" style="color: var(--lex-text-primary)">--</div>
             </div>
-            <div id="metaSummarySection" class="hidden">
+            <div id="metaSummarySection" class="file-viewer-file-info__summary hidden">
               <label class="block text-sm font-medium mb-1 flex items-center gap-1.5" style="color: var(--lex-text-primary)">
                 <svg class="w-4 h-4" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 AI Summary
               </label>
-              <div id="metaSummaryView" class="text-sm whitespace-pre-wrap leading-relaxed rounded-lg p-3 border" style="color: var(--lex-text-secondary); background: var(--lex-bg-secondary); border-color: var(--lex-border-subtle); max-height: 20rem; overflow-y: auto;">--</div>
+              <div id="metaSummaryView" class="file-viewer-file-info__summary-text text-sm whitespace-pre-wrap leading-relaxed rounded-lg p-3 border" style="color: var(--lex-text-secondary); background: var(--lex-bg-secondary); border-color: var(--lex-border-subtle);">--</div>
               <div id="metaSummaryTimestamp" class="text-xs mt-1" style="color: var(--lex-text-tertiary)"></div>
             </div>
           </div>

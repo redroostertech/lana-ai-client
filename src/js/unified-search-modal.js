@@ -13,9 +13,9 @@
     abortController: null,
     shortcutBound: false,
     pendingQueryHandled: false,
-    // Full normalized result set for the current query (unfiltered), plus the
-    // active type-filter chip. Filtering is client-side over lastResults, so
-    // toggling a chip never re-queries the backend.
+    // Full normalized result set for the current query plus the active entity
+    // filter. The filter is sent to the search API so narrowing to a type is
+    // not limited to whichever records happened to appear on the first page.
     lastResults: [],
     activeType: null
   };
@@ -96,50 +96,54 @@
         line-height: 1.5rem;
       }
 
+      .unified-search-entity-filter {
+        flex: 0 0 auto;
+        height: 2.125rem;
+        min-width: 10rem;
+        max-width: 13rem;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #374151;
+        font-size: 0.8125rem;
+        line-height: 1;
+        padding: 0 0.625rem;
+        cursor: pointer;
+      }
+
+      .unified-search-entity-filter:focus {
+        outline: 2px solid rgba(79, 70, 229, 0.22);
+        outline-offset: 1px;
+        border-color: #4f46e5;
+      }
+
       .unified-search-close {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        border: 0;
+        background: transparent;
+        color: #374151;
+        border-radius: 6px;
+        padding: 0.25rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+      }
+
+      .unified-search-close-x {
+        color: #4f46e5;
+        font-size: 1.25rem;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .unified-search-close-key {
         border: 1px solid #d1d5db;
         background: #f9fafb;
         color: #374151;
         border-radius: 6px;
         padding: 0.375rem 0.625rem;
         font-size: 0.75rem;
-        cursor: pointer;
-      }
-
-      .unified-search-filter-bar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.375rem;
-        padding: 0.625rem 1rem;
-        border-bottom: 1px solid #e5e7eb;
-      }
-
-      .unified-search-filter-chip {
-        border: 1px solid #d1d5db;
-        background: #ffffff;
-        color: #374151;
-        border-radius: 999px;
-        padding: 0.25rem 0.625rem;
-        font-size: 0.75rem;
-        line-height: 1;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-
-      .unified-search-filter-chip:hover {
-        background: #f8fafc;
-        border-color: #94a3b8;
-      }
-
-      .unified-search-filter-chip[aria-pressed="true"] {
-        background: #4f46e5;
-        border-color: #4f46e5;
-        color: #ffffff;
-      }
-
-      .unified-search-filter-chip-count {
-        opacity: 0.7;
-        margin-left: 0.25rem;
       }
 
       .unified-search-results {
@@ -473,6 +477,15 @@
         .unified-search-detail {
           display: none;
         }
+
+        .unified-search-input-row {
+          gap: 0.5rem;
+        }
+
+        .unified-search-entity-filter {
+          min-width: 7.75rem;
+          max-width: 8.75rem;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -492,9 +505,14 @@
             <div class="unified-search-input-row">
               ${searchIcon()}
               <input id="unifiedSearchInput" class="unified-search-input" type="search" placeholder="Search Lana — matters, contacts, documents, conversations, messages, tasks…" autocomplete="off">
-              <button id="unifiedSearchClose" class="unified-search-close" type="button">Esc</button>
+              <select id="unifiedSearchEntityFilter" class="unified-search-entity-filter" aria-label="Filter search by entity type">
+                ${entityFilterOptionsHtml()}
+              </select>
+              <button id="unifiedSearchClose" class="unified-search-close" type="button" aria-label="Close search">
+                <span class="unified-search-close-x" aria-hidden="true">&times;</span>
+                <span class="unified-search-close-key" aria-hidden="true">Esc</span>
+              </button>
             </div>
-            <div id="unifiedSearchFilters" class="unified-search-filter-bar" hidden></div>
             <div id="unifiedSearchResults" class="unified-search-results">
               <div class="unified-search-empty">Start typing to search all indexed data.</div>
             </div>
@@ -515,6 +533,7 @@
     });
     document.getElementById('unifiedSearchClose').addEventListener('click', close);
     document.getElementById('unifiedSearchInput').addEventListener('input', onInput);
+    document.getElementById('unifiedSearchEntityFilter').addEventListener('change', onEntityFilterChange);
     renderStartState();
     bindShortcut();
     state.mounted = true;
@@ -555,17 +574,17 @@
     state.searchTimer = setTimeout(() => search(query), 180);
   }
 
-  function renderEmpty(message) {
-    hideFilterBar();
-    document.getElementById('unifiedSearchResults').innerHTML = `<div class="unified-search-empty">${escapeHtml(message)}</div>`;
+  function onEntityFilterChange(event) {
+    state.activeType = event.target.value === 'all' ? null : event.target.value;
+    if (state.query && state.query.length >= 2) {
+      search(state.query);
+      return;
+    }
+    renderStartState();
   }
 
-  function hideFilterBar() {
-    const bar = document.getElementById('unifiedSearchFilters');
-    if (bar) {
-      bar.hidden = true;
-      bar.innerHTML = '';
-    }
+  function renderEmpty(message) {
+    document.getElementById('unifiedSearchResults').innerHTML = `<div class="unified-search-empty">${escapeHtml(message)}</div>`;
   }
 
   function renderLoading() {
@@ -604,7 +623,6 @@
   }
 
   function renderStartState() {
-    hideFilterBar();
     const recents = getRecentSearches();
     if (!recents.length) {
       renderEmpty('Start typing to search all indexed data.');
@@ -642,8 +660,28 @@
     });
   }
 
+  var ENTITY_FILTER_OPTIONS = [
+    { value: 'all', label: 'All entities' },
+    { value: 'matter', label: 'Workspaces' },
+    { value: 'document', label: 'Documents' },
+    { value: 'conversation', label: 'Conversations' },
+    { value: 'conversation_message', label: 'Messages' },
+    { value: 'task', label: 'Tasks' },
+    { value: 'contact', label: 'Contacts' },
+    { value: 'user', label: 'Users' },
+    { value: 'approval', label: 'Approvals' },
+    { value: 'note', label: 'Notes' },
+    { value: 'email', label: 'Emails' },
+    { value: 'calendar_event', label: 'Calendar events' }
+  ];
+
   // Friendly type-badge labels (override the underscored default).
-  var TYPE_LABELS = { conversation: 'Conversation', conversation_message: 'Message' };
+  var TYPE_LABELS = {
+    matter: 'Workspace',
+    conversation: 'Conversation',
+    conversation_message: 'Message',
+    calendar_event: 'Calendar event'
+  };
 
   // Entity types that open the REAL entity directly (deep-link via result.url)
   // instead of the generic result-details inspector, with a context-specific
@@ -653,6 +691,18 @@
     conversation_message: 'Open chat',
     matter: 'Open workspace'
   };
+
+  function entityFilterOptionsHtml() {
+    return ENTITY_FILTER_OPTIONS.map((option) => (
+      `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`
+    )).join('');
+  }
+
+  function syncEntityFilterSelect() {
+    const select = document.getElementById('unifiedSearchEntityFilter');
+    if (!select) return;
+    select.value = state.activeType || 'all';
+  }
 
   function entityTypeOf(result) {
     return (result && (result.entity_type || result.source_type)) || '';
@@ -822,11 +872,16 @@
 
     try {
       saveRecentSearch(query);
-      const response = await window.api.post('/api/v1/search', {
+      const payload = {
         query,
         limit: 20,
         page: 1
-      });
+      };
+      if (state.activeType) {
+        payload.entity_types = [state.activeType];
+      }
+      syncEntityFilterSelect();
+      const response = await window.api.post('/api/v1/search', payload);
       renderResults((response.results || []).map(normalizeResult), response);
     } catch (error) {
       renderEmpty(error.message || 'Search failed.');
@@ -847,53 +902,16 @@
     return filter.filterResultsByType(state.lastResults, state.activeType);
   }
 
-  function renderFilterBar() {
-    const bar = document.getElementById('unifiedSearchFilters');
-    if (!bar) return;
-    const filter = searchFilter();
-    if (!filter) {
-      hideFilterBar();
-      return;
-    }
-    const facetData = filter.computeTypeFacets(state.lastResults, typeLabel);
-    // A single type (or none) needs no filtering UI.
-    if (facetData.facets.length <= 1) {
-      hideFilterBar();
-      return;
-    }
-
-    const chips = [
-      `<button type="button" class="unified-search-filter-chip" data-filter-type="all" aria-pressed="${state.activeType ? 'false' : 'true'}">All<span class="unified-search-filter-chip-count">${facetData.total}</span></button>`
-    ];
-    facetData.facets.forEach((facet) => {
-      const pressed = state.activeType === facet.type ? 'true' : 'false';
-      chips.push(`<button type="button" class="unified-search-filter-chip" data-filter-type="${escapeHtml(facet.type)}" aria-pressed="${pressed}">${escapeHtml(facet.label)}<span class="unified-search-filter-chip-count">${facet.count}</span></button>`);
-    });
-    bar.innerHTML = chips.join('');
-    bar.hidden = false;
-
-    Array.from(bar.querySelectorAll('[data-filter-type]')).forEach((chip) => {
-      chip.addEventListener('click', () => {
-        const type = chip.getAttribute('data-filter-type');
-        state.activeType = (type && type !== 'all') ? type : null;
-        renderFilterBar();
-        renderResultList(applyActiveFilter(), { autoSelect: false });
-      });
-    });
-  }
-
   function renderResults(results, response) {
     state.lastResults = Array.isArray(results) ? results : [];
-    state.activeType = null;
+    syncEntityFilterSelect();
 
     if (!state.lastResults.length) {
-      hideFilterBar();
       renderEmpty(response && response.message ? response.message : 'No results found.');
       renderDetails(null);
       return;
     }
 
-    renderFilterBar();
     renderResultList(applyActiveFilter(), { autoSelect: true });
   }
 

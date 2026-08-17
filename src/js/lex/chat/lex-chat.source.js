@@ -199,6 +199,7 @@
             citations: (m.metadata && m.metadata.citations) || m.citations || [],
             references: (m.metadata && m.metadata.references) || m.references || [],
             artifacts: (m.metadata && (m.metadata.artifacts || m.metadata.agentic_artifacts)) || m.artifacts || [],
+            attachments: (m.metadata && m.metadata.attachments) || m.attachments || [],
             duration: m.duration_ms || null,
             tokenCount: m.token_count || null,
             metadata: m.metadata || {}  // Preserve full metadata for dynamic_cards re-hydration

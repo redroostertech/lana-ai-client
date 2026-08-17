@@ -307,11 +307,29 @@
         color: var(--lex-chat-accent);
         flex-shrink: 0;
       }
+      .lex-chat-msg-attachment--context {
+        align-items: flex-start;
+        max-width: 260px;
+      }
       .lex-chat-msg-attachment-name {
         max-width: 200px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+      .lex-chat-msg-attachment-copy {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+      .lex-chat-msg-attachment-summary {
+        max-width: 220px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--lex-chat-text-muted);
+        opacity: 0.82;
+        font-weight: 400;
       }
 
       /* System message */
@@ -342,6 +360,7 @@
 
   // -- Attachment file icon --
   const ATTACH_FILE_ICON = `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+  const ATTACH_CONTEXT_ICON = `<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>`;
 
   // -- Breathing logo SVG --
   const BREATHING_LOGO = `
@@ -450,10 +469,7 @@
       if (role === 'user') {
         const attachments = this.attachments || [];
         const attachHtml = attachments.length > 0
-          ? `<div class="lex-chat-msg-attachments">${attachments.map(a => {
-              const name = ChatFormat ? ChatFormat.escapeHtml(a.filename || a.name || 'Document') : (a.filename || a.name || 'Document');
-              return `<div class="lex-chat-msg-attachment">${ATTACH_FILE_ICON}<span class="lex-chat-msg-attachment-name" title="${name}">${name}</span></div>`;
-            }).join('')}</div>`
+          ? `<div class="lex-chat-msg-attachments">${attachments.map(a => this._renderAttachment(a)).join('')}</div>`
           : '';
 
         return `
@@ -631,6 +647,21 @@
       if (!this.streaming && ChatFormat && typeof ChatFormat.renderMermaidDiagrams === 'function') {
         ChatFormat.renderMermaidDiagrams(this);
       }
+    }
+
+    _renderAttachment(attachment) {
+      const item = attachment || {};
+      const esc = (value) => ChatFormat ? ChatFormat.escapeHtml(value) : String(value || '');
+      if (item.type === 'module_context') {
+        const name = esc(item.name || 'Attached context');
+        const summaryRaw = String(item.summary || '').replace(/\s+/g, ' ').trim();
+        const summary = summaryRaw
+          ? `<span class="lex-chat-msg-attachment-summary" title="${esc(summaryRaw)}">${esc(summaryRaw)}</span>`
+          : '';
+        return `<div class="lex-chat-msg-attachment lex-chat-msg-attachment--context">${ATTACH_CONTEXT_ICON}<span class="lex-chat-msg-attachment-copy"><span class="lex-chat-msg-attachment-name" title="${name}">${name}</span>${summary}</span></div>`;
+      }
+      const name = esc(item.filename || item.name || 'Document');
+      return `<div class="lex-chat-msg-attachment">${ATTACH_FILE_ICON}<span class="lex-chat-msg-attachment-name" title="${name}">${name}</span></div>`;
     }
 
     /**

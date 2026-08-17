@@ -592,6 +592,26 @@
       tryAttach(5);
     }
 
+    prefillPrompt(prompt) {
+      var self = this;
+      var text = String(prompt || '');
+      if (!text) return;
+      function tryPrefill(attempts) {
+        if (!self._chatEl) {
+          if (attempts > 0) setTimeout(function () { tryPrefill(attempts - 1); }, 100);
+          return;
+        }
+        var composer = self._chatEl.querySelector('lex-chat-composer');
+        if (composer && typeof composer.getValue === 'function' && typeof composer.setValue === 'function') {
+          if (!composer.getValue()) composer.setValue(text);
+          if (typeof self._focusComposer === 'function') self._focusComposer();
+        } else if (attempts > 0) {
+          setTimeout(function () { tryPrefill(attempts - 1); }, 100);
+        }
+      }
+      tryPrefill(5);
+    }
+
     clearModuleContext() {
       if (!this._chatEl) return null;
       var composer = this._chatEl.querySelector('lex-chat-composer');
@@ -1381,6 +1401,9 @@
       });
       container.addEventListener('lex-composer-module-context-remove', function (e) {
         self.emit('lex-lana-module-context-remove', e.detail || {});
+      });
+      container.addEventListener('lex-chat-response-end', function (e) {
+        self.emit('lex-lana-response-end', e.detail || {});
       });
     }
 

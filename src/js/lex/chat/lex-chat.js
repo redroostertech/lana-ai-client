@@ -528,9 +528,14 @@
       this._planReadyReceived = false;
       this._recoveryNoticeShownForConversation = null;
 
+      const sendOpts = this._buildSendOptions(opts);
+      const messageAttachments = this._messageAttachmentsFromSendOptions(sendOpts);
+
       // Add user message to thread
       if (this._threadEl) {
-        this._threadEl.addMessage('user', content);
+        this._threadEl.addMessage('user', content, {
+          attachments: messageAttachments.length ? messageAttachments : undefined
+        });
       }
 
       // Hide suggestions after first message
@@ -548,8 +553,6 @@
 
       // Emit send event
       this.emit('lex-chat-send', { content, conversationId: this.conversationId });
-
-      const sendOpts = this._buildSendOptions(opts);
 
       // Fire-and-forget JIT processing for any #filename mentions
       this._processMessageMentions(content);
@@ -635,6 +638,59 @@
       return sendOpts;
     }
 
+    _messageAttachmentsFromSendOptions(sendOpts = {}) {
+      const attachments = sendOpts.attachments || {};
+      const items = [];
+      if (Array.isArray(attachments)) {
+        for (const attachment of attachments) {
+          if (!attachment) continue;
+          if (attachment.type === 'module_context' || attachment.context_type || attachment.module_context || attachment.moduleContext) {
+            const moduleContext = attachment.module_context || attachment.moduleContext || attachment;
+            items.push({
+              type: 'module_context',
+              name: moduleContext.name || moduleContext.ui_label || moduleContext.card_title || moduleContext.module_name || moduleContext.module_key || 'Attached context',
+              context_type: moduleContext.context_type || moduleContext.type || '',
+              summary: moduleContext.summary
+                || (moduleContext.selection && moduleContext.selection.text)
+                || (moduleContext.revision && moduleContext.revision.text)
+                || (moduleContext.details && moduleContext.details.change_summary)
+                || ''
+            });
+          } else {
+            items.push({
+              type: 'file',
+              file_id: attachment.file_id || attachment.id || null,
+              name: attachment.filename || attachment.name || 'Document'
+            });
+          }
+        }
+        return items;
+      }
+      const files = Array.isArray(attachments.files) ? attachments.files : [];
+      for (const file of files) {
+        if (!file) continue;
+        items.push({
+          type: 'file',
+          file_id: file.file_id || file.id || null,
+          name: file.filename || file.name || 'Document'
+        });
+      }
+      const moduleContext = attachments.module_context || attachments.moduleContext || null;
+      if (moduleContext) {
+        items.push({
+          type: 'module_context',
+          name: moduleContext.ui_label || moduleContext.card_title || moduleContext.module_name || moduleContext.module_key || 'Attached context',
+          context_type: moduleContext.type || '',
+          summary: moduleContext.summary
+            || (moduleContext.selection && moduleContext.selection.text)
+            || (moduleContext.revision && moduleContext.revision.text)
+            || (moduleContext.details && moduleContext.details.change_summary)
+            || ''
+        });
+      }
+      return items;
+    }
+
     /**
      * Fast-path registered slash commands. Backend-backed commands are
      * dispatched through the command registry endpoint instead of the LLM
@@ -650,7 +706,10 @@
     }
 
     async _runSlashCommand(content, service, sendOpts = {}) {
-      if (this._threadEl) this._threadEl.addMessage('user', content);
+      const messageAttachments = this._messageAttachmentsFromSendOptions(sendOpts);
+      if (this._threadEl) this._threadEl.addMessage('user', content, {
+        attachments: messageAttachments.length ? messageAttachments : undefined
+      });
       if (this._composerEl) {
         this._composerEl.clear();
         this._composerEl.hideSuggestions();
@@ -726,12 +785,14 @@
             this._threadEl.clear();
             for (const m of result.messages) {
               lastPersistedMessage = m;
+              const messageAttachments = this._messageAttachmentsFromSendOptions({ attachments: m.attachments || [] });
               this._threadEl.addMessage(m.role, m.content, {
                 messageId: m.id || m.message_id,
                 timestamp: m.timestamp || m.created_at,
                 citations: m.citations && m.citations.length > 0 ? m.citations : undefined,
                 references: m.references && m.references.length > 0 ? m.references : undefined,
                 artifacts: m.artifacts && m.artifacts.length > 0 ? m.artifacts : undefined,
+                attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
                 duration: m.duration || null,
                 tokenCount: m.tokenCount || null
               });
@@ -1237,7 +1298,8 @@
 
           this.emit('lex-chat-response-end', {
             conversationId: this.conversationId,
-            messageId: event.messageId
+            messageId: event.messageId,
+            content: this._streamingContent || ''
           });
           break;
 
