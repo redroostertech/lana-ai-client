@@ -310,6 +310,60 @@ describe('LANA dock/panel conversation API routing', () => {
     });
   });
 
+  test('dock page context does not inject matter into an existing conversation send (SCRUM-261)', () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    let beforeSend;
+    const panel = {
+      addEventListener: jest.fn((name, handler) => {
+        if (name === 'lex-lana-before-send') beforeSend = handler;
+      })
+    };
+    dock._pageContext = { matterId: 'matter-1', matterName: 'Matter One' };
+    // An already-created (possibly unscoped) conversation is on screen —
+    // injecting the page matter here triggers a 409 scope mismatch.
+    dock._panelEl = { _chatEl: { conversationId: 'conversation-9' } };
+
+    dock._bindPageContextSend(panel);
+    const event = { detail: { content: 'Follow-up question', opts: { contextType: 'full_chat' } } };
+    beforeSend(event);
+
+    expect(event.detail.opts).toEqual({ contextType: 'full_chat' });
+  });
+
+  test('dock adopts page matter scope when a conversation is created on a workspace page (SCRUM-261)', () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    dock._pageContext = { matterId: 'matter-1', matterName: 'Matter One' };
+    dock._panelEl = {
+      setAttribute: jest.fn(),
+      removeAttribute: jest.fn(),
+      _chatEl: {
+        setAttribute: jest.fn(),
+        removeAttribute: jest.fn(),
+        querySelector: jest.fn(() => null)
+      }
+    };
+
+    expect(dock._adoptPageScopeOnCreate()).toBe(true);
+    expect(dock._scopeMatterId).toBe('matter-1');
+    expect(dock._workspaceName).toBe('Matter One');
+    expect(dock._panelEl._chatEl.setAttribute).toHaveBeenCalledWith('matter-id', 'matter-1');
+
+    // Second creation with a scope already applied must not overwrite it.
+    dock._pageContext = { matterId: 'matter-2', matterName: 'Matter Two' };
+    expect(dock._adoptPageScopeOnCreate()).toBe(false);
+    expect(dock._scopeMatterId).toBe('matter-1');
+  });
+
   test('dock page context keeps document attachment injection before sends', () => {
     const { Component } = loadComponent(
       'src/js/lex/components/layout/lex-lana-dock.js',
