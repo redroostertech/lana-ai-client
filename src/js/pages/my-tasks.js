@@ -438,10 +438,43 @@
         mentionsLoading: false,
         mentionFilter: '',
         comments: comments,
+        commentsRemote: false,
+        commentsLoading: false,
         activity: []
       };
     }
     return state.detailStores[key];
+  }
+
+  function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''));
+  }
+
+  function taskUuid(task) {
+    return String((task && (task.id || task.task_id)) || '');
+  }
+
+  function isTaskCommentSynced(store, commentId) {
+    return !!(store.commentsRemote && window.api && isUuid(commentId));
+  }
+
+  async function loadTaskComments(task) {
+    if (!window.api || !api.getResourceComments || !isUuid(taskUuid(task))) return;
+    var store = getTaskDetailStore(task);
+    if (store.commentsRemote || store.commentsLoading) return;
+    store.commentsLoading = true;
+    try {
+      var response = await api.getResourceComments('task', taskUuid(task), { limit: 100, include_replies: true });
+      var payload = response && response.data ? response.data : response;
+      store.comments = asArray(payload && payload.comments).map(normalizeComment);
+      store.commentsRemote = true;
+      if (state.viewingTask && detailKey(state.viewingTask) === detailKey(task)) rerenderTaskDetails();
+    } catch (error) {
+      // Leave metadata/local comments in place; the modal still works offline.
+      console.warn('[MyTasks] Failed to load task comments:', error && error.message);
+    } finally {
+      store.commentsLoading = false;
+    }
   }
 
   function addDetailActivity(task, type, label) {
@@ -742,11 +775,11 @@
 
   function renderTaskCommentActions(comment, isReply) {
     var isAuthor = !!comment.author_id && String(comment.author_id) === String(currentUserId());
+    var replyCount = asArray(comment.replies).length;
     return [
       '<div class="my-task-comment-actions">',
-      !isReply ? '<button type="button" class="my-task-comment-action" data-task-comment-action="reply" data-comment-id="' + esc(comment.id) + '" title="Reply" aria-label="Reply">' + iconHtml('corner-up-left') + '</button>' : '',
+      !isReply ? '<button type="button" class="my-task-comment-action" data-task-comment-action="reply" data-comment-id="' + esc(comment.id) + '" title="Reply" aria-label="Reply">' + iconHtml('message-circle') + (replyCount ? '<span>' + esc(replyCount) + '</span>' : '') + '</button>' : '',
       '<button type="button" class="my-task-comment-action' + (comment.liked ? ' is-active' : '') + '" data-task-comment-action="like" data-comment-id="' + esc(comment.id) + '" title="Like" aria-label="Like">' + iconHtml('thumbs-up') + (comment.like_count ? '<span>' + esc(comment.like_count) + '</span>' : '') + '</button>',
-      '<button type="button" class="my-task-comment-action" data-task-comment-action="react" data-comment-id="' + esc(comment.id) + '" title="Add reaction" aria-label="Add reaction">' + iconHtml('message-circle') + (comment.reaction_count ? '<span>' + esc(comment.reaction_count) + '</span>' : '') + '</button>',
       isAuthor ? '<button type="button" class="my-task-comment-action" data-task-comment-action="edit" data-comment-id="' + esc(comment.id) + '" title="Edit" aria-label="Edit">' + iconHtml('edit-2') + '</button>' : '',
       '<button type="button" class="my-task-comment-action" data-task-comment-action="pin" data-comment-id="' + esc(comment.id) + '" title="' + (comment.is_pinned ? 'Unpin' : 'Pin') + '" aria-label="' + (comment.is_pinned ? 'Unpin' : 'Pin') + '">' + iconHtml('pin') + '</button>',
       isAuthor ? '<button type="button" class="my-task-comment-action" data-task-comment-action="delete" data-comment-id="' + esc(comment.id) + '" title="Delete" aria-label="Delete">' + iconHtml('trash') + '</button>' : '',
@@ -893,6 +926,7 @@
     renderHeaderActions(modal, task);
     modal.open = true;
     requestAnimationFrame(function () { syncTaskActivityTabs(task); });
+    loadTaskComments(task);
   }
 
   function exposeTaskDetailsBridge() {
@@ -2011,7 +2045,7 @@
     }
   }
 
-  function handleTaskCommentAction(action, commentId, actionEl) {
+  async function handleTaskCommentAction(action, commentId, actionEl) {
     var task = state.viewingTask;
     if (!task || !commentId) return;
     var store = getTaskDetailStore(task);
@@ -2048,33 +2082,52 @@
         return;
       }
       if (!comment.replies) comment.replies = [];
-      comment.replies.push({
-        id: 'local-reply-' + LanaTime.nowMs(),
-        author: currentUserName(),
-        author_id: String(currentUserId()),
-        content: replyContent,
-        created_at: LanaTime.nowIso(),
-        is_edited: false,
-        is_pinned: false,
-        liked: false,
-        like_count: 0,
-        reaction_count: 0,
-        replies: []
-      });
+      if (isTaskCommentSynced(store, commentId)) {
+        try {
+          var replyResponse = await api.replyToComment(commentId, { content: replyContent });
+          comment.replies.push(normalizeComment(replyResponse && replyResponse.data ? replyResponse.data : replyResponse));
+        } catch (replyError) {
+          Lex.Toast.error(replyError.message || 'Failed to post reply');
+          return;
+        }
+      } else {
+        comment.replies.push({
+          id: 'local-reply-' + LanaTime.nowMs(),
+          author: currentUserName(),
+          author_id: String(currentUserId()),
+          content: replyContent,
+          created_at: LanaTime.nowIso(),
+          is_edited: false,
+          is_pinned: false,
+          liked: false,
+          like_count: 0,
+          reaction_count: 0,
+          replies: []
+        });
+      }
       addDetailActivity(task, 'history', 'Replied to a comment');
       rerenderTaskDetails();
       return;
     }
 
     if (action === 'like') {
-      comment.liked = !comment.liked;
-      comment.like_count = Math.max(0, Number(comment.like_count || 0) + (comment.liked ? 1 : -1));
-      rerenderTaskDetails();
-      return;
-    }
-
-    if (action === 'react') {
-      comment.reaction_count = Number(comment.reaction_count || 0) + 1;
+      var nextLiked = !comment.liked;
+      if (isTaskCommentSynced(store, commentId) && api.likeComment && api.unlikeComment) {
+        try {
+          var likeResponse = nextLiked ? await api.likeComment(commentId) : await api.unlikeComment(commentId);
+          var likeState = likeResponse && likeResponse.data ? likeResponse.data : likeResponse;
+          comment.liked = likeState && likeState.liked !== undefined ? !!likeState.liked : nextLiked;
+          comment.like_count = likeState && likeState.like_count !== undefined
+            ? Number(likeState.like_count) || 0
+            : Math.max(0, Number(comment.like_count || 0) + (nextLiked ? 1 : -1));
+        } catch (likeError) {
+          Lex.Toast.error(likeError.message || 'Failed to update like');
+          return;
+        }
+      } else {
+        comment.liked = nextLiked;
+        comment.like_count = Math.max(0, Number(comment.like_count || 0) + (nextLiked ? 1 : -1));
+      }
       rerenderTaskDetails();
       return;
     }
@@ -2104,6 +2157,14 @@
         Lex.Toast.warning('Comment cannot be empty');
         return;
       }
+      if (isTaskCommentSynced(store, commentId)) {
+        try {
+          await api.updateComment(commentId, { content: editedContent });
+        } catch (editError) {
+          Lex.Toast.error(editError.message || 'Failed to update comment');
+          return;
+        }
+      }
       comment.content = editedContent;
       comment.is_edited = true;
       addDetailActivity(task, 'history', 'Edited a comment');
@@ -2112,15 +2173,29 @@
     }
 
     if (action === 'delete') {
-      if (!window.confirm('Delete this comment? This cannot be undone.')) return;
-      if (removeTaskComment(store.comments, commentId)) {
-        addDetailActivity(task, 'history', 'Deleted a comment');
-        rerenderTaskDetails();
-      }
+      Lex.Modal.confirm(
+        'Delete Comment',
+        'Are you sure you want to delete this comment? This action cannot be undone.',
+        async function () {
+          if (isTaskCommentSynced(store, commentId)) {
+            try {
+              await api.deleteComment(commentId);
+            } catch (deleteError) {
+              Lex.Toast.error(deleteError.message || 'Failed to delete comment');
+              return;
+            }
+          }
+          if (removeTaskComment(store.comments, commentId)) {
+            addDetailActivity(task, 'history', 'Deleted a comment');
+            rerenderTaskDetails();
+          }
+        },
+        { variant: 'danger', confirmText: 'Delete' }
+      );
     }
   }
 
-  function handleDetailAdd(kind) {
+  async function handleDetailAdd(kind) {
     var task = state.viewingTask;
     if (!task) return;
     var store = getTaskDetailStore(task);
@@ -2178,19 +2253,29 @@
     if (kind === 'comment') {
       var comment = detailInputValue('comment');
       if (!comment) return;
-      store.comments.unshift({
-        id: 'local-comment-' + LanaTime.nowMs(),
-        author: currentUserName(),
-        author_id: String(currentUserId()),
-        content: comment,
-        created_at: LanaTime.nowIso(),
-        is_edited: false,
-        is_pinned: false,
-        liked: false,
-        like_count: 0,
-        reaction_count: 0,
-        replies: []
-      });
+      if (store.commentsRemote && window.api && api.createResourceComment) {
+        try {
+          var commentResponse = await api.createResourceComment('task', taskUuid(task), { content: comment });
+          store.comments.unshift(normalizeComment(commentResponse && commentResponse.data ? commentResponse.data : commentResponse));
+        } catch (commentError) {
+          Lex.Toast.error(commentError.message || 'Failed to post comment');
+          return;
+        }
+      } else {
+        store.comments.unshift({
+          id: 'local-comment-' + LanaTime.nowMs(),
+          author: currentUserName(),
+          author_id: String(currentUserId()),
+          content: comment,
+          created_at: LanaTime.nowIso(),
+          is_edited: false,
+          is_pinned: false,
+          liked: false,
+          like_count: 0,
+          reaction_count: 0,
+          replies: []
+        });
+      }
       state.activityTabs[detailKey(task)] = 'comments';
       rerenderTaskDetails();
     }

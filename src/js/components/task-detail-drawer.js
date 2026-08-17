@@ -225,6 +225,9 @@
   function normalizeComment(item, index) {
     if (typeof item === 'string') item = { content: item };
     item = item || {};
+    var reactions = firstArray(item.reactions, item.comment_reactions, []);
+    var likes = firstDefined(item.like_count, item.likes_count, item.likes, item.upvotes, 0);
+    var reactionCount = firstDefined(item.reaction_count, item.reactions_count, reactions.length, 0);
     return {
       id: String(firstDefined(item.id, item.comment_id, 'comment-' + index)),
       author: firstDefined(item.author_name, item.created_by_name, item.user_name, item.author, currentUserName()),
@@ -232,6 +235,9 @@
       content: firstDefined(item.content, item.body, item.text, ''),
       created_at: firstDefined(item.created_at, item.timestamp, LanaTime.nowIso()),
       is_edited: !!(item.is_edited || item.edited),
+      liked: !!(item.liked || item.liked_by_me || item.user_liked),
+      like_count: Number(likes) || 0,
+      reaction_count: Number(reactionCount) || 0,
       replies: asArray(firstArray(item.replies, item.children, [])).map(normalizeComment)
     };
   }
@@ -381,22 +387,44 @@
     return esc(content).split('\n').join('<br>');
   }
 
-  function renderComment(comment) {
+  function renderCommentActions(comment, isReply) {
     var isAuthor = comment.author_id && String(comment.author_id) === currentUserId();
+    var replyCount = asArray(comment.replies).length;
+    return [
+      '<div class="my-task-comment-actions">',
+      !isReply ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="reply" data-comment-id="' + esc(comment.id) + '" title="Reply" aria-label="Reply">' + iconHtml('message-circle') + (replyCount ? '<span>' + esc(replyCount) + '</span>' : '') + '</button>' : '',
+      '  <button type="button" class="my-task-comment-action' + (comment.liked ? ' is-active' : '') + '" data-shared-comment-action="like" data-comment-id="' + esc(comment.id) + '" title="Like" aria-label="Like">' + iconHtml('thumbs-up') + (comment.like_count ? '<span>' + esc(comment.like_count) + '</span>' : '') + '</button>',
+      isAuthor ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="edit" data-comment-id="' + esc(comment.id) + '" title="Edit" aria-label="Edit">' + iconHtml('edit-2') + '</button>' : '',
+      isAuthor ? '  <button type="button" class="my-task-comment-action" data-shared-comment-action="delete" data-comment-id="' + esc(comment.id) + '" title="Delete" aria-label="Delete">' + iconHtml('trash') + '</button>' : '',
+      '</div>'
+    ].join('');
+  }
+
+  function renderCommentReply(reply) {
+    return [
+      '<article class="my-task-comment-thread my-task-comment-thread--reply" data-shared-comment-id="' + esc(reply.id) + '">',
+      '  <div class="my-task-avatar my-task-avatar--sm">' + esc(initialsFor(reply.author)) + '</div>',
+      '  <div class="my-task-comment-thread__body">',
+      '    <div class="my-task-activity-item__meta"><strong>' + esc(reply.author) + '</strong><span>' + esc(formatDateTime(reply.created_at)) + '</span>' + (reply.is_edited ? '<span>edited</span>' : '') + '</div>',
+      '    <div class="my-task-comment-content" data-shared-comment-content="' + esc(reply.id) + '">' + renderCommentContent(reply.content) + '</div>',
+      renderCommentActions(reply, true),
+      '  </div>',
+      '</article>'
+    ].join('');
+  }
+
+  function renderComment(comment) {
+    var replies = asArray(comment.replies);
     return [
       '<article class="my-task-comment-thread" data-shared-comment-id="' + esc(comment.id) + '">',
       '  <div class="my-task-comment-thread__row">',
       '    <div class="my-task-avatar">' + esc(initialsFor(comment.author)) + '</div>',
       '    <div class="my-task-comment-thread__body">',
       '      <div class="my-task-activity-item__meta"><strong>' + esc(comment.author) + '</strong><span>' + esc(formatDateTime(comment.created_at)) + '</span>' + (comment.is_edited ? '<span>edited</span>' : '') + '</div>',
-      '      <div class="my-task-comment-content">' + renderCommentContent(comment.content) + '</div>',
-      '      <div class="my-task-comment-actions">',
-      '        <button type="button" class="my-task-comment-action" data-shared-comment-action="reply" data-comment-id="' + esc(comment.id) + '">' + iconHtml('corner-up-left') + '</button>',
-      '        <button type="button" class="my-task-comment-action" data-shared-comment-action="like" data-comment-id="' + esc(comment.id) + '">' + iconHtml('thumbs-up') + '</button>',
-      '        <button type="button" class="my-task-comment-action" data-shared-comment-action="react" data-comment-id="' + esc(comment.id) + '">' + iconHtml('message-circle') + '</button>',
-      isAuthor ? '        <button type="button" class="my-task-comment-action" data-shared-comment-action="edit" data-comment-id="' + esc(comment.id) + '">' + iconHtml('edit-2') + '</button>' : '',
-      '      </div>',
+      '      <div class="my-task-comment-content" data-shared-comment-content="' + esc(comment.id) + '">' + renderCommentContent(comment.content) + '</div>',
+      renderCommentActions(comment, false),
       '      <div class="my-task-reply-editor hidden" data-shared-reply-editor="' + esc(comment.id) + '"><textarea rows="2" placeholder="Write a reply..."></textarea><div class="my-task-reply-editor__actions"><button type="button" class="my-task-comment-action" data-shared-comment-action="cancel-reply" data-comment-id="' + esc(comment.id) + '">Cancel</button><button type="button" class="my-task-comment-action my-task-comment-action--primary" data-shared-comment-action="post-reply" data-comment-id="' + esc(comment.id) + '">' + iconHtml('send') + '<span>Reply</span></button></div></div>',
+      replies.length ? '      <div class="my-task-comment-replies">' + replies.map(renderCommentReply).join('') + '</div>' : '',
       '    </div>',
       '  </div>',
       '</article>'
@@ -573,7 +601,7 @@
     });
   }
 
-  function addItem(kind) {
+  async function addItem(kind) {
     var task = state.task;
     if (!task) return;
     var store = getStore(task);
@@ -604,14 +632,24 @@
     if (kind === 'comment') {
       var comment = inputValue('comment');
       if (!comment) return;
-      store.comments.unshift({
-        id: 'local-comment-' + LanaTime.nowMs(),
-        author: currentUserName(),
-        author_id: currentUserId(),
-        content: comment,
-        created_at: LanaTime.nowIso(),
-        replies: []
-      });
+      if (store.remote && window.api && api.createResourceComment) {
+        try {
+          var response = await api.createResourceComment('task', taskId(task), { content: comment });
+          store.comments.unshift(normalizeComment(response && response.data ? response.data : response));
+        } catch (error) {
+          toastError(error.message || 'Failed to post comment');
+          return;
+        }
+      } else {
+        store.comments.unshift({
+          id: 'local-comment-' + LanaTime.nowMs(),
+          author: currentUserName(),
+          author_id: currentUserId(),
+          content: comment,
+          created_at: LanaTime.nowIso(),
+          replies: []
+        });
+      }
       state.activityTabs[detailKey(task)] = 'comments';
       render();
     }
@@ -645,7 +683,46 @@
     return null;
   }
 
-  function handleCommentAction(action, commentId, actionEl) {
+  function removeComment(comments, commentId) {
+    comments = asArray(comments);
+    for (var i = 0; i < comments.length; i += 1) {
+      if (String(comments[i].id) === String(commentId)) {
+        comments.splice(i, 1);
+        return true;
+      }
+      if (removeComment(comments[i].replies, commentId)) return true;
+    }
+    return false;
+  }
+
+  function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''));
+  }
+
+  function isSynced(store, commentId) {
+    return !!(store.remote && window.api && isUuid(commentId));
+  }
+
+  function toastError(message) {
+    if (window.Lex && Lex.Toast) Lex.Toast.error(message);
+  }
+
+  async function loadComments(task) {
+    if (!window.api || !api.getResourceComments || !isUuid(taskId(task))) return;
+    var store = getStore(task);
+    try {
+      var response = await api.getResourceComments('task', taskId(task), { limit: 100, include_replies: true });
+      var payload = response && response.data ? response.data : response;
+      store.comments = asArray(payload && payload.comments).map(normalizeComment);
+      store.remote = true;
+      if (state.task && detailKey(state.task) === detailKey(task)) render();
+    } catch (error) {
+      // Leave metadata/local comments in place; the drawer still works offline.
+      console.warn('[TaskDetails] Failed to load comments:', error && error.message);
+    }
+  }
+
+  async function handleCommentAction(action, commentId, actionEl) {
     var task = state.task;
     var store = task && getStore(task);
     var comment = store && findComment(store.comments, commentId);
@@ -670,9 +747,115 @@
       var text = textarea ? textarea.value.trim() : '';
       if (!text) return;
       comment.replies = comment.replies || [];
-      comment.replies.push({ id: 'local-reply-' + LanaTime.nowMs(), author: currentUserName(), author_id: currentUserId(), content: text, created_at: LanaTime.nowIso(), replies: [] });
+      if (isSynced(store, commentId)) {
+        try {
+          var replyResponse = await api.replyToComment(commentId, { content: text });
+          comment.replies.push(normalizeComment(replyResponse && replyResponse.data ? replyResponse.data : replyResponse));
+        } catch (error) {
+          toastError(error.message || 'Failed to post reply');
+          return;
+        }
+      } else {
+        comment.replies.push({ id: 'local-reply-' + LanaTime.nowMs(), author: currentUserName(), author_id: currentUserId(), content: text, created_at: LanaTime.nowIso(), replies: [] });
+      }
       addActivity(store, 'Replied to a comment');
       render();
+      return;
+    }
+    if (action === 'like') {
+      var nextLiked = !comment.liked;
+      if (isSynced(store, commentId) && api.likeComment && api.unlikeComment) {
+        try {
+          var likeResponse = nextLiked ? await api.likeComment(commentId) : await api.unlikeComment(commentId);
+          var likeState = likeResponse && likeResponse.data ? likeResponse.data : likeResponse;
+          comment.liked = likeState && likeState.liked !== undefined ? !!likeState.liked : nextLiked;
+          comment.like_count = likeState && likeState.like_count !== undefined
+            ? Number(likeState.like_count) || 0
+            : Math.max(0, Number(comment.like_count || 0) + (nextLiked ? 1 : -1));
+        } catch (error) {
+          toastError(error.message || 'Failed to update like');
+          return;
+        }
+      } else {
+        comment.liked = nextLiked;
+        comment.like_count = Math.max(0, Number(comment.like_count || 0) + (nextLiked ? 1 : -1));
+      }
+      render();
+      return;
+    }
+    if (action === 'edit') {
+      startCommentEdit(comment);
+      return;
+    }
+    if (action === 'cancel-edit') {
+      render();
+      return;
+    }
+    if (action === 'save-edit') {
+      var editBox = actionEl.closest('.my-task-comment-edit');
+      var editTextarea = editBox && editBox.querySelector('textarea');
+      var editedContent = editTextarea ? editTextarea.value.trim() : '';
+      if (!editedContent) {
+        if (window.Lex && Lex.Toast) Lex.Toast.warning('Comment cannot be empty');
+        return;
+      }
+      if (isSynced(store, commentId)) {
+        try {
+          await api.updateComment(commentId, { content: editedContent });
+        } catch (error) {
+          toastError(error.message || 'Failed to update comment');
+          return;
+        }
+      }
+      comment.content = editedContent;
+      comment.is_edited = true;
+      addActivity(store, 'Edited a comment');
+      render();
+      return;
+    }
+    if (action === 'delete') {
+      confirmDelete('Delete Comment', 'Are you sure you want to delete this comment? This action cannot be undone.', async function () {
+        if (isSynced(store, commentId)) {
+          try {
+            await api.deleteComment(commentId);
+          } catch (error) {
+            toastError(error.message || 'Failed to delete comment');
+            return;
+          }
+        }
+        if (removeComment(store.comments, commentId)) {
+          addActivity(store, 'Deleted a comment');
+          render();
+        }
+      });
+    }
+  }
+
+  function confirmDelete(title, message, onConfirm) {
+    if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
+      Lex.Modal.confirm(title, message, onConfirm, { variant: 'danger', confirmText: 'Delete' });
+      return;
+    }
+    if (window.confirm(message)) onConfirm();
+  }
+
+  function startCommentEdit(comment) {
+    var content = contentEl();
+    var target = content && content.querySelector('[data-shared-comment-content="' + comment.id + '"]');
+    if (!target) return;
+    target.innerHTML = [
+      '<div class="my-task-comment-edit">',
+      '  <textarea rows="3">' + esc(comment.content || '') + '</textarea>',
+      '  <div class="my-task-reply-editor__actions">',
+      '    <button type="button" class="my-task-comment-action" data-shared-comment-action="cancel-edit" data-comment-id="' + esc(comment.id) + '">Cancel</button>',
+      '    <button type="button" class="my-task-comment-action my-task-comment-action--primary" data-shared-comment-action="save-edit" data-comment-id="' + esc(comment.id) + '">' + iconHtml('send') + '<span>Save</span></button>',
+      '  </div>',
+      '</div>'
+    ].join('');
+    var textarea = target.querySelector('textarea');
+    if (textarea) {
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     }
   }
 
@@ -764,7 +947,9 @@
     if (!task) return false;
     state.task = task;
     state.options = options || state.options || {};
-    return render();
+    var opened = render();
+    if (opened) loadComments(task);
+    return opened;
   }
 
   function openById(id, options) {
