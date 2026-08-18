@@ -636,6 +636,37 @@ class ApiClient {
           throw new ApiError(result.error?.message || result.detail || 'Session expired', response.status, result);
         }
 
+        // Rate limiting: a 429 means the request was rejected before it ran, so
+        // replaying it is safe for any method. Workspace open fans out ten
+        // parallel calls and the sidebar polls alongside it, which is enough to
+        // trip the limiter; without this the burst surfaced as a hard failure.
+        // Honour the server's own delay hint and jitter it so the throttled
+        // calls do not all wake at the same instant and trip it again.
+        const retryPolicy = (typeof RequestRetry !== 'undefined') ? RequestRetry : null;
+        if (retryPolicy && response.status === 429) {
+          const attempt = (options.__rateLimitAttempt || 0) + 1;
+          const rateLimitError = new ApiError(
+            extractApiErrorMessage(result, 'Too many requests'),
+            response.status,
+            result
+          );
+
+          if (retryPolicy.shouldRetry(rateLimitError, attempt - 1)) {
+            const waitMs = retryPolicy.jitter(retryPolicy.parseRetryDelayMs(response.headers, result));
+            console.warn(
+              `[LanaAPI] Rate limited on ${endpoint} — retry ${attempt}/${retryPolicy.MAX_ATTEMPTS} in ${waitMs}ms`
+            );
+            await new Promise((resolve) => setTimeout(resolve, waitMs));
+            return this.request(method, endpoint, data, {
+              ...options,
+              __rateLimitAttempt: attempt
+            });
+          }
+
+          console.error(`[LanaAPI] Rate limited on ${endpoint} — giving up after ${attempt - 1} retries`);
+          throw rateLimitError;
+        }
+
         // Extract error message with comprehensive fallback chain
         const finalErrorMessage = extractApiErrorMessage(result, 'Request failed');
 

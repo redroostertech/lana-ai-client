@@ -329,6 +329,62 @@
   // Data Loading (adapted from workspace.js viewMatter)
   // =========================================================================
 
+  /**
+   * Blocking "no access" dialog for a workspace the server refuses.
+   *
+   * The matter-scoped routes answer 403 ("You do not have access to this
+   * matter"), which is a permanent answer — there is nothing on this page the
+   * user can reach, so leaving them on a half-rendered shell is not an option
+   * and a toast they can ignore is not either.
+   *
+   * lex-modal has no non-dismissible mode: it always renders the X when a
+   * heading is set, and ESC is bound unconditionally. Rather than fight the
+   * component, every exit path — CTA, cancel, X, ESC, backdrop — is wired to the
+   * same destination, so the dialog cannot be dismissed back into the broken
+   * page. closeOnOverlay stays off so a stray click outside is not treated as an
+   * answer at all.
+   *
+   * @param {string} matterId shown so the user can quote it when asking for access
+   */
+  function showAccessDeniedModal(matterId) {
+    var LIST_PAGE = 'workspaces.html';
+
+    function goToList() {
+      Lex.Nav.go(LIST_PAGE);
+    }
+
+    // If the modal component is unavailable for any reason, never strand the
+    // user on an empty page — fall back to the list directly.
+    if (!window.Lex || !Lex.Modal || typeof document.createElement !== 'function') {
+      goToList();
+      return;
+    }
+
+    var modal = document.createElement('lex-modal');
+    modal.heading = 'You do not have access';
+    modal.variant = 'danger';
+    modal.size = 'sm';
+    modal.hideActions = false;
+    modal.confirmText = 'Back to Workspaces';
+    modal.cancelText = '';           // falsy hides the cancel button entirely
+    modal.closeOnOverlay = false;
+
+    var idLabel = matterId ? String(matterId) : '';
+    modal.innerHTML =
+      '<p class="lex-modal-body-text">' +
+        'You do not have permission to open this workspace' +
+        (idLabel ? ' (' + escapeHtml(idLabel) + ')' : '') + '. ' +
+        'Ask an administrator to share it with you.' +
+      '</p>';
+
+    ['lex-confirm', 'lex-cancel', 'lex-close'].forEach(function (evt) {
+      modal.addEventListener(evt, goToList);
+    });
+
+    modal.open = true;
+    document.body.appendChild(modal);
+  }
+
   async function loadMatterDetails(matterId, options) {
     options = options || {};
 
@@ -355,7 +411,32 @@
       // Extract results (match shapes returned by api.js methods)
       var matterResult = results[0].status === 'fulfilled' ? results[0].value : null;
       if (!matterResult || !matterResult.matter) {
-        console.error('[loadMatterDetails] FAILED — matterResult:', matterResult);
+        var loadError = results[0].status === 'rejected' ? results[0].reason : null;
+        console.error('[loadMatterDetails] FAILED — matterResult:', matterResult, 'error:', loadError);
+
+        // A throttle or a blip is not a missing workspace. api.request already
+        // retried a 429 with the server's own backoff, so reaching here means the
+        // burst is still being shed — bouncing to the list would throw away the
+        // user's place for something that fixes itself. Keep them here and let
+        // them retry.
+        if (typeof RequestRetry !== 'undefined' && RequestRetry.isTransient(loadError)) {
+          Lex.Toast.error(
+            RequestRetry.isRateLimited(loadError)
+              ? 'The server is rate limiting requests right now. Wait a moment and hit Refresh.'
+              : 'Could not reach the server. Wait a moment and hit Refresh.'
+          );
+          return;
+        }
+
+        // Access denied is a permanent answer about permissions, not a failure to
+        // load. Silently bouncing to the list told the user nothing and made the
+        // workspace look broken, so state the reason in a blocking dialog whose
+        // only way out is a deliberate return to the list.
+        if (typeof RequestRetry !== 'undefined' && RequestRetry.isAccessDenied(loadError)) {
+          showAccessDeniedModal(matterId);
+          return;
+        }
+
         Lex.Toast.error('Failed to load matter details');
         Lex.Nav.go('workspaces.html');
         return;
@@ -424,9 +505,14 @@
       }
 
     } catch (error) {
+      // This catch wraps the whole function, so it fires for rendering faults
+      // long after the matter itself loaded successfully — not just for fetch
+      // failures. Redirecting here bounced the user back to the list for any
+      // such error and took the evidence with it, making the workspace look
+      // permanently unopenable. The genuinely-cannot-load case is handled above,
+      // where a non-transient failure to fetch the matter still redirects.
       console.error('[loadMatterDetails] Error:', error);
       Lex.Toast.error(error.message || 'Failed to load matter');
-      Lex.Nav.go('workspaces.html');
     }
   }
 
