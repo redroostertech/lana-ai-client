@@ -15,6 +15,8 @@
   <script src="js/version.js"></script>
   <script src="js/mock-data.js"></script>
   <script src="js/time-utils.js"></script>
+  <script src="js/shared/server-reachability.js"></script>
+  <script src="js/shared/account-status.js"></script>
   <script src="js/api.js"></script>
   <script src="js/notifications.js"></script>
   <script src="js/utils/rename-conversation.js"></script>
@@ -652,16 +654,10 @@
         const isReachable = await verifyServer(serverInfo.url);
 
         if (!isReachable) {
-          // Server not reachable - check if VPN is available from discovery
-          if (serverInfo.vpn && serverInfo.vpn.enabled) {
-            // VPN is available! Redirect to setup page
-            const serverInfoEncoded = btoa(JSON.stringify(serverInfo));
-            window.location.href = `vpn-setup.html?server=${encodeURIComponent(serverInfoEncoded)}`;
-            return;
-          }
-
-          // No VPN available - just show error
-          throw new Error(`Unable to reach server at ${serverInfo.staticIp}:${serverInfo.port}. Please check your network connection or contact your administrator.`);
+          // Server not reachable. When discovery says the org sits behind a VPN,
+          // that is almost always the reason, so name it in the error instead of
+          // giving the generic network message.
+          throw new Error(ServerReachability.buildUnreachableMessage(serverInfo));
         }
 
         // Set the API base URL
@@ -798,7 +794,24 @@
           document.getElementById('mfaToken').focus();
           Toast.info('Please enter your MFA code');
         } else {
-          Toast.error(error.message || 'Login failed. Please check your credentials.');
+          // Accounts created but never activated cannot sign in. Rather than
+          // leaving the user on the form with a generic failure, send them
+          // straight to the activation screen. A deactivated account is a
+          // different problem — an activation code will not reopen it — so it
+          // keeps the error message instead of a redirect.
+          const accountState = AccountStatus.classifyLoginFailure(error);
+
+          if (accountState === 'activation_required') {
+            Toast.info('This account has not been activated yet. Opening account activation...');
+            window.location.href = 'activate.html';
+            return;
+          }
+
+          if (accountState === 'account_disabled') {
+            Toast.error('This account has been deactivated. Please contact your administrator.');
+          } else {
+            Toast.error(error.message || 'Login failed. Please check your credentials.');
+          }
         }
         submitBtn.disabled = false;
         submitBtn.textContent = 'Sign in';

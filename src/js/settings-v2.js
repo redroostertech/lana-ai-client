@@ -1330,8 +1330,18 @@
           Lex.Toast.error('Invalid server configuration.');
           return;
         }
-        var serverInfoEncoded = btoa(JSON.stringify(serverInfo));
-        Lex.Nav.go('vpn-setup.html', { params: { server: serverInfoEncoded } });
+        // There is no in-app setup page: discovery advertises that the org sits
+        // behind a VPN but ships no endpoint, key, or PSK to configure, so the
+        // connection is made with the provider's own client. Navigating to a
+        // setup page here previously landed on a URL that does not exist and
+        // blanked the window.
+        var vpnType = (serverInfo.vpn && serverInfo.vpn.type) ? serverInfo.vpn.type : '';
+        var vpnName = vpnType ? vpnType.charAt(0).toUpperCase() + vpnType.slice(1) : 'the';
+        Lex.Toast.info(
+          (serverInfo.orgName || serverInfo.orgId || 'This organization') +
+          ' uses ' + vpnName + ' VPN for remote access. Install and sign in to it on this device, ' +
+          'then reconnect — there is no setup step inside LanaAI.'
+        );
       });
     }
   }
