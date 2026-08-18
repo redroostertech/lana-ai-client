@@ -895,7 +895,13 @@
         if (showAdmin) {
           menuItems.push({ id: 'admin', label: 'Administration', icon: 'users', href: 'admin/index.html' });
         }
-        menuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' });
+        // Data Connectors is admin-only: the connector endpoints sit behind the
+        // API permission middleware, so a non-admin following this link lands on
+        // a page that cannot load. Gated on the same showAdmin flag as
+        // Administration above.
+        if (showAdmin) {
+          menuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug', href: 'data-connectors.html' });
+        }
         if (this._isLanaOne) {
           menuItems.push({ id: 'billing', label: 'Plan and billing', icon: 'credit-card', href: 'settings-v2.html#billing' });
         }
@@ -909,7 +915,9 @@
         if (showAdmin) {
           topbarMenuItems.push({ id: 'admin', label: 'Administration', icon: 'users' });
         }
-        topbarMenuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug' });
+        if (showAdmin) {
+          topbarMenuItems.push({ id: 'connectors', label: 'Data Connectors', icon: 'plug' });
+        }
         topbarMenuItems.push({ id: 'settings', label: 'Settings', icon: 'settings' });
         topbarMenuItems.push({ id: 'help', label: 'Help & Support', icon: 'help-circle' });
         topbarMenuItems.push({ divider: true });

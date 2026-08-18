@@ -129,6 +129,34 @@
   }
 
   /**
+   * Admin-only dashboard sections.
+   *
+   * Zone E's three tiles (Team Members, Total Documents, Storage Used) are fed by
+   * org-stats and /admin/health/storage, and the Activity Overview card reports
+   * organization-wide activity. All of it sits behind the API's permission
+   * middleware, so a non-admin previously got the containers rendered with "-"
+   * placeholders that never resolved. Hide the sections outright for anyone who
+   * is not an org or system admin.
+   *
+   * Zone E is hidden as a whole rather than tile-by-tile because every tile in it
+   * comes from an admin-gated source. Hiding uses the same 'hidden' class as the
+   * rest of the dashboard (display:none), so the containers leave the grid
+   * entirely and the CSS lets the remaining cards take the full width.
+   *
+   * @returns {boolean} true when the viewer is an admin and the sections stay.
+   */
+  function applyAdminSectionGate() {
+    var isAdmin = canViewStatus();
+    if (isAdmin) return true;
+
+    hide('ccZoneE');
+    // The expandable metric panel only ever opens from a Zone E tile.
+    hide('ccDetailPanel');
+    hide('userProductivityWidget');
+    return false;
+  }
+
+  /**
    * @returns {boolean}
    */
   function heartbeatAppEnabled() {
@@ -2976,13 +3004,20 @@
     // ── 3. Zone A — render immediately (local data only) ──────────────────
     renderZoneA();
 
+    // Hide admin-only sections before the fan-out so they never flash empty.
+    // renderZoneE still runs even when its container is hidden: it is the source
+    // of the matters count used by the Zone A pill below.
+    var showAdminSections = applyAdminSectionGate();
+
     // ── 4. Fan-out: all zones load in parallel ────────────────────────────
     var zoneResults = await Promise.allSettled([
       renderZoneC(),              // 0 — action queue (critical items first)
       renderZoneE(),              // 1 — pipeline stats → returns {matters}
       renderZoneFRight(),         // 2 — data pulse
-      loadUserProductivity(null), // 3 — heatmap
-      loadActivityForUser(null),  // 4 — activity feed
+      // 3, 4 — heatmap + activity feed live inside the Activity Overview card;
+      // skip the requests entirely when that card is gated away.
+      showAdminSections ? loadUserProductivity(null) : Promise.resolve(),
+      showAdminSections ? loadActivityForUser(null) : Promise.resolve(),
       renderZoneD(),              // 5 — Lana Tasks status
       loadBillableHours()         // 6 — billable hours today
     ]);
@@ -3001,11 +3036,15 @@
     initializeActivityUserFilter();
 
     // ── 8. Legacy Widget system (kept for backward-compat) ─────────────────
-    _timeouts.push(setTimeout(function () {
-      if (typeof WidgetRenderer !== 'undefined') {
-        WidgetRenderer.init();
-      }
-    }, 500));
+    // /api/v1/dashboard-widgets requires dashboard:read, so for a non-admin this
+    // only ever produced a 403 into an already-hidden #widgetGrid.
+    if (showAdminSections) {
+      _timeouts.push(setTimeout(function () {
+        if (typeof WidgetRenderer !== 'undefined') {
+          WidgetRenderer.init();
+        }
+      }, 500));
+    }
 
     // ── 9. Heartbeat indicator in topbar ──────────────────────────────────
     _timeouts.push(setTimeout(function () {

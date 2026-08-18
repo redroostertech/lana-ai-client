@@ -357,6 +357,18 @@
   grid-column: 1 / -1;
 }
 
+/* Admin-gated collapse: the Activity Overview card (2fr) is hidden for non-admins
+   because its data comes from organization-wide endpoints behind the API
+   permission middleware. Without this, the surviving Billable Hours card would
+   inherit the 2fr track and leave the 1fr track empty, so the row is dropped to a
+   single full-width column instead. Keyed on the specific children rather than a
+   bare `.hidden` because #ccZoneFRight ships hidden by default and must not
+   trigger the collapse. */
+.cc-signals-row:has(> #userProductivityWidget.hidden),
+.cc-signals-row:has(> #ccZoneFBillable.hidden) {
+  grid-template-columns: 1fr;
+}
+
 
 /* ==========================================================================
    7. Section headers (used inside zones)

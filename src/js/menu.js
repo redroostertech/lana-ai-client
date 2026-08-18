@@ -167,7 +167,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors', requiredRoles: ADMIN_ROLES },
           {
             id: 'insights',
             label: 'Analytics',
@@ -282,7 +282,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors', requiredRoles: ADMIN_ROLES },
           {
             id: 'insights',
             label: 'Analytics',
@@ -346,7 +346,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors', requiredRoles: ADMIN_ROLES },
           {
             id: 'insights',
             label: 'Analytics',
@@ -410,7 +410,7 @@ const MenuConfig = {
         title: null,
         requiredRoles: [],
         items: [
-          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors' },
+          { id: 'connectors', label: 'Data Connectors', href: '/data-connectors.html', icon: 'connectors', requiredRoles: ADMIN_ROLES },
           {
             id: 'insights',
             label: 'Analytics',
