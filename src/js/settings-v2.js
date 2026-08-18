@@ -1970,6 +1970,16 @@
       if (data.authorizationUrl) {
         openExternalUrl(data.authorizationUrl);
         Lex.Toast.info('Complete authorization in your browser.');
+        // The spinner covers "starting authorization", and that work is done the
+        // moment the browser is open. Leaving it spinning until a deep link
+        // arrives strands the button whenever no deep link ever comes: the
+        // provider refuses before it redirects (an unverified app, or an account
+        // that is not an approved tester, both stop on the provider's own error
+        // page), the user closes the tab, or the deep link fails to route. There
+        // is no timeout behind it, so the row stayed unusable until the page was
+        // reloaded. _pendingUserConnectionOAuth is deliberately left in place, so
+        // a callback that does arrive later still completes normally.
+        if (btn) btn.loading = false;
       } else {
         Lex.Toast.error('Authorization URL was not returned by the server.');
         if (btn) btn.loading = false;
