@@ -2980,14 +2980,18 @@ class ApiClient {
     return this.get('/api/v1/me/connections');
   }
 
+  // The server computes the OAuth redirect URI. redirectUri is optional and only
+  // forwarded when a caller explicitly supplies one.
   async connectUserConnection(connectorId, redirectUri) {
-    return this.post(`/api/v1/me/connections/${encodeURIComponent(connectorId)}/connect`, {
-      redirect_uri: redirectUri
-    });
+    const payload = {};
+    if (redirectUri) payload.redirect_uri = redirectUri;
+    return this.post(`/api/v1/me/connections/${encodeURIComponent(connectorId)}/connect`, payload);
   }
 
+  // data carries the OAuth code and state. redirect_uri is optional and only sent
+  // when a caller explicitly includes it.
   async completeUserConnection(connectorId, data) {
-    return this.post(`/api/v1/me/connections/${encodeURIComponent(connectorId)}/complete`, data);
+    return this.post(`/api/v1/me/connections/${encodeURIComponent(connectorId)}/complete`, data || {});
   }
 
   async disconnectUserConnection(sourceId) {

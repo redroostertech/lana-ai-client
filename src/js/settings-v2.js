@@ -1597,7 +1597,6 @@
   // Plugins / Connections (user-scoped connectors)
   // =========================================================================
 
-  var USER_CONNECTION_REDIRECT_URI = 'lana-ai://oauth/callback';
   var _userConnectionsAvailable = false;
   var _oauthCallbackRegistered = false;
   var _pendingUserConnectionOAuth = null;
@@ -1961,7 +1960,8 @@
     if (!connectorId || !api) return;
     if (btn) btn.loading = true;
 
-    api.connectUserConnection(connectorId, USER_CONNECTION_REDIRECT_URI).then(function (result) {
+    // The server owns the OAuth redirect URI, so the client does not send one.
+    api.connectUserConnection(connectorId).then(function (result) {
       var data = (result && result.data) || result || {};
       _pendingUserConnectionOAuth = {
         connectorId: connectorId,
@@ -1994,8 +1994,7 @@
     var connectorId = _pendingUserConnectionOAuth.connectorId;
     api.completeUserConnection(connectorId, {
       code: data.code,
-      state: data.state,
-      redirect_uri: USER_CONNECTION_REDIRECT_URI
+      state: data.state
     }).then(function () {
       Lex.Toast.success('Connection authorized.');
       _pendingUserConnectionOAuth = null;
