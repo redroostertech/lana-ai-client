@@ -45,21 +45,34 @@ function getLoginPath() {
   return getPagePath('login.html');
 }
 
+const LanaTime = Object.assign({
+  MS_PER_MINUTE: 60 * 1000,
+  MS_PER_HOUR: 60 * 60 * 1000,
+  nowMs: () => Date.now(),
+  nowIso: () => new Date().toISOString(),
+  millisecondsSince: (startMs) => Date.now() - Number(startMs || 0),
+  formatUtcDateOnly: (value) => {
+    const date = value ? new Date(value) : new Date();
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+  }
+}, window.LanaTime || {});
+
 function apiNowMs() {
-  return window.LanaTime.nowMs();
+  return LanaTime.nowMs();
 }
 
 function apiMillisecondsSince(startMs) {
-  return window.LanaTime.millisecondsSince(startMs);
+  return LanaTime.millisecondsSince(startMs);
 }
 
 function apiMsPerMinute() {
-  return window.LanaTime.MS_PER_MINUTE;
+  return LanaTime.MS_PER_MINUTE;
 }
 
 function extractApiErrorMessage(result, fallback) {
   const error = result && result.error;
   const candidates = [
+    typeof error === 'string' ? error : null,
     error && error.message,
     result && result.detail,
     result && result.message,
@@ -1384,6 +1397,57 @@ class ApiClient {
         ? folders.filter(folder => aliases.includes(folder.matter_id))
         : folders;
       return { status: 'success', folders: items, data: { folders: items } };
+    }
+
+    if (path === '/api/v1/storage/documents' && method === 'GET') {
+      const clientMatter = queryParams.get('client_matter');
+      const search = (queryParams.get('search') || '').toLowerCase();
+      const sortBy = queryParams.get('sort_by') || 'created_at';
+      const sortOrder = (queryParams.get('sort_order') || 'desc').toLowerCase() === 'asc' ? 1 : -1;
+      let files = documents.slice();
+
+      if (clientMatter) {
+        files = files.filter(file =>
+          file.client_matter === clientMatter ||
+          file.matter_id === clientMatter ||
+          file.client_matter_id === clientMatter
+        );
+      }
+      if (search) {
+        files = files.filter(file =>
+          String(file.filename || file.name || '').toLowerCase().includes(search)
+        );
+      }
+
+      files.sort((a, b) => {
+        const aValue = sortBy === 'name' || sortBy === 'filename'
+          ? String(a.filename || a.name || '').toLowerCase()
+          : sortBy === 'file_size'
+            ? Number(a.file_size || 0)
+            : new Date(a[sortBy] || a.created_at || 0).getTime();
+        const bValue = sortBy === 'name' || sortBy === 'filename'
+          ? String(b.filename || b.name || '').toLowerCase()
+          : sortBy === 'file_size'
+            ? Number(b.file_size || 0)
+            : new Date(b[sortBy] || b.created_at || 0).getTime();
+        if (aValue < bValue) return -1 * sortOrder;
+        if (aValue > bValue) return 1 * sortOrder;
+        return 0;
+      });
+
+      const result = paginate(files);
+      const items = result.items.map(file => {
+        const matter = findMatter(file.client_matter || file.matter_id || file.client_matter_id);
+        return {
+          ...file,
+          matter_name: file.matter_name || matter?.name || matter?.matter_name || ''
+        };
+      });
+      return {
+        files: items,
+        documents: items,
+        pagination: result.pagination
+      };
     }
 
     if (path === '/api/v1/storage/recent' && method === 'GET') {

@@ -41,7 +41,7 @@
       >
         <div id="viewerCanvasMode" class="file-viewer-mode-strip" data-banner-meta>
           <span id="viewerReadOnlyBadge" class="file-viewer-mode-badge file-viewer-mode-badge--active">View / Read-only</span>
-          <button id="viewerReviewModeBadge" type="button" class="file-viewer-mode-badge hidden">Enter Review Mode</button>
+          <button id="viewerReviewModeBadge" type="button" class="file-viewer-mode-badge hidden">Open in File Editor</button>
         </div>
         <!-- Visible action: LANA -->
         <lex-ask-lana-btn id="askLanaBtn" panel="fileViewerLana" size="sm"></lex-ask-lana-btn>
@@ -205,8 +205,7 @@
             <span id="reviewBatchStatus">No saved review draft.</span>
           </div>
           <div class="file-viewer-review-workflow__actions">
-            <button id="reviewSaveDraftBtn" type="button" class="file-viewer-review-action file-viewer-review-action--secondary">Save Draft</button>
-            <button id="reviewReleaseBtn" type="button" class="file-viewer-review-action file-viewer-review-action--primary">Release Version</button>
+            <button id="reviewReleaseBtn" type="button" class="file-viewer-review-action file-viewer-review-action--primary">Open in File Editor</button>
           </div>
         </div>
       </aside>
@@ -253,6 +252,10 @@
                   Lifecycle
                 </span>
                 <span id="metaLifecycleBadge" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium">--</span>
+              </div>
+              <div class="flex justify-between items-center pt-2 border-t" style="border-color: var(--lex-border-accent)">
+                <span class="font-medium" style="color: var(--lex-text-secondary)">Access</span>
+                <span id="metaAccessScope" class="font-semibold" style="color: var(--lex-text-primary)">--</span>
               </div>
             </div>
           </div>
@@ -530,6 +533,7 @@
 
   <!-- Shared services -->
   <script src="js/services/docx-template-modal.js"></script>
+  <script src="js/services/document-review-api.service.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/file-viewer-page.js"></script>

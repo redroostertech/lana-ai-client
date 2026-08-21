@@ -54,10 +54,10 @@ describe('document-studio-templates-mapper', () => {
 
   describe('kindLabel', () => {
     test('maps known kinds', () => {
-      expect(mapper.kindLabel('fill')).toBe('Fill');
-      expect(mapper.kindLabel('compose')).toBe('Compose');
-      expect(mapper.kindLabel('render')).toBe('Render');
-      expect(mapper.kindLabel('FILL')).toBe('Fill');
+      expect(mapper.kindLabel('fill')).toBe('Document');
+      expect(mapper.kindLabel('compose')).toBe('Document set');
+      expect(mapper.kindLabel('render')).toBe('Layout');
+      expect(mapper.kindLabel('FILL')).toBe('Document');
     });
 
     test('falls back to raw value', () => {
@@ -74,6 +74,60 @@ describe('document-studio-templates-mapper', () => {
       expect(mapper.scopeLabel({ scope: 'unknown' })).toBe('—');
       expect(mapper.scopeLabel({})).toBe('—');
       expect(mapper.scopeLabel(null)).toBe('—');
+      expect(mapper.scopeLabel({ scope: 'matter', access_scope: 'workspace' })).toBe('Workspace');
+      expect(mapper.scopeLabel({ scope: 'matter', access_scope: 'private' })).toBe('Private');
+      expect(mapper.scopeLabel({ scope: 'org', access_scope: 'organization' })).toBe('Organization');
+    });
+  });
+
+  describe('mapTemplateRow — org-wide editable templates', () => {
+    test('org-wide fill row shows Org-wide with no matter pill but keeps the hosting workspace key', () => {
+      const row = mapper.mapTemplateRow({
+        kind: 'fill',
+        id: 'doc-1',
+        name: 'Affidavit Template.docx',
+        scope: 'org',
+        matter_id: null,
+        source_matter_id: 'MATT-00044',
+        content_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+      expect(row.scope).toBe('org');
+      expect(row.scopeLabel).toBe('Org-wide');
+      expect(row.matterId).toBe('');
+      expect(row.sourceMatterId).toBe('MATT-00044');
+      expect(row.contentType).toContain('wordprocessingml');
+    });
+
+    test('missing handoff fields map to empty strings', () => {
+      const row = mapper.mapTemplateRow({ kind: 'compose', id: 'set-1' });
+      expect(row.sourceMatterId).toBe('');
+      expect(row.contentType).toBe('');
+      expect(row.matterName).toBe('');
+    });
+
+    test('workspace name flows through for matter-scoped rows and into the detail Workspace field', () => {
+      const dto = {
+        kind: 'fill',
+        id: 'doc-2',
+        name: 'NDA.docx',
+        scope: 'matter',
+        matter_id: 'MATT-00007',
+        matter_name: 'Acme Executive Separation'
+      };
+      expect(mapper.mapTemplateRow(dto).matterName).toBe('Acme Executive Separation');
+      const detail = mapper.mapTemplateDetail('fill', dto);
+      const fillSection = detail.sections.find((s) => s.title === 'Document template');
+      const workspaceField = fillSection.fields.find((f) => f.label === 'Workspace');
+      expect(workspaceField.value).toBe('Acme Executive Separation');
+    });
+
+    test('org-wide rows show Organization as the detail Workspace field', () => {
+      const detail = mapper.mapTemplateDetail('fill', {
+        kind: 'fill', id: 'doc-1', name: 'Affidavit.docx', scope: 'org', source_matter_id: 'MATT-00044'
+      });
+      const fillSection = detail.sections.find((s) => s.title === 'Document template');
+      const workspaceField = fillSection.fields.find((f) => f.label === 'Workspace');
+      expect(workspaceField.value).toBe('Organization');
     });
   });
 
@@ -95,7 +149,7 @@ describe('document-studio-templates-mapper', () => {
         updated_at: '2026-01-01T00:00:00Z'
       });
       expect(row.kind).toBe('compose');
-      expect(row.kindLabel).toBe('Compose');
+      expect(row.kindLabel).toBe('Document set');
       expect(row.id).toBe('set-1');
       expect(row.name).toBe('Demand Package');
       expect(row.scopeLabel).toBe('Org-wide');
@@ -191,10 +245,10 @@ describe('document-studio-templates-mapper', () => {
         is_public: true
       });
       expect(detail.kind).toBe('render');
-      expect(detail.kindLabel).toBe('Render');
+      expect(detail.kindLabel).toBe('Layout');
       expect(detail.base.name).toBe('HTML Letter');
       expect(detail.sections).toHaveLength(1);
-      expect(detail.sections[0].title).toBe('Render template');
+      expect(detail.sections[0].title).toBe('Layout');
       const f = fieldMap(detail.sections[0]);
       expect(f.Category).toBe('letters');
       expect(f.Version).toBe('2');
@@ -223,7 +277,7 @@ describe('document-studio-templates-mapper', () => {
         status: 'active',
         scope: 'org'
       });
-      expect(detail.sections[0].title).toBe('Compose set');
+      expect(detail.sections[0].title).toBe('Document set');
       const f = fieldMap(detail.sections[0]);
       expect(f['Document type']).toBe('Demand Letter');
       expect(f['Documents in set']).toBe('3');
@@ -248,11 +302,13 @@ describe('document-studio-templates-mapper', () => {
         status: 'active',
         scope: 'matter'
       });
-      expect(detail.sections[0].title).toBe('Fill template');
+      expect(detail.sections[0].title).toBe('Document template');
       const f = fieldMap(detail.sections[0]);
       expect(f['Document type']).toBe('intake');
       expect(f.Variables).toBe('7');
-      expect(f.Matter).toBe('M-100');
+      // The field is labeled Workspace and falls back to the matter key when
+      // no workspace name accompanies the row.
+      expect(f.Workspace).toBe('M-100');
       expect(f.Status).toBe('active');
     });
 
@@ -267,7 +323,7 @@ describe('document-studio-templates-mapper', () => {
     test('handles null dto and derives kind from the argument', () => {
       const detail = mapper.mapTemplateDetail('render', null);
       expect(detail.kind).toBe('render');
-      expect(detail.kindLabel).toBe('Render');
+      expect(detail.kindLabel).toBe('Layout');
       expect(detail.base.name).toBe('Untitled template');
       expect(detail.sections).toHaveLength(1);
     });

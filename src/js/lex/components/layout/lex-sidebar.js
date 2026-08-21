@@ -1576,6 +1576,10 @@
         this.querySelectorAll('.lex-sidebar-nav-item[data-id]').forEach(el => {
           el.dataset.active = String(el.dataset.id === this.activeId);
         });
+        this.querySelectorAll('.lex-sidebar-nav-group').forEach(group => {
+          const activeChild = group.querySelector('.lex-sidebar-subnav .lex-sidebar-nav-item[data-active="true"]');
+          if (activeChild) group.dataset.expanded = 'true';
+        });
         const appMenu = this.querySelector('.lex-sidebar-app-menu');
         if (appMenu) appMenu.dataset.open = String(this.appMenuOpen);
         const appSwitcher = this.querySelector('.lex-sidebar-app-switcher');
@@ -1714,6 +1718,13 @@
           route: 'doc-studio/index.html',
           colors: ['#2f6f73', '#b56b45', '#17201f', '#f7f4ef']
         },
+        'document-library': {
+          id: 'document-library',
+          label: 'Document Library',
+          description: 'Create, find, and work on documents across workspaces',
+          route: 'document-library.html',
+          colors: ['#38bdf8', '#2563eb', '#16a34a', '#111827']
+        },
         'lana-voice': {
           id: 'lana-voice',
           label: 'LanaVoice',
@@ -1733,13 +1744,13 @@
 
     _getDefaultAppItems() {
       // Safe fallback when discovery hasn't supplied enabled_apps yet
-      // (e.g. first launch, missing field, parse error). LanaWorks is the
-      // baseline app every org has; other sub-apps must be explicitly enabled.
+      // (e.g. first launch, missing field, parse error). Keep this aligned
+      // with LanaClientApps.defaultApps().
       if (window.LanaClientApps && typeof window.LanaClientApps.defaultApps === 'function') {
         return window.LanaClientApps.defaultApps();
       }
       const catalog = this._getAppCatalog();
-      return [catalog['lana-works'], catalog['lana-agents']];
+      return [catalog['lana-works'], catalog['document-library'], catalog['lana-agents']];
     }
 
     // DEPRECATED FALLBACK. The source of truth for the app catalog + aliases is
@@ -1774,6 +1785,11 @@
         'doc-studio': 'doc-studio',
         'deck-studio': 'doc-studio',
         documents: 'doc-studio',
+        office: 'document-library',
+        'office-suite': 'document-library',
+        'lana-office': 'document-library',
+        'lana-office-suite': 'document-library',
+        'document-library': 'document-library',
         brainchild: 'brainchild',
         brain: 'brainchild',
         knowledge: 'brainchild'
@@ -1930,6 +1946,13 @@
       if (path.indexOf('/agents/') !== -1) return byId('lana-agents') || items[0];
       if (path.indexOf('/brainchild/') !== -1) return byId('brainchild') || items[0];
       if (path.indexOf('/doc-studio/') !== -1 || path.indexOf('/deck-studio/') !== -1) return byId('doc-studio') || items[0];
+      if (path.indexOf('/document-library.html') !== -1 || path.indexOf('document-library.html') !== -1 ||
+          path.indexOf('/document-library-templates.html') !== -1 || path.indexOf('document-library-templates.html') !== -1 ||
+          path.indexOf('/file-viewer.html') !== -1 || path.indexOf('file-viewer.html') !== -1 ||
+          path.indexOf('/file-editor.html') !== -1 || path.indexOf('file-editor.html') !== -1 ||
+          path.indexOf('/office-suite.html') !== -1 || path.indexOf('office-suite.html') !== -1) {
+        return byId('document-library') || items[0];
+      }
       return byId('lana-works') || items[0];
     }
 
@@ -2113,7 +2136,8 @@
         const chevronHtml = `<span class="lex-sidebar-nav-chevron">${icon('chevron-right', 'small')}</span>`;
         const defaultChild = item.children.find((child) => child && child.href);
         const defaultHref = item.href || (defaultChild && defaultChild.href) || '';
-        return `<div class="lex-sidebar-nav-group" data-expanded="false">
+        const hasActiveChild = item.children.some((child) => child && child.id === this.activeId);
+        return `<div class="lex-sidebar-nav-group" data-expanded="${hasActiveChild ? 'true' : 'false'}">
           <button type="button" class="lex-sidebar-nav-item lex-sidebar-nav-group-toggle" data-nav-toggle data-id="${this.escapeHtml(item.id || '')}" data-href="${this.escapeHtml(defaultHref)}" data-tooltip="${this.escapeHtml(item.label || '')}">
             ${iconHtml}
             <span class="lex-sidebar-nav-label">${this.escapeHtml(item.label || '')}</span>
@@ -2312,7 +2336,6 @@
 
     _getApiClient() {
       if (window.api) return window.api;
-      if (typeof api !== 'undefined') return api;
       return null;
     }
 

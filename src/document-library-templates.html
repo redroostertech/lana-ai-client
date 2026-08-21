@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Templates - LANA AI</title>
+  <title>Template Library - LANA AI</title>
 
   <!-- CSS -->
   <link rel="stylesheet" href="css/lex-tokens.css">
   <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/document-studio-templates.css">
+  <link rel="stylesheet" href="css/document-library.css">
+  <link rel="stylesheet" href="css/document-library-templates.css">
+  <link rel="stylesheet" href="css/document-create-modal.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <script src="js/tailwind-loader.js"></script>
@@ -23,69 +25,72 @@
     logo-src="img/logo-light.png"
     logo-alt="LANA AI"
     logo-href="dashboard.html"
-    active-nav-id="templates"
-    page-title="Templates"
+    active-nav-id="library-templates"
+    page-title="Template Library"
   ></lex-app>
 
   <template id="page-content">
 
-    <main>
+    <main id="templateLibrary" class="document-library template-library">
 
-      <!-- Page header -->
-      <div class="dst-header">
-        <div class="dst-header-title">Templates</div>
-        <div class="dst-header-subtitle">All document templates across Fill, Compose, and Render engines</div>
-      </div>
+      <lex-banner
+        id="templateLibraryBanner"
+        variant="light"
+        corners
+        heading="Template Library"
+        subtitle="Reusable templates for the whole organization and for individual workspaces."
+        lana
+        lana-context-type="full_chat"
+      >
+        <lex-btn id="dstNewTemplate" variant="primary" leading-icon="file-plus" data-action="new-template">New Template</lex-btn>
+      </lex-banner>
 
-      <!-- Kind filter (segmented) with live counts -->
+      <!-- Kind filter, org-wide toggle, and search -->
       <div class="dst-filters">
+        <span class="dst-filter-label" id="dstKindFilterLabel">Template type</span>
         <lex-segmented
           id="dstKindFilter"
+          aria-labelledby="dstKindFilterLabel"
           value=""
-          options='[{"value":"","label":"All"},{"value":"fill","label":"Fill"},{"value":"compose","label":"Compose"},{"value":"render","label":"Render"}]'
+          options='[{"value":"","label":"All"},{"value":"fill","label":"Documents"},{"value":"compose","label":"Document sets"},{"value":"render","label":"Layouts"}]'
         ></lex-segmented>
 
-        <div style="flex:1;"></div>
+        <div class="dst-filters-spacer"></div>
 
-        <label class="dst-orgwide" title="Include org-wide and render templates when a matter is set">
+        <label class="dst-orgwide" title="Include organization-wide templates when a workspace is selected">
           <input type="checkbox" id="dstOrgWideToggle" checked>
-          <span>Include org-wide</span>
+          <span>Include organization-wide</span>
         </label>
 
-        <input
-          type="text"
-          id="dstSearch"
-          placeholder="Search templates..."
-          style="width:240px;padding:6px 12px;border:1px solid var(--lex-border-default);border-radius:6px;font-size:13px;outline:none;background:var(--lex-bg-primary);color:var(--lex-text-primary);"
-        >
+        <input type="text" id="dstSearch" class="dst-search" placeholder="Search templates...">
       </div>
 
-      <!-- Per-kind counts -->
-      <div class="dst-counts" id="dstCounts">
-        <span class="dst-count" data-kind="fill">Fill <strong id="dstCountFill">—</strong></span>
-        <span class="dst-count" data-kind="compose">Compose <strong id="dstCountCompose">—</strong></span>
-        <span class="dst-count" data-kind="render">Render <strong id="dstCountRender">—</strong></span>
-      </div>
+      <lex-card class="document-library-recents" padding="none" aria-labelledby="dstListHeading">
+        <div class="document-library-section-heading">
+          <div>
+            <h2 id="dstListHeading">All templates</h2>
+            <p>Organization-wide and workspace templates across every type.</p>
+          </div>
+          <span id="dstTotalCount" class="document-library-count" aria-live="polite"></span>
+        </div>
 
-      <!-- Loading -->
-      <div id="dstLoading">
-        <lex-card padding="compact">
-          <lex-spinner></lex-spinner>
-        </lex-card>
-      </div>
+        <div id="dstColumns" class="document-library-columns" role="row" hidden>
+          <span aria-hidden="true"></span>
+          <span role="columnheader">Template</span>
+          <span role="columnheader">Workspace</span>
+          <span role="columnheader">Last edited</span>
+          <span aria-hidden="true"></span>
+        </div>
 
-      <!-- Template list -->
-      <lex-card id="dstCard" padding="none" class="hidden">
-        <div id="dstList"></div>
+        <div id="dstList" class="document-library-files" aria-live="polite" aria-busy="true">
+          <div class="document-library-skeleton" aria-hidden="true"></div>
+          <div class="document-library-skeleton" aria-hidden="true"></div>
+          <div class="document-library-skeleton" aria-hidden="true"></div>
+          <div class="document-library-skeleton" aria-hidden="true"></div>
+        </div>
+
+        <lex-pagination id="dstPagination" page="1" total-pages="1" total="0" limit="12" hidden></lex-pagination>
       </lex-card>
-
-      <!-- Pagination -->
-      <lex-pagination id="dstPagination" class="hidden" page="1" total-pages="1" total="0" limit="25"></lex-pagination>
-
-      <!-- Empty state -->
-      <div id="dstEmpty" class="hidden">
-        <lex-empty icon="file" message="No templates found" description="Nothing matches the current filters"></lex-empty>
-      </div>
 
       <!-- Detail drawer (read-only) -->
       <lex-drawer id="dstDetailDrawer" heading="Template" side="right" width="480">
@@ -130,6 +135,7 @@
   <script src="js/lex/components/foundation/lex-toast.js"></script>
   <script src="js/lex/components/foundation/lex-spinner.js"></script>
   <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/app-catalog.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
@@ -140,6 +146,8 @@
 
   <!-- Page-specific Lex components -->
   <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/foundation/lex-card.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>
   <script src="js/lex/components/foundation/lex-kv.js"></script>
@@ -151,16 +159,17 @@
   <!-- Document Studio data layer (pure mapper + API wrapper) -->
   <script src="js/shared/document-studio-templates-mapper.js"></script>
   <script src="js/document-studio-api.js"></script>
+  <script src="js/services/document-create-modal.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
-  <script src="js/document-studio-templates.js"></script>
+  <script src="js/document-library-templates.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->
   <script src="js/companion-bridge-consent.js"></script>
 
   <!-- Auth guard + loader dismiss -->
   <script src="js/auth-guard.js"></script>
-  <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
+  <lex-lana-dock page-scope="document-library-templates" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
   <!-- LANA dock (IDE-style docked chat panel) -->
   <script src="js/lex/chat/lex-chat.format.js"></script>
   <script src="js/lex/chat/lex-chat.conversations-api.js"></script>

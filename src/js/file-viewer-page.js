@@ -63,6 +63,7 @@
     suppressReviewDraftRestoreForLoad: false,
     formatCapabilities: null,
     formatConversionRunning: false,
+    viewerPlainText: null,
     editorFocusedContext: null,
     workspaceFieldCatalog: null,
     workspaceFieldCatalogMatterId: null,
@@ -74,6 +75,11 @@
     // askLanaDrawer/askLanaChatEl/askLanaThreadsEl removed — managed by lex-lana-panel
     _lanaSessionBootstrapped: false
   };
+
+  // The retired office-release localStorage bridge. Releases now come only
+  // from the server; purge any stale bridge data left by older sessions so
+  // fabricated local releases can never surface in the viewer again.
+  try { localStorage.removeItem('lana:file-viewer:office-releases'); } catch (_) {}
 
   // =========================================================================
   // Helpers
@@ -93,6 +99,18 @@
       else out += ch;
     }
     return out;
+  }
+
+  function explicitFileSourceDocumentId(file) {
+    return LanaDocumentReview.explicitSourceDocumentId(file);
+  }
+
+  function canonicalReviewSourceDocumentId(file) {
+    return state.reviewSourceDocumentId || explicitFileSourceDocumentId(file) || (file && file.id ? String(file.id) : '');
+  }
+
+  function isReleasedArtifactFile(file) {
+    return LanaDocumentReview.isReleasedArtifact(file);
   }
 
   function notify(message, type) {
@@ -360,21 +378,7 @@
     if (!state.editorFocusedContext || state.editorFocusedContext.type !== 'document_edit') return;
     var suggestion = parseDocumentEditSuggestion(detail && detail.content);
     if (!suggestion) return;
-    var editor = state.editorInstance;
-    if (!editor || typeof editor.stageSuggestedEdit !== 'function') {
-      notify('LANA suggested an edit, but the editor is not ready to stage it.', 'error');
-      return;
-    }
-    try {
-      editor.stageSuggestedEdit({
-        text: suggestion.suggested_text,
-        strategy: suggestion.strategy
-      });
-      notify('LANA suggestion staged in the editor. Review it, then click Apply to create a tracked change.', 'success');
-    } catch (error) {
-      console.warn('[FileViewerPage] Failed to stage LANA document edit suggestion:', error);
-      notify('LANA suggested an edit, but it could not be staged in the editor.', 'error');
-    }
+    notify('Open this document in File Editor to apply LANA suggested edits.', 'error');
   }
 
   function fieldOptionsAttribute(fields) {
@@ -893,6 +897,9 @@
     var filename = String((file && file.filename) || '').toLowerCase();
     if (isEditorDocx(file)) return 'docx';
     if (mimeType === 'application/pdf' || filename.endsWith('.pdf')) return 'pdf';
+    if (mimeType === 'text/csv' || filename.endsWith('.csv')) return 'csv';
+    if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || filename.endsWith('.xlsx')) return 'xlsx';
+    if (mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' || filename.endsWith('.pptx')) return 'pptx';
     if (mimeType === 'text/markdown' || filename.endsWith('.md') || filename.endsWith('.markdown')) return 'markdown';
     if (mimeType.indexOf('text/') === 0 || filename.endsWith('.txt') || filename.endsWith('.text') || filename.endsWith('.log')) return 'text';
     return filename.indexOf('.') !== -1 ? filename.split('.').pop() : 'unknown';
@@ -928,7 +935,7 @@
     try {
       var response = await api.get(reviewEndpoint('/documents/' + encodeURIComponent(file.id) + '/format-capabilities'));
       var capabilities = response && response.data ? response.data : response;
-      if (capabilities && capabilities.format) {
+      if (capabilities && typeof capabilities === 'object') {
         state.formatCapabilities = Object.assign({}, state.formatCapabilities, capabilities);
       }
     } catch (error) {
@@ -943,6 +950,28 @@
 
   function canReviewFile(file) {
     return currentFormatCapabilities(file).reviewable === true;
+  }
+
+  function isOfficeEditFormat(file) {
+    var kind = fileEditorKindForFile(file);
+    if (kind !== 'sheet' && kind !== 'deck') return false;
+    var filename = String(file && file.filename || '').toLowerCase();
+    var contentType = String(file && (file.content_type || file.mime_type) || '').toLowerCase();
+    return filename.endsWith('.csv') || filename.endsWith('.xlsx') || filename.endsWith('.pptx') ||
+      contentType === 'text/csv' ||
+      contentType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      contentType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  }
+
+  function officeCapabilitySupportsEditing(capabilities) {
+    var value = capabilities && typeof capabilities === 'object' ? capabilities : {};
+    return value.editable === true || value.edit_model_supported === true ||
+      Boolean(value.file_editor && value.file_editor.editable === true);
+  }
+
+  function canOpenFileInEditor(file) {
+    if (isOfficeEditFormat(file)) return officeCapabilitySupportsEditing(currentFormatCapabilities(file));
+    return canReviewFile(file);
   }
 
   function releaseContentType(file) {
@@ -1178,15 +1207,225 @@
   // Navigation
   // =========================================================================
 
+  function isFileViewerRoute(route) {
+    var value = String(route || '').trim();
+    if (!value) return false;
+    var queryIndex = value.indexOf('?');
+    var path = queryIndex === -1 ? value : value.substring(0, queryIndex);
+    var parts = path.split('/');
+    var page = parts[parts.length - 1] || path;
+    return page === 'file-viewer.html';
+  }
+
+  function normalizeBackReferrer(referrer) {
+    var value = String(referrer || '').trim();
+    if (!value || isFileViewerRoute(value)) return '';
+    return value;
+  }
+
+  function fallbackBackReferrer() {
+    return '';
+  }
+
+  function fileViewerRouteForFile(file) {
+    return file && file.id ? 'file-viewer.html?id=' + encodeURIComponent(file.id) : '';
+  }
+
+  function fileViewerNavContext(file) {
+    return {
+      referrer: normalizeBackReferrer(state.referrerPage) || fallbackBackReferrer(),
+      fileViewerReferrer: fileViewerRouteForFile(file)
+    };
+  }
+
+  function fileEditorKindForFile(file) {
+    var mimeType = String((file && (file.content_type || file.mime_type)) || '').toLowerCase();
+    var filename = String((file && file.filename) || '').toLowerCase();
+    var ext = filename.split('.').pop();
+    if (mimeType === 'text/csv' || mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || ext === 'xlsx' || ext === 'csv') return 'sheet';
+    if (mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' || ext === 'pptx') return 'deck';
+    return 'doc';
+  }
+
+  function plainTextToViewerHtml(text) {
+    var normalized = String(text || '').replace(/\r\n?/g, '\n');
+    if (!normalized.trim()) return '';
+    return normalized.split(/\n{2,}/).map(function (part) {
+      var lines = part.split('\n').map(function (line) {
+        return escapeHtml(line.replace(/\s+$/, ''));
+      });
+      while (lines.length && !lines[0]) lines.shift();
+      while (lines.length && !lines[lines.length - 1]) lines.pop();
+      if (!lines.length) return '';
+      return '<p>' + lines.join('<br>') + '</p>';
+    }).filter(Boolean).join('');
+  }
+
+  function visibleViewerDocumentHtml() {
+    // Text-like files: build the handoff from the decoded source text, not a
+    // DOM scrape. The LANA Editor embed renders one block element per line,
+    // so textContent jams lines together with no separator.
+    var textHtml = plainTextToViewerHtml(state.viewerPlainText);
+    if (textHtml) return textHtml;
+    var sources = [
+      document.getElementById('viewerDocx'),
+      document.getElementById('viewerEditor'),
+      document.getElementById('viewerText')
+    ];
+    for (var i = 0; i < sources.length; i += 1) {
+      var node = sources[i];
+      if (!node || node.classList.contains('hidden')) continue;
+      if (node.id === 'viewerDocx' && String(node.textContent || '').trim()) return node.innerHTML;
+      // innerText preserves rendered line breaks; textContent does not.
+      var raw = String(typeof node.innerText === 'string' ? node.innerText : node.textContent || '');
+      var fallbackHtml = plainTextToViewerHtml(raw);
+      if (fallbackHtml) return fallbackHtml;
+    }
+    return '';
+  }
+
+  function fileEditorReviewChange(change, type) {
+    var status = reviewStatus(change, type || 'changes');
+    var before = type === 'comments' ? '' : changeOriginalText(change);
+    var after = type === 'comments' ? '' : changeProposedText(change);
+    return {
+      type: reviewItemLabel(type || 'changes', change),
+      status: status && status.label ? status.label : (type === 'comments' ? 'Open' : 'Pending'),
+      text: reviewItemText(change) || after || before || 'Tracked change from File Viewer.',
+      before: before,
+      after: after || reviewItemText(change),
+      author: historyChangeUser(change),
+      createdAt: historyChangeDate(change, null)
+    };
+  }
+
+  function fileEditorReviewChanges() {
+    var reviewState = currentReviewState();
+    var revisions = currentUnreleasedDisplayChanges();
+    var comments = reviewState && Array.isArray(reviewState.comments) ? reviewState.comments.filter(Boolean) : [];
+    var changes = revisions.map(function (change) {
+      return fileEditorReviewChange(change, 'changes');
+    });
+    comments.forEach(function (comment) {
+      changes.push(fileEditorReviewChange(comment, 'comments'));
+    });
+    return changes;
+  }
+
+  function fileEditorVersions(file) {
+    var versions = [];
+    versions.push({
+      label: 'Current draft',
+      status: 'Draft',
+      time: state.currentReviewBatch && state.currentReviewBatch.updated_at
+        ? 'Updated ' + formatDate(state.currentReviewBatch.updated_at)
+        : 'Opened from File Viewer'
+    });
+    reviewReleasesNewestFirst().forEach(function (item) {
+      var release = item.release || {};
+      versions.push({
+        label: 'Version ' + (release.release_number || versions.length),
+        status: release.status || 'Released',
+        time: release.released_at ? 'Released ' + formatDate(release.released_at) : 'Released version'
+      });
+    });
+    if (file) {
+      versions.push({
+        label: 'Source file',
+        status: 'Base',
+        time: file.created_at ? 'Uploaded ' + formatDate(file.created_at) : 'Original document'
+      });
+    }
+    return versions;
+  }
+
+  function fileEditorHandoff(file) {
+    var sourceUrl = file && file.id ? getFileDownloadUrl(file) : '';
+    var draftBatch = state.currentReviewBatch && isActiveReviewDraftBatch(state.currentReviewBatch)
+      ? state.currentReviewBatch
+      : null;
+    return {
+      source: 'file_viewer',
+      referrer: fileViewerRouteForFile(file) || targetBackRoute(),
+      file: {
+        id: file && file.id ? 'file-editor-' + String(file.id) : '',
+        documentId: file && file.id ? String(file.id) : '',
+        sourceDocumentId: canonicalReviewSourceDocumentId(file),
+        releasedDocumentId: isReleasedArtifactFile(file) && file && file.id ? file.id : '',
+        matterId: getCurrentMatterId() || '',
+        matterName: getFileMatterDisplayName(file) || '',
+        kind: fileEditorKindForFile(file),
+        title: file && (file.filename || file.name) ? (file.filename || file.name) : 'Document',
+        filename: file && file.filename,
+        contentType: file && (file.content_type || file.mime_type),
+        fileSize: file && file.file_size,
+        createdAt: file && file.created_at,
+        documentUpdatedAt: (file && (file.updated_at || file.created_at)) || '',
+        updatedAt: LanaDocumentReview.latestActivityIso(file, draftBatch) || (file && (file.updated_at || file.created_at)),
+        lastSavedAt: draftBatch && draftBatch.updated_at ? draftBatch.updated_at : null,
+        metadata: fileMetadata(file),
+        summary: file && file.summary,
+        summaryGeneratedAt: file && file.summary_generated_at,
+        editorEngine: fileEditorKindForFile(file) === 'doc' ? 'lana-editor' : 'server-edit-model',
+        editorMode: fileEditorKindForFile(file) === 'doc' ? 'review' : 'edit',
+        officeEditingSupported: isOfficeEditFormat(file) && officeCapabilitySupportsEditing(currentFormatCapabilities(file)),
+        formatCapabilities: currentFormatCapabilities(file),
+        content: visibleViewerDocumentHtml(),
+        reviewChanges: fileEditorReviewChanges(),
+        versions: fileEditorVersions(file),
+        sourceUrl: sourceUrl
+      }
+    };
+  }
+
+  function openCurrentFileInFileEditor() {
+    var file = state.currentFile;
+    if (!file || !file.id) {
+      notify('No file is open to edit.', 'error');
+      return;
+    }
+    if (!canOpenFileInEditor(file)) {
+      notify(isOfficeEditFormat(file)
+        ? 'This Office format is read-only because the server did not report edit-model support.'
+        : 'This format is read-only. Convert it to DOCX before opening File Editor.', 'error');
+      return;
+    }
+    var matterId = getCurrentMatterId() || '';
+    Lex.Nav.go('file-editor.html', {
+      params: { id: file.id, matter_id: matterId || null },
+      context: {
+        fileEditor: fileEditorHandoff(file),
+        referrer: fileViewerRouteForFile(file) || targetBackRoute()
+      }
+    });
+  }
+
+  function targetBackRoute() {
+    return normalizeBackReferrer(state.referrerPage) || fallbackBackReferrer();
+  }
+
   function navigateBack() {
     if (state.metadataChanged) {
       if (!confirm('You have unsaved changes. Leave anyway?')) return;
     }
-    if (state.referrerPage) {
-      Lex.Nav.go(state.referrerPage);
-    } else {
-      window.history.back();
+    var target = targetBackRoute();
+    if (target) {
+      Lex.Nav.go(target);
+      return;
     }
+    if (window.history && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    Lex.Nav.go('dashboard.html');
+  }
+
+  function interceptShellBack(event) {
+    if (!event) return;
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    navigateBack();
   }
 
   // =========================================================================
@@ -1215,8 +1454,8 @@
       readOnlyBadge.classList.toggle('file-viewer-mode-badge--active', !isReview);
     });
     reviewBadges.forEach(function (reviewBadge) {
-      reviewBadge.textContent = isReview ? 'Exit Review Mode' : 'Enter Review Mode';
-      reviewBadge.classList.toggle('file-viewer-mode-badge--active', isReview);
+      reviewBadge.textContent = 'Open in File Editor';
+      reviewBadge.classList.remove('file-viewer-mode-badge--active');
       reviewBadge.classList.toggle('hidden', !reviewAvailable);
     });
     var subtitle = document.querySelector('.file-viewer-review-subtitle');
@@ -1230,7 +1469,7 @@
   function setReviewRailVisible(visible) {
     var rail = document.getElementById('reviewRail');
     if (rail) rail.classList.toggle('hidden', !visible);
-    setCanvasModeDisplay(visible);
+    setCanvasModeDisplay(canOpenFileInEditor(state.currentFile));
     if (visible) {
       requestAnimationFrame(function () {
         var tabs = document.getElementById('reviewTabs');
@@ -1279,7 +1518,7 @@
     var comments = Array.isArray(next.comments) ? next.comments : null;
     var selectedVersionChanges = selectedReviewReleaseChanges();
     var showingCurrentDraft = reviewDisplayScope() === 'current';
-    var unreleasedChanges = showingCurrentDraft ? unreleasedReviewChangesForDisplay(next) : [];
+    var unreleasedChanges = unreleasedReviewChangesForDisplay(next);
     var pendingChangeCount = unreleasedChanges.length;
     var releasedChangeCount = state.releaseChangeGroups.reduce(function (total, group) {
       return total + displayReviewChanges(group.changes || []).length;
@@ -1415,359 +1654,66 @@
     return 'added';
   }
 
+  // Change readers, grouping, and serialization are shared with File Editor
+  // through LanaDocumentReview so both pages treat batch data identically.
   function reviewChangeOperation(change) {
-    return String((change && change.operation) || (change && change.type) || '').toLowerCase();
+    return LanaDocumentReview.reviewChangeOperation(change);
   }
 
   function isDeletionChange(change) {
-    var operation = reviewChangeOperation(change);
-    return operation === 'delete' || operation === 'del' || operation === 'remove' || operation === 'removed';
+    return LanaDocumentReview.isDeletionChange(change);
   }
 
   function isInsertionChange(change) {
-    var operation = reviewChangeOperation(change);
-    return operation === 'insert' || operation === 'ins' || operation === 'add' || operation === 'added';
+    return LanaDocumentReview.isInsertionChange(change);
   }
 
   function changeOriginalText(change) {
-    if (!change) return '';
-    return change.original_text || (isDeletionChange(change) ? reviewItemText(change) : '');
+    return LanaDocumentReview.changeOriginalText(change);
   }
 
   function changeProposedText(change) {
-    if (!change) return '';
-    return change.proposed_text || (isInsertionChange(change) ? reviewItemText(change) : '');
+    return LanaDocumentReview.changeProposedText(change);
   }
 
   function sourceChangesForReviewChange(change) {
-    if (!change) return [];
-    if (Array.isArray(change.source_changes)) return change.source_changes.filter(Boolean);
-    return [change];
-  }
-
-  function editScriptKeyForChange(change) {
-    var script = change && (change.edit_script || change.editScript);
-    var ops = script && Array.isArray(script.ops) ? script.ops : [];
-    if (!ops.length) return null;
-    try {
-      return JSON.stringify(ops);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function editScriptGroupIdForChange(change) {
-    var script = change && (change.edit_script || change.editScript);
-    if (!script || typeof script !== 'object') return '';
-    return String(
-      script.group_id ||
-      script.groupId ||
-      script.change_group_id ||
-      script.changeGroupId ||
-      ''
-    );
+    return LanaDocumentReview.sourceChangesForReviewChange(change);
   }
 
   function reviewChangeIdentityKey(change) {
-    if (!change) return '';
-    var metadata = change.metadata || {};
-    var anchor = change.anchor || {};
-    return String(
-      editScriptGroupIdForChange(change) ||
-      change.change_group_id ||
-      change.changeGroupId ||
-      change.group_id ||
-      change.change_id ||
-      metadata.change_group_id ||
-      metadata.changeGroupId ||
-      metadata.group_id ||
-      metadata.change_id ||
-      anchor.change_group_id ||
-      anchor.group_id ||
-      ''
-    );
-  }
-
-  function sameReviewChangeMoment(a, b) {
-    if (!a || !b) return false;
-    var leftIdentity = reviewChangeIdentityKey(a);
-    var rightIdentity = reviewChangeIdentityKey(b);
-    if (leftIdentity && rightIdentity) return leftIdentity === rightIdentity;
-    var leftScriptKey = editScriptKeyForChange(a);
-    var rightScriptKey = editScriptKeyForChange(b);
-    return !!(leftScriptKey && rightScriptKey && leftScriptKey === rightScriptKey);
-  }
-
-  function mergeReviewChangeRun(run, startIndex) {
-    var sources = Array.isArray(run) ? run.filter(Boolean) : [];
-    if (!sources.length) return null;
-    var original = '';
-    var proposed = '';
-    var revisionIds = [];
-    var hasRemoved = false;
-    var hasAdded = false;
-    sources.forEach(function (source) {
-      var sourceOriginal = changeOriginalText(source);
-      var sourceProposed = changeProposedText(source);
-      if (sourceOriginal) {
-        original += sourceOriginal;
-        hasRemoved = true;
-      }
-      if (sourceProposed) {
-        proposed += sourceProposed;
-        hasAdded = true;
-      }
-      var revisionId = source && source.anchor && source.anchor.revision_id;
-      if (!revisionId && source && source.id) revisionId = source.id;
-      if (revisionId && revisionIds.indexOf(String(revisionId)) === -1) revisionIds.push(String(revisionId));
-    });
-    var first = sources[0];
-    var last = sources[sources.length - 1];
-    var operation = hasRemoved && hasAdded ? 'replace' : (hasRemoved ? 'delete' : 'insert');
-    var identityKey = reviewChangeIdentityKey(first) || reviewChangeIdentityKey(last);
-    var mergedOps = editScriptOpsForReviewChange({ source_changes: sources });
-    var firstScript = first && (first.edit_script || first.editScript);
-    var lastScript = last && (last.edit_script || last.editScript);
-    var scriptAuthor = (firstScript && firstScript.author) ||
-      (lastScript && lastScript.author) ||
-      (first.metadata && first.metadata.author) ||
-      (last.metadata && last.metadata.author) ||
-      'Reviewer';
-    var scriptDate = (firstScript && firstScript.date) ||
-      (lastScript && lastScript.date) ||
-      (first.metadata && first.metadata.date) ||
-      (last.metadata && last.metadata.date) ||
-      new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-    var mergedScript = mergedOps.length
-      ? { version: '0', author: String(scriptAuthor), date: String(scriptDate), ops: mergedOps }
-      : (first.edit_script || first.editScript || null);
-    if (mergedScript && identityKey) mergedScript.group_id = identityKey;
-    return {
-      change_key: (first.change_key || first.id || startIndex) + ':' + operation + ':merged',
-      status: first.status || last.status || 'proposed',
-      operation: operation,
-      type: operation,
-      original_text: original || null,
-      proposed_text: proposed || null,
-      edit_script: mergedScript,
-      anchor: Object.assign({}, first.anchor || { index: startIndex }, {
-        index: first && first.anchor && Number.isFinite(Number(first.anchor.index)) ? Number(first.anchor.index) : startIndex,
-        revision_ids: revisionIds
-      }),
-      source_changes: sources,
-      metadata: Object.assign({}, last.metadata || {}, first.metadata || {}, identityKey ? { change_group_id: identityKey } : {}),
-      released_in: first.released_in || last.released_in || null
-    };
-  }
-
-  function fragmentRunHasProposedText(run) {
-    return (Array.isArray(run) ? run : []).some(function (change) {
-      return !!changeProposedText(change);
-    });
-  }
-
-  function adjacentDeletionFragmentRun(items, startIndex) {
-    var current = items[startIndex];
-    if (!isDeletionChange(current)) return null;
-    var run = [current];
-    var cursor = startIndex + 1;
-    while (cursor < items.length && isDeletionChange(items[cursor]) && sameReviewChangeMoment(current, items[cursor])) {
-      run.push(items[cursor]);
-      cursor += 1;
-    }
-    if (cursor < items.length
-      && sameReviewChangeMoment(current, items[cursor])
-      && (isInsertionChange(items[cursor]) || reviewChangeOperation(items[cursor]) === 'replace')) {
-      run.push(items[cursor]);
-      cursor += 1;
-    }
-    return run.length > 1 && fragmentRunHasProposedText(run)
-      ? { run: run, nextIndex: cursor }
-      : null;
-  }
-
-  function adjacentIdentityRun(items, startIndex) {
-    var current = items[startIndex];
-    var identity = reviewChangeIdentityKey(current);
-    if (!identity) return null;
-    var run = [current];
-    var cursor = startIndex + 1;
-    while (cursor < items.length && reviewChangeIdentityKey(items[cursor]) === identity) {
-      run.push(items[cursor]);
-      cursor += 1;
-    }
-    return run.length > 1
-      ? { run: run, nextIndex: cursor }
-      : null;
+    return LanaDocumentReview.reviewChangeIdentityKey(change);
   }
 
   function displayReviewChanges(changes) {
-    var items = Array.isArray(changes) ? changes : [];
-    var grouped = [];
-    for (var i = 0; i < items.length; i++) {
-      var current = items[i];
-      var identityRun = adjacentIdentityRun(items, i);
-      if (identityRun) {
-        grouped.push(mergeReviewChangeRun(identityRun.run, i));
-        i = identityRun.nextIndex - 1;
-        continue;
-      }
-      var adjacentRun = adjacentDeletionFragmentRun(items, i);
-      if (adjacentRun) {
-        grouped.push(mergeReviewChangeRun(adjacentRun.run, i));
-        i = adjacentRun.nextIndex - 1;
-        continue;
-      }
-      var next = items[i + 1];
-      if (isDeletionChange(current) && isInsertionChange(next) && sameReviewChangeMoment(current, next)) {
-        grouped.push(mergeReviewChangeRun([current, next], i));
-        i += 1;
-      } else {
-        if (current && !current.source_changes) {
-          grouped.push(Object.assign({}, current, { source_changes: [current] }));
-        } else {
-          grouped.push(current);
-        }
-      }
-    }
-    return grouped;
+    return LanaDocumentReview.displayReviewChanges(changes);
   }
 
   function revisionIdsForReviewChange(change) {
-    var ids = [];
-    sourceChangesForReviewChange(change).forEach(function (source) {
-      var revisionId = source && source.anchor && source.anchor.revision_id;
-      if (!revisionId && source && source.id) revisionId = source.id;
-      if (revisionId && ids.indexOf(String(revisionId)) === -1) ids.push(String(revisionId));
-    });
-    var anchorIds = change && change.anchor && Array.isArray(change.anchor.revision_ids) ? change.anchor.revision_ids : [];
-    anchorIds.forEach(function (revisionId) {
-      if (revisionId && ids.indexOf(String(revisionId)) === -1) ids.push(String(revisionId));
-    });
-    return ids;
+    return LanaDocumentReview.revisionIdsForReviewChange(change);
   }
 
   function editScriptOpsForReviewChange(change) {
-    var ops = [];
-    var seen = {};
-    sourceChangesForReviewChange(change).forEach(function (source) {
-      var script = source && (source.edit_script || source.editScript);
-      var scriptOps = Array.isArray(script) ? script : (script && Array.isArray(script.ops) ? script.ops : []);
-      scriptOps.forEach(function (op) {
-        if (!op) return;
-        var key;
-        try {
-          key = JSON.stringify(op);
-        } catch (_) {
-          key = String(ops.length);
-        }
-        if (seen[key]) return;
-        seen[key] = true;
-        ops.push(op);
-      });
-    });
-    return ops;
+    return LanaDocumentReview.editScriptOpsForReviewChange(change);
   }
 
   function liveRevisionChangesForReviewChange(change) {
-    var ids = revisionIdsForReviewChange(change);
-    if (!ids.length) return [];
-    var reviewState = currentReviewState();
-    var revisions = Array.isArray(reviewState && reviewState.revisions) ? reviewState.revisions : [];
-    var byId = {};
-    ids.forEach(function (id) { byId[String(id)] = true; });
-    return revisions.filter(function (revision) {
-      return revision && revision.id && byId[String(revision.id)] && (revision.editScript || revision.edit_script);
-    }).map(function (revision, index) {
-      var type = revision && revision.type ? String(revision.type) : 'change';
-      var text = revision && revision.text ? String(revision.text) : '';
-      return {
-        change_key: 'live-revision:' + revision.id,
-        status: 'proposed',
-        operation: type === 'del' ? 'delete' : (type === 'ins' ? 'insert' : type),
-        original_text: type === 'del' ? text : null,
-        proposed_text: type === 'ins' ? text : null,
-        edit_script: revision.editScript || revision.edit_script,
-        anchor: {
-          type: 'editor_revision',
-          revision_id: String(revision.id),
-          revision_type: type,
-          index: index
-        },
-        metadata: {
-          author: revision.author || null,
-          date: revision.date || null
-        }
-      };
-    });
+    return LanaDocumentReview.liveRevisionChangesForChange(change, currentReviewState());
   }
 
   function editableOpsForReviewChange(change) {
-    var liveChanges = liveRevisionChangesForReviewChange(change);
-    if (liveChanges.length) return editScriptOpsForReviewChange({ source_changes: liveChanges });
-    return editScriptOpsForReviewChange(change);
+    return LanaDocumentReview.editableOpsForChange(change, currentReviewState());
   }
 
   function firstEditableDraftOpForChange(change, nextText) {
-    var ops = editableOpsForReviewChange(change);
-    if (!ops.length) return null;
-    var text = String(nextText || '');
-    var preferredOps = [];
-    if (isInsertionChange(change) && !isReplacementReviewChange(change)) {
-      preferredOps = ['insertText', 'insertBlocks'];
-    } else if (isDeletionChange(change) && !text) {
-      preferredOps = ['deleteText'];
-    } else if (isDeletionChange(change)) {
-      preferredOps = ['deleteText', 'replaceText'];
-    } else {
-      preferredOps = ['replaceText', 'deleteText', 'insertText', 'insertBlocks'];
-    }
-    for (var i = 0; i < ops.length; i++) {
-      var op = ops[i] || {};
-      if (preferredOps.indexOf(op.op) === -1) continue;
-      if (op.op === 'replaceText' && op.range) {
-        return {
-          op: 'replaceText',
-          range: Object.assign({}, op.range),
-          text: text
-        };
-      }
-      if (op.op === 'insertText' && op.at) {
-        return {
-          op: 'insertText',
-          at: Object.assign({}, op.at),
-          text: text
-        };
-      }
-      if (op.op === 'insertBlocks' && op.at) {
-        return {
-          op: 'insertText',
-          at: Object.assign({}, op.at),
-          text: text
-        };
-      }
-      if (op.op === 'deleteText' && op.range && text) {
-        return {
-          op: 'replaceText',
-          range: Object.assign({}, op.range),
-          text: text
-        };
-      }
-    }
-    return null;
+    return LanaDocumentReview.firstEditableDraftOpForChange(change, nextText, currentReviewState());
   }
 
   function isReplacementReviewChange(change) {
-    if (!change) return false;
-    if (reviewChangeOperation(change) === 'replace') return true;
-    return Boolean(changeOriginalText(change) && changeProposedText(change));
+    return LanaDocumentReview.isReplacementReviewChange(change);
   }
 
   function canEditDraftReviewChange(change) {
-    if (!change) return false;
-    if (change.released_in) return false;
-    if (!revisionIdsForReviewChange(change).length) return false;
-    return !!firstEditableDraftOpForChange(change, changeProposedText(change));
+    return LanaDocumentReview.canEditDraftReviewChange(change, currentReviewState());
   }
 
   function ensureDraftReviewChangeCanBeEdited(change) {
@@ -1775,70 +1721,8 @@
     throw new Error('This change cannot be edited directly. Revert it and create a new change instead.');
   }
 
-  function operationTextFromRuns(runs) {
-    if (!Array.isArray(runs)) return '';
-    return runs.map(function (run) { return run && run.text ? String(run.text) : ''; }).join('');
-  }
-
-  function insertedTextForOperation(op, fallback) {
-    if (!op) return fallback || '';
-    if (typeof op.text === 'string') return op.text;
-    var runText = operationTextFromRuns(op.runs);
-    return runText || fallback || '';
-  }
-
   function inverseEditOpsForReleasedChange(change) {
-    var sources = sourceChangesForReviewChange(change);
-    var ops = editScriptOpsForReviewChange(change);
-    if (!ops.length) return [];
-    var inverse = [];
-    for (var i = ops.length - 1; i >= 0; i--) {
-      var op = ops[i];
-      var source = sources[Math.min(i, sources.length - 1)] || change;
-      if (!op || !op.op) continue;
-      if (op.op === 'insertText') {
-        var inserted = insertedTextForOperation(op, changeProposedText(source));
-        var at = op.at || {};
-        if (!inserted || !Number.isFinite(Number(at.paragraph)) || !Number.isFinite(Number(at.start))) return [];
-        inverse.push({
-          op: 'deleteText',
-          range: {
-            paragraph: Number(at.paragraph),
-            start: Number(at.start),
-            end: Number(at.start) + inserted.length
-          }
-        });
-      } else if (op.op === 'deleteText') {
-        var range = op.range || {};
-        var original = changeOriginalText(source);
-        if (!original || !Number.isFinite(Number(range.paragraph)) || !Number.isFinite(Number(range.start))) return [];
-        inverse.push({
-          op: 'insertText',
-          at: {
-            paragraph: Number(range.paragraph),
-            start: Number(range.start)
-          },
-          text: original
-        });
-      } else if (op.op === 'replaceText') {
-        var replaceRange = op.range || {};
-        var proposed = insertedTextForOperation(op, changeProposedText(source));
-        var replacementOriginal = changeOriginalText(source);
-        if (!replacementOriginal || !Number.isFinite(Number(replaceRange.paragraph)) || !Number.isFinite(Number(replaceRange.start))) return [];
-        inverse.push({
-          op: 'replaceText',
-          range: {
-            paragraph: Number(replaceRange.paragraph),
-            start: Number(replaceRange.start),
-            end: Number(replaceRange.start) + proposed.length
-          },
-          text: replacementOriginal
-        });
-      } else {
-        return [];
-      }
-    }
-    return inverse;
+    return LanaDocumentReview.inverseEditOpsForReleasedChange(change);
   }
 
   function renderReviewChangeDiff(change) {
@@ -1931,7 +1815,7 @@
 
   function renderReviewChangeLanaButton(change, index, options) {
     options = options || {};
-    if (!options.unreleased || !change) return '';
+    if (!change) return '';
     var file = state.currentFile || {};
     var matterId = getConversationMatterId(file) || '';
     var matterName = getFileMatterDisplayName(file) || '';
@@ -2021,9 +1905,9 @@
     var groups = selectedReleaseGroups();
     var draftBatchChanges = currentReviewBatchDisplayChanges();
     var editorChanges = liveEditorReviewDisplayChanges({ revisions: editorItems || [] });
-    var unreleasedChanges = reviewDisplayScope() === 'current'
-      ? (editorChanges.length ? editorChanges : draftBatchChanges)
-      : [];
+    // The unreleased working copy belongs to the document lineage, not to any
+    // one version, so it stays visible whichever version is selected.
+    var unreleasedChanges = editorChanges.length ? editorChanges : draftBatchChanges;
     if (!groups.length && !unreleasedChanges.length) {
       renderReviewList('changes', editorItems || []);
       return;
@@ -2044,17 +1928,10 @@
             var releaseAttr = options.releaseId ? ' data-review-history-release="' + escapeHtml(options.releaseId) + '"' : '';
             var focusIndex = change && change.anchor && Number.isFinite(Number(change.anchor.index)) ? Number(change.anchor.index) : index;
             var section = options.unreleased ? 'unreleased' : 'released';
-            var revertLabel = options.unreleased ? 'Revert draft change' : 'Revert in new draft';
-            var editButton = options.unreleased && canEditDraftReviewChange(change)
-              ? '<button type="button" class="file-viewer-review-history-row__action file-viewer-review-history-row__edit" data-review-change-edit-index="' + index + '" aria-label="Edit draft change">Edit</button>'
-              : '';
-            var revertButton = options.unreleased
-              ? '<button type="button" class="file-viewer-review-history-row__action file-viewer-review-history-row__revert" data-review-change-revert-section="' + section + '" data-review-change-revert-index="' + index + '"' + releaseAttr + ' aria-label="' + escapeHtml(revertLabel) + '">Revert</button>'
-              : '';
             return '<div role="button" tabindex="0" class="file-viewer-review-history-row"' + releaseAttr + ' data-review-history-section="' + section + '" data-review-item-type="changes" data-review-item-index="' + focusIndex + '">' +
               '<span class="file-viewer-review-history-row__heading">' +
                 '<span class="file-viewer-review-history-row__heading-main"><span class="file-viewer-review-history-row__title">' + escapeHtml(reviewItemLabel('changes', change)) + '</span>' + badge + '</span>' +
-                '<span class="file-viewer-review-history-row__actions">' + editButton + revertButton + '</span>' +
+                '<span class="file-viewer-review-history-row__actions"></span>' +
               '</span>' +
               renderReviewChangeDiff(change) +
               renderReviewChangeLanaButton(change, index, options) +
@@ -2429,10 +2306,9 @@
           var draftResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(state.currentReviewBatch.id)));
           state.currentReviewBatch = draftResponse && draftResponse.data ? draftResponse.data : draftResponse;
         }
-        var restored = await restorePersistedDraftIntoEditorWithRetry(state.currentReviewBatch);
-        state.currentReviewBatchRestoreFailed = !restored && !restoredDraftHasVisibleRevisions() && persistedBatchChangeCount(state.currentReviewBatch) > 0;
+        state.currentReviewBatchRestoreFailed = false;
       } catch (error) {
-        console.warn('[FileViewerPage] Current draft restore failed:', error);
+        console.warn('[FileViewerPage] Current draft detail load failed:', error);
         state.currentReviewBatchRestoreFailed = true;
       }
     }
@@ -2486,6 +2362,17 @@
     return latest;
   }
 
+  function releaseForCurrentFile(file) {
+    var currentFileId = file && file.id ? String(file.id) : '';
+    if (!currentFileId) return null;
+    var releases = Array.isArray(state.reviewReleases) ? state.reviewReleases : [];
+    for (var i = 0; i < releases.length; i++) {
+      var documentId = releaseDocumentId(releases[i]);
+      if (documentId && currentFileId === String(documentId)) return releases[i];
+    }
+    return null;
+  }
+
   function originalVersionDocumentId() {
     if (state.reviewSourceDocumentId) return state.reviewSourceDocumentId;
     var latest = latestReviewRelease();
@@ -2495,12 +2382,13 @@
 
   function openLatestReleasedDocumentIfAvailable(file) {
     if (shouldHonorExplicitVersionView(file)) return false;
+    if (isReleasedArtifactFile(file) || releaseForCurrentFile(file)) return false;
     var latest = latestReviewRelease();
     var documentId = releaseDocumentId(latest);
     if (!file || !documentId || String(file.id) === String(documentId)) return false;
     var params = new URLSearchParams({ id: documentId });
     Lex.Nav.go('file-viewer.html?' + params.toString(), {
-      referrer: 'file-viewer.html?id=' + encodeURIComponent(file.id)
+      context: fileViewerNavContext(file)
     });
     return true;
   }
@@ -2514,6 +2402,11 @@
 
   function selectInitialReviewDisplay(file) {
     if (shouldHonorExplicitVersionView(file) || state.reviewDisplayTarget) return false;
+    var openedRelease = releaseForCurrentFile(file);
+    if (openedRelease) {
+      selectReviewDisplayScope('release', openedRelease);
+      return false;
+    }
     if (hasUnreleasedWorkingCopy()) {
       selectReviewDisplayScope('current');
       return false;
@@ -2885,9 +2778,7 @@
         if (nextDocumentId) {
           var params = new URLSearchParams({ id: nextDocumentId });
           Lex.Nav.go('file-viewer.html?' + params.toString(), {
-            referrer: state.currentFile && state.currentFile.id
-              ? 'file-viewer.html?id=' + encodeURIComponent(state.currentFile.id)
-              : undefined
+            context: fileViewerNavContext(state.currentFile)
           });
           return;
         }
@@ -2953,15 +2844,12 @@
   }
 
   async function setEditorInteractionMode(mode) {
-    var nextMode = mode === 'review' ? 'review' : 'view';
+    var nextMode = 'view';
     state.editorMode = nextMode;
     if (state.editorInstance && typeof state.editorInstance.setMode === 'function') {
       state.editorInstance.setMode(nextMode);
     }
     setCanvasModeDisplay(Boolean(state.editorInstance));
-    if (nextMode === 'review') {
-      await acceptBaselineRevisionsForReviewMode();
-    }
   }
 
   function forceReadOnlyDisplayMode() {
@@ -3352,58 +3240,11 @@
   }
 
   function normalizeReviewChanges(reviewState) {
-    var revisions = unreleasedRawReviewRevisions(reviewState);
-    return revisions.filter(function (revision) {
-      return Boolean(revision && (revision.editScript || revision.edit_script));
-    }).map(function (revision, index) {
-      var id = revision && revision.id ? String(revision.id) : String(index + 1);
-      var type = revision && revision.type ? String(revision.type) : 'change';
-      var text = revision && revision.text ? String(revision.text) : '';
-      var editScript = revision && (revision.editScript || revision.edit_script) ? (revision.editScript || revision.edit_script) : null;
-      return {
-        change_key: 'revision:' + id,
-        status: 'proposed',
-        operation: type === 'del' ? 'delete' : (type === 'ins' ? 'insert' : type),
-        original_text: type === 'del' ? text : null,
-        proposed_text: type === 'ins' ? text : null,
-        edit_script: editScript,
-        anchor: {
-          type: 'editor_revision',
-          revision_id: id,
-          revision_type: type,
-          index: index
-        },
-        metadata: {
-          author: revision && revision.author ? revision.author : null,
-          date: revision && revision.date ? revision.date : null
-        }
-      };
-    });
+    return LanaDocumentReview.changesFromRevisions(unreleasedRawReviewRevisions(reviewState));
   }
 
   function persistableReviewChange(change, index) {
-    if (!change) return null;
-    var script = change.edit_script || change.editScript || null;
-    var ops = script && Array.isArray(script.ops) ? dedupeEditOps(script.ops) : [];
-    var editScript = ops.length
-      ? {
-          version: '0',
-          author: String(script.author || (change.metadata && change.metadata.author) || 'Reviewer'),
-          date: String(script.date || (change.metadata && change.metadata.date) || new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')),
-          ops: ops
-        }
-      : null;
-    return {
-      change_key: String(change.change_key || change.id || ('change:' + (index + 1))),
-      status: change.status || 'proposed',
-      operation: change.operation || change.type || null,
-      original_text: change.original_text !== undefined ? change.original_text : null,
-      proposed_text: change.proposed_text !== undefined ? change.proposed_text : null,
-      edit_script: editScript,
-      anchor: change.anchor || {},
-      reviewer_notes: change.reviewer_notes || null,
-      metadata: change.metadata || {}
-    };
+    return LanaDocumentReview.persistableReviewChange(change, index);
   }
 
   function persistableReviewChanges(reviewState) {
@@ -3547,81 +3388,15 @@
   }
 
   function dedupeEditOps(ops) {
-    var items = Array.isArray(ops) ? ops : [];
-    var deduped = [];
-    var seenOps = {};
-    for (var i = 0; i < items.length; i++) {
-      var op = items[i];
-      if (!op) continue;
-      var opKey;
-      try {
-        opKey = JSON.stringify(op);
-      } catch (_) {
-        opKey = null;
-      }
-      if (opKey && seenOps[opKey]) continue;
-      if (opKey) seenOps[opKey] = true;
-      deduped.push(op);
-    }
-    return deduped;
+    return LanaDocumentReview.dedupeEditOps(ops);
   }
 
   function editOpsFromPersistedBatch(batch) {
-    var changes = Array.isArray(batch && batch.changes) ? batch.changes : [];
-    var ops = [];
-    var seenScripts = {};
-    for (var i = 0; i < changes.length; i++) {
-      var script = changes[i] && (changes[i].edit_script || changes[i].editScript);
-      var scriptOps = dedupeEditOps(script && Array.isArray(script.ops) ? script.ops : []);
-      if (!scriptOps.length) continue;
-      var scriptKey;
-      try {
-        scriptKey = JSON.stringify(scriptOps);
-      } catch (_) {
-        scriptKey = null;
-      }
-      if (scriptKey && seenScripts[scriptKey]) continue;
-      if (scriptKey) seenScripts[scriptKey] = true;
-      for (var j = 0; j < scriptOps.length; j++) {
-        if (scriptOps[j]) ops.push(scriptOps[j]);
-      }
-    }
-    return ops;
+    return LanaDocumentReview.editOpsFromBatch(batch);
   }
 
   function editScriptsFromPersistedBatch(batch) {
-    var changes = displayReviewChanges(Array.isArray(batch && batch.changes) ? batch.changes : []);
-    var scripts = [];
-    var seenScripts = {};
-    for (var i = 0; i < changes.length; i++) {
-      var script = changes[i] && (changes[i].edit_script || changes[i].editScript);
-      var scriptOps = dedupeEditOps(script && Array.isArray(script.ops) ? script.ops : []);
-      if (!scriptOps.length) continue;
-      var groupId = script && (script.group_id || script.groupId);
-      var author = script && script.author
-        ? String(script.author)
-        : (changes[i] && changes[i].metadata && changes[i].metadata.author ? String(changes[i].metadata.author) : 'Reviewer');
-      var date = script && script.date
-        ? String(script.date)
-        : (changes[i] && changes[i].metadata && changes[i].metadata.date ? String(changes[i].metadata.date) : new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'));
-      var normalizedScript = {
-        version: '0',
-        author: author,
-        date: date,
-        ops: scriptOps
-      };
-      if (groupId) normalizedScript.group_id = String(groupId);
-      var scriptKey;
-      try {
-        scriptKey = JSON.stringify(normalizedScript);
-      } catch (_) {
-        scriptKey = null;
-      }
-      if (scriptKey && seenScripts[scriptKey]) continue;
-      if (scriptKey) seenScripts[scriptKey] = true;
-      scripts.push(normalizedScript);
-    }
-    return scripts;
+    return LanaDocumentReview.editScriptsFromBatch(batch);
   }
 
   function persistedBatchChangeCount(batch) {
@@ -3724,7 +3499,17 @@
     }
 
     try {
-      var query = '?document_id=' + encodeURIComponent(file.id) + '&limit=20&sort_by=updated_at&sort_dir=desc';
+      var reviewDocumentId = canonicalReviewSourceDocumentId(file);
+      var releasesResponse = await api.get(reviewEndpoint('/documents/' + encodeURIComponent(reviewDocumentId) + '/releases?limit=20'));
+      var metadataSourceDocumentId = releasesResponse && releasesResponse.metadata && releasesResponse.metadata.source_document_id
+        ? String(releasesResponse.metadata.source_document_id)
+        : '';
+      if (metadataSourceDocumentId && metadataSourceDocumentId !== reviewDocumentId) {
+        reviewDocumentId = metadataSourceDocumentId;
+        releasesResponse = await api.get(reviewEndpoint('/documents/' + encodeURIComponent(reviewDocumentId) + '/releases?limit=20'));
+      }
+      state.reviewSourceDocumentId = reviewDocumentId;
+      var query = '?document_id=' + encodeURIComponent(reviewDocumentId) + '&limit=20&sort_by=updated_at&sort_dir=desc';
       var batchesResponse = await api.get(reviewEndpoint('/document-edit-batches' + query));
       state.reviewBatches = Array.isArray(batchesResponse && batchesResponse.data) ? batchesResponse.data : [];
       state.currentReviewBatch = activeDraftBatchFromList(state.reviewBatches);
@@ -3733,19 +3518,14 @@
         try {
           var draftResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(state.currentReviewBatch.id)));
           state.currentReviewBatch = draftResponse && draftResponse.data ? draftResponse.data : draftResponse;
-          var restored = await restorePersistedDraftIntoEditorWithRetry(state.currentReviewBatch);
-          state.currentReviewBatchRestoreFailed = !restored && !restoredDraftHasVisibleRevisions() && persistedBatchChangeCount(state.currentReviewBatch) > 0;
+          state.currentReviewBatchRestoreFailed = false;
         } catch (draftError) {
           console.warn('[FileViewerPage] Draft review batch detail load failed:', draftError);
           state.currentReviewBatchRestoreFailed = true;
         }
       }
 
-      var releasesResponse = await api.get(reviewEndpoint('/documents/' + encodeURIComponent(file.id) + '/releases?limit=20'));
       state.reviewReleases = Array.isArray(releasesResponse && releasesResponse.data) ? releasesResponse.data : [];
-      state.reviewSourceDocumentId = releasesResponse && releasesResponse.metadata && releasesResponse.metadata.source_document_id
-        ? releasesResponse.metadata.source_document_id
-        : file.id;
       state.releaseChangeGroups = await loadReleaseChangeGroups(state.reviewReleases);
       if (selectInitialReviewDisplay(file)) {
         return;
@@ -3793,14 +3573,16 @@
 
   function renderReviewWorkflow(message) {
     var statusEl = document.getElementById('reviewBatchStatus');
-    var saveBtn = document.getElementById('reviewSaveDraftBtn');
     var releaseBtn = document.getElementById('reviewReleaseBtn');
     var releasesEl = document.getElementById('reviewReleasesList');
     var matterId = getCurrentMatterId();
     var hasEditor = !!state.editorInstance;
     var canUseWorkflow = !!(matterId && state.currentFile && state.currentFile.id && hasEditor && canReviewFile(state.currentFile));
     var changeCount = pendingReviewChangeCount();
-    var hasReviewWork = changeCount > 0;
+    var persistedDraftChanges = state.currentReviewBatch && Array.isArray(state.currentReviewBatch.changes)
+      ? state.currentReviewBatch.changes.length
+      : 0;
+    var hasReviewWork = changeCount > 0 || persistedDraftChanges > 0;
 
     if (statusEl) {
       if (message) {
@@ -3817,37 +3599,20 @@
       } else if (hasEditor && !canReviewFile(state.currentFile)) {
         statusEl.textContent = 'This format is read-only. Convert it to DOCX before review edits.';
       } else if (state.currentReviewBatchRestoreFailed) {
-        statusEl.textContent = 'Saved draft could not be replayed. Make a new tracked change and save to replace it.';
+        statusEl.textContent = 'Saved draft details could not be loaded.';
       } else if (state.currentReviewBatch && hasReviewWork) {
-        statusEl.textContent = state.reviewDirty
-          ? 'Unsaved changes to ' + (state.currentReviewBatch.title || 'review draft') + '.'
-          : 'Draft saved and ready to request release.';
+        statusEl.textContent = 'Draft saved. Open File Editor to edit or release it.';
       } else if (hasReviewWork) {
-        statusEl.textContent = changeCount + ' pending change' + (changeCount === 1 ? '' : 's') + ' not saved yet.';
+        statusEl.textContent = changeCount + ' pending change' + (changeCount === 1 ? '' : 's') + ' available in this view.';
       } else {
         statusEl.textContent = 'No saved review draft.';
       }
     }
 
-    var persistedDraftChanges = state.currentReviewBatch && Array.isArray(state.currentReviewBatch.changes)
-      ? state.currentReviewBatch.changes.length
-      : 0;
-    var liveDraftChanges = Array.isArray(state.reviewState && state.reviewState.revisions)
-      ? state.reviewState.revisions.length
-      : 0;
-    var persistedOnlyDraft = persistedDraftChanges > 0 && liveDraftChanges === 0 && !state.currentReviewBatchRestoreFailed;
-    if (!message && statusEl && persistedOnlyDraft) {
-      statusEl.textContent = 'Saved draft must be replayed into the document before release.';
-    }
-    var failedPersistedDraftWithoutLiveChanges = state.currentReviewBatchRestoreFailed && liveDraftChanges === 0;
-
-    if (saveBtn) {
-      saveBtn.disabled = !canUseWorkflow || !hasReviewWork || state.reviewSaving || persistedOnlyDraft || failedPersistedDraftWithoutLiveChanges;
-      saveBtn.textContent = state.reviewSaving ? 'Saving...' : 'Save Draft';
-    }
     if (releaseBtn) {
-      releaseBtn.disabled = !canUseWorkflow || !hasReviewWork || state.reviewSaving || state.reviewReleasing || persistedOnlyDraft || failedPersistedDraftWithoutLiveChanges;
-      releaseBtn.textContent = state.reviewReleasing ? 'Requesting Approval...' : 'Release Version';
+      // Editing and releasing live in File Editor; this button routes there.
+      releaseBtn.disabled = !(state.currentFile && state.currentFile.id && canReviewFile(state.currentFile));
+      releaseBtn.textContent = 'Open in File Editor';
     }
 
     if (releasesEl) {
@@ -3939,8 +3704,9 @@
           payload
         );
       } else {
+        var reviewDocumentId = canonicalReviewSourceDocumentId(state.currentFile);
         response = await api.post(
-          reviewEndpoint('/documents/' + encodeURIComponent(state.currentFile.id) + '/edit-batches'),
+          reviewEndpoint('/documents/' + encodeURIComponent(reviewDocumentId) + '/edit-batches'),
           payload
         );
       }
@@ -3961,13 +3727,15 @@
       notify('Convert this file to DOCX before releasing review edits.', 'error');
       return;
     }
+    if (!state.currentReviewBatch || !state.currentReviewBatch.id) {
+      notify('Open this document in File Editor to create a saved draft before release.', 'error');
+      return;
+    }
     var run = async function () {
       state.reviewReleasing = true;
       renderReviewWorkflow();
       try {
-        var batch = state.currentReviewBatch && !state.reviewDirty
-          ? state.currentReviewBatch
-          : await saveReviewBatch({ silent: true });
+        var batch = state.currentReviewBatch;
         if (!batch || !batch.id) throw new Error('Review draft could not be saved.');
         if (typeof state.editorInstance.bytes !== 'function') throw new Error('Editor bytes are unavailable.');
         var bytes = state.editorInstance.bytes();
@@ -3986,7 +3754,7 @@
           notify('Version released', 'success');
           var params = new URLSearchParams({ id: releasedDocument.id });
           Lex.Nav.go('file-viewer.html?' + params.toString(), {
-            referrer: 'file-viewer.html?id=' + encodeURIComponent(state.currentFile.id)
+            context: fileViewerNavContext(state.currentFile)
           });
           return;
         }
@@ -4118,6 +3886,20 @@
     setReviewRailVisible(false);
   }
 
+  function isFileAccessDenied(error) {
+    return !!error && Number(error.status) === 403;
+  }
+
+  function showFileAccessDenied() {
+    showError('You do not have access to this file.');
+    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.alert === 'function') {
+      Lex.Modal.alert('Access denied', 'You do not have access to this file.', {
+        variant: 'danger',
+        confirmText: 'OK'
+      });
+    }
+  }
+
   function hideAllViewers() {
     var ids = ['viewerLoading', 'viewerError', 'viewerIframe', 'viewerText', 'viewerImage', 'viewerDocumentCard', 'viewerEditor', 'viewerDiff', 'viewerDocx'];
     for (var i = 0; i < ids.length; i++) {
@@ -4197,7 +3979,7 @@
       if (banner) {
         banner.setAttribute('heading', response.filename);
         banner.setAttribute('subtitle',
-          formatFileSize(response.file_size) + ' \u2022 ' + formatDate(response.created_at));
+          formatFileSize(response.file_size) + ' \u2022 ' + formatDate(response.updated_at || response.created_at));
       }
 
       // Breadcrumb mirrors workspace-details: matter-scoped files thread
@@ -4242,7 +4024,11 @@
 
     } catch (error) {
       console.error('[FileViewerPage] Failed to load file:', error);
-      showError('Failed to load file: ' + error.message);
+      if (isFileAccessDenied(error)) {
+        showFileAccessDenied();
+      } else {
+        showError('Failed to load file: ' + error.message);
+      }
       if (typeof Lex !== 'undefined' && Lex.Loader && typeof Lex.Loader.hide === 'function') {
         Lex.Loader.hide();
       }
@@ -4258,6 +4044,7 @@
     hideAllViewers();
     hideFormatNotice();
     state.editorMode = 'view';
+    state.viewerPlainText = null;
     state.reviewState = null;
     resetReviewBaselineRevisions();
     state.reviewBatches = [];
@@ -4379,7 +4166,8 @@
   async function loadText(file) {
     if (isDemoMode()) {
       var demoText = document.getElementById('viewerText');
-      demoText.textContent = buildDemoDocumentText(file);
+      state.viewerPlainText = buildDemoDocumentText(file);
+      demoText.textContent = state.viewerPlainText;
       demoText.classList.remove('hidden');
       hideLoading();
       return;
@@ -4390,11 +4178,12 @@
     });
     await assertFetchOk(response, 'Failed to fetch file');
     var arrayBuffer = await response.arrayBuffer();
+    var text = new TextDecoder('utf-8').decode(arrayBuffer);
+    state.viewerPlainText = text;
     if (isEditorEnabled() && isEditorPreviewFile(file)) {
       var renderedWithEditor = await loadFileInEditor(file, arrayBuffer);
       if (renderedWithEditor) return;
     }
-    var text = new TextDecoder('utf-8').decode(arrayBuffer);
     var pre = document.getElementById('viewerText');
     pre.textContent = text;
     pre.classList.remove('hidden');
@@ -4470,6 +4259,14 @@
         fontsUrl: baseUrl + '/editor-fonts',
         pdfWorkerUrl: baseUrl + '/pdfjs/pdf.worker.min.mjs',
         mode: 'view',
+        readOnly: true,
+        readonly: true,
+        editable: false,
+        enableEditing: false,
+        enableReviewEditing: false,
+        selectionToolbar: false,
+        showSelectionToolbar: false,
+        workspaceFields: false,
         author: currentReviewerName()
       });
       state.editorInstance = editor;
@@ -4527,13 +4324,15 @@
       });
       editor.on('review-state-changed', function (reviewState) {
         state.reviewState = reviewState || null;
-        state.editorMode = reviewState && reviewState.editorMode ? reviewState.editorMode : state.editorMode;
+        state.editorMode = 'view';
+        if (reviewState && reviewState.editorMode && reviewState.editorMode !== 'view') {
+          forceReadOnlyDisplayMode();
+        }
         updateReviewRailCounts(reviewState || null);
         setCanvasModeDisplay(true);
         applyTrackedChangesDisplay();
       });
       editor.on('lana-context-requested', openLanaForEditorContext);
-      editor.on('workspace-field-requested', openWorkspaceFieldPicker);
 
       var bytes = new Uint8Array(arrayBuffer);
       await editor.open_file(new File([bytes], file.filename || 'document', {
@@ -4676,7 +4475,7 @@
       notify('Editable DOCX created', 'success');
       var params = new URLSearchParams({ id: converted.id });
       Lex.Nav.go('file-viewer.html?' + params.toString(), {
-        referrer: 'file-viewer.html?id=' + encodeURIComponent(file.id)
+        context: fileViewerNavContext(file)
       });
     } catch (error) {
       console.error('[FileViewerPage] PDF conversion failed:', error);
@@ -4701,6 +4500,10 @@
     document.getElementById('metaUploadedAt').textContent = formatDate(file.created_at);
     document.getElementById('metaChunkCount').textContent =
       file.chunk_count !== undefined ? file.chunk_count.toLocaleString() : '0';
+    var accessLabels = { organization: 'Organization', workspace: 'Workspace', private: 'Private' };
+    var accessScope = file.access_scope || (file.metadata && file.metadata.access_scope) || 'workspace';
+    var accessEl = document.getElementById('metaAccessScope');
+    if (accessEl) accessEl.textContent = accessLabels[accessScope] || 'Workspace';
 
     var metadata = file.metadata || {};
 
@@ -5121,7 +4924,10 @@
     // Read referrer context
     var ctx = Lex.Nav.consume();
     if (ctx && ctx.referrer) {
-      state.referrerPage = ctx.referrer;
+      state.referrerPage = normalizeBackReferrer(ctx.referrer);
+    }
+    if (!state.referrerPage && ctx && ctx.fileViewerReferrer) {
+      state.referrerPage = normalizeBackReferrer(ctx.fileViewerReferrer);
     }
 
     // Validate file ID
@@ -5135,6 +4941,7 @@
 
     // Wire up event listeners
     document.getElementById('viewerErrorBack').addEventListener('click', navigateBack);
+    document.addEventListener('topbar-back-click', interceptShellBack, true);
     document.getElementById('viewerErrorDownload').addEventListener('click', function () {
       if (state.currentFile) {
         downloadFile(state.currentFile.id, state.currentFile.filename);
@@ -5151,10 +4958,7 @@
         var action = target.dataset && target.dataset.viewerAction;
         switch (action || target.id) {
           case 'viewerReviewModeBadge':
-            setEditorInteractionMode(state.editorMode === 'review' ? 'view' : 'review').catch(function (error) {
-              console.error('[FileViewerPage] Review mode toggle failed:', error);
-              notify((error && error.message) || 'Failed to switch review mode', 'error');
-            });
+            openCurrentFileInFileEditor();
             break;
           case 'viewerFileInfoBtn':
             openFileInfoDrawer();
@@ -5249,31 +5053,9 @@
         actionable.click();
       });
       reviewRail.addEventListener('click', function (event) {
-        var saveButton = event.target && event.target.closest ? event.target.closest('#reviewSaveDraftBtn') : null;
-        if (saveButton) {
-          saveReviewBatch().catch(function (error) {
-            console.error('[FileViewerPage] Save review draft failed:', error);
-            notify((error && error.message) || 'Failed to save review draft', 'error');
-          });
-          return;
-        }
         var releaseButton = event.target && event.target.closest ? event.target.closest('#reviewReleaseBtn') : null;
         if (releaseButton) {
-          releaseReviewVersion();
-          return;
-        }
-        var editChangeItem = event.target && event.target.closest ? event.target.closest('[data-review-change-edit-index]') : null;
-        if (editChangeItem) {
-          confirmReviewHistoryChangeEdit(editChangeItem.getAttribute('data-review-change-edit-index'));
-          return;
-        }
-        var revertChangeItem = event.target && event.target.closest ? event.target.closest('[data-review-change-revert-index]') : null;
-        if (revertChangeItem) {
-          confirmReviewHistoryChangeRevert(
-            revertChangeItem.getAttribute('data-review-change-revert-section'),
-            revertChangeItem.getAttribute('data-review-change-revert-index'),
-            revertChangeItem.getAttribute('data-review-history-release')
-          );
+          openCurrentFileInFileEditor();
           return;
         }
         var lanaDockTrigger = event.target && event.target.closest ? event.target.closest('[data-lana-dock-trigger]') : null;
@@ -5361,15 +5143,14 @@
     document.getElementById('metaSaveBtn').addEventListener('click', saveMetadata);
     document.getElementById('metaCancelBtn').addEventListener('click', cancelMetadataChanges);
 
-    // Keyboard: Escape to go back
+    // Keyboard: Escape closes viewer-owned overlays only. It should not route
+    // the file viewer away from the current document.
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
-        // If Ask LANA panel drawer is open, let it handle Escape
         var lanaPanel = document.getElementById('fileViewerLana');
         if (lanaPanel && lanaPanel.open) return;
         var fileInfoDrawer = document.getElementById('fileInfoDrawer');
         if (fileInfoDrawer && fileInfoDrawer.open) return;
-        navigateBack();
       }
     });
 

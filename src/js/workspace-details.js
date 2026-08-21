@@ -362,6 +362,19 @@
       }
 
       var matter = matterResult.matter;
+
+      // System workspaces (e.g. the per-organization "Organization Templates"
+      // shelf) are storage containers, never a matter page: deep links and
+      // stale bookmarks land on the Template Library instead.
+      var matterMetadata = matter.metadata;
+      if (typeof matterMetadata === 'string') {
+        try { matterMetadata = JSON.parse(matterMetadata); } catch (e) { matterMetadata = null; }
+      }
+      if (matterMetadata && matterMetadata.system_type === 'organization_templates') {
+        Lex.Nav.go('document-library-templates.html');
+        return;
+      }
+
       var permissions = results[1].status === 'fulfilled' ? (results[1].value.permissions || []) : [];
       var activityData = results[2].status === 'fulfilled' ? results[2].value : { activities: [], pagination: {} };
       var chatsData = results[3].status === 'fulfilled' ? results[3].value : { sessions: [], pagination: {} };
@@ -2046,6 +2059,7 @@
               '<h4 class="text-sm font-semibold text-gray-900">Workspace documents</h4>' +
               '<p class="text-xs text-gray-500 mt-0.5">Upload source files and review generated work product for this workspace.</p>' +
             '</div>' +
+            '<lex-btn id="workspaceNewDocumentBtn" variant="secondary" size="sm">New Document</lex-btn>' +
           '</div>' +
           '<div id="drawerEmptyDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:lex-border-accent transition-colors cursor-pointer mb-6">' +
             '<input type="file" id="drawerEmptyFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">' +
@@ -2062,6 +2076,7 @@
           '<div id="matterDocsViewHost"></div>' +
         '</div>';
       setupDrawerUpload(matter, 'drawerEmptyDropZone', 'drawerEmptyFileInput');
+      bindWorkspaceNewDocumentButton(matter);
       mountMatterDocumentsView(matter, documents, orphanedFiles);
       return;
     }
@@ -2077,6 +2092,7 @@
             '<h4 class="text-sm font-semibold text-gray-900">Workspace documents</h4>' +
             '<p class="text-xs text-gray-500 mt-0.5">Manage uploaded files, templates, and generated work product.</p>' +
           '</div>' +
+          '<lex-btn id="workspaceNewDocumentBtn" variant="secondary" size="sm">New Document</lex-btn>' +
         '</div>' +
         '<div id="drawerDocDropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:lex-border-accent transition-colors cursor-pointer">' +
           '<input type="file" id="drawerDocFileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt" class="hidden">' +
@@ -2095,7 +2111,26 @@
       '</div>';
 
     setupDrawerUpload(matter, 'drawerDocDropZone', 'drawerDocFileInput');
+    bindWorkspaceNewDocumentButton(matter);
     mountMatterDocumentsView(matter, documents, orphanedFiles);
+  }
+
+  // "New Document" opens the shared creation modal fixed to this workspace,
+  // then hands the created file to the LANA File Editor.
+  function bindWorkspaceNewDocumentButton(matter) {
+    var button = document.getElementById('workspaceNewDocumentBtn');
+    if (!button) return;
+    button.addEventListener('click', function () {
+      if (!window.LanaDocumentCreate || typeof window.LanaDocumentCreate.open !== 'function') {
+        if (window.Lex && Lex.Toast && Lex.Toast.error) Lex.Toast.error('Document creation is unavailable on this page.');
+        return;
+      }
+      window.LanaDocumentCreate.open({
+        matterId: matter && matter.matter_id,
+        matterName: matter && (matter.name || matter.matter_name),
+        source: 'workspace_documents'
+      });
+    });
   }
 
   function mountMatterDocumentsView(matter, documents, orphanedFiles) {

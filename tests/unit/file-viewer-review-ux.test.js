@@ -11,6 +11,10 @@ const pageJs = fs.readFileSync(
   path.join(__dirname, '../../src/js/file-viewer-page.js'),
   'utf8'
 );
+const serviceJs = fs.readFileSync(
+  path.join(__dirname, '../../src/js/services/document-review-api.service.js'),
+  'utf8'
+);
 const drawerJs = fs.readFileSync(
   path.join(__dirname, '../../src/js/lex/components/foundation/lex-drawer.js'),
   'utf8'
@@ -68,13 +72,25 @@ describe('file-viewer review UX foundation', () => {
 
   test('makes read-only canvas mode explicit without freeform edit language', () => {
     expect(html).toContain('View / Read-only');
-    expect(html).toContain('Enter Review Mode');
+    expect(html).toContain('Open in File Editor');
+    expect(pageJs).toContain("reviewBadge.textContent = 'Open in File Editor';");
     expect(html).not.toContain('Freeform Edit');
   });
 
-  test('handles review mode through delegated banner clicks because lex-banner clones slot content', () => {
+  test('opens File Editor through delegated banner clicks because lex-banner clones slot content', () => {
     expect(pageJs).toContain("node.id === 'viewerReviewModeBadge'");
     expect(pageJs).toContain("case 'viewerReviewModeBadge':");
+    expect(pageJs).toContain('function openCurrentFileInFileEditor');
+    expect(pageJs).toContain("Lex.Nav.go('file-editor.html'");
+    expect(pageJs).toContain('fileEditor: fileEditorHandoff(file)');
+    expect(pageJs).toContain('function visibleViewerDocumentHtml');
+    expect(pageJs).toContain('function fileEditorReviewChanges');
+    expect(pageJs).toContain('reviewChanges: fileEditorReviewChanges()');
+    expect(pageJs).toContain('versions: fileEditorVersions(file)');
+    expect(pageJs).toContain("editorMode: fileEditorKindForFile(file) === 'doc' ? 'review' : 'edit'");
+    expect(pageJs).not.toContain('preferDraftShell: true');
+    expect(pageJs).toContain("matterId: getCurrentMatterId() || ''");
+    expect(pageJs).toContain('LanaDocumentReview.latestActivityIso(file, draftBatch)');
     expect(pageJs).not.toContain("reviewModeBtn.addEventListener('click'");
   });
 
@@ -83,8 +99,9 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('tabs._positionIndicator()');
   });
 
-  test('wires review drafts and releases to backend edit-batch endpoints', () => {
-    expect(html).toContain('id="reviewSaveDraftBtn"');
+  test('wires viewer releases to backend edit-batch endpoints without viewer-side draft editing', () => {
+    expect(html).not.toContain('id="reviewSaveDraftBtn"');
+    expect(html).not.toContain('Save Draft');
     expect(html).toContain('id="reviewReleaseBtn"');
     expect(html).toContain('id="reviewReleasesList"');
     expect(pageJs).toContain('async function saveReviewBatch');
@@ -107,7 +124,7 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('state.editorInstance.applyEditScripts');
     expect(pageJs).toContain('await state.editorInstance.applyEditScripts(scripts)');
     expect(pageJs).toContain('state.currentReviewBatchRestoreFailed');
-    expect(pageJs).toContain('Saved draft could not be replayed.');
+    expect(pageJs).toContain('Saved draft details could not be loaded.');
     expect(pageJs).toContain('function currentReviewBatchDisplayChanges');
     expect(pageJs).toContain('reviewBaselineRevisionKeyCounts');
     expect(pageJs).toContain('function captureReviewBaselineRevisions');
@@ -119,13 +136,13 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('captureReviewBaselineRevisions(state.reviewState)');
     expect(pageJs).toContain('resetReviewBaselineRevisions()');
     expect(pageJs).toContain('function dedupeEditOps');
-    expect(pageJs).toContain('seenScripts');
-    expect(pageJs).toContain('JSON.stringify(scriptOps)');
+    expect(pageJs).toContain('LanaDocumentReview.editScriptsFromBatch(batch)');
+    expect(pageJs).toContain('LanaDocumentReview.editOpsFromBatch(batch)');
     expect(pageJs).toContain('state.reviewRestoring = true');
-    expect(pageJs).toContain("setEditorInteractionMode('review')");
-    expect(pageJs).toContain('Saved draft must be replayed into the document before release.');
-    expect(pageJs).toContain('revision.editScript || revision.edit_script');
-    expect(pageJs).toContain('edit_script: editScript');
+    expect(pageJs).toContain("var nextMode = 'view';");
+    expect(pageJs).not.toContain('Saved draft must be replayed into the document before release.');
+    expect(pageJs).toContain('LanaDocumentReview.changesFromRevisions(unreleasedRawReviewRevisions(reviewState))');
+    expect(pageJs).toContain('LanaDocumentReview.persistableReviewChange(change, index)');
     expect(pageJs).toContain("'/edit-batches'");
     expect(pageJs).toContain("'/release'");
     expect(pageJs).toContain('approved: false');
@@ -167,11 +184,20 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function restoredDraftHasVisibleRevisions');
     expect(pageJs).toContain('state.currentReviewBatchRestoreFailed = false;');
     expect(pageJs).toContain('var attempts = 4;');
-    expect(pageJs).toContain('await restorePersistedDraftIntoEditorWithRetry(state.currentReviewBatch)');
+    expect(pageJs).not.toContain('await restorePersistedDraftIntoEditorWithRetry(state.currentReviewBatch)');
     expect(pageJs).toContain("if (hasUnreleasedWorkingCopy())");
     expect(pageJs).toContain("selectReviewDisplayScope('current')");
     expect(pageJs).toContain('selectInitialReviewDisplay(file)');
     expect(pageJs).toContain('state.reviewSourceDocumentId');
+    // The localStorage office-release bridge is retired: releases come only
+    // from the server, and stale bridge data is purged so fabricated local
+    // releases can never surface in the viewer.
+    expect(pageJs).toContain("localStorage.removeItem('lana:file-viewer:office-releases')");
+    expect(pageJs).not.toContain('loadOfficeEditorReleaseBridge');
+    expect(pageJs).not.toContain('mergeOfficeEditorReleases');
+    expect(pageJs).not.toContain('isLocalOfficeEditorRelease');
+    expect(pageJs).not.toContain('local_office_release');
+    expect(pageJs).not.toContain('renderLocalOfficeRelease');
     expect(html).toContain('id="viewerDocumentCard"');
     expect(html).toContain('id="viewerDisplayControls"');
     expect(html).toContain('id="viewerChangeDisplayToggle"');
@@ -212,7 +238,10 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain("if (state.editorInstance)");
     expect(pageJs).toContain("host.classList.toggle('file-viewer-editor-host--original', isOriginalScope);");
     expect(pageJs).toContain('openReviewVersionFromSelect(reviewVersionSelectValueForRelease(versionRelease))');
-    expect(pageJs).toContain("var unreleasedChanges = reviewDisplayScope() === 'current'");
+    // The unreleased working copy is lineage-level and stays visible in every
+    // version scope, so the change history must not gate it on 'current'.
+    expect(pageJs).toContain('var unreleasedChanges = editorChanges.length ? editorChanges : draftBatchChanges;');
+    expect(pageJs).not.toContain("var unreleasedChanges = reviewDisplayScope() === 'current'");
     expect(pageJs).toContain("if (value === 'current')");
     expect(pageJs).toContain("value.indexOf('release:')");
     expect(pageJs).toContain('Current view');
@@ -226,6 +255,8 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function reviewChangeLanaContext');
     expect(pageJs).toContain('function reviewChangeLanaSummary');
     expect(pageJs).toContain('function renderReviewChangeLanaButton');
+    expect(pageJs).toContain("if (!change) return '';");
+    expect(pageJs).not.toContain("if (!options.unreleased || !change) return '';");
     expect(pageJs).toContain("type: 'tracked_change'");
     expect(pageJs).toContain("context_type: 'tracked_change'");
     expect(pageJs).toContain('summary: summary');
@@ -239,14 +270,17 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('Review whether this tracked change is well-grounded');
     expect(pageJs).toContain('Talk about this.');
     expect(pageJs).toContain("event.target.closest ? event.target.closest('[data-lana-dock-trigger]')");
-    expect(pageJs).toContain('function adjacentDeletionFragmentRun');
-    expect(pageJs).toContain('function sameReviewChangeMoment');
+    // Grouping and identity are shared with File Editor through the
+    // LanaDocumentReview module; the viewer only delegates.
     expect(pageJs).toContain('function reviewChangeIdentityKey');
-    expect(pageJs).toContain('function editScriptGroupIdForChange');
-    expect(pageJs).toContain('function adjacentIdentityRun');
-    expect(pageJs).toContain('function mergeReviewChangeRun');
-    expect(pageJs).toContain('mergedScript.group_id');
-    expect(pageJs).toContain('if (isDeletionChange(current) && isInsertionChange(next) && sameReviewChangeMoment(current, next))');
+    expect(pageJs).toContain('LanaDocumentReview.displayReviewChanges(changes)');
+    expect(serviceJs).toContain('function adjacentDeletionFragmentRun');
+    expect(serviceJs).toContain('function sameReviewChangeMoment');
+    expect(serviceJs).toContain('function editScriptGroupIdForChange');
+    expect(serviceJs).toContain('function adjacentIdentityRun');
+    expect(serviceJs).toContain('function mergeReviewChangeRun');
+    expect(serviceJs).toContain('mergedScript.group_id');
+    expect(serviceJs).toContain('if (isDeletionChange(current) && isInsertionChange(next) && sameReviewChangeMoment(current, next))');
     expect(pageJs).not.toContain('var author = metadata.author || change.author');
     expect(pageJs).toContain('function revertReviewHistoryChange');
     expect(pageJs).toContain('function confirmReviewHistoryChangeRevert');
@@ -259,18 +293,18 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function isReplacementReviewChange');
     expect(pageJs).toContain('function canEditDraftReviewChange');
     expect(pageJs).toContain('function ensureDraftReviewChangeCanBeEdited');
-    expect(pageJs).toContain("if (op.op === 'insertText' && op.at)");
-    expect(pageJs).toContain("preferredOps = ['insertText', 'insertBlocks']");
+    expect(serviceJs).toContain("if (op.op === 'insertText' && op.at)");
+    expect(serviceJs).toContain("preferredOps = ['insertText', 'insertBlocks']");
     expect(pageJs).not.toContain('Insertion-only changes cannot be edited in place yet.');
     expect(pageJs).not.toContain('if (!isReplacementReviewChange(change)) return false;');
     expect(pageJs).toContain('function confirmReviewHistoryChangeEdit');
     expect(pageJs).toContain('function editUnreleasedReviewChange');
-    expect(pageJs).toContain('data-review-change-edit-index');
+    expect(pageJs).not.toContain('data-review-change-edit-index');
     expect(pageJs).toContain('Edit Draft Change');
     expect(pageJs).toContain('Update Change');
     expect(pageJs).toContain('Draft change updated');
-    expect(pageJs).toContain('data-review-change-revert-index');
-    expect(pageJs).toContain('var revertButton = options.unreleased');
+    expect(pageJs).not.toContain('data-review-change-revert-index');
+    expect(pageJs).not.toContain('var revertButton = options.unreleased');
     expect(pageJs).toContain("action: 'reject'");
     expect(pageJs).toContain('state.editorInstance.decide');
     expect(pageJs).toContain('state.editorInstance.applyEdits([op])');
@@ -348,7 +382,7 @@ describe('file-viewer review UX foundation', () => {
     expect(fileViewerCss).toContain('.file-viewer-format-notice__action');
   });
 
-  test('wires workspace data insertion through existing merge/template fields', () => {
+  test('keeps workspace data catalogs available without enabling viewer insertion edits', () => {
     expect(html).not.toContain('id="reviewInsertFieldBtn"');
     expect(html).not.toContain('Insert workspace data');
     expect(pageJs).toContain("'/merge-fields'");
@@ -359,13 +393,14 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('data-editor-field-mode');
     expect(pageJs).toContain('Current value');
     expect(pageJs).toContain('Template field');
-    expect(pageJs).toContain('workspace-field-requested');
+    expect(pageJs).not.toContain('workspace-field-requested');
     expect(pageJs).toContain('edit_intent');
     expect(pageJs).toContain("'document_edit'");
     expect(pageJs).toContain('base.document_edit =');
     expect(pageJs).toContain('function parseDocumentEditSuggestion');
     expect(pageJs).toContain('```lana-document-edit');
-    expect(pageJs).toContain('stageSuggestedEdit');
+    expect(pageJs).not.toContain('stageSuggestedEdit');
+    expect(pageJs).toContain('Open this document in File Editor to apply LANA suggested edits.');
     expect(pageJs).toContain('lex-lana-response-end');
     expect(pageJs).toContain('lex-lana-module-context-remove');
     expect(pageJs).toContain('state.editorFocusedContext = null');
@@ -422,5 +457,40 @@ describe('file-viewer review UX foundation', () => {
     expect(chatJs).toContain("content: this._streamingContent || ''");
     expect(panelJs).toContain('lex-chat-response-end');
     expect(panelJs).toContain('lex-lana-response-end');
+  });
+
+  test('file viewer back navigation skips self-referrer viewer routes', () => {
+    expect(pageJs).toContain('function normalizeBackReferrer');
+    expect(pageJs).toContain("return page === 'file-viewer.html';");
+    expect(pageJs).toContain("return '';");
+    expect(pageJs).toContain('function fileViewerNavContext');
+    expect(pageJs).toContain('context: fileViewerNavContext');
+    expect(pageJs).toContain("document.addEventListener('topbar-back-click', interceptShellBack, true);");
+    expect(pageJs).toContain('var target = targetBackRoute();');
+    expect(pageJs).toContain("Lex.Nav.go('dashboard.html');");
+    expect(pageJs).not.toContain("return 'library.html';");
+    expect(pageJs).not.toContain("referrer: 'file-viewer.html?id='");
+  });
+
+  test('shows a dedicated access-denied modal when the metadata API returns 403', () => {
+    expect(pageJs).toContain('function isFileAccessDenied');
+    expect(pageJs).toContain("Number(error.status) === 403");
+    expect(pageJs).toContain("Lex.Modal.alert('Access denied', 'You do not have access to this file.'");
+  });
+
+  test('file viewer uses source document lineage for released artifacts', () => {
+    expect(pageJs).toContain('function explicitFileSourceDocumentId');
+    expect(pageJs).toContain('function canonicalReviewSourceDocumentId');
+    expect(pageJs).toContain('function isReleasedArtifactFile');
+    expect(pageJs).toContain('function releaseForCurrentFile');
+    expect(pageJs).toContain('sourceDocumentId: canonicalReviewSourceDocumentId(file)');
+    expect(pageJs).toContain('releasedDocumentId: isReleasedArtifactFile(file) && file && file.id ? file.id :');
+    expect(pageJs).toContain("var reviewDocumentId = canonicalReviewSourceDocumentId(file);");
+    expect(pageJs).toContain("'/documents/' + encodeURIComponent(reviewDocumentId) + '/releases?limit=20'");
+    expect(pageJs).toContain("'?document_id=' + encodeURIComponent(reviewDocumentId)");
+    expect(pageJs).toContain('state.reviewReleases = Array.isArray(releasesResponse && releasesResponse.data)');
+    expect(pageJs).toContain('if (isReleasedArtifactFile(file) || releaseForCurrentFile(file)) return false;');
+    expect(pageJs).toContain('var openedRelease = releaseForCurrentFile(file);');
+    expect(pageJs).toContain("reviewEndpoint('/documents/' + encodeURIComponent(reviewDocumentId) + '/edit-batches')");
   });
 });

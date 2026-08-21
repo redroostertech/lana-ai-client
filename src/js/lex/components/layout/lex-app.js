@@ -105,14 +105,17 @@
     try {
       const base = docStudioAssetBase();
       await ensureLexComponents(base);
-      if (!window.DocStudioCreateModal || !window.DocStudioCreateModal.open) {
-        await loadAssetOnce('link', base.replace(/\/js\/$/, '/css/') + 'components/doc-studio-create-modal.css');
-        await loadAssetOnce('script', base + 'components/doc-studio-create-modal.js');
+      // Document Studio now creates a real matter document and opens it in the
+      // LANA File Editor. The shared New Document modal handles the flow
+      // (document vs template, name, workspace picker, organization templates).
+      if (!window.LanaDocumentCreate || !window.LanaDocumentCreate.open) {
+        await loadAssetOnce('link', base.replace(/\/js\/$/, '/css/') + 'document-create-modal.css');
+        await loadAssetOnce('script', base + 'services/document-create-modal.js');
       }
-      if (!window.DocStudioCreateModal || !window.DocStudioCreateModal.open) {
-        throw new Error('Doc Studio modal unavailable.');
+      if (!window.LanaDocumentCreate || !window.LanaDocumentCreate.open) {
+        throw new Error('Document creation modal unavailable.');
       }
-      window.DocStudioCreateModal.open({ api: window.api, pickMatter: true });
+      window.LanaDocumentCreate.open({ source: 'sidebar_menu' });
     } catch (error) {
       console.error('[DocStudio] Failed to open from menu:', error);
       if (window.Lex && window.Lex.Toast && window.Lex.Toast.error) {
@@ -968,7 +971,9 @@
             { id: 'dashboard', label: 'Dashboard', icon: 'home', href: 'dashboard.html' },
             { id: 'library', label: 'Library', icon: 'folder', href: 'drive.html', children: [
               { id: 'library-all-sources', label: 'All Sources', href: 'drive.html' },
-              { id: 'library-document-studio', label: 'Document Studio', isButton: true, onClick: 'openDocStudioFromMenu' }
+              { id: 'document-library', label: 'Documents', href: 'document-library.html' },
+              { id: 'library-templates', label: 'Templates', href: 'document-library-templates.html' },
+              { id: 'library-document-studio', label: 'Studio', isButton: true, onClick: 'openDocStudioFromMenu' }
             ] }
           ];
 

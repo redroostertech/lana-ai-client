@@ -1,0 +1,107 @@
+/* New Document modal (shared creation flow). */
+
+.doc-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.doc-create-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.doc-create-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lex-text-secondary, #5f6368);
+}
+
+.doc-create-field input[type="text"] {
+  width: 100%;
+  border: 1px solid var(--lex-border-primary, #d7d9dd);
+  border-radius: var(--lex-radius-md, 8px);
+  padding: 9px 12px;
+  font: inherit;
+  color: var(--lex-text-primary, #17181a);
+  background: var(--lex-bg-primary, #fff);
+}
+
+.doc-create-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.doc-create-choice label {
+  flex: 1 1 120px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--lex-border-primary, #d7d9dd);
+  border-radius: var(--lex-radius-md, 8px);
+  padding: 9px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--lex-text-primary, #17181a);
+}
+
+.doc-create-choice label:has(input:checked) {
+  border-color: var(--lex-border-accent, #4f46e5);
+  background: var(--lex-bg-accent-muted, #eef2ff);
+}
+
+.doc-create-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lex-text-tertiary, #8a8f98);
+}
+
+.doc-create-fixed-matter {
+  border: 1px solid var(--lex-border-primary, #d7d9dd);
+  border-radius: var(--lex-radius-md, 8px);
+  padding: 9px 12px;
+  font-size: 13px;
+  background: var(--lex-bg-secondary, #f6f7f8);
+  color: var(--lex-text-primary, #17181a);
+}
+
+.doc-create-matter-results {
+  border: 1px solid var(--lex-border-primary, #d7d9dd);
+  border-radius: var(--lex-radius-md, 8px);
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--lex-bg-primary, #fff);
+}
+
+.doc-create-matter-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: var(--lex-text-primary, #17181a);
+}
+
+.doc-create-matter-option:hover {
+  background: var(--lex-bg-secondary, #f6f7f8);
+}
+
+.doc-create-matter-id {
+  font-size: 11px;
+  color: var(--lex-text-tertiary, #8a8f98);
+  white-space: nowrap;
+}
+
+.doc-create-matter-empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--lex-text-tertiary, #8a8f98);
+}

@@ -12,7 +12,7 @@
  * only builds the query string and maps DTOs to display view-models.
  *
  *   - buildListQuery(filters)       -> query string (no leading '?') or ''
- *   - kindLabel(kind)               -> 'Fill' | 'Compose' | 'Render' | kind
+ *   - kindLabel(kind)               -> user-facing template type | kind
  *   - scopeLabel(template)          -> 'Org-wide' | 'Matter' | '—'
  *   - mapTemplateRow(dto)           -> list-row view-model
  *   - mapTemplates(response)        -> { rows, total, countsByKind, limit, offset }
@@ -26,9 +26,9 @@
   var VALID_KINDS = ['fill', 'compose', 'render'];
 
   var KIND_LABELS = {
-    fill: 'Fill',
-    compose: 'Compose',
-    render: 'Render'
+    fill: 'Document',
+    compose: 'Document set',
+    render: 'Layout'
   };
 
   /**
@@ -107,6 +107,10 @@
    */
   function scopeLabel(template) {
     var t = template || {};
+    var accessScope = String(t.access_scope || t.accessScope || '').toLowerCase();
+    if (accessScope === 'organization') return 'Organization';
+    if (accessScope === 'workspace') return 'Workspace';
+    if (accessScope === 'private') return 'Private';
     var scope = String(t.scope || '').toLowerCase();
     if (scope === 'org') return 'Org-wide';
     if (scope === 'matter') return 'Matter';
@@ -134,8 +138,14 @@
       documentTypeLabel: t.document_type_label != null ? String(t.document_type_label) : '',
       category: t.category != null ? String(t.category) : '',
       scope: String(t.scope || '').toLowerCase(),
+      accessScope: String(t.access_scope || '').toLowerCase(),
       scopeLabel: scopeLabel(t),
       matterId: t.matter_id != null ? String(t.matter_id) : '',
+      matterName: t.matter_name != null ? String(t.matter_name) : '',
+      // Hosting workspace key (always set for fill rows, even org-wide ones
+      // whose matter_id is null by design) — used for File Editor handoffs.
+      sourceMatterId: t.source_matter_id != null ? String(t.source_matter_id) : '',
+      contentType: t.content_type != null ? String(t.content_type) : '',
       status: t.status != null ? String(t.status) : '',
       updatedAt: t.updated_at || null,
       createdAt: t.created_at || null,
@@ -230,7 +240,7 @@
       _pushField(renderFields, 'Variables', base.variableCount);
       var isPublic = (dto && dto.is_public != null) ? (dto.is_public ? 'Yes' : 'No') : null;
       _pushField(renderFields, 'Public', isPublic);
-      sections.push({ title: 'Render template', fields: renderFields });
+      sections.push({ title: 'Layout', fields: renderFields });
     } else if (k === 'compose') {
       // compose: template set. Real fields: document_type(_label),
       // document_count, status.
@@ -238,16 +248,16 @@
       _pushField(composeFields, 'Document type', base.documentTypeLabel || base.documentType);
       _pushField(composeFields, 'Documents in set', base.documentCount);
       _pushField(composeFields, 'Status', base.status);
-      sections.push({ title: 'Compose set', fields: composeFields });
+      sections.push({ title: 'Document set', fields: composeFields });
     } else if (k === 'fill') {
       // fill: matter-scoped fillable document. Real fields: document_type,
       // variable_count (placeholders), status, matter scope.
       var fillFields = [];
       _pushField(fillFields, 'Document type', base.documentType);
       _pushField(fillFields, 'Variables', base.variableCount);
-      _pushField(fillFields, 'Matter', base.matterId);
+      _pushField(fillFields, 'Workspace', base.scope === 'org' ? 'Organization' : (base.matterName || base.matterId));
       _pushField(fillFields, 'Status', base.status);
-      sections.push({ title: 'Fill template', fields: fillFields });
+      sections.push({ title: 'Document template', fields: fillFields });
     }
 
     return {

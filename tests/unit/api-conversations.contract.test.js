@@ -4,7 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-function loadApi() {
+function loadApi(options = {}) {
+  const includeLanaTime = options.includeLanaTime !== false;
   const context = {
     console,
     URLSearchParams,
@@ -30,13 +31,18 @@ function loadApi() {
       origin: 'http://client.test',
       pathname: '/app.html'
     },
-    LanaConfig: {},
-    LanaTime: {
-      nowMs: jest.fn(() => 1000),
-      millisecondsSince: jest.fn((start) => 1000 - start),
-      MS_PER_MINUTE: 60000
-    }
+    LanaConfig: {}
   };
+  if (includeLanaTime) {
+    context.LanaTime = {
+      nowMs: jest.fn(() => 1000),
+      nowIso: jest.fn(() => '2026-08-20T00:00:00.000Z'),
+      millisecondsSince: jest.fn((start) => 1000 - start),
+      MS_PER_MINUTE: 60000,
+      MS_PER_HOUR: 3600000,
+      formatUtcDateOnly: jest.fn(() => '2026-08-20')
+    };
+  }
   context.window = context;
   context.globalThis = context;
 
@@ -47,6 +53,13 @@ function loadApi() {
 }
 
 describe('ApiClient canonical conversation aliases', () => {
+  test('constructs without relying on a bare global LanaTime binding', () => {
+    const api = loadApi({ includeLanaTime: false });
+
+    expect(api).toBeTruthy();
+    expect(api.lastActivityTime).toEqual(expect.any(Number));
+  });
+
   test('lists conversations through the canonical conversation route', async () => {
     const api = loadApi();
     api.get = jest.fn().mockResolvedValue({ data: [] });

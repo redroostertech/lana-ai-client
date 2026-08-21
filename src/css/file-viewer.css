@@ -859,7 +859,7 @@ button.file-viewer-mode-badge:hover {
 
 .file-viewer-review-workflow__actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 

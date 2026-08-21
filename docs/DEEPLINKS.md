@@ -52,7 +52,7 @@ These client routes are supported by the OS protocol handler for this phase:
 | Area | Routes |
 | --- | --- |
 | Core | `dashboard.html`, `workspaces.html`, `workspace-details.html`, `workspace-data.html`, `matters.html`, `matters/timeline.html`, `my-tasks.html`, `action-queue.html`, `notifications.html`, `alerts.html`, `approvals.html`, `approval-detail.html`, `search-results.html`, `search-conversations.html`, `settings-v2.html` |
-| Documents | `file-viewer.html`, `drive.html`, `folder.html`, `doc-studio/index.html`, `deck-studio/index.html`, `document-studio-templates.html` |
+| Documents | `file-viewer.html`, `drive.html`, `folder.html`, `doc-studio/index.html`, `deck-studio/index.html`, `document-library-templates.html` |
 | Agents | `agents/index.html` with hashes: `catalog`, `activity`, `create`, `tools/browse`, `agent/<slug>`, `run/<run-id>`, `activity/<id>` |
 | Automations | `automation/index.html` with hashes: `home`, `library`, `builder`, `runs`, `approvals`, `connectors`, `automation/<automation-id>` |
 | Insights | `insights/dashboard.html`, `insights/predictions.html`, `insights/module-execution.html` |

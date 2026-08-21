@@ -1,0 +1,156 @@
+/* document-library-templates.css
+ * Styles for the unified Document Studio Templates list/picker (C3).
+ * Uses Lex design tokens; no inline product styles in the page logic.
+ */
+
+/* The list itself uses the Document Library's classes (document-library.css)
+ * so both library pages share one visual language. This file only carries the
+ * template-specific extras: the filter bar, kind badges, and the drawer. */
+
+.dst-detail-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---- Filter bar ----------------------------------------------------------- */
+.dst-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0 12px;
+}
+
+.dst-filters-spacer {
+  flex: 1;
+}
+
+.dst-filter-label {
+  color: var(--lex-text-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dst-search {
+  width: 240px;
+  padding: 6px 12px;
+  border: 1px solid var(--lex-border-default);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  background: var(--lex-bg-primary);
+  color: var(--lex-text-primary);
+}
+
+.dst-orgwide {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--lex-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dst-orgwide input {
+  cursor: pointer;
+}
+
+/* ---- Kind badges ---------------------------------------------------------- */
+.dst-kind {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.dst-kind-fill {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.dst-kind-compose {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.dst-kind-render {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+/* ---- Detail drawer -------------------------------------------------------- */
+.dst-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dst-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dst-detail-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+.dst-detail-desc {
+  font-size: 13px;
+  color: var(--lex-text-secondary);
+  margin: 0 0 12px;
+}
+
+.dst-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--lex-border-subtle);
+  font-size: 13px;
+}
+
+.dst-detail-label {
+  color: var(--lex-text-tertiary);
+}
+
+.dst-detail-value {
+  color: var(--lex-text-primary);
+  text-align: right;
+  word-break: break-word;
+}
+
+.dst-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.dst-detail-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lex-text-tertiary);
+  margin-bottom: 4px;
+}
+
+.dst-detail-loading,
+.dst-detail-error {
+  padding: 24px 0;
+  text-align: center;
+  color: var(--lex-text-secondary);
+  font-size: 13px;
+}

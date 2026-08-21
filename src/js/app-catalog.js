@@ -37,6 +37,13 @@
       route: 'doc-studio/index.html',
       colors: ['#2f6f73', '#b56b45', '#17201f', '#f7f4ef']
     },
+    'document-library': {
+      id: 'document-library',
+      label: 'Document Library',
+      description: 'Create, find, and work on documents across workspaces',
+      route: 'document-library.html',
+      colors: ['#38bdf8', '#2563eb', '#16a34a', '#111827']
+    },
     'lana-voice': {
       id: 'lana-voice',
       label: 'LanaVoice',
@@ -70,6 +77,11 @@
     'doc-studio': 'doc-studio',
     'deck-studio': 'doc-studio',
     documents: 'doc-studio',
+    office: 'document-library',
+    'office-suite': 'document-library',
+    'lana-office': 'document-library',
+    'lana-office-suite': 'document-library',
+    'document-library': 'document-library',
     brainchild: 'brainchild',
     brain: 'brainchild',
     knowledge: 'brainchild'
@@ -307,7 +319,7 @@
   }
 
   function defaultApps() {
-    return [CATALOG['lana-works'], CATALOG['lana-agents']];
+    return [CATALOG['lana-works'], CATALOG['document-library'], CATALOG['lana-agents']];
   }
 
   global.LanaClientApps = {
