@@ -428,6 +428,66 @@
   background: var(--lex-bg-secondary);
 }
 
+.agent-detail-access-summary {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.agent-detail-access-summary > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--lex-status-success, #16845b) 11%, var(--lex-bg-primary));
+  color: var(--lex-status-success, #16845b);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.agent-detail-access-summary strong {
+  color: var(--lex-text-primary);
+  font-size: 0.83rem;
+}
+
+.agent-detail-access-summary p {
+  margin: 3px 0 0;
+  color: var(--lex-text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.agent-detail-drawer-section--access {
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--lex-border-subtle);
+  border-radius: 12px;
+  background: var(--lex-bg-primary);
+}
+
+.agent-detail-drawer-section--access lex-select {
+  width: 100%;
+}
+
+#agentDetailEditVisibilityWorkspaceField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.agent-detail-exposure-notice {
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
 .agent-detail-governance-card {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) auto;

@@ -69,6 +69,9 @@
     +     '<lex-card heading="Purpose" padding="normal">'
     +       '<p id="agentDetailDescription" class="agent-detail-description">(description)</p>'
     +     '</lex-card>'
+    +     '<lex-card heading="Access" padding="normal">'
+    +       '<div class="agent-detail-access-summary"><span id="agentDetailAccessIcon">O</span><div><strong id="agentDetailAccessLabel">Organization</strong><p id="agentDetailAccessHint">Everyone in your organization can use this agent.</p></div></div>'
+    +     '</lex-card>'
     +     '<lex-card heading="Capabilities" padding="normal">'
     +       '<div id="agentDetailToolsList" class="agent-detail-chip-list">'
     +         '<span class="agent-detail-empty-text">No tools configured.</span>'
@@ -273,12 +276,15 @@
     +     '</p>'
     +     '<lex-input id="agentDetailEditName" label="Display name" required></lex-input>'
     +     '<lex-textarea id="agentDetailEditDescription" label="Description" rows="3"></lex-textarea>'
+    +     '<div class="agent-detail-drawer-section agent-detail-drawer-section--access">'
+    +       '<div class="agent-detail-drawer-section-label">Who can use this agent?<span class="agent-detail-drawer-section-hint">Access controls who can find, run, and review it.</span></div>'
+    +       '<lex-select id="agentDetailEditVisibility" label="Agent access" options=\'[{"value":"private","label":"Only me"},{"value":"workspace","label":"Workspace"},{"value":"shared","label":"Organization"}]\'></lex-select>'
+    +       '<div id="agentDetailEditVisibilityWorkspaceField" class="hidden"><lex-select id="agentDetailEditVisibilityMatter" label="Workspace" placeholder="Choose a workspace..." searchable></lex-select><span class="agent-detail-drawer-section-hint">Workspace membership controls access.</span></div>'
+    +       '<p id="agentDetailEditVisibilityNotice" class="agent-detail-exposure-notice hidden">You can see this access level, but only the owner or an authorized administrator can change it.</p>'
+    +     '</div>'
     +     '<div class="agent-detail-drawer-section agent-detail-drawer-section--visibility">'
-    +       '<div>'
-    +         '<div class="agent-detail-drawer-section-label">Team visibility</div>'
-    +         '<span class="agent-detail-drawer-section-hint">Let teammates find and start this agent from LANA chat.</span>'
-    +       '</div>'
-    +       '<lex-toggle id="agentDetailEditDiscoverable" label="Discoverable" label-side="right"></lex-toggle>'
+    +       '<div><div class="agent-detail-drawer-section-label">Findable in chat</div><span class="agent-detail-drawer-section-hint">Shows the agent in LANA chat to people who already have access. This does not grant access.</span></div>'
+    +       '<lex-toggle id="agentDetailEditDiscoverable" label="Findable" label-side="right"></lex-toggle>'
     +     '</div>'
     +     '<div class="agent-detail-drawer-section">'
     +       '<div class="agent-detail-drawer-section-label">'
@@ -544,12 +550,21 @@
     return options;
   }
 
-  function buildRunPayload(input, matterId, scope) {
+  function buildRunPayload(input, matterId, scope, definitionId) {
     var value = String(input || '').trim();
     var resolvedScope = scope || (matterId ? 'workspace' : 'system');
     var payload = { input: { goal: value }, title: value.slice(0, 100), scope: resolvedScope };
     if (resolvedScope === 'workspace' && matterId) payload.matter_id = matterId;
+    if (definitionId) payload.definition_id = definitionId;
     return payload;
+  }
+
+  function agentApiUrl(state, suffix, query) {
+    var url = '/api/v1/agents/' + encodeURIComponent(state.slug) + (suffix || '');
+    var parts = [];
+    if (state.definitionId) parts.push('definition_id=' + encodeURIComponent(state.definitionId));
+    if (query) parts.push(query);
+    return parts.length ? url + '?' + parts.join('&') : url;
   }
 
   function approvalPolicySummary(policy) {
@@ -606,6 +621,34 @@
     if (agent.organization_id === null || agent.organization_id === undefined) return true;
     if (agent.kind === 'system') return true;
     return false;
+  }
+
+  function exposureForAgent(agent) {
+    if (isSystemAgent(agent)) return 'shared';
+    var value = String(agent && (agent.visibility || agent.exposure) || '').toLowerCase();
+    if (value === 'private') return 'private';
+    if (value === 'workspace' || value === 'matter') return 'workspace';
+    // Existing agents predate personal access. Missing/legacy values stay at
+    // the prior organization-wide behavior instead of being silently hidden.
+    return 'shared';
+  }
+
+  function exposureLabel(value) {
+    if (value === 'private') return 'Only me';
+    if (value === 'workspace') return 'Workspace';
+    return 'Organization';
+  }
+
+  function canEditExposure(agent) {
+    if (!agent || isSystemAgent(agent)) return false;
+    if (agent.can_edit_visibility !== undefined) return agent.can_edit_visibility === true;
+    if (agent.can_manage !== undefined) return agent.can_manage === true;
+    var permissions = agent.permissions || agent.capabilities || {};
+    if (permissions.can_change_visibility !== undefined) return permissions.can_change_visibility === true;
+    if (permissions.manage !== undefined) return permissions.manage === true;
+    // Compatibility with Chef versions that authorize the whole settings
+    // update but do not yet return field-level capability metadata.
+    return true;
   }
 
   function setVal(id, value) {
@@ -748,9 +791,10 @@
   // Per-render state
   // =========================================================================
 
-  function createState(slug) {
+  function createState(slug, definitionId) {
     return {
       slug: slug || null,
+      definitionId: definitionId || null,
       agent: null,
       activeTab: 'capabilities',
       statsRange: '30d',
@@ -818,6 +862,7 @@
 
   function renderProfile(state, agent) {
     state.agent = agent || {};
+    if (agent && agent.id) state.definitionId = agent.id;
 
     var banner = el('agentDetailBanner');
     if (banner) {
@@ -836,6 +881,15 @@
 
     var descEl = el('agentDetailDescription');
     if (descEl) descEl.textContent = agent.description || agent.summary || 'No description provided.';
+
+    var exposure = exposureForAgent(agent);
+    setText('agentDetailAccessLabel', exposureLabel(exposure));
+    setText('agentDetailAccessIcon', exposure === 'private' ? '1' : (exposure === 'workspace' ? 'W' : 'O'));
+    setText('agentDetailAccessHint', exposure === 'private'
+      ? 'Only you can find, run, and review this agent.'
+      : (exposure === 'workspace'
+        ? 'People with access to the selected workspace can use this agent.'
+        : 'Everyone in your organization can use this agent.'));
 
     var toolsEl = el('agentDetailToolsList');
     if (toolsEl) {
@@ -1153,6 +1207,16 @@
       state._unbindFns.push(function () { drawer.removeEventListener('lex-confirm', saveHandler); });
     }
 
+    var exposureSelect = el('agentDetailEditVisibility');
+    if (exposureSelect) {
+      var exposureHandler = function () {
+        syncEditExposure(state);
+        if (String(exposureSelect.value || '') === 'workspace') loadRunWorkspaces(state);
+      };
+      exposureSelect.addEventListener('lex-change', exposureHandler);
+      state._unbindFns.push(function () { exposureSelect.removeEventListener('lex-change', exposureHandler); });
+    }
+
     var deleteBtn = el('agentDetailEditDeleteBtn');
     if (deleteBtn) {
       var deleteHandler = function () { confirmDelete(ctx, state); };
@@ -1267,7 +1331,7 @@
     var path = desired ? 'enable' : 'disable';
     if (!window.api || typeof window.api.put !== 'function') return;
 
-    window.api.put('/api/v1/agents/' + encodeURIComponent(state.slug) + '/' + path, {})
+    window.api.put(agentApiUrl(state, '/' + path), {})
       .then(function (resp) {
         if (state.destroyed) return;
         var agent = (resp && resp.agent) ? resp.agent
@@ -1308,6 +1372,13 @@
     drawer.open = true;
   }
 
+  function syncEditExposure(state) {
+    var select = el('agentDetailEditVisibility');
+    var field = el('agentDetailEditVisibilityWorkspaceField');
+    var value = select && select.value ? String(select.value) : exposureForAgent(state.agent);
+    if (value === 'workspace') show(field); else hide(field);
+  }
+
   function captureEditFormState(state) {
     var budget = readBudgetFromForm();
     if (budget && budget._invalid) budget = {};
@@ -1317,6 +1388,8 @@
       description: ((el('agentDetailEditDescription') && el('agentDetailEditDescription').value) || '').trim(),
       model_slot: (el('agentDetailEditModelSlot') && el('agentDetailEditModelSlot').value) || '',
       discoverable: !!(el('agentDetailEditDiscoverable') && el('agentDetailEditDiscoverable').checked),
+      visibility: String((el('agentDetailEditVisibility') && el('agentDetailEditVisibility').value) || 'shared'),
+      visibility_matter_id: String((el('agentDetailEditVisibilityMatter') && el('agentDetailEditVisibilityMatter').value) || ''),
       disabled_tools: Object.assign({}, state.editDisabledTools || {}),
       schedule_enabled: !!(el('agentDetailEditScheduleEnabled') && el('agentDetailEditScheduleEnabled').checked),
       schedule_cron: ((el('agentDetailEditScheduleCron') && el('agentDetailEditScheduleCron').value) || '').trim(),
@@ -1333,6 +1406,29 @@
     setVal('agentDetailEditName', a.name || '');
     setVal('agentDetailEditDescription', a.description || '');
     setChecked('agentDetailEditDiscoverable', a.discoverable === true);
+    var exposure = exposureForAgent(a);
+    var exposureSelect = el('agentDetailEditVisibility');
+    if (exposureSelect) {
+      exposureSelect.options = [
+        { value: 'private', label: 'Only me' },
+        { value: 'workspace', label: 'Workspace' },
+        { value: 'shared', label: 'Organization' }
+      ];
+      exposureSelect.value = exposure;
+      exposureSelect.disabled = !canEditExposure(a);
+    }
+    var exposureMatter = el('agentDetailEditVisibilityMatter');
+    if (exposureMatter) {
+      exposureMatter.options = workspaceOptions(state.workspaces);
+      exposureMatter.value = a.matter_id || a.workspace_id || '';
+      exposureMatter.disabled = !canEditExposure(a);
+    }
+    syncEditExposure(state);
+    if (exposure === 'workspace') loadRunWorkspaces(state);
+    var exposureNotice = el('agentDetailEditVisibilityNotice');
+    if (exposureNotice) {
+      if (canEditExposure(a)) hide(exposureNotice); else show(exposureNotice);
+    }
 
     var slotEl = el('agentDetailEditModelSlot');
     if (slotEl) {
@@ -1402,6 +1498,12 @@
     if (cur.description !== (snap.description || '')) body.description = cur.description;
     if (cur.model_slot && cur.model_slot !== (snap.model_slot || '')) body.model_slot = cur.model_slot;
     if (cur.discoverable !== !!snap.discoverable) body.discoverable = cur.discoverable;
+    if (canEditExposure(state.agent)
+        && (cur.visibility !== (snap.visibility || 'shared')
+          || cur.visibility_matter_id !== (snap.visibility_matter_id || ''))) {
+      body.visibility = cur.visibility;
+      body.matter_id = cur.visibility === 'workspace' ? cur.visibility_matter_id : null;
+    }
 
     var snapDisabled = snap.disabled_tools || {};
     var curDisabled = cur.disabled_tools || {};
@@ -1462,6 +1564,10 @@
       if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Schedule is enabled but no cron expression was provided.');
       return;
     }
+    if (curState.visibility === 'workspace' && !curState.visibility_matter_id) {
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Choose which workspace can use this agent.');
+      return;
+    }
     var rawBudget = readBudgetFromForm();
     if (rawBudget && rawBudget._invalid) {
       if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(rawBudget._invalid);
@@ -1475,7 +1581,7 @@
 
     if (!window.api || typeof window.api.put !== 'function') return;
 
-    window.api.put('/api/v1/agents/' + encodeURIComponent(state.slug), body)
+    window.api.put(agentApiUrl(state), body)
       .then(function (resp) {
         if (state.destroyed) return;
         var agent = (resp && resp.agent) ? resp.agent
@@ -1535,7 +1641,7 @@
     if (!state.slug) return;
     if (!window.api || typeof window.api.delete !== 'function') return;
 
-    window.api.delete('/api/v1/agents/' + encodeURIComponent(state.slug))
+    window.api.delete(agentApiUrl(state))
       .then(function (resp) {
         if (state.destroyed) return;
         var agent = (resp && resp.agent) ? resp.agent
@@ -1579,9 +1685,8 @@
     hide(unavailable);
 
     var w = statsRangeToWindow(state.statsRange);
-    var url = '/api/v1/agents/' + encodeURIComponent(state.slug) + '/stats'
-            + '?since=' + encodeURIComponent(w.since)
-            + '&until=' + encodeURIComponent(w.until);
+    var url = agentApiUrl(state, '/stats', 'since=' + encodeURIComponent(w.since)
+            + '&until=' + encodeURIComponent(w.until));
 
     loadStatsTrends(state, w);
 
@@ -1717,10 +1822,9 @@
     if (!state.slug) return;
     if (!window.api || typeof window.api.get !== 'function') return;
 
-    var url = '/api/v1/agents/' + encodeURIComponent(state.slug) + '/stats/trends'
-            + '?since=' + encodeURIComponent(w.since)
+    var url = agentApiUrl(state, '/stats/trends', 'since=' + encodeURIComponent(w.since)
             + '&until=' + encodeURIComponent(w.until)
-            + '&bucket=day';
+            + '&bucket=day');
 
     window.api.get(url)
       .then(function (resp) {
@@ -1844,10 +1948,18 @@
   }
 
   function populateRunWorkspaces(state) {
+    var options = workspaceOptions(state.workspaces);
     var select = el('agentDetailRunWorkspace');
-    if (!select) return;
-    select.options = workspaceOptions(state.workspaces);
-    select.disabled = false;
+    if (select) {
+      select.options = options;
+      select.disabled = false;
+    }
+    var exposureSelect = el('agentDetailEditVisibilityMatter');
+    if (exposureSelect) {
+      exposureSelect.options = options;
+      exposureSelect.disabled = !canEditExposure(state.agent);
+      if (state.agent && (state.agent.matter_id || state.agent.workspace_id)) exposureSelect.value = state.agent.matter_id || state.agent.workspace_id;
+    }
     if (!state.workspaces.length) setText('agentDetailRunWorkspaceHint', 'No active workspaces are available. Create or activate one before starting this agent.');
     else setText('agentDetailRunWorkspaceHint', 'This agent uses the selected workspace’s documents, tasks, and business context.');
   }
@@ -1874,6 +1986,8 @@
     state.workspacesLoading = true;
     var select = el('agentDetailRunWorkspace');
     if (select) select.disabled = true;
+    var exposureSelect = el('agentDetailEditVisibilityMatter');
+    if (exposureSelect) exposureSelect.disabled = true;
     setText('agentDetailRunWorkspaceHint', 'Loading active workspaces...');
     window.api.getMatters(1, 100, { status: 'active', sort_by: 'updated_at', sort_order: 'desc' }).then(function (response) {
       if (state.destroyed) return;
@@ -1887,6 +2001,7 @@
       state.workspaces = [];
       state.workspacesLoading = false;
       if (select) select.disabled = false;
+      if (exposureSelect) exposureSelect.disabled = !canEditExposure(state.agent);
       setText('agentDetailRunWorkspaceHint', 'Workspaces could not be loaded. Close this window and try again.');
     });
   }
@@ -1910,7 +2025,7 @@
 
     var modal = el('agentDetailRunModal');
     if (modal) modal.loading = true;
-    window.api.post('/api/v1/agents/' + encodeURIComponent(state.slug) + '/runs', buildRunPayload(value, matterId, scope))
+    window.api.post('/api/v1/agents/' + encodeURIComponent(state.slug) + '/runs', buildRunPayload(value, matterId, scope, state.definitionId))
       .then(function (resp) {
         if (state.destroyed) return;
         var runId = (resp && resp.run && resp.run.id)
@@ -1953,7 +2068,7 @@
       return;
     }
 
-    window.api.get('/api/v1/agents/' + encodeURIComponent(state.slug))
+    window.api.get(agentApiUrl(state))
       .then(function (resp) {
         if (state.destroyed) return;
         var agent = (resp && resp.agent) ? resp.agent
@@ -1980,7 +2095,7 @@
   function loadWorkflow(state) {
     if (state.destroyed || !state.slug) return;
     if (!window.api || typeof window.api.get !== 'function') return;
-    window.api.get('/api/v1/agents/' + encodeURIComponent(state.slug) + '/workflows')
+    window.api.get(agentApiUrl(state, '/workflows'))
       .then(function (resp) {
         if (state.destroyed) return;
         var workflow = resp && resp.workflow ? resp.workflow : null;
@@ -2096,7 +2211,7 @@
     rootEl.innerHTML = TEMPLATE;
 
     var slug = ctx && ctx.slug;
-    var state = createState(slug);
+    var state = createState(slug, ctx && ctx.definitionId);
     state._rootEl = rootEl;
     rootEl._agentDetailState = state;
 
@@ -2136,7 +2251,9 @@
       runScopesFor: runScopesFor,
       defaultRunScope: defaultRunScope,
       contextProviderLabel: contextProviderLabel,
-      buildRunPayload: buildRunPayload
+      buildRunPayload: buildRunPayload,
+      exposureForAgent: exposureForAgent,
+      canEditExposure: canEditExposure
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

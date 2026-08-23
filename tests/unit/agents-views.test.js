@@ -87,7 +87,8 @@ describe('agent-create view: pure helpers', () => {
         modelSlot: 'agentic',
         selectedTools: ['search_documents', 'clone_matter'],
         scheduleEnabled: false,
-        discoverable: true
+        discoverable: true,
+        visibility: 'private'
       });
       expect(out).toEqual({
         template_slug: 'connector-triage',
@@ -95,6 +96,7 @@ describe('agent-create view: pure helpers', () => {
         description: 'helpful',
         allowed_tools: ['search_documents', 'clone_matter'],
         discoverable: true,
+        visibility: 'private',
         model_slot: 'agentic'
       });
     });
@@ -142,8 +144,36 @@ describe('agent-create view: pure helpers', () => {
         name: 'Imported helper',
         description: 'Creates a weekly summary.',
         allowed_tools: ['search_documents'],
-        discoverable: false
+        discoverable: false,
+        visibility: 'private'
       });
+    });
+
+    test('scopes a workspace agent with the canonical matter id', () => {
+      const state = { selectedTpl: { slug: 'a', name: 'Agent A' } };
+      const out = testApi.buildCreateBody(state, {
+        name: 'Workspace helper',
+        description: 'Helps one workspace.',
+        selectedTools: [],
+        discoverable: true,
+        visibility: 'workspace',
+        visibilityMatterId: 'matter-7'
+      });
+      expect(out.visibility).toBe('workspace');
+      expect(out.matter_id).toBe('matter-7');
+    });
+
+    test('uses shared for organization access without leaking a workspace id', () => {
+      const state = { selectedTpl: { slug: 'a', name: 'Agent A' } };
+      const out = testApi.buildCreateBody(state, {
+        name: 'Org helper',
+        description: 'Helps the organization.',
+        selectedTools: [],
+        visibility: 'shared',
+        visibilityMatterId: 'stale-matter'
+      });
+      expect(out.visibility).toBe('shared');
+      expect(out).not.toHaveProperty('matter_id');
     });
   });
 
@@ -251,6 +281,15 @@ describe('agent-create view: pure helpers', () => {
         matter_id: 'matter-123'
       });
     });
+
+    test('pins the first run to the definition that was just created', () => {
+      expect(testApi.buildFirstRunBody('Start the pilot', '', 'agent-private-7')).toEqual({
+        input: { goal: 'Start the pilot' },
+        title: 'Start the pilot',
+        scope: 'system',
+        definition_id: 'agent-private-7'
+      });
+    });
   });
 
   describe('plain-language schedules', () => {
@@ -312,6 +351,12 @@ describe('agent catalog view: run context helpers', () => {
       title: 'Review all connector data',
       scope: 'system'
     });
+    expect(testApi.buildRunPayload('Review the selected copy', '', 'system', 'agent-22')).toEqual({
+      input: { goal: 'Review the selected copy' },
+      title: 'Review the selected copy',
+      scope: 'system',
+      definition_id: 'agent-22'
+    });
   });
 });
 
@@ -360,12 +405,31 @@ describe('agent-detail view: editing and teaching helpers', () => {
       scope: 'workspace',
       matter_id: 'matter-7'
     });
+    expect(testApi.buildRunPayload('Draft from this definition', '', 'system', 'agent-9')).toEqual({
+      input: { goal: 'Draft from this definition' },
+      title: 'Draft from this definition',
+      scope: 'system',
+      definition_id: 'agent-9'
+    });
   });
 
   test('defaults flexible analytics agents to the system scope', () => {
     const agent = { run_scopes: ['system', 'workspace'], context_providers: [{ slug: 'insights', scope: 'org' }] };
     expect(testApi.runScopesFor(agent)).toEqual(['system', 'workspace']);
     expect(testApi.defaultRunScope(agent)).toBe('system');
+  });
+
+  test('keeps legacy and system agents at organization access while honoring new scopes', () => {
+    expect(testApi.exposureForAgent({ organization_id: 'org-1' })).toBe('shared');
+    expect(testApi.exposureForAgent({ organization_id: null, visibility: 'private' })).toBe('shared');
+    expect(testApi.exposureForAgent({ organization_id: 'org-1', visibility: 'private' })).toBe('private');
+    expect(testApi.exposureForAgent({ organization_id: 'org-1', visibility: 'workspace' })).toBe('workspace');
+  });
+
+  test('uses API capability metadata to decide whether exposure is editable', () => {
+    expect(testApi.canEditExposure({ organization_id: 'org-1', can_edit_visibility: true })).toBe(true);
+    expect(testApi.canEditExposure({ organization_id: 'org-1', can_edit_visibility: false })).toBe(false);
+    expect(testApi.canEditExposure({ organization_id: null, can_edit_visibility: true })).toBe(false);
   });
 });
 

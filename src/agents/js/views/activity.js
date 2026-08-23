@@ -33,6 +33,7 @@
     +     '<div class="outcomes-workspace-head">'
     +       '<div><span class="outcomes-eyebrow">Agent history</span><h2 id="outcomesListTitle">Work and deliverables</h2></div>'
     +       '<div class="outcomes-filters">'
+    +         '<lex-segmented id="atAudienceFilter" value="mine" aria-label="Whose runs" options=\'[{"value":"mine","label":"My runs"},{"value":"shared","label":"Shared with me"}]\'></lex-segmented>'
     +         '<lex-segmented id="atStatusFilter" value="all" options=\'[{"value":"all","label":"All"},{"value":"running","label":"Working"},{"value":"awaiting_input","label":"Needs input"},{"value":"awaiting_approval","label":"Approvals"},{"value":"completed","label":"Ready"}]\'></lex-segmented>'
     +         '<lex-select id="atPriorityFilter" placeholder="All priorities" options=\'[{"value":"","label":"All priorities"},{"value":"urgent","label":"Urgent"},{"value":"high","label":"High"},{"value":"medium","label":"Medium"},{"value":"low","label":"Low"}]\'></lex-select>'
     +       '</div>'
@@ -97,7 +98,7 @@
   }
 
   function createState() {
-    return { currentPage: 1, pageSize: 20, statusFilter: '', priorityFilter: '', totalItems: 0, tasks: [], destroyed: false, _unbindFns: [] };
+    return { currentPage: 1, pageSize: 20, audience: 'mine', statusFilter: '', priorityFilter: '', totalItems: 0, tasks: [], destroyed: false, _unbindFns: [] };
   }
 
   function setMetric(id, value) { var metric = el(id); if (metric) metric.value = String(value); }
@@ -127,12 +128,17 @@
     var created = task.created_at ? escHtml(timeAgo(task.created_at)) : '';
     var priority = task.priority || 'medium';
     var action = group === 'attention' ? 'Respond now' : (group === 'ready' ? 'Review outcome' : 'Open details');
-    return '<button type="button" class="outcome-card outcome-card--' + group + '" data-task-id="' + escHtml(task.id || '') + '">'
+    var scope = task.visibility === 'private'
+      ? 'Only me'
+      : (task.matter_id || task.visibility === 'workspace' || task.run_scope === 'workspace' ? 'Workspace' : 'Organization');
+    var starter = task.triggered_by_name || task.created_by_name || task.owner_name || '';
+    var access = task.is_mine === true ? 'Started by you' : (starter ? 'Started by ' + starter : (scope + ' run'));
+    return '<article class="outcome-card outcome-card--' + group + '">'
       + '<span class="outcome-card-status-icon"><i></i></span>'
-      + '<span class="outcome-card-main"><span class="outcome-card-title-row"><strong>' + title + '</strong><span class="outcome-card-priority outcome-card-priority--' + escHtml(priority) + '">' + escHtml(priorityLabel(priority)) + '</span></span>'
-      + '<span class="outcome-card-description">' + description + '</span><small>' + escHtml(statusMessage(status)) + '</small></span>'
-      + '<span class="outcome-card-meta"><strong>' + escHtml(statusLabel(status)) + '</strong><small>' + created + '</small><span>' + escHtml(action) + ' →</span></span>'
-      + '</button>';
+      + '<button type="button" class="outcome-card-main" data-task-id="' + escHtml(task.id || '') + '"><span class="outcome-card-title-row"><strong>' + title + '</strong><span class="outcome-card-priority outcome-card-priority--' + escHtml(priority) + '">' + escHtml(priorityLabel(priority)) + '</span></span>'
+      + '<span class="outcome-card-description">' + description + '</span><small>' + escHtml(statusMessage(status)) + '</small><span class="outcome-card-scope">' + escHtml(scope) + ' · ' + escHtml(access) + '</span></button>'
+      + '<span class="outcome-card-meta"><strong>' + escHtml(statusLabel(status)) + '</strong><small>' + created + '</small><button type="button" data-task-id="' + escHtml(task.id || '') + '">' + escHtml(action) + ' →</button><button type="button" class="outcome-card-log" data-task-log-id="' + escHtml(task.id || '') + '">Run activity</button></span>'
+      + '</article>';
   }
 
   function renderTasks(state) {
@@ -147,7 +153,7 @@
   function renderEmpty(state) {
     var empty = el('atEmpty');
     if (!empty) return;
-    var filtered = state.statusFilter || state.priorityFilter;
+    var filtered = state.statusFilter || state.priorityFilter || state.audience === 'shared';
     if (filtered) empty.innerHTML = '<lex-empty icon="search" message="No outcomes match these filters" description="Try All or choose a different priority."></lex-empty>';
     else empty.innerHTML = '<div class="outcomes-first-empty"><span class="outcomes-first-mark">L</span><div><strong>Your agents’ work will collect here.</strong><p>Run an agent from the workspace and return here to review its result, decisions, and deliverables.</p></div><lex-btn id="outcomesEmptyBuildBtn" variant="primary" icon="plus">Build an agent</lex-btn></div>';
     show(empty);
@@ -166,6 +172,7 @@
     }
     var offset = (state.currentPage - 1) * state.pageSize;
     var url = '/api/v1/agentic-tasks?limit=' + state.pageSize + '&offset=' + offset;
+    url += '&audience=' + encodeURIComponent(state.audience || 'mine');
     if (state.statusFilter) url += '&execution_status=' + encodeURIComponent(state.statusFilter);
     if (state.priorityFilter) url += '&priority=' + encodeURIComponent(state.priorityFilter);
     url += '&sort_by=created_at&sort_order=desc';
@@ -209,6 +216,12 @@
     var state = createState();
     rootEl._activityState = state;
     bind(state, el('outcomesBuildBtn'), 'click', function () { ctx.app.setView('create'); });
+    bind(state, el('atAudienceFilter'), 'lex-change', function (event) {
+      var value = (event && event.detail && event.detail.value) || 'mine';
+      state.audience = value === 'shared' ? 'shared' : 'mine';
+      state.currentPage = 1;
+      loadTasks(ctx, state);
+    });
     bind(state, el('atStatusFilter'), 'lex-change', function (event) {
       var value = (event && event.detail && event.detail.value) || 'all';
       state.statusFilter = value === 'all' ? '' : value;
@@ -225,6 +238,11 @@
       loadTasks(ctx, state);
     });
     bind(state, el('atItems'), 'click', function (event) {
+      var log = event.target.closest('[data-task-log-id]');
+      if (log && log.getAttribute('data-task-log-id')) {
+        ctx.app.setView('activityDetail', { id: log.getAttribute('data-task-log-id'), mode: 'run' });
+        return;
+      }
       var card = event.target.closest('[data-task-id]');
       if (card && card.getAttribute('data-task-id')) ctx.app.setView('activityDetail', { id: card.getAttribute('data-task-id') });
     });

@@ -178,7 +178,17 @@
     +             '<lex-select id="agentCreateScheduleTimezone" label="Timezone" searchable></lex-select>'
     +             '<lex-input id="agentCreateScheduleCron" class="hidden" label="Custom schedule" placeholder="0 9 * * 1-5" help="Advanced: standard 5-field cron expression"></lex-input>'
     +           '</div>'
-    +           '<div class="agent-builder-visibility-row"><div><strong>Let teammates find it</strong><span>Show this agent in LANA chat so others can give it work.</span></div><lex-toggle id="agentCreateDiscoverable" label="Findable in chat" label-side="right"></lex-toggle></div>'
+    +           '<div class="agent-builder-access-card">'
+    +             '<div class="agent-builder-section-heading"><div><h3>Who can use this agent?</h3><p>Start private, or give a workspace or your organization access.</p></div><span>You can change this later</span></div>'
+    +             '<input id="agentCreateVisibility" type="hidden" value="private">'
+    +             '<div class="agent-builder-access-choices" role="radiogroup" aria-label="Agent access">'
+    +               '<button type="button" class="agent-builder-access-choice active" data-exposure-choice="private" role="radio" aria-checked="true"><span class="agent-builder-access-icon">1</span><span><strong>Only me</strong><small>Only you can find, run, and review this agent.</small></span><span class="agent-builder-access-check">✓</span></button>'
+    +               '<button type="button" class="agent-builder-access-choice" data-exposure-choice="workspace" role="radio" aria-checked="false"><span class="agent-builder-access-icon">W</span><span><strong>Workspace</strong><small>People with access to one workspace can use it.</small></span><span class="agent-builder-access-check">✓</span></button>'
+    +               '<button type="button" class="agent-builder-access-choice" data-exposure-choice="shared" role="radio" aria-checked="false"><span class="agent-builder-access-icon">O</span><span><strong>Organization</strong><small>Everyone in your organization can use it.</small></span><span class="agent-builder-access-check">✓</span></button>'
+    +             '</div>'
+    +             '<div id="agentCreateVisibilityWorkspaceField" class="agent-builder-access-workspace hidden"><lex-select id="agentCreateVisibilityMatter" label="Which workspace?" placeholder="Choose a workspace..." searchable></lex-select><span>Workspace membership controls who can find, run, and review this agent.</span></div>'
+    +           '</div>'
+    +           '<div class="agent-builder-visibility-row"><div><strong>Findable in chat</strong><span>Show this agent in LANA chat to people who already have access. This does not grant anyone access.</span></div><lex-toggle id="agentCreateDiscoverable" label="Findable in chat" label-side="right"></lex-toggle></div>'
     +           '<div class="agent-builder-pilot-card">'
     +             '<div class="agent-builder-pilot-head"><div><span>Pilot run</span><strong>Try it on one real task</strong></div><span class="agent-builder-pilot-badge">Recommended</span></div>'
     +             '<p>This is an actual first run, not a simulation. It starts after deployment, stays inside your selected workspace, and still pauses for required approvals.</p>'
@@ -280,6 +290,7 @@
       path: ctx && ctx.mode === 'import' ? 'import' : 'template',
       imported: null,
       pendingPilotMatterId: '',
+      pendingVisibilityMatterId: '',
       pendingSnapshot: readPending(ctx && ctx.app),
       requestedTemplateSlug: ctx && ctx.templateSlug ? ctx.templateSlug : '',
       destroyed: false,
@@ -420,13 +431,38 @@
   }
 
   function applyWorkspaceOptions(state) {
-    var select = el('agentCreateFirstTaskMatter');
-    if (!select) return;
-    select.options = workspaceOptions(state.workspaces);
-    if (state.pendingPilotMatterId) {
-      select.value = state.pendingPilotMatterId;
+    var options = workspaceOptions(state.workspaces);
+    var pilotSelect = el('agentCreateFirstTaskMatter');
+    if (pilotSelect) pilotSelect.options = options;
+    if (pilotSelect && state.pendingPilotMatterId) {
+      pilotSelect.value = state.pendingPilotMatterId;
       state.pendingPilotMatterId = '';
     }
+    var visibilitySelect = el('agentCreateVisibilityMatter');
+    if (visibilitySelect) visibilitySelect.options = options;
+    if (visibilitySelect && state.pendingVisibilityMatterId) {
+      visibilitySelect.value = state.pendingVisibilityMatterId;
+      state.pendingVisibilityMatterId = '';
+    }
+  }
+
+  function exposureLabel(visibility) {
+    if (visibility === 'workspace') return 'Workspace';
+    if (visibility === 'shared') return 'Organization';
+    return 'Only me';
+  }
+
+  function updateExposureChoice(value) {
+    var visibility = value === 'workspace' || value === 'shared' ? value : 'private';
+    setVal('agentCreateVisibility', visibility);
+    var choices = document.querySelectorAll('[data-exposure-choice]');
+    for (var i = 0; i < choices.length; i++) {
+      var active = choices[i].getAttribute('data-exposure-choice') === visibility;
+      choices[i].classList.toggle('active', active);
+      choices[i].setAttribute('aria-checked', active ? 'true' : 'false');
+    }
+    if (visibility === 'workspace') show(el('agentCreateVisibilityWorkspaceField'));
+    else hide(el('agentCreateVisibilityWorkspaceField'));
   }
 
   function configurePilotWorkspace(state) {
@@ -916,6 +952,8 @@
       scheduleCron: schedule ? schedule.cron : '',
       scheduleTimezone: schedule ? schedule.timezone : timezone,
       discoverable: !!(el('agentCreateDiscoverable') && el('agentCreateDiscoverable').checked),
+      visibility: String((el('agentCreateVisibility') && el('agentCreateVisibility').value) || 'private'),
+      visibilityMatterId: String((el('agentCreateVisibilityMatter') && el('agentCreateVisibilityMatter').value) || ''),
       selectedTools: selectedToolList(state),
       currentStep: state.currentStep,
       path: state.path,
@@ -937,6 +975,11 @@
     setVal('agentCreateScheduleTimezone', snapshot.scheduleTimezone || 'UTC');
     setVal('agentCreateScheduleCron', snapshot.scheduleCron || '');
     setChecked('agentCreateDiscoverable', !!snapshot.discoverable);
+    updateExposureChoice(snapshot.visibility || 'private');
+    if (snapshot.visibilityMatterId) {
+      state.pendingVisibilityMatterId = snapshot.visibilityMatterId;
+      setVal('agentCreateVisibilityMatter', snapshot.visibilityMatterId);
+    }
     if (snapshot.goal) setVal('agentBuilderGoalInput', snapshot.goal);
     if (snapshot.firstTask) setVal('agentCreateFirstTask', snapshot.firstTask);
     if (snapshot.firstTaskMatterId) {
@@ -977,8 +1020,10 @@
       name: String(formValues.name || '').trim() || state.selectedTpl.name || state.selectedTpl.slug,
       description: String(formValues.description || '').trim(),
       allowed_tools: tools.slice(),
-      discoverable: !!formValues.discoverable
+      discoverable: !!formValues.discoverable,
+      visibility: formValues.visibility === 'workspace' || formValues.visibility === 'shared' ? formValues.visibility : 'private'
     };
+    if (body.visibility === 'workspace' && formValues.visibilityMatterId) body.matter_id = String(formValues.visibilityMatterId);
     if (formValues.modelSlot) body.model_slot = formValues.modelSlot;
     if (formValues.scheduleEnabled) {
       body.schedule = { enabled: true, cron: String(formValues.scheduleCron || '').trim(), timezone: formValues.scheduleTimezone || 'UTC' };
@@ -997,7 +1042,7 @@
     var snapshot = captureFormSnapshot(state);
     var name = snapshot.name.trim() || state.selectedTpl.name || 'Your agent';
     var source = state.imported ? 'Mapped from ' + state.imported.sourceKind : 'LANA starting point';
-    var visibility = snapshot.discoverable ? 'Findable in LANA chat' : 'Only from Agent Studio';
+    var visibility = exposureLabel(snapshot.visibility);
     var purpose = snapshot.description.trim() || 'Add a clear outcome before deploying.';
     var contextCount = contextProvidersFor(state.selectedTpl).length;
     holder.innerHTML = '<div class="agent-builder-review-head"><span class="agent-builder-review-mark">' + escHtml(name.charAt(0).toUpperCase()) + '</span><div><span>Ready to deploy</span><strong>' + escHtml(name) + '</strong></div></div>'
@@ -1006,12 +1051,13 @@
       + '<div><span>Foundation</span><strong>' + escHtml(state.selectedTpl.name || humanize(state.selectedTpl.slug)) + '</strong><small>' + escHtml(source) + '</small></div>'
       + '<div><span>Access</span><strong>' + snapshot.selectedTools.length + ' capabilit' + (snapshot.selectedTools.length === 1 ? 'y' : 'ies') + '</strong><small>' + contextCount + ' context source' + (contextCount === 1 ? '' : 's') + ' · approvals stay active</small></div>'
       + '<div><span>Runs</span><strong>' + escHtml(snapshot.firstTask && snapshot.firstTask.trim() ? 'First task starts on deploy' : scheduleLabel(snapshot.runMode)) + '</strong><small>' + escHtml(snapshot.firstTask && snapshot.firstTask.trim() ? scheduleLabel(snapshot.runMode) : (snapshot.scheduleTimezone || 'UTC')) + '</small></div>'
-      + '<div><span>Team access</span><strong>' + escHtml(visibility) + '</strong><small>You can change this later</small></div>'
+      + '<div><span>Who can use it</span><strong>' + escHtml(visibility) + '</strong><small>' + escHtml(snapshot.discoverable ? 'Findable in chat for people with access' : 'Available from Agent Studio') + '</small></div>'
       + '</div>';
   }
 
-  function showDeploySuccess(state, slug) {
+  function showDeploySuccess(state, slug, definitionId) {
     state.deployedSlug = slug;
+    state.deployedDefinitionId = definitionId || '';
     state.currentStep = 5;
     state.furthestStep = 4;
     for (var i = 1; i <= 4; i++) hide(el('agentBuilderStep' + i));
@@ -1037,6 +1083,7 @@
     if (!body) { notifyError('Choose a starting point first.'); updateStep(state, 1); return; }
     if (!body.name || !body.description) { notifyError('Add a name and a clear outcome before deploying.'); updateStep(state, 2); return; }
     if (snapshot.runMode === 'advanced' && (!body.schedule || !body.schedule.cron)) { notifyError('Enter a custom schedule or choose on demand.'); return; }
+    if (snapshot.visibility === 'workspace' && !snapshot.visibilityMatterId) { notifyError('Choose which workspace can use this agent.'); return; }
     if (snapshot.firstTask && snapshot.firstTask.trim() && templateNeedsWorkspace(state.selectedTpl) && !snapshot.firstTaskMatterId) {
       notifyError('Choose the workspace for this pilot task.');
       return;
@@ -1051,11 +1098,11 @@
       var agent = (response && response.agent) || (response && response.data) || response || {};
       var slug = agent.slug || body.template_slug;
       if (snapshot.firstTask && snapshot.firstTask.trim()) {
-        return startFirstRun(ctx, state, slug, snapshot.firstTask.trim(), snapshot.firstTaskMatterId);
+        return startFirstRun(ctx, state, slug, snapshot.firstTask.trim(), snapshot.firstTaskMatterId, agent.id);
       }
       if (window.Lex && window.Lex.Toast) window.Lex.Toast.success('Agent deployed and ready to run');
       if (saveButton) saveButton.loading = false;
-      showDeploySuccess(state, slug);
+      showDeploySuccess(state, slug, agent.id);
     }).catch(function (err) {
       if (state.destroyed) return;
       if (saveButton) saveButton.loading = false;
@@ -1066,15 +1113,16 @@
       if (status === 422 && nested && nested.code === 'MISSING_REQUIRED_CONNECTORS') message = formatMissingConnectorsMessage(nested.missing);
       else if (status === 400) message = 'Review the agent name, capabilities, and schedule.';
       else if (status === 401) message = 'Your session expired. Sign in again.';
+      else if (status === 403 && snapshot.visibility === 'shared') message = 'Only an agent administrator can publish to the organization. Choose Only me or Workspace instead.';
       else if (status === 403) message = 'You do not have permission to deploy agents.';
       else if (status === 404) message = 'Agent deployment is not available on this server.';
-      else if (status === 409) message = 'This starting point is already in your workspace. Open that agent to configure it.';
+      else if (status === 409) message = 'An agent from this starting point already exists at this access level. Open it to configure it.';
       notifyError(message);
       if (status === 401 && window.Lex && window.Lex.Nav) window.Lex.Nav.go('login.html');
     });
   }
 
-  function buildFirstRunBody(task, matterId) {
+  function buildFirstRunBody(task, matterId, definitionId) {
     var input = String(task || '').trim();
     var body = {
       input: { goal: input },
@@ -1082,11 +1130,12 @@
       scope: matterId ? 'workspace' : 'system'
     };
     if (matterId) body.matter_id = matterId;
+    if (definitionId) body.definition_id = definitionId;
     return body;
   }
 
-  function startFirstRun(ctx, state, slug, task, matterId) {
-    return window.api.post('/api/v1/agents/' + encodeURIComponent(slug) + '/runs', buildFirstRunBody(task, matterId)).then(function (response) {
+  function startFirstRun(ctx, state, slug, task, matterId, definitionId) {
+    return window.api.post('/api/v1/agents/' + encodeURIComponent(slug) + '/runs', buildFirstRunBody(task, matterId, definitionId)).then(function (response) {
       if (state.destroyed) return;
       var runId = (response && response.run && response.run.id)
         || (response && response.data && response.data.id)
@@ -1094,11 +1143,11 @@
         || (response && response.run_id);
       if (window.Lex && window.Lex.Toast) window.Lex.Toast.success('Agent deployed and first run started');
       if (runId) ctx.app.setView('agentRun', { runId: runId });
-      else ctx.app.setView('agentDetail', { slug: slug });
+      else ctx.app.setView('agentDetail', { slug: slug, definitionId: definitionId || '' });
     }).catch(function () {
       if (state.destroyed) return;
       if (window.Lex && window.Lex.Toast) window.Lex.Toast.warning('Agent deployed, but its first run did not start. You can run it from the agent page.');
-      ctx.app.setView('agentDetail', { slug: slug });
+      ctx.app.setView('agentDetail', { slug: slug, definitionId: definitionId || '' });
     });
   }
 
@@ -1202,7 +1251,7 @@
     bind(state, el('agentCreateCancelBtn'), 'click', function () { clearPending(ctx.app); ctx.app.setView('catalog'); });
     bind(state, el('agentCreateSaveBtn'), 'click', function () { submitCreate(ctx, state); });
     bind(state, el('agentBuilderSuccessOpenBtn'), 'click', function () {
-      if (state.deployedSlug) ctx.app.setView('agentDetail', { slug: state.deployedSlug });
+      if (state.deployedSlug) ctx.app.setView('agentDetail', { slug: state.deployedSlug, definitionId: state.deployedDefinitionId || '' });
     });
     bind(state, el('agentBuilderSuccessWorkspaceBtn'), 'click', function () { ctx.app.setView('catalog'); });
 
@@ -1252,6 +1301,13 @@
     bind(state, el('agentCreateFirstTask'), 'lex-input', function () { renderReview(state); });
     bind(state, el('agentCreateFirstTaskMatter'), 'lex-change', function () { renderReview(state); });
     bind(state, el('agentCreateDiscoverable'), 'lex-change', function () { renderReview(state); });
+    bind(state, document.querySelector('.agent-builder-access-choices'), 'click', function (event) {
+      var choice = event.target.closest('[data-exposure-choice]');
+      if (!choice) return;
+      updateExposureChoice(choice.getAttribute('data-exposure-choice'));
+      renderReview(state);
+    });
+    bind(state, el('agentCreateVisibilityMatter'), 'lex-change', function () { renderReview(state); });
   }
 
   function render(rootEl, ctx) {

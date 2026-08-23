@@ -1057,6 +1057,118 @@
   background: var(--lex-bg-primary, #fff);
 }
 
+.agent-builder-access-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 17px;
+  border: 1px solid var(--lex-border-subtle, #e2e6e2);
+  border-radius: var(--lex-radius-md, 11px);
+  background: var(--lex-bg-primary, #fff);
+}
+
+.agent-builder-access-card .agent-builder-section-heading p {
+  margin: 4px 0 0;
+  color: var(--lex-text-tertiary, #747b75);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.agent-builder-access-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-builder-access-choice {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 20px;
+  gap: 10px;
+  align-items: start;
+  min-height: 94px;
+  padding: 13px;
+  border: 1px solid var(--lex-border-subtle, #dce2dd);
+  border-radius: 10px;
+  background: var(--lex-bg-primary, #fff);
+  color: var(--lex-text-primary, #171b18);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-builder-access-choice:hover {
+  border-color: #a9c4b6;
+  background: #f8fbf9;
+}
+
+.agent-builder-access-choice.active {
+  border-color: var(--lex-color-success-600, #28735a);
+  box-shadow: 0 0 0 1px var(--lex-color-success-600, #28735a);
+  background: #f4faf6;
+}
+
+.agent-builder-access-icon,
+.agent-builder-access-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--lex-bg-secondary, #f0f3f0);
+  color: var(--lex-text-secondary, #5f675f);
+  font-size: 0.65rem;
+  font-weight: 750;
+}
+
+.agent-builder-access-check {
+  width: 19px;
+  height: 19px;
+  border: 1px solid var(--lex-border-default, #d2d7d3);
+  border-radius: 50%;
+  background: transparent;
+  color: transparent;
+}
+
+.agent-builder-access-choice.active .agent-builder-access-check {
+  border-color: var(--lex-color-success-600, #28735a);
+  background: var(--lex-color-success-600, #28735a);
+  color: #fff;
+}
+
+.agent-builder-access-choice strong,
+.agent-builder-access-choice small {
+  display: block;
+}
+
+.agent-builder-access-choice strong {
+  font-size: 0.76rem;
+}
+
+.agent-builder-access-choice small {
+  margin-top: 5px;
+  color: var(--lex-text-tertiary, #747b75);
+  font-size: 0.66rem;
+  line-height: 1.42;
+}
+
+.agent-builder-access-workspace {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: end;
+  padding: 13px;
+  border-radius: 9px;
+  background: var(--lex-bg-secondary, #f5f7f5);
+}
+
+.agent-builder-access-workspace > span {
+  padding-bottom: 7px;
+  color: var(--lex-text-tertiary, #747b75);
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
 .agent-builder-visibility-row strong,
 .agent-builder-visibility-row span {
   display: block;
@@ -1450,6 +1562,8 @@
   .agent-builder-import-map,
   .agent-builder-control-map,
   .agent-builder-run-choices,
+  .agent-builder-access-choices,
+  .agent-builder-access-workspace,
   .agent-builder-context-list,
   .agent-builder-review-grid,
   .agent-create-schedule-fields,

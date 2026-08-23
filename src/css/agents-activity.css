@@ -48,6 +48,7 @@
 
 .outcomes-filters {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 }
@@ -118,12 +119,9 @@
   width: 100%;
   min-height: 118px;
   padding: 18px 20px;
-  border: 0;
   border-bottom: 1px solid var(--lex-border-subtle, #e5e8e5);
   background: transparent;
   color: var(--lex-text-primary, #171b18);
-  text-align: left;
-  cursor: pointer;
   transition: background 150ms ease;
 }
 
@@ -200,7 +198,15 @@
 }
 
 .outcome-card-main {
+  width: 100%;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .outcome-card-title-row {
@@ -237,7 +243,7 @@
 .outcome-card-main > small,
 .outcome-card-meta strong,
 .outcome-card-meta small,
-.outcome-card-meta > span {
+.outcome-card-meta > button {
   display: block;
 }
 
@@ -260,6 +266,14 @@
   white-space: nowrap;
 }
 
+.outcome-card-scope {
+  display: block;
+  margin-top: 8px;
+  color: var(--lex-color-success-700, #286950);
+  font-size: 0.62rem;
+  font-weight: 650;
+}
+
 .outcome-card-meta {
   min-width: 150px;
   text-align: right;
@@ -276,11 +290,26 @@
   font-size: 0.63rem;
 }
 
-.outcome-card-meta > span {
+.outcome-card-meta > button {
+  margin-left: auto;
   margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--lex-color-success-700, #286950);
+  font-family: var(--lex-font-sans, system-ui, sans-serif);
   font-size: 0.67rem;
   font-weight: 700;
+  cursor: pointer;
+}
+
+.outcome-card-meta > .outcome-card-log {
+  margin-top: 7px;
+  color: var(--lex-text-secondary, #5f675f);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--lex-border-default, #cbd1cc);
+  text-underline-offset: 3px;
 }
 
 .outcomes-empty {
@@ -365,9 +394,13 @@
 
   .outcome-card-meta strong,
   .outcome-card-meta small,
-  .outcome-card-meta > span {
+  .outcome-card-meta > button {
     display: inline;
     margin-right: 10px;
+  }
+
+  .outcome-card-meta > button {
+    margin-left: 0;
   }
 
   .outcomes-first-empty {

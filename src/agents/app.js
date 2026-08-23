@@ -324,11 +324,19 @@
       return { view: VIEW_IDS.catalog, params: {} };
     }
 
-    // '#agent/<slug>'
+    // '#agent/<slug>?definition_id=<id>'
     if (hash.indexOf('agent/') === 0) {
-      var slug = hash.slice('agent/'.length).trim();
+      var agentRoute = hash.slice('agent/'.length).trim();
+      var queryIndex = agentRoute.indexOf('?');
+      var slug = queryIndex === -1 ? agentRoute : agentRoute.slice(0, queryIndex);
+      var agentParams = { slug: decodeURIComponent(slug) };
+      if (queryIndex !== -1) {
+        var query = new URLSearchParams(agentRoute.slice(queryIndex + 1));
+        var definitionId = query.get('definition_id');
+        if (definitionId) agentParams.definitionId = definitionId;
+      }
       if (slug) {
-        return { view: VIEW_IDS.agentDetail, params: { slug: decodeURIComponent(slug) } };
+        return { view: VIEW_IDS.agentDetail, params: agentParams };
       }
       return { view: VIEW_IDS.catalog, params: {} };
     }
@@ -384,7 +392,10 @@
       case VIEW_IDS.activity:
         return '#activity';
       case VIEW_IDS.agentDetail:
-        return p.slug ? '#agent/' + encodeURIComponent(p.slug) : '#catalog';
+        return p.slug
+          ? '#agent/' + encodeURIComponent(p.slug)
+            + (p.definitionId ? '?definition_id=' + encodeURIComponent(p.definitionId) : '')
+          : '#catalog';
       case VIEW_IDS.agentRun:
         return p.runId ? '#run/' + encodeURIComponent(p.runId) : '#catalog';
       case VIEW_IDS.activityDetail:

@@ -1259,7 +1259,8 @@
     else hide('atdRetryArea');
 
     if (!state.hasChosenTab) {
-      if (status === 'queued' || status === 'pending' || status === 'compiling_context' || status === 'running' || status === 'awaiting_input') setActiveTab('execution');
+      if (state.mode === 'run') setActiveTab('execution');
+      else if (status === 'queued' || status === 'pending' || status === 'compiling_context' || status === 'running' || status === 'awaiting_input') setActiveTab('execution');
       else setActiveTab('deliverables');
     }
   }

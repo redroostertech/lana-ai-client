@@ -175,11 +175,12 @@
     return options;
   }
 
-  function buildRunPayload(input, matterId, scope) {
+  function buildRunPayload(input, matterId, scope, definitionId) {
     var value = String(input || '').trim();
     var resolvedScope = scope || (matterId ? 'workspace' : 'system');
     var payload = { input: { goal: value }, title: value.slice(0, 100), scope: resolvedScope };
     if (resolvedScope === 'workspace' && matterId) payload.matter_id = matterId;
+    if (definitionId) payload.definition_id = definitionId;
     return payload;
   }
 
@@ -231,17 +232,19 @@
 
   function renderCustomCard(agent) {
     var slug = escHtml(agent.slug || '');
+    var definitionId = escHtml(agent.id || '');
     var name = escHtml(agent.name || humanize(agent.slug) || 'Untitled agent');
     var description = escHtml(agent.description || agent.summary || 'Ready for your next task.');
     var active = agent.is_active !== false;
     var tools = Array.isArray(agent.allowed_tools) ? agent.allowed_tools.length : 0;
-    return '<article class="agents-card agents-card--deployed" data-agent-slug="' + slug + '">'
+    var visibility = agent.visibility === 'private' ? 'Only me' : (agent.visibility === 'workspace' ? 'Workspace' : 'Organization');
+    return '<article class="agents-card agents-card--deployed" data-agent-slug="' + slug + '" data-agent-id="' + definitionId + '">'
       + '<div class="agents-card-top"><span class="agents-card-avatar">' + escHtml((agent.name || agent.slug || 'A').charAt(0).toUpperCase()) + '</span>'
       + '<span class="agents-card-status ' + (active ? 'agents-card-status--live' : 'agents-card-status--paused') + '"><i></i>' + (active ? 'Deployed' : 'Paused') + '</span></div>'
       + '<div class="agents-card-body"><h3>' + name + '</h3><p>' + description + '</p></div>'
-      + '<div class="agents-card-facts"><span>' + tools + ' capabilit' + (tools === 1 ? 'y' : 'ies') + '</span><span>' + escHtml(scheduleLabel(agent.schedule)) + '</span></div>'
-      + '<div class="agents-card-actions"><lex-btn variant="primary" size="sm" icon="play" data-action="run" data-agent-slug="' + slug + '"' + (active ? '' : ' disabled') + '>Run agent</lex-btn>'
-      + '<lex-btn variant="ghost" size="sm" data-action="open" data-agent-slug="' + slug + '">Open</lex-btn></div></article>';
+      + '<div class="agents-card-facts"><span>' + escHtml(visibility) + '</span><span>' + tools + ' capabilit' + (tools === 1 ? 'y' : 'ies') + '</span><span>' + escHtml(scheduleLabel(agent.schedule)) + '</span></div>'
+      + '<div class="agents-card-actions"><lex-btn variant="primary" size="sm" icon="play" data-action="run" data-agent-slug="' + slug + '" data-agent-id="' + definitionId + '"' + (active ? '' : ' disabled') + '>Run agent</lex-btn>'
+      + '<lex-btn variant="ghost" size="sm" data-action="open" data-agent-slug="' + slug + '" data-agent-id="' + definitionId + '">Open</lex-btn></div></article>';
   }
 
   function renderTemplateCard(state, template) {
@@ -250,16 +253,17 @@
     var description = escHtml(template.description || 'A governed LANA starting point.');
     var tools = Array.isArray(template.allowed_tools) ? template.allowed_tools.length : 0;
     var installed = findInstalledAgent(state, template);
-    return '<article class="agents-card agents-card--template" data-agent-slug="' + slug + '">'
+    var definitionId = escHtml(template.id || '');
+    return '<article class="agents-card agents-card--template" data-agent-slug="' + slug + '" data-agent-id="' + definitionId + '">'
       + '<div class="agents-card-top"><span class="agents-card-avatar agents-card-avatar--template">' + escHtml((template.name || template.slug || 'A').charAt(0).toUpperCase()) + '</span>'
       + '<span class="agents-card-status agents-card-status--starter">' + (installed ? 'Already added' : 'Starting point') + '</span></div>'
       + '<div class="agents-card-body"><h3>' + name + '</h3><p>' + description + '</p></div>'
       + '<div class="agents-card-facts"><span>' + tools + ' built-in capabilit' + (tools === 1 ? 'y' : 'ies') + '</span><span>Governed template</span></div>'
       + '<div class="agents-card-actions">'
       + (installed
-        ? '<lex-btn variant="secondary" size="sm" data-action="open" data-agent-slug="' + escHtml(installed.slug) + '">Open agent</lex-btn>'
+        ? '<lex-btn variant="secondary" size="sm" data-action="open" data-agent-slug="' + escHtml(installed.slug) + '" data-agent-id="' + escHtml(installed.id || '') + '">Open agent</lex-btn>'
         : '<lex-btn variant="primary" size="sm" icon="plus" data-action="use-template" data-agent-slug="' + slug + '">Use this starting point</lex-btn>')
-      + '<lex-btn variant="ghost" size="sm" data-action="preview" data-agent-slug="' + slug + '">Preview</lex-btn></div></article>';
+      + '<lex-btn variant="ghost" size="sm" data-action="preview" data-agent-slug="' + slug + '" data-agent-id="' + definitionId + '">Preview</lex-btn></div></article>';
   }
 
   function matchesSearch(agent, query) {
@@ -384,13 +388,16 @@
     });
   }
 
-  function findAgent(state, slug) {
-    for (var i = 0; i < state.allAgents.length; i++) if (state.allAgents[i].slug === slug) return state.allAgents[i];
+  function findAgent(state, slug, definitionId) {
+    for (var i = 0; i < state.allAgents.length; i++) {
+      if (definitionId && String(state.allAgents[i].id || '') === String(definitionId)) return state.allAgents[i];
+    }
+    for (var j = 0; j < state.allAgents.length; j++) if (state.allAgents[j].slug === slug) return state.allAgents[j];
     return null;
   }
 
-  function openRunModal(state, slug) {
-    var agent = findAgent(state, slug);
+  function openRunModal(state, slug, definitionId) {
+    var agent = findAgent(state, slug, definitionId);
     state.selectedAgent = agent || { slug: slug };
     var modal = el('agentsRunModal');
     var input = el('agentsRunInput');
@@ -476,7 +483,7 @@
     if (scope === 'workspace' && !matterId) { if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Choose the workspace where this agent should work.'); return; }
     var modal = el('agentsRunModal');
     if (modal) modal.loading = true;
-    window.api.post('/api/v1/agents/' + encodeURIComponent(state.selectedAgent.slug) + '/runs', buildRunPayload(value, matterId, scope)).then(function (response) {
+    window.api.post('/api/v1/agents/' + encodeURIComponent(state.selectedAgent.slug) + '/runs', buildRunPayload(value, matterId, scope, state.selectedAgent.id)).then(function (response) {
       if (state.destroyed) return;
       var runId = (response && response.run && response.run.id) || (response && response.data && response.data.id) || (response && response.id) || (response && response.run_id);
       if (modal) { modal.loading = false; modal.open = false; }
@@ -533,11 +540,12 @@
       var card = event.target.closest('[data-agent-slug]');
       if (!button && !card) return;
       var slug = (button && button.getAttribute('data-agent-slug')) || (card && card.getAttribute('data-agent-slug'));
+      var definitionId = (button && button.getAttribute('data-agent-id')) || (card && card.getAttribute('data-agent-id')) || '';
       var action = button && button.getAttribute('data-action');
-      if (!button) { ctx.app.setView('agentDetail', { slug: slug }); return; }
+      if (!button) { ctx.app.setView('agentDetail', { slug: slug, definitionId: definitionId }); return; }
       event.stopPropagation();
-      if (action === 'run') openRunModal(state, slug);
-      if (action === 'open' || action === 'preview') ctx.app.setView('agentDetail', { slug: slug });
+      if (action === 'run') openRunModal(state, slug, definitionId);
+      if (action === 'open' || action === 'preview') ctx.app.setView('agentDetail', { slug: slug, definitionId: definitionId });
       if (action === 'use-template') ctx.app.setView('create', { templateSlug: slug });
     });
     bind(state, el('agentsRecentOutcomes'), 'click', function (event) {
