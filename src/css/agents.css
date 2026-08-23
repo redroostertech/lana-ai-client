@@ -662,6 +662,7 @@
   line-height: 1.55;
 }
 
+.agents-run-scope-field,
 .agents-run-workspace-field {
   display: flex;
   flex-direction: column;
@@ -672,6 +673,7 @@
   background: var(--lex-bg-secondary, #fafbf9);
 }
 
+.agents-run-scope-field > span,
 .agents-run-workspace-field > span {
   color: var(--lex-text-tertiary, #757c76);
   font-size: 0.66rem;

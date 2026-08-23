@@ -149,7 +149,7 @@
     if (!banner) return;
 
     var taskStatus = status || (task && task.execution_status) || 'pending';
-    var subtitleParts = [statusLabel(taskStatus)];
+    var subtitleParts = [statusLabel(taskStatus), runScopeLabel(task)];
     if (task && task.priority) subtitleParts.push(String(task.priority).toUpperCase());
     if (task && task.created_at) subtitleParts.push(timeAgo(task.created_at));
 
@@ -165,6 +165,16 @@
         { label: (task && task.name) || 'Outcome detail' }
       ]));
     }
+  }
+
+  function runScopeValue(task) {
+    var explicit = task && (task.run_scope || task.scope);
+    if (explicit === 'workspace' || explicit === 'system') return explicit;
+    return task && task.matter_id ? 'workspace' : 'system';
+  }
+
+  function runScopeLabel(task) {
+    return runScopeValue(task) === 'workspace' ? 'Workspace run' : 'System run';
   }
 
   function statusLabel(status) {
@@ -270,6 +280,8 @@
     task: { group: 'plan', label: 'Task', icon: 'T' },
     task_batch: { group: 'plan', label: 'Task collection', icon: 'T' },
     dashboard_widget_batch: { group: 'plan', label: 'Dashboard updates', icon: 'W' },
+    contact_batch: { group: 'action', label: 'Contact records', icon: 'C' },
+    email_draft_batch: { group: 'action', label: 'Email drafts', icon: 'E' },
     redline: { group: 'document', label: 'Document redline', icon: 'D' },
     matter_review_summary: { group: 'document', label: 'Review summary', icon: 'D' },
     legal_document_draft: { group: 'document', label: 'Document draft', icon: 'D' },
@@ -587,6 +599,11 @@
     var approval = approvalStatusForTask(task);
     var status = task.execution_status || 'pending';
     var targetHtml = target ? renderTargetLink(target) : '<span class="atd-muted">No applied target recorded</span>';
+    var scopeHtml = runScopeValue(task) === 'workspace'
+      ? (task.matter_id
+        ? '<a class="atd-target-link" href="../workspace-details.html?id=' + encodeURIComponent(task.matter_id) + '">Workspace ' + escHtml(task.matter_id) + '</a>'
+        : 'Workspace run')
+      : 'System · organization-wide data';
 
     container.innerHTML = '<lex-card padding="none">' +
       '<div class="atd-summary-head">' +
@@ -608,6 +625,10 @@
         '<div class="atd-summary-block">' +
           '<span>Approval</span>' +
           '<strong>' + escHtml(approval) + '</strong>' +
+        '</div>' +
+        '<div class="atd-summary-block">' +
+          '<span>Run scope</span>' +
+          '<strong>' + scopeHtml + '</strong>' +
         '</div>' +
       '</div>' +
     '</lex-card>';
@@ -1534,14 +1555,16 @@
         var actionParts = String(actionLabel).split('.');
         actionLabel = actionParts[actionParts.length - 1];
       }
-      var itemTitle = firstValue([item.title, item.name, item.text, item.question, item.topic, item.category, actionLabel, item.event_type, item.invoice_number, item.payment_id, item.document_type, item.label, item.id]) || ('Item ' + String(i + 1));
-      var itemBody = firstValue([item.description, item.summary, item.scope, item.context, item.reason, item.recommended_action, item.rationale, item.expected_reason, item.draft_text, item.proposed_text, item.origin_quote]);
+      var itemTitle = firstValue([item.title, item.name, item.display_name, item.subject, item.text, item.question, item.topic, item.category, actionLabel, item.event_type, item.invoice_number, item.payment_id, item.document_type, item.label, item.email, item.id]) || ('Item ' + String(i + 1));
+      var itemBody = firstValue([item.description, item.summary, item.scope, item.context, item.reason, item.purpose, item.evidence, item.body_text, item.recommended_action, item.rationale, item.expected_reason, item.draft_text, item.proposed_text, item.origin_quote]);
       if (!itemBody && item.config && typeof item.config === 'object') itemBody = compactObjectSummary(item.config);
       var meta = [];
       if (item.owner_suggestion || item.suggested_owner_role || item.owner_role || item.actor) meta.push('Owner: ' + humanizeValue(item.owner_suggestion || item.suggested_owner_role || item.owner_role || item.actor));
       if (item.priority || item.priority_hint || item.level || item.severity) meta.push(humanizeValue(item.priority || item.priority_hint || item.level || item.severity));
       if (item.due_hint || item.due_date || item.date) meta.push(String(item.due_hint || item.due_date || item.date));
       if (item.status || item.confidence) meta.push(humanizeValue(item.status || item.confidence));
+      if (item.email) meta.push(String(item.email));
+      if (Array.isArray(item.to_addresses) && item.to_addresses.length) meta.push('To: ' + item.to_addresses.join(', '));
       html += '<article class="atd-outcome-collection-card"><span class="atd-outcome-collection-number">' + String(i + 1).padStart(2, '0') + '</span><div><strong>' + escHtml(humanizeValue(itemTitle)) + '</strong>'
         + (itemBody ? '<p>' + escHtml(compactLongText(itemBody, 360)) + '</p>' : '')
         + (meta.length ? '<small>' + escHtml(meta.join(' · ')) + '</small>' : '') + '</div></article>';
@@ -1600,6 +1623,8 @@
       ['requirements', payload.requirements],
       ['milestones', payload.milestones],
       ['widgets', payload.widgets],
+      ['contacts', payload.contacts],
+      ['email drafts', payload.emails],
       ['matches', payload.matches],
       ['entries', payload.entries],
       ['received documents', payload.received],
@@ -1627,7 +1652,7 @@
     else {
       var facts = withoutKeys(payload, [
         'executive_summary', 'summary', 'problem', 'scope', 'issue', 'context', 'text', 'question', 'rationale', 'tldr',
-        'workstreams', 'tasks', 'proposed_tasks', 'recommended_tasks', 'sections', 'topics', 'requirements', 'milestones', 'widgets',
+        'workstreams', 'tasks', 'proposed_tasks', 'recommended_tasks', 'sections', 'topics', 'requirements', 'milestones', 'widgets', 'contacts', 'emails',
         'matches', 'entries', 'received', 'missing', 'gaps', 'risk_register', 'key_risks', 'risks', 'open_questions', 'unresolved_questions',
         'goals', 'non_goals', 'actions', 'timeline', 'proposed_changes', 'current_text', 'proposed_text', 'trigger', 'config'
       ]);
@@ -2236,6 +2261,7 @@
       collectDeliverables: collectDeliverables,
       findInputPrompt: findInputPrompt,
       humanizeValue: humanizeValue,
+      runScopeValue: runScopeValue,
       outcomeGroupCounts: outcomeGroupCounts
     }
   };

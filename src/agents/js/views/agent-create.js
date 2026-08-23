@@ -1076,7 +1076,11 @@
 
   function buildFirstRunBody(task, matterId) {
     var input = String(task || '').trim();
-    var body = { input: input, title: input.slice(0, 100) };
+    var body = {
+      input: { goal: input },
+      title: input.slice(0, 100),
+      scope: matterId ? 'workspace' : 'system'
+    };
     if (matterId) body.matter_id = matterId;
     return body;
   }

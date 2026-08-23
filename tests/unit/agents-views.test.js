@@ -245,8 +245,9 @@ describe('agent-create view: pure helpers', () => {
 
     test('includes workspace context in the real first run but not the definition', () => {
       expect(testApi.buildFirstRunBody('  Review this workspace  ', 'matter-123')).toEqual({
-        input: 'Review this workspace',
+        input: { goal: 'Review this workspace' },
         title: 'Review this workspace',
+        scope: 'workspace',
         matter_id: 'matter-123'
       });
     });
@@ -296,9 +297,20 @@ describe('agent catalog view: run context helpers', () => {
 
   test('builds the Chef run payload with the selected workspace', () => {
     expect(testApi.buildRunPayload('  Prepare the weekly review  ', 'matter-42')).toEqual({
-      input: 'Prepare the weekly review',
+      input: { goal: 'Prepare the weekly review' },
       title: 'Prepare the weekly review',
+      scope: 'workspace',
       matter_id: 'matter-42'
+    });
+  });
+
+  test('uses backend run scope capabilities and keeps system payloads matterless', () => {
+    expect(testApi.runScopesFor({ run_scopes: ['system', 'workspace'] })).toEqual(['system', 'workspace']);
+    expect(testApi.defaultRunScope({ run_scopes: ['system'] })).toBe('system');
+    expect(testApi.buildRunPayload('Review all connector data', 'stale-matter', 'system')).toEqual({
+      input: { goal: 'Review all connector data' },
+      title: 'Review all connector data',
+      scope: 'system'
     });
   });
 });
@@ -343,10 +355,17 @@ describe('agent-detail view: editing and teaching helpers', () => {
     expect(testApi.contextProviderLabel({ slug: 'custom-fields', scope: 'matter' })).toBe('Business fields');
     expect(testApi.agentNeedsWorkspace({ context_providers: [{ slug: 'tasks', scope: 'matter' }] })).toBe(true);
     expect(testApi.buildRunPayload('  Draft the update  ', 'matter-7')).toEqual({
-      input: 'Draft the update',
+      input: { goal: 'Draft the update' },
       title: 'Draft the update',
+      scope: 'workspace',
       matter_id: 'matter-7'
     });
+  });
+
+  test('defaults flexible analytics agents to the system scope', () => {
+    const agent = { run_scopes: ['system', 'workspace'], context_providers: [{ slug: 'insights', scope: 'org' }] };
+    expect(testApi.runScopesFor(agent)).toEqual(['system', 'workspace']);
+    expect(testApi.defaultRunScope(agent)).toBe('system');
   });
 });
 
@@ -432,6 +451,8 @@ describe('activity-detail view: verification and deliverable helpers', () => {
     expect(testApi.artifactPresentation({ kind: 'redline' }).group).toBe('document');
     expect(testApi.artifactPresentation({ kind: 'workspace_timeline_risk_report' }).group).toBe('analysis');
     expect(testApi.artifactPresentation({ kind: 'automation_rule' }).group).toBe('action');
+    expect(testApi.artifactPresentation({ kind: 'contact_batch' })).toMatchObject({ group: 'action', label: 'Contact records' });
+    expect(testApi.artifactPresentation({ kind: 'email_draft_batch' })).toMatchObject({ group: 'action', label: 'Email drafts' });
     expect(testApi.artifactPresentation({ kind: 'custom_output', content_jsonb: { tasks: [{ title: 'Follow up' }] } }).group).toBe('plan');
   });
 

@@ -251,6 +251,7 @@ vpn-discovery-config.json
 # =============================================================================
 test-results/
 test-output/
+playwright-report/
 *.test.js.map
 
 # API test artifacts

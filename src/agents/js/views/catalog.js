@@ -88,6 +88,7 @@
     +   '<lex-modal id="agentsRunModal" heading="Give this agent a task" size="md" confirm-text="Start run" cancel-text="Cancel" data-hoist>'
     +     '<div class="agents-run-modal-body"><p id="agentsRunModalText" class="agents-run-modal-text">Describe the outcome you need. You will be able to follow the work live.</p>'
     +       '<lex-textarea id="agentsRunInput" label="What should it do?" rows="5" auto-resize maxlength="1200" show-count placeholder="Example: Review this week’s open items and prepare a prioritized follow-up list..."></lex-textarea>'
+    +       '<div class="agents-run-scope-field"><lex-select id="agentsRunScope" label="Run scope"></lex-select><span id="agentsRunScopeHint">Choose whether this run should use organization-wide data or one workspace.</span></div>'
     +       '<div id="agentsRunWorkspaceField" class="agents-run-workspace-field hidden"><lex-select id="agentsRunWorkspace" label="Where should it work?" placeholder="Choose a workspace..." searchable></lex-select><span id="agentsRunWorkspaceHint">This agent uses the selected workspace’s documents, tasks, and business context.</span></div>'
     +       '<div class="agents-run-safety"><span>✓</span><p><strong>You stay in control.</strong> This is a real run. Sensitive changes still pause for approval, and its work will appear in Outcomes.</p></div>'
     +     '</div>'
@@ -134,6 +135,33 @@
     return false;
   }
 
+  function runScopesFor(agent) {
+    var configured = agent && (agent.run_scopes || agent.runScopes);
+    var scopes = [];
+    if (Array.isArray(configured)) {
+      for (var i = 0; i < configured.length; i++) {
+        var scope = String(configured[i] || '').toLowerCase();
+        if ((scope === 'system' || scope === 'workspace') && scopes.indexOf(scope) === -1) scopes.push(scope);
+      }
+    }
+    if (scopes.length) return scopes;
+    return agentNeedsWorkspace(agent) ? ['workspace'] : ['system', 'workspace'];
+  }
+
+  function defaultRunScope(agent) {
+    var scopes = runScopesFor(agent);
+    if (scopes.length === 1) return scopes[0];
+    return agentNeedsWorkspace(agent) ? 'workspace' : 'system';
+  }
+
+  function runScopeOptions(agent) {
+    var scopes = runScopesFor(agent);
+    var options = [];
+    if (scopes.indexOf('system') !== -1) options.push({ value: 'system', label: 'System · Across the organization' });
+    if (scopes.indexOf('workspace') !== -1) options.push({ value: 'workspace', label: 'Workspace · One workspace' });
+    return options;
+  }
+
   function workspaceOptions(workspaces) {
     var options = [];
     for (var i = 0; i < workspaces.length; i++) {
@@ -147,10 +175,11 @@
     return options;
   }
 
-  function buildRunPayload(input, matterId) {
+  function buildRunPayload(input, matterId, scope) {
     var value = String(input || '').trim();
-    var payload = { input: value, title: value.slice(0, 100) };
-    if (matterId) payload.matter_id = matterId;
+    var resolvedScope = scope || (matterId ? 'workspace' : 'system');
+    var payload = { input: { goal: value }, title: value.slice(0, 100), scope: resolvedScope };
+    if (resolvedScope === 'workspace' && matterId) payload.matter_id = matterId;
     return payload;
   }
 
@@ -366,15 +395,16 @@
     var modal = el('agentsRunModal');
     var input = el('agentsRunInput');
     var workspace = el('agentsRunWorkspace');
-    var workspaceField = el('agentsRunWorkspaceField');
+    var scope = el('agentsRunScope');
     if (input) input.value = '';
     if (workspace) workspace.value = '';
-    if (agentNeedsWorkspace(state.selectedAgent)) {
-      show(workspaceField);
-      loadRunWorkspaces(state);
-    } else {
-      hide(workspaceField);
+    if (scope) {
+      var scopes = runScopesFor(state.selectedAgent);
+      scope.options = runScopeOptions(state.selectedAgent);
+      scope.value = defaultRunScope(state.selectedAgent);
+      scope.disabled = scopes.length === 1;
     }
+    syncRunScope(state);
     if (modal) {
       modal.heading = 'Run ' + (state.selectedAgent.name || humanize(slug));
       modal.open = true;
@@ -388,6 +418,22 @@
     select.disabled = false;
     if (!state.workspaces.length) setText('agentsRunWorkspaceHint', 'No active workspaces are available. Create or activate one before starting this agent.');
     else setText('agentsRunWorkspaceHint', 'This agent uses the selected workspace’s documents, tasks, and business context.');
+  }
+
+  function syncRunScope(state) {
+    var scopeSelect = el('agentsRunScope');
+    var workspace = el('agentsRunWorkspace');
+    var workspaceField = el('agentsRunWorkspaceField');
+    var scope = scopeSelect && scopeSelect.value ? String(scopeSelect.value) : defaultRunScope(state.selectedAgent);
+    if (scope === 'workspace') {
+      show(workspaceField);
+      setText('agentsRunScopeHint', 'This run is isolated to one workspace and its documents, tasks, contacts, and connected data.');
+      loadRunWorkspaces(state);
+      return;
+    }
+    if (workspace) workspace.value = '';
+    hide(workspaceField);
+    setText('agentsRunScopeHint', 'This run can work across organization-level analytics, tables, and connected data.');
   }
 
   function setText(id, value) {
@@ -424,11 +470,13 @@
     var value = input && input.value != null ? String(input.value).trim() : '';
     if (!value) { if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Describe the outcome you need first.'); return; }
     var workspace = el('agentsRunWorkspace');
+    var scopeSelect = el('agentsRunScope');
+    var scope = scopeSelect && scopeSelect.value ? String(scopeSelect.value) : defaultRunScope(state.selectedAgent);
     var matterId = workspace && workspace.value ? String(workspace.value) : '';
-    if (agentNeedsWorkspace(state.selectedAgent) && !matterId) { if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Choose the workspace where this agent should work.'); return; }
+    if (scope === 'workspace' && !matterId) { if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Choose the workspace where this agent should work.'); return; }
     var modal = el('agentsRunModal');
     if (modal) modal.loading = true;
-    window.api.post('/api/v1/agents/' + encodeURIComponent(state.selectedAgent.slug) + '/runs', buildRunPayload(value, matterId)).then(function (response) {
+    window.api.post('/api/v1/agents/' + encodeURIComponent(state.selectedAgent.slug) + '/runs', buildRunPayload(value, matterId, scope)).then(function (response) {
       if (state.destroyed) return;
       var runId = (response && response.run && response.run.id) || (response && response.data && response.data.id) || (response && response.id) || (response && response.run_id);
       if (modal) { modal.loading = false; modal.open = false; }
@@ -497,6 +545,7 @@
       if (row && row.getAttribute('data-outcome-id')) ctx.app.setView('activityDetail', { id: row.getAttribute('data-outcome-id') });
     });
     bind(state, el('agentsRunModal'), 'lex-confirm', function () { submitRun(ctx, state); });
+    bind(state, el('agentsRunScope'), 'lex-change', function () { syncRunScope(state); });
   }
 
   function render(rootEl, ctx) {
@@ -525,6 +574,8 @@
     destroy: destroy,
     __test: {
       agentNeedsWorkspace: agentNeedsWorkspace,
+      runScopesFor: runScopesFor,
+      defaultRunScope: defaultRunScope,
       buildRunPayload: buildRunPayload
     }
   };

@@ -26,6 +26,9 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
+    "test:agents:ui": "playwright test tests/playwright/agents-ui.spec.js",
+    "test:agents:live": "playwright test tests/playwright/agents-live.spec.js",
+    "test:agents:e2e": "playwright test tests/playwright",
     "lint": "eslint src/",
     "migrate": "node scripts/migrate.js",
     "migrate:phase2": "node scripts/migrate-phase2.js",
@@ -105,6 +108,7 @@
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
     "@jest/globals": "^29.7.0",
+    "@playwright/test": "^1.62.1",
     "babel-jest": "^29.7.0",
     "cssnano": "^7.1.2",
     "electron": "^32.0.0",

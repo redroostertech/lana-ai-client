@@ -20,6 +20,17 @@ optional chat discoverability, and an optional first task. A successful quiet
 deploy stays in context long enough to show a deployment receipt and clear
 choices to give the agent work or return to the workspace.
 
+Runs explicitly choose a system or workspace scope from the backend definition.
+System scope is organization-wide and supports governed Chef and connector
+analytics; workspace scope requires one workspace and keeps matter-aware data
+isolated to it. Outcomes show that scope alongside verification, approval,
+deliverables, and applied targets.
+
+Approved outcome entities can materialize as plans, tasks, widgets, disabled
+automations, generated documents, contacts, or unsent email drafts. The
+Playwright catalog harness under `tests/playwright` exercises the real Chef
+runtime and keeps approval application opt-in for disposable test data.
+
 ## Pattern alignment
 
 LanaAgents is a **single-page application**, matching the pattern used
