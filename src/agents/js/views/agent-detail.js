@@ -72,6 +72,13 @@
     +     '<lex-card heading="Access" padding="normal">'
     +       '<div class="agent-detail-access-summary"><span id="agentDetailAccessIcon">O</span><div><strong id="agentDetailAccessLabel">Organization</strong><p id="agentDetailAccessHint">Everyone in your organization can use this agent.</p></div></div>'
     +     '</lex-card>'
+    +     '<lex-card heading="Rhythm" padding="normal">'
+    +       '<div id="agentDetailScheduleSummary" class="agent-detail-schedule-summary" data-state="on-demand">'
+    +         '<span id="agentDetailScheduleIcon" class="agent-detail-schedule-icon">→</span>'
+    +         '<div class="agent-detail-schedule-copy"><strong id="agentDetailScheduleLabel">On demand</strong><p id="agentDetailScheduleCadence">This agent runs when someone starts it.</p><small id="agentDetailScheduleNext">Choose Settings to add a recurring rhythm.</small></div>'
+    +         '<span id="agentDetailScheduleState" class="agent-detail-schedule-state">Ready</span>'
+    +       '</div>'
+    +     '</lex-card>'
     +     '<lex-card heading="Capabilities" padding="normal">'
     +       '<div id="agentDetailToolsList" class="agent-detail-chip-list">'
     +         '<span class="agent-detail-empty-text">No tools configured.</span>'
@@ -583,6 +590,74 @@
     return 'No approval is required for this agent.';
   }
 
+  function scheduleCadenceLabel(schedule) {
+    var cron = String((schedule && schedule.cron) || '').trim();
+    if (cron === '0 9 * * 1-5') return 'Weekdays at 9:00 AM';
+    if (cron === '0 9 * * *') return 'Every day at 9:00 AM';
+    if (cron === '0 9 * * 1') return 'Mondays at 9:00 AM';
+    return cron ? 'Custom cadence · ' + cron : 'Recurring cadence';
+  }
+
+  function formatNextRun(value, timezone) {
+    if (!value) return '';
+    var date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone || 'UTC',
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      }).format(date);
+    } catch (_err) {
+      return date.toLocaleString();
+    }
+  }
+
+  function renderScheduleSummary(agent) {
+    var holder = el('agentDetailScheduleSummary');
+    if (!holder) return;
+    var schedule = agent && agent.schedule && typeof agent.schedule === 'object' ? agent.schedule : null;
+    var icon = el('agentDetailScheduleIcon');
+    var label = el('agentDetailScheduleLabel');
+    var cadence = el('agentDetailScheduleCadence');
+    var next = el('agentDetailScheduleNext');
+    var state = el('agentDetailScheduleState');
+
+    if (!schedule) {
+      holder.setAttribute('data-state', 'on-demand');
+      if (icon) icon.textContent = '→';
+      if (label) label.textContent = 'On demand';
+      if (cadence) cadence.textContent = 'This agent runs when someone starts it.';
+      if (next) next.textContent = 'Choose Settings to add a recurring rhythm.';
+      if (state) state.textContent = 'Ready';
+      return;
+    }
+
+    var timezone = schedule.timezone || 'UTC';
+    var cadenceText = scheduleCadenceLabel(schedule) + ' · ' + timezone;
+    if (schedule.enabled !== true) {
+      holder.setAttribute('data-state', 'paused');
+      if (icon) icon.textContent = 'Ⅱ';
+      if (label) label.textContent = 'Rhythm paused';
+      if (cadence) cadence.textContent = cadenceText;
+      if (next) next.textContent = 'The cadence is saved. No scheduled runs will start while paused.';
+      if (state) state.textContent = 'Paused';
+      return;
+    }
+
+    var formattedNext = formatNextRun(schedule.next_run_at, timezone);
+    holder.setAttribute('data-state', 'active');
+    if (icon) icon.textContent = '↻';
+    if (label) label.textContent = 'On a rhythm';
+    if (cadence) cadence.textContent = cadenceText;
+    if (next) next.textContent = formattedNext ? 'Next run · ' + formattedNext : 'Next run will be set by the scheduler.';
+    if (state) state.textContent = 'Active';
+  }
+
   function buildTeachingExample(message, createdAt) {
     var text = String(message || '').trim();
     if (!text) return null;
@@ -890,6 +965,7 @@
       : (exposure === 'workspace'
         ? 'People with access to the selected workspace can use this agent.'
         : 'Everyone in your organization can use this agent.'));
+    renderScheduleSummary(agent);
 
     var toolsEl = el('agentDetailToolsList');
     if (toolsEl) {

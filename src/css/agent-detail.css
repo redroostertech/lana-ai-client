@@ -460,6 +460,74 @@
   line-height: 1.5;
 }
 
+.agent-detail-schedule-summary {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.agent-detail-schedule-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--lex-status-success, #16845b) 11%, var(--lex-bg-primary));
+  color: var(--lex-status-success, #16845b);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.agent-detail-schedule-copy {
+  min-width: 0;
+}
+
+.agent-detail-schedule-copy strong {
+  color: var(--lex-text-primary);
+  font-size: 0.83rem;
+}
+
+.agent-detail-schedule-copy p,
+.agent-detail-schedule-copy small {
+  display: block;
+  margin: 3px 0 0;
+  color: var(--lex-text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.agent-detail-schedule-copy small {
+  color: var(--lex-text-tertiary);
+}
+
+.agent-detail-schedule-state {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lex-status-success, #16845b) 10%, transparent);
+  color: var(--lex-status-success, #16845b);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.agent-detail-schedule-summary[data-state="paused"] .agent-detail-schedule-icon,
+.agent-detail-schedule-summary[data-state="paused"] .agent-detail-schedule-state {
+  background: color-mix(in srgb, var(--lex-text-tertiary) 12%, transparent);
+  color: var(--lex-text-secondary);
+}
+
+@media (max-width: 520px) {
+  .agent-detail-schedule-summary {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .agent-detail-schedule-state {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
 .agent-detail-drawer-section--access {
   gap: 12px;
   padding: 14px;
