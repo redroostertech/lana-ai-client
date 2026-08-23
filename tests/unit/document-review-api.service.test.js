@@ -167,6 +167,26 @@ describe('LanaDocumentReview grouping and serialization', () => {
     });
   });
 
+  test('prefers semantic formatting metadata over a legacy generic text fallback', () => {
+    const persisted = {
+      operation: 'format',
+      original_text: 'previous draft text',
+      proposed_text: 'Captured local edit',
+      metadata: {
+        format_change: {
+          kind: 'text',
+          properties: ['font'],
+          before: { font: 'Arial' },
+          after: { font: 'Times New Roman' }
+        }
+      }
+    };
+
+    expect(review.changeLabel(persisted)).toBe('Font');
+    expect(review.changeOriginalText(persisted)).toBe('Font: Arial');
+    expect(review.changeProposedText(persisted)).toBe('Font: Times New Roman');
+  });
+
   test('audits size, marks, color, and alignment with readable semantic values', () => {
     const text = review.formatChangeDetailsFromRevision({
       type: 'fmt',
@@ -230,6 +250,131 @@ describe('LanaDocumentReview grouping and serialization', () => {
 });
 
 describe('LanaDocumentReview API workflows', () => {
+  test('resolves an original-based draft to the canonical source document', () => {
+    expect(review.draftBaseDocumentId(
+      { id: 'draft-original', base_file_version_id: 'source-fv-1' },
+      [{ id: 'release-1', file_version_id: 'release-fv-1', released_document_id: 'released-doc-1' }],
+      'source-doc'
+    )).toBe('source-doc');
+  });
+
+  test('resolves a Release-N-based draft to that immutable release document', () => {
+    expect(review.draftBaseDocumentId(
+      { id: 'draft-8', base_file_version_id: 'release-fv-8' },
+      [
+        { id: 'release-9', file_version_id: 'release-fv-9', released_document_id: 'released-doc-9' },
+        { id: 'release-8', file_version_id: 'release-fv-8', released_document_id: 'released-doc-8' }
+      ],
+      'source-doc'
+    )).toBe('released-doc-8');
+  });
+
+  test('uses server predecessor identity when a release parent is outside the loaded 20-row rail', () => {
+    var visibleReleases = [];
+    for (var releaseNumber = 40; releaseNumber >= 21; releaseNumber -= 1) {
+      visibleReleases.push({
+        id: 'release-' + releaseNumber,
+        release_number: releaseNumber,
+        released_document_id: 'released-doc-' + releaseNumber
+      });
+    }
+    visibleReleases[19].previous_released_document_id = 'released-doc-20';
+
+    expect(review.previousReleaseDocumentId(
+      visibleReleases[19],
+      visibleReleases,
+      'source-doc'
+    )).toBe('released-doc-20');
+  });
+
+  test('loads every release page so versions older than the first 20 remain selectable', async () => {
+    var firstPage = [];
+    for (var releaseNumber = 40; releaseNumber >= 21; releaseNumber -= 1) {
+      firstPage.push({ id: 'release-' + releaseNumber, release_number: releaseNumber });
+    }
+    var api = makeApi([
+      {
+        match: 'GET /api/v1/matters/MATT-1/documents/source-doc/releases?limit=20',
+        reply: { data: firstPage, metadata: { total: 20, source_document_id: 'source-doc' } }
+      },
+      {
+        match: 'GET /api/v1/matters/MATT-1/documents/source-doc/releases?limit=20&page=2',
+        reply: { data: [{ id: 'release-20', release_number: 20 }], metadata: { total: 21 } }
+      }
+    ]);
+
+    var result = await review.loadReleaseLineage({ api, matterId: 'MATT-1', documentId: 'source-doc' });
+
+    expect(result.data).toHaveLength(21);
+    expect(result.data[20]).toEqual(expect.objectContaining({ id: 'release-20' }));
+    expect(api.calls).toHaveLength(2);
+  });
+
+  test('reports batch-detail hydration failure without discarding the list row', async () => {
+    var api = makeApi([]);
+    var summary = { id: 'draft-failed', status: 'draft' };
+    var result = await review.hydrateBatchDetail({ api, matterId: 'MATT-1', batch: summary });
+
+    expect(result.failed).toBe(true);
+    expect(result.batch).toBe(summary);
+    expect(result.error).toBeInstanceOf(Error);
+  });
+
+  test('distinguishes an unavailable release batch detail from a valid empty release', async () => {
+    var api = makeApi([
+      {
+        match: 'GET /api/v1/matters/MATT-1/document-edit-batches/batch-ok',
+        reply: { data: { id: 'batch-ok', changes: [] } }
+      }
+    ]);
+    var groups = await review.loadReleaseChangeGroups({
+      api,
+      matterId: 'MATT-1',
+      releases: [
+        { id: 'release-ok', edit_batch_id: 'batch-ok' },
+        { id: 'release-failed', edit_batch_id: 'batch-5xx' },
+        { id: 'release-without-batch' }
+      ]
+    });
+
+    expect(groups).toEqual([
+      expect.objectContaining({ release_id: 'release-ok', changes: [], failed: false }),
+      expect.objectContaining({ release_id: 'release-failed', changes: [], failed: true }),
+      expect.objectContaining({ release_id: 'release-without-batch', changes: [], failed: true })
+    ]);
+  });
+
+  test('loads an original-based draft with replayable scripts on the source bytes', async () => {
+    var insertScript = {
+      version: '0',
+      ops: [{ op: 'insertText', at: { paragraph: 0, start: 0 }, text: 'Original draft' }]
+    };
+    var api = makeApi([
+      {
+        match: 'GET /api/v1/matters/MATT-1/documents/source-doc/releases?limit=20',
+        reply: {
+          data: [{ id: 'rel-1', released_document_id: 'released-doc-1', file_version_id: 'release-fv-1', release_number: 1 }],
+          metadata: { source_document_id: 'source-doc', current_document_is_release: false }
+        }
+      },
+      {
+        match: /^GET \/api\/v1\/matters\/MATT-1\/document-edit-batches\?document_id=source-doc/,
+        reply: { data: [{ id: 'draft-original', status: 'draft', base_file_version_id: 'source-fv-1' }] }
+      },
+      {
+        match: 'GET /api/v1/matters/MATT-1/document-edit-batches/draft-original',
+        reply: { data: { id: 'draft-original', status: 'draft', base_file_version_id: 'source-fv-1', changes: [{ change_key: 'c1', edit_script: insertScript }] } }
+      }
+    ]);
+
+    var workflow = await review.loadWorkflow({ api, matterId: 'MATT-1', documentId: 'source-doc' });
+
+    expect(workflow.currentDraftBatch.id).toBe('draft-original');
+    expect(review.draftBaseDocumentId(workflow.currentDraftBatch, workflow.releases, workflow.sourceDocumentId)).toBe('source-doc');
+    expect(review.editScriptsFromBatch(workflow.currentDraftBatch)).toHaveLength(1);
+    expect(review.editScriptsFromBatch(workflow.currentDraftBatch)[0].ops).toEqual(insertScript.ops);
+  });
+
   test('loadWorkflow follows the canonical source id from releases metadata', async () => {
     const api = makeApi([
       {
@@ -246,7 +391,7 @@ describe('LanaDocumentReview API workflows', () => {
       },
       {
         match: 'GET /api/v1/matters/MATT-1/document-edit-batches/draft-1',
-        reply: { data: { id: 'draft-1', status: 'draft', changes: [{ change_key: 'c1' }] } }
+        reply: { data: { id: 'draft-1', status: 'draft', base_file_version_id: 'fv-7', changes: [{ change_key: 'c1', edit_script: { version: '0', ops: [{ op: 'insertText', at: { paragraph: 0, start: 0 }, text: 'Release draft' }] } }] } }
       }
     ]);
 
@@ -258,6 +403,8 @@ describe('LanaDocumentReview API workflows', () => {
     expect(workflow.releases).toHaveLength(1);
     expect(workflow.currentDraftBatch.changes).toHaveLength(1);
     expect(workflow.pendingReleaseBatch).toBeNull();
+    expect(review.draftBaseDocumentId(workflow.currentDraftBatch, workflow.releases, workflow.sourceDocumentId)).toBe('released-doc');
+    expect(review.editScriptsFromBatch(workflow.currentDraftBatch)[0].ops[0].text).toBe('Release draft');
   });
 
   test('loadWorkflow does not replay a draft from another release version', async () => {

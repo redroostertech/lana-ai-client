@@ -982,6 +982,7 @@
   align-items: center;
   display: flex;
   gap: 4px;
+  min-width: 0;
 }
 
 .office-ruler-actions button {
@@ -1030,6 +1031,56 @@
 .office-show-changes-toggle svg {
   height: var(--lex-icon-small);
   width: var(--lex-icon-small);
+}
+
+.office-changes-legend {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  margin-left: 8px;
+  min-width: 0;
+}
+
+.office-changes-legend[hidden] {
+  display: none;
+}
+
+.office-changes-comparison {
+  color: var(--lex-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.office-change-key {
+  border: 1px solid transparent;
+  border-radius: var(--lex-radius-full);
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+.office-change-key--insert {
+  background: #e6f2ec;
+  border-color: rgba(30, 111, 76, 0.24);
+  color: #1e6f4c;
+}
+
+.office-change-key--delete {
+  background: #f7e8e6;
+  border-color: rgba(176, 58, 46, 0.24);
+  color: #b03a2e;
+}
+
+.office-change-key--format {
+  background: rgba(124, 92, 173, 0.14);
+  border-color: rgba(124, 92, 173, 0.3);
+  color: #624393;
 }
 
 .office-ruler-track {
@@ -2030,8 +2081,8 @@
   outline: none;
 }
 
-.office-lana-editor-host.office-lana-editor-host--release-compare .le-page del.lee-rev-baseline,
-.office-lana-editor-host.office-lana-editor-host--release-compare .le-page [data-rev-type="del"].lee-rev-baseline {
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page del.lee-rev-baseline.lee-rev-release-delta,
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page [data-rev-type="del"].lee-rev-baseline.lee-rev-release-delta {
   background: #f7e8e6;
   color: #b03a2e;
   display: inline;
@@ -2039,19 +2090,19 @@
   text-decoration-color: #b03a2e;
 }
 
-.office-lana-editor-host.office-lana-editor-host--release-compare .le-page ins.lee-rev-baseline,
-.office-lana-editor-host.office-lana-editor-host--release-compare .le-page [data-rev-type="ins"].lee-rev-baseline {
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page ins.lee-rev-baseline.lee-rev-release-delta,
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page [data-rev-type="ins"].lee-rev-baseline.lee-rev-release-delta {
   background: #e6f2ec;
   color: #1e6f4c;
   text-decoration: underline;
   text-decoration-color: #1e6f4c;
 }
 
-.office-lana-editor-host.office-lana-editor-host--release-compare .le-page .le-rev.lee-rev-baseline {
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page .le-rev.lee-rev-baseline.lee-rev-release-delta {
   cursor: pointer;
 }
 
-.office-lana-editor-host.office-lana-editor-host--release-compare .le-page span.le-rev.lee-rev-baseline[data-rev-type="fmt"] {
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page span.le-rev.lee-rev-baseline.lee-rev-release-delta[data-rev-type="fmt"] {
   background: rgba(124, 92, 173, 0.08);
   text-decoration-line: underline;
   text-decoration-style: dotted;
@@ -2059,13 +2110,64 @@
   text-decoration-thickness: 1px;
 }
 
-.office-lana-editor-host.office-lana-editor-host--release-compare .le-page p.le-rev.lee-rev-baseline[data-rev-type="fmt"] {
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page p.le-rev.lee-rev-baseline.lee-rev-release-delta[data-rev-type="fmt"] {
   box-shadow: inset 3px 0 0 rgba(124, 92, 173, 0.45);
 }
 
-.office-lana-editor-host.office-lana-editor-host--release-compare .le-page .le-rev.lee-rev-baseline:hover {
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page .le-rev.lee-rev-baseline.lee-rev-release-delta:hover {
   outline: 2px solid rgba(29, 39, 51, 0.35);
   outline-offset: 1px;
+}
+
+/* Active comparisons must remain obvious at document scale. The embedded
+   editor's native run tint is deliberately quiet, so the host also marks the
+   complete paragraph containing each compared revision. */
+.office-lana-editor-host.office-lana-editor-host--draft-compare .le-page .le-p:has(.le-rev:not(.lee-rev-baseline)),
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page .le-p:has(.le-rev.lee-rev-baseline.lee-rev-release-delta) {
+  background: linear-gradient(90deg, rgba(124, 92, 173, 0.1), rgba(124, 92, 173, 0.025) 70%, transparent);
+  box-shadow: inset 3px 0 0 rgba(124, 92, 173, 0.58);
+  padding-left: 0.45em;
+}
+
+.office-lana-editor-host.office-lana-editor-host--draft-compare .le-page span.le-rev:not(.lee-rev-baseline)[data-rev-type="fmt"] {
+  background: rgba(124, 92, 173, 0.2);
+  box-shadow: inset 0 -2px 0 rgba(124, 92, 173, 0.65);
+  text-decoration-color: #624393;
+  text-decoration-thickness: 2px;
+}
+
+/* A Review-rail Locate action temporarily projects its exact revision into
+   the canvas. This intentionally overrides baseline acceptance styling so a
+   released history item can be found without changing document content. */
+.office-lana-editor-host .le-page del.lee-rev-review-focus,
+.office-lana-editor-host .le-page [data-rev-type="del"].lee-rev-review-focus {
+  background: #f4d6d2;
+  color: #942d23;
+  display: inline;
+  outline: 3px solid rgba(176, 58, 46, 0.5);
+  outline-offset: 2px;
+  text-decoration: line-through;
+}
+
+.office-lana-editor-host .le-page ins.lee-rev-review-focus,
+.office-lana-editor-host .le-page [data-rev-type="ins"].lee-rev-review-focus {
+  background: #cfe8da;
+  color: #145c3d;
+  outline: 3px solid rgba(30, 111, 76, 0.48);
+  outline-offset: 2px;
+  text-decoration: underline;
+}
+
+.office-lana-editor-host .le-page span.le-rev.lee-rev-review-focus[data-rev-type="fmt"],
+.office-lana-editor-host .le-page p.le-rev.lee-rev-review-focus[data-rev-type="fmt"] {
+  background: rgba(124, 92, 173, 0.24);
+  box-shadow: inset 0 -3px 0 rgba(98, 67, 147, 0.72);
+  outline: 3px solid rgba(124, 92, 173, 0.52);
+  outline-offset: 2px;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: #624393;
+  text-decoration-thickness: 2px;
 }
 
 /* Toolbar controls not yet supported for tracked documents are disabled with

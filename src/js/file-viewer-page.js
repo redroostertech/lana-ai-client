@@ -47,6 +47,7 @@
     pendingReviewReleaseBatch: null,
     currentReviewBatchRestoreFailed: false,
     reviewSourceDocumentId: null,
+    reviewWorkflowPromise: null,
     reviewReleases: [],
     reviewDisplayTarget: null,
     selectedReviewReleaseId: null,
@@ -752,11 +753,13 @@
       var name = getMatterRecordDisplayName(matter);
       if (!name) continue;
       var hrefId = getMatterRecordDetailId(matter);
+      var conversationMatterId = getConversationMatterId(matter);
       var ids = getMatterRecordIdentityValues(matter);
       for (var j = 0; j < ids.length; j++) {
         map[ids[j]] = {
           name: name,
-          hrefId: hrefId || ids[j]
+          hrefId: hrefId || ids[j],
+          conversationMatterId: conversationMatterId
         };
       }
     }
@@ -1340,8 +1343,33 @@
     return versions;
   }
 
+  function fileEditorBaselineRelease(file) {
+    var releases = reviewReleasesNewestFirst();
+    var documentId = file && file.id ? String(file.id) : '';
+    if (isReleasedArtifactFile(file)) {
+      for (var releasedIndex = 0; releasedIndex < releases.length; releasedIndex += 1) {
+        if (String(releaseDocumentId(releases[releasedIndex].release)) === documentId) {
+          return releases[releasedIndex].release;
+        }
+      }
+    }
+    var baseFileVersionId = state.currentReviewBatch && state.currentReviewBatch.base_file_version_id
+      ? String(state.currentReviewBatch.base_file_version_id)
+      : '';
+    if (baseFileVersionId) {
+      for (var baseIndex = 0; baseIndex < releases.length; baseIndex += 1) {
+        if (String(releases[baseIndex].release.file_version_id || '') === baseFileVersionId) {
+          return releases[baseIndex].release;
+        }
+      }
+    }
+    return releases.length ? releases[0].release : null;
+  }
+
   function fileEditorHandoff(file) {
-    var sourceUrl = file && file.id ? getFileDownloadUrl(file) : '';
+    var baselineRelease = fileEditorBaselineRelease(file);
+    var baselineDocumentId = releaseDocumentId(baselineRelease) || (file && file.id ? String(file.id) : '');
+    var sourceUrl = baselineDocumentId ? getFileDownloadUrl(baselineDocumentId) : '';
     var displayFilename = documentDisplayFilename(file);
     var draftBatch = state.currentReviewBatch && isActiveReviewDraftBatch(state.currentReviewBatch)
       ? state.currentReviewBatch
@@ -1353,7 +1381,9 @@
         id: file && file.id ? 'file-editor-' + String(file.id) : '',
         documentId: file && file.id ? String(file.id) : '',
         sourceDocumentId: canonicalReviewSourceDocumentId(file),
-        releasedDocumentId: isReleasedArtifactFile(file) && file && file.id ? file.id : '',
+        releasedDocumentId: baselineRelease && baselineDocumentId ? baselineDocumentId : '',
+        editorBaselineReleaseId: baselineRelease && baselineRelease.id ? String(baselineRelease.id) : '',
+        editorBaselineReleaseNumber: baselineRelease && baselineRelease.release_number ? Number(baselineRelease.release_number) : null,
         matterId: getCurrentMatterId() || '',
         matterNumber: getConversationMatterId(file) || '',
         matterName: getFileMatterDisplayName(file) || '',
@@ -1384,7 +1414,7 @@
     };
   }
 
-  function openCurrentFileInFileEditor() {
+  async function openCurrentFileInFileEditor() {
     var file = state.currentFile;
     if (!file || !file.id) {
       notify('No file is open to edit.', 'error');
@@ -1395,6 +1425,27 @@
         ? 'This Office format is read-only because the server did not report edit-model support.'
         : 'This format is read-only. Convert it to DOCX before opening File Editor.', 'error');
       return;
+    }
+    var openButton = document.getElementById('viewerReviewModeBadge');
+    if (openButton) {
+      openButton.disabled = true;
+      openButton.setAttribute('aria-busy', 'true');
+    }
+    try {
+      if (state.reviewWorkflowPromise) {
+        await state.reviewWorkflowPromise;
+      } else if (canReviewFile(file) && !state.reviewSourceDocumentId) {
+        state.reviewWorkflowPromise = loadReviewWorkflow(file);
+        await state.reviewWorkflowPromise;
+      }
+    } catch (error) {
+      notify((error && error.message) || 'Review history could not be prepared for File Editor.', 'error');
+      return;
+    } finally {
+      if (openButton) {
+        openButton.disabled = false;
+        openButton.removeAttribute('aria-busy');
+      }
     }
     var matterId = getCurrentMatterId() || '';
     Lex.Nav.go('file-editor.html', {
@@ -1442,7 +1493,7 @@
     var drawer = document.getElementById('fileInfoDrawer');
     if (!drawer) return;
     drawer.heading = 'File Info';
-    drawer.subtitle = state.currentFile && state.currentFile.filename ? state.currentFile.filename : '';
+    drawer.subtitle = documentDisplayFilename(state.currentFile);
     drawer.open = true;
 
     var toggle = document.getElementById('metaModeToggle');
@@ -1542,7 +1593,9 @@
     if (changesEmpty) {
       changesEmpty.textContent = state.reviewCounts.changes
         ? state.reviewCounts.changes + ' change' + (state.reviewCounts.changes === 1 ? '' : 's') + (state.selectedReviewReleaseId ? ' shipped in the selected version.' : ' reported by the editor.')
-        : (state.selectedReviewReleaseId ? 'No persisted changes are attached to the selected version.' : 'No tracked changes reported by the editor.');
+        : (selectedReviewReleaseChangeLoadFailed()
+          ? 'Persisted change details for the selected version are unavailable.'
+          : (state.selectedReviewReleaseId ? 'No persisted changes are attached to the selected version.' : 'No tracked changes reported by the editor.'));
     }
     renderReviewWorkflow();
   }
@@ -1571,6 +1624,12 @@
     }
     var group = releaseChangeGroupForId(state.selectedReviewReleaseId);
     return group && Array.isArray(group.changes) ? group.changes : [];
+  }
+
+  function selectedReviewReleaseChangeLoadFailed() {
+    if (reviewDisplayScope() !== 'release') return false;
+    var group = releaseChangeGroupForId(state.selectedReviewReleaseId);
+    return Boolean(group && group.failed);
   }
 
   function pendingReviewChangeCount() {
@@ -1725,8 +1784,8 @@
 
   function renderReviewChangeDiff(change) {
     if (!change) return '';
-    var original = change.original_text ? String(change.original_text) : '';
-    var proposed = change.proposed_text ? String(change.proposed_text) : '';
+    var original = String(changeOriginalText(change) || '');
+    var proposed = String(changeProposedText(change) || '');
     var fallback = String(reviewItemText(change) || 'No preview available');
     var kind = reviewChangeKind(change);
     var lines = [];
@@ -1872,15 +1931,18 @@
 
   function releaseGroupForRelease(release) {
     var changes = [];
+    var failed = false;
     for (var i = 0; i < state.releaseChangeGroups.length; i++) {
       if (state.releaseChangeGroups[i].release_id === release.id) {
         changes = state.releaseChangeGroups[i].changes || [];
+        failed = Boolean(state.releaseChangeGroups[i].failed);
         break;
       }
     }
     return {
       release: release,
-      changes: changes
+      changes: changes,
+      failed: failed
     };
   }
 
@@ -1914,13 +1976,16 @@
     var filteredGroups = groups.map(function (group) {
       return {
         release: group.release,
-        changes: filterHistoryChanges(displayReviewChanges(group.changes || []), group.release)
+        changes: filterHistoryChanges(displayReviewChanges(group.changes || []), group.release),
+        failed: Boolean(group.failed)
       };
     });
     var controls = groups.length ? renderHistoryFilters(groups) : '';
     function renderHistorySection(options) {
       var changes = Array.isArray(options.changes) ? options.changes : [];
-      var rows = changes.length
+      var rows = options.unavailable
+        ? '<div class="file-viewer-review-history-empty">Persisted change details are unavailable for this version.</div>'
+        : changes.length
         ? changes.map(function (change, index) {
             var badge = renderReviewStatusBadge(reviewStatus(change, 'changes'));
             var releaseAttr = options.releaseId ? ' data-review-history-release="' + escapeHtml(options.releaseId) + '"' : '';
@@ -1939,7 +2004,7 @@
       return '<section class="file-viewer-review-history-group' + (options.unreleased ? ' file-viewer-review-history-group--unreleased' : '') + '">' +
         '<header class="file-viewer-review-history-header">' +
           '<h5>' + escapeHtml(options.title) + '</h5>' +
-          '<span>' + changes.length + ' change' + (changes.length === 1 ? '' : 's') + '</span>' +
+          '<span>' + (options.unavailable ? 'Unavailable' : changes.length + ' change' + (changes.length === 1 ? '' : 's')) + '</span>' +
         '</header>' +
         '<div class="file-viewer-review-history-rows">' + rows + '</div>' +
       '</section>';
@@ -1958,6 +2023,7 @@
         title: 'Version ' + (release.release_number || ''),
         changes: changes,
         releaseId: release.id || '',
+        unavailable: Boolean(group.failed),
         emptyText: 'No persisted changes attached to this version.'
       });
     }).join('');
@@ -2025,6 +2091,23 @@
     return release.released_document_id || release.releasedDocumentId || '';
   }
 
+  function releaseVersionLabel(release) {
+    var number = Number(release && release.release_number);
+    return Number.isFinite(number) && number > 0 ? 'Version ' + number : 'Released version';
+  }
+
+  function parentVersionLabelForRelease(release, baseDocumentId) {
+    var previousNumber = Number(release && (release.previous_release_number || release.previousReleaseNumber));
+    if (Number.isFinite(previousNumber) && previousNumber > 0) return 'Version ' + previousNumber;
+    var releases = Array.isArray(state.reviewReleases) ? state.reviewReleases : [];
+    for (var i = 0; i < releases.length; i++) {
+      if (String(releaseDocumentId(releases[i])) === String(baseDocumentId || '')) {
+        return releaseVersionLabel(releases[i]);
+      }
+    }
+    return String(baseDocumentId || '') === String(originalVersionDocumentId()) ? 'Original' : 'Previous release';
+  }
+
   function releaseSortValue(release) {
     var releaseNumber = Number(release && release.release_number);
     if (Number.isFinite(releaseNumber) && releaseNumber > 0) return releaseNumber;
@@ -2067,7 +2150,7 @@
       key: release.id,
       releaseId: release.id,
       documentId: releaseDocumentId(release),
-      label: release.released_document_filename || ('Version ' + release.release_number),
+      label: releaseVersionLabel(release),
       release: release,
       changes: []
     };
@@ -2108,24 +2191,20 @@
     return null;
   }
 
-  function parentReleaseForRelease(release) {
-    if (!release) return null;
-    var releaseNumber = Number(release.release_number || 0);
-    var releases = Array.isArray(state.reviewReleases) ? state.reviewReleases : [];
-    var parent = null;
-    for (var i = 0; i < releases.length; i++) {
-      var candidate = releases[i];
-      var candidateNumber = Number(candidate && candidate.release_number || 0);
-      if (!releaseDocumentId(candidate)) continue;
-      if (releaseNumber > 0 && candidateNumber >= releaseNumber) continue;
-      if (!parent || candidateNumber > Number(parent.release_number || 0)) parent = candidate;
-    }
-    return parent;
+  function parentDocumentIdForRelease(release) {
+    return LanaDocumentReview.previousReleaseDocumentId(
+      release,
+      state.reviewReleases,
+      originalVersionDocumentId()
+    );
   }
 
-  function parentDocumentIdForRelease(release) {
-    var parent = parentReleaseForRelease(release);
-    return releaseDocumentId(parent) || originalVersionDocumentId();
+  function currentDraftBaseDocumentId() {
+    return LanaDocumentReview.draftBaseDocumentId(
+      state.currentReviewBatch,
+      state.reviewReleases,
+      originalVersionDocumentId()
+    );
   }
 
   function reviewVersionSelectValueForRelease(release) {
@@ -2254,7 +2333,15 @@
         { comparison_document_id: comparisonDocumentId }
       );
       state.releaseComparison = comparisonResponse && comparisonResponse.data ? comparisonResponse.data : comparisonResponse;
-      renderDiffComparison(state.releaseComparison);
+      var releaseChangeGroup = releaseChangeGroupForId(release.id);
+      if (state.releaseComparison && releaseChangeGroup && releaseChangeGroup.failed) {
+        state.releaseComparison.change_details_unavailable_reason = 'Text differences are shown. Persisted formatting change details could not be loaded for this version.';
+      }
+      renderDiffComparison(state.releaseComparison, {
+        base: parentVersionLabelForRelease(release, baseDocumentId),
+        comparison: releaseVersionLabel(release),
+        context: documentDisplayFilename(state.currentFile)
+      });
     } catch (error) {
       console.error('[FileViewerPage] Version parent comparison failed:', error);
       notify((error && error.message) || 'Failed to show changes for selected version', 'error');
@@ -2298,18 +2385,18 @@
 
   async function restoreCurrentDraftForDisplay() {
     selectReviewDisplayScope('current');
-    if (state.currentReviewBatch && state.currentReviewBatch.id && state.editorInstance) {
-      try {
-        if (!Array.isArray(state.currentReviewBatch.changes)) {
-          var draftResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(state.currentReviewBatch.id)));
-          state.currentReviewBatch = draftResponse && draftResponse.data ? draftResponse.data : draftResponse;
-        }
-        state.currentReviewBatchRestoreFailed = false;
-      } catch (error) {
-        console.warn('[FileViewerPage] Current draft detail load failed:', error);
-        state.currentReviewBatchRestoreFailed = true;
-      }
+    var baseDocumentId = currentDraftBaseDocumentId();
+    var currentDocumentId = state.currentFile && state.currentFile.id
+      ? String(state.currentFile.id)
+      : '';
+    // A release selection may have replaced the bytes mounted in the single
+    // viewer instance. Replay the draft against its immutable base release,
+    // or the source document when the draft predates any release.
+    if (baseDocumentId && currentDocumentId && currentDocumentId !== String(baseDocumentId)) {
+      await openVersionDocument(baseDocumentId, { scope: 'current' });
+      return;
     }
+    await restoreCurrentPersistedDraftIfNeeded();
     state.reviewState = currentReviewState();
     refreshReviewDisplayScope();
   }
@@ -2465,11 +2552,20 @@
     return '';
   }
 
-  function renderDiffComparisonBody(parts) {
+  function renderDiffComparisonBody(parts, comparison) {
     var formattingChanges = formattingReviewChangesForDiff();
     var formattingHtml = renderFormattingComparison(formattingChanges);
+    var unavailableReason = comparison && comparison.change_details_unavailable_reason
+      ? String(comparison.change_details_unavailable_reason)
+      : '';
+    var unavailableHtml = unavailableReason
+      ? '<div class="file-viewer-diff-warning" role="status">' + escapeHtml(unavailableReason) + '</div>'
+      : '';
     if (!parts.length) {
-      return formattingHtml || '<p class="file-viewer-review-releases__empty">No textual or formatting differences detected.</p>';
+      if (formattingHtml) return unavailableHtml + formattingHtml;
+      return unavailableHtml + '<p class="file-viewer-review-releases__empty">' +
+        (unavailableReason ? 'No textual differences detected.' : 'No textual or formatting differences detected.') +
+        '</p>';
     }
     var fallbackChanges = fallbackReviewChangesForDiff();
     var usedFallbackIndexes = [];
@@ -2484,25 +2580,31 @@
       if (!normalizedDiffText(text) && kind !== 'unchanged') return '';
       return '<span class="file-viewer-diff-part file-viewer-diff-part--' + kind + '">' + escapeHtml(text) + '</span>';
     }).join('');
-    return (rendered || '<p class="file-viewer-review-releases__empty">No textual differences detected.</p>') + formattingHtml;
+    return unavailableHtml + (rendered || '<p class="file-viewer-review-releases__empty">No textual differences detected.</p>') + formattingHtml;
   }
 
-  function renderDiffComparison(comparison) {
+  function renderDiffComparison(comparison, labels) {
     var target = document.getElementById('viewerDiff');
     if (!target) return;
     var parts = Array.isArray(comparison && comparison.parts) ? comparison.parts : [];
-    var originalName = comparison && comparison.original_document ? comparison.original_document.filename : 'Source document';
-    var newName = comparison && comparison.new_document ? comparison.new_document.filename : 'Selected version';
+    var originalFilename = comparison && comparison.original_document ? comparison.original_document.filename : 'Source document';
+    var newFilename = comparison && comparison.new_document ? comparison.new_document.filename : 'Selected version';
+    var originalName = labels && labels.base ? labels.base : originalFilename;
+    var newName = labels && labels.comparison ? labels.comparison : newFilename;
+    var contextName = labels
+      ? (labels.context || (originalFilename === newFilename ? originalFilename : originalFilename + ' → ' + newFilename))
+      : '';
     var textChangeCount = comparison && Number(comparison.changes || 0);
     var formattingChangeCount = formattingReviewChangesForDiff().length;
     var meta = textChangeCount + ' changed segment' + (textChangeCount === 1 ? '' : 's') +
       (formattingChangeCount ? ' · ' + formattingChangeCount + ' formatting change' + (formattingChangeCount === 1 ? '' : 's') : '');
-    var body = renderDiffComparisonBody(parts);
+    var body = renderDiffComparisonBody(parts, comparison);
 
     target.innerHTML =
       '<div class="file-viewer-diff-header">' +
         '<div>' +
           '<h4 class="file-viewer-diff-title">' + escapeHtml(originalName || 'Source document') + ' vs ' + escapeHtml(newName || 'Selected version') + '</h4>' +
+          (contextName ? '<p class="file-viewer-diff-context">' + escapeHtml(contextName) + '</p>' : '') +
           '<p class="file-viewer-diff-meta">' + escapeHtml(meta) + '</p>' +
         '</div>' +
       '</div>' +
@@ -2623,15 +2725,38 @@
   }
 
   async function changesForRelease(release) {
-    if (!release || !release.edit_batch_id) return [];
+    if (!release) return { changes: [], failed: false };
+    var existing = releaseChangeGroupForId(release.id);
+    if (existing) {
+      return {
+        changes: Array.isArray(existing.changes) ? existing.changes : [],
+        failed: Boolean(existing.failed)
+      };
+    }
+    if (!release.edit_batch_id) return { changes: [], failed: Boolean(release.id) };
     try {
       var batchResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(release.edit_batch_id)));
       var batch = batchResponse && batchResponse.data ? batchResponse.data : batchResponse;
-      return Array.isArray(batch && batch.changes) ? batch.changes : [];
+      return {
+        changes: Array.isArray(batch && batch.changes) ? batch.changes : [],
+        failed: false
+      };
     } catch (error) {
       console.warn('[FileViewerPage] Release change history unavailable:', error);
-      return [];
+      return { changes: [], failed: true };
     }
+  }
+
+  function isDirectForwardVersionComparison(base, comparison) {
+    if (!comparison || !comparison.release) return false;
+    var comparisonRelease = comparison.release;
+    var previousReleaseId = comparisonRelease.previous_release_id || comparisonRelease.previousReleaseId || '';
+    if (base && base.key === 'original') {
+      return Number(comparisonRelease.release_number || 0) === 1 && !previousReleaseId;
+    }
+    if (!base || !base.release) return false;
+    if (previousReleaseId) return String(previousReleaseId) === String(base.release.id || '');
+    return Number(comparisonRelease.release_number || 0) === Number(base.release.release_number || 0) + 1;
   }
 
   async function runVersionComparison() {
@@ -2645,7 +2770,10 @@
     }
     state.selectedReviewReleaseId = comparison.key;
     state.selectedReviewReleaseDocumentId = comparison.documentId;
-    state.releaseChangeHistory = Array.isArray(comparison.changes) ? comparison.changes : [];
+    var directForwardComparison = isDirectForwardVersionComparison(base, comparison);
+    state.releaseChangeHistory = directForwardComparison && Array.isArray(comparison.changes)
+      ? comparison.changes
+      : [];
     state.releaseComparison = null;
     state.releaseComparisonLoading = true;
     renderReviewWorkflow('Comparing ' + base.label + ' with ' + comparison.label + '...');
@@ -2657,7 +2785,16 @@
         { comparison_document_id: comparison.documentId }
       );
       state.releaseComparison = comparisonResponse && comparisonResponse.data ? comparisonResponse.data : comparisonResponse;
-      renderDiffComparison(state.releaseComparison);
+      if (state.releaseComparison && !directForwardComparison) {
+        state.releaseComparison.change_details_unavailable_reason = 'Text differences are shown. Direct formatting comparison is unavailable for non-adjacent or reverse version selections.';
+      } else if (state.releaseComparison && comparison.changeDetailsUnavailable) {
+        state.releaseComparison.change_details_unavailable_reason = 'Text differences are shown. Persisted formatting change details could not be loaded for the comparison version.';
+      }
+      renderDiffComparison(state.releaseComparison, {
+        base: base.label,
+        comparison: comparison.label,
+        context: documentDisplayFilename(state.currentFile)
+      });
     } catch (error) {
       console.error('[FileViewerPage] Version comparison failed:', error);
       notify((error && error.message) || 'Failed to compare selected versions', 'error');
@@ -2689,7 +2826,9 @@
       return;
     }
     if (identity.release) {
-      identity.changes = await changesForRelease(identity.release);
+      var detail = await changesForRelease(identity.release);
+      identity.changes = detail.changes;
+      identity.changeDetailsUnavailable = detail.failed;
     }
     selections.push(identity);
     state.versionCompareSelections = selections;
@@ -3466,18 +3605,17 @@
   }
 
   function restoredDraftHasVisibleRevisions() {
-    var reviewState = currentReviewState();
-    var revisions = Array.isArray(reviewState && reviewState.revisions) ? reviewState.revisions : [];
+    var revisions = unreleasedRawReviewRevisions(currentReviewState());
     return revisions.length > 0;
   }
 
   async function restorePersistedDraftIntoEditor(batch) {
     if (!batch || !state.editorInstance || typeof state.editorInstance.applyEdits !== 'function') return false;
-    if (state.editorMode !== 'review') {
-      await setEditorInteractionMode('review');
-    }
     var current = currentReviewState();
-    if (Array.isArray(current.revisions) && current.revisions.length > 0) return false;
+    // Baseline revisions belong to the source file and were captured when it
+    // opened. Only a revision beyond that baseline proves this saved draft is
+    // already present; otherwise the persisted EditScript still needs replay.
+    if (unreleasedRawReviewRevisions(current).length > 0) return false;
     var scripts = editScriptsFromPersistedBatch(batch);
     var ops = scripts.length ? [] : editOpsFromPersistedBatch(batch);
     for (var scriptIndex = 0; scriptIndex < scripts.length; scriptIndex++) {
@@ -3488,8 +3626,23 @@
     }
     if (!ops.length) return false;
     state.reviewRestoring = true;
+    var host = document.getElementById('viewerEditor');
+    if (host) {
+      host.setAttribute('aria-busy', 'true');
+      host.setAttribute('inert', '');
+    }
     try {
+      // applyEdits intentionally requires review mode. File Viewer remains a
+      // read-only surface: unlock only for this host-driven replay while the
+      // canvas is inert, then synchronously return to view mode below.
+      if (typeof state.editorInstance.setMode === 'function') {
+        state.editorInstance.setMode('review');
+        state.editorMode = 'review';
+      }
       await applyPersistedEditScriptsSequentially(scripts, ops);
+      if (typeof state.editorInstance.clearHistory === 'function') {
+        state.editorInstance.clearHistory();
+      }
       state.reviewState = currentReviewState();
       state.reviewDirty = false;
       updateReviewRailCounts(state.reviewState || {});
@@ -3498,6 +3651,11 @@
       console.warn('[FileViewerPage] Persisted review draft could not be restored into editor:', error);
       return false;
     } finally {
+      forceReadOnlyDisplayMode();
+      if (host) {
+        host.removeAttribute('inert');
+        host.removeAttribute('aria-busy');
+      }
       state.reviewRestoring = false;
     }
   }
@@ -3517,6 +3675,48 @@
       }
     }
     return false;
+  }
+
+  async function hydrateCurrentReviewBatchDetail() {
+    var batch = state.currentReviewBatch;
+    if (!isActiveReviewDraftBatch(batch) || !batch.id || Array.isArray(batch.changes)) return batch;
+    var result = await LanaDocumentReview.hydrateBatchDetail({
+      api: api,
+      matterId: getCurrentMatterId(),
+      batch: batch
+    });
+    if (result.failed) {
+      state.currentReviewBatchRestoreFailed = true;
+      console.warn('[FileViewerPage] Current draft detail load failed:', result.error);
+      return null;
+    }
+    if (result.batch && result.batch.id) state.currentReviewBatch = result.batch;
+    state.currentReviewBatchRestoreFailed = false;
+    return state.currentReviewBatch;
+  }
+
+  async function restoreCurrentPersistedDraftIfNeeded() {
+    if (state.suppressReviewDraftRestoreForLoad || reviewDisplayScope() !== 'current') return true;
+    var batch = await hydrateCurrentReviewBatchDetail();
+    if (state.currentReviewBatchRestoreFailed) return false;
+    if (!isActiveReviewDraftBatch(batch) || persistedBatchChangeCount(batch) < 1) return true;
+    var baseDocumentId = currentDraftBaseDocumentId();
+    var currentDocumentId = state.currentFile && state.currentFile.id
+      ? String(state.currentFile.id)
+      : '';
+    if (baseDocumentId && currentDocumentId && currentDocumentId !== String(baseDocumentId)) {
+      await openVersionDocument(baseDocumentId, { scope: 'current' });
+      return !state.currentReviewBatchRestoreFailed;
+    }
+    var restored = await restorePersistedDraftIntoEditorWithRetry(batch);
+    var visible = restored || restoredDraftHasVisibleRevisions();
+    state.currentReviewBatchRestoreFailed = !visible;
+    state.reviewState = currentReviewState();
+    state.reviewDirty = false;
+    forceReadOnlyDisplayMode();
+    applyTrackedChangesDisplay();
+    updateReviewRailCounts(state.reviewState || {});
+    return visible;
   }
 
   async function loadReviewWorkflow(file) {
@@ -3547,7 +3747,11 @@
 
     try {
       var reviewDocumentId = String(file.id);
-      var releasesResponse = await api.get(reviewEndpoint('/documents/' + encodeURIComponent(reviewDocumentId) + '/releases?limit=20'));
+      var releasesResponse = await LanaDocumentReview.loadReleaseLineage({
+        api: api,
+        matterId: matterId,
+        documentId: reviewDocumentId
+      });
       var currentDocumentIsRelease = Boolean(
         releasesResponse
         && releasesResponse.metadata
@@ -3558,7 +3762,11 @@
         : '';
       if (metadataSourceDocumentId && metadataSourceDocumentId !== reviewDocumentId) {
         reviewDocumentId = metadataSourceDocumentId;
-        releasesResponse = await api.get(reviewEndpoint('/documents/' + encodeURIComponent(reviewDocumentId) + '/releases?limit=20'));
+        releasesResponse = await LanaDocumentReview.loadReleaseLineage({
+          api: api,
+          matterId: matterId,
+          documentId: reviewDocumentId
+        });
       }
       state.reviewSourceDocumentId = reviewDocumentId;
       var query = '?document_id=' + encodeURIComponent(reviewDocumentId) + '&limit=20&sort_by=updated_at&sort_dir=desc';
@@ -3572,16 +3780,10 @@
         currentDocumentIsRelease
       );
       state.pendingReviewReleaseBatch = pendingReleaseBatchFromList(state.reviewBatches);
-      if (!state.suppressReviewDraftRestoreForLoad && state.currentReviewBatch && state.currentReviewBatch.id) {
-        try {
-          var draftResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(state.currentReviewBatch.id)));
-          state.currentReviewBatch = draftResponse && draftResponse.data ? draftResponse.data : draftResponse;
-          state.currentReviewBatchRestoreFailed = false;
-        } catch (draftError) {
-          console.warn('[FileViewerPage] Draft review batch detail load failed:', draftError);
-          state.currentReviewBatchRestoreFailed = true;
-        }
-      }
+      // List responses intentionally omit the potentially large change
+      // payload. Hydrate the saved draft before choosing Current vs Original,
+      // but replay it only after that display scope has been selected.
+      await hydrateCurrentReviewBatchDetail();
       state.releaseChangeGroups = await loadReleaseChangeGroups(state.reviewReleases);
       if (selectInitialReviewDisplay(file)) {
         return;
@@ -3598,33 +3800,11 @@
   }
 
   async function loadReleaseChangeGroups(releases) {
-    var items = Array.isArray(releases) ? releases : [];
-    var groups = await Promise.all(items.map(async function (release) {
-      if (!release || !release.edit_batch_id) {
-        return {
-          release_id: release && release.id,
-          release: release,
-          changes: []
-        };
-      }
-      try {
-        var batchResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(release.edit_batch_id)));
-        var batch = batchResponse && batchResponse.data ? batchResponse.data : batchResponse;
-        return {
-          release_id: release.id,
-          release: release,
-          changes: Array.isArray(batch && batch.changes) ? batch.changes : []
-        };
-      } catch (error) {
-        console.warn('[FileViewerPage] Release change group load failed:', error);
-        return {
-          release_id: release.id,
-          release: release,
-          changes: []
-        };
-      }
-    }));
-    return groups;
+    return LanaDocumentReview.loadReleaseChangeGroups({
+      api: api,
+      matterId: getCurrentMatterId(),
+      releases: releases
+    });
   }
 
   function renderReviewWorkflow(message) {
@@ -3639,6 +3819,11 @@
       ? state.currentReviewBatch.changes.length
       : 0;
     var hasReviewWork = changeCount > 0 || persistedDraftChanges > 0;
+
+    // The review rail subtitle is state, not static decoration. Keep it in
+    // lockstep with comparison lifecycle changes even when the rail itself
+    // stays mounted throughout an async release comparison.
+    setCanvasModeDisplay(canOpenFileInEditor(state.currentFile));
 
     if (statusEl) {
       if (message) {
@@ -3994,6 +4179,13 @@
 
       state.currentFile = response;
       var conversationMatterId = getConversationMatterId(response);
+      if (!conversationMatterId) {
+        var storageMatterId = getFileMatterId(response);
+        var resolvedMatter = await resolveMatterFromList(storageMatterId);
+        conversationMatterId = resolvedMatter && resolvedMatter.conversationMatterId
+          ? resolvedMatter.conversationMatterId
+          : '';
+      }
 
       // Configure LANA panel with file context
       var lanaPanel = document.getElementById('fileViewerLana');
@@ -4003,19 +4195,6 @@
           lanaPanel.setAttribute('matter-id', conversationMatterId);
         } else {
           lanaPanel.removeAttribute('matter-id');
-        }
-      }
-
-      // The Ask LANA button injects this document's context into the dock
-      var askLanaBtn = document.getElementById('askLanaBtn');
-      if (askLanaBtn) {
-        askLanaBtn.setAttribute('document-id', response.id);
-        askLanaBtn.setAttribute('document-name', displayFilename);
-        askLanaBtn.setAttribute('context-type', 'document_chat');
-        if (conversationMatterId) {
-          askLanaBtn.setAttribute('matter-id', conversationMatterId);
-        } else {
-          askLanaBtn.removeAttribute('matter-id');
         }
       }
 
@@ -4067,6 +4246,21 @@
       // the soon-to-be-replaced clones. Click handlers are wired via
       // delegation on the banner itself, so they survive re-renders.
       await Promise.resolve();
+
+      // Configure the rendered Ask LANA clone after lex-banner has rebuilt
+      // its action slot. Setting this before the heading/subtitle update would
+      // target the soon-to-be-replaced clone and silently drop document scope.
+      var askLanaBtn = banner && banner.querySelector('#askLanaBtn');
+      if (askLanaBtn) {
+        askLanaBtn.setAttribute('document-id', response.id);
+        askLanaBtn.setAttribute('document-name', displayFilename);
+        askLanaBtn.setAttribute('context-type', 'document_chat');
+        if (conversationMatterId) {
+          askLanaBtn.setAttribute('matter-id', conversationMatterId);
+        } else {
+          askLanaBtn.removeAttribute('matter-id');
+        }
+      }
 
       updateDocStudioButton(response);
       var fileInfoBtn = document.getElementById('viewerFileInfoBtn');
@@ -4121,6 +4315,7 @@
     state.currentReviewBatch = null;
     state.pendingReviewReleaseBatch = null;
     state.reviewSourceDocumentId = null;
+    state.reviewWorkflowPromise = null;
     state.reviewReleases = [];
     state.reviewDisplayTarget = null;
     state.selectedReviewReleaseId = null;
@@ -4394,8 +4589,10 @@
       });
       editor.on('review-state-changed', function (reviewState) {
         state.reviewState = reviewState || null;
-        state.editorMode = 'view';
-        if (reviewState && reviewState.editorMode && reviewState.editorMode !== 'view') {
+        state.editorMode = state.reviewRestoring && reviewState && reviewState.editorMode
+          ? reviewState.editorMode
+          : 'view';
+        if (!state.reviewRestoring && reviewState && reviewState.editorMode && reviewState.editorMode !== 'view') {
           forceReadOnlyDisplayMode();
         }
         updateReviewRailCounts(reviewState || null);
@@ -4416,7 +4613,9 @@
       applyTrackedChangesDisplay();
       setReviewRailVisible(canReviewFile(file));
       if (canReviewFile(file)) {
-        await loadReviewWorkflow(file);
+        state.reviewWorkflowPromise = loadReviewWorkflow(file);
+        await state.reviewWorkflowPromise;
+        await restoreCurrentPersistedDraftIfNeeded();
       } else {
         renderReviewWorkflow('This format is read-only. Convert it to DOCX before review edits.');
       }
@@ -4491,7 +4690,7 @@
     var file = state.currentFile;
     var fileId = (file && file.id) || state.fileId;
     if (!fileId) return;
-    var name = (file && file.filename) || 'this file';
+    var name = file ? documentDisplayFilename(file) : 'this file';
 
     var run = async function () {
       try {
@@ -5014,7 +5213,7 @@
     document.addEventListener('topbar-back-click', interceptShellBack, true);
     document.getElementById('viewerErrorDownload').addEventListener('click', function () {
       if (state.currentFile) {
-        downloadFile(state.currentFile.id, state.currentFile.filename);
+        downloadFile(state.currentFile.id, documentDisplayFilename(state.currentFile));
       }
     });
     // Banner action buttons live inside <lex-banner>, which re-renders
@@ -5038,7 +5237,7 @@
             break;
           case 'viewerDownloadBtn':
             if (state.currentFile) {
-              downloadFile(state.currentFile.id, state.currentFile.filename);
+              downloadFile(state.currentFile.id, documentDisplayFilename(state.currentFile));
             }
             break;
           case 'viewerTemplateBtn':

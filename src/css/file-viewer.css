@@ -1152,6 +1152,12 @@ button.file-viewer-review-release:focus-visible {
   font-size: var(--lex-body-xs-size, 0.75rem);
 }
 
+.file-viewer-diff-context {
+  margin: 3px 0 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+}
+
 .file-viewer-diff-document {
   max-width: 980px;
   margin: 24px auto;
@@ -1161,6 +1167,19 @@ button.file-viewer-review-release:focus-visible {
   font-size: 15px;
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.file-viewer-diff-warning {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--lex-warning-border, #f6c453);
+  border-radius: var(--lex-radius-sm, 6px);
+  background: var(--lex-warning-bg, #fff8e1);
+  color: var(--lex-text-secondary);
+  font-family: var(--lex-font-sans, Arial, sans-serif);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  line-height: 1.4;
+  white-space: normal;
 }
 
 .file-viewer-diff-part--added {

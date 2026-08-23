@@ -116,6 +116,12 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain("if (officeHasUnreleasedChanges(file)) return 'draft';");
     expect(editor).toContain("if (officeHasReleaseComparison(file)) return 'release';");
     expect(editor).toContain('Show or hide this release against the previous release');
+    expect(editor).toContain("return 'Current release vs previous release'");
+    expect(editor).toContain("return 'Unreleased vs last release'");
+    expect(editor).toContain('id="officeChangesLegend"');
+    expect(editor).toContain('data-action="locate-review-change"');
+    expect(editor).toContain('function locateOfficeReviewChange(file, revisionIds)');
+    expect(editor).toContain("mark.classList.toggle('lee-rev-review-focus', focused)");
     expect(editor).toContain("if (officeTrackedChangesMode(file) === 'none')");
     expect(editor).toContain('async function resolveOfficeConversationMatterContext(storageMatterId)');
     expect(editor).toContain('matterNumber: conversationMatter && conversationMatter.matterId');
@@ -125,7 +131,12 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain("'<div class=\"office-doc-ruler office-doc-ruler-' + marginPreset");
     expect(editor).not.toContain("panel.innerHTML = '<div class=\"office-doc-canvas\">' +\n      '<div class=\"office-doc-toolbar\"");
     expect(css).toContain('.office-lana-editor-host--final .le-page span.le-rev[data-rev-type="fmt"]');
-    expect(css).toContain('.office-lana-editor-host--release-compare .le-page span.le-rev.lee-rev-baseline[data-rev-type="fmt"]');
+    expect(css).toContain('.office-lana-editor-host--release-compare .le-page span.le-rev.lee-rev-baseline.lee-rev-release-delta[data-rev-type="fmt"]');
+    expect(editor).toContain('function officeReleaseDeltaRevisionIds(file)');
+    expect(editor).toContain("mark.classList.toggle('lee-rev-release-delta'");
+    expect(css).toContain('.office-lana-editor-host--draft-compare .le-page .le-p:has(.le-rev:not(.lee-rev-baseline))');
+    expect(css).toContain('.le-rev.lee-rev-review-focus[data-rev-type="fmt"]');
+    expect(css).toContain('.office-changes-legend');
 
     ['officeEditorStatusBar', 'officeSaveStatus', 'officePageCount', 'officeWordCount', 'officeCharacterCount', 'officeTokenCount', 'officeParagraphCount', 'officeReadingTime'].forEach((id) => {
       expect(html).toContain('id="' + id + '"');
@@ -323,11 +334,15 @@ describe('File Editor live document boundary', () => {
 
     expect(mountSource).toContain("mountedEditor.on('review-state-changed', function (reviewState)");
     expect(mountSource).toContain('handleServerEmbedEvent(file, reviewState || null)');
+    expect(mountSource).toContain('applyServerReviewToFile(file);\n        // Release lineage arrives after the first document render.');
+    expect(mountSource).toContain('applyOfficeBaselineRevisionTags(file);\n        syncOfficeShowChangesControl(file);');
     expect(editor).toContain('function serverPendingApprovalDisplayChanges(file)');
     expect(applySource).toContain("{ section: 'unreleased' }");
     expect(applySource).toContain("{ section: 'pending-approval' }");
     expect(applySource).toContain("row.status = 'Pending'");
     expect(applySource).toContain("row.status = 'Pending approval'");
+    expect(applySource).toContain("var editorBaselineReleaseId = String(file.editorBaselineReleaseId || '')");
+    expect(applySource).toContain('group.release.id');
     expect(applySource).toContain('pendingRows.concat(pendingApprovalRows, releasedRows)');
     expect(railSource).toContain("change.serverSection === 'pending-approval'");
     expect(railSource).toContain("change.serverSection !== 'pending-approval'");

@@ -44,6 +44,8 @@ describe('file-viewer review UX foundation', () => {
     expect(html).not.toContain('id="reviewRailInfoBtn"');
     expect(html).toContain('<lex-drawer id="fileInfoDrawer"');
     expect(html).toContain('id="metadataSidebar" class="file-viewer-file-info"');
+    expect(pageJs).toContain('drawer.subtitle = documentDisplayFilename(state.currentFile);');
+    expect(pageJs).toContain('downloadFile(state.currentFile.id, documentDisplayFilename(state.currentFile));');
   });
 
   test('routes the viewer header LANA button to its explicit document drawer before the shell dock', () => {
@@ -52,6 +54,7 @@ describe('file-viewer review UX foundation', () => {
     const shellDockBranch = askLanaButtonJs.indexOf("var dock = document.querySelector('lex-lana-dock')");
     expect(explicitPanelBranch).toBeGreaterThan(-1);
     expect(shellDockBranch).toBeGreaterThan(explicitPanelBranch);
+    expect(pageJs).toContain("var askLanaBtn = banner && banner.querySelector('#askLanaBtn');");
   });
 
   test('renders a review rail with change history and releases tabs', () => {
@@ -95,6 +98,7 @@ describe('file-viewer review UX foundation', () => {
     expect(html).toContain('View / Read-only');
     expect(html).toContain('Open in File Editor');
     expect(pageJs).toContain("reviewBadge.textContent = 'Open in File Editor';");
+    expect(pageJs).toContain('setCanvasModeDisplay(canOpenFileInEditor(state.currentFile));');
     expect(html).not.toContain('Freeform Edit');
   });
 
@@ -104,6 +108,9 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function openCurrentFileInFileEditor');
     expect(pageJs).toContain("Lex.Nav.go('file-editor.html'");
     expect(pageJs).toContain('fileEditor: fileEditorHandoff(file)');
+    expect(pageJs).toContain('async function openCurrentFileInFileEditor()');
+    expect(pageJs).toContain('if (state.reviewWorkflowPromise)');
+    expect(pageJs).toContain('await state.reviewWorkflowPromise;');
     expect(pageJs).toContain('function visibleViewerDocumentHtml');
     expect(pageJs).toContain('function fileEditorReviewChanges');
     expect(pageJs).toContain('reviewChanges: fileEditorReviewChanges()');
@@ -206,10 +213,19 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('currentFileId === String(originalId)');
     expect(pageJs).toContain('function selectInitialReviewDisplay');
     expect(pageJs).toContain('function restorePersistedDraftIntoEditorWithRetry');
+    expect(pageJs).toContain('function currentDraftBaseDocumentId');
+    expect(pageJs).toContain('LanaDocumentReview.draftBaseDocumentId(');
+    expect(pageJs).toContain('function hydrateCurrentReviewBatchDetail');
+    expect(pageJs).toContain('await hydrateCurrentReviewBatchDetail();');
     expect(pageJs).toContain('function waitForReviewRestoreRetry');
     expect(pageJs).toContain('function restoredDraftHasVisibleRevisions');
     expect(pageJs).toContain('state.currentReviewBatchRestoreFailed = false;');
     expect(pageJs).toContain('var attempts = 4;');
+    // File Viewer stays read-only, but Current draft must replay the persisted
+    // edit scripts into its in-memory editor so the canvas matches the Review
+    // rail. This does not save or mutate the source document.
+    expect(pageJs).toContain('await restoreCurrentPersistedDraftIfNeeded()');
+    expect(pageJs).toContain('state.currentReviewBatchRestoreFailed = true;');
     expect(pageJs).not.toContain('await restorePersistedDraftIntoEditorWithRetry(state.currentReviewBatch)');
     expect(pageJs).toContain("if (hasUnreleasedWorkingCopy())");
     expect(pageJs).toContain("selectReviewDisplayScope('current')");
@@ -235,12 +251,19 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function applyTrackedChangesDisplay');
     expect(pageJs).toContain('function setTrackedChangesDisplay');
     expect(pageJs).toContain('function showSelectedReleaseChangesFromParent');
+    expect(pageJs).toContain('function releaseVersionLabel');
+    expect(pageJs).toContain('function parentVersionLabelForRelease');
+    expect(pageJs).toContain("base: parentVersionLabelForRelease(release, baseDocumentId)");
+    expect(pageJs).toContain("comparison: releaseVersionLabel(release)");
+    expect(pageJs).toContain("context: documentDisplayFilename(state.currentFile)");
     expect(pageJs).toContain('setViewerDisplayControlsVisible(Boolean(state.editorInstance));');
     expect(pageJs).toContain('function fallbackReviewChangesForDiff');
     expect(pageJs).toContain('function proposedTextForBlankAddedDiffPart');
     expect(pageJs).toContain('function renderDiffComparisonBody');
     expect(pageJs).toContain('function formattingReviewChangesForDiff');
     expect(pageJs).toContain('function renderFormattingComparison');
+    expect(pageJs).toContain("var original = String(changeOriginalText(change) || '');");
+    expect(pageJs).toContain("var proposed = String(changeProposedText(change) || '');");
     expect(pageJs).toContain('LanaDocumentReview.changesFromRevisions(');
     expect(pageJs).toContain('return LanaDocumentReview.changeLabel(item);');
     expect(pageJs).toContain('No textual or formatting differences detected.');
@@ -248,6 +271,13 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('var previousRemovedText');
     expect(pageJs).toContain("if (!normalizedDiffText(text) && kind !== 'unchanged') return '';");
     expect(pageJs).toContain('parentDocumentIdForRelease');
+    expect(pageJs).toContain('LanaDocumentReview.previousReleaseDocumentId(');
+    expect(pageJs).toContain('function isDirectForwardVersionComparison');
+    expect(pageJs).toContain('Direct formatting comparison is unavailable for non-adjacent or reverse version selections.');
+    expect(pageJs).toContain('Persisted formatting change details could not be loaded for this version.');
+    expect(pageJs).toContain('Persisted change details are unavailable for this version.');
+    expect(fileViewerCss).toContain('.file-viewer-diff-warning');
+    expect(fileViewerCss).toContain('.file-viewer-diff-context');
     expect(pageJs).toContain('function reviewVersionSelectOptions');
     expect(pageJs).toContain('function currentReviewVersionSelectValue');
     expect(pageJs).toContain('function openReviewVersionFromSelect');
@@ -449,6 +479,7 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function getMatterRecordDetailId');
     expect(pageJs).toContain('function matterRowsFromResponse');
     expect(pageJs).toContain('function buildMatterLookupMap');
+    expect(pageJs).toContain('conversationMatterId: conversationMatterId');
     expect(pageJs).toContain('function loadMatterLookupMap');
     expect(pageJs).toContain('function resolveMatterFromList');
     expect(pageJs).toContain('function isMatterIdentifierLabel');
@@ -457,6 +488,8 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain("label: matterLabel || getFileMatterDisplayName(file) || 'Workspace'");
     expect(pageJs).toContain("href: 'workspace-details.html?id=' + encodeURIComponent(hrefId)");
     expect(pageJs).toContain('var listMatter = await resolveMatterFromList(matterId);');
+    expect(pageJs).toContain('var resolvedMatter = await resolveMatterFromList(storageMatterId);');
+    expect(pageJs).toContain('resolvedMatter && resolvedMatter.conversationMatterId');
     expect(pageJs).toContain('setFileBreadcrumb(file, listMatter.name, listMatter.hrefId)');
     expect(pageJs).toContain('if (isLikelyUuid(matterId) || typeof api.getMatter !==');
     expect(pageJs).toContain('api.getMatter(matterId)');
@@ -518,9 +551,12 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function isReleasedArtifactFile');
     expect(pageJs).toContain('function releaseForCurrentFile');
     expect(pageJs).toContain('sourceDocumentId: canonicalReviewSourceDocumentId(file)');
-    expect(pageJs).toContain('releasedDocumentId: isReleasedArtifactFile(file) && file && file.id ? file.id :');
+    expect(pageJs).toContain('function fileEditorBaselineRelease(file)');
+    expect(pageJs).toContain('var baselineDocumentId = releaseDocumentId(baselineRelease)');
+    expect(pageJs).toContain('releasedDocumentId: baselineRelease && baselineDocumentId ? baselineDocumentId :');
+    expect(pageJs).toContain('editorBaselineReleaseId: baselineRelease && baselineRelease.id');
     expect(pageJs).toContain('var reviewDocumentId = String(file.id);');
-    expect(pageJs).toContain("'/documents/' + encodeURIComponent(reviewDocumentId) + '/releases?limit=20'");
+    expect(pageJs).toContain('LanaDocumentReview.loadReleaseLineage({');
     expect(pageJs).toContain("'?document_id=' + encodeURIComponent(reviewDocumentId)");
     expect(pageJs).toContain('state.reviewReleases = Array.isArray(releasesResponse && releasesResponse.data)');
     expect(pageJs).toContain('if (isReleasedArtifactFile(file) || releaseForCurrentFile(file)) return false;');

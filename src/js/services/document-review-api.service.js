@@ -162,11 +162,19 @@
 
   function changeOriginalText(change) {
     if (!change) return '';
+    if (isFormattingChange(change)) {
+      var formatDetails = formatChangeDetailsFromRevision(change);
+      if (formatDetails) return formatDetails.originalText;
+    }
     return change.original_text || (isDeletionChange(change) ? reviewItemText(change) : '');
   }
 
   function changeProposedText(change) {
     if (!change) return '';
+    if (isFormattingChange(change)) {
+      var formatDetails = formatChangeDetailsFromRevision(change);
+      if (formatDetails) return formatDetails.proposedText;
+    }
     return change.proposed_text || (isInsertionChange(change) ? reviewItemText(change) : '');
   }
 
@@ -908,6 +916,110 @@
     return null;
   }
 
+  /**
+   * Resolve the immutable document whose bytes a saved draft was authored
+   * against. Batches created from a released artifact keep that release's
+   * file-version id even though the batch itself is re-parented to the
+   * canonical source document.
+   */
+  function draftBaseDocumentId(batch, releases, sourceDocumentId) {
+    var fallback = sourceDocumentId ? String(sourceDocumentId) : '';
+    var baseFileVersionId = batch && batch.base_file_version_id
+      ? String(batch.base_file_version_id)
+      : '';
+    if (!baseFileVersionId) return fallback;
+    var items = Array.isArray(releases) ? releases : [];
+    for (var i = 0; i < items.length; i++) {
+      var release = items[i];
+      if (!release) continue;
+      if (String(release.file_version_id || '') !== baseFileVersionId) continue;
+      var releasedDocumentId = release.released_document_id || release.document_id;
+      if (releasedDocumentId) return String(releasedDocumentId);
+    }
+    return fallback;
+  }
+
+  function previousReleaseDocumentId(release, releases, originalDocumentId) {
+    var exactPreviousDocumentId = release && (
+      release.previous_released_document_id ||
+      release.previousReleasedDocumentId
+    );
+    if (exactPreviousDocumentId) return String(exactPreviousDocumentId);
+    var releaseNumber = Number(release && release.release_number || 0);
+    var items = Array.isArray(releases) ? releases : [];
+    var previous = null;
+    for (var i = 0; i < items.length; i++) {
+      var candidate = items[i];
+      var candidateNumber = Number(candidate && candidate.release_number || 0);
+      var candidateDocumentId = candidate && (candidate.released_document_id || candidate.releasedDocumentId);
+      if (!candidateDocumentId || (releaseNumber > 0 && candidateNumber >= releaseNumber)) continue;
+      if (!previous || candidateNumber > Number(previous.release_number || 0)) previous = candidate;
+    }
+    return String(
+      (previous && (previous.released_document_id || previous.releasedDocumentId)) ||
+      originalDocumentId ||
+      ''
+    );
+  }
+
+  async function hydrateBatchDetail(options) {
+    var api = options && options.api;
+    var matterId = options && options.matterId;
+    var batch = options && options.batch;
+    if (!batch || !batch.id || Array.isArray(batch.changes)) {
+      return { batch: batch || null, failed: false, error: null };
+    }
+    if (!api) throw new Error('hydrateBatchDetail requires an api client.');
+    try {
+      var response = await api.get(matterEndpoint(
+        matterId,
+        '/document-edit-batches/' + encodeURIComponent(batch.id)
+      ));
+      return {
+        batch: responseData(response) || batch,
+        failed: false,
+        error: null
+      };
+    } catch (error) {
+      return { batch: batch, failed: true, error: error };
+    }
+  }
+
+  async function loadReleaseLineage(options) {
+    var api = options && options.api;
+    var matterId = options && options.matterId;
+    var documentId = String(options && options.documentId || '');
+    var pageSize = 20;
+    if (!api) throw new Error('loadReleaseLineage requires an api client.');
+    if (!documentId) throw new Error('loadReleaseLineage requires a documentId.');
+
+    var releases = [];
+    var seen = {};
+    var metadata = {};
+    var page = 1;
+    while (page <= 250) {
+      var suffix = '?limit=' + pageSize + (page > 1 ? '&page=' + page : '');
+      var response = await api.get(matterEndpoint(
+        matterId,
+        '/documents/' + encodeURIComponent(documentId) + '/releases' + suffix
+      ));
+      var pageRows = Array.isArray(response && response.data) ? response.data : [];
+      if (page === 1 && response && response.metadata) metadata = response.metadata;
+      var added = 0;
+      for (var i = 0; i < pageRows.length; i++) {
+        var release = pageRows[i];
+        var key = release && release.id ? String(release.id) : 'page:' + page + ':row:' + i;
+        if (seen[key]) continue;
+        seen[key] = true;
+        releases.push(release);
+        added += 1;
+      }
+      if (pageRows.length < pageSize || added === 0) break;
+      page += 1;
+    }
+    return { data: releases, metadata: metadata };
+  }
+
   // =========================================================================
   // API workflows (matter-scoped)
   // =========================================================================
@@ -925,7 +1037,7 @@
     if (!api) throw new Error('loadWorkflow requires an api client.');
     if (!documentId) throw new Error('loadWorkflow requires a documentId.');
 
-    var releasesResponse = await api.get(matterEndpoint(matterId, '/documents/' + encodeURIComponent(documentId) + '/releases?limit=20'));
+    var releasesResponse = await loadReleaseLineage({ api: api, matterId: matterId, documentId: documentId });
     var sourceDocumentId = documentId;
     var currentDocumentIsRelease = false;
     var metadataSourceDocumentId = releasesResponse && releasesResponse.metadata && releasesResponse.metadata.source_document_id
@@ -936,7 +1048,7 @@
     }
     if (metadataSourceDocumentId && metadataSourceDocumentId !== sourceDocumentId) {
       sourceDocumentId = metadataSourceDocumentId;
-      releasesResponse = await api.get(matterEndpoint(matterId, '/documents/' + encodeURIComponent(sourceDocumentId) + '/releases?limit=20'));
+      releasesResponse = await loadReleaseLineage({ api: api, matterId: matterId, documentId: sourceDocumentId });
     }
 
     var releases = Array.isArray(releasesResponse && releasesResponse.data) ? releasesResponse.data : [];
@@ -959,21 +1071,15 @@
     var pendingDetailFailed = false;
 
     if (currentDraftBatch && currentDraftBatch.id && options.loadDraftDetail !== false) {
-      try {
-        var draftResponse = await api.get(matterEndpoint(matterId, '/document-edit-batches/' + encodeURIComponent(currentDraftBatch.id)));
-        currentDraftBatch = responseData(draftResponse);
-      } catch (error) {
-        draftDetailFailed = true;
-      }
+      var draftDetail = await hydrateBatchDetail({ api: api, matterId: matterId, batch: currentDraftBatch });
+      currentDraftBatch = draftDetail.batch;
+      draftDetailFailed = draftDetail.failed;
     }
 
     if (pendingReleaseBatch && pendingReleaseBatch.id && options.loadDraftDetail !== false) {
-      try {
-        var pendingResponse = await api.get(matterEndpoint(matterId, '/document-edit-batches/' + encodeURIComponent(pendingReleaseBatch.id)));
-        pendingReleaseBatch = responseData(pendingResponse);
-      } catch (error) {
-        pendingDetailFailed = true;
-      }
+      var pendingDetail = await hydrateBatchDetail({ api: api, matterId: matterId, batch: pendingReleaseBatch });
+      pendingReleaseBatch = pendingDetail.batch;
+      pendingDetailFailed = pendingDetail.failed;
     }
 
     return {
@@ -994,22 +1100,40 @@
     var api = options.api;
     var matterId = options.matterId;
     var releases = Array.isArray(options.releases) ? options.releases : [];
-    var groups = await Promise.all(releases.map(async function (release) {
-      if (!release || !release.edit_batch_id) {
-        return { release_id: release && release.id, release: release, changes: [] };
+    var groups = new Array(releases.length);
+    var cursor = 0;
+    async function loadNextGroup() {
+      while (cursor < releases.length) {
+        var index = cursor;
+        cursor += 1;
+        var release = releases[index];
+        if (!release || !release.edit_batch_id) {
+          groups[index] = {
+            release_id: release && release.id,
+            release: release,
+            changes: [],
+            failed: Boolean(release && release.id)
+          };
+        } else {
+          try {
+            var batchResponse = await api.get(matterEndpoint(matterId, '/document-edit-batches/' + encodeURIComponent(release.edit_batch_id)));
+            var batch = responseData(batchResponse);
+            groups[index] = {
+              release_id: release.id,
+              release: release,
+              changes: Array.isArray(batch && batch.changes) ? batch.changes : [],
+              failed: false
+            };
+          } catch (error) {
+            groups[index] = { release_id: release.id, release: release, changes: [], failed: true };
+          }
+        }
       }
-      try {
-        var batchResponse = await api.get(matterEndpoint(matterId, '/document-edit-batches/' + encodeURIComponent(release.edit_batch_id)));
-        var batch = responseData(batchResponse);
-        return {
-          release_id: release.id,
-          release: release,
-          changes: Array.isArray(batch && batch.changes) ? batch.changes : []
-        };
-      } catch (error) {
-        return { release_id: release.id, release: release, changes: [] };
-      }
-    }));
+    }
+    var workerCount = Math.min(6, releases.length);
+    var workers = [];
+    for (var worker = 0; worker < workerCount; worker++) workers.push(loadNextGroup());
+    await Promise.all(workers);
     return groups;
   }
 
@@ -1218,6 +1342,10 @@
     activeDraftBatchFromList: activeDraftBatchFromList,
     activeDraftBatchForBaseVersion: activeDraftBatchForBaseVersion,
     pendingReleaseBatchFromList: pendingReleaseBatchFromList,
+    draftBaseDocumentId: draftBaseDocumentId,
+    previousReleaseDocumentId: previousReleaseDocumentId,
+    hydrateBatchDetail: hydrateBatchDetail,
+    loadReleaseLineage: loadReleaseLineage,
     loadWorkflow: loadWorkflow,
     loadReleaseChangeGroups: loadReleaseChangeGroups,
     saveDraftBatch: saveDraftBatch,

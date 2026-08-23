@@ -50,6 +50,7 @@
   var editorImportMapBase = '';
   var editorModulePromise = null;
   var officeEditorInstance = null;
+  var officeReviewFocus = null;
   var officeEditorFileId = '';
   var officeEditorHostEl = null;
   var embedToolbarSelectionRanges = null;
@@ -1114,6 +1115,11 @@
             : 'LANA Editor - Edit mode';
         }
         applyServerReviewToFile(file);
+        // Release lineage arrives after the first document render. Re-tag the
+        // already-mounted revision nodes now that the exact current-release
+        // delta is known; otherwise Show changes is active while every
+        // baseline mark remains visually accepted.
+        applyOfficeBaselineRevisionTags(file);
         syncOfficeShowChangesControl(file);
         renderChrome();
         renderReviewDock(file);
@@ -1456,6 +1462,9 @@
     var released = status.tone === 'released';
     var originalText = service.changeOriginalText(change);
     var proposedText = service.changeProposedText(change);
+    var revisionIds = typeof service.revisionIdsForReviewChange === 'function'
+      ? service.revisionIdsForReviewChange(change)
+      : [];
     return {
       title: service.changeLabel(change),
       status: status.label,
@@ -1467,6 +1476,7 @@
       isInsertion: service.isInsertionChange(change),
       meta: (change && change.metadata && change.metadata.author) || '',
       items: [],
+      revisionIds: Array.isArray(revisionIds) ? revisionIds.map(String).filter(Boolean) : [],
       serverChange: change,
       serverSection: options && options.section ? options.section : 'unreleased',
       sourceIndex: index
@@ -1519,7 +1529,11 @@
     });
 
     var releasedRows = [];
+    var editorBaselineReleaseId = String(file.editorBaselineReleaseId || '');
     review.releaseChangeGroups.forEach(function (group) {
+      if (editorBaselineReleaseId && String(group && group.release && group.release.id || '') !== editorBaselineReleaseId) {
+        return;
+      }
       var releaseNumber = group && group.release ? group.release.release_number : null;
       service.displayReviewChanges(group && group.changes ? group.changes : []).forEach(function (change, index) {
         var row = officeRowFromServerChange(change, index, { section: 'released' });
@@ -2263,6 +2277,8 @@
     file.filename = incoming.filename || file.filename;
     file.sourceDocumentId = incoming.sourceDocumentId || file.sourceDocumentId;
     file.releasedDocumentId = incoming.releasedDocumentId || file.releasedDocumentId || '';
+    file.editorBaselineReleaseId = incoming.editorBaselineReleaseId || file.editorBaselineReleaseId || '';
+    file.editorBaselineReleaseNumber = incoming.editorBaselineReleaseNumber || file.editorBaselineReleaseNumber || null;
     file.documentId = incoming.documentId || file.documentId || file.releasedDocumentId || file.sourceDocumentId || '';
     file.matterId = incoming.matterId || file.matterId || '';
     file.matterNumber = incoming.matterNumber || incoming.matter_number || file.matterNumber || file.matter_number || '';
@@ -3622,7 +3638,10 @@
       var after = change.after || change.body || (change.isDeletion ? 'text removed' : 'Captured local edit');
       var canRevert = changeIsPending(change) && Number.isFinite(Number(change.sourceIndex)) &&
         change.serverSection !== 'pending-approval';
-      var actionButtons = '';
+      var revisionIds = Array.isArray(change.revisionIds) ? change.revisionIds.filter(Boolean) : [];
+      var actionButtons = revisionIds.length
+        ? '<button type="button" data-action="locate-review-change" data-review-revision-ids="' + esc(revisionIds.join(',')) + '">Locate</button>'
+        : '';
       if (canRevert) {
         if (serverFile && change.serverChange && serverState && documentReviewService() &&
             documentReviewService().canEditDraftReviewChange(change.serverChange, serverState.liveReviewState)) {
@@ -3967,13 +3986,33 @@
   function officeHasReleaseComparison(file) {
     if (!isServerReviewFile(file)) return false;
     var review = serverReview(file);
-    if (!review || review.currentDocumentIsRelease !== true || !review.session ||
-        typeof review.session.baselineRevisionIds !== 'function') return false;
-    try {
-      return review.session.baselineRevisionIds().length > 0;
-    } catch (_) {
-      return false;
-    }
+    return Boolean(review && officeReleaseDeltaRevisionIds(file).length);
+  }
+
+  function officeReleaseDeltaRevisionIds(file) {
+    var review = serverReview(file);
+    var service = documentReviewService();
+    if (!review || !service || typeof service.revisionIdsForReviewChange !== 'function') return [];
+    var releaseId = String(file && file.editorBaselineReleaseId || '');
+    var releasedDocumentId = String(file && file.releasedDocumentId || '');
+    var ids = [];
+    (review.releaseChangeGroups || []).forEach(function (group) {
+      var release = group && group.release ? group.release : {};
+      var matchesRelease = releaseId && String(release.id || '') === releaseId;
+      var matchesDocument = releasedDocumentId && String(release.released_document_id || '') === releasedDocumentId;
+      if (!matchesRelease && !matchesDocument) return;
+      (group.changes || []).forEach(function (change) {
+        service.revisionIdsForReviewChange(change).forEach(function (id) {
+          if (id !== null && id !== undefined && String(id)) ids.push(String(id));
+        });
+      });
+    });
+    var seen = {};
+    return ids.filter(function (id) {
+      if (seen[id]) return false;
+      seen[id] = true;
+      return true;
+    });
   }
 
   function officeTrackedChangesMode(file) {
@@ -3988,6 +4027,12 @@
     return 'Available when this document has a release comparison or unreleased changes';
   }
 
+  function officeChangesComparisonLabel(mode) {
+    if (mode === 'release') return 'Current release vs previous release';
+    if (mode === 'draft') return 'Unreleased vs last release';
+    return '';
+  }
+
   function syncOfficeShowChangesControl(file) {
     var button = document.querySelector('[data-action="toggle-show-changes"]');
     if (!button) return;
@@ -3998,7 +4043,47 @@
     button.setAttribute('aria-disabled', available ? 'false' : 'true');
     button.classList.toggle('is-active', Boolean(active));
     button.title = officeShowChangesTitle(comparisonMode);
+    var legend = el('officeChangesLegend');
+    if (legend) {
+      legend.hidden = !active;
+      var comparison = legend.querySelector('[data-change-comparison]');
+      if (comparison) comparison.textContent = officeChangesComparisonLabel(comparisonMode);
+    }
     applyOfficeTrackedChangesDisplay(file);
+  }
+
+  function applyOfficeReviewFocusTags(file) {
+    var host = el('officeLanaEditorHost');
+    if (!host) return [];
+    var ids = officeReviewFocus && officeReviewFocus.fileId === file.id
+      ? officeReviewFocus.revisionIds
+      : [];
+    var wanted = {};
+    ids.forEach(function (id) { wanted[String(id)] = true; });
+    var matched = [];
+    host.querySelectorAll('.le-rev[data-rev-id]').forEach(function (mark) {
+      var focused = wanted[mark.getAttribute('data-rev-id')] === true;
+      mark.classList.toggle('lee-rev-review-focus', focused);
+      if (focused) matched.push(mark);
+    });
+    return matched;
+  }
+
+  function locateOfficeReviewChange(file, revisionIds) {
+    if (!file || !Array.isArray(revisionIds) || !revisionIds.length) {
+      toast('This history entry has no document location.');
+      return;
+    }
+    file.showChanges = true;
+    officeReviewFocus = { fileId: file.id, revisionIds: revisionIds.map(String) };
+    syncOfficeShowChangesControl(file);
+    var matched = applyOfficeReviewFocusTags(file);
+    if (!matched.length) {
+      toast('This change belongs to another released version. Open that version to locate it in the document.');
+      return;
+    }
+    matched[0].scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    toast('Change located and highlighted in the document.');
   }
 
   // Tag the embed's revision marks that belong to the opened document's
@@ -4012,16 +4097,23 @@
     if (!host) return;
     var review = serverReview(file);
     var baselineById = {};
+    var releaseDeltaById = {};
     if (review && review.session && typeof review.session.baselineRevisionIds === 'function') {
       review.session.baselineRevisionIds().forEach(function (id) {
         baselineById[String(id)] = true;
       });
     }
+    officeReleaseDeltaRevisionIds(file).forEach(function (id) {
+      releaseDeltaById[String(id)] = true;
+    });
     // A page-boundary split clones a mark onto the continuation page, so one
     // revision id can match several elements; tag (or clear) every one.
     host.querySelectorAll('.le-rev[data-rev-id]').forEach(function (mark) {
-      mark.classList.toggle('lee-rev-baseline', baselineById[mark.getAttribute('data-rev-id')] === true);
+      var revisionId = mark.getAttribute('data-rev-id');
+      mark.classList.toggle('lee-rev-baseline', baselineById[revisionId] === true);
+      mark.classList.toggle('lee-rev-release-delta', releaseDeltaById[revisionId] === true);
     });
+    applyOfficeReviewFocusTags(file);
   }
 
   function setOfficeDocumentFooterStats(stats) {
@@ -4200,7 +4292,13 @@
         '<div class="office-ruler-actions">' + marginActionsHtml +
         '<button class="office-show-changes-toggle' + (showChanges ? ' is-active' : '') + '" type="button" data-action="toggle-show-changes"' +
           (canShowChanges ? ' aria-disabled="false" title="' + esc(officeShowChangesTitle(comparisonMode)) + '"' : ' disabled aria-disabled="true" title="' + esc(officeShowChangesTitle('none')) + '"') + '>' +
-          toolbarIcon('circle-dot', 'Show changes') + '<span>Show changes</span></button></div>' +
+          toolbarIcon('circle-dot', 'Show changes') + '<span>Show changes</span></button>' +
+        '<div id="officeChangesLegend" class="office-changes-legend"' + (showChanges ? '' : ' hidden') + '>' +
+          '<span class="office-changes-comparison" data-change-comparison>' + esc(officeChangesComparisonLabel(comparisonMode)) + '</span>' +
+          '<span class="office-change-key office-change-key--insert">Added</span>' +
+          '<span class="office-change-key office-change-key--delete">Removed</span>' +
+          '<span class="office-change-key office-change-key--format">Formatting</span>' +
+        '</div></div>' +
         '<div class="office-ruler-track" aria-hidden="true"><span class="office-ruler-paper"></span><span class="office-ruler-margin office-ruler-margin-left"></span><span class="office-ruler-margin office-ruler-margin-right"></span></div></div>';
     }
     setOfficeDocumentFooterStats(stats);
@@ -6617,15 +6715,22 @@
           // (mirrors the File Viewer toggle). Re-rendering here would remount
           // the embed and reload the document bytes for a display-only change.
           file.showChanges = file.showChanges === false;
+          if (file.showChanges === false) officeReviewFocus = null;
           saveState();
-          applyOfficeTrackedChangesDisplay(file);
-          actionTarget.classList.toggle('is-active', file.showChanges !== false);
+          syncOfficeShowChangesControl(file);
         } else {
           syncActiveDocContent({ autosave: false });
           file.showChanges = file.showChanges === false;
+          if (file.showChanges === false) officeReviewFocus = null;
           setUpdated(file);
           renderEditor();
         }
+        return;
+      }
+      if (action === 'locate-review-change' && file && file.kind === 'doc') {
+        var revisionIds = String(actionTarget.dataset.reviewRevisionIds || '').split(',').filter(Boolean);
+        locateOfficeReviewChange(file, revisionIds);
+        return;
       }
     });
 
