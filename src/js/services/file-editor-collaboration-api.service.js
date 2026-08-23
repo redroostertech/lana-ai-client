@@ -425,6 +425,9 @@
         var path = packetPath(documentId, packetId, '/signers/' + encodeURIComponent(requiredIdentifier(signerId, 'Signer id')) + '/status');
         var response = await client().patch(path, statusInput(status, input));
         var value = responseObject(response, 'Signature packet API');
+        if (Array.isArray(value.signers) || value.packet || value.signature_packet) {
+          return normalizePacket(packetObject(value));
+        }
         var signer = value.signer || value;
         return normalizeSigner(signer, 0);
       }

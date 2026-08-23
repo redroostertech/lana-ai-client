@@ -357,6 +357,38 @@ describe('LanaFileEditorCollaborationApi signature packets', () => {
     );
   });
 
+  test('accepts the live facade packet response after a signer transition', async () => {
+    const api = makeApi([{
+      match: 'PATCH /api/v1/file-editor/documents/doc-1/signature-packets/packet-1/signers/signer-1/status',
+      reply: {
+        data: packet({
+          status: 'declined',
+          signers: [{
+            id: 'signer-1',
+            name: 'Morgan Lee',
+            email: 'morgan@example.com',
+            status: 'declined',
+            decline_reason: 'Terms changed'
+          }]
+        })
+      }
+    }]);
+    const service = collaborationApi.create({ api });
+
+    const result = await service.updateSignerStatus('doc-1', 'packet-1', 'signer-1', 'declined', {
+      declineReason: 'Terms changed'
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      id: 'packet-1',
+      status: 'declined'
+    }));
+    expect(result.signers[0]).toEqual(expect.objectContaining({
+      id: 'signer-1',
+      status: 'declined'
+    }));
+  });
+
   test('maps an optional decline reason onto the strict signer status payload', async () => {
     const api = makeApi([{
       match: 'PATCH /api/v1/file-editor/documents/doc-1/signature-packets/packet-1/signers/signer-1/status',
