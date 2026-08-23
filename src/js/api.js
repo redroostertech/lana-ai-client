@@ -2297,8 +2297,28 @@ class ApiClient {
 
     const data = await response.json();
 
-    // Return first result for single file upload
-    const result = data.results[0];
+    // Return the first result for a single-file upload. Content-hash
+    // deduplication is also a successful terminal outcome, but deliberately
+    // returns an empty results array because no new file was created.
+    const result = Array.isArray(data.results) ? data.results[0] : null;
+    if (!result) {
+      const skipped = Number(data && data.stats && data.stats.skipped || 0);
+      if (skipped > 0) {
+        return {
+          success: true,
+          skipped: true,
+          duplicate: true,
+          job_id: null,
+          file_id: null,
+          document_id: null,
+          matter_id: matterId,
+          filename: file.name,
+          status: 'skipped',
+          stats: data.stats
+        };
+      }
+      throw new Error(data.detail || data.error || 'Upload completed without a document result');
+    }
     return {
       success: true,
       job_id: result.job_id,
