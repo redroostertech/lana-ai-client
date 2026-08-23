@@ -24,7 +24,7 @@ test.describe('Agent Studio catalog UI', () => {
       const slug = agent.slug;
       await test.step(slug, async () => {
         await page.goto('/agents/index.html#agent/' + encodeURIComponent(slug));
-        await expect(page.locator('#agentDetailBanner')).toHaveAttribute('heading', agent.name || slug);
+        await expect(page.locator('#agentDetailBanner .lex-banner-heading')).toHaveText(agent.name || slug);
         await page.locator('#agentDetailRunBtn').click();
         await expect(page.locator('#agentDetailRunModal')).toBeVisible();
         const options = await page.locator('#agentDetailRunScope').evaluate((node) => node.options || []);

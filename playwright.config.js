@@ -1,13 +1,11 @@
 'use strict';
 
 const { defineConfig, devices } = require('@playwright/test');
+const { hasAuthConfiguration } = require('./tests/playwright/helpers/agents-harness');
 
 const clientUrl = process.env.LANA_E2E_CLIENT_URL || 'http://127.0.0.1:4177';
 const usesLocalClient = !process.env.LANA_E2E_CLIENT_URL;
-const hasAuth = Boolean(
-  process.env.LANA_E2E_TOKEN
-  || (process.env.LANA_E2E_EMAIL && process.env.LANA_E2E_PASSWORD)
-);
+const hasAuth = hasAuthConfiguration();
 
 module.exports = defineConfig({
   testDir: './tests/playwright',

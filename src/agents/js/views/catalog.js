@@ -166,7 +166,7 @@
     var options = [];
     for (var i = 0; i < workspaces.length; i++) {
       var workspace = workspaces[i] || {};
-      var value = workspace.matter_id || workspace.id;
+      var value = workspace.id || workspace.matter_id;
       if (!value) continue;
       var name = workspace.name || workspace.matter_name || workspace.title || String(value);
       var client = workspace.client_name || (workspace.client && workspace.client.name) || '';

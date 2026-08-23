@@ -1,6 +1,13 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
 const API_BASE_URL = String(process.env.LANA_E2E_API_URL || 'http://127.0.0.1:8080').replace(/\/$/, '');
+const DEFAULT_CREDENTIALS_FILE = path.resolve(
+  __dirname,
+  '../../../../lana-ai-chef/scripts/dev/.credentials'
+);
 
 const CATALOG_AGENTS = Object.freeze([
   'matter-architect',
@@ -27,7 +34,10 @@ const REQUIRED_ARTIFACT_KINDS = Object.freeze({
   'connector-triage': [],
   'insights-reporter': ['narrative_report'],
   'cash-application-specialist': ['cash_application_batch'],
-  'roadmap-architect': ['meeting_summary', 'prd_draft'],
+  // The stateful Roadmap Architect always emits a meeting summary. A PRD is
+  // intentionally skipped for short/tactical recordings and when transcript
+  // scope is unavailable, so it cannot be an unconditional live assertion.
+  'roadmap-architect': ['meeting_summary'],
   'brief-decomposer': ['requirement_set'],
   'workstream-planner': ['workstream_set'],
   'task-generator': ['task_batch'],
@@ -45,35 +55,91 @@ const WORKSPACE_ONLY = new Set([
   'onboarding-navigator',
 ]);
 
+function readCredentialsFile() {
+  const credentialsPath = process.env.LANA_E2E_CREDENTIALS_FILE || DEFAULT_CREDENTIALS_FILE;
+  if (!credentialsPath || !fs.existsSync(credentialsPath)) return {};
+  const values = {};
+  fs.readFileSync(credentialsPath, 'utf8').split(/\r?\n/).forEach((line) => {
+    const match = line.match(/^\s*([A-Z_]+)\s*=\s*["']?([^"'\n#]+)["']?\s*(?:#.*)?$/);
+    if (match) values[match[1]] = match[2].trim();
+  });
+  return values;
+}
+
+function resolveAuthConfiguration() {
+  const file = readCredentialsFile();
+  return {
+    token: process.env.LANA_E2E_TOKEN || '',
+    email: process.env.LANA_E2E_EMAIL || file.LANA_E2E_EMAIL || file.EMAIL || '',
+    password: process.env.LANA_E2E_PASSWORD || file.LANA_E2E_PASSWORD || file.PASSWORD || '',
+    userId: process.env.LANA_E2E_USER_ID || '',
+    organizationId: process.env.LANA_E2E_ORG_ID || '',
+  };
+}
+
 function hasAuthConfiguration() {
-  return Boolean(
-    process.env.LANA_E2E_TOKEN
-    || (process.env.LANA_E2E_EMAIL && process.env.LANA_E2E_PASSWORD)
-  );
+  const config = resolveAuthConfiguration();
+  return Boolean(config.token || (config.email && config.password));
+}
+
+function isTransientTransportError(error) {
+  const message = String(error && error.message || error || '');
+  return /ECONNREFUSED|ECONNRESET|socket hang up|fetch failed|Target page, context or browser has been closed/i.test(message);
+}
+
+async function retryTransientTransport(operation, attempts = 8, delayMs = 1000) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isTransientTransportError(error) || attempt === attempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
 }
 
 async function authenticate(request) {
-  if (process.env.LANA_E2E_TOKEN) {
+  const config = resolveAuthConfiguration();
+  if (config.token) {
     return {
-      token: process.env.LANA_E2E_TOKEN,
-      user: { id: process.env.LANA_E2E_USER_ID || '', organization_id: process.env.LANA_E2E_ORG_ID || '' },
+      token: config.token,
+      user: { id: config.userId, organization_id: config.organizationId },
     };
   }
   if (!hasAuthConfiguration()) {
     throw new Error('Set LANA_E2E_TOKEN or both LANA_E2E_EMAIL and LANA_E2E_PASSWORD.');
   }
-  const response = await request.post(API_BASE_URL + '/api/v1/auth/login', {
+  const response = await retryTransientTransport(() => request.post(API_BASE_URL + '/api/v1/auth/login', {
     data: {
-      email: process.env.LANA_E2E_EMAIL,
-      password: process.env.LANA_E2E_PASSWORD,
+      email: config.email,
+      password: config.password,
     },
-  });
+  }));
   if (!response.ok()) {
     throw new Error(`LANA login failed (${response.status()}): ${await response.text()}`);
   }
   const body = await response.json();
   if (!body.token) throw new Error('LANA login response did not include a token.');
-  return { token: body.token, user: body.user || {} };
+  let user = body.user || {};
+  // The login response is intentionally compact in some Chef builds. Enrich
+  // it from the authenticated session endpoint so live audits can verify the
+  // persisted run tenant against the actual test user without trusting an
+  // environment-supplied organization id.
+  try {
+    const me = await retryTransientTransport(() => request.get(API_BASE_URL + '/api/v1/auth/me', {
+      headers: { Authorization: 'Bearer ' + body.token },
+    }));
+    if (me.ok()) {
+      const meBody = await me.json();
+      user = { ...user, ...(meBody && meBody.user || {}) };
+    }
+  } catch (_error) {
+    // The run envelope remains authoritative if a legacy build lacks /me.
+  }
+  return { token: body.token, user };
 }
 
 function authHeaders(auth) {
@@ -81,11 +147,17 @@ function authHeaders(auth) {
 }
 
 async function apiJson(request, auth, method, pathname, data) {
-  const response = await request.fetch(API_BASE_URL + pathname, {
+  const execute = () => request.fetch(API_BASE_URL + pathname, {
     method,
     headers: authHeaders(auth),
     data,
   });
+  // Retrying read-only polling is safe across a brief local API restart.
+  // Mutating requests remain single-attempt to avoid duplicate agent runs or
+  // duplicate approval decisions when a response is lost after persistence.
+  const response = String(method).toUpperCase() === 'GET'
+    ? await retryTransientTransport(execute)
+    : await execute();
   const text = await response.text();
   let body = null;
   try { body = text ? JSON.parse(text) : null; } catch (_err) { body = { raw: text }; }
@@ -97,11 +169,25 @@ async function apiJson(request, auth, method, pathname, data) {
 
 async function listCatalogAgents(request, auth) {
   const body = await apiJson(request, auth, 'GET', '/api/v1/agents?include_system=true&active_only=true');
-  return (body && body.agents || []).filter((agent) => (
-    agent
-    && CATALOG_AGENTS.includes(agent.template_slug || agent.slug)
-    && agent.discoverable !== false
-  ));
+  const catalog = new Map();
+  const preferDeployed = process.env.LANA_E2E_PREFER_DEPLOYED === '1';
+  (body && body.agents || []).forEach((agent) => {
+    if (!agent) return;
+    const slug = agent.template_slug || agent.slug;
+    if (!CATALOG_AGENTS.includes(slug)) return;
+
+    // `discoverable` controls whether an agent can be found from LANA chat;
+    // it does not hide templates or deployed agents from Agent Studio. The
+    // canonical sweep exercises system templates. Set LANA_E2E_PREFER_DEPLOYED
+    // to validate an organization's installed copy as an additional pass.
+    const existing = catalog.get(slug);
+    const agentIsDeployed = Boolean(agent.organization_id);
+    const existingIsDeployed = Boolean(existing && existing.organization_id);
+    if (!existing || (preferDeployed ? (!existingIsDeployed && agentIsDeployed) : (existingIsDeployed && !agentIsDeployed))) {
+      catalog.set(slug, agent);
+    }
+  });
+  return CATALOG_AGENTS.map((slug) => catalog.get(slug)).filter(Boolean);
 }
 
 async function findWorkspace(request, auth) {
@@ -111,9 +197,9 @@ async function findWorkspace(request, auth) {
     : (body && (body.matters || body.data || body.items) || []);
   const requested = process.env.LANA_E2E_MATTER_ID;
   const workspace = requested
-    ? rows.find((row) => String(row.matter_id || row.id) === requested)
+    ? rows.find((row) => [row.id, row.matter_id].filter(Boolean).map(String).includes(requested))
     : rows[0];
-  return workspace ? String(workspace.matter_id || workspace.id) : null;
+  return workspace ? String(workspace.id || workspace.matter_id) : null;
 }
 
 function runInputFor(slug) {
@@ -156,8 +242,11 @@ function shouldSkipAgent(slug) {
   if (slug === 'roadmap-architect' && !process.env.LANA_E2E_RECORDING_ID) {
     return 'Set LANA_E2E_RECORDING_ID to exercise the transcript-backed Roadmap Architect.';
   }
-  const filter = String(process.env.LANA_E2E_AGENT || '').trim();
-  if (filter && filter !== slug) return `Filtered by LANA_E2E_AGENT=${filter}`;
+  const filter = String(process.env.LANA_E2E_AGENTS || process.env.LANA_E2E_AGENT || '').trim();
+  const selected = filter.split(',').map((value) => value.trim()).filter(Boolean);
+  if (selected.length > 0 && !selected.includes(slug)) {
+    return `Filtered by LANA_E2E_AGENTS=${selected.join(',')}`;
+  }
   return '';
 }
 
@@ -165,7 +254,17 @@ function readRunEnvelope(body) {
   const data = body && body.data || body || {};
   const run = data.run || body && body.run || data;
   const artifacts = data.artifacts || body && body.artifacts || run.artifacts || [];
-  return { run, artifacts: Array.isArray(artifacts) ? artifacts : [] };
+  const outcome = data.outcome || body && body.outcome || run.outcome || null;
+  return {
+    run,
+    artifacts: Array.isArray(artifacts) ? artifacts : [],
+    outcome,
+    steps: Array.isArray(data.steps) ? data.steps : [],
+    runSteps: Array.isArray(data.run_steps) ? data.run_steps : [],
+    runtimeEvents: Array.isArray(data.runtime_events) ? data.runtime_events : [],
+    legalHarnessManifest: data.legal_harness_manifest || null,
+    childRuns: Array.isArray(data.child_runs) ? data.child_runs : [],
+  };
 }
 
 async function pollRun(request, auth, runId, timeoutMs) {
@@ -182,7 +281,11 @@ async function pollRun(request, auth, runId, timeoutMs) {
 }
 
 async function installBrowserAuth(page, auth) {
-  const apiUrl = API_BASE_URL;
+  // The local static harness proxies /api to Chef, matching the production
+  // same-origin path and avoiding a test-only CORS exception in the backend.
+  const useSameOriginProxy = process.env.LANA_E2E_USE_CLIENT_PROXY === '1'
+    || !process.env.LANA_E2E_CLIENT_URL;
+  const apiUrl = useSameOriginProxy ? '' : API_BASE_URL;
   await page.route('**/js/config.js', async (route) => {
     const response = await route.fetch();
     const body = await response.text();
