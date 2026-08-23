@@ -1580,6 +1580,7 @@
       state.selectedReviewReleaseDocumentId = null;
       state.releaseComparison = null;
       state.releaseComparisonLoading = false;
+      state.showTrackedChanges = false;
       state.versionCompareMode = false;
       state.versionCompareSelections = [];
       restorePrimaryViewerSurface();
