@@ -903,6 +903,24 @@
       : kind === 'revision'
         ? 'Tracked change selected in LANA Editor'
         : 'Text selected in LANA Editor';
+    if (kind === 'selection') {
+      context.selection = {
+        text: String(context.text || context.selection && context.selection.text || ''),
+        ranges: Array.isArray(context.ranges)
+          ? context.ranges.slice(0, 12)
+          : (context.selection && Array.isArray(context.selection.ranges)
+            ? context.selection.ranges.slice(0, 12)
+            : [])
+      };
+    }
+    if (kind === 'revision' && !context.revision) {
+      context.revision = {
+        type: context.changeType || context.change_type || 'revision',
+        author: context.author || '',
+        date: context.date || context.created_at || '',
+        text: String(context.text || '')
+      };
+    }
     if (detail && detail.edit_intent) {
       context.edit_intent = Object.assign({}, detail.edit_intent);
       context.document_edit = {
@@ -5061,6 +5079,9 @@
       context.type = focusedContext.type || context.type;
       context.context_type = focusedContext.context_type || context.context_type;
       context.summary = focusedContext.summary || context.summary;
+      ['selection', 'revision', 'edit_intent', 'document_edit', 'editor_mode', 'document_mode'].forEach(function (key) {
+        if (focusedContext[key] !== undefined) context[key] = focusedContext[key];
+      });
     }
     return context;
   }

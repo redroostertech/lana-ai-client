@@ -40,7 +40,10 @@ describe('File Editor live document boundary', () => {
     expect(contextSource).toContain("? 'document_edit'");
     expect(contextSource).toContain("? 'editor_revision'");
     expect(contextSource).toContain("context.context_type = contextType");
+    expect(contextSource).toContain('context.selection = {');
+    expect(contextSource).toContain('text: String(context.text');
     expect(contextSource).toContain('context.edit_intent = Object.assign({}, detail.edit_intent)');
+    expect(editor).toContain("['selection', 'revision', 'edit_intent', 'document_edit', 'editor_mode', 'document_mode']");
     expect(contextSource).toContain('return officeFileCardContext(file, context)');
     expect(contextSource).toContain('var blockPattern = /```(?:lana-document-edit|json)?');
     expect(contextSource).toContain('var toolCallPattern = /<tool_call>');
