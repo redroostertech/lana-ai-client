@@ -141,6 +141,9 @@
     var name = row.display_name || row.full_name || row.name || user.display_name || user.full_name ||
       [firstName, lastName].join(' ').trim() || row.email || user.email || 'Collaborator';
     var permissions = normalizedPermissions(row.permissions || row.permission);
+    var declaredPermission = normalizedPermissions(row.permission)[0];
+    var effectivePermission = declaredPermission ||
+      (permissions.indexOf('write') !== -1 ? 'write' : (permissions[0] || ''));
     return {
       id: id,
       target_type: targetType,
@@ -150,7 +153,7 @@
       name: String(name),
       email: targetType === 'user' ? String(row.email || user.email || '') : '',
       permissions: permissions,
-      permission: permissions[0] || '',
+      permission: effectivePermission,
       shared_at: row.shared_at || row.granted_at || row.created_at || null,
       shared_by: row.shared_by || row.granted_by || row.created_by || null,
       status: row.status ? String(row.status) : null

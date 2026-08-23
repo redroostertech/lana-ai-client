@@ -105,13 +105,34 @@ describe('LanaFileEditorCollaborationApi collaborators', () => {
         name: 'Avery Stone',
         email: 'avery@example.com',
         permissions: ['read', 'write'],
-        permission: 'read',
+        permission: 'write',
         shared_at: '2026-08-21T12:00:00Z',
         shared_by: null,
         status: null
       }],
       total: 1
     });
+  });
+
+  test('prefers the facade effective permission over its inherited permission closure', async () => {
+    const api = makeApi([{
+      match: 'GET /api/v1/file-editor/documents/doc-1/collaborators',
+      reply: {
+        data: [{
+          ...collaborator(),
+          permission: 'write',
+          permissions: ['read', 'write']
+        }]
+      }
+    }]);
+    const service = collaborationApi.create({ api });
+
+    const result = await service.listCollaborators('doc-1');
+
+    expect(result.collaborators[0]).toEqual(expect.objectContaining({
+      permission: 'write',
+      permissions: ['read', 'write']
+    }));
   });
 
   test('adds a collaborator through the authenticated API client', async () => {
