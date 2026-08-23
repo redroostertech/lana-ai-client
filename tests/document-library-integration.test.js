@@ -415,6 +415,11 @@ describe('Document Library integration', () => {
     expect(controller).toContain('function loadServerReview');
     expect(controller).toContain('function saveServerDraft');
     expect(controller).toContain('function releaseServerVersion');
+    expect(controller).toContain('function completeApprovedRelease');
+    expect(controller).toContain("pendingApprovalStatus === 'approved'");
+    expect(controller).toContain("return 'complete-approved-release'");
+    expect(controller).toContain("return 'Complete Release'");
+    expect(controller).toContain('approval_id: review.pendingApprovalId');
     expect(controller).toContain('LanaDocumentReview');
     expect(controller).toContain('function sanitizeOfficeDocHtml');
     expect(controller).toContain('function sanitizeOfficeDocText');
@@ -464,6 +469,7 @@ describe('Document Library integration', () => {
     expect(controller).not.toContain('Save draft');
     expect(controller).not.toContain('>Save Draft</button>');
     expect(controller).toContain("if (action === 'release-review-version' && file)");
+    expect(controller).toContain("if (action === 'complete-approved-release' && file)");
     expect(controller).toContain('Only server-managed documents can be released.');
     expect(controller).not.toContain('No unreleased changes');
 

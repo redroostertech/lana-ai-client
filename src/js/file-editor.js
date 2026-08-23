@@ -1363,14 +1363,22 @@
   function pendingReleaseNeedsApprovalRestart(review) {
     if (!review || !review.pendingReleaseBatch) return false;
     if (!review.pendingApprovalId) return true;
-    return Boolean(review.pendingApprovalStatus && review.pendingApprovalStatus !== 'pending');
+    return Boolean(review.pendingApprovalStatus &&
+      review.pendingApprovalStatus !== 'pending' &&
+      review.pendingApprovalStatus !== 'approved');
   }
 
   function pendingReleaseButtonAction(review) {
+    if (review && review.pendingApprovalId && review.pendingApprovalStatus === 'approved') {
+      return 'complete-approved-release';
+    }
     return pendingReleaseNeedsApprovalRestart(review) ? 'retry-release-approval' : 'view-release-approval';
   }
 
   function pendingReleaseButtonLabel(review) {
+    if (review && review.pendingApprovalId && review.pendingApprovalStatus === 'approved') {
+      return 'Complete Release';
+    }
     return pendingReleaseNeedsApprovalRestart(review) ? 'Restart Release Approval' : 'View Pending Approval';
   }
 
@@ -2129,6 +2137,52 @@
     } catch (error) {
       console.warn('[file-editor] Release approval restart failed:', error && error.message ? error.message : error);
       toast((error && error.message) || 'Failed to restart release approval.');
+    } finally {
+      review.releasing = false;
+      renderReviewDock(file);
+    }
+  }
+
+  async function completeApprovedRelease(file) {
+    var review = serverReview(file);
+    var service = documentReviewService();
+    if (!review || !service || !review.pendingReleaseBatch || !review.pendingApprovalId || review.releasing) return;
+    if (review.pendingApprovalStatus !== 'approved') {
+      toast('This release still needs approval.');
+      return;
+    }
+    review.releasing = true;
+    renderReviewDock(file);
+    try {
+      var result = await service.releaseBatch({
+        api: window.api,
+        matterId: review.matterId,
+        batchId: review.pendingReleaseBatch.id,
+        payload: {
+          approved: true,
+          approval_id: review.pendingApprovalId
+        }
+      });
+      var releasedDocument = result && result.document;
+      if (!releasedDocument || !releasedDocument.id) {
+        throw new Error('The approved release did not create an immutable document version.');
+      }
+      toast('Version released.');
+      review.pendingReleaseBatch = null;
+      review.pendingApprovalId = '';
+      review.pendingApprovalStatus = '';
+      if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
+        leavingEditor = true;
+        Lex.Nav.go('file-viewer.html', {
+          params: { id: releasedDocument.id },
+          context: { referrer: editorReferrer || 'document-library.html' }
+        });
+        return;
+      }
+      await loadServerReview(file);
+    } catch (error) {
+      console.warn('[file-editor] Approved release completion failed:', error && error.message ? error.message : error);
+      toast((error && error.message) || 'Failed to complete the approved release.');
     } finally {
       review.releasing = false;
       renderReviewDock(file);
@@ -3672,7 +3726,11 @@
       releaseButton.disabled = !releaseButtonEnabled;
       releaseButton.setAttribute('aria-disabled', releaseButtonEnabled ? 'false' : 'true');
       releaseButton.title = hasPendingApproval
-        ? (pendingApprovalAction === 'retry-release-approval' ? 'Restart the expired or closed approval request' : 'Open pending approval')
+        ? (pendingApprovalAction === 'retry-release-approval'
+          ? 'Restart the expired or closed approval request'
+          : pendingApprovalAction === 'complete-approved-release'
+            ? 'Create the immutable version authorized by this approval'
+            : 'Open pending approval')
         : 'Release this version';
       releaseButton.textContent = isRequestingRelease
         ? 'Requesting Release...'
@@ -6881,6 +6939,10 @@
       }
       if (action === 'retry-release-approval' && file) {
         retryReleaseApproval(file);
+        return;
+      }
+      if (action === 'complete-approved-release' && file) {
+        completeApprovedRelease(file);
         return;
       }
       if (action === 'set-review-tab') {
