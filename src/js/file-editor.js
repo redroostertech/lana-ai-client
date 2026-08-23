@@ -1810,7 +1810,16 @@
     review.restoring = true;
     try {
       if (scripts.length && typeof editor.applyEditScripts === 'function') {
-        await editor.applyEditScripts(scripts);
+        // Persisted scripts were captured after successive user actions. Their
+        // anchors therefore address the document state produced by the prior
+        // script, not one shared original document. Replaying them as one
+        // flattened request makes otherwise-valid sequences (for example a
+        // delete followed by a replacement at the same visible offset) fail
+        // the redline engine's disjoint-operation guard. Apply one script at a
+        // time, in saved order, to reconstruct the exact editing session.
+        for (var replayIndex = 0; replayIndex < scripts.length; replayIndex++) {
+          await editor.applyEditScripts([scripts[replayIndex]]);
+        }
       } else {
         await editor.applyEdits(ops);
       }

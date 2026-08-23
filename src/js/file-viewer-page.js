@@ -3599,7 +3599,13 @@
 
   async function applyPersistedEditScriptsSequentially(scripts, fallbackOps) {
     if (scripts.length && typeof state.editorInstance.applyEditScripts === 'function') {
-      await state.editorInstance.applyEditScripts(scripts);
+      // Each saved script was authored against the state left by the previous
+      // user action. Preserve that ordering during read-only reconstruction;
+      // flattening all scripts into one redline request incorrectly treats
+      // their anchors as sharing one original document.
+      for (var replayIndex = 0; replayIndex < scripts.length; replayIndex++) {
+        await state.editorInstance.applyEditScripts([scripts[replayIndex]]);
+      }
       return;
     }
     await state.editorInstance.applyEdits(fallbackOps);

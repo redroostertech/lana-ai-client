@@ -295,6 +295,9 @@ describe('File Editor live document boundary', () => {
     expect(workflowLoadedAt).toBeGreaterThan(-1);
     expect(reviewModeAt).toBeGreaterThan(workflowLoadedAt);
     expect(restoreAt).toBeGreaterThan(reviewModeAt);
+    expect(editor).toContain('replayIndex < scripts.length');
+    expect(editor).toContain('await editor.applyEditScripts([scripts[replayIndex]])');
+    expect(editor).not.toContain('await editor.applyEditScripts(scripts)');
     expect(editor).toContain('Release pending approval. Editing continues in a new draft; only another release request is unavailable until this approval is resolved.');
     expect(reviewRailSource).not.toContain('class="file-editor-pending-approval"');
     expect(reviewRailSource).not.toContain('data-action="show-review-details"');

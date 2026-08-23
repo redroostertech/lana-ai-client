@@ -151,7 +151,9 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('editScriptsFromPersistedBatch');
     expect(pageJs).toContain('function applyPersistedEditScriptsSequentially');
     expect(pageJs).toContain('state.editorInstance.applyEditScripts');
-    expect(pageJs).toContain('await state.editorInstance.applyEditScripts(scripts)');
+    expect(pageJs).toContain('replayIndex < scripts.length');
+    expect(pageJs).toContain('await state.editorInstance.applyEditScripts([scripts[replayIndex]])');
+    expect(pageJs).not.toContain('await state.editorInstance.applyEditScripts(scripts)');
     expect(pageJs).toContain('state.currentReviewBatchRestoreFailed');
     expect(pageJs).toContain('Saved draft details could not be loaded.');
     expect(pageJs).toContain('function currentReviewBatchDisplayChanges');
