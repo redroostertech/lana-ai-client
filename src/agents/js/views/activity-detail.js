@@ -23,38 +23,88 @@
   // contribution (Agent 3 will decide whether to move it). We keep the
   // class names here matching the existing CSS so the view renders.
   var TEMPLATE = ''
-    + '<main>'
+    + '<main class="atd-page">'
 
-    + '<lex-banner id="atdBanner" variant="light" heading="Loading..." subtitle="Loading run details" lana lana-context-type="full_chat">'
+    + '<lex-banner id="atdBanner" variant="light" heading="Loading..." subtitle="Loading outcome details" lana lana-context-type="full_chat">'
     +   '<a id="atdMatterLink" class="atd-banner-action hidden" href="#">View Matter</a>'
     + '</lex-banner>'
-    + '<lex-breadcrumb id="atdBreadcrumb" style="margin:12px 0 16px;" items=\'[{"label":"LanaAgents","href":"#catalog"},{"label":"Activity","href":"#activity"},{"label":"Run detail"}]\'></lex-breadcrumb>'
+    + '<lex-breadcrumb id="atdBreadcrumb" class="atd-breadcrumb" items=\'[{"label":"Agent Studio","href":"#catalog"},{"label":"Outcomes","href":"#activity"},{"label":"Outcome detail"}]\'></lex-breadcrumb>'
 
-    // Run-level actions. Kept OUTSIDE lex-banner because the banner clones its
-    // action children on render, which would orphan our show/hide + click wiring.
-    + '<div id="atdRunActions" class="atd-run-actions hidden">'
-    +   '<button id="atdExportJson" class="atd-banner-action" type="button">Export JSON</button>'
-    +   '<button id="atdExportHtml" class="atd-banner-action" type="button">Export HTML</button>'
-    + '</div>'
+    + '<section id="atdJourney" class="atd-journey" aria-labelledby="atdJourneyTitle">'
+    +   '<div class="atd-journey-head">'
+    +     '<div><span id="atdJourneyKicker" class="atd-journey-kicker">Agent run</span><h2 id="atdJourneyTitle">Preparing the run</h2><p id="atdJourneyDescription">LANA is getting the right context ready.</p></div>'
+    +     '<div id="atdJourneyPulse" class="atd-journey-pulse"><span></span><div><small>Status</small><strong>Starting</strong></div></div>'
+    +   '</div>'
+    +   '<ol id="atdJourneyStages" class="atd-journey-stages"></ol>'
+    // Keep exports inside their own padded footer so they never collide with
+    // the four journey stages or the banner component's cloned action slot.
+    +   '<div id="atdRunActions" class="atd-run-actions hidden">'
+    +     '<span>Keep a portable record of this run</span>'
+    +     '<div><button id="atdExportJson" class="atd-banner-action" type="button">Export JSON</button>'
+    +     '<button id="atdExportHtml" class="atd-banner-action" type="button">Export HTML</button></div>'
+    +   '</div>'
+    + '</section>'
 
     + '<div id="atdRunSummary" class="atd-run-summary hidden"></div>'
 
-    + '<div class="atd-tabs" role="tablist" aria-label="Run details">'
-    +   '<button id="atdExecutionTab" class="atd-tab active" type="button" role="tab" aria-selected="true" aria-controls="atdExecutionPane" data-atd-tab="execution">Trace</button>'
-    +   '<button id="atdDeliverablesTab" class="atd-tab" type="button" role="tab" aria-selected="false" aria-controls="atdDeliverablesPane" data-atd-tab="deliverables">Deliverables <span id="atdDeliverablesCount" class="atd-tab-count hidden">0</span></button>'
+    + '<section id="atdVerification" class="atd-verification hidden" aria-labelledby="atdVerificationTitle"></section>'
+
+    + '<section id="atdInputArea" class="atd-input-area hidden" aria-labelledby="atdInputTitle">'
+    +   '<div class="atd-input-icon">?</div>'
+    +   '<div class="atd-input-main"><span class="atd-input-kicker">Your input is needed</span><h2 id="atdInputTitle">Help the agent continue</h2><p id="atdInputPrompt">The agent needs one detail before it can finish this work.</p>'
+    +     '<label for="atdMessageInput">Your answer</label><textarea id="atdMessageInput" placeholder="Add the missing detail or clarify what you want..." rows="3"></textarea>'
+    +     '<div class="atd-input-actions"><span>The run stays paused until you respond.</span><lex-btn id="atdSendBtn" variant="primary" size="sm" icon-right="arrow-right">Send and continue</lex-btn></div>'
+    +   '</div>'
+    + '</section>'
+
+    + '<div id="atdRetryArea" class="atd-run-control atd-run-control--retry hidden">'
+    +   '<span>The original attempt remains in the record.</span><lex-btn id="atdRetryBtn" variant="primary" size="sm">Try this run again</lex-btn>'
     + '</div>'
 
-    + '<section id="atdExecutionPane" class="atd-tab-pane" role="tabpanel" aria-labelledby="atdExecutionTab">'
+    + '<section id="atdApprovalPanel" class="atd-approval hidden" aria-labelledby="atdApprovalTitle">'
+    +   '<div class="atd-approval-layout">'
+    +     '<div class="atd-approval-rail" aria-label="Approval steps">'
+    +       '<div class="atd-approval-step atd-approval-step--done"><span>1</span><div><strong>Inspect</strong><small>Proposed work</small></div></div>'
+    +       '<div class="atd-approval-step atd-approval-step--active"><span>2</span><div><strong>Decide</strong><small>Your review</small></div></div>'
+    +       '<div class="atd-approval-step"><span>3</span><div><strong>Continue</strong><small>Apply or stop</small></div></div>'
+    +     '</div>'
+    +     '<div class="atd-approval-main">'
+    +       '<div class="atd-approval-head">'
+    +         '<div><span class="atd-approval-kicker">Human checkpoint</span><h2 id="atdApprovalTitle">Your approval is required</h2></div>'
+    +         '<span class="atd-approval-safety">Nothing applies until approved</span>'
+    +       '</div>'
+    +       '<div id="atdApprovalSummary" class="atd-approval-summary"></div>'
+    +       '<div id="atdApprovalDescription" class="atd-approval-description"></div>'
+    +       '<button class="atd-approval-toggle" id="atdDiffToggle" type="button">Show technical details</button>'
+    +       '<div id="atdDiffContainer" class="atd-approval-diff hidden"></div>'
+    +       '<div id="atdRejectReason" class="atd-reject-reason hidden">'
+    +         '<label for="atdRejectReasonInput">What should the agent change?</label>'
+    +         '<textarea id="atdRejectReasonInput" placeholder="Optional feedback for this run"></textarea>'
+    +       '</div>'
+    +       '<div class="atd-approval-actions">'
+    +         '<lex-btn id="atdRejectBtn" variant="outline" size="sm">Reject and give feedback</lex-btn>'
+    +         '<lex-btn id="atdApproveBtn" variant="primary" size="sm">Approve and continue</lex-btn>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    + '</section>'
+
+    + '<div class="atd-tabs" role="tablist" aria-label="Run details">'
+    +   '<button id="atdDeliverablesTab" class="atd-tab active" type="button" role="tab" aria-selected="true" aria-controls="atdDeliverablesPane" data-atd-tab="deliverables">Deliverables <span id="atdDeliverablesCount" class="atd-tab-count hidden">0</span></button>'
+    +   '<button id="atdExecutionTab" class="atd-tab" type="button" role="tab" aria-selected="false" aria-controls="atdExecutionPane" data-atd-tab="execution">Run activity</button>'
+    + '</div>'
+
+    + '<section id="atdExecutionPane" class="atd-tab-pane hidden" role="tabpanel" aria-labelledby="atdExecutionTab">'
     +   '<lex-card padding="none">'
     +     '<div class="atd-pane-head">'
-    +       '<div>Step Trace</div>'
-    +       '<div class="atd-pane-subtitle">Grouped by run phase</div>'
+    +       '<div id="atdActivityTitle">What the agent is doing</div>'
+    +       '<div id="atdActivitySubtitle" class="atd-pane-subtitle">Live updates appear here as the run progresses.</div>'
     +     '</div>'
     +     '<div class="atd-trace-tabs" role="tablist" aria-label="Trace sections">'
     +       '<button class="atd-trace-tab active" type="button" data-atd-trace="all">All</button>'
     +       '<button class="atd-trace-tab" type="button" data-atd-trace="context">Context</button>'
     +       '<button class="atd-trace-tab" type="button" data-atd-trace="runtime">Runtime</button>'
-    +       '<button class="atd-trace-tab" type="button" data-atd-trace="hermes">Hermes</button>'
+    +       '<button class="atd-trace-tab" type="button" data-atd-trace="work">Agent work</button>'
     +       '<button class="atd-trace-tab" type="button" data-atd-trace="tools">Tools</button>'
     +       '<button class="atd-trace-tab" type="button" data-atd-trace="approval">Approval</button>'
     +       '<button class="atd-trace-tab" type="button" data-atd-trace="deliverable">Deliverables</button>'
@@ -68,36 +118,12 @@
     +   '</lex-card>'
     + '</section>'
 
-    + '<section id="atdDeliverablesPane" class="atd-tab-pane hidden" role="tabpanel" aria-labelledby="atdDeliverablesTab">'
+    + '<section id="atdDeliverablesPane" class="atd-tab-pane" role="tabpanel" aria-labelledby="atdDeliverablesTab">'
     +   '<div id="atdDeliverables" class="atd-deliverables"></div>'
     + '</section>'
 
-    + '<div id="atdApprovalPanel" class="atd-approval hidden">'
-    +   '<div class="atd-approval-title">Lana wants to make the following changes:</div>'
-    +   '<div id="atdApprovalSummary" style="font-size:0.8125rem;color:var(--lex-text-secondary);margin-bottom:12px;"></div>'
-    +   '<div id="atdApprovalDescription" class="atd-approval-description"></div>'
-    +   '<div class="atd-approval-toggle" id="atdDiffToggle">Show raw JSON</div>'
-    +   '<div id="atdDiffContainer" class="atd-approval-diff hidden"></div>'
-    +   '<div id="atdRejectReason" class="hidden" style="margin-top:12px;">'
-    +     '<textarea id="atdRejectReasonInput" placeholder="Reason for rejection (optional)" style="width:100%;min-height:60px;border:1px solid var(--lex-border-default);border-radius:6px;padding:8px;font-size:0.8125rem;resize:vertical;font-family:inherit;"></textarea>'
-    +   '</div>'
-    +   '<div class="atd-approval-actions">'
-    +     '<lex-btn id="atdRejectBtn" variant="outline" size="sm">Reject</lex-btn>'
-    +     '<lex-btn id="atdApproveBtn" variant="primary" size="sm">Approve</lex-btn>'
-    +   '</div>'
-    + '</div>'
-
-    + '<div id="atdInputArea" class="atd-input-area hidden">'
-    +   '<textarea id="atdMessageInput" placeholder="Type a message to Lana..." rows="2"></textarea>'
-    +   '<lex-btn id="atdSendBtn" variant="primary" size="sm">Send</lex-btn>'
-    + '</div>'
-
-    + '<div id="atdCancelArea" class="hidden" style="padding:16px 0;text-align:right;">'
-    +   '<lex-btn id="atdCancelBtn" variant="outline" size="sm">Cancel Task</lex-btn>'
-    + '</div>'
-
-    + '<div id="atdRetryArea" class="hidden" style="padding:16px 0;text-align:right;">'
-    +   '<lex-btn id="atdRetryBtn" variant="primary" size="sm">Retry Task</lex-btn>'
+    + '<div id="atdCancelArea" class="atd-run-control hidden">'
+    +   '<span>This run is active. Stopping it keeps the activity recorded.</span><lex-btn id="atdCancelBtn" variant="outline" size="sm">Stop run</lex-btn>'
     + '</div>'
 
     + '</main>';
@@ -134,9 +160,9 @@
     var breadcrumb = el('atdBreadcrumb');
     if (breadcrumb) {
       breadcrumb.setAttribute('items', JSON.stringify([
-        { label: 'LanaAgents', href: '#catalog' },
-        { label: 'Activity', href: '#activity' },
-        { label: (task && task.name) || 'Run detail' }
+        { label: 'Agent Studio', href: '#catalog' },
+        { label: 'Outcomes', href: '#activity' },
+        { label: (task && task.name) || 'Outcome detail' }
       ]));
     }
   }
@@ -207,9 +233,20 @@
       .join(' ')
       .split('-')
       .join(' ')
+      .split('.')
+      .join(' ')
       .split(' ')
       .filter(Boolean);
-    var text = words.join(' ');
+    var joined = words.join(' ');
+    var text = '';
+    for (var i = 0; i < joined.length; i++) {
+      var character = joined.charAt(i);
+      var previous = i > 0 ? joined.charAt(i - 1) : '';
+      var isUppercase = character >= 'A' && character <= 'Z';
+      var followsWordCharacter = (previous >= 'a' && previous <= 'z') || (previous >= '0' && previous <= '9');
+      if (isUppercase && followsWordCharacter) text += ' ';
+      text += character;
+    }
     if (!text) return '';
     return text.charAt(0).toUpperCase() + text.slice(1);
   }
@@ -224,6 +261,121 @@
     if (typeof value === 'number') return String(value);
     if (typeof value !== 'string') return '';
     return humanizeToken(value);
+  }
+
+  var ARTIFACT_PRESENTATIONS = {
+    matter_plan: { group: 'plan', label: 'Workspace plan', icon: 'P' },
+    requirement_set: { group: 'plan', label: 'Requirements', icon: 'R' },
+    workstream_set: { group: 'plan', label: 'Workstream plan', icon: 'P' },
+    task: { group: 'plan', label: 'Task', icon: 'T' },
+    task_batch: { group: 'plan', label: 'Task collection', icon: 'T' },
+    dashboard_widget_batch: { group: 'plan', label: 'Dashboard updates', icon: 'W' },
+    redline: { group: 'document', label: 'Document redline', icon: 'D' },
+    matter_review_summary: { group: 'document', label: 'Review summary', icon: 'D' },
+    legal_document_draft: { group: 'document', label: 'Document draft', icon: 'D' },
+    privilege_log_draft: { group: 'document', label: 'Privilege log draft', icon: 'D' },
+    narrative_report: { group: 'document', label: 'Narrative report', icon: 'D' },
+    meeting_summary: { group: 'document', label: 'Meeting summary', icon: 'D' },
+    prd_draft: { group: 'document', label: 'Product brief', icon: 'D' },
+    case_chronology: { group: 'analysis', label: 'Case chronology', icon: 'I' },
+    missing_document_report: { group: 'analysis', label: 'Document gap analysis', icon: 'I' },
+    workspace_timeline_risk_report: { group: 'analysis', label: 'Timeline and risk analysis', icon: 'I' },
+    cash_application_batch: { group: 'analysis', label: 'Cash match analysis', icon: 'I' },
+    automation_rule: { group: 'action', label: 'Automation draft', icon: 'A' },
+    remediation_proposal: { group: 'action', label: 'Remediation proposal', icon: 'A' },
+    action_item: { group: 'action', label: 'Action item', icon: 'A' },
+    open_question: { group: 'action', label: 'Open question', icon: '?' }
+  };
+
+  function artifactKind(artifact) {
+    return String((artifact && (artifact.kind || artifact.artifact_type || artifact.type)) || 'artifact').toLowerCase();
+  }
+
+  function artifactPresentation(artifact) {
+    var kind = artifactKind(artifact);
+    if (ARTIFACT_PRESENTATIONS[kind]) {
+      return Object.assign({ kind: kind }, ARTIFACT_PRESENTATIONS[kind]);
+    }
+    var payload = parseStructuredValue(artifact && (artifact.content_jsonb || artifact.payload || artifact.content));
+    var group = 'other';
+    var icon = 'O';
+    if (payload && typeof payload === 'object') {
+      if (Array.isArray(payload.workstreams) || Array.isArray(payload.tasks) || Array.isArray(payload.requirements)) { group = 'plan'; icon = 'P'; }
+      else if (Array.isArray(payload.sections) || payload.executive_summary || payload.document_text) { group = 'document'; icon = 'D'; }
+      else if (payload.timeline || Array.isArray(payload.risks) || Array.isArray(payload.matches) || Array.isArray(payload.entries)) { group = 'analysis'; icon = 'I'; }
+      else if (payload.trigger || Array.isArray(payload.actions) || payload.recommended_action) { group = 'action'; icon = 'A'; }
+    }
+    return { kind: kind, group: group, label: humanizeValue(kind), icon: icon };
+  }
+
+  function outcomeGroupLabel(group) {
+    if (group === 'plan') return 'Plans and tasks';
+    if (group === 'document') return 'Documents and reports';
+    if (group === 'analysis') return 'Analysis and insights';
+    if (group === 'action') return 'Proposed actions';
+    if (group === 'other') return 'Other';
+    return 'All deliverables';
+  }
+
+  function buildRunJourneyState(status, artifactCount) {
+    var current = 0;
+    var tone = 'working';
+    var title = 'Preparing the run';
+    var description = 'LANA is getting the right context ready before it begins.';
+    var pulse = 'Starting';
+    if (status === 'compiling_context') {
+      title = 'Loading the right context';
+      description = 'The agent is assembling the workspace information it is allowed to use.';
+      pulse = 'Preparing';
+    } else if (status === 'running') {
+      current = 1;
+      title = 'Your agent is working';
+      description = 'You can leave this page. The run will continue and its work will stay here.';
+      pulse = 'Working now';
+    } else if (status === 'awaiting_input') {
+      current = 1;
+      tone = 'attention';
+      title = 'Your agent needs one detail';
+      description = 'The run is paused safely until you answer the question below.';
+      pulse = 'Needs input';
+    } else if (status === 'awaiting_approval') {
+      current = 2;
+      tone = 'review';
+      title = 'Work is ready for review';
+      description = 'Inspect the proposed deliverables and decide what the agent may do next.';
+      pulse = 'Your review';
+    } else if (status === 'approved') {
+      current = 2;
+      tone = 'review';
+      title = 'Approval recorded';
+      description = 'The agent may continue with the approved work. The decision is in the run record.';
+      pulse = 'Continuing';
+    } else if (status === 'completed') {
+      current = 3;
+      tone = 'complete';
+      title = 'Your outcome is ready';
+      description = artifactCount ? 'Review the finished deliverables, verification checks, and approval record below.' : 'The run finished without a recorded deliverable.';
+      pulse = 'Complete';
+    } else if (status === 'failed') {
+      current = artifactCount ? 2 : 1;
+      tone = 'attention';
+      title = 'This run needs attention';
+      description = 'The attempt is preserved. Review what happened, then try the run again when ready.';
+      pulse = 'Stopped';
+    } else if (status === 'rejected') {
+      current = 2;
+      tone = 'attention';
+      title = 'The proposed work was not approved';
+      description = 'The decision and any feedback remain attached to this outcome.';
+      pulse = 'Rejected';
+    } else if (status === 'cancelled') {
+      current = artifactCount ? 2 : 1;
+      tone = 'attention';
+      title = 'This run was stopped';
+      description = 'Any work produced before cancellation remains available in the run record.';
+      pulse = 'Cancelled';
+    }
+    return { current: current, tone: tone, title: title, description: description, pulse: pulse };
   }
 
   function compactText(value, fallback) {
@@ -462,6 +614,205 @@
     container.classList.remove('hidden');
   }
 
+  function renderRunJourney(state, task, status) {
+    var container = el('atdJourney');
+    if (!container) return;
+    var currentStatus = status || (task && task.execution_status) || 'pending';
+    var artifacts = collectDeliverables(task || {});
+    var journey = buildRunJourneyState(currentStatus, artifacts.length);
+    var kicker = state && state.mode === 'run' && !isTerminal(currentStatus) ? 'Live agent run' : 'Agent outcome';
+    var stages = [
+      { label: 'Prepare', detail: 'Load the right context' },
+      { label: 'Work', detail: 'Create the requested result' },
+      { label: 'Review', detail: 'Check and approve' },
+      { label: 'Outcome', detail: 'Use the finished work' }
+    ];
+    setTextValue('atdJourneyKicker', kicker);
+    setTextValue('atdJourneyTitle', journey.title);
+    setTextValue('atdJourneyDescription', journey.description);
+    var pulse = el('atdJourneyPulse');
+    if (pulse) {
+      pulse.className = 'atd-journey-pulse atd-journey-pulse--' + journey.tone;
+      pulse.innerHTML = '<span></span><div><small>Status</small><strong>' + escHtml(journey.pulse) + '</strong></div>';
+    }
+    var list = el('atdJourneyStages');
+    if (list) {
+      var html = '';
+      for (var i = 0; i < stages.length; i++) {
+        var done = i < journey.current || currentStatus === 'completed';
+        var active = i === journey.current && currentStatus !== 'completed';
+        var attention = active && journey.tone === 'attention';
+        html += '<li class="atd-journey-stage' + (done ? ' atd-journey-stage--done' : '') + (active ? ' atd-journey-stage--active' : '') + (attention ? ' atd-journey-stage--attention' : '') + '">'
+          + '<span class="atd-journey-stage-number">' + (done ? '✓' : String(i + 1)) + '</span>'
+          + '<div><strong>' + escHtml(stages[i].label) + '</strong><small>' + escHtml(stages[i].detail) + '</small></div></li>';
+      }
+      list.innerHTML = html;
+    }
+    container.classList.remove('hidden');
+  }
+
+  function setTextValue(id, value) {
+    var node = el(id);
+    if (node) node.textContent = value == null ? '' : String(value);
+  }
+
+  function findInputPrompt(task) {
+    var item = task || {};
+    var direct = firstValue([item.input_prompt, item.question, item.awaiting_input_reason]);
+    if (direct) return compactLongText(direct, 420);
+    var events = item.events || [];
+    for (var i = events.length - 1; i >= 0; i--) {
+      var event = events[i] || {};
+      var content = event.content || {};
+      var prompt = firstValue([content.question, content.prompt, content.required_input, content.input_request]);
+      if (prompt) return compactLongText(prompt, 420);
+      if ((event.event_type === 'input_request' || event.event_type === 'agent_message') && content.message) {
+        return compactLongText(content.message, 420);
+      }
+    }
+    return 'The agent needs one detail before it can finish this work.';
+  }
+
+  function renderInputRequest(task) {
+    setTextValue('atdInputPrompt', findInputPrompt(task));
+  }
+
+  function updateActivityHeading(status) {
+    var active = !isTerminal(status);
+    setTextValue('atdActivityTitle', active ? 'What the agent is doing' : 'What happened during this run');
+    setTextValue('atdActivitySubtitle', active ? 'Live updates appear here as the run progresses.' : 'A complete, inspectable record grouped by run phase.');
+  }
+
+  function artifactValidationState(artifact) {
+    var item = artifact || {};
+    var validation = item.validation || item.validation_result || {};
+    var status = String(firstValue([
+      item.validation_status,
+      validation.status,
+      item.schema_validation_status
+    ]) || '').toLowerCase();
+    var explicitlyInvalid = validation.valid === false || item.schema_valid === false ||
+      status === 'failed' || status === 'invalid' || status === 'error';
+    if (explicitlyInvalid) return 'attention';
+    var explicitlyValid = validation.valid === true || item.schema_valid === true ||
+      status === 'passed' || status === 'valid' || status === 'success';
+    if (explicitlyValid) return 'pass';
+    return 'unreported';
+  }
+
+  function buildVerificationState(task) {
+    var item = task || {};
+    var status = item.execution_status || 'pending';
+    var artifacts = (item.artifacts || []).filter(Boolean);
+    var deliverables = collectDeliverables(item);
+    var approval = approvalStatusForTask(item);
+    var terminal = isTerminal(status);
+    var checks = [];
+
+    var runState = 'pending';
+    var runDetail = 'The agent is still working.';
+    if (status === 'awaiting_approval') {
+      runState = 'pass';
+      runDetail = 'Work is prepared and paused safely for review.';
+    } else if (status === 'completed' || status === 'approved') {
+      runState = 'pass';
+      runDetail = 'The runtime completed without a reported execution error.';
+    } else if (status === 'failed' || status === 'rejected' || status === 'cancelled') {
+      runState = 'attention';
+      runDetail = status === 'rejected' ? 'This work was rejected during review.' : 'The run did not complete successfully.';
+    }
+    checks.push({ label: 'Run state', detail: runDetail, state: runState });
+
+    var deliverableState = deliverables.length > 0 ? 'pass' : (terminal ? 'attention' : 'pending');
+    var deliverableDetail = deliverables.length > 0
+      ? String(deliverables.length) + ' artifact' + (deliverables.length === 1 ? '' : 's') + ' ready to inspect.'
+      : (terminal ? 'No artifact was recorded for this run.' : 'Waiting for the first artifact.');
+    checks.push({ label: 'Deliverables', detail: deliverableDetail, state: deliverableState });
+
+    var sawValid = false;
+    var sawInvalid = false;
+    for (var i = 0; i < artifacts.length; i++) {
+      var validationState = artifactValidationState(artifacts[i]);
+      if (validationState === 'pass') sawValid = true;
+      if (validationState === 'attention') sawInvalid = true;
+    }
+    var validationCheck = { label: 'Automatic checks', detail: 'Validation evidence has not been reported by the runtime.', state: 'unreported' };
+    if (sawInvalid) {
+      validationCheck.detail = 'At least one artifact reported a validation issue.';
+      validationCheck.state = 'attention';
+    } else if (sawValid) {
+      validationCheck.detail = 'Reported schema and artifact checks passed.';
+      validationCheck.state = 'pass';
+    }
+    checks.push(validationCheck);
+
+    var approvalState = 'pass';
+    var approvalDetail = approval;
+    if (approval === 'Pending approval') {
+      approvalState = 'pending';
+      approvalDetail = 'A teammate must decide before anything is applied.';
+    } else if (approval === 'Rejected') {
+      approvalState = 'attention';
+      approvalDetail = 'A teammate rejected the proposed work.';
+    } else if (approval === 'No approval required') {
+      approvalState = 'unreported';
+      approvalDetail = 'This run did not require a human checkpoint.';
+    } else {
+      approvalDetail = 'The required human checkpoint was approved.';
+    }
+    checks.push({ label: 'Human approval', detail: approvalDetail, state: approvalState });
+
+    var overall = 'In progress';
+    var tone = 'pending';
+    if (status === 'awaiting_approval') {
+      overall = 'Ready for your review';
+      tone = 'review';
+    } else if (status === 'completed') {
+      overall = sawInvalid ? 'Needs attention' : 'Ready to use';
+      tone = sawInvalid ? 'attention' : 'pass';
+    } else if (status === 'failed' || status === 'rejected' || status === 'cancelled') {
+      overall = 'Needs attention';
+      tone = 'attention';
+    }
+
+    return { overall: overall, tone: tone, checks: checks, deliverable_count: deliverables.length };
+  }
+
+  function verificationIcon(state) {
+    if (state === 'pass') return '✓';
+    if (state === 'attention') return '!';
+    if (state === 'pending') return '…';
+    return '·';
+  }
+
+  function renderVerification(task) {
+    var container = el('atdVerification');
+    if (!container || !task) return;
+    var verification = buildVerificationState(task);
+    var html = ''
+      + '<div class="atd-verification-head">'
+      +   '<div><span class="atd-verification-kicker">Outcome verification</span><h2 id="atdVerificationTitle">' + escHtml(verification.overall) + '</h2></div>'
+      +   '<span class="atd-verification-state atd-verification-state--' + escHtml(verification.tone) + '">' + escHtml(verification.overall) + '</span>'
+      + '</div>'
+      + '<div class="atd-verification-checks">';
+    for (var i = 0; i < verification.checks.length; i++) {
+      var check = verification.checks[i];
+      html += ''
+        + '<article class="atd-verification-check atd-verification-check--' + escHtml(check.state) + '">'
+        +   '<span class="atd-verification-icon">' + escHtml(verificationIcon(check.state)) + '</span>'
+        +   '<div><strong>' + escHtml(check.label) + '</strong><p>' + escHtml(check.detail) + '</p></div>'
+        + '</article>';
+    }
+    html += ''
+      + '</div>'
+      + '<div class="atd-verification-foot">'
+      +   '<p>Automatic checks reflect evidence reported by the runtime. Human decisions are recorded separately in the approval trail.</p>'
+      +   '<button type="button" data-atd-open-deliverables>Inspect ' + escHtml(String(verification.deliverable_count)) + ' deliverable' + (verification.deliverable_count === 1 ? '' : 's') + ' →</button>'
+      + '</div>';
+    container.innerHTML = html;
+    container.classList.remove('hidden');
+  }
+
   function setActiveTab(tabName) {
     var executionTab = el('atdExecutionTab');
     var deliverablesTab = el('atdDeliverablesTab');
@@ -579,9 +930,9 @@
     if (family === 'context' || source === 'context' || phase === 'context' || phase === 'compile_context') return 'context';
     if (sourceEventName === 'runtime_selection' || sourceEventName === 'runtime_selected' || sourceEventName === 'runtime_policy') return 'runtime';
     if (family === 'tool' || family === 'tools' || source === 'tool' || source === 'tools' || content.tool_call || content.tool_name) return 'tools';
-    if (family === 'hermes' || source === 'hermes' || runtimeType === 'hermes') return 'hermes';
+    if (family === 'work' || family === 'hermes' || source === 'hermes' || runtimeType === 'hermes') return 'work';
     if (type === 'runtime_event') return 'trace';
-    if (type === 'progress') return 'hermes';
+    if (type === 'progress') return 'work';
     if (type === 'status_change') return 'runtime';
     return 'trace';
   }
@@ -589,7 +940,7 @@
   function sectionLabel(section) {
     if (section === 'context') return 'Context';
     if (section === 'runtime') return 'Runtime Selection';
-    if (section === 'hermes') return 'Hermes Loop';
+    if (section === 'work') return 'Agent work';
     if (section === 'tools') return 'Lana Tool Calls';
     if (section === 'approval') return 'Approval';
     if (section === 'deliverable') return 'Deliverable';
@@ -670,14 +1021,17 @@
   // Per-render state
   // =========================================================================
 
-  function createState(taskId) {
+  function createState(taskId, mode) {
     return {
       taskId: taskId || null,
+      mode: mode === 'run' ? 'run' : 'outcome',
       task: null,
       eventSource: null,
       currentStatus: 'pending',
       events: [],
       activeTraceSection: 'all',
+      activeDeliverableGroup: 'all',
+      hasChosenTab: false,
       reconnectTimer: null,
       destroyed: false,
       seenEventIds: {},
@@ -801,15 +1155,53 @@
     if (eventId && state.seenEventIds[eventId]) return;
     if (eventId) state.seenEventIds[eventId] = true;
     state.events.push(evt);
+    if (state.task) state.task.events = state.events.slice();
     renderTrace(state);
+
+    if (evt.event_type === 'artifact' || evt.event_type === 'approval_request') {
+      syncArtifactFromEvent(state, evt);
+    }
 
     if (evt.event_type === 'approval_request') {
       showApproval(evt.content || {});
     }
 
     if (evt.event_type === 'status_change' && evt.content) {
-      updateUIForStatus(state, evt.content.to_status);
+      var nextStatus = firstValue([evt.content.to_status, evt.content.execution_status, evt.content.status]);
+      if (nextStatus) updateUIForStatus(state, nextStatus);
     }
+  }
+
+  function syncArtifactFromEvent(state, evt) {
+    if (!state.task || !evt) return;
+    var content = evt.content || {};
+    var id = content.artifact_id || evt.id;
+    if (!id) return;
+    var artifacts = state.task.artifacts || [];
+    var artifact = {
+      id: id,
+      kind: content.artifact_type || content.kind || 'artifact',
+      title: content.title || humanizeValue(content.artifact_type || 'Artifact'),
+      status: content.status || (evt.event_type === 'approval_request' ? 'awaiting_approval' : 'proposed'),
+      content_jsonb: content.content_raw_json || content.raw_json || {},
+      approval_id: content.approval_id || null,
+      apply_target_type: content.apply_target_type || null,
+      apply_target_id: content.apply_target_id || null,
+      created_at: evt.created_at || null
+    };
+    var replaced = false;
+    for (var i = 0; i < artifacts.length; i++) {
+      if (artifacts[i] && artifacts[i].id === id) {
+        artifacts[i] = Object.assign({}, artifacts[i], artifact);
+        replaced = true;
+        break;
+      }
+    }
+    if (!replaced) artifacts.push(artifact);
+    state.task.artifacts = artifacts;
+    renderDeliverables(state, state.task);
+    renderRunJourney(state, state.task, state.currentStatus);
+    renderVerification(state.task);
   }
 
   // =========================================================================
@@ -822,7 +1214,11 @@
     if (state.task) {
       state.task.execution_status = status;
       renderRunSummary(state.task);
+      renderVerification(state.task);
+      renderRunJourney(state, state.task, status);
+      renderInputRequest(state.task);
     }
+    updateActivityHeading(status);
 
     var dot = el('atdStatusDot');
     var label = el('atdStatusLabel');
@@ -840,6 +1236,11 @@
 
     if (status === 'failed' || status === 'cancelled') show('atdRetryArea');
     else hide('atdRetryArea');
+
+    if (!state.hasChosenTab) {
+      if (status === 'queued' || status === 'pending' || status === 'compiling_context' || status === 'running' || status === 'awaiting_input') setActiveTab('execution');
+      else setActiveTab('deliverables');
+    }
   }
 
   function decodeText(value) {
@@ -1057,58 +1458,230 @@
     show('atdApprovalPanel');
   }
 
-  function collectDeliverables(task) {
-    var artifacts = (task && task.artifacts) || [];
-    var applied = artifacts.filter(function (artifact) {
-      return artifact && (artifact.status === 'applied' || artifact.status === 'approved');
-    });
-    if (applied.length > 0) return applied;
-    if (task && task.execution_status === 'completed') {
-      return artifacts.filter(function (artifact) {
-        return artifact && artifact.status !== 'rejected' && artifact.status !== 'failed';
-      });
-    }
-    return [];
+  function renderApprovalDecision(approved, reason) {
+    var panel = el('atdApprovalPanel');
+    if (!panel) return;
+    var title = approved ? 'Approved — the agent may continue' : 'Rejected — the agent will stop';
+    var detail = approved
+      ? 'Your decision was recorded in the run trail. The agent can now continue to the next safe step.'
+      : (reason ? 'Your feedback was recorded: ' + reason : 'Your decision was recorded in the run trail.');
+    panel.innerHTML = ''
+      + '<div class="atd-approval-receipt atd-approval-receipt--' + (approved ? 'approved' : 'rejected') + '">'
+      +   '<span class="atd-approval-receipt-icon">' + (approved ? '✓' : '×') + '</span>'
+      +   '<div><span class="atd-approval-kicker">Decision recorded</span><h2>' + escHtml(title) + '</h2><p>' + escHtml(detail) + '</p></div>'
+      + '</div>';
+    panel.classList.remove('hidden');
   }
 
-  function renderDeliverables(task) {
+  function collectDeliverables(task) {
+    var artifacts = (task && task.artifacts) || [];
+    return artifacts.filter(Boolean);
+  }
+
+  function artifactStatusLabel(artifact) {
+    var status = String((artifact && artifact.status) || 'proposed').toLowerCase();
+    if (status === 'proposed' || status === 'awaiting_approval' || status === 'pending') return 'Needs approval';
+    if (status === 'approved') return 'Approved';
+    if (status === 'applied') return 'Applied';
+    if (status === 'rejected') return 'Rejected';
+    if (status === 'failed' || status === 'failed_to_apply') return 'Needs attention';
+    if (status === 'completed') return 'Complete';
+    return humanizeValue(status);
+  }
+
+  function artifactStatusTone(artifact) {
+    var status = String((artifact && artifact.status) || 'proposed').toLowerCase();
+    if (status === 'approved' || status === 'applied' || status === 'completed') return 'success';
+    if (status === 'rejected' || status === 'failed' || status === 'failed_to_apply') return 'danger';
+    return 'review';
+  }
+
+  function outcomeGroupCounts(deliverables) {
+    var counts = { all: deliverables.length, plan: 0, document: 0, analysis: 0, action: 0, other: 0 };
+    for (var i = 0; i < deliverables.length; i++) {
+      var group = artifactPresentation(deliverables[i]).group;
+      if (!Object.prototype.hasOwnProperty.call(counts, group)) group = 'other';
+      counts[group] += 1;
+    }
+    return counts;
+  }
+
+  function renderOutcomeFilters(deliverables, activeGroup) {
+    var counts = outcomeGroupCounts(deliverables);
+    var groups = ['all', 'plan', 'document', 'analysis', 'action', 'other'];
+    var html = '<div class="atd-outcome-filters" role="tablist" aria-label="Deliverable types">';
+    for (var i = 0; i < groups.length; i++) {
+      var group = groups[i];
+      if (!counts[group] && group !== 'all') continue;
+      html += '<button type="button" class="atd-outcome-filter' + (activeGroup === group ? ' active' : '') + '" data-atd-outcome-filter="' + group + '" role="tab" aria-selected="' + (activeGroup === group ? 'true' : 'false') + '">'
+        + escHtml(outcomeGroupLabel(group)) + '<span>' + escHtml(String(counts[group])) + '</span></button>';
+    }
+    return html + '</div>';
+  }
+
+  function renderOutcomeCollection(title, items) {
+    if (!Array.isArray(items) || !items.length) return '';
+    var html = '<section class="atd-outcome-collection"><div class="atd-outcome-collection-head"><strong>' + escHtml(humanizeKey(title)) + '</strong><span>' + items.length + '</span></div><div class="atd-outcome-collection-list">';
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      if (item == null) continue;
+      if (typeof item !== 'object') {
+        html += '<article class="atd-outcome-collection-card"><span class="atd-outcome-collection-number">' + String(i + 1).padStart(2, '0') + '</span><div><p>' + escHtml(String(item)) + '</p></div></article>';
+        continue;
+      }
+      var actionLabel = firstValue([item.action_type, item.type, item.action_id]);
+      if (actionLabel && String(actionLabel).indexOf('.') !== -1) {
+        var actionParts = String(actionLabel).split('.');
+        actionLabel = actionParts[actionParts.length - 1];
+      }
+      var itemTitle = firstValue([item.title, item.name, item.text, item.question, item.topic, item.category, actionLabel, item.event_type, item.invoice_number, item.payment_id, item.document_type, item.label, item.id]) || ('Item ' + String(i + 1));
+      var itemBody = firstValue([item.description, item.summary, item.scope, item.context, item.reason, item.recommended_action, item.rationale, item.expected_reason, item.draft_text, item.proposed_text, item.origin_quote]);
+      if (!itemBody && item.config && typeof item.config === 'object') itemBody = compactObjectSummary(item.config);
+      var meta = [];
+      if (item.owner_suggestion || item.suggested_owner_role || item.owner_role || item.actor) meta.push('Owner: ' + humanizeValue(item.owner_suggestion || item.suggested_owner_role || item.owner_role || item.actor));
+      if (item.priority || item.priority_hint || item.level || item.severity) meta.push(humanizeValue(item.priority || item.priority_hint || item.level || item.severity));
+      if (item.due_hint || item.due_date || item.date) meta.push(String(item.due_hint || item.due_date || item.date));
+      if (item.status || item.confidence) meta.push(humanizeValue(item.status || item.confidence));
+      html += '<article class="atd-outcome-collection-card"><span class="atd-outcome-collection-number">' + String(i + 1).padStart(2, '0') + '</span><div><strong>' + escHtml(humanizeValue(itemTitle)) + '</strong>'
+        + (itemBody ? '<p>' + escHtml(compactLongText(itemBody, 360)) + '</p>' : '')
+        + (meta.length ? '<small>' + escHtml(meta.join(' · ')) + '</small>' : '') + '</div></article>';
+    }
+    return html + '</div></section>';
+  }
+
+  function artifactLeadText(artifact, payload) {
+    if (!payload || typeof payload !== 'object') return compactLongText(payload, 520);
+    var tldr = Array.isArray(payload.tldr) ? payload.tldr.join(' ') : '';
+    return compactLongText(firstValue([
+      payload.executive_summary,
+      payload.summary,
+      payload.problem,
+      payload.scope,
+      payload.issue,
+      payload.context,
+      payload.text,
+      payload.question,
+      payload.rationale,
+      tldr,
+      artifact && (artifact.summary || artifact.description)
+    ]), 620);
+  }
+
+  function renderTypedArtifactPayload(artifact) {
+    var payload = parseStructuredValue(artifact && (artifact.content_jsonb || artifact.payload || artifact.content));
+    if (payload == null || payload === '') return '';
+    var presentation = artifactPresentation(artifact);
+    if (typeof payload !== 'object') return renderReadablePayload(payload, presentation.label, 0);
+    var lead = artifactLeadText(artifact, payload);
+    var html = '';
+    if (lead) {
+      html += '<div class="atd-outcome-lead"><span>' + escHtml(outcomeGroupLabel(presentation.group)) + '</span><p>' + escHtml(lead) + '</p></div>';
+    }
+    if (presentation.kind === 'redline' && (payload.current_text || payload.proposed_text)) {
+      html += '<div class="atd-outcome-compare"><div><span>Current language</span><p>' + escHtml(payload.current_text || 'Not provided') + '</p></div><div><span>Proposed language</span><p>' + escHtml(payload.proposed_text || 'Not provided') + '</p></div></div>';
+    }
+    var automationTrigger = payload.trigger || (payload.config && payload.config.trigger);
+    var automationActions = payload.actions || (payload.config && payload.config.actions) || [];
+    if (automationTrigger || Array.isArray(automationActions) && automationActions.length) {
+      var triggerLabel = automationTrigger && typeof automationTrigger === 'object'
+        ? firstValue([automationTrigger.label, automationTrigger.name, automationTrigger.type, automationTrigger.event])
+        : automationTrigger;
+      html += '<div class="atd-outcome-automation">'
+        + '<div><span>When</span><strong>' + escHtml(humanizeValue(triggerLabel) || 'Trigger configured') + '</strong></div>'
+        + '<div class="atd-outcome-automation-arrow">→</div>'
+        + '<div><span>Then</span><strong>' + escHtml(String(automationActions.length)) + ' action' + (automationActions.length === 1 ? '' : 's') + '</strong></div></div>';
+    }
+
+    var collectionFields = [
+      ['workstreams', payload.workstreams],
+      ['tasks', payload.tasks || payload.proposed_tasks || payload.recommended_tasks],
+      ['sections', payload.sections],
+      ['topics', payload.topics],
+      ['requirements', payload.requirements],
+      ['milestones', payload.milestones],
+      ['widgets', payload.widgets],
+      ['matches', payload.matches],
+      ['entries', payload.entries],
+      ['received documents', payload.received],
+      ['missing documents', payload.missing],
+      ['gaps', payload.gaps],
+      ['risks', payload.risk_register || payload.key_risks || payload.risks],
+      ['open questions', payload.open_questions || payload.unresolved_questions],
+      ['goals', payload.goals],
+      ['non goals', payload.non_goals],
+      ['actions', payload.actions || (payload.config && payload.config.actions)],
+      ['timeline', payload.timeline && payload.timeline.events]
+    ];
+    var renderedCollection = false;
+    for (var i = 0; i < collectionFields.length; i++) {
+      if (Array.isArray(collectionFields[i][1]) && collectionFields[i][1].length) {
+        html += renderOutcomeCollection(collectionFields[i][0], collectionFields[i][1]);
+        renderedCollection = true;
+      }
+    }
+    if (Array.isArray(payload.proposed_changes) && payload.proposed_changes.length) {
+      html += renderProposedChanges(payload.proposed_changes);
+      renderedCollection = true;
+    }
+    if (!lead && !renderedCollection && !payload.trigger) html += renderReadablePayload(payload, 'Deliverable details', 0);
+    else {
+      var facts = withoutKeys(payload, [
+        'executive_summary', 'summary', 'problem', 'scope', 'issue', 'context', 'text', 'question', 'rationale', 'tldr',
+        'workstreams', 'tasks', 'proposed_tasks', 'recommended_tasks', 'sections', 'topics', 'requirements', 'milestones', 'widgets',
+        'matches', 'entries', 'received', 'missing', 'gaps', 'risk_register', 'key_risks', 'risks', 'open_questions', 'unresolved_questions',
+        'goals', 'non_goals', 'actions', 'timeline', 'proposed_changes', 'current_text', 'proposed_text', 'trigger', 'config'
+      ]);
+      if (objectHasValues(facts)) html += renderReadablePayload(facts, 'Key details', 0);
+    }
+    return html;
+  }
+
+  function renderDeliverables(state, task) {
     var panel = el('atdDeliverables');
     if (!panel) return;
     var deliverables = collectDeliverables(task);
     updateDeliverablesCount(deliverables.length);
     if (deliverables.length === 0) {
       panel.innerHTML = '<lex-card padding="none">' +
-        '<div class="atd-deliverables-head">Deliverables</div>' +
-        '<div class="atd-deliverables-empty">No deliverables have been produced for this run yet.</div>' +
+        '<div class="atd-deliverables-head"><div><h2>Run deliverables</h2><p>Artifacts, documents, and proposed changes produced by this agent.</p></div></div>' +
+        '<div class="atd-deliverables-empty"><strong>No deliverables yet</strong><span>The agent’s work will appear here as it is produced.</span></div>' +
       '</lex-card>';
       return;
     }
 
+    var activeGroup = state && state.activeDeliverableGroup ? state.activeDeliverableGroup : 'all';
+    var counts = outcomeGroupCounts(deliverables);
+    if (activeGroup !== 'all' && !counts[activeGroup]) activeGroup = 'all';
+    if (state) state.activeDeliverableGroup = activeGroup;
+    var filtered = deliverables.filter(function (artifact) { return activeGroup === 'all' || artifactPresentation(artifact).group === activeGroup; });
     var html = '<lex-card padding="none">';
-    html += '<div class="atd-deliverables-head">Deliverables</div>';
+    html += '<div class="atd-deliverables-head"><div><span class="atd-deliverables-kicker">Finished work</span><h2>Run deliverables</h2><p>Open the outcome type you need, inspect its evidence, and confirm its status before using it.</p></div><span>' + escHtml(String(deliverables.length)) + ' item' + (deliverables.length === 1 ? '' : 's') + '</span></div>';
+    html += renderOutcomeFilters(deliverables, activeGroup);
     html += '<div class="atd-deliverables-list">';
-    for (var i = 0; i < deliverables.length; i++) {
-      var artifact = deliverables[i] || {};
-      var changes = artifactToReadableItems(artifact);
+    for (var i = 0; i < filtered.length; i++) {
+      var artifact = filtered[i] || {};
+      var presentation = artifactPresentation(artifact);
       var target = artifactTarget(artifact);
-      var payload = artifact.content_jsonb || artifact.payload || artifact.content;
+      var validationState = artifactValidationState(artifact);
       html += '<div class="atd-deliverable">';
-      html += '<div class="atd-deliverable-title">' + escHtml(artifact.title || artifact.kind || 'Artifact') + '</div>';
-      html += '<div class="atd-deliverable-meta">' + escHtml(humanizeValue(artifact.kind || 'artifact') + ' · ' + statusLabel(artifact.status || 'completed')) + '</div>';
+      html += '<div class="atd-deliverable-head">';
+      html += '<div class="atd-deliverable-mark atd-deliverable-mark--' + escHtml(presentation.group) + '"><span>' + escHtml(presentation.icon) + '</span><small>' + escHtml(String(i + 1).padStart(2, '0')) + '</small></div>';
+      html += '<div class="atd-deliverable-heading"><div class="atd-deliverable-title">' + escHtml(artifact.title || artifact.name || humanizeValue(artifact.kind || 'Artifact')) + '</div>';
+      html += '<div class="atd-deliverable-meta">' + escHtml(presentation.label) + ' · ' + escHtml(outcomeGroupLabel(presentation.group)) + (artifact.created_at ? ' · ' + escHtml(timeAgo(artifact.created_at)) : '') + '</div></div>';
+      html += '<div class="atd-deliverable-badges"><span class="atd-deliverable-status atd-deliverable-status--' + escHtml(artifactStatusTone(artifact)) + '">' + escHtml(artifactStatusLabel(artifact)) + '</span>';
+      if (validationState !== 'unreported') {
+        html += '<span class="atd-deliverable-validation atd-deliverable-validation--' + escHtml(validationState) + '">' + (validationState === 'pass' ? '✓ Checks passed' : '! Check issue') + '</span>';
+      }
+      html += '</div></div>';
       if (target) {
         html += '<div class="atd-deliverable-target"><span>Applied target</span>' + renderTargetLink(target) + '</div>';
       }
       if (artifact.approval_status || artifact.approval_state || artifact.decision) {
         html += '<div class="atd-deliverable-target"><span>Approval</span><strong>' + escHtml(humanizeValue(artifact.approval_status || artifact.approval_state || artifact.decision)) + '</strong></div>';
       }
-      if (changes.length > 0) {
-        html += '<div class="atd-deliverable-items">';
-        for (var j = 0; j < changes.length; j++) html += changes[j];
-        html += '</div>';
-      } else {
-        html += renderReadablePayload(payload, 'Artifact payload', 0);
-      }
+      html += renderTypedArtifactPayload(artifact);
       html += renderRawDetails('Raw artifact JSON', artifact.content_jsonb || artifact.payload || artifact.content || artifact);
+      html += '<div class="atd-deliverable-foot"><span>Artifact ' + escHtml(artifact.id || String(i + 1)) + '</span><span>Evidence and raw data remain available above</span></div>';
       html += '</div>';
     }
     html += '</div></lex-card>';
@@ -1204,6 +1777,7 @@
       .then(function (resp) {
         if (state.destroyed) return;
         state.task = resp.data || {};
+        var loadedStatus = state.task.execution_status || 'pending';
         var events = state.task.events || [];
 
         var matterEl = el('atdMatterLink');
@@ -1227,8 +1801,10 @@
           appendEvent(state, events[i]);
         }
 
-        renderDeliverables(state.task);
-        updateUIForStatus(state, state.task.execution_status || 'pending');
+        renderDeliverables(state, state.task);
+        // The task response is authoritative. Historical status events may
+        // describe earlier phases and must not leave the screen in the past.
+        updateUIForStatus(state, loadedStatus);
 
         startSSE(state);
       })
@@ -1370,11 +1946,17 @@
     window.api.post('/api/v1/agentic-tasks/' + state.taskId + '/approve', {})
       .then(function () {
         if (state.destroyed) return;
-        hide('atdApprovalPanel');
-        appendEvent(state, {
+        var approvalEvent = {
           event_type: 'approval_response',
           content: { approved: true }
-        });
+        };
+        if (state.task) {
+          state.task.events = state.task.events || [];
+          state.task.events.push(approvalEvent);
+        }
+        appendEvent(state, approvalEvent);
+        updateUIForStatus(state, 'approved');
+        renderApprovalDecision(true, '');
         if (approveBtn) approveBtn.removeAttribute('disabled');
       })
       .catch(function (err) {
@@ -1395,12 +1977,17 @@
     window.api.post('/api/v1/agentic-tasks/' + state.taskId + '/reject', { reason: reason })
       .then(function () {
         if (state.destroyed) return;
-        hide('atdApprovalPanel');
-        updateUIForStatus(state, 'rejected');
-        appendEvent(state, {
+        var rejectionEvent = {
           event_type: 'approval_response',
           content: { approved: false, reason: reason }
-        });
+        };
+        if (state.task) {
+          state.task.events = state.task.events || [];
+          state.task.events.push(rejectionEvent);
+        }
+        appendEvent(state, rejectionEvent);
+        updateUIForStatus(state, 'rejected');
+        renderApprovalDecision(false, reason);
         if (rejectBtn) rejectBtn.removeAttribute('disabled');
       })
       .catch(function (err) {
@@ -1467,7 +2054,7 @@
     rootEl.innerHTML = TEMPLATE;
 
     var taskId = ctx && ctx.id;
-    var state = createState(taskId);
+    var state = createState(taskId, ctx && ctx.mode);
     rootEl._activityDetailState = state;
 
     if (!state.taskId) {
@@ -1564,10 +2151,10 @@
         if (!container) return;
         if (container.classList.contains('hidden')) {
           show('atdDiffContainer');
-          diffToggle.textContent = 'Hide raw JSON';
+          diffToggle.textContent = 'Hide technical details';
         } else {
           hide('atdDiffContainer');
-          diffToggle.textContent = 'Show raw JSON';
+          diffToggle.textContent = 'Show technical details';
         }
       };
       diffToggle.addEventListener('click', diffHandler);
@@ -1578,12 +2165,31 @@
     for (var i = 0; i < tabButtons.length; i++) {
       (function (button) {
         var tabHandler = function () {
+          state.hasChosenTab = true;
           setActiveTab(button.getAttribute('data-atd-tab') || 'execution');
         };
         button.addEventListener('click', tabHandler);
         state._unbindFns.push(function () { button.removeEventListener('click', tabHandler); });
       })(tabButtons[i]);
     }
+
+    var reviewClickHandler = function (event) {
+      if (!event || !event.target || typeof event.target.closest !== 'function') return;
+      if (event.target.closest('[data-atd-open-deliverables]')) {
+        state.hasChosenTab = true;
+        setActiveTab('deliverables');
+        var pane = el('atdDeliverablesPane');
+        if (pane && typeof pane.scrollIntoView === 'function') pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      var filter = event.target.closest('[data-atd-outcome-filter]');
+      if (filter) {
+        state.activeDeliverableGroup = filter.getAttribute('data-atd-outcome-filter') || 'all';
+        renderDeliverables(state, state.task || {});
+      }
+    };
+    rootEl.addEventListener('click', reviewClickHandler);
+    state._unbindFns.push(function () { rootEl.removeEventListener('click', reviewClickHandler); });
 
     var traceButtons = rootEl.querySelectorAll('[data-atd-trace]');
     for (var k = 0; k < traceButtons.length; k++) {
@@ -1596,6 +2202,7 @@
       })(traceButtons[k]);
     }
 
+    setActiveTab(state.mode === 'run' ? 'execution' : 'deliverables');
     loadTask(state);
   }
 
@@ -1617,5 +2224,19 @@
     rootEl._activityDetailState = null;
   }
 
-  global.LanaAgentsApp.Views.activityDetail = { render: render, destroy: destroy };
+  global.LanaAgentsApp.Views.activityDetail = {
+    render: render,
+    destroy: destroy,
+    __test: {
+      artifactValidationState: artifactValidationState,
+      approvalStatusForTask: approvalStatusForTask,
+      artifactPresentation: artifactPresentation,
+      buildVerificationState: buildVerificationState,
+      buildRunJourneyState: buildRunJourneyState,
+      collectDeliverables: collectDeliverables,
+      findInputPrompt: findInputPrompt,
+      humanizeValue: humanizeValue,
+      outcomeGroupCounts: outcomeGroupCounts
+    }
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

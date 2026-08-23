@@ -1,12 +1,6 @@
-/* activity.js — Lana Tasks list SPA view (the "Activity" sidebar item).
-   Migrated from src/js/pages/agentic-tasks-list.js. Provides filtering by
-   status and priority, pagination, and click-to-detail routing.
-
-   Rules:
-     - NO regex anywhere — string methods only
-     - All HTML escaping via Lex.Utils.escapeHtml()
-     - All time/date formatting via Lex.Utils.timeAgo()
-     - IIFE wrapper to keep scope clean
+/* activity.js — Outcome-first history for the Agent Studio.
+   Uses the legacy-compatible agentic-tasks list endpoint while presenting
+   status, required decisions, and finished work in plain language.
 */
 
 'use strict';
@@ -15,275 +9,228 @@
   global.LanaAgentsApp = global.LanaAgentsApp || {};
   global.LanaAgentsApp.Views = global.LanaAgentsApp.Views || {};
 
-  // Markup template — extracted from src/agents/agentic-tasks.html
-  // (the <main> body inside <template id="page-content">). Cloned into
-  // rootEl on render.
-  var TEMPLATE = ''
-    + '<main>'
-
-    + '<lex-banner variant="light" heading="Lana Tasks" subtitle="Interactive tasks assigned to Lana" lana lana-context-type="full_chat"></lex-banner>'
-    + '<lex-breadcrumb style="margin:12px 0 16px;" items=\'[{"label":"LanaAgents","href":"#catalog"},{"label":"Activity"}]\'></lex-breadcrumb>'
-
-    + '<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">'
-    +   '<lex-segmented'
-    +     ' id="atStatusFilter"'
-    +     ' value="all"'
-    +     ' options=\'[{"value":"all","label":"All"},{"value":"running","label":"Running"},{"value":"awaiting_input","label":"Needs Input"},{"value":"awaiting_approval","label":"Pending Approval"},{"value":"completed","label":"Completed"}]\''
-    +   '></lex-segmented>'
-    +   '<lex-select'
-    +     ' id="atPriorityFilter"'
-    +     ' placeholder="All priorities"'
-    +     ' options=\'[{"value":"","label":"All priorities"},{"value":"urgent","label":"Urgent"},{"value":"high","label":"High"},{"value":"medium","label":"Medium"},{"value":"low","label":"Low"}]\''
-    +   '></lex-select>'
-    + '</div>'
-
-    + '<div id="atLoading">'
-    +   '<lex-card padding="compact">'
-    +     '<div style="padding:16px;" aria-hidden="true">'
-    +       '<div style="height:20px;background:var(--lex-bg-tertiary);border-radius:4px;width:60%;margin-bottom:12px;"></div>'
-    +       '<div style="height:14px;background:var(--lex-bg-tertiary);border-radius:4px;width:80%;margin-bottom:8px;"></div>'
-    +       '<div style="height:14px;background:var(--lex-bg-tertiary);border-radius:4px;width:40%;"></div>'
-    +     '</div>'
-    +     '<div style="padding:16px;border-top:1px solid var(--lex-border-subtle);" aria-hidden="true">'
-    +       '<div style="height:20px;background:var(--lex-bg-tertiary);border-radius:4px;width:55%;margin-bottom:12px;"></div>'
-    +       '<div style="height:14px;background:var(--lex-bg-tertiary);border-radius:4px;width:70%;"></div>'
-    +     '</div>'
-    +   '</lex-card>'
-    + '</div>'
-
-    + '<div id="atItems" class="hidden"></div>'
-
-    + '<div id="atEmpty" class="hidden">'
-    +   '<lex-empty icon="inbox" message="No Lana tasks" description="Tasks assigned to Lana will appear here"></lex-empty>'
-    + '</div>'
-
-    + '<lex-pagination id="atPagination" class="hidden" page="1" total-pages="1" total="0" limit="20"></lex-pagination>'
-
-    + '</main>';
-
   var escHtml = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils && window.Lex.Utils.escapeHtml)
     ? window.Lex.Utils.escapeHtml
     : function (s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; };
-
   var timeAgo = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils && window.Lex.Utils.timeAgo)
     ? window.Lex.Utils.timeAgo
     : function (s) { return s ? String(s) : ''; };
 
-  // =========================================================================
-  // Helpers
-  // =========================================================================
+  var TEMPLATE = ''
+    + '<main class="agents-activity-page">'
+    +   '<lex-banner id="outcomesBanner" variant="light" heading="Outcomes" subtitle="See what your agents produced, what is still underway, and where they need you." lana lana-context-type="full_chat">'
+    +     '<lex-btn id="outcomesBuildBtn" variant="primary" icon="plus">Build an agent</lex-btn>'
+    +   '</lex-banner>'
+
+    +   '<section class="outcomes-pulse" aria-label="Outcome pulse">'
+    +     '<lex-metric id="outcomesMetricTotal" label="All outcomes" value="–"></lex-metric>'
+    +     '<lex-metric id="outcomesMetricWorking" label="Working now" value="–"></lex-metric>'
+    +     '<lex-metric id="outcomesMetricAttention" label="Need you" value="–"></lex-metric>'
+    +     '<lex-metric id="outcomesMetricReady" label="Ready to review" value="–"></lex-metric>'
+    +   '</section>'
+
+    +   '<section class="outcomes-workspace" aria-labelledby="outcomesListTitle">'
+    +     '<div class="outcomes-workspace-head">'
+    +       '<div><span class="outcomes-eyebrow">Agent history</span><h2 id="outcomesListTitle">Work and deliverables</h2></div>'
+    +       '<div class="outcomes-filters">'
+    +         '<lex-segmented id="atStatusFilter" value="all" options=\'[{"value":"all","label":"All"},{"value":"running","label":"Working"},{"value":"awaiting_input","label":"Needs input"},{"value":"awaiting_approval","label":"Approvals"},{"value":"completed","label":"Ready"}]\'></lex-segmented>'
+    +         '<lex-select id="atPriorityFilter" placeholder="All priorities" options=\'[{"value":"","label":"All priorities"},{"value":"urgent","label":"Urgent"},{"value":"high","label":"High"},{"value":"medium","label":"Medium"},{"value":"low","label":"Low"}]\'></lex-select>'
+    +       '</div>'
+    +     '</div>'
+
+    +     '<div id="atLoading" class="outcomes-loading" aria-hidden="true">'
+    +       '<div class="outcomes-row-skeleton"><i></i><div><span></span><small></small></div></div>'
+    +       '<div class="outcomes-row-skeleton"><i></i><div><span></span><small></small></div></div>'
+    +       '<div class="outcomes-row-skeleton"><i></i><div><span></span><small></small></div></div>'
+    +     '</div>'
+    +     '<div id="atItems" class="outcomes-list hidden"></div>'
+    +     '<div id="atEmpty" class="outcomes-empty hidden"></div>'
+    +     '<lex-pagination id="atPagination" class="hidden" page="1" total-pages="1" total="0" limit="20"></lex-pagination>'
+    +   '</section>'
+    + '</main>';
 
   function el(id) { return document.getElementById(id); }
-  function show(id) { var e = el(id); if (e) e.classList.remove('hidden'); }
-  function hide(id) { var e = el(id); if (e) e.classList.add('hidden'); }
+  function show(node) { if (node) node.classList.remove('hidden'); }
+  function hide(node) { if (node) node.classList.add('hidden'); }
+
+  function humanize(value) {
+    var parts = String(value || '').split('_').join(' ').split('-').join(' ').split(' ');
+    var words = [];
+    for (var i = 0; i < parts.length; i++) if (parts[i]) words.push(parts[i].charAt(0).toUpperCase() + parts[i].slice(1));
+    return words.join(' ');
+  }
 
   function statusLabel(status) {
-    if (!status) return 'Pending';
-    if (status === 'compiling_context') return 'Compiling...';
-    if (status === 'running')           return 'Running';
-    if (status === 'awaiting_input')    return 'Needs Input';
-    if (status === 'awaiting_approval') return 'Pending Approval';
-    if (status === 'approved')          return 'Approved';
-    if (status === 'completed')         return 'Completed';
-    if (status === 'failed')            return 'Failed';
-    if (status === 'rejected')          return 'Rejected';
-    if (status === 'cancelled')         return 'Cancelled';
-    return status;
+    if (status === 'compiling_context') return 'Getting ready';
+    if (status === 'running') return 'Working now';
+    if (status === 'queued') return 'Queued';
+    if (status === 'awaiting_input') return 'Needs your input';
+    if (status === 'awaiting_approval') return 'Ready for approval';
+    if (status === 'approved') return 'Approved';
+    if (status === 'completed') return 'Outcome ready';
+    if (status === 'failed') return 'Needs attention';
+    if (status === 'rejected') return 'Not approved';
+    if (status === 'cancelled') return 'Cancelled';
+    return humanize(status || 'pending');
   }
 
-  function statusColor(status) {
-    if (status === 'running' || status === 'compiling_context') return '#3b82f6';
-    if (status === 'awaiting_input')    return '#f59e0b';
-    if (status === 'awaiting_approval') return '#f59e0b';
-    if (status === 'completed')         return '#10b981';
-    if (status === 'failed')            return '#ef4444';
-    if (status === 'rejected')          return '#ef4444';
-    if (status === 'cancelled')         return '#6b7280';
-    return '#9ca3af';
+  function statusGroup(status) {
+    if (status === 'completed' || status === 'approved') return 'ready';
+    if (status === 'awaiting_input' || status === 'awaiting_approval') return 'attention';
+    if (status === 'running' || status === 'queued' || status === 'compiling_context') return 'working';
+    if (status === 'failed' || status === 'rejected') return 'issue';
+    return 'neutral';
   }
 
-  function priorityColor(priority) {
-    if (priority === 'urgent')  return '#ef4444';
-    if (priority === 'high')    return '#f59e0b';
-    if (priority === 'medium')  return '#3b82f6';
-    if (priority === 'low')     return '#6b7280';
-    return '#9ca3af';
+  function statusMessage(status) {
+    if (status === 'awaiting_input') return 'Open this outcome to answer the agent and keep the work moving.';
+    if (status === 'awaiting_approval') return 'A proposed action is waiting for your review.';
+    if (status === 'completed' || status === 'approved') return 'The work is finished and ready for you to review.';
+    if (status === 'running' || status === 'compiling_context' || status === 'queued') return 'The agent is handling this now. Open it to follow along.';
+    if (status === 'failed') return 'The run stopped before finishing. Open it to see what happened.';
+    return 'Open the complete record for details and deliverables.';
   }
 
-  // =========================================================================
-  // Per-render state
-  // =========================================================================
+  function priorityLabel(priority) {
+    if (!priority) return 'Normal';
+    return humanize(priority);
+  }
 
   function createState() {
-    return {
-      currentPage: 1,
-      pageSize: 20,
-      statusFilter: '',
-      priorityFilter: '',
-      totalItems: 0,
-      destroyed: false,
-      _unbindFns: []
-    };
+    return { currentPage: 1, pageSize: 20, statusFilter: '', priorityFilter: '', totalItems: 0, tasks: [], destroyed: false, _unbindFns: [] };
   }
 
-  // =========================================================================
-  // Rendering
-  // =========================================================================
+  function setMetric(id, value) { var metric = el(id); if (metric) metric.value = String(value); }
 
-  function renderTaskCard(task) {
-    var title = escHtml(task.name || 'Untitled task');
-    var desc  = escHtml(task.task_description || '').slice(0, 200);
-    var status = task.execution_status || 'pending';
+  function updateMetrics(state) {
+    var working = 0;
+    var attention = 0;
+    var ready = 0;
+    for (var i = 0; i < state.tasks.length; i++) {
+      var status = state.tasks[i].execution_status || state.tasks[i].status || '';
+      var group = statusGroup(status);
+      if (group === 'working') working++;
+      if (group === 'attention') attention++;
+      if (group === 'ready') ready++;
+    }
+    setMetric('outcomesMetricTotal', state.totalItems);
+    setMetric('outcomesMetricWorking', working);
+    setMetric('outcomesMetricAttention', attention);
+    setMetric('outcomesMetricReady', ready);
+  }
+
+  function renderOutcome(task) {
+    var status = task.execution_status || task.status || 'pending';
+    var group = statusGroup(status);
+    var title = escHtml(task.name || task.title || 'Untitled outcome');
+    var description = escHtml(task.task_description || task.description || statusMessage(status));
+    var created = task.created_at ? escHtml(timeAgo(task.created_at)) : '';
     var priority = task.priority || 'medium';
-    var sColor = statusColor(status);
-    var pColor = priorityColor(priority);
-
-    return '<div class="at-task-card" data-task-id="' + escHtml(task.id) + '" ' +
-      'style="padding:16px;border-bottom:1px solid var(--lex-border-subtle);cursor:pointer;transition:background 0.15s ease;"' +
-      ' onmouseenter="this.style.background=\'var(--lex-bg-secondary)\'" onmouseleave="this.style.background=\'transparent\'">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
-          '<div style="display:flex;align-items:center;gap:8px;">' +
-            '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + sColor + ';flex-shrink:0;"></span>' +
-            '<span style="font-size:0.8125rem;font-weight:500;color:var(--lex-text-primary);">' + title + '</span>' +
-          '</div>' +
-          '<div style="display:flex;align-items:center;gap:8px;">' +
-            '<span style="font-size:0.625rem;text-transform:uppercase;letter-spacing:0.08em;padding:2px 6px;border-radius:3px;background:' + pColor + ';color:#fff;font-weight:600;">' +
-              escHtml(priority) +
-            '</span>' +
-            '<span style="font-size:0.6875rem;color:var(--lex-text-tertiary);">' + escHtml(statusLabel(status)) + '</span>' +
-          '</div>' +
-        '</div>' +
-        (desc ? '<div style="font-size:0.75rem;color:var(--lex-text-secondary);line-height:1.4;margin-bottom:6px;">' + desc + '</div>' : '') +
-        '<div style="font-size:0.6875rem;color:var(--lex-text-tertiary);">' +
-          (task.created_at ? escHtml(timeAgo(task.created_at)) : '') +
-        '</div>' +
-      '</div>';
+    var action = group === 'attention' ? 'Respond now' : (group === 'ready' ? 'Review outcome' : 'Open details');
+    return '<button type="button" class="outcome-card outcome-card--' + group + '" data-task-id="' + escHtml(task.id || '') + '">'
+      + '<span class="outcome-card-status-icon"><i></i></span>'
+      + '<span class="outcome-card-main"><span class="outcome-card-title-row"><strong>' + title + '</strong><span class="outcome-card-priority outcome-card-priority--' + escHtml(priority) + '">' + escHtml(priorityLabel(priority)) + '</span></span>'
+      + '<span class="outcome-card-description">' + description + '</span><small>' + escHtml(statusMessage(status)) + '</small></span>'
+      + '<span class="outcome-card-meta"><strong>' + escHtml(statusLabel(status)) + '</strong><small>' + created + '</small><span>' + escHtml(action) + ' →</span></span>'
+      + '</button>';
   }
 
-  // =========================================================================
-  // Data fetching
-  // =========================================================================
+  function renderTasks(state) {
+    var holder = el('atItems');
+    if (!holder) return;
+    var html = '';
+    for (var i = 0; i < state.tasks.length; i++) html += renderOutcome(state.tasks[i]);
+    holder.innerHTML = html;
+    show(holder);
+  }
+
+  function renderEmpty(state) {
+    var empty = el('atEmpty');
+    if (!empty) return;
+    var filtered = state.statusFilter || state.priorityFilter;
+    if (filtered) empty.innerHTML = '<lex-empty icon="search" message="No outcomes match these filters" description="Try All or choose a different priority."></lex-empty>';
+    else empty.innerHTML = '<div class="outcomes-first-empty"><span class="outcomes-first-mark">L</span><div><strong>Your agents’ work will collect here.</strong><p>Run an agent from the workspace and return here to review its result, decisions, and deliverables.</p></div><lex-btn id="outcomesEmptyBuildBtn" variant="primary" icon="plus">Build an agent</lex-btn></div>';
+    show(empty);
+  }
 
   function loadTasks(ctx, state) {
-    hide('atItems');
-    hide('atEmpty');
-    hide('atPagination');
-    show('atLoading');
-
+    hide(el('atItems'));
+    hide(el('atEmpty'));
+    hide(el('atPagination'));
+    show(el('atLoading'));
     if (!window.api || typeof window.api.get !== 'function') {
-      var onReady = function () { loadTasks(ctx, state); };
-      state._lexReadyHandler = onReady;
-      document.addEventListener('lex-ready', onReady, { once: true });
+      var ready = function () { loadTasks(ctx, state); };
+      state._lexReadyHandler = ready;
+      document.addEventListener('lex-ready', ready, { once: true });
       return;
     }
-
     var offset = (state.currentPage - 1) * state.pageSize;
     var url = '/api/v1/agentic-tasks?limit=' + state.pageSize + '&offset=' + offset;
     if (state.statusFilter) url += '&execution_status=' + encodeURIComponent(state.statusFilter);
     if (state.priorityFilter) url += '&priority=' + encodeURIComponent(state.priorityFilter);
     url += '&sort_by=created_at&sort_order=desc';
-
-    window.api.get(url)
-      .then(function (resp) {
-        if (state.destroyed) return;
-        hide('atLoading');
-        var tasks = resp.data || [];
-        var pagination = resp.pagination || {};
-        state.totalItems = pagination.total || 0;
-
-        if (tasks.length === 0) {
-          show('atEmpty');
-          return;
+    window.api.get(url).then(function (response) {
+      if (state.destroyed) return;
+      hide(el('atLoading'));
+      state.tasks = response && Array.isArray(response.data) ? response.data : (Array.isArray(response) ? response : []);
+      var pagination = response && response.pagination ? response.pagination : {};
+      state.totalItems = Number(pagination.total != null ? pagination.total : state.tasks.length);
+      updateMetrics(state);
+      if (!state.tasks.length) renderEmpty(state);
+      else renderTasks(state);
+      var totalPages = Math.max(1, Math.ceil(state.totalItems / state.pageSize));
+      if (totalPages > 1) {
+        var paginationEl = el('atPagination');
+        if (paginationEl) {
+          paginationEl.setAttribute('page', String(state.currentPage));
+          paginationEl.setAttribute('total-pages', String(totalPages));
+          paginationEl.setAttribute('total', String(state.totalItems));
+          show(paginationEl);
         }
-
-        var container = el('atItems');
-        if (!container) return;
-
-        var html = '<lex-card padding="compact">';
-        for (var i = 0; i < tasks.length; i++) {
-          html += renderTaskCard(tasks[i]);
-        }
-        html += '</lex-card>';
-        container.innerHTML = html;
-        show('atItems');
-
-        // Click handlers — delegated via container, so cleanup uses one listener.
-        var cards = container.querySelectorAll('.at-task-card');
-        for (var j = 0; j < cards.length; j++) {
-          (function (card) {
-            var cardHandler = function () {
-              var taskId = card.getAttribute('data-task-id');
-              if (taskId) {
-                ctx.app.setView('activityDetail', { id: taskId });
-              }
-            };
-            card.addEventListener('click', cardHandler);
-            state._unbindFns.push(function () { card.removeEventListener('click', cardHandler); });
-          })(cards[j]);
-        }
-
-        var totalPages = Math.ceil(state.totalItems / state.pageSize);
-        if (totalPages > 1) {
-          var pagEl = el('atPagination');
-          if (pagEl) {
-            pagEl.setAttribute('page', String(state.currentPage));
-            pagEl.setAttribute('total-pages', String(totalPages));
-            pagEl.setAttribute('total', String(state.totalItems));
-            show('atPagination');
-          }
-        }
-      })
-      .catch(function (err) {
-        if (state.destroyed) return;
-        hide('atLoading');
-        show('atEmpty');
-        console.error('[AgenticTasksList] Failed to load tasks:', err);
-      });
+      }
+    }).catch(function (err) {
+      if (state.destroyed) return;
+      console.error('[agents] Failed to load outcomes', err);
+      hide(el('atLoading'));
+      var empty = el('atEmpty');
+      if (empty) empty.innerHTML = '<lex-empty icon="alert-circle" message="Outcomes are unavailable" description="Check the LANA Agents service and try again."></lex-empty>';
+      show(empty);
+    });
   }
 
-  // =========================================================================
-  // Lifecycle
-  // =========================================================================
+  function bind(state, node, eventName, handler) {
+    if (!node) return;
+    node.addEventListener(eventName, handler);
+    state._unbindFns.push(function () { node.removeEventListener(eventName, handler); });
+  }
 
   function render(rootEl, ctx) {
     rootEl.innerHTML = TEMPLATE;
-
     var state = createState();
     rootEl._activityState = state;
-
-    var statusFilterEl = el('atStatusFilter');
-    if (statusFilterEl) {
-      var sHandler = function (e) {
-        var val = (e.detail && e.detail.value) || statusFilterEl.value || '';
-        state.statusFilter = (val === 'all') ? '' : val;
-        state.currentPage = 1;
-        loadTasks(ctx, state);
-      };
-      statusFilterEl.addEventListener('lex-change', sHandler);
-      state._unbindFns.push(function () { statusFilterEl.removeEventListener('lex-change', sHandler); });
-    }
-
-    var priorityFilterEl = el('atPriorityFilter');
-    if (priorityFilterEl) {
-      var pHandler = function (e) {
-        state.priorityFilter = (e.detail && e.detail.value !== undefined) ? e.detail.value : '';
-        state.currentPage = 1;
-        loadTasks(ctx, state);
-      };
-      priorityFilterEl.addEventListener('lex-change', pHandler);
-      state._unbindFns.push(function () { priorityFilterEl.removeEventListener('lex-change', pHandler); });
-    }
-
-    var paginationEl = el('atPagination');
-    if (paginationEl) {
-      var pageHandler = function (e) {
-        state.currentPage = e.detail && e.detail.page ? e.detail.page : 1;
-        loadTasks(ctx, state);
-      };
-      paginationEl.addEventListener('page-change', pageHandler);
-      state._unbindFns.push(function () { paginationEl.removeEventListener('page-change', pageHandler); });
-    }
-
+    bind(state, el('outcomesBuildBtn'), 'click', function () { ctx.app.setView('create'); });
+    bind(state, el('atStatusFilter'), 'lex-change', function (event) {
+      var value = (event && event.detail && event.detail.value) || 'all';
+      state.statusFilter = value === 'all' ? '' : value;
+      state.currentPage = 1;
+      loadTasks(ctx, state);
+    });
+    bind(state, el('atPriorityFilter'), 'lex-change', function (event) {
+      state.priorityFilter = event && event.detail && event.detail.value !== undefined ? event.detail.value : '';
+      state.currentPage = 1;
+      loadTasks(ctx, state);
+    });
+    bind(state, el('atPagination'), 'page-change', function (event) {
+      state.currentPage = event && event.detail && event.detail.page ? event.detail.page : 1;
+      loadTasks(ctx, state);
+    });
+    bind(state, el('atItems'), 'click', function (event) {
+      var card = event.target.closest('[data-task-id]');
+      if (card && card.getAttribute('data-task-id')) ctx.app.setView('activityDetail', { id: card.getAttribute('data-task-id') });
+    });
+    bind(state, el('atEmpty'), 'click', function (event) {
+      if (event.target.closest('#outcomesEmptyBuildBtn')) ctx.app.setView('create');
+    });
     loadTasks(ctx, state);
   }
 
@@ -291,14 +238,9 @@
     var state = rootEl && rootEl._activityState;
     if (!state) return;
     state.destroyed = true;
-    if (state._lexReadyHandler) {
-      document.removeEventListener('lex-ready', state._lexReadyHandler);
-      state._lexReadyHandler = null;
-    }
-    if (Array.isArray(state._unbindFns)) {
-      for (var i = 0; i < state._unbindFns.length; i++) {
-        try { state._unbindFns[i](); } catch (e) { /* ignore */ }
-      }
+    if (state._lexReadyHandler) document.removeEventListener('lex-ready', state._lexReadyHandler);
+    for (var i = 0; i < state._unbindFns.length; i++) {
+      try { state._unbindFns[i](); } catch (_err) { /* ignored */ }
     }
     state._unbindFns = [];
     rootEl._activityState = null;

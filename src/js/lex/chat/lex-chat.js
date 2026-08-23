@@ -889,6 +889,12 @@
     clearConversation() {
       this._loadConversationSeq += 1;
       this._props.conversationId = null;
+      this._conversationRegistered = false;
+      this._resolvedMatterId = null;
+      this._pendingDocumentAdds = [];
+      if (this._source && typeof this._source.resetConversation === 'function') {
+        this._source.resetConversation();
+      }
       this._citations = [];
       this._references = [];
       this._artifacts = [];
@@ -955,9 +961,12 @@
               this.emit('lex-chat-conversation-created', { conversationId: event.threadId });
             }
           }
-          // Capture backend-resolved matter ID early (before handler runs)
+          // Keep a backend-resolved matter available for composer searches,
+          // but do not promote it to this.matterId. An ad-hoc conversation
+          // created without a matter remains unscoped; sending the inferred
+          // attachment matter on its next turn violates that immutable scope.
           if (event.matterId && !this.matterId) {
-            this._props.matterId = event.matterId;
+            this._resolvedMatterId = event.matterId;
             // Propagate to the composer so subsequent @-mention searches
             // include matter contacts. (The initial render forwarded
             // whatever matter id was set at mount time; this catches the
@@ -1289,10 +1298,10 @@
             })();
           }
 
-          // Capture backend-resolved matter ID (e.g. resolved from attachment file)
-          // This ensures subsequent messages include the correct matter_id
+          // Preserve the resolved matter for composer lookups only. The
+          // conversation's explicit scope is authoritative for later sends.
           if (event.matterId && !this.matterId) {
-            this._props.matterId = event.matterId;
+            this._resolvedMatterId = event.matterId;
             if (this._composerEl) this._composerEl.matterId = event.matterId;
           }
 

@@ -83,7 +83,8 @@
   }
 
   function fileName(file) {
-    return file.filename || file.original_name || file.original_filename || file.file_name || file.name || 'Untitled file';
+    return file.display_filename || file.original_filename || file.original_name ||
+      file.filename || file.file_name || file.name || 'Untitled file';
   }
 
   function isOrganizationScoped(file) {

@@ -1,14 +1,9 @@
-/* catalog.js — Agents catalog SPA view module.
-   Migrated from src/js/pages/agents.js. Loads agent definitions from
-   GET /api/v1/agents, renders a filterable grid of cards. The Run button
-   opens a run modal; the Configure button opens the detail view. The
-   "Create from template" modal calls POST /api/v1/agents.
+/* catalog.js — Agent Studio workspace home.
+   Combines a plain-language launchpad, deployed-agent roster, governed
+   starting points, and a small outcomes pulse. All durable state remains in
+   the @agents backend; this module only maps DTOs into the workspace view.
 
-   Rules:
-     - IIFE wrapper, no top-level const/class
-     - Internal navigation goes through ctx.app.setView
-     - All HTML escaping via Lex.Utils.escapeHtml()
-     - NO regex — string methods only
+   Rules: IIFE, no regex, escaped dynamic HTML, hash navigation through ctx.app.
 */
 
 'use strict';
@@ -17,796 +12,520 @@
   global.LanaAgentsApp = global.LanaAgentsApp || {};
   global.LanaAgentsApp.Views = global.LanaAgentsApp.Views || {};
 
-  // Markup template — extracted verbatim from src/agents/index.html's
-  // <template id="page-content"> block. Cloned into rootEl on render.
-  var TEMPLATE = ''
-    + '<main class="agents-page-container">'
-
-    + '<lex-banner'
-    +   ' id="agentsBanner"'
-    +   ' variant="light"'
-    +   ' heading="Agents"'
-    +   ' subtitle="Browse and configure system and custom agents."'
-    +   ' lana'
-    +   ' lana-context-type="full_chat"'
-    + '>'
-    +   '<lex-btn id="agentsCreateBtn" variant="primary" icon="plus">Create agent</lex-btn>'
-    + '</lex-banner>'
-
-    + '<div class="agents-filter-bar">'
-    +   '<lex-segmented'
-    +     ' id="agentsFilterTabs"'
-    +     ' value="all"'
-    +     ' options=\'[{"value":"all","label":"All"},{"value":"system","label":"System"},{"value":"custom","label":"Custom"}]\''
-    +   '></lex-segmented>'
-    + '</div>'
-
-    + '<div id="agentsLoading" class="agents-grid">'
-    +   '<div class="agents-card-skeleton" aria-hidden="true">'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--avatar"></div>'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--title"></div>'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--text"></div>'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--text-short"></div>'
-    +   '</div>'
-    +   '<div class="agents-card-skeleton" aria-hidden="true">'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--avatar"></div>'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--title"></div>'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--text"></div>'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--text-short"></div>'
-    +   '</div>'
-    +   '<div class="agents-card-skeleton" aria-hidden="true">'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--avatar"></div>'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--title"></div>'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--text"></div>'
-    +     '<div class="agents-skeleton-line agents-skeleton-line--text-short"></div>'
-    +   '</div>'
-    + '</div>'
-
-    + '<div id="agentsGrid" class="agents-grid hidden"></div>'
-
-    + '<div id="agentsEmpty" class="hidden">'
-    +   '<lex-empty'
-    +     ' icon="bot"'
-    +     ' message="No agents yet"'
-    +     ' description="Agent definitions will appear here once they are configured."'
-    +   '></lex-empty>'
-    + '</div>'
-
-    + '<lex-modal id="agentsRunModal" heading="Run Agent" size="md" data-hoist>'
-    +   '<div class="agents-run-modal-body">'
-    +     '<p class="agents-run-modal-text">'
-    +       'Provide a brief input describing what the agent should do.'
-    +     '</p>'
-    +     '<lex-textarea'
-    +       ' id="agentsRunInput"'
-    +       ' label="Input"'
-    +       ' rows="4"'
-    +       ' placeholder="Describe the task you want this agent to perform..."'
-    +     '></lex-textarea>'
-    +   '</div>'
-    + '</lex-modal>'
-
-    + '<lex-modal'
-    +   ' id="agentsCreateModal"'
-    +   ' heading="Create agent from template"'
-    +   ' size="lg"'
-    +   ' confirm-text="Create"'
-    +   ' cancel-text="Cancel"'
-    +   ' data-hoist'
-    + '>'
-    +   '<div class="agents-create-modal-body">'
-    +     '<p class="agents-create-modal-help">'
-    +       'Pick a template, adjust the name, description, and which tools the '
-    +       'agent may call. Templates own the underlying prompt — those rules '
-    +       'stay locked on the template.'
-    +     '</p>'
-
-    +     '<lex-select'
-    +       ' id="agentsCreateTemplate"'
-    +       ' label="Template"'
-    +       ' placeholder="Choose a template..."'
-    +       ' required'
-    +       ' searchable'
-    +     '></lex-select>'
-
-    +     '<div id="agentsCreateTemplatePreview" class="agents-create-preview hidden">'
-    +       '<div class="agents-create-preview-row">'
-    +         '<span class="agents-create-preview-label">Template</span>'
-    +         '<span id="agentsCreateTemplateSlug" class="agents-create-preview-value"></span>'
-    +       '</div>'
-    +       '<div class="agents-create-preview-row">'
-    +         '<span class="agents-create-preview-label">Description</span>'
-    +         '<span id="agentsCreateTemplateDescription" class="agents-create-preview-value"></span>'
-    +       '</div>'
-    +     '</div>'
-
-    +     '<lex-input'
-    +       ' id="agentsCreateName"'
-    +       ' label="Display name"'
-    +       ' placeholder="e.g. Contract Reviewer"'
-    +       ' required'
-    +     '></lex-input>'
-
-    +     '<lex-textarea'
-    +       ' id="agentsCreateDescription"'
-    +       ' label="Description"'
-    +       ' rows="3"'
-    +       ' placeholder="What this agent will do for your team..."'
-    +     '></lex-textarea>'
-
-    +     '<div class="agents-create-section">'
-    +       '<div class="agents-create-section-label">'
-    +         'Allowed tools'
-    +         '<span class="agents-create-section-hint">'
-    +           "Uncheck tools you don\\'t want this agent to use. The template "
-    +           'defines the maximum set — adding new tools is not supported here.'
-    +         '</span>'
-    +       '</div>'
-    +       '<div id="agentsCreateToolsList" class="agents-create-tools-list">'
-    +         "<span class=\"agents-create-empty-text\">Pick a template to see its tools.</span>"
-    +       '</div>'
-    +     '</div>'
-
-    +     '<lex-select'
-    +       ' id="agentsCreateModelSlot"'
-    +       ' label="Model slot"'
-    +       ' placeholder="Choose a model slot..."'
-    +     '></lex-select>'
-
-    +     '<div class="agents-create-section">'
-    +       '<div class="agents-create-section-label">Schedule</div>'
-    +       '<lex-toggle'
-    +         ' id="agentsCreateScheduleEnabled"'
-    +         ' label="Run this agent on a schedule"'
-    +         ' label-side="right"'
-    +       '></lex-toggle>'
-    +       '<div id="agentsCreateScheduleFields" class="agents-create-schedule-fields hidden">'
-    +         '<lex-input'
-    +           ' id="agentsCreateScheduleCron"'
-    +           ' label="Cron expression"'
-    +           ' placeholder="0 9 * * 1-5"'
-    +           ' help="Standard 5-field cron (minute hour dom month dow)"'
-    +         '></lex-input>'
-    +         '<lex-select'
-    +           ' id="agentsCreateScheduleTimezone"'
-    +           ' label="Timezone"'
-    +           ' placeholder="UTC"'
-    +         '></lex-select>'
-    +       '</div>'
-    +     '</div>'
-    +   '</div>'
-    + '</lex-modal>'
-
-    + '</main>';
-
-  // =========================================================================
-  // Per-render state (closed over by the wired event handlers)
-  // =========================================================================
-
-  function createState() {
-    return {
-      allAgents: [],
-      filter: 'all',
-      selectedSlug: null,
-      templates: [],
-      selectedTpl: null,
-      // Tools the user has unchecked relative to the chosen template's set.
-      // Final allowed_tools = template.allowed_tools - this set.
-      disabledTools: {},
-      // AbortController for in-flight loadAgents, so destroy() can cancel it.
-      loadAbort: null
-    };
-  }
-
-  var COMMON_TZS = [
-    { value: 'UTC',                 label: 'UTC' },
-    { value: 'America/New_York',    label: 'America/New York (Eastern)' },
-    { value: 'America/Chicago',     label: 'America/Chicago (Central)' },
-    { value: 'America/Denver',      label: 'America/Denver (Mountain)' },
-    { value: 'America/Los_Angeles', label: 'America/Los Angeles (Pacific)' },
-    { value: 'Europe/London',       label: 'Europe/London' },
-    { value: 'Europe/Berlin',       label: 'Europe/Berlin' },
-    { value: 'Asia/Singapore',      label: 'Asia/Singapore' },
-    { value: 'Asia/Tokyo',          label: 'Asia/Tokyo' },
-    { value: 'Australia/Sydney',    label: 'Australia/Sydney' }
-  ];
-
-  var MODEL_SLOTS = [
-    { value: 'agentic', label: 'Agentic (planning + tool use)' },
-    { value: 'rag',     label: 'RAG (retrieval-augmented chat)' },
-    { value: 'main',    label: 'Main (general-purpose chat)' }
-  ];
-
   var escHtml = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils && window.Lex.Utils.escapeHtml)
     ? window.Lex.Utils.escapeHtml
     : function (s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; };
 
-  // =========================================================================
-  // Helpers
-  // =========================================================================
+  var timeAgo = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils && window.Lex.Utils.timeAgo)
+    ? window.Lex.Utils.timeAgo
+    : function (s) { return s ? String(s) : ''; };
+
+  var TEMPLATE = ''
+    + '<main class="agents-page-container">'
+    +   '<section class="agents-studio-hero">'
+    +     '<div class="agents-studio-hero-copy">'
+    +       '<span class="agents-studio-eyebrow">LANA Agent Studio</span>'
+    +       '<h1>Turn repeat work into<br><em>reliable outcomes.</em></h1>'
+    +       '<p>Build an agent in a few guided steps, run it when you need it, and see exactly what it produced.</p>'
+    +       '<div class="agents-studio-hero-actions">'
+    +         '<lex-btn id="agentsCreateBtn" variant="primary" size="lg" icon="plus">Build an agent</lex-btn>'
+    +         '<lex-btn id="agentsImportBtn" variant="secondary" size="lg" icon="upload">Bring one from Claude</lex-btn>'
+    +       '</div>'
+    +     '</div>'
+    +     '<div class="agents-studio-orbit" aria-hidden="true">'
+    +       '<div class="agents-studio-orbit-ring agents-studio-orbit-ring--outer"></div>'
+    +       '<div class="agents-studio-orbit-ring agents-studio-orbit-ring--inner"></div>'
+    +       '<div class="agents-studio-orbit-core">L</div>'
+    +       '<span class="agents-studio-orbit-node agents-studio-orbit-node--one">Build</span>'
+    +       '<span class="agents-studio-orbit-node agents-studio-orbit-node--two">Run</span>'
+    +       '<span class="agents-studio-orbit-node agents-studio-orbit-node--three">Review</span>'
+    +     '</div>'
+    +   '</section>'
+
+    +   '<section class="agents-studio-metrics" aria-label="Workspace pulse">'
+    +     '<lex-metric id="agentsMetricDeployed" label="Deployed agents" value="–"></lex-metric>'
+    +     '<lex-metric id="agentsMetricRunning" label="Working now" value="–"></lex-metric>'
+    +     '<lex-metric id="agentsMetricAttention" label="Need your input" value="–"></lex-metric>'
+    +     '<lex-metric id="agentsMetricCompleted" label="Outcomes ready" value="–"></lex-metric>'
+    +   '</section>'
+
+    +   '<section class="agents-studio-journey" aria-labelledby="agentsJourneyTitle">'
+    +     '<div class="agents-studio-section-head">'
+    +       '<div><span class="agents-studio-section-kicker">A simple loop</span><h2 id="agentsJourneyTitle">You always know what happens next.</h2></div>'
+    +     '</div>'
+    +     '<div class="agents-studio-journey-grid">'
+    +       '<button type="button" class="agents-studio-journey-step" data-journey="build"><span class="agents-studio-journey-number">01</span><div><strong>Build</strong><span>Start with the outcome and choose what your agent may use.</span></div><span class="agents-studio-journey-arrow">→</span></button>'
+    +       '<button type="button" class="agents-studio-journey-step" data-journey="run"><span class="agents-studio-journey-number">02</span><div><strong>Run</strong><span>Give it a task yourself or put recurring work on a schedule.</span></div><span class="agents-studio-journey-arrow">→</span></button>'
+    +       '<button type="button" class="agents-studio-journey-step" data-journey="review"><span class="agents-studio-journey-number">03</span><div><strong>Review outcomes</strong><span>Open deliverables, approvals, and a clear record of the work.</span></div><span class="agents-studio-journey-arrow">→</span></button>'
+    +     '</div>'
+    +   '</section>'
+
+    +   '<section class="agents-studio-roster" aria-labelledby="agentsRosterTitle">'
+    +     '<div class="agents-studio-section-head agents-studio-section-head--roster">'
+    +       '<div><span class="agents-studio-section-kicker">Your workspace</span><h2 id="agentsRosterTitle">Agents</h2></div>'
+    +       '<div class="agents-studio-roster-tools">'
+    +         '<lex-input id="agentsSearch" type="search" placeholder="Find an agent..." leading-icon="search" clearable></lex-input>'
+    +         '<lex-segmented id="agentsFilterTabs" value="mine" options=\'[{"value":"mine","label":"My agents"},{"value":"templates","label":"Starting points"}]\'></lex-segmented>'
+    +       '</div>'
+    +     '</div>'
+    +     '<div id="agentsLoading" class="agents-grid">'
+    +       '<div class="agents-card-skeleton" aria-hidden="true"><div class="agents-skeleton-line agents-skeleton-line--avatar"></div><div class="agents-skeleton-line agents-skeleton-line--title"></div><div class="agents-skeleton-line agents-skeleton-line--text"></div><div class="agents-skeleton-line agents-skeleton-line--text-short"></div></div>'
+    +       '<div class="agents-card-skeleton" aria-hidden="true"><div class="agents-skeleton-line agents-skeleton-line--avatar"></div><div class="agents-skeleton-line agents-skeleton-line--title"></div><div class="agents-skeleton-line agents-skeleton-line--text"></div><div class="agents-skeleton-line agents-skeleton-line--text-short"></div></div>'
+    +       '<div class="agents-card-skeleton" aria-hidden="true"><div class="agents-skeleton-line agents-skeleton-line--avatar"></div><div class="agents-skeleton-line agents-skeleton-line--title"></div><div class="agents-skeleton-line agents-skeleton-line--text"></div><div class="agents-skeleton-line agents-skeleton-line--text-short"></div></div>'
+    +     '</div>'
+    +     '<div id="agentsGrid" class="agents-grid hidden"></div>'
+    +     '<div id="agentsEmpty" class="agents-studio-empty hidden"></div>'
+    +   '</section>'
+
+    +   '<section class="agents-studio-recent" aria-labelledby="agentsRecentTitle">'
+    +     '<div class="agents-studio-section-head">'
+    +       '<div><span class="agents-studio-section-kicker">Recent work</span><h2 id="agentsRecentTitle">Outcomes</h2></div>'
+    +       '<lex-btn id="agentsViewOutcomesBtn" variant="ghost" icon-right="arrow-right">See all outcomes</lex-btn>'
+    +     '</div>'
+    +     '<div id="agentsRecentOutcomes" class="agents-studio-outcome-list"><div class="agents-studio-outcome-loading"><lex-spinner size="sm"></lex-spinner><span>Loading recent outcomes...</span></div></div>'
+    +   '</section>'
+
+    +   '<lex-modal id="agentsRunModal" heading="Give this agent a task" size="md" confirm-text="Start run" cancel-text="Cancel" data-hoist>'
+    +     '<div class="agents-run-modal-body"><p id="agentsRunModalText" class="agents-run-modal-text">Describe the outcome you need. You will be able to follow the work live.</p>'
+    +       '<lex-textarea id="agentsRunInput" label="What should it do?" rows="5" auto-resize maxlength="1200" show-count placeholder="Example: Review this week’s open items and prepare a prioritized follow-up list..."></lex-textarea>'
+    +       '<div id="agentsRunWorkspaceField" class="agents-run-workspace-field hidden"><lex-select id="agentsRunWorkspace" label="Where should it work?" placeholder="Choose a workspace..." searchable></lex-select><span id="agentsRunWorkspaceHint">This agent uses the selected workspace’s documents, tasks, and business context.</span></div>'
+    +       '<div class="agents-run-safety"><span>✓</span><p><strong>You stay in control.</strong> This is a real run. Sensitive changes still pause for approval, and its work will appear in Outcomes.</p></div>'
+    +     '</div>'
+    +   '</lex-modal>'
+    + '</main>';
 
   function el(id) { return document.getElementById(id); }
   function show(node) { if (node) node.classList.remove('hidden'); }
   function hide(node) { if (node) node.classList.add('hidden'); }
 
-  function getAvatarLetter(agent) {
-    var name = (agent && (agent.name || agent.slug)) || '';
-    if (!name) return 'A';
-    return String(name).charAt(0).toUpperCase();
-  }
-
   function getKind(agent) {
     if (!agent) return 'custom';
-    if (agent.is_system === true) return 'system';
-    if (agent.is_system === false) return 'custom';
-    if (agent.kind === 'system') return 'system';
-    if (agent.kind === 'custom') return 'custom';
-    if (agent.organization_id === null || agent.organization_id === undefined) {
-      if (agent.org_id) return 'custom';
-      return 'system';
-    }
+    if (agent.is_system === true || agent.kind === 'system') return 'system';
+    if (agent.is_system === false || agent.kind === 'custom') return 'custom';
+    if (agent.organization_id === null || agent.organization_id === undefined) return agent.org_id ? 'custom' : 'system';
     return 'custom';
   }
 
-  function toolName(t) {
-    if (!t) return '';
-    if (typeof t === 'string') return t;
-    return t.name || t.slug || '';
+  function humanize(value) {
+    var parts = String(value || '').split('_').join(' ').split('-').join(' ').split(' ');
+    var words = [];
+    for (var i = 0; i < parts.length; i++) if (parts[i]) words.push(parts[i].charAt(0).toUpperCase() + parts[i].slice(1));
+    return words.join(' ');
   }
 
-  function setVal(id, value) {
-    var n = el(id);
-    if (n) n.value = (value == null ? '' : value);
+  function scheduleLabel(schedule) {
+    if (!schedule || schedule.enabled === false || !schedule.cron) return 'On demand';
+    if (schedule.cron === '0 9 * * 1-5') return 'Weekday mornings';
+    if (schedule.cron === '0 9 * * *') return 'Every morning';
+    if (schedule.cron === '0 9 * * 1') return 'Every Monday';
+    return 'Scheduled';
   }
 
-  function setChecked(id, checked) {
-    var n = el(id);
-    if (n) n.checked = !!checked;
+  function contextProvidersFor(agent) {
+    if (!agent) return [];
+    if (Array.isArray(agent.context_providers)) return agent.context_providers;
+    if (Array.isArray(agent.contextProviders)) return agent.contextProviders;
+    return [];
   }
 
-  // =========================================================================
-  // Rendering
-  // =========================================================================
+  function agentNeedsWorkspace(agent) {
+    var providers = contextProvidersFor(agent);
+    for (var i = 0; i < providers.length; i++) if (providers[i] && providers[i].scope === 'matter') return true;
+    return false;
+  }
 
-  function renderCard(agent) {
+  function workspaceOptions(workspaces) {
+    var options = [];
+    for (var i = 0; i < workspaces.length; i++) {
+      var workspace = workspaces[i] || {};
+      var value = workspace.matter_id || workspace.id;
+      if (!value) continue;
+      var name = workspace.name || workspace.matter_name || workspace.title || String(value);
+      var client = workspace.client_name || (workspace.client && workspace.client.name) || '';
+      options.push({ value: String(value), label: client ? name + ' · ' + client : name });
+    }
+    return options;
+  }
+
+  function buildRunPayload(input, matterId) {
+    var value = String(input || '').trim();
+    var payload = { input: value, title: value.slice(0, 100) };
+    if (matterId) payload.matter_id = matterId;
+    return payload;
+  }
+
+  function createState() {
+    return {
+      allAgents: [],
+      customAgents: [],
+      templates: [],
+      tasks: [],
+      filter: 'mine',
+      query: '',
+      selectedAgent: null,
+      workspaces: [],
+      workspacesLoaded: false,
+      workspacesLoading: false,
+      destroyed: false,
+      _unbindFns: []
+    };
+  }
+
+  function setMetric(id, value) {
+    var metric = el(id);
+    if (metric) metric.value = String(value);
+  }
+
+  function updateMetrics(state) {
+    var running = 0;
+    var attention = 0;
+    var completed = 0;
+    for (var i = 0; i < state.tasks.length; i++) {
+      var status = state.tasks[i].execution_status || state.tasks[i].status || '';
+      if (status === 'running' || status === 'queued' || status === 'compiling_context') running++;
+      if (status === 'awaiting_input' || status === 'awaiting_approval') attention++;
+      if (status === 'completed' || status === 'approved') completed++;
+    }
+    setMetric('agentsMetricDeployed', state.customAgents.filter(function (agent) { return agent.is_active !== false; }).length);
+    setMetric('agentsMetricRunning', running);
+    setMetric('agentsMetricAttention', attention);
+    setMetric('agentsMetricCompleted', completed);
+  }
+
+  function findInstalledAgent(state, template) {
+    for (var i = 0; i < state.customAgents.length; i++) {
+      var agent = state.customAgents[i];
+      if (agent.template_slug === template.slug || agent.slug === template.slug) return agent;
+    }
+    return null;
+  }
+
+  function renderCustomCard(agent) {
     var slug = escHtml(agent.slug || '');
-    var name = escHtml(agent.name || agent.slug || 'Untitled agent');
-    var description = escHtml(agent.description || agent.summary || '');
-    var avatarLetter = escHtml(getAvatarLetter(agent));
-    var kind = getKind(agent);
-    var kindLabel = kind === 'system' ? 'System' : 'Custom';
-
-    return ''
-      + '<lex-card class="agents-card" data-agent-slug="' + slug + '" padding="normal">'
-      +   '<div class="agents-card-header">'
-      +     '<div class="agents-card-avatar" aria-hidden="true">' + avatarLetter + '</div>'
-      +     '<div class="agents-card-title-block">'
-      +       '<div class="agents-card-title">' + name + '</div>'
-      +       (slug ? '<div class="agents-card-slug">' + slug + '</div>' : '')
-      +     '</div>'
-      +     '<span class="agents-card-kind-badge agents-card-kind-badge--' + escHtml(kind) + '">' + kindLabel + '</span>'
-      +   '</div>'
-      +   (description ? '<div class="agents-card-description">' + description + '</div>' : '')
-      +   '<div class="agents-card-actions">'
-      +     '<lex-btn variant="primary" size="sm" data-action="run" data-agent-slug="' + slug + '">Run</lex-btn>'
-      +     '<lex-btn variant="ghost" size="sm" data-action="configure" data-agent-slug="' + slug + '">Configure</lex-btn>'
-      +   '</div>'
-      + '</lex-card>';
+    var name = escHtml(agent.name || humanize(agent.slug) || 'Untitled agent');
+    var description = escHtml(agent.description || agent.summary || 'Ready for your next task.');
+    var active = agent.is_active !== false;
+    var tools = Array.isArray(agent.allowed_tools) ? agent.allowed_tools.length : 0;
+    return '<article class="agents-card agents-card--deployed" data-agent-slug="' + slug + '">'
+      + '<div class="agents-card-top"><span class="agents-card-avatar">' + escHtml((agent.name || agent.slug || 'A').charAt(0).toUpperCase()) + '</span>'
+      + '<span class="agents-card-status ' + (active ? 'agents-card-status--live' : 'agents-card-status--paused') + '"><i></i>' + (active ? 'Deployed' : 'Paused') + '</span></div>'
+      + '<div class="agents-card-body"><h3>' + name + '</h3><p>' + description + '</p></div>'
+      + '<div class="agents-card-facts"><span>' + tools + ' capabilit' + (tools === 1 ? 'y' : 'ies') + '</span><span>' + escHtml(scheduleLabel(agent.schedule)) + '</span></div>'
+      + '<div class="agents-card-actions"><lex-btn variant="primary" size="sm" icon="play" data-action="run" data-agent-slug="' + slug + '"' + (active ? '' : ' disabled') + '>Run agent</lex-btn>'
+      + '<lex-btn variant="ghost" size="sm" data-action="open" data-agent-slug="' + slug + '">Open</lex-btn></div></article>';
   }
 
-  function applyFilter(state, agents) {
-    if (state.filter === 'all') return agents;
-    return agents.filter(function (a) { return getKind(a) === state.filter; });
+  function renderTemplateCard(state, template) {
+    var slug = escHtml(template.slug || '');
+    var name = escHtml(template.name || humanize(template.slug));
+    var description = escHtml(template.description || 'A governed LANA starting point.');
+    var tools = Array.isArray(template.allowed_tools) ? template.allowed_tools.length : 0;
+    var installed = findInstalledAgent(state, template);
+    return '<article class="agents-card agents-card--template" data-agent-slug="' + slug + '">'
+      + '<div class="agents-card-top"><span class="agents-card-avatar agents-card-avatar--template">' + escHtml((template.name || template.slug || 'A').charAt(0).toUpperCase()) + '</span>'
+      + '<span class="agents-card-status agents-card-status--starter">' + (installed ? 'Already added' : 'Starting point') + '</span></div>'
+      + '<div class="agents-card-body"><h3>' + name + '</h3><p>' + description + '</p></div>'
+      + '<div class="agents-card-facts"><span>' + tools + ' built-in capabilit' + (tools === 1 ? 'y' : 'ies') + '</span><span>Governed template</span></div>'
+      + '<div class="agents-card-actions">'
+      + (installed
+        ? '<lex-btn variant="secondary" size="sm" data-action="open" data-agent-slug="' + escHtml(installed.slug) + '">Open agent</lex-btn>'
+        : '<lex-btn variant="primary" size="sm" icon="plus" data-action="use-template" data-agent-slug="' + slug + '">Use this starting point</lex-btn>')
+      + '<lex-btn variant="ghost" size="sm" data-action="preview" data-agent-slug="' + slug + '">Preview</lex-btn></div></article>';
+  }
+
+  function matchesSearch(agent, query) {
+    if (!query) return true;
+    var haystack = [agent.name, agent.slug, agent.description, agent.summary].join(' ').toLowerCase();
+    return haystack.indexOf(query.toLowerCase()) !== -1;
   }
 
   function renderGrid(state) {
     var grid = el('agentsGrid');
-    var emptyEl = el('agentsEmpty');
-    var loadingEl = el('agentsLoading');
-    if (!grid) return;
-
-    hide(loadingEl);
-
-    var filtered = applyFilter(state, state.allAgents);
-
-    if (filtered.length === 0) {
+    var empty = el('agentsEmpty');
+    if (!grid || !empty) return;
+    hide(el('agentsLoading'));
+    var source = state.filter === 'templates' ? state.templates : state.customAgents;
+    var filtered = source.filter(function (agent) { return matchesSearch(agent, state.query); });
+    if (!filtered.length) {
+      grid.innerHTML = '';
       hide(grid);
-      show(emptyEl);
+      if (state.query) {
+        empty.innerHTML = '<lex-empty icon="search" message="No agents match that search" description="Try a different name or clear the search."></lex-empty>';
+      } else if (state.filter === 'mine') {
+        empty.innerHTML = '<div class="agents-studio-first-agent"><span class="agents-studio-first-mark">01</span><div><strong>Your first agent starts with one repeatable outcome.</strong><p>Choose a starting point, describe the job in your own words, and deploy it when everything looks right.</p></div><lex-btn id="agentsEmptyCreateBtn" variant="primary" icon="plus">Build your first agent</lex-btn></div>';
+      } else {
+        empty.innerHTML = '<lex-empty icon="bot" message="No starting points available" description="Ask an administrator to seed the LANA agent catalog."></lex-empty>';
+      }
+      show(empty);
       return;
     }
-
     var html = '';
-    for (var i = 0; i < filtered.length; i++) {
-      html += renderCard(filtered[i]);
-    }
+    for (var i = 0; i < filtered.length; i++) html += state.filter === 'templates' ? renderTemplateCard(state, filtered[i]) : renderCustomCard(filtered[i]);
     grid.innerHTML = html;
-    hide(emptyEl);
+    hide(empty);
     show(grid);
   }
 
-  // =========================================================================
-  // Data
-  // =========================================================================
+  function statusLabel(status) {
+    if (status === 'awaiting_input') return 'Needs your input';
+    if (status === 'awaiting_approval') return 'Ready for approval';
+    if (status === 'compiling_context') return 'Getting ready';
+    if (status === 'running') return 'Working now';
+    if (status === 'queued') return 'Queued';
+    if (status === 'completed' || status === 'approved') return 'Outcome ready';
+    if (status === 'failed') return 'Needs attention';
+    if (status === 'cancelled') return 'Cancelled';
+    return humanize(status || 'pending');
+  }
 
-  function loadAgents(state) {
-    var grid = el('agentsGrid');
-    var loadingEl = el('agentsLoading');
-    var emptyEl = el('agentsEmpty');
-    hide(grid);
-    hide(emptyEl);
-    show(loadingEl);
+  function statusClass(status) {
+    if (status === 'completed' || status === 'approved') return 'ready';
+    if (status === 'awaiting_input' || status === 'awaiting_approval') return 'attention';
+    if (status === 'running' || status === 'queued' || status === 'compiling_context') return 'working';
+    if (status === 'failed' || status === 'rejected') return 'issue';
+    return 'neutral';
+  }
 
-    if (!window.api || typeof window.api.get !== 'function') {
-      // Defer until api is ready. The destroy() hook removes this listener
-      // by aborting via state.loadAbort below.
-      var onReady = function () { loadAgents(state); };
-      state._lexReadyHandler = onReady;
-      document.addEventListener('lex-ready', onReady, { once: true });
+  function renderRecentOutcomes(state) {
+    var holder = el('agentsRecentOutcomes');
+    if (!holder) return;
+    if (!state.tasks.length) {
+      holder.innerHTML = '<div class="agents-studio-outcomes-empty"><span>No outcomes yet.</span><strong>Run an agent and its work will appear here.</strong></div>';
       return;
     }
-
-    window.api.get('/api/v1/agents')
-      .then(function (resp) {
-        if (state.destroyed) return;
-        var agents = [];
-        if (Array.isArray(resp)) agents = resp;
-        else if (resp && Array.isArray(resp.data)) agents = resp.data;
-        else if (resp && Array.isArray(resp.agents)) agents = resp.agents;
-        state.allAgents = agents;
-        renderGrid(state);
-      })
-      .catch(function (err) {
-        if (state.destroyed) return;
-        console.error('[agents] Failed to load agents:', err);
-        state.allAgents = [];
-        showLoadError(state, err);
-      });
-  }
-
-  function showLoadError(state, err) {
-    var grid = el('agentsGrid');
-    var loadingEl = el('agentsLoading');
-    var emptyEl = el('agentsEmpty');
-    hide(loadingEl);
-    hide(grid);
-    if (!emptyEl) return;
-
-    var status = err && (err.status || (err.response && err.response.status));
-    var icon = 'alert-circle';
-    var title = 'Unable to load agents';
-    var description = 'Something went wrong. Try again.';
-
-    if (status === 401) {
-      title = 'Session expired';
-      description = 'Your session expired. Please sign in again.';
-      if (window.Lex && window.Lex.Nav) window.Lex.Nav.go('login.html');
-    } else if (status === 404) {
-      title = 'Agents unavailable';
-      description = 'The agents service is not available on this server.';
+    var html = '';
+    var limit = Math.min(4, state.tasks.length);
+    for (var i = 0; i < limit; i++) {
+      var task = state.tasks[i];
+      var status = task.execution_status || task.status || 'pending';
+      var title = escHtml(task.name || task.title || 'Agent outcome');
+      var description = escHtml(task.task_description || task.description || 'Open this outcome to review the work.');
+      html += '<button type="button" class="agents-studio-outcome" data-outcome-id="' + escHtml(task.id || '') + '">'
+        + '<span class="agents-studio-outcome-dot agents-studio-outcome-dot--' + statusClass(status) + '"></span>'
+        + '<span class="agents-studio-outcome-copy"><strong>' + title + '</strong><small>' + description + '</small></span>'
+        + '<span class="agents-studio-outcome-meta"><strong>' + escHtml(statusLabel(status)) + '</strong><small>' + escHtml(task.created_at ? timeAgo(task.created_at) : '') + '</small></span>'
+        + '<span class="agents-studio-outcome-arrow">→</span></button>';
     }
-
-    emptyEl.innerHTML = '<lex-empty icon="' + escHtml(icon)
-      + '" message="' + escHtml(title)
-      + '" description="' + escHtml(description) + '"></lex-empty>';
-    show(emptyEl);
+    holder.innerHTML = html;
   }
 
-  // =========================================================================
-  // Event handlers
-  // =========================================================================
+  function loadAgents(state) {
+    if (!window.api || typeof window.api.get !== 'function') {
+      var ready = function () { loadAgents(state); };
+      state._lexReadyHandler = ready;
+      document.addEventListener('lex-ready', ready, { once: true });
+      return;
+    }
+    window.api.get('/api/v1/agents').then(function (response) {
+      if (state.destroyed) return;
+      var agents = Array.isArray(response) ? response : ((response && (response.data || response.agents)) || []);
+      state.allAgents = Array.isArray(agents) ? agents : [];
+      state.customAgents = state.allAgents.filter(function (agent) { return getKind(agent) === 'custom'; });
+      state.templates = state.allAgents.filter(function (agent) { return getKind(agent) === 'system'; });
+      if (!state.customAgents.length) {
+        state.filter = 'templates';
+        var filter = el('agentsFilterTabs');
+        if (filter) filter.value = 'templates';
+      }
+      updateMetrics(state);
+      renderGrid(state);
+    }).catch(function (err) {
+      if (state.destroyed) return;
+      console.error('[agents] Failed to load workspace agents', err);
+      hide(el('agentsLoading'));
+      var empty = el('agentsEmpty');
+      if (empty) empty.innerHTML = '<lex-empty icon="alert-circle" message="Agent workspace unavailable" description="Check the LANA Agents service and try again."></lex-empty>';
+      show(empty);
+    });
+  }
 
-  function navigateToDetail(ctx, slug) {
-    if (!slug) return;
-    ctx.app.setView('agentDetail', { slug: slug });
+  function loadRecentOutcomes(state) {
+    if (!window.api || typeof window.api.get !== 'function') return;
+    window.api.get('/api/v1/agentic-tasks?limit=50&offset=0&sort_by=created_at&sort_order=desc').then(function (response) {
+      if (state.destroyed) return;
+      state.tasks = response && Array.isArray(response.data) ? response.data : (Array.isArray(response) ? response : []);
+      updateMetrics(state);
+      renderRecentOutcomes(state);
+    }).catch(function (err) {
+      if (state.destroyed) return;
+      console.warn('[agents] Recent outcomes unavailable', err);
+      state.tasks = [];
+      updateMetrics(state);
+      renderRecentOutcomes(state);
+    });
+  }
+
+  function findAgent(state, slug) {
+    for (var i = 0; i < state.allAgents.length; i++) if (state.allAgents[i].slug === slug) return state.allAgents[i];
+    return null;
   }
 
   function openRunModal(state, slug) {
-    state.selectedSlug = slug;
+    var agent = findAgent(state, slug);
+    state.selectedAgent = agent || { slug: slug };
     var modal = el('agentsRunModal');
     var input = el('agentsRunInput');
-    if (input && typeof input.value !== 'undefined') input.value = '';
+    var workspace = el('agentsRunWorkspace');
+    var workspaceField = el('agentsRunWorkspaceField');
+    if (input) input.value = '';
+    if (workspace) workspace.value = '';
+    if (agentNeedsWorkspace(state.selectedAgent)) {
+      show(workspaceField);
+      loadRunWorkspaces(state);
+    } else {
+      hide(workspaceField);
+    }
     if (modal) {
-      modal.heading = 'Run Agent: ' + slug;
+      modal.heading = 'Run ' + (state.selectedAgent.name || humanize(slug));
       modal.open = true;
     }
   }
 
-  function submitRun(ctx, state) {
-    if (!state.selectedSlug) return;
-    var input = el('agentsRunInput');
-    var value = input && typeof input.value !== 'undefined' ? input.value : '';
-    if (!value || !String(value).trim()) {
-      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Please describe what the agent should do.');
-      return;
-    }
-
-    if (!window.api || typeof window.api.post !== 'function') return;
-
-    window.api.post('/api/v1/agents/' + encodeURIComponent(state.selectedSlug) + '/runs', {
-      input: String(value).trim()
-    })
-      .then(function (resp) {
-        if (state.destroyed) return;
-        var runId = (resp && resp.run && resp.run.id)
-                 || (resp && resp.data && resp.data.id)
-                 || (resp && resp.id)
-                 || (resp && resp.run_id);
-        var modal = el('agentsRunModal');
-        if (modal) modal.open = false;
-        if (window.Lex && window.Lex.Toast) window.Lex.Toast.success('Run started');
-        if (runId) {
-          ctx.app.setView('agentRun', { runId: runId });
-        } else {
-          console.warn('[agents] Run started but no id in response:', resp);
-          if (window.Lex && window.Lex.Toast) {
-            window.Lex.Toast.info('Run started, but we could not open the live view.');
-          }
-        }
-      })
-      .catch(function (err) {
-        if (state.destroyed) return;
-        console.error('[agents] Run start failed:', err);
-        var status = err && (err.status || (err.response && err.response.status));
-        var msg = 'Unable to start run';
-        if (status === 401) msg = 'Your session expired. Please sign in again.';
-        else if (status === 404) msg = 'This agent no longer exists.';
-        if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(msg);
-      });
+  function populateRunWorkspaces(state) {
+    var select = el('agentsRunWorkspace');
+    if (!select) return;
+    select.options = workspaceOptions(state.workspaces);
+    select.disabled = false;
+    if (!state.workspaces.length) setText('agentsRunWorkspaceHint', 'No active workspaces are available. Create or activate one before starting this agent.');
+    else setText('agentsRunWorkspaceHint', 'This agent uses the selected workspace’s documents, tasks, and business context.');
   }
 
-  function wireGridDelegation(rootEl, ctx, state) {
-    var grid = el('agentsGrid');
-    if (!grid) return;
-    var handler = function (evt) {
-      var actionBtn = evt.target.closest('[data-action]');
-      var card = evt.target.closest('[data-agent-slug]');
-      if (!card) return;
-
-      var slug = (actionBtn && actionBtn.getAttribute('data-agent-slug'))
-        || card.getAttribute('data-agent-slug');
-
-      if (actionBtn) {
-        evt.stopPropagation();
-        var action = actionBtn.getAttribute('data-action');
-        if (action === 'run') {
-          openRunModal(state, slug);
-        } else if (action === 'configure') {
-          navigateToDetail(ctx, slug);
-        }
-        return;
-      }
-
-      navigateToDetail(ctx, slug);
-    };
-    grid.addEventListener('click', handler);
-    state._unbindFns.push(function () { grid.removeEventListener('click', handler); });
+  function setText(id, value) {
+    var node = el(id);
+    if (node) node.textContent = value == null ? '' : String(value);
   }
 
-  function wireFilters(state) {
-    var filterEl = el('agentsFilterTabs');
-    if (!filterEl) return;
-    var handler = function (e) {
-      var v = (e.detail && e.detail.value) || (filterEl.value) || 'all';
-      state.filter = v;
-      renderGrid(state);
-    };
-    filterEl.addEventListener('lex-change', handler);
-    state._unbindFns.push(function () { filterEl.removeEventListener('lex-change', handler); });
-  }
-
-  function wireRunModal(ctx, state) {
-    var modal = el('agentsRunModal');
-    if (!modal) return;
-    var handler = function () { submitRun(ctx, state); };
-    modal.addEventListener('lex-confirm', handler);
-    state._unbindFns.push(function () { modal.removeEventListener('lex-confirm', handler); });
-  }
-
-  // =========================================================================
-  // Create-from-template modal
-  // =========================================================================
-
-  function openCreateModal(state) {
-    var modal = el('agentsCreateModal');
-    if (!modal) return;
-    populateCreateModal(state);
-    modal.open = true;
-  }
-
-  function populateCreateModal(state) {
-    state.selectedTpl = null;
-    state.disabledTools = {};
-
-    state.templates = (state.allAgents || []).filter(function (a) {
-      return getKind(a) === 'system';
+  function loadRunWorkspaces(state) {
+    if (state.workspacesLoaded) { populateRunWorkspaces(state); return; }
+    if (state.workspacesLoading || !window.api || typeof window.api.getMatters !== 'function') return;
+    state.workspacesLoading = true;
+    var select = el('agentsRunWorkspace');
+    if (select) select.disabled = true;
+    setText('agentsRunWorkspaceHint', 'Loading active workspaces...');
+    window.api.getMatters(1, 100, { status: 'active', sort_by: 'updated_at', sort_order: 'desc' }).then(function (response) {
+      if (state.destroyed) return;
+      var matters = Array.isArray(response) ? response : ((response && (response.matters || response.data)) || []);
+      state.workspaces = Array.isArray(matters) ? matters : [];
+      state.workspacesLoaded = true;
+      state.workspacesLoading = false;
+      populateRunWorkspaces(state);
+    }).catch(function () {
+      if (state.destroyed) return;
+      state.workspaces = [];
+      state.workspacesLoading = false;
+      if (select) select.disabled = false;
+      setText('agentsRunWorkspaceHint', 'Workspaces could not be loaded. Close this window and try again.');
     });
-
-    var tplSelect = el('agentsCreateTemplate');
-    if (tplSelect) {
-      tplSelect.options = state.templates.map(function (t) {
-        return {
-          value: t.slug,
-          label: t.name || t.slug,
-          description: t.description || ''
-        };
-      });
-      tplSelect.value = '';
-    }
-
-    var modelSelect = el('agentsCreateModelSlot');
-    if (modelSelect) {
-      modelSelect.options = MODEL_SLOTS.slice();
-      modelSelect.value = 'agentic';
-    }
-
-    var tzSelect = el('agentsCreateScheduleTimezone');
-    if (tzSelect) {
-      tzSelect.options = COMMON_TZS.slice();
-      tzSelect.value = 'UTC';
-    }
-
-    setVal('agentsCreateName', '');
-    setVal('agentsCreateDescription', '');
-    setVal('agentsCreateScheduleCron', '');
-    setChecked('agentsCreateScheduleEnabled', false);
-
-    hide(el('agentsCreateScheduleFields'));
-    hide(el('agentsCreateTemplatePreview'));
-
-    var toolsList = el('agentsCreateToolsList');
-    if (toolsList) {
-      toolsList.innerHTML = '<span class="agents-create-empty-text">Pick a template to see its tools.</span>';
-    }
   }
 
-  function onTemplateChange(state, evt) {
-    var v = (evt && evt.detail && evt.detail.value) || (el('agentsCreateTemplate') && el('agentsCreateTemplate').value) || '';
-    if (!v) {
-      state.selectedTpl = null;
-      hide(el('agentsCreateTemplatePreview'));
-      return;
-    }
-
-    var tpl = null;
-    for (var i = 0; i < state.templates.length; i++) {
-      if (state.templates[i].slug === v) { tpl = state.templates[i]; break; }
-    }
-    state.selectedTpl = tpl;
-    if (!tpl) return;
-
-    setVal('agentsCreateName', tpl.name || tpl.slug || '');
-    setVal('agentsCreateDescription', tpl.description || '');
-
-    var slotEl = el('agentsCreateModelSlot');
-    if (slotEl && tpl.model_slot) slotEl.value = tpl.model_slot;
-
-    state.disabledTools = {};
-    renderToolsCheckboxes(tpl.allowed_tools || []);
-
-    var preview = el('agentsCreateTemplatePreview');
-    if (preview) {
-      var slugEl = el('agentsCreateTemplateSlug');
-      var descEl = el('agentsCreateTemplateDescription');
-      if (slugEl) slugEl.textContent = tpl.slug || '';
-      if (descEl) descEl.textContent = tpl.description || '(no description)';
-      show(preview);
-    }
+  function submitRun(ctx, state) {
+    if (!state.selectedAgent || !state.selectedAgent.slug) return;
+    var input = el('agentsRunInput');
+    var value = input && input.value != null ? String(input.value).trim() : '';
+    if (!value) { if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Describe the outcome you need first.'); return; }
+    var workspace = el('agentsRunWorkspace');
+    var matterId = workspace && workspace.value ? String(workspace.value) : '';
+    if (agentNeedsWorkspace(state.selectedAgent) && !matterId) { if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Choose the workspace where this agent should work.'); return; }
+    var modal = el('agentsRunModal');
+    if (modal) modal.loading = true;
+    window.api.post('/api/v1/agents/' + encodeURIComponent(state.selectedAgent.slug) + '/runs', buildRunPayload(value, matterId)).then(function (response) {
+      if (state.destroyed) return;
+      var runId = (response && response.run && response.run.id) || (response && response.data && response.data.id) || (response && response.id) || (response && response.run_id);
+      if (modal) { modal.loading = false; modal.open = false; }
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.success('Agent started');
+      if (runId) ctx.app.setView('agentRun', { runId: runId });
+      else ctx.app.setView('activity');
+    }).catch(function (err) {
+      if (state.destroyed) return;
+      if (modal) modal.loading = false;
+      var status = err && (err.status || (err.response && err.response.status));
+      var message = status === 403 ? 'You do not have permission to run this agent.' : 'LANA could not start this agent.';
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(message);
+    });
   }
 
-  function renderToolsCheckboxes(tools) {
-    var toolsList = el('agentsCreateToolsList');
-    if (!toolsList) return;
-
-    if (!tools || tools.length === 0) {
-      toolsList.innerHTML = '<span class="agents-create-empty-text">This template doesn\'t expose any tools.</span>';
-      return;
-    }
-
-    var html = '';
-    for (var i = 0; i < tools.length; i++) {
-      var name = toolName(tools[i]);
-      if (!name) continue;
-      var safe = escHtml(name);
-      html += '<label class="agents-create-tool-row">'
-            + '<input type="checkbox" class="agents-create-tool-checkbox" data-tool="' + safe + '" checked />'
-            + '<span class="agents-create-tool-name">' + safe + '</span>'
-            + '</label>';
-    }
-    toolsList.innerHTML = html;
+  function bind(state, node, eventName, handler) {
+    if (!node) return;
+    node.addEventListener(eventName, handler);
+    state._unbindFns.push(function () { node.removeEventListener(eventName, handler); });
   }
 
-  function onToolToggle(state, evt) {
-    var input = evt.target.closest('.agents-create-tool-checkbox');
-    if (!input) return;
-    var name = input.getAttribute('data-tool');
-    if (!name) return;
-    if (input.checked) {
-      delete state.disabledTools[name];
-    } else {
-      state.disabledTools[name] = true;
-    }
+  function wire(rootEl, ctx, state) {
+    bind(state, el('agentsCreateBtn'), 'click', function () { ctx.app.setView('create'); });
+    bind(state, el('agentsImportBtn'), 'click', function () { ctx.app.setView('create', { mode: 'import' }); });
+    bind(state, el('agentsViewOutcomesBtn'), 'click', function () { ctx.app.setView('activity'); });
+    bind(state, el('agentsFilterTabs'), 'lex-change', function (event) {
+      state.filter = (event && event.detail && event.detail.value) || 'mine';
+      renderGrid(state);
+    });
+    bind(state, el('agentsSearch'), 'lex-input', function (event) {
+      state.query = (event && event.detail && event.detail.value) || '';
+      renderGrid(state);
+    });
+    bind(state, el('agentsEmpty'), 'click', function (event) {
+      if (event.target.closest('#agentsEmptyCreateBtn')) ctx.app.setView('create');
+    });
+    bind(state, document.querySelector('.agents-studio-journey-grid'), 'click', function (event) {
+      var step = event.target.closest('[data-journey]');
+      if (!step) return;
+      var action = step.getAttribute('data-journey');
+      if (action === 'build') ctx.app.setView('create');
+      else if (action === 'review') ctx.app.setView('activity');
+      else {
+        state.filter = 'mine';
+        var filter = el('agentsFilterTabs');
+        if (filter) filter.value = 'mine';
+        renderGrid(state);
+        var roster = document.querySelector('.agents-studio-roster');
+        if (roster) roster.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+    bind(state, el('agentsGrid'), 'click', function (event) {
+      var button = event.target.closest('[data-action]');
+      var card = event.target.closest('[data-agent-slug]');
+      if (!button && !card) return;
+      var slug = (button && button.getAttribute('data-agent-slug')) || (card && card.getAttribute('data-agent-slug'));
+      var action = button && button.getAttribute('data-action');
+      if (!button) { ctx.app.setView('agentDetail', { slug: slug }); return; }
+      event.stopPropagation();
+      if (action === 'run') openRunModal(state, slug);
+      if (action === 'open' || action === 'preview') ctx.app.setView('agentDetail', { slug: slug });
+      if (action === 'use-template') ctx.app.setView('create', { templateSlug: slug });
+    });
+    bind(state, el('agentsRecentOutcomes'), 'click', function (event) {
+      var row = event.target.closest('[data-outcome-id]');
+      if (row && row.getAttribute('data-outcome-id')) ctx.app.setView('activityDetail', { id: row.getAttribute('data-outcome-id') });
+    });
+    bind(state, el('agentsRunModal'), 'lex-confirm', function () { submitRun(ctx, state); });
   }
-
-  function onScheduleEnabledChange(evt) {
-    var checked = !!(evt && evt.detail && evt.detail.value);
-    var fields = el('agentsCreateScheduleFields');
-    if (!fields) return;
-    if (checked) show(fields); else hide(fields);
-  }
-
-  function buildCreateBody(state) {
-    if (!state.selectedTpl) return null;
-
-    var name = (el('agentsCreateName') && el('agentsCreateName').value) || '';
-    var description = (el('agentsCreateDescription') && el('agentsCreateDescription').value) || '';
-    var modelSlot = (el('agentsCreateModelSlot') && el('agentsCreateModelSlot').value) || '';
-
-    var tplTools = (state.selectedTpl.allowed_tools || []).map(toolName).filter(Boolean);
-    var allowedTools = tplTools.filter(function (t) { return !state.disabledTools[t]; });
-
-    var body = {
-      template_slug: state.selectedTpl.slug,
-      name: String(name).trim() || state.selectedTpl.name || state.selectedTpl.slug,
-      description: String(description).trim(),
-      allowed_tools: allowedTools
-    };
-    if (modelSlot) body.model_slot = modelSlot;
-
-    var scheduleOn = !!(el('agentsCreateScheduleEnabled') && el('agentsCreateScheduleEnabled').checked);
-    if (scheduleOn) {
-      var cron = (el('agentsCreateScheduleCron') && el('agentsCreateScheduleCron').value) || '';
-      var tz = (el('agentsCreateScheduleTimezone') && el('agentsCreateScheduleTimezone').value) || 'UTC';
-      body.schedule = {
-        enabled: true,
-        cron: String(cron).trim(),
-        timezone: tz
-      };
-    }
-
-    return body;
-  }
-
-  function submitCreate(ctx, state) {
-    var body = buildCreateBody(state);
-    if (!body) {
-      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Please pick a template first.');
-      return;
-    }
-    if (!body.name) {
-      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Display name is required.');
-      return;
-    }
-    if (body.schedule && body.schedule.enabled && !body.schedule.cron) {
-      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Schedule is enabled but no cron expression was provided.');
-      return;
-    }
-
-    if (!window.api || typeof window.api.post !== 'function') return;
-
-    window.api.post('/api/v1/agents', body)
-      .then(function (resp) {
-        if (state.destroyed) return;
-        var agent = (resp && resp.agent) ? resp.agent
-                  : ((resp && resp.data) ? resp.data : resp);
-        var slug = agent && agent.slug;
-
-        var modal = el('agentsCreateModal');
-        if (modal) modal.open = false;
-        populateCreateModal(state);
-
-        if (window.Lex && window.Lex.Toast) {
-          window.Lex.Toast.success('Agent created');
-        }
-
-        loadAgents(state);
-
-        if (slug) {
-          ctx.app.setView('agentDetail', { slug: slug });
-        }
-      })
-      .catch(function (err) {
-        if (state.destroyed) return;
-        console.error('[agents] Create failed:', err);
-        var status = err && (err.status || (err.response && err.response.status));
-        var msg = 'Unable to create agent';
-        if (status === 400) msg = 'Some fields look invalid. Check name and tools.';
-        else if (status === 401) msg = 'Your session expired. Please sign in again.';
-        else if (status === 403) msg = 'You do not have permission to create agents.';
-        else if (status === 404) msg = 'Agent creation is not available on this server.';
-        else if (status === 409) msg = 'An agent with that name already exists.';
-        if (window.Lex && window.Lex.Toast) window.Lex.Toast.error(msg);
-        if (status === 401 && window.Lex && window.Lex.Nav) {
-          window.Lex.Nav.go('login.html');
-        }
-      });
-  }
-
-  function wireCreateModal(ctx, state) {
-    // PHASE 8 — full-screen create view supersedes this in-template modal.
-    // The banner's Create button now navigates to '#create' rather than
-    // opening agentsCreateModal.
-    var btn = el('agentsCreateBtn');
-    if (btn) {
-      var openHandler = function () {
-        if (ctx && ctx.app && typeof ctx.app.setView === 'function') {
-          ctx.app.setView('create', {});
-        } else {
-          // LEGACY fallback — only hit if the SPA shell isn't wired,
-          // which shouldn't happen in practice.
-          openCreateModal(state);
-        }
-      };
-      btn.addEventListener('click', openHandler);
-      state._unbindFns.push(function () { btn.removeEventListener('click', openHandler); });
-    }
-
-    // LEGACY: Phase 8 follow-up — remove once #create view is canonical.
-    var modal = el('agentsCreateModal');
-    if (modal) {
-      var confirmHandler = function () { submitCreate(ctx, state); };
-      modal.addEventListener('lex-confirm', confirmHandler);
-      state._unbindFns.push(function () { modal.removeEventListener('lex-confirm', confirmHandler); });
-    }
-
-    // LEGACY: Phase 8 follow-up — remove once #create view is canonical.
-    var tplSelect = el('agentsCreateTemplate');
-    if (tplSelect) {
-      var tplHandler = function (e) { onTemplateChange(state, e); };
-      tplSelect.addEventListener('lex-change', tplHandler);
-      state._unbindFns.push(function () { tplSelect.removeEventListener('lex-change', tplHandler); });
-    }
-
-    // LEGACY: Phase 8 follow-up — remove once #create view is canonical.
-    var toolsList = el('agentsCreateToolsList');
-    if (toolsList) {
-      var toolHandler = function (e) { onToolToggle(state, e); };
-      toolsList.addEventListener('change', toolHandler);
-      state._unbindFns.push(function () { toolsList.removeEventListener('change', toolHandler); });
-    }
-
-    // LEGACY: Phase 8 follow-up — remove once #create view is canonical.
-    var schedToggle = el('agentsCreateScheduleEnabled');
-    if (schedToggle) {
-      schedToggle.addEventListener('lex-change', onScheduleEnabledChange);
-      state._unbindFns.push(function () { schedToggle.removeEventListener('lex-change', onScheduleEnabledChange); });
-    }
-  }
-
-  // =========================================================================
-  // Lifecycle
-  // =========================================================================
 
   function render(rootEl, ctx) {
     rootEl.innerHTML = TEMPLATE;
-
     var state = createState();
-    state._unbindFns = [];
-    state.destroyed = false;
     rootEl._catalogState = state;
-
-    wireFilters(state);
-    wireGridDelegation(rootEl, ctx, state);
-    wireRunModal(ctx, state);
-    wireCreateModal(ctx, state);
+    wire(rootEl, ctx, state);
     loadAgents(state);
+    loadRecentOutcomes(state);
   }
 
   function destroy(rootEl) {
     var state = rootEl && rootEl._catalogState;
     if (!state) return;
     state.destroyed = true;
-    if (state._lexReadyHandler) {
-      document.removeEventListener('lex-ready', state._lexReadyHandler);
-      state._lexReadyHandler = null;
-    }
-    if (Array.isArray(state._unbindFns)) {
-      for (var i = 0; i < state._unbindFns.length; i++) {
-        try { state._unbindFns[i](); } catch (e) { /* ignore */ }
-      }
+    if (state._lexReadyHandler) document.removeEventListener('lex-ready', state._lexReadyHandler);
+    for (var i = 0; i < state._unbindFns.length; i++) {
+      try { state._unbindFns[i](); } catch (_err) { /* ignored */ }
     }
     state._unbindFns = [];
     rootEl._catalogState = null;
   }
 
-  global.LanaAgentsApp.Views.catalog = { render: render, destroy: destroy };
+  global.LanaAgentsApp.Views.catalog = {
+    render: render,
+    destroy: destroy,
+    __test: {
+      agentNeedsWorkspace: agentNeedsWorkspace,
+      buildRunPayload: buildRunPayload
+    }
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

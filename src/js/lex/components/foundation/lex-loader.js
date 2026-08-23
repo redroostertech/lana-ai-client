@@ -44,6 +44,7 @@
         align-items: center;
         justify-content: center;
         opacity: 0;
+        pointer-events: none;
         transition: opacity 0.3s ease;
         cursor: pointer;
         overflow: hidden;
@@ -52,6 +53,7 @@
       }
       #lex-loader-overlay.lex-loader-visible {
         opacity: 1;
+        pointer-events: auto;
       }
 
       /* ── Theme: dark ────────────────────────────────────── */

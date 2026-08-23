@@ -1,10 +1,11 @@
 /* Document Library page (document-library.html). */
 
 .document-library {
+  box-sizing: border-box;
   display: block;
-  margin: 0 auto;
-  max-width: 1180px;
-  padding: 2rem 0 48px;
+  margin: 0;
+  max-width: none;
+  padding: 2rem;
   width: 100%;
 }
 
@@ -363,10 +364,6 @@ lex-card.document-library-recents {
 }
 
 @media (max-width: 820px) {
-  .document-library {
-    padding-top: 1rem;
-  }
-
   .document-library-columns,
   .document-library-file {
     gap: 12px;
@@ -379,11 +376,13 @@ lex-card.document-library-recents {
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .document-library {
-    padding-bottom: 28px;
+    padding: 1rem;
   }
+}
 
+@media (max-width: 600px) {
   .document-library-section-heading {
     align-items: flex-start;
     min-height: auto;
@@ -421,7 +420,7 @@ lex-card.document-library-recents {
 
 @media (max-width: 480px) {
   .document-library {
-    padding-top: 0.75rem;
+    padding: 0.75rem;
   }
 }
 

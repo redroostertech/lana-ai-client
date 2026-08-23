@@ -9,8 +9,48 @@ const css = fs.readFileSync(path.join(SRC, 'css/file-editor.css'), 'utf8');
 const editor = fs.readFileSync(path.join(SRC, 'js/file-editor.js'), 'utf8');
 const viewer = fs.readFileSync(path.join(SRC, 'js/file-viewer-page.js'), 'utf8');
 const createModal = fs.readFileSync(path.join(SRC, 'js/services/document-create-modal.js'), 'utf8');
+const chatComposer = fs.readFileSync(path.join(SRC, 'js/lex/chat/lex-chat.composer.js'), 'utf8');
 
 describe('File Editor live document boundary', () => {
+  test('uses the original filename for visible editor titles while retaining the storage-safe name', () => {
+    expect(editor).toContain('function documentDisplayFilename(file)');
+    expect(editor).toContain('value.display_filename || value.original_filename');
+    expect(editor).toContain('storageFilename: file.filename || displayFilename');
+    expect(editor).toContain('title: displayFilename');
+    expect(editor).toContain('filename: displayFilename');
+  });
+
+  test('mounts a document-scoped LANA dock for editor AI actions', () => {
+    expect(html).toContain('<lex-lana-dock');
+    expect(html).toContain('page-scope="file-editor"');
+    expect(html).toContain('context-type="document_chat"');
+    expect(html).toContain('default-tool="document_chat"');
+    expect(editor).toContain('function officeConversationMatterId(file)');
+    expect(editor).toContain('matterId: officeConversationMatterId(file) || null');
+    expect(chatComposer).toContain("'tracked_change'");
+    expect(chatComposer).toContain("moduleContext.type !== 'ui_card' && !documentContext");
+  });
+
+  test('enriches native editor AI context and stages document-edit suggestions for user approval', () => {
+    const contextSource = editor.slice(
+      editor.indexOf('function embedLanaFocusedContext(file, detail)'),
+      editor.indexOf('async function mountLanaEditorForFile(file)')
+    );
+
+    expect(contextSource).toContain("? 'document_edit'");
+    expect(contextSource).toContain("? 'editor_revision'");
+    expect(contextSource).toContain("context.context_type = contextType");
+    expect(contextSource).toContain('context.edit_intent = Object.assign({}, detail.edit_intent)');
+    expect(contextSource).toContain('return officeFileCardContext(file, context)');
+    expect(contextSource).toContain('var blockPattern = /```(?:lana-document-edit|json)?');
+    expect(contextSource).toContain("parsed.type !== 'document_edit_suggestion'");
+    expect(contextSource).toContain('editor.stageSuggestedEdit({');
+    expect(contextSource).toContain('strategy: pending.strategy || suggestion.strategy');
+    expect(contextSource).toContain("detail.context.kind === 'selection'");
+    expect(contextSource).toContain('cardContext: focusedContext');
+    expect(editor).toContain("document.addEventListener('lex-lana-response-end'");
+  });
+
   test('is a focused single-document surface, not another dashboard', () => {
     ['save', 'share', 'export', 'sign', 'show-review-details'].forEach((action) => {
       expect(html).toContain('data-action="' + action + '"');
@@ -70,11 +110,22 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('data-margin="normal"');
     expect(editor).toContain('data-margin="wide"');
     expect(editor).toContain('data-action="toggle-show-changes"');
+    expect(editor).toContain('function officeHasUnreleasedChanges(file)');
+    expect(editor).toContain("review.session.unreleasedRevisions(review.liveReviewState).length > 0");
+    expect(editor).toContain('function officeHasReleaseComparison(file)');
+    expect(editor).toContain("if (officeHasUnreleasedChanges(file)) return 'draft';");
+    expect(editor).toContain("if (officeHasReleaseComparison(file)) return 'release';");
+    expect(editor).toContain('Show or hide this release against the previous release');
+    expect(editor).toContain("if (officeTrackedChangesMode(file) === 'none')");
+    expect(editor).toContain('async function resolveOfficeConversationMatterContext(storageMatterId)');
+    expect(editor).toContain('matterNumber: conversationMatter && conversationMatter.matterId');
     expect(editor).toContain('data-action="add-selection-comment"');
     expect(editor).toContain('data-action="ask-lana-selection"');
     expect(editor).toContain("contextToolbar.innerHTML = '<div class=\"office-doc-toolbar\"");
     expect(editor).toContain("'<div class=\"office-doc-ruler office-doc-ruler-' + marginPreset");
     expect(editor).not.toContain("panel.innerHTML = '<div class=\"office-doc-canvas\">' +\n      '<div class=\"office-doc-toolbar\"");
+    expect(css).toContain('.office-lana-editor-host--final .le-page span.le-rev[data-rev-type="fmt"]');
+    expect(css).toContain('.office-lana-editor-host--release-compare .le-page span.le-rev.lee-rev-baseline[data-rev-type="fmt"]');
 
     ['officeEditorStatusBar', 'officeSaveStatus', 'officePageCount', 'officeWordCount', 'officeCharacterCount', 'officeTokenCount', 'officeParagraphCount', 'officeReadingTime'].forEach((id) => {
       expect(html).toContain('id="' + id + '"');
@@ -85,6 +136,48 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain("['officeTokenCount', 'Tokens '");
     expect(editor).toContain("['officeParagraphCount', 'Paragraphs '");
     expect(editor).toContain("['officeReadingTime', 'Reading time '");
+  });
+
+  test('renders semantic formatting revisions from the shared review datasource', () => {
+    expect(editor).toContain('service.formatChangeDetailsFromRevision(item)');
+    expect(editor).toContain('? service.changeLabel(item)');
+    expect(editor).toContain('review.liveReviewState && (review.dirty || review.restored)');
+  });
+
+  test('binds undo and redo availability to the live Lana Editor history', () => {
+    const historySource = editor.slice(
+      editor.indexOf('function officeHistoryAvailability(file, editor)'),
+      editor.indexOf('function renderDoc(file, panel)')
+    );
+    const mountSource = editor.slice(
+      editor.indexOf('async function mountLanaEditorForFile(file)'),
+      editor.indexOf('function nowIso()')
+    );
+    const actionSource = editor.slice(
+      editor.indexOf('async function applyEmbedHistoryCommand(file, command)'),
+      editor.indexOf('async function applyEmbedMarkCommand(file, mark, ranges)')
+    );
+
+    expect(editor).toContain('data-command="undo" data-format="undo" title="Undo" disabled aria-disabled="true"');
+    expect(editor).toContain('data-command="redo" data-format="redo" title="Redo" disabled aria-disabled="true"');
+    expect(historySource).toContain("undo: available('canUndo', 'undo')");
+    expect(historySource).toContain("redo: available('canRedo', 'redo')");
+    expect(historySource).toContain('button.disabled = !enabled');
+    expect(historySource).toContain("button.setAttribute('aria-disabled', enabled ? 'false' : 'true')");
+    expect(historySource).toContain("activeEditor.editorMode() === 'review'");
+    expect(historySource).toContain('officeEditorHostEl !== currentHost');
+    expect(historySource).not.toContain('prototype');
+    expect(historySource).not.toContain('historyCount');
+
+    ['document-loaded', 'change-applied', 'change-decision', 'review-state-changed'].forEach((event) => {
+      expect(mountSource).toContain("mountedEditor.on('" + event + "'");
+    });
+    expect(mountSource).toContain('await activeEditor.open_file(input);');
+    expect(mountSource).toContain('syncOfficeHistoryControls(file, activeEditor);');
+    expect(mountSource).toContain("activeEditor.setMode('review');");
+    expect(editor).toContain("if (typeof editor.clearHistory === 'function') editor.clearHistory();");
+    expect(actionSource).toContain('var changed = await officeEditorInstance[command]();');
+    expect(actionSource).toContain('finally {\n      syncOfficeHistoryControls(file, officeEditorInstance);');
   });
 
   test('has one shared persistent footer below both editor and review surfaces', () => {
@@ -195,9 +288,15 @@ describe('File Editor live document boundary', () => {
     expect(reviewRailSource).not.toContain('class="file-editor-pending-approval"');
     expect(reviewRailSource).not.toContain('data-action="show-review-details"');
     expect(reviewRailSource).toContain('!serverState.pendingReleaseBatch');
-    expect(reviewRailSource).toContain("releaseButton.dataset.action = hasPendingApproval ? 'view-release-approval' : 'release-review-version'");
+    expect(reviewRailSource).toContain("releaseButton.dataset.action = hasPendingApproval ? pendingApprovalAction : 'release-review-version'");
     expect(reviewRailSource).toContain('hasPendingApproval || canReleaseVersion');
-    expect(reviewRailSource).toContain("? 'View Pending Approval'");
+    expect(reviewRailSource).toContain('pendingApprovalLabel');
+    expect(editor).toContain("return pendingReleaseNeedsApprovalRestart(review) ? 'retry-release-approval' : 'view-release-approval'");
+    expect(editor).toContain("payload: { retry_approval: true }");
+    expect(editor).toContain("toast('Release approval restarted.')");
+    expect(editor).toContain("isDeletion: service.isDeletionChange(change)");
+    expect(editor).toContain("isInsertion: service.isInsertionChange(change)");
+    expect(reviewRailSource).toContain("change.isDeletion ? '' : '<span class=\"office-review-diff-add\"");
     expect(editor).toContain("Lex.Nav.go('approval-detail.html', { params: { id: approvalReview.pendingApprovalId } })");
     expect(editor).toContain("Lex.Nav.go('approvals.html', { params: { status: 'pending' } })");
     expect(commentButtonAt).toBeGreaterThan(-1);
@@ -206,6 +305,35 @@ describe('File Editor live document boundary', () => {
     expect(saveButton).not.toContain('disabled');
     expect(editor).toContain("if (action === 'save' && file)");
     expect(editor).toContain('await saveServerDraft(file, { silent: true })');
+  });
+
+  test('streams live review state into distinct new-draft and pending-approval history groups', () => {
+    const mountSource = editor.slice(
+      editor.indexOf('async function mountLanaEditorForFile(file)'),
+      editor.indexOf('function nowIso()')
+    );
+    const applySource = editor.slice(
+      editor.indexOf('function applyServerReviewToFile(file)'),
+      editor.indexOf('function scheduleServerDraftSave(file)')
+    );
+    const railSource = editor.slice(
+      editor.indexOf('function renderDocReviewRail(file)'),
+      editor.indexOf('function createFile(kind)')
+    );
+
+    expect(mountSource).toContain("mountedEditor.on('review-state-changed', function (reviewState)");
+    expect(mountSource).toContain('handleServerEmbedEvent(file, reviewState || null)');
+    expect(editor).toContain('function serverPendingApprovalDisplayChanges(file)');
+    expect(applySource).toContain("{ section: 'unreleased' }");
+    expect(applySource).toContain("{ section: 'pending-approval' }");
+    expect(applySource).toContain("row.status = 'Pending'");
+    expect(applySource).toContain("row.status = 'Pending approval'");
+    expect(applySource).toContain('pendingRows.concat(pendingApprovalRows, releasedRows)');
+    expect(railSource).toContain("change.serverSection === 'pending-approval'");
+    expect(railSource).toContain("change.serverSection !== 'pending-approval'");
+    expect(railSource).toContain("hasPendingApproval ? 'New draft' : 'Unreleased'");
+    expect(railSource).toContain('<h5>Pending approval</h5>');
+    expect(railSource).toContain('unreleasedHtml + pendingApprovalHtml + releasedChangesHistoryHtml + releasedHistoryHtml');
   });
 
   test('registers one SPA initializer with explicit leave cleanup', () => {

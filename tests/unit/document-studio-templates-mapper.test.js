@@ -132,6 +132,18 @@ describe('document-studio-templates-mapper', () => {
   });
 
   describe('mapTemplateRow', () => {
+    test('prefers the original filename supplied by the document projection', () => {
+      const row = mapper.mapTemplateRow({
+        kind: 'fill',
+        id: 'doc-1',
+        name: 'Client_Affidavit.docx',
+        original_filename: 'Client Affidavit.docx',
+        display_filename: 'Client Affidavit.docx'
+      });
+
+      expect(row.name).toBe('Client Affidavit.docx');
+    });
+
     test('maps a compose DTO with counts and labels', () => {
       const row = mapper.mapTemplateRow({
         kind: 'compose',
@@ -298,6 +310,7 @@ describe('document-studio-templates-mapper', () => {
         name: 'Intake Form',
         document_type: 'intake',
         variable_count: 7,
+        version: 4,
         matter_id: 'M-100',
         status: 'active',
         scope: 'matter'
@@ -305,6 +318,7 @@ describe('document-studio-templates-mapper', () => {
       expect(detail.sections[0].title).toBe('Document template');
       const f = fieldMap(detail.sections[0]);
       expect(f['Document type']).toBe('intake');
+      expect(f['Released version']).toBe('4');
       expect(f.Variables).toBe('7');
       // The field is labeled Workspace and falls back to the matter key when
       // no workspace name accompanies the row.

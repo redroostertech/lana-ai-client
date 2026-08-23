@@ -1018,6 +1018,15 @@
   color: var(--lex-text-accent);
 }
 
+.office-ruler-actions .office-show-changes-toggle:disabled,
+.office-ruler-actions .office-show-changes-toggle[aria-disabled="true"] {
+  background: var(--office-panel-bg);
+  border-color: var(--office-line-subtle);
+  color: var(--lex-text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
 .office-show-changes-toggle svg {
   height: var(--lex-icon-small);
   width: var(--lex-icon-small);
@@ -1979,11 +1988,21 @@
   text-decoration: none;
 }
 
-/* Baseline redlines (released in an earlier version and embedded in the
-   opened document bytes) always render as final, accepted text in the
-   editor, regardless of the Show changes toggle. Only unreleased draft
-   marks keep the redline treatment above; cross-version comparison lives
-   in the File Viewer. */
+.office-lana-editor-host.office-lana-editor-host--final .le-page span.le-rev[data-rev-type="fmt"],
+.office-lana-editor-host.office-lana-editor-host--final .le-page p.le-rev[data-rev-type="fmt"] {
+  background: transparent;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+.office-lana-editor-host.office-lana-editor-host--final .le-page .le-rev[data-rev-type="fmt"]:hover {
+  outline: none;
+}
+
+/* Baseline redlines are embedded in released document bytes. They stay final
+   while editing an unreleased draft (the draft compares against that release),
+   then become visible when a released document compares itself with its
+   previous release. */
 .office-lana-editor-host .le-page del.lee-rev-baseline,
 .office-lana-editor-host .le-page [data-rev-type="del"].lee-rev-baseline {
   display: none;
@@ -2000,8 +2019,53 @@
   cursor: text;
 }
 
+.office-lana-editor-host .le-page span.le-rev.lee-rev-baseline[data-rev-type="fmt"],
+.office-lana-editor-host .le-page p.le-rev.lee-rev-baseline[data-rev-type="fmt"] {
+  background: transparent;
+  box-shadow: none;
+  text-decoration: none;
+}
+
 .office-lana-editor-host .le-page .le-rev.lee-rev-baseline:hover {
   outline: none;
+}
+
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page del.lee-rev-baseline,
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page [data-rev-type="del"].lee-rev-baseline {
+  background: #f7e8e6;
+  color: #b03a2e;
+  display: inline;
+  text-decoration: line-through;
+  text-decoration-color: #b03a2e;
+}
+
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page ins.lee-rev-baseline,
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page [data-rev-type="ins"].lee-rev-baseline {
+  background: #e6f2ec;
+  color: #1e6f4c;
+  text-decoration: underline;
+  text-decoration-color: #1e6f4c;
+}
+
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page .le-rev.lee-rev-baseline {
+  cursor: pointer;
+}
+
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page span.le-rev.lee-rev-baseline[data-rev-type="fmt"] {
+  background: rgba(124, 92, 173, 0.08);
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: #7c5cad;
+  text-decoration-thickness: 1px;
+}
+
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page p.le-rev.lee-rev-baseline[data-rev-type="fmt"] {
+  box-shadow: inset 3px 0 0 rgba(124, 92, 173, 0.45);
+}
+
+.office-lana-editor-host.office-lana-editor-host--release-compare .le-page .le-rev.lee-rev-baseline:hover {
+  outline: 2px solid rgba(29, 39, 51, 0.35);
+  outline-offset: 1px;
 }
 
 /* Toolbar controls not yet supported for tracked documents are disabled with

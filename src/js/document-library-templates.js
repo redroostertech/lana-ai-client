@@ -403,9 +403,10 @@
   }
 
   /**
-   * Editable DOCX templates (fill rows are documents) open in the File
-   * Editor. sourceMatterId always carries the hosting workspace key, even for
-   * org-wide templates whose visible scope hides it.
+   * Editable DOCX templates (fill rows are documents) can create a separate
+   * regular document or open the template itself in File Editor.
+   * sourceMatterId always carries the hosting workspace key, even for org-wide
+   * templates whose visible scope hides it.
    */
   function _canOpenInFileEditor(base) {
     return !!(base && base.kind === 'fill' && base.sourceMatterId &&
@@ -441,7 +442,8 @@
 
     if (_canOpenInFileEditor(detail.base)) {
       html += '<div class="dst-detail-actions">' +
-        '<lex-btn id="dstOpenInEditor" variant="primary" size="sm">Open in File Editor</lex-btn>' +
+        '<lex-btn id="dstUseTemplate" variant="primary" size="sm" leading-icon="file-plus">Use Template</lex-btn>' +
+        '<lex-btn id="dstOpenInEditor" variant="secondary" size="sm">Edit Template</lex-btn>' +
         '</div>';
     }
 
@@ -451,11 +453,29 @@
 
   /** Wire the drawer's File Editor action after its HTML lands. */
   function _bindDetailActions(body, dto) {
-    var btn = body.querySelector('#dstOpenInEditor');
-    if (!btn) return;
-    btn.addEventListener('click', function () {
-      var base = mapper.mapTemplateRow(dto);
-      if (!_canOpenInFileEditor(base)) return;
+    var base = mapper.mapTemplateRow(dto);
+    if (!_canOpenInFileEditor(base)) return;
+
+    var useBtn = body.querySelector('#dstUseTemplate');
+    if (useBtn) useBtn.addEventListener('click', function () {
+      if (!window.LanaDocumentCreate || typeof window.LanaDocumentCreate.open !== 'function') {
+        Lex.Toast.error('Document creation is unavailable on this page.');
+        return;
+      }
+      window.LanaDocumentCreate.open({
+        source: 'template_library_use',
+        sourceTemplate: {
+          id: base.id,
+          name: base.name,
+          sourceMatterId: base.sourceMatterId,
+          version: base.version
+        }
+      });
+    });
+
+    var editBtn = body.querySelector('#dstOpenInEditor');
+    if (!editBtn) return;
+    editBtn.addEventListener('click', function () {
       if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
         Lex.Nav.go('file-editor.html', {
           params: { id: base.id, matter_id: base.sourceMatterId },

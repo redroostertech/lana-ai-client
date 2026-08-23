@@ -175,8 +175,18 @@
       if (this.disabled) return;
       this.emit('lex-ask-lana-click', {});
 
-      // Dock-first: when the page hosts the LANA dock, the button's only
-      // job is to open it with this surface's context injected.
+      // An explicit panel target is authoritative. Some document surfaces
+      // host a focused drawer and the universal shell dock at the same time;
+      // routing those buttons to the shell dock bypasses the drawer's file
+      // attachment, module-context, and conversation bootstrap handlers.
+      if (this.panel && !this._panelEl) this._panelEl = document.getElementById(this.panel);
+      if (this.panel && this._panelEl && typeof this._panelEl.toggle === 'function') {
+        this._panelEl.toggle();
+        return;
+      }
+
+      // Without an explicit panel, open the universal dock with this
+      // surface's context injected.
       var dock = document.querySelector('lex-lana-dock');
       if (dock && typeof dock.openWith === 'function') {
         dock.openWith({
@@ -188,7 +198,6 @@
         return;
       }
 
-      // Legacy: auto-toggle connected drawer panel
       if (this._panelEl && typeof this._panelEl.toggle === 'function') {
         this._panelEl.toggle();
       }

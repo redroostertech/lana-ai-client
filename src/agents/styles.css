@@ -17,4 +17,8 @@
  * styles from the per-page files above.
  */
 
-/* Reserved for future app-shell rules. */
+/* Keep every Agent Studio view on the canonical Lex product typeface.
+   Technical surfaces (JSON, traces, tool ids) opt into mono locally. */
+#lex-main-content {
+  font-family: var(--lex-font-sans, system-ui, sans-serif);
+}

@@ -109,6 +109,85 @@ describe('LanaDocumentReview grouping and serialization', () => {
     expect(scripts[0].ops).toEqual([{ op: 'deleteText', range: { paragraph: 1, start: 0, end: 13 } }]);
   });
 
+  test('persists semantic font before/after values without rewriting the format operation', () => {
+    const session = review.createReviewSession();
+    const formatOp = {
+      op: 'formatText',
+      range: { paragraph: 0, start: 0, end: 5 },
+      marks: { font: 'Times New Roman' }
+    };
+    const changes = session.persistableChanges({
+      revisions: [{
+        id: 'font-1',
+        type: 'fmt',
+        text: 'Alpha',
+        author: 'Michael',
+        date: '2026-08-21T18:00:00Z',
+        formatKind: 'text',
+        formatBefore: {
+          font: 'Arial', size: 11, bold: false, italic: false,
+          underline: false, strike: false, superscript: false,
+          subscript: false, color: '#112233', highlight: null
+        },
+        formatAfter: {
+          font: 'Times New Roman', size: 11, bold: false, italic: false,
+          underline: false, strike: false, superscript: false,
+          subscript: false, color: '#112233', highlight: null
+        },
+        editScript: { version: '0', author: 'Michael', date: '2026-08-21T18:00:00Z', ops: [formatOp] }
+      }]
+    });
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      operation: 'format',
+      original_text: 'Font: Arial',
+      proposed_text: 'Font: Times New Roman',
+      edit_script: { ops: [formatOp] },
+      anchor: { revision_id: 'font-1', revision_type: 'fmt' },
+      metadata: {
+        format_change: {
+          kind: 'text',
+          properties: ['font'],
+          before: { font: 'Arial' },
+          after: { font: 'Times New Roman' }
+        }
+      }
+    });
+    expect(review.changeLabel(changes[0])).toBe('Font');
+    expect(review.changeLabel(Object.assign({}, changes[0], {
+      released_in: { release_number: 8 }
+    }))).toBe('Font');
+    expect(review.persistedDraftChangePayload(changes[0])).toMatchObject({
+      operation: 'format',
+      original_text: 'Font: Arial',
+      proposed_text: 'Font: Times New Roman',
+      edit_script: { ops: [formatOp] },
+      metadata: { format_change: { properties: ['font'] } }
+    });
+  });
+
+  test('audits size, marks, color, and alignment with readable semantic values', () => {
+    const text = review.formatChangeDetailsFromRevision({
+      type: 'fmt',
+      formatKind: 'text',
+      formatBefore: { size: 11, bold: false, italic: false, underline: false, color: '#111111' },
+      formatAfter: { size: 14, bold: true, italic: true, underline: true, color: '#AABBCC' }
+    });
+    expect(text.properties).toEqual(['size', 'bold', 'italic', 'underline', 'color']);
+    expect(text.originalText).toBe('Size: 11 pt; Bold: Off; Italic: Off; Underline: Off; Text color: #111111');
+    expect(text.proposedText).toBe('Size: 14 pt; Bold: On; Italic: On; Underline: On; Text color: #AABBCC');
+
+    const paragraph = review.formatChangeDetailsFromRevision({
+      type: 'fmt',
+      formatKind: 'paragraph',
+      formatBefore: { alignment: 'left' },
+      formatAfter: { alignment: 'both' }
+    });
+    expect(paragraph.originalText).toBe('Alignment: Left');
+    expect(paragraph.proposedText).toBe('Alignment: Justified');
+  });
+
   test('preserves every current Lana Editor operation and its script provenance', () => {
     const ops = [
       { op: 'insertText', at: { paragraph: 0, start: 0 }, text: 'A' },
@@ -155,15 +234,15 @@ describe('LanaDocumentReview API workflows', () => {
     const api = makeApi([
       {
         match: 'GET /api/v1/matters/MATT-1/documents/released-doc/releases?limit=20',
-        reply: { data: [], metadata: { source_document_id: 'source-doc', current_document_is_release: true } }
+        reply: { data: [{ id: 'rel-7', released_document_id: 'released-doc', file_version_id: 'fv-7', release_number: 7, edit_batch_id: 'batch-7' }], metadata: { source_document_id: 'source-doc', current_document_is_release: true } }
       },
       {
         match: 'GET /api/v1/matters/MATT-1/documents/source-doc/releases?limit=20',
-        reply: { data: [{ id: 'rel-7', release_number: 7, edit_batch_id: 'batch-7' }], metadata: { source_document_id: 'source-doc' } }
+        reply: { data: [{ id: 'rel-7', released_document_id: 'released-doc', file_version_id: 'fv-7', release_number: 7, edit_batch_id: 'batch-7' }], metadata: { source_document_id: 'source-doc' } }
       },
       {
         match: /^GET \/api\/v1\/matters\/MATT-1\/document-edit-batches\?document_id=source-doc/,
-        reply: { data: [{ id: 'draft-1', status: 'draft' }, { id: 'old-1', status: 'released' }] }
+        reply: { data: [{ id: 'draft-1', status: 'draft', base_file_version_id: 'fv-7' }, { id: 'old-1', status: 'released' }] }
       },
       {
         match: 'GET /api/v1/matters/MATT-1/document-edit-batches/draft-1',
@@ -175,9 +254,34 @@ describe('LanaDocumentReview API workflows', () => {
 
     expect(workflow.sourceDocumentId).toBe('source-doc');
     expect(workflow.currentDocumentIsRelease).toBe(true);
+    expect(workflow.currentBaseFileVersionId).toBe('fv-7');
     expect(workflow.releases).toHaveLength(1);
     expect(workflow.currentDraftBatch.changes).toHaveLength(1);
     expect(workflow.pendingReleaseBatch).toBeNull();
+  });
+
+  test('loadWorkflow does not replay a draft from another release version', async () => {
+    const release = { id: 'rel-8', released_document_id: 'released-doc-8', file_version_id: 'fv-8', release_number: 8 };
+    const api = makeApi([
+      {
+        match: 'GET /api/v1/matters/MATT-1/documents/released-doc-8/releases?limit=20',
+        reply: { data: [release], metadata: { source_document_id: 'source-doc', current_document_is_release: true } }
+      },
+      {
+        match: 'GET /api/v1/matters/MATT-1/documents/source-doc/releases?limit=20',
+        reply: { data: [release], metadata: { source_document_id: 'source-doc' } }
+      },
+      {
+        match: /^GET \/api\/v1\/matters\/MATT-1\/document-edit-batches\?document_id=source-doc/,
+        reply: { data: [{ id: 'stale-draft', status: 'draft', base_file_version_id: 'fv-7' }] }
+      }
+    ]);
+
+    const workflow = await review.loadWorkflow({ api, matterId: 'MATT-1', documentId: 'released-doc-8' });
+
+    expect(workflow.currentBaseFileVersionId).toBe('fv-8');
+    expect(workflow.currentDraftBatch).toBeNull();
+    expect(api.calls.some((call) => call.endpoint.includes('/document-edit-batches/stale-draft'))).toBe(false);
   });
 
   test('saveDraftBatch PATCHes an active draft and POSTs a new one', async () => {
@@ -249,7 +353,14 @@ describe('LanaDocumentReview API workflows', () => {
       },
       {
         match: 'GET /api/v1/matters/MATT-1/document-edit-batches/pending-1',
-        reply: { data: { id: 'pending-1', status: 'pending_release', changes: [{ change_key: 'c1' }] } }
+        reply: {
+          data: {
+            id: 'pending-1',
+            status: 'pending_release',
+            changes: [{ change_key: 'c1' }],
+            release_approval: { id: 'approval-1', status: 'expired' }
+          }
+        }
       }
     ]);
 
@@ -257,6 +368,7 @@ describe('LanaDocumentReview API workflows', () => {
 
     expect(workflow.currentDraftBatch).toBeNull();
     expect(workflow.pendingReleaseBatch.changes).toHaveLength(1);
+    expect(workflow.pendingReleaseBatch.release_approval).toEqual({ id: 'approval-1', status: 'expired' });
     expect(workflow.pendingDetailFailed).toBe(false);
   });
 

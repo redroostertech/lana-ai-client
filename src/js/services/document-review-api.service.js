@@ -74,6 +74,92 @@
     return operation === 'insert' || operation === 'ins' || operation === 'add' || operation === 'added';
   }
 
+  function isFormattingChange(change) {
+    var operation = reviewChangeOperation(change);
+    return operation === 'fmt' || operation === 'format' || operation === 'formatting';
+  }
+
+  var FORMAT_PROPERTY_LABELS = {
+    font: 'Font',
+    size: 'Size',
+    bold: 'Bold',
+    italic: 'Italic',
+    underline: 'Underline',
+    strike: 'Strikethrough',
+    superscript: 'Superscript',
+    subscript: 'Subscript',
+    color: 'Text color',
+    highlight: 'Highlight',
+    alignment: 'Alignment',
+    style: 'Style',
+    list: 'List',
+    indent: 'Indent',
+    horizontalRule: 'Horizontal rule'
+  };
+
+  var FORMAT_PROPERTY_ORDER = [
+    'font', 'size', 'bold', 'italic', 'underline', 'strike',
+    'superscript', 'subscript', 'color', 'highlight', 'alignment',
+    'style', 'list', 'indent', 'horizontalRule'
+  ];
+
+  function sameFormatValue(left, right) {
+    if (left === right) return true;
+    if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+    try { return JSON.stringify(left) === JSON.stringify(right); } catch (_) { return false; }
+  }
+
+  function formatValueText(key, value) {
+    if (value === null || value === undefined || value === '') return 'Default / inherited';
+    if (typeof value === 'boolean') return value ? 'On' : 'Off';
+    if (key === 'size') return String(value) + ' pt';
+    if (key === 'indent') return String(value) + ' pt';
+    if (key === 'alignment') {
+      var alignment = String(value);
+      if (alignment === 'both') return 'Justified';
+      return alignment.charAt(0).toUpperCase() + alignment.slice(1);
+    }
+    if (key === 'list' && value && typeof value === 'object') {
+      return value.numId
+        ? 'List ' + value.numId + ', level ' + (Number(value.level || 0) + 1)
+        : 'List, level ' + (Number(value.level || 0) + 1);
+    }
+    return String(value);
+  }
+
+  function formatSummary(snapshot, properties) {
+    var source = snapshot && typeof snapshot === 'object' ? snapshot : {};
+    return (Array.isArray(properties) ? properties : []).map(function (key) {
+      return FORMAT_PROPERTY_LABELS[key] + ': ' + formatValueText(key, source[key]);
+    }).join('; ');
+  }
+
+  function formatChangeDetailsFromRevision(revision) {
+    if (!revision) return null;
+    var before = revision.formatBefore || revision.format_before || null;
+    var after = revision.formatAfter || revision.format_after || null;
+    var kind = revision.formatKind || revision.format_kind || null;
+    if ((!before || !after) && revision.metadata && revision.metadata.format_change) {
+      var persisted = revision.metadata.format_change;
+      before = before || persisted.before || null;
+      after = after || persisted.after || null;
+      kind = kind || persisted.kind || null;
+    }
+    if (!before || !after) return null;
+    var properties = FORMAT_PROPERTY_ORDER.filter(function (key) {
+      return !sameFormatValue(before[key], after[key]);
+    });
+    if (!properties.length) return null;
+    return {
+      kind: kind === 'paragraph' ? 'paragraph' : 'text',
+      properties: properties,
+      before: before,
+      after: after,
+      originalText: formatSummary(before, properties),
+      proposedText: formatSummary(after, properties)
+    };
+  }
+
   function changeOriginalText(change) {
     if (!change) return '';
     return change.original_text || (isDeletionChange(change) ? reviewItemText(change) : '');
@@ -85,10 +171,13 @@
   }
 
   function changeLabel(item) {
-    if (item && item.released_in && item.released_in.release_number) {
-      return 'Version ' + item.released_in.release_number + ' change';
-    }
     if (item && item.operation === 'replace') return 'Replacement';
+    if (isFormattingChange(item)) {
+      var details = formatChangeDetailsFromRevision(item);
+      return details && details.properties.length === 1
+        ? FORMAT_PROPERTY_LABELS[details.properties[0]]
+        : 'Formatting';
+    }
     if (item && item.operation) {
       return String(item.operation).charAt(0).toUpperCase() + String(item.operation).slice(1);
     }
@@ -218,7 +307,20 @@
     });
     var first = sources[0];
     var last = sources[sources.length - 1];
-    var operation = hasRemoved && hasAdded ? 'replace' : (hasRemoved ? 'delete' : 'insert');
+    var formattingOnly = sources.every(isFormattingChange);
+    if (formattingOnly) {
+      var uniqueOriginal = [];
+      var uniqueProposed = [];
+      sources.forEach(function (source) {
+        var sourceOriginal = changeOriginalText(source);
+        var sourceProposed = changeProposedText(source);
+        if (sourceOriginal && uniqueOriginal.indexOf(sourceOriginal) === -1) uniqueOriginal.push(sourceOriginal);
+        if (sourceProposed && uniqueProposed.indexOf(sourceProposed) === -1) uniqueProposed.push(sourceProposed);
+      });
+      original = uniqueOriginal.join(' · ');
+      proposed = uniqueProposed.join(' · ');
+    }
+    var operation = formattingOnly ? 'format' : (hasRemoved && hasAdded ? 'replace' : (hasRemoved ? 'delete' : 'insert'));
     var identityKey = reviewChangeIdentityKey(first) || reviewChangeIdentityKey(last);
     var mergedOps = editScriptOpsForReviewChange({ source_changes: sources });
     var firstScript = first && (first.edit_script || first.editScript);
@@ -355,27 +457,12 @@
     return revisions.filter(function (revision) {
       return revision && revision.id && byId[String(revision.id)] && (revision.editScript || revision.edit_script);
     }).map(function (revision, index) {
-      var type = revision && revision.type ? String(revision.type) : 'change';
-      var text = revision && revision.text ? String(revision.text) : '';
-      return {
-        change_key: 'live-revision:' + revision.id,
-        status: 'proposed',
-        operation: type === 'del' ? 'delete' : (type === 'ins' ? 'insert' : type),
-        original_text: type === 'del' ? text : null,
-        proposed_text: type === 'ins' ? text : null,
-        edit_script: revision.editScript || revision.edit_script,
-        anchor: {
-          type: 'editor_revision',
-          revision_id: String(revision.id),
-          revision_type: type,
-          index: index
-        },
-        metadata: {
-          author: revision.author || null,
-          date: revision.date || null
-        }
-      };
-    });
+      var mapped = changesFromRevisions([revision])[0];
+      if (!mapped) return null;
+      mapped.change_key = 'live-revision:' + revision.id;
+      mapped.anchor.index = index;
+      return mapped;
+    }).filter(Boolean);
   }
 
   function editableOpsForChange(change, reviewState) {
@@ -606,7 +693,10 @@
       type: String((revision.type || revision.operation || revision.op || '')).toLowerCase(),
       text: revision.text !== undefined ? String(revision.text) : '',
       original_text: changeOriginalText(revision),
-      proposed_text: changeProposedText(revision)
+      proposed_text: changeProposedText(revision),
+      format_kind: revision.formatKind || revision.format_kind || null,
+      format_before: revision.formatBefore || revision.format_before || null,
+      format_after: revision.formatAfter || revision.format_after || null
     };
     try {
       return JSON.stringify(payload);
@@ -629,12 +719,25 @@
       var type = revision && revision.type ? String(revision.type) : 'change';
       var text = revision && revision.text ? String(revision.text) : '';
       var editScript = revision && (revision.editScript || revision.edit_script) ? (revision.editScript || revision.edit_script) : null;
+      var formatDetails = type === 'fmt' ? formatChangeDetailsFromRevision(revision) : null;
+      var metadata = {
+        author: revision && revision.author ? revision.author : null,
+        date: revision && revision.date ? revision.date : null
+      };
+      if (formatDetails) {
+        metadata.format_change = {
+          kind: formatDetails.kind,
+          properties: formatDetails.properties,
+          before: formatDetails.before,
+          after: formatDetails.after
+        };
+      }
       return {
         change_key: 'revision:' + id,
         status: 'proposed',
-        operation: type === 'del' ? 'delete' : (type === 'ins' ? 'insert' : type),
-        original_text: type === 'del' ? text : null,
-        proposed_text: type === 'ins' ? text : null,
+        operation: type === 'del' ? 'delete' : (type === 'ins' ? 'insert' : (type === 'fmt' ? 'format' : type)),
+        original_text: type === 'del' ? text : (formatDetails ? formatDetails.originalText : null),
+        proposed_text: type === 'ins' ? text : (formatDetails ? formatDetails.proposedText : null),
         edit_script: editScript,
         anchor: {
           type: 'editor_revision',
@@ -642,10 +745,7 @@
           revision_type: type,
           index: index
         },
-        metadata: {
-          author: revision && revision.author ? revision.author : null,
-          date: revision && revision.date ? revision.date : null
-        }
+        metadata: metadata
       };
     });
   }
@@ -785,6 +885,19 @@
     return null;
   }
 
+  function activeDraftBatchForBaseVersion(list, baseFileVersionId, requireMatch) {
+    if (!requireMatch) return activeDraftBatchFromList(list);
+    var expected = String(baseFileVersionId || '');
+    if (!expected) return null;
+    var batches = Array.isArray(list) ? list : [];
+    for (var i = 0; i < batches.length; i++) {
+      if (isActiveDraftBatch(batches[i]) && String(batches[i].base_file_version_id || '') === expected) {
+        return batches[i];
+      }
+    }
+    return null;
+  }
+
   function pendingReleaseBatchFromList(list) {
     var batches = Array.isArray(list) ? list : [];
     for (var i = 0; i < batches.length; i++) {
@@ -808,6 +921,7 @@
     var api = options.api;
     var matterId = options.matterId;
     var documentId = String(options.documentId || '');
+    var openedDocumentId = documentId;
     if (!api) throw new Error('loadWorkflow requires an api client.');
     if (!documentId) throw new Error('loadWorkflow requires a documentId.');
 
@@ -825,10 +939,21 @@
       releasesResponse = await api.get(matterEndpoint(matterId, '/documents/' + encodeURIComponent(sourceDocumentId) + '/releases?limit=20'));
     }
 
+    var releases = Array.isArray(releasesResponse && releasesResponse.data) ? releasesResponse.data : [];
+    var openedRelease = releases.find(function (release) {
+      return release && String(release.released_document_id || '') === openedDocumentId;
+    }) || null;
+    var currentBaseFileVersionId = openedRelease && openedRelease.file_version_id
+      ? String(openedRelease.file_version_id)
+      : '';
     var query = '?document_id=' + encodeURIComponent(sourceDocumentId) + '&limit=20&sort_by=updated_at&sort_dir=desc';
     var batchesResponse = await api.get(matterEndpoint(matterId, '/document-edit-batches' + query));
     var batches = Array.isArray(batchesResponse && batchesResponse.data) ? batchesResponse.data : [];
-    var currentDraftBatch = activeDraftBatchFromList(batches);
+    var currentDraftBatch = activeDraftBatchForBaseVersion(
+      batches,
+      currentBaseFileVersionId,
+      currentDocumentIsRelease
+    );
     var pendingReleaseBatch = pendingReleaseBatchFromList(batches);
     var draftDetailFailed = false;
     var pendingDetailFailed = false;
@@ -854,7 +979,8 @@
     return {
       sourceDocumentId: sourceDocumentId,
       currentDocumentIsRelease: currentDocumentIsRelease,
-      releases: Array.isArray(releasesResponse && releasesResponse.data) ? releasesResponse.data : [],
+      currentBaseFileVersionId: currentBaseFileVersionId,
+      releases: releases,
       batches: batches,
       currentDraftBatch: currentDraftBatch,
       pendingReleaseBatch: pendingReleaseBatch,
@@ -1054,6 +1180,10 @@
     reviewChangeOperation: reviewChangeOperation,
     isDeletionChange: isDeletionChange,
     isInsertionChange: isInsertionChange,
+    isFormattingChange: isFormattingChange,
+    formatValueText: formatValueText,
+    formatSummary: formatSummary,
+    formatChangeDetailsFromRevision: formatChangeDetailsFromRevision,
     changeOriginalText: changeOriginalText,
     changeProposedText: changeProposedText,
     changeLabel: changeLabel,
@@ -1086,6 +1216,7 @@
     createReviewSession: createReviewSession,
     isActiveDraftBatch: isActiveDraftBatch,
     activeDraftBatchFromList: activeDraftBatchFromList,
+    activeDraftBatchForBaseVersion: activeDraftBatchForBaseVersion,
     pendingReleaseBatchFromList: pendingReleaseBatchFromList,
     loadWorkflow: loadWorkflow,
     loadReleaseChangeGroups: loadReleaseChangeGroups,

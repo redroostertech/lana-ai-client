@@ -67,6 +67,7 @@
   var officeEditorDocumentStats = {};
   var officeRemoteWorkflows = {};
   var shareModalState = null;
+  var pendingLanaEditRequest = null;
 
   function el(id) {
     return document.getElementById(id);
@@ -80,6 +81,12 @@
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;');
+  }
+
+  function documentDisplayFilename(file) {
+    var value = file || {};
+    return value.display_filename || value.original_filename || value.original_name ||
+      value.title || value.filename || value.name || 'Document';
   }
 
   function icon(name) {
@@ -730,12 +737,22 @@
 
   function officeEditorOriginalText(item) {
     if (!item) return '';
+    var service = documentReviewService();
+    var formatDetails = service && typeof service.formatChangeDetailsFromRevision === 'function'
+      ? service.formatChangeDetailsFromRevision(item)
+      : null;
+    if (formatDetails) return formatDetails.originalText;
     var operation = String((item.operation || item.type || '')).toLowerCase();
     return item.original_text || (operation === 'delete' || operation === 'del' ? officeEditorReviewItemText(item) : '');
   }
 
   function officeEditorProposedText(item) {
     if (!item) return '';
+    var service = documentReviewService();
+    var formatDetails = service && typeof service.formatChangeDetailsFromRevision === 'function'
+      ? service.formatChangeDetailsFromRevision(item)
+      : null;
+    if (formatDetails) return formatDetails.proposedText;
     var operation = String((item.operation || item.type || '')).toLowerCase();
     return item.proposed_text || (operation === 'insert' || operation === 'ins' ? officeEditorReviewItemText(item) : '');
   }
@@ -746,6 +763,12 @@
     if (operation === 'replace') return 'Replacement';
     if (operation === 'delete' || operation === 'del') return 'Deletion';
     if (operation === 'insert' || operation === 'ins') return 'Insertion';
+    if (operation === 'format' || operation === 'fmt' || operation === 'formatting') {
+      var service = documentReviewService();
+      return service && typeof service.changeLabel === 'function'
+        ? service.changeLabel(item)
+        : 'Formatting';
+    }
     return 'Tracked change';
   }
 
@@ -781,8 +804,9 @@
   function syncOfficeEditorReviewState(file, reviewState) {
     if (!file || !reviewState) return;
     var changes = officeEditorReviewChangesFromState(reviewState);
-    if (!changes.length) return;
     file.reviewChanges = changes;
+    syncOfficeShowChangesControl(file);
+    if (!changes.length) return;
     file.updatedAt = nowIso();
     saveState();
     renderChrome();
@@ -809,17 +833,106 @@
     return null;
   }
 
+  function embedLanaFocusedContext(file, detail) {
+    var context = detail && detail.context && typeof detail.context === 'object'
+      ? Object.assign({}, detail.context)
+      : {};
+    var kind = String(context.kind || '').toLowerCase();
+    var contextType = detail && detail.edit_intent
+      ? 'document_edit'
+      : kind === 'revision'
+        ? 'editor_revision'
+        : 'editor_selection';
+    context.type = contextType;
+    context.context_type = contextType;
+    context.summary = contextType === 'document_edit'
+      ? 'LANA-assisted edit for the selected document text'
+      : kind === 'revision'
+        ? 'Tracked change selected in LANA Editor'
+        : 'Text selected in LANA Editor';
+    if (detail && detail.edit_intent) {
+      context.edit_intent = Object.assign({}, detail.edit_intent);
+      context.document_edit = {
+        strategy: detail.edit_intent.strategy || 'insert_after',
+        draft_text: String(detail.edit_intent.draft_text || ''),
+        selection_text: String(context.text || '')
+      };
+    }
+    return officeFileCardContext(file, context);
+  }
+
+  function parseLanaDocumentEditSuggestion(content) {
+    var raw = String(content || '');
+    // Prefer the documented ```lana-document-edit fence, but accept a JSON or
+    // unlabeled fence because OpenAI-compatible local models commonly
+    // normalize custom fence labels to `json`. The payload discriminator is
+    // still mandatory, so unrelated code blocks can never stage an edit.
+    var blockPattern = /```(?:lana-document-edit|json)?\s*\n([\s\S]*?)```/gi;
+    var match;
+    while ((match = blockPattern.exec(raw))) {
+      try {
+        var parsed = JSON.parse(String(match[1] || '').trim());
+        var suggestedText = String(parsed && parsed.suggested_text || '').trim();
+        if (!parsed || parsed.type !== 'document_edit_suggestion' || !suggestedText) continue;
+        return {
+          strategy: parsed.strategy === 'replace' ? 'replace' : 'insert_after',
+          suggested_text: suggestedText,
+          rationale: String(parsed.rationale || '').slice(0, 1000)
+        };
+      } catch (error) {
+        console.warn('[file-editor] Unable to parse fenced LANA document edit suggestion:', error);
+      }
+    }
+    return null;
+  }
+
+  function handleLanaDocumentEditSuggestion(detail) {
+    var pending = pendingLanaEditRequest;
+    if (!pending) return;
+    var suggestion = parseLanaDocumentEditSuggestion(detail && detail.content);
+    if (!suggestion) return;
+    pendingLanaEditRequest = null;
+    var file = activeFile();
+    var editor = file && editorForFile(file);
+    if (!file || file.id !== pending.fileId || !editor || editor !== pending.editor ||
+        typeof editor.stageSuggestedEdit !== 'function') {
+      toast('The active document changed before the LANA suggestion could be staged.');
+      return;
+    }
+    try {
+      // An explicit originating UI intent controls replace vs insert. For a
+      // general selection request, a fenced suggestion may declare the
+      // operation, but it is still only staged until the user clicks Apply.
+      editor.stageSuggestedEdit({
+        text: suggestion.suggested_text,
+        strategy: pending.strategy || suggestion.strategy
+      });
+      toast('LANA suggestion staged. Review it, then click Apply to add the tracked change.');
+    } catch (error) {
+      toast((error && error.message) || 'The LANA suggestion could not be staged.');
+    }
+  }
+
   function openLanaForEmbedContext(file, detail) {
     var dock = document.querySelector('lex-lana-dock');
     if (!dock || typeof dock.openWith !== 'function' || !detail) return;
+    var editor = editorForFile(file);
+    var focusedContext = embedLanaFocusedContext(file, detail);
+    pendingLanaEditRequest = editor && detail.context && detail.context.kind === 'selection' ? {
+      fileId: file.id,
+      editor: editor,
+      strategy: detail.edit_intent
+        ? (detail.edit_intent.strategy === 'replace' ? 'replace' : 'insert_after')
+        : null
+    } : null;
     dock.openWith({
       contextType: 'document_chat',
       documentId: officeRealDocumentId(file) || null,
       documentName: file.filename || file.title || 'Document',
-      matterId: file.matterId || null,
+      matterId: officeConversationMatterId(file) || null,
       matterName: file.matterName || null,
       prefillPrompt: detail.prompt || 'Help me review this document selection.',
-      cardContext: detail.context || null
+      cardContext: focusedContext
     });
   }
 
@@ -835,6 +948,7 @@
       if (status) status.textContent = 'Read-only';
       host.hidden = true;
       if (draftPage) draftPage.hidden = false;
+      syncOfficeHistoryControls(file);
       return;
     }
 
@@ -892,24 +1006,36 @@
             // event; re-tag the baseline revision marks each time.
             applyOfficeBaselineRevisionTags(file);
             updateOfficeEditorDocumentStats(file, event && event.counts ? event.counts : null);
+            syncOfficeHistoryControls(file, mountedEditor);
             if (isServerReviewFile(file)) return;
             syncOfficeEditorReviewState(file, event && event.reviewState ? event.reviewState : null);
           });
           mountedEditor.on('change-applied', function (event) {
             if (editorForFile(file) !== mountedEditor) return;
+            syncOfficeHistoryControls(file, mountedEditor);
             if (isServerReviewFile(file)) {
-              handleServerEmbedEvent(file, event && event.reviewState ? event.reviewState : null);
+              if (event && event.reviewState) handleServerEmbedEvent(file, event.reviewState);
               return;
             }
             syncOfficeEditorReviewState(file, event && event.reviewState ? event.reviewState : null);
           });
           mountedEditor.on('change-decision', function (event) {
             if (editorForFile(file) !== mountedEditor) return;
+            syncOfficeHistoryControls(file, mountedEditor);
             if (isServerReviewFile(file)) {
-              handleServerEmbedEvent(file, event && event.reviewState ? event.reviewState : null);
+              if (event && event.reviewState) handleServerEmbedEvent(file, event.reviewState);
               return;
             }
             syncOfficeEditorReviewState(file, event && event.reviewState ? event.reviewState : null);
+          });
+          mountedEditor.on('review-state-changed', function (reviewState) {
+            if (editorForFile(file) !== mountedEditor) return;
+            syncOfficeHistoryControls(file, mountedEditor);
+            if (isServerReviewFile(file)) {
+              handleServerEmbedEvent(file, reviewState || null);
+              return;
+            }
+            syncOfficeEditorReviewState(file, reviewState || null);
           });
           mountedEditor.on('lana-context-requested', function (detail) {
             if (editorForFile(file) !== mountedEditor) return;
@@ -937,7 +1063,9 @@
         if (typeof activeEditor.shutdown === 'function') activeEditor.shutdown();
         return;
       }
+      syncOfficeHistoryControls(file, activeEditor);
       if (typeof activeEditor.setMode === 'function') activeEditor.setMode(serverFile ? 'view' : officeEditorModeForFile(file));
+      syncOfficeHistoryControls(file, activeEditor);
       host.hidden = false;
       if (draftPage) draftPage.hidden = true;
       editorLoadError = '';
@@ -963,6 +1091,7 @@
         // every saved draft and incorrectly leaves the document read-only.
         if (!review.loadFailed && !review.draftDetailFailed && typeof activeEditor.setMode === 'function') {
           activeEditor.setMode('review');
+          syncOfficeHistoryControls(file, activeEditor);
         }
         var restored = !review.loadFailed && !review.draftDetailFailed
           ? await restoreServerDraftWithRetry(file)
@@ -970,6 +1099,7 @@
         review.restoreFailed = !restored;
         if (typeof activeEditor.setMode === 'function') {
           activeEditor.setMode(officeEditorModeForFile(file));
+          syncOfficeHistoryControls(file, activeEditor);
         }
         if (review.loadFailed || review.draftDetailFailed || review.restoreFailed) {
           editorLoadError = review.draftDetailFailed
@@ -984,6 +1114,7 @@
             : 'LANA Editor - Edit mode';
         }
         applyServerReviewToFile(file);
+        syncOfficeShowChangesControl(file);
         renderChrome();
         renderReviewDock(file);
       }
@@ -993,6 +1124,7 @@
       editorLoadError = (error && error.message) || 'LANA Editor is unavailable.';
       host.hidden = true;
       if (draftPage) draftPage.hidden = false;
+      syncOfficeHistoryControls(file);
       if (serverFile) {
         var failedReview = ensureServerReview(file);
         if (failedReview) failedReview.embedFailed = true;
@@ -1067,6 +1199,66 @@
     return String(file.documentId || file.releasedDocumentId || file.sourceDocumentId || '');
   }
 
+  // Chat's matter_id is the human/external matter key, not the storage UUID
+  // used by document review routes. Sending the UUID makes conversation
+  // creation fail with "Matter not found" before document retrieval begins.
+  function officeConversationMatterId(file) {
+    if (!file) return '';
+    var metadata = file.metadata && typeof file.metadata === 'object' ? file.metadata : {};
+    var candidates = [
+      file.matterNumber,
+      file.matter_number,
+      file.externalMatterId,
+      file.external_matter_id,
+      file.clientMatterNumber,
+      file.client_matter_number,
+      metadata.matter_number,
+      metadata.client_matter_number,
+      metadata.external_matter_id
+    ];
+    for (var i = 0; i < candidates.length; i += 1) {
+      var value = String(candidates[i] || '').trim();
+      if (value && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) return value;
+    }
+    return '';
+  }
+
+  function officeMatterRows(response) {
+    if (!response) return [];
+    if (Array.isArray(response.matters)) return response.matters;
+    if (Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response.items)) return response.items;
+    if (response.data && Array.isArray(response.data.matters)) return response.data.matters;
+    if (response.data && Array.isArray(response.data.items)) return response.data.items;
+    return [];
+  }
+
+  async function resolveOfficeConversationMatterContext(storageMatterId) {
+    var storageId = String(storageMatterId || '').trim();
+    if (!storageId || !window.api || typeof window.api.getMatters !== 'function') return null;
+    try {
+      var response = await window.api.getMatters(1, 250, {
+        status: 'active',
+        sort_by: 'updated_at',
+        sort_order: 'desc'
+      });
+      var rows = officeMatterRows(response);
+      var match = rows.find(function (matter) {
+        return [matter.id, matter.uuid, matter.client_matter].some(function (candidate) {
+          return String(candidate || '').trim() === storageId;
+        });
+      });
+      if (!match) return null;
+      return {
+        matterId: String(match.matter_id || match.matter_number || match.client_matter_number || '').trim(),
+        matterName: String(match.workspace_name || match.matter_name || match.name || match.title || '').trim()
+      };
+    } catch (error) {
+      console.warn('[file-editor] Matter context lookup for LANA failed:', error && error.message ? error.message : error);
+      return null;
+    }
+  }
+
   function isServerReviewFile(file) {
     // Any doc handed off with a real matter + source document identity is a
     // server-managed document, regardless of which surface created it
@@ -1110,6 +1302,20 @@
     return file && officeServerReview[file.id] ? officeServerReview[file.id] : null;
   }
 
+  function pendingReleaseNeedsApprovalRestart(review) {
+    if (!review || !review.pendingReleaseBatch) return false;
+    if (!review.pendingApprovalId) return true;
+    return Boolean(review.pendingApprovalStatus && review.pendingApprovalStatus !== 'pending');
+  }
+
+  function pendingReleaseButtonAction(review) {
+    return pendingReleaseNeedsApprovalRestart(review) ? 'retry-release-approval' : 'view-release-approval';
+  }
+
+  function pendingReleaseButtonLabel(review) {
+    return pendingReleaseNeedsApprovalRestart(review) ? 'Restart Release Approval' : 'View Pending Approval';
+  }
+
   function ensureServerReview(file) {
     if (!isServerReviewFile(file)) return null;
     var entry = officeServerReview[file.id];
@@ -1121,11 +1327,14 @@
         matterId: String(file.matterId),
         documentId: officeRealDocumentId(file),
         sourceDocumentId: String(file.sourceDocumentId),
+        currentDocumentIsRelease: false,
+        currentBaseFileVersionId: '',
         releases: [],
         releaseChangeGroups: [],
         currentDraftBatch: null,
         pendingReleaseBatch: null,
         pendingApprovalId: '',
+        pendingApprovalStatus: '',
         draftDetailFailed: false,
         pendingDetailFailed: false,
         session: documentReviewService().createReviewSession(),
@@ -1166,12 +1375,17 @@
       var workflow = await service.loadWorkflow({
         api: window.api,
         matterId: review.matterId,
-        documentId: review.sourceDocumentId
+        documentId: review.documentId
       });
       review.sourceDocumentId = workflow.sourceDocumentId;
+      review.currentDocumentIsRelease = workflow.currentDocumentIsRelease === true;
+      review.currentBaseFileVersionId = workflow.currentBaseFileVersionId || '';
       review.releases = workflow.releases;
       review.currentDraftBatch = workflow.currentDraftBatch;
       review.pendingReleaseBatch = workflow.pendingReleaseBatch;
+      var releaseApproval = workflow.pendingReleaseBatch && workflow.pendingReleaseBatch.release_approval;
+      review.pendingApprovalId = releaseApproval && releaseApproval.id ? String(releaseApproval.id) : '';
+      review.pendingApprovalStatus = releaseApproval && releaseApproval.status ? String(releaseApproval.status) : '';
       review.draftDetailFailed = workflow.draftDetailFailed;
       review.pendingDetailFailed = workflow.pendingDetailFailed;
       review.releaseChangeGroups = await service.loadReleaseChangeGroups({
@@ -1216,14 +1430,11 @@
     var review = serverReview(file);
     var service = documentReviewService();
     if (!review || !service) return [];
-    if (review.dirty && review.liveReviewState) {
+    if (review.liveReviewState && (review.dirty || review.restored)) {
       return service.displayReviewChanges(review.session.normalizeChanges(review.liveReviewState));
     }
     if (review.currentDraftBatch && Array.isArray(review.currentDraftBatch.changes) && review.currentDraftBatch.changes.length) {
       return service.displayReviewChanges(review.currentDraftBatch.changes);
-    }
-    if (review.pendingReleaseBatch && Array.isArray(review.pendingReleaseBatch.changes) && review.pendingReleaseBatch.changes.length) {
-      return service.displayReviewChanges(review.pendingReleaseBatch.changes);
     }
     if (review.liveReviewState) {
       return service.displayReviewChanges(review.session.normalizeChanges(review.liveReviewState));
@@ -1231,17 +1442,29 @@
     return [];
   }
 
+  function serverPendingApprovalDisplayChanges(file) {
+    var review = serverReview(file);
+    var service = documentReviewService();
+    if (!review || !service || !review.pendingReleaseBatch ||
+        !Array.isArray(review.pendingReleaseBatch.changes)) return [];
+    return service.displayReviewChanges(review.pendingReleaseBatch.changes);
+  }
+
   function officeRowFromServerChange(change, index, options) {
     var service = documentReviewService();
     var status = service.changeStatus(change);
     var released = status.tone === 'released';
+    var originalText = service.changeOriginalText(change);
+    var proposedText = service.changeProposedText(change);
     return {
       title: service.changeLabel(change),
       status: status.label,
       tone: released ? 'release' : 'draft',
-      before: service.changeOriginalText(change) || '',
-      after: service.changeProposedText(change) || '',
+      before: originalText === null || originalText === undefined ? '' : originalText,
+      after: proposedText === null || proposedText === undefined ? '' : proposedText,
       body: released ? '' : (service.reviewItemText(change) || ''),
+      isDeletion: service.isDeletionChange(change),
+      isInsertion: service.isInsertionChange(change),
       meta: (change && change.metadata && change.metadata.author) || '',
       items: [],
       serverChange: change,
@@ -1284,8 +1507,15 @@
       return officeRowFromServerChange(change, index, { section: 'unreleased' });
     });
     pendingRows.forEach(function (row) {
-      row.status = review.pendingReleaseBatch ? 'Pending approval' : 'Pending';
+      row.status = 'Pending';
       row.tone = 'draft';
+    });
+
+    var pendingApprovalRows = serverPendingApprovalDisplayChanges(file).map(function (change, index) {
+      var row = officeRowFromServerChange(change, index, { section: 'pending-approval' });
+      row.status = 'Pending approval';
+      row.tone = 'draft';
+      return row;
     });
 
     var releasedRows = [];
@@ -1310,14 +1540,17 @@
           ? 'Requested ' + formatTimestamp(review.pendingReleaseBatch.updated_at)
           : 'Waiting for approval'
       });
-    } else {
+    }
+    if (!review.pendingReleaseBatch || review.currentDraftBatch || review.dirty) {
       versions.push({
-        title: 'Current draft',
+        title: review.pendingReleaseBatch ? 'New draft' : 'Current draft',
         status: 'Draft',
         tone: 'draft',
         meta: review.currentDraftBatch && review.currentDraftBatch.updated_at
           ? 'Updated ' + formatTimestamp(review.currentDraftBatch.updated_at)
-          : 'No saved draft yet'
+          : review.dirty
+            ? 'Unsaved changes'
+            : 'No saved draft yet'
       });
     }
     review.releases.forEach(function (release) {
@@ -1336,7 +1569,7 @@
       meta: file.createdAt ? 'Uploaded ' + formatTimestamp(file.createdAt) : 'Original document'
     });
 
-    file.review = { versions: versions, changes: pendingRows.concat(releasedRows) };
+    file.review = { versions: versions, changes: pendingRows.concat(pendingApprovalRows, releasedRows) };
     file.updatedAt = newestIso(
       service.latestActivityIso(
         { updated_at: file.documentUpdatedAt || null, created_at: file.createdAt || null },
@@ -1425,7 +1658,7 @@
         review.currentDraftBatch = await service.saveDraftBatch({
           api: window.api,
           matterId: review.matterId,
-          documentId: review.sourceDocumentId,
+          documentId: review.documentId,
           batch: review.currentDraftBatch,
           payload: payload
         });
@@ -1506,6 +1739,10 @@
         await editor.applyEdits(ops);
       }
       if (editorForFile(file) !== editor) return false;
+      // Replaying the saved draft establishes the session baseline; it is not
+      // a user action in this browser session and must not enable Undo. New
+      // edits made after restore still enter the normal editor history.
+      if (typeof editor.clearHistory === 'function') editor.clearHistory();
       review.liveReviewState = editor.reviewState();
       review.dirty = false;
       review.restored = true;
@@ -1538,6 +1775,7 @@
         review.draftDetailFailed || review.restoreFailed) return;
     review.dirty = true;
     applyServerReviewToFile(file);
+    syncOfficeShowChangesControl(file);
     renderChrome();
     renderReviewDock(file);
     scheduleServerDraftSave(file);
@@ -1643,7 +1881,7 @@
       review.currentDraftBatch = await service.saveDraftBatch({
         api: window.api,
         matterId: review.matterId,
-        documentId: review.sourceDocumentId,
+        documentId: review.documentId,
         batch: batch,
         payload: { changes: remaining.map(service.persistedDraftChangePayload).filter(Boolean) }
       });
@@ -1759,6 +1997,7 @@
           }
         } else if (result && result.approval_required) {
           review.pendingApprovalId = result.approval_id || '';
+          review.pendingApprovalStatus = 'pending';
           review.pendingReleaseBatch = result.batch || review.currentDraftBatch;
           review.currentDraftBatch = null;
           // Continue work from the exact bytes submitted for approval, but
@@ -1795,6 +2034,36 @@
       Lex.Modal.confirm('Release Version', message, run, { confirmText: 'Release Version' });
     } else if (window.confirm(message)) {
       run();
+    }
+  }
+
+  async function retryReleaseApproval(file) {
+    var review = serverReview(file);
+    var service = documentReviewService();
+    if (!review || !service || !review.pendingReleaseBatch || review.releasing) return;
+    review.releasing = true;
+    renderReviewDock(file);
+    try {
+      var result = await service.releaseBatch({
+        api: window.api,
+        matterId: review.matterId,
+        batchId: review.pendingReleaseBatch.id,
+        payload: { retry_approval: true }
+      });
+      if (!result || !result.approval_required || !result.approval_id) {
+        throw new Error('The release approval could not be restarted.');
+      }
+      review.pendingApprovalId = result.approval_id;
+      review.pendingApprovalStatus = 'pending';
+      review.pendingReleaseBatch = result.batch || review.pendingReleaseBatch;
+      await loadServerReview(file);
+      toast('Release approval restarted.');
+    } catch (error) {
+      console.warn('[file-editor] Release approval restart failed:', error && error.message ? error.message : error);
+      toast((error && error.message) || 'Failed to restart release approval.');
+    } finally {
+      review.releasing = false;
+      renderReviewDock(file);
     }
   }
 
@@ -1996,6 +2265,7 @@
     file.releasedDocumentId = incoming.releasedDocumentId || file.releasedDocumentId || '';
     file.documentId = incoming.documentId || file.documentId || file.releasedDocumentId || file.sourceDocumentId || '';
     file.matterId = incoming.matterId || file.matterId || '';
+    file.matterNumber = incoming.matterNumber || incoming.matter_number || file.matterNumber || file.matter_number || '';
     file.matterName = incoming.matterName || file.matterName || '';
     file.contentType = incoming.contentType || file.contentType;
     file.fileSize = incoming.fileSize || file.fileSize;
@@ -2048,9 +2318,13 @@
 
   function applyOfficeDocument(file, documentRow) {
     if (!file || !documentRow || typeof documentRow !== 'object') return;
+    var displayFilename = documentDisplayFilename(documentRow);
     file.documentId = String(documentRow.id || documentRow.document_id || file.documentId || '');
-    file.filename = documentRow.filename || documentRow.name || file.filename;
-    file.title = documentRow.filename || documentRow.name || file.title;
+    file.storageFilename = documentRow.filename || file.storageFilename || displayFilename;
+    file.original_filename = documentRow.original_filename || displayFilename;
+    file.display_filename = documentRow.display_filename || displayFilename;
+    file.filename = displayFilename || file.filename;
+    file.title = displayFilename || file.title;
     file.contentType = documentRow.content_type || documentRow.mime_type || file.contentType;
     file.fileSize = documentRow.file_size != null ? documentRow.file_size : file.fileSize;
     file.documentUpdatedAt = documentRow.updated_at || file.documentUpdatedAt;
@@ -3122,7 +3396,7 @@
     if (!change) return '';
     var documentId = officeRealDocumentId(file);
     var documentName = (file && (file.filename || file.title)) || 'Document';
-    var matterId = (file && file.matterId) || '';
+    var matterId = officeConversationMatterId(file);
     var matterName = (file && file.matterName) || '';
     var summary = officeReviewChangeLanaSummary(change);
     var context = {
@@ -3301,7 +3575,12 @@
   function renderDocReviewRail(file) {
     var review = docReviewModel(file);
     var tab = reviewRailTab === 'versions' || reviewRailTab === 'comments' ? reviewRailTab : 'changes';
-    var pendingChanges = sortReviewChangesByNewest(review.changes.filter(changeIsPending));
+    var pendingApprovalChanges = sortReviewChangesByNewest(review.changes.filter(function (change) {
+      return change && change.serverSection === 'pending-approval';
+    }));
+    var pendingChanges = sortReviewChangesByNewest(review.changes.filter(function (change) {
+      return changeIsPending(change) && (!change.serverSection || change.serverSection !== 'pending-approval');
+    }));
     var releasedChanges = sortReviewChangesByNewest(review.changes.filter(function (change) {
       return !changeIsComment(change) && changeIsReleased(change);
     }));
@@ -3313,18 +3592,22 @@
           (pendingChanges.length || (serverState.currentDraftBatch && serverState.currentDraftBatch.id)))
       : docHasActiveSavedDraft(file);
     var hasPendingApproval = Boolean(serverState && serverState.pendingReleaseBatch);
+    var pendingApprovalAction = pendingReleaseButtonAction(serverState);
+    var pendingApprovalLabel = pendingReleaseButtonLabel(serverState);
     var isRequestingRelease = Boolean(serverState && serverState.releasing);
     var releaseButton = el('officeReviewReleaseButton');
     if (releaseButton) {
       var releaseButtonEnabled = !isRequestingRelease && (hasPendingApproval || canReleaseVersion);
-      releaseButton.dataset.action = hasPendingApproval ? 'view-release-approval' : 'release-review-version';
+      releaseButton.dataset.action = hasPendingApproval ? pendingApprovalAction : 'release-review-version';
       releaseButton.disabled = !releaseButtonEnabled;
       releaseButton.setAttribute('aria-disabled', releaseButtonEnabled ? 'false' : 'true');
-      releaseButton.title = hasPendingApproval ? 'Open pending approval' : 'Release this version';
+      releaseButton.title = hasPendingApproval
+        ? (pendingApprovalAction === 'retry-release-approval' ? 'Restart the expired or closed approval request' : 'Open pending approval')
+        : 'Release this version';
       releaseButton.textContent = isRequestingRelease
         ? 'Requesting Release...'
         : hasPendingApproval
-          ? 'View Pending Approval'
+          ? pendingApprovalLabel
           : 'Release Version';
     }
     var versions = review.versions.length ? review.versions : [{
@@ -3335,10 +3618,10 @@
     }];
     var renderChangeHistoryRow = function (change) {
       var status = change.status || 'Pending';
-      var before = change.before || 'previous draft text';
-      var after = change.after || change.body || 'Captured local edit';
+      var before = change.before || (change.isInsertion ? 'no previous text' : 'previous draft text');
+      var after = change.after || change.body || (change.isDeletion ? 'text removed' : 'Captured local edit');
       var canRevert = changeIsPending(change) && Number.isFinite(Number(change.sourceIndex)) &&
-        !(serverState && serverState.pendingReleaseBatch);
+        change.serverSection !== 'pending-approval';
       var actionButtons = '';
       if (canRevert) {
         if (serverFile && change.serverChange && serverState && documentReviewService() &&
@@ -3357,8 +3640,8 @@
             '<span class="office-review-diff-remove">- ' + esc(item.before || 'no previous text') + '</span>' +
             '<span class="office-review-diff-add">+ ' + esc(item.after || item.text || 'text removed') + '</span></div>';
         }).join('')
-        : '<span class="office-review-diff-remove">- ' + esc(before) + '</span>' +
-          '<span class="office-review-diff-add">+ ' + esc(after) + '</span>';
+        : (change.isInsertion ? '' : '<span class="office-review-diff-remove">- ' + esc(before) + '</span>') +
+          (change.isDeletion ? '' : '<span class="office-review-diff-add">+ ' + esc(after) + '</span>');
       var rowClass = 'office-review-history-row' + (batchItems.length ? ' office-review-history-row--batch' : '');
       return '<div class="' + rowClass + '">' +
         '<div class="office-review-history-row-heading"><span class="office-review-history-row-title">' + esc(change.title || 'Replacement') + '</span>' +
@@ -3367,14 +3650,20 @@
         officeReviewChangeLanaButton(file, change) + '</div>';
     };
     var pendingChangesHtml = pendingChanges.map(renderChangeHistoryRow).join('');
+    var pendingApprovalChangesHtml = pendingApprovalChanges.map(renderChangeHistoryRow).join('');
     var releasedChangesHtml = releasedChanges.map(renderChangeHistoryRow).join('');
     var releasedHistoryVersions = versions.filter(function (version) {
       return reviewTone(version.status) === 'release';
     });
     var unreleasedHtml = pendingChanges.length
       ? '<section class="office-review-history-group office-review-history-group--unreleased">' +
-        '<header class="office-review-history-header"><h5>Unreleased</h5><span>' + esc(pendingChanges.length) + ' change' + (pendingChanges.length === 1 ? '' : 's') + '</span></header>' +
+        '<header class="office-review-history-header"><h5>' + esc(hasPendingApproval ? 'New draft' : 'Unreleased') + '</h5><span>' + esc(pendingChanges.length) + ' change' + (pendingChanges.length === 1 ? '' : 's') + '</span></header>' +
         '<div class="office-review-history-rows">' + pendingChangesHtml + '</div></section>'
+      : '';
+    var pendingApprovalHtml = pendingApprovalChanges.length
+      ? '<section class="office-review-history-group office-review-history-group--pending-approval">' +
+        '<header class="office-review-history-header"><h5>Pending approval</h5><span>' + esc(pendingApprovalChanges.length) + ' change' + (pendingApprovalChanges.length === 1 ? '' : 's') + '</span></header>' +
+        '<div class="office-review-history-rows">' + pendingApprovalChangesHtml + '</div></section>'
       : '';
     var releasedChangesHistoryHtml = releasedChanges.length
       ? '<section class="office-review-history-group">' +
@@ -3386,7 +3675,7 @@
         '<header class="office-review-history-header"><h5>' + esc(version.title) + '</h5><span>1 change</span></header>' +
         '<div class="office-review-history-rows"><div class="office-review-history-row"><div class="office-review-history-row-heading"><span class="office-review-history-row-title">Version released</span><span class="office-review-status office-review-status--' + (version.tone || 'release') + '">' + esc(version.status || 'Released') + '</span></div><div class="office-review-diff"><span class="office-review-diff-add">+ ' + esc(version.meta || 'Released version') + '</span></div></div></div></section>';
     }).join('');
-    var changeHistoryHtml = unreleasedHtml + releasedChangesHistoryHtml + releasedHistoryHtml;
+    var changeHistoryHtml = unreleasedHtml + pendingApprovalHtml + releasedChangesHistoryHtml + releasedHistoryHtml;
     var commentItems = serverFile
       ? serverReviewComments(file).map(function (comment) {
           return { type: 'Comment', status: 'Open', text: comment.text, author: comment.author || '' };
@@ -3640,7 +3929,7 @@
     dock.setPageContext({
       documentId: officeRealDocumentId(file) || null,
       documentName: file.filename || file.title || 'Office file',
-      matterId: file.matterId || null,
+      matterId: officeConversationMatterId(file) || null,
       matterName: file.matterName || null
     });
   }
@@ -3648,7 +3937,68 @@
   function applyOfficeTrackedChangesDisplay(file) {
     var host = el('officeLanaEditorHost');
     if (!host) return;
-    host.classList.toggle('office-lana-editor-host--final', Boolean(file && file.showChanges === false));
+    var comparisonMode = officeTrackedChangesMode(file);
+    var canShow = comparisonMode !== 'none';
+    var active = canShow && file && file.showChanges !== false;
+    host.classList.toggle('office-lana-editor-host--final', Boolean(!canShow || (file && file.showChanges === false)));
+    host.classList.toggle('office-lana-editor-host--release-compare', Boolean(active && comparisonMode === 'release'));
+    host.classList.toggle('office-lana-editor-host--draft-compare', Boolean(active && comparisonMode === 'draft'));
+  }
+
+  function officeHasUnreleasedChanges(file) {
+    if (!file || file.kind !== 'doc') return false;
+    if (isServerReviewFile(file)) {
+      var review = serverReview(file);
+      if (!review) return false;
+      if (review.session && review.liveReviewState && typeof review.session.unreleasedRevisions === 'function') {
+        try {
+          if (review.session.unreleasedRevisions(review.liveReviewState).length > 0) return true;
+        } catch (_) {}
+      }
+      return Boolean(
+        review.currentDraftBatch
+        && Array.isArray(review.currentDraftBatch.changes)
+        && review.currentDraftBatch.changes.length
+      );
+    }
+    return pendingDocReviewChanges(file).length > 0 || docHasUnsavedDraftChanges(file);
+  }
+
+  function officeHasReleaseComparison(file) {
+    if (!isServerReviewFile(file)) return false;
+    var review = serverReview(file);
+    if (!review || review.currentDocumentIsRelease !== true || !review.session ||
+        typeof review.session.baselineRevisionIds !== 'function') return false;
+    try {
+      return review.session.baselineRevisionIds().length > 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function officeTrackedChangesMode(file) {
+    if (officeHasUnreleasedChanges(file)) return 'draft';
+    if (officeHasReleaseComparison(file)) return 'release';
+    return 'none';
+  }
+
+  function officeShowChangesTitle(mode) {
+    if (mode === 'release') return 'Show or hide this release against the previous release';
+    if (mode === 'draft') return 'Show or hide unreleased changes against the previous release';
+    return 'Available when this document has a release comparison or unreleased changes';
+  }
+
+  function syncOfficeShowChangesControl(file) {
+    var button = document.querySelector('[data-action="toggle-show-changes"]');
+    if (!button) return;
+    var comparisonMode = officeTrackedChangesMode(file);
+    var available = comparisonMode !== 'none';
+    var active = available && file && file.showChanges !== false;
+    button.disabled = !available;
+    button.setAttribute('aria-disabled', available ? 'false' : 'true');
+    button.classList.toggle('is-active', Boolean(active));
+    button.title = officeShowChangesTitle(comparisonMode);
+    applyOfficeTrackedChangesDisplay(file);
   }
 
   // Tag the embed's revision marks that belong to the opened document's
@@ -3735,6 +4085,46 @@
     setOfficeDocumentFooterStats(stats);
   }
 
+  function officeHistoryAvailability(file, editor) {
+    if (!file || file.kind !== 'doc') return { undo: false, redo: false };
+    if (!isServerReviewFile(file)) {
+      return {
+        undo: Boolean(Array.isArray(file.undoStack) && file.undoStack.length),
+        redo: Boolean(Array.isArray(file.redoStack) && file.redoStack.length)
+      };
+    }
+    var currentHost = el('officeLanaEditorHost');
+    var activeEditor = editor || editorForFile(file);
+    // renderDoc replaces the host before the async remount completes. Never
+    // expose history from an instance still attached to the discarded host.
+    if (!activeEditor || officeEditorHostEl !== currentHost) return { undo: false, redo: false };
+    var reviewMode = true;
+    if (typeof activeEditor.editorMode === 'function') {
+      try { reviewMode = activeEditor.editorMode() === 'review'; } catch (_) { reviewMode = false; }
+    }
+    function available(capability, action) {
+      if (!reviewMode || typeof activeEditor[action] !== 'function' || typeof activeEditor[capability] !== 'function') return false;
+      try { return activeEditor[capability]() === true; } catch (_) { return false; }
+    }
+    return {
+      undo: available('canUndo', 'undo'),
+      redo: available('canRedo', 'redo')
+    };
+  }
+
+  function syncOfficeHistoryControls(file, editor) {
+    var current = activeFile();
+    if (!file || !current || current.id !== file.id) return;
+    var availability = officeHistoryAvailability(file, editor);
+    ['undo', 'redo'].forEach(function (command) {
+      document.querySelectorAll('.office-doc-toolbar [data-format="' + command + '"]').forEach(function (button) {
+        var enabled = availability[command] === true;
+        button.disabled = !enabled;
+        button.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+      });
+    });
+  }
+
   function renderDoc(file, panel) {
     ensureReviewBaseline(file);
     if (el('officeEditorEngineStatus')) el('officeEditorEngineStatus').textContent = 'Loading LANA Editor...';
@@ -3746,7 +4136,9 @@
     var tools = writerTools();
     var stats = !isServerReviewFile(file) && tools ? tools.getDocumentStats(file.content || '') : null;
     var marginPreset = file.marginPreset === 'narrow' || file.marginPreset === 'wide' ? file.marginPreset : 'normal';
-    var showChanges = file.showChanges !== false;
+    var comparisonMode = officeTrackedChangesMode(file);
+    var canShowChanges = comparisonMode !== 'none';
+    var showChanges = canShowChanges && file.showChanges !== false;
     var docContent = renderDocContentWithReviewMarks(file);
     // Tracked documents edit through the LANA Editor embed. The prototype
     // toolbar is the product surface, so every control remains visible and
@@ -3758,8 +4150,8 @@
     }
     var toolbarHtml =
       toolbarGroup('History',
-        '<button type="button" data-command="undo" title="Undo">' + toolbarIcon('undo-2', 'Undo') + '</button>' +
-        '<button type="button" data-command="redo" title="Redo">' + toolbarIcon('redo-2', 'Redo') + '</button>') +
+        '<button type="button" data-command="undo" data-format="undo" title="Undo" disabled aria-disabled="true">' + toolbarIcon('undo-2', 'Undo') + '</button>' +
+        '<button type="button" data-command="redo" data-format="redo" title="Redo" disabled aria-disabled="true">' + toolbarIcon('redo-2', 'Redo') + '</button>') +
       toolbarGroup('Style',
         '<select class="office-format-select" data-command="formatBlock" aria-label="Paragraph style"' + embedBlockedAttrs + '>' +
         '<option value="p">Normal</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="h4">Heading 4</option><option value="subheading">Subheading</option><option value="blockquote">Quote</option><option value="pre">Code</option><option value="caption">Caption</option><option value="footnote">Footnote</option></select>' +
@@ -3806,7 +4198,9 @@
       contextToolbar.innerHTML = '<div class="office-doc-toolbar" role="toolbar" aria-label="Text formatting">' + toolbarHtml + '</div>' +
         '<div class="office-doc-ruler office-doc-ruler-' + marginPreset + '" aria-label="Document margins">' +
         '<div class="office-ruler-actions">' + marginActionsHtml +
-        '<button class="office-show-changes-toggle' + (showChanges ? ' is-active' : '') + '" type="button" data-action="toggle-show-changes">' + toolbarIcon('circle-dot', 'Show changes') + '<span>Show changes</span></button></div>' +
+        '<button class="office-show-changes-toggle' + (showChanges ? ' is-active' : '') + '" type="button" data-action="toggle-show-changes"' +
+          (canShowChanges ? ' aria-disabled="false" title="' + esc(officeShowChangesTitle(comparisonMode)) + '"' : ' disabled aria-disabled="true" title="' + esc(officeShowChangesTitle('none')) + '"') + '>' +
+          toolbarIcon('circle-dot', 'Show changes') + '<span>Show changes</span></button></div>' +
         '<div class="office-ruler-track" aria-hidden="true"><span class="office-ruler-paper"></span><span class="office-ruler-margin office-ruler-margin-left"></span><span class="office-ruler-margin office-ruler-margin-right"></span></div></div>';
     }
     setOfficeDocumentFooterStats(stats);
@@ -3824,6 +4218,7 @@
       '</div></div></div></div>' +
       '</div>' +
       '</div>';
+    syncOfficeHistoryControls(file);
     mountLanaEditorForFile(file);
   }
 
@@ -4001,8 +4396,8 @@
       '<section class="office-section-card"><h2>Activity</h2>' + activityHtml + '</section>' +
       '<section class="office-section-card"><h2>Versions</h2>' + versionsHtml +
         '<div class="office-inline-actions office-inline-actions--release-only"><button class="office-btn" type="button" data-action="' +
-          (serverReview(file) && serverReview(file).pendingReleaseBatch ? 'view-release-approval' : 'release-review-version') + '">' +
-          (serverReview(file) && serverReview(file).pendingReleaseBatch ? 'View Pending Approval' : 'Release Version') + '</button></div></section>' +
+          (serverReview(file) && serverReview(file).pendingReleaseBatch ? pendingReleaseButtonAction(serverReview(file)) : 'release-review-version') + '">' +
+          (serverReview(file) && serverReview(file).pendingReleaseBatch ? pendingReleaseButtonLabel(serverReview(file)) : 'Release Version') + '</button></div></section>' +
       '<section class="office-section-card"><h2>Changes</h2>' + changesHtml + '</section>' +
       '<section class="office-section-card"><h2>Collaboration Model</h2><ul class="office-scope-list">' +
         '<li><span>Access source</span><span>Server-managed document shares</span></li>' +
@@ -4417,7 +4812,7 @@
       contextType: lanaContextType(file),
       documentId: documentId || null,
       documentName: file && (file.filename || file.title) ? (file.filename || file.title) : 'Office file',
-      matterId: (file && file.matterId) || null,
+      matterId: officeConversationMatterId(file) || null,
       matterName: (file && file.matterName) || null,
       cardContext: officeFileCardContext(file, focusedContext),
       prefillPrompt: prompt || 'Help me work on this document.'
@@ -5145,6 +5540,7 @@
     if (!page || !toolbars.length) return;
     var file = activeFile();
     var embed = file && editorForFile(file);
+    syncOfficeHistoryControls(file, embed);
     if (file && isServerReviewFile(file) && embed && typeof embed.selectionFormatState === 'function') {
       var embedState = null;
       try { embedState = embed.selectionFormatState(); } catch (_) { embedState = null; }
@@ -5482,7 +5878,8 @@
 
   async function applyEmbedHistoryCommand(file, command) {
     if (!embedEditorReady(file) || typeof officeEditorInstance[command] !== 'function') {
-      toast('Undo is not available for this document yet.');
+      syncOfficeHistoryControls(file);
+      toast(command === 'undo' ? 'Undo is not available for this document yet.' : 'Redo is not available for this document yet.');
       return;
     }
     try {
@@ -5496,6 +5893,8 @@
       handleServerEmbedEvent(file, reviewState);
     } catch (error) {
       toast((error && error.message) || 'The action could not be completed.');
+    } finally {
+      syncOfficeHistoryControls(file, officeEditorInstance);
     }
   }
 
@@ -5773,6 +6172,10 @@
   function bindEvents() {
     if (eventsBound) return;
     eventsBound = true;
+
+    document.addEventListener('lex-lana-response-end', function (event) {
+      handleLanaDocumentEditSuggestion(event && event.detail ? event.detail : {});
+    });
 
     function applyDocumentCommand(commandTarget) {
       if (!commandTarget) return;
@@ -6122,6 +6525,10 @@
         }
         return;
       }
+      if (action === 'retry-release-approval' && file) {
+        retryReleaseApproval(file);
+        return;
+      }
       if (action === 'set-review-tab') {
         var nextReviewTab = actionTarget.dataset.reviewTab || 'changes';
         reviewRailTab = nextReviewTab === 'versions' || nextReviewTab === 'comments' ? nextReviewTab : 'changes';
@@ -6201,6 +6608,10 @@
         return;
       }
       if (action === 'toggle-show-changes' && file && file.kind === 'doc') {
+        if (officeTrackedChangesMode(file) === 'none') {
+          syncOfficeShowChangesControl(file);
+          return;
+        }
         if (isServerReviewFile(file) && officeEditorInstance && !fallbackDocPage()) {
           // Embed-backed file: flip the display class on the LANA Editor host
           // (mirrors the File Viewer toggle). Re-rendering here would remount
@@ -6460,7 +6871,9 @@
     var response = await window.api.get(path);
     var file = response && response.data ? response.data : response;
     if (!file || !file.id) throw new Error('The requested document was not found.');
+    var displayFilename = documentDisplayFilename(file);
     matterId = matterId || String(file.client_matter || file.matter_id || '').trim();
+    var conversationMatter = await resolveOfficeConversationMatterContext(matterId);
     var kind = officeKindForRouteFile(file);
     var capabilities = file.format_capabilities || file.formatCapabilities || null;
     if ((kind === 'sheet' || kind === 'deck') && matterId) {
@@ -6491,10 +6904,16 @@
           documentId: String(file.id),
           sourceDocumentId: String(file.id),
           matterId: matterId,
-          matterName: file.matter_name || file.client_matter_name || '',
+          matterNumber: conversationMatter && conversationMatter.matterId ? conversationMatter.matterId : '',
+          matterName: conversationMatter && conversationMatter.matterName
+            ? conversationMatter.matterName
+            : (file.matter_name || file.client_matter_name || ''),
           kind: kind,
-          title: file.filename || file.name || 'Document',
-          filename: file.filename || file.name || 'document.docx',
+          title: displayFilename,
+          filename: displayFilename,
+          storageFilename: file.filename || displayFilename,
+          original_filename: file.original_filename || displayFilename,
+          display_filename: file.display_filename || displayFilename,
           contentType: file.content_type || file.mime_type || '',
           fileSize: file.file_size,
           chunkCount: file.chunk_count,
@@ -6547,6 +6966,8 @@
       officeEditorInstance = null;
       officeEditorFileId = '';
       officeEditorHostEl = null;
+      var file = activeFile();
+      if (file) syncOfficeHistoryControls(file);
     }
   }
 

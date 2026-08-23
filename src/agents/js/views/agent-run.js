@@ -1524,7 +1524,8 @@
     if (activityDetail && typeof activityDetail.render === 'function') {
       rootEl._agentRunDelegatedToActivityDetail = true;
       activityDetail.render(rootEl, Object.assign({}, ctx || {}, {
-        id: ctx && (ctx.runId || ctx.id)
+        id: ctx && (ctx.runId || ctx.id),
+        mode: 'run'
       }));
       return;
     }

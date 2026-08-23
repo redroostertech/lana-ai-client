@@ -24,6 +24,23 @@
 
   let stylesInjected = false;
 
+  function removeAfterClose(modal) {
+    if (!modal || modal.__lexRemoveScheduled) return;
+    modal.__lexRemoveScheduled = true;
+    // Setting `open` first lets updated() restore focus, release the focus
+    // trap, and start the standard exit animation before the element leaves
+    // the DOM. A fallback covers reduced-motion or missing animation events.
+    modal.open = false;
+    const panel = modal.querySelector('.lex-modal-panel');
+    let fallback = null;
+    const finish = () => {
+      if (fallback) clearTimeout(fallback);
+      if (modal.isConnected) modal.remove();
+    };
+    if (panel) panel.addEventListener('animationend', finish, { once: true });
+    fallback = setTimeout(finish, 350);
+  }
+
   function injectStyles() {
     if (stylesInjected) return;
     stylesInjected = true;
@@ -633,10 +650,10 @@
 
       modal.addEventListener('lex-confirm', () => {
         if (onConfirm) onConfirm();
-        modal.remove();
+        removeAfterClose(modal);
       });
-      modal.addEventListener('lex-cancel', () => modal.remove());
-      modal.addEventListener('lex-close', () => modal.remove());
+      modal.addEventListener('lex-cancel', () => removeAfterClose(modal));
+      modal.addEventListener('lex-close', () => removeAfterClose(modal));
 
       document.body.appendChild(modal);
       return modal;
@@ -676,8 +693,11 @@
       }
       modal.open = true;
 
-      modal.addEventListener('lex-close', () => modal.remove());
-      modal.addEventListener('lex-cancel', () => modal.remove());
+      // Expose the component's standard close lifecycle to custom-footers.
+      modal.removeAfterClose = () => removeAfterClose(modal);
+
+      modal.addEventListener('lex-close', () => removeAfterClose(modal));
+      modal.addEventListener('lex-cancel', () => removeAfterClose(modal));
 
       if (options.onConfirm) {
         modal.hideActions = false;
@@ -685,7 +705,7 @@
         modal.cancelText = options.cancelText || 'Cancel';
         modal.addEventListener('lex-confirm', () => {
           options.onConfirm();
-          modal.remove();
+          removeAfterClose(modal);
         });
       }
 

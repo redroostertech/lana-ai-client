@@ -87,6 +87,9 @@
       throw new Error('ChatSource.connect() not implemented');
     }
 
+    /** Forget the currently-bound conversation before starting a new chat. */
+    resetConversation() {}
+
     /**
      * Send a message and stream back events.
      * @param {string} content
@@ -144,6 +147,12 @@
       this._conversationId = conversationId || null;
       this._connected = true;
       return { conversationId: this._conversationId, sessionId: null, model: null };
+    }
+
+    resetConversation() {
+      this._conversationId = null;
+      this._generationId = null;
+      this._model = null;
     }
 
     async _ensureConversation(options = {}) {

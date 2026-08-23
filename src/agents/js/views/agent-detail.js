@@ -1,4 +1,4 @@
-/* agent-detail.js — Agent profile SPA view (Capabilities | Runs | Stats).
+/* agent-detail.js — Agent profile SPA view (Overview | Teach | Outcomes | Performance).
    Migrated from src/js/pages/agent-detail.js. Reads ctx.slug, fetches agent
    profile + filtered run list. Includes the Configure edit drawer, Stats
    tab, and the header enable/disable toggle.
@@ -47,8 +47,8 @@
     +       " title=\"System agents can't be disabled per-org from this UI. Use the org kill switch in admin.\""
     +     '>System (always on)</span>'
     +   '</div>'
-    +   '<lex-btn id="agentDetailRunBtn" variant="primary" icon="play">Run</lex-btn>'
-    +   '<lex-btn id="agentDetailConfigBtn" variant="secondary" icon="settings">Configure</lex-btn>'
+    +   '<lex-btn id="agentDetailRunBtn" variant="primary" icon="play">Run agent</lex-btn>'
+    +   '<lex-btn id="agentDetailConfigBtn" variant="secondary" icon="settings">Settings</lex-btn>'
     + '</lex-banner>'
 
     + '<div class="agent-detail-tabs-bar">'
@@ -56,7 +56,7 @@
     +     ' id="agentDetailTabs"'
     +     ' active="capabilities"'
     +     ' variant="underline"'
-    +     ' tabs=\'[{"id":"capabilities","label":"Capabilities","icon":"layers"},{"id":"runs","label":"Runs","icon":"workflow"},{"id":"stats","label":"Stats","icon":"bar-chart-2"}]\''
+    +     ' tabs=\'[{"id":"capabilities","label":"Overview","icon":"layers"},{"id":"teach","label":"Teach","icon":"message-circle"},{"id":"runs","label":"Outcomes","icon":"sparkles"},{"id":"stats","label":"Performance","icon":"bar-chart-2"}]\''
     +   '></lex-tabs>'
     + '</div>'
 
@@ -66,13 +66,17 @@
     +     '<span>Loading capabilities...</span>'
     +   '</div>'
     +   '<div id="agentPanelCapabilitiesContent" class="hidden">'
-    +     '<lex-card heading="About" padding="normal">'
+    +     '<lex-card heading="Purpose" padding="normal">'
     +       '<p id="agentDetailDescription" class="agent-detail-description">(description)</p>'
     +     '</lex-card>'
-    +     '<lex-card heading="Allowed Tools" padding="normal">'
+    +     '<lex-card heading="Capabilities" padding="normal">'
     +       '<div id="agentDetailToolsList" class="agent-detail-chip-list">'
     +         '<span class="agent-detail-empty-text">No tools configured.</span>'
     +       '</div>'
+    +     '</lex-card>'
+    +     '<lex-card heading="Working context" padding="normal">'
+    +       '<div id="agentDetailContextList" class="agent-detail-context-list"><span class="agent-detail-empty-text">Uses only the briefing provided with each run.</span></div>'
+    +       '<p id="agentDetailContextNote" class="agent-detail-context-note">Context is assembled at run time and kept within its configured scope.</p>'
     +     '</lex-card>'
     +     '<lex-card heading="Delegation" padding="normal">'
     +       '<div id="agentDetailDelegationList" class="agent-detail-chip-list">'
@@ -92,7 +96,7 @@
     +       '<div id="agentDetailWorkflowMeta" class="agent-detail-workflow-meta hidden">'
     +         '<span class="agent-detail-chip">v<span id="agentDetailWorkflowVersion">-</span></span>'
     +         '<span class="agent-detail-chip agent-detail-chip--accent">'
-    +           '<span id="agentDetailWorkflowStateCount">0</span> states'
+    +           '<span id="agentDetailWorkflowStateCount">0</span>&nbsp;states'
     +         '</span>'
     +         '<span class="agent-detail-workflow-initial">'
     +           'starts at <code id="agentDetailWorkflowInitial">-</code>'
@@ -103,10 +107,65 @@
     +   '</div>'
     + '</section>'
 
+    + '<section id="agentPanelTeach" class="agent-detail-panel hidden">'
+    +   '<div class="agent-teach-intro">'
+    +     '<div>'
+    +       '<span class="agent-teach-kicker">Practice workspace</span>'
+    +       '<h2>Teach through conversation</h2>'
+    +       '<p>Show this agent how your team prefers work to be handled. Useful moments become reviewable guidance examples.</p>'
+    +     '</div>'
+    +     '<span class="agent-teach-draft-badge">Draft guidance</span>'
+    +   '</div>'
+    +   '<div class="agent-teach-grid">'
+    +     '<section class="agent-teach-chat" aria-labelledby="agentTeachChatTitle">'
+    +       '<div class="agent-teach-panel-head">'
+    +         '<div>'
+    +           '<h3 id="agentTeachChatTitle">Practice conversation</h3>'
+    +           '<p>This is a teaching workspace, not a live run.</p>'
+    +         '</div>'
+    +         '<span class="agent-teach-presence"><span></span> Ready</span>'
+    +       '</div>'
+    +       '<div id="agentTeachMessages" class="agent-teach-messages" aria-live="polite">'
+    +         '<div class="agent-teach-message agent-teach-message--agent">'
+    +           '<span class="agent-teach-avatar" aria-hidden="true">A</span>'
+    +           '<div><strong id="agentTeachAgentName">Agent</strong><p>What should I learn about how your team works? Give me a real example, a correction, or a preferred format.</p></div>'
+    +         '</div>'
+    +       '</div>'
+    +       '<div class="agent-teach-composer">'
+    +         '<textarea id="agentTeachInput" rows="3" placeholder="For example: Always put the recommendation first, then the supporting evidence."></textarea>'
+    +         '<div class="agent-teach-composer-foot">'
+    +           '<span>Enter to add · Shift+Enter for a new line</span>'
+    +           '<lex-btn id="agentTeachSendBtn" variant="primary" size="sm" icon="arrow-up">Add guidance</lex-btn>'
+    +         '</div>'
+    +       '</div>'
+    +     '</section>'
+    +     '<aside class="agent-teach-guidance" aria-labelledby="agentTeachGuidanceTitle">'
+    +       '<div class="agent-teach-panel-head">'
+    +         '<div>'
+    +           '<h3 id="agentTeachGuidanceTitle">Guidance draft</h3>'
+    +           '<p>Examples captured from this practice.</p>'
+    +         '</div>'
+    +         '<span id="agentTeachGuidanceCount" class="agent-teach-count">0</span>'
+    +       '</div>'
+    +       '<div id="agentTeachGuidanceList" class="agent-teach-guidance-list">'
+    +         '<div class="agent-teach-empty">'
+    +           '<span class="agent-teach-empty-icon">✦</span>'
+    +           '<strong>No examples yet</strong>'
+    +           '<p>Corrections and preferences you add will collect here for review.</p>'
+    +         '</div>'
+    +       '</div>'
+    +       '<div class="agent-teach-boundary">'
+    +         '<strong>Review before it reaches live work</strong>'
+    +         '<p>These browser drafts do not change the governed agent template or affect runs. Publishing requires the Chef guidance contract.</p>'
+    +       '</div>'
+    +     '</aside>'
+    +   '</div>'
+    + '</section>'
+
     + '<section id="agentPanelRuns" class="agent-detail-panel hidden">'
     +   '<lex-card padding="none">'
     +     '<div class="agent-detail-runs-header">'
-    +       '<span class="agent-detail-runs-title">Recent Runs</span>'
+    +       '<span class="agent-detail-runs-title">Recent outcomes</span>'
     +       '<span id="agentDetailRunsCount" class="agent-detail-runs-count"></span>'
     +     '</div>'
     +     '<div id="agentDetailRunsLoading" class="agent-detail-loading">'
@@ -117,8 +176,8 @@
     +     '<div id="agentDetailRunsEmpty" class="hidden agent-detail-runs-empty">'
     +       '<lex-empty'
     +         ' icon="workflow"'
-    +         ' message="No runs yet"'
-    +         ' description="Runs of this agent will appear here."'
+    +         ' message="No outcomes yet"'
+    +         ' description="Run this agent and its work will appear here."'
     +       '></lex-empty>'
     +     '</div>'
     +   '</lex-card>'
@@ -199,7 +258,7 @@
 
     + '<lex-drawer'
     +   ' id="agentDetailConfigDrawer"'
-    +   ' heading="Configure Agent"'
+    +   ' heading="Agent settings"'
     +   ' side="right"'
     +   ' width="lg"'
     +   ' show-footer'
@@ -214,6 +273,13 @@
     +     '</p>'
     +     '<lex-input id="agentDetailEditName" label="Display name" required></lex-input>'
     +     '<lex-textarea id="agentDetailEditDescription" label="Description" rows="3"></lex-textarea>'
+    +     '<div class="agent-detail-drawer-section agent-detail-drawer-section--visibility">'
+    +       '<div>'
+    +         '<div class="agent-detail-drawer-section-label">Team visibility</div>'
+    +         '<span class="agent-detail-drawer-section-hint">Let teammates find and start this agent from LANA chat.</span>'
+    +       '</div>'
+    +       '<lex-toggle id="agentDetailEditDiscoverable" label="Discoverable" label-side="right"></lex-toggle>'
+    +     '</div>'
     +     '<div class="agent-detail-drawer-section">'
     +       '<div class="agent-detail-drawer-section-label">'
     +         'Allowed tools'
@@ -231,11 +297,11 @@
     +       ' label="Model slot"'
     +       ' placeholder="Choose a model slot..."'
     +     '></lex-select>'
-    +     '<lex-select'
-    +       ' id="agentDetailEditApprovalPolicy"'
-    +       ' label="Approval policy"'
-    +       ' options=\'[{"value":"none","label":"No approval required"},{"value":"sensitive","label":"Required for sensitive actions"},{"value":"all","label":"Required for every action"}]\''
-    +     '></lex-select>'
+    +     '<div class="agent-detail-governance-card">'
+    +       '<span class="agent-detail-governance-icon">✓</span>'
+    +       '<div><strong>Approval guardrail</strong><p id="agentDetailEditApprovalSummary">Loading approval policy...</p></div>'
+    +       '<span class="agent-detail-governance-badge">Governed</span>'
+    +     '</div>'
     +     '<div class="agent-detail-drawer-section">'
     +       '<div class="agent-detail-drawer-section-label">Schedule</div>'
     +       '<lex-toggle'
@@ -286,17 +352,22 @@
     +   '</div>'
     + '</lex-drawer>'
 
-    + '<lex-modal id="agentDetailRunModal" heading="Run Agent" size="md" data-hoist>'
+    + '<lex-modal id="agentDetailRunModal" heading="Run Agent" size="md" confirm-text="Start run" cancel-text="Cancel" data-hoist>'
     +   '<div class="agent-detail-run-modal-body">'
     +     '<p class="agent-detail-config-notice">'
-    +       'Provide a brief input describing what the agent should do.'
+    +       'Describe the outcome you need. You will be able to follow the work live and review what it produces.'
     +     '</p>'
     +     '<lex-textarea'
     +       ' id="agentDetailRunInput"'
-    +       ' label="Input"'
+    +       ' label="What should it do?"'
     +       ' rows="4"'
-    +       ' placeholder="Describe the task..."'
+    +       ' placeholder="Example: Review this week’s open work and prepare a prioritized follow-up list..."'
     +     '></lex-textarea>'
+    +     '<div id="agentDetailRunWorkspaceField" class="agent-detail-run-workspace hidden">'
+    +       '<lex-select id="agentDetailRunWorkspace" label="Where should it work?" placeholder="Choose a workspace..." searchable></lex-select>'
+    +       '<span id="agentDetailRunWorkspaceHint">This agent uses the selected workspace’s documents, tasks, and business context.</span>'
+    +     '</div>'
+    +     '<div class="agent-detail-run-safety"><span>✓</span><p><strong>You stay in control.</strong> Sensitive changes still pause for approval, and the finished work will appear under Outcomes.</p></div>'
     +   '</div>'
     + '</lex-modal>'
 
@@ -345,6 +416,7 @@
   function el(id) { return document.getElementById(id); }
   function show(node) { if (node) node.classList.remove('hidden'); }
   function hide(node) { if (node) node.classList.add('hidden'); }
+  function setText(id, value) { var node = el(id); if (node) node.textContent = value == null ? '' : String(value); }
 
   function statusLabel(status) {
     if (!status) return 'Pending';
@@ -382,6 +454,114 @@
     if (!t) return '';
     if (typeof t === 'string') return t;
     return t.name || t.slug || '';
+  }
+
+  function humanizeToolName(value) {
+    if (!value) return '';
+    var words = String(value).split('_').join(' ').split('-').join(' ').split(' ').filter(Boolean);
+    if (words.length > 1 && (words[0] === 'lana' || words[0] === 'tool')) words.shift();
+    var text = words.join(' ');
+    if (!text) return '';
+    return text.charAt(0).toUpperCase() + text.substring(1);
+  }
+
+  function contextProvidersFor(agent) {
+    if (!agent) return [];
+    if (Array.isArray(agent.context_providers)) return agent.context_providers;
+    if (Array.isArray(agent.contextProviders)) return agent.contextProviders;
+    return [];
+  }
+
+  function agentNeedsWorkspace(agent) {
+    var providers = contextProvidersFor(agent);
+    for (var i = 0; i < providers.length; i++) if (providers[i] && providers[i].scope === 'matter') return true;
+    return false;
+  }
+
+  function contextProviderLabel(provider) {
+    var slug = typeof provider === 'string' ? provider : (provider && (provider.name || provider.slug || provider.type || ''));
+    var labels = {
+      core: 'Workspace overview',
+      tasks: 'Tasks and deadlines',
+      contacts: 'People and contacts',
+      'linked-matters': 'Linked workspaces',
+      'custom-fields': 'Business fields',
+      connector: 'Connected systems',
+      connectors: 'Connected systems',
+      workflow: 'Automations and workflow',
+      insights: 'Insights data',
+      analytics: 'Analytics',
+      'recording-transcript': 'Recording transcript'
+    };
+    return labels[slug] || humanizeToolName(slug || 'Task briefing');
+  }
+
+  function workspaceOptions(workspaces) {
+    var options = [];
+    for (var i = 0; i < workspaces.length; i++) {
+      var workspace = workspaces[i] || {};
+      var value = workspace.matter_id || workspace.id;
+      if (!value) continue;
+      var name = workspace.name || workspace.matter_name || workspace.title || String(value);
+      var client = workspace.client_name || (workspace.client && workspace.client.name) || '';
+      options.push({ value: String(value), label: client ? name + ' · ' + client : name });
+    }
+    return options;
+  }
+
+  function buildRunPayload(input, matterId) {
+    var value = String(input || '').trim();
+    var payload = { input: value, title: value.slice(0, 100) };
+    if (matterId) payload.matter_id = matterId;
+    return payload;
+  }
+
+  function approvalPolicySummary(policy) {
+    if (!policy) return 'No approval is required for this agent.';
+    if (typeof policy === 'string') {
+      if (policy === 'none') return 'No approval is required for this agent.';
+      if (policy === 'all') return 'A teammate must approve every proposed action.';
+      if (policy === 'sensitive') return 'A teammate must approve sensitive actions before they are applied.';
+      return humanizeToolName(policy) + '.';
+    }
+    if (typeof policy !== 'object') return 'No approval is required for this agent.';
+    if (policy.summary) return String(policy.summary);
+    if (policy.required === false) return 'No approval is required for this agent.';
+    if (policy.required_for === 'all') return 'A teammate must approve every proposed action.';
+    if (policy.required) return 'A teammate must approve sensitive actions before they are applied.';
+    return 'No approval is required for this agent.';
+  }
+
+  function buildTeachingExample(message, createdAt) {
+    var text = String(message || '').trim();
+    if (!text) return null;
+    return {
+      instruction: text,
+      created_at: createdAt || new Date().toISOString(),
+      review_status: 'draft'
+    };
+  }
+
+  function teachingStorageKey(slug) {
+    return 'lana-agent-teaching-draft:' + String(slug || 'agent');
+  }
+
+  function loadTeachingDrafts(slug) {
+    try {
+      var raw = window.sessionStorage && window.sessionStorage.getItem(teachingStorageKey(slug));
+      var parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_err) {
+      return [];
+    }
+  }
+
+  function saveTeachingDrafts(state) {
+    try {
+      if (window.sessionStorage) {
+        window.sessionStorage.setItem(teachingStorageKey(state.slug), JSON.stringify(state.teachingDrafts || []));
+      }
+    } catch (_err) { /* Draft remains available for the current render. */ }
   }
 
   function isSystemAgent(agent) {
@@ -542,6 +722,10 @@
       runsLoaded: false,
       editDisabledTools: {},
       editSnapshot: null,
+      workspaces: [],
+      workspacesLoaded: false,
+      workspacesLoading: false,
+      teachingDrafts: loadTeachingDrafts(slug),
       destroyed: false,
       _unbindFns: []
     };
@@ -555,6 +739,7 @@
     state.activeTab = id || 'capabilities';
     var panels = {
       capabilities: el('agentPanelCapabilities'),
+      teach:        el('agentPanelTeach'),
       runs:         el('agentPanelRuns'),
       stats:        el('agentPanelStats')
     };
@@ -624,12 +809,31 @@
       } else {
         var toolsHtml = '';
         for (var i = 0; i < tools.length; i++) {
-          var label = typeof tools[i] === 'string' ? tools[i] : (tools[i] && (tools[i].name || tools[i].slug || ''));
-          toolsHtml += '<span class="agent-detail-chip">' + escHtml(label) + '</span>';
+          var rawLabel = typeof tools[i] === 'string' ? tools[i] : (tools[i] && (tools[i].name || tools[i].slug || ''));
+          toolsHtml += '<span class="agent-detail-chip" title="' + escHtml(rawLabel) + '">' + escHtml(humanizeToolName(rawLabel)) + '</span>';
         }
         toolsEl.innerHTML = toolsHtml;
       }
     }
+
+    var contextEl = el('agentDetailContextList');
+    var providers = contextProvidersFor(agent);
+    if (contextEl) {
+      if (!providers.length) {
+        contextEl.innerHTML = '<span class="agent-detail-context-item"><span class="agent-detail-context-icon">→</span><span><strong>Task briefing</strong><small>Instructions supplied with each run</small></span></span>';
+      } else {
+        var contextHtml = '';
+        for (var c = 0; c < providers.length; c++) {
+          var provider = providers[c] || {};
+          var scope = provider.scope === 'matter' ? 'Selected workspace' : 'Your organization';
+          contextHtml += '<span class="agent-detail-context-item"><span class="agent-detail-context-icon">' + (provider.scope === 'matter' ? 'W' : 'L') + '</span><span><strong>' + escHtml(contextProviderLabel(provider)) + '</strong><small>' + escHtml(scope) + '</small></span></span>';
+        }
+        contextEl.innerHTML = contextHtml;
+      }
+    }
+    setText('agentDetailContextNote', agentNeedsWorkspace(agent)
+      ? 'Choose a workspace for each run. LANA loads only the relevant context from that workspace.'
+      : (providers.length ? 'LANA assembles this organization context for every run.' : 'This agent works from the task briefing and its connected capabilities.'));
 
     var delegEl = el('agentDetailDelegationList');
     if (delegEl) {
@@ -641,7 +845,7 @@
         for (var j = 0; j < deleg.length; j++) {
           var d = deleg[j];
           var dLabel = typeof d === 'string' ? d : (d && (d.name || d.slug || ''));
-          delegHtml += '<span class="agent-detail-chip agent-detail-chip--accent">' + escHtml(dLabel) + '</span>';
+          delegHtml += '<span class="agent-detail-chip agent-detail-chip--accent" title="' + escHtml(dLabel) + '">' + escHtml(humanizeToolName(dLabel)) + '</span>';
         }
         delegEl.innerHTML = delegHtml;
       }
@@ -654,17 +858,108 @@
 
     var policyEl = el('agentDetailApprovalPolicy');
     if (policyEl) {
-      var policy = agent.approval_policy;
-      if (!policy) {
-        policyEl.textContent = 'No approval required.';
-      } else if (typeof policy === 'string') {
-        policyEl.textContent = policy;
-      } else if (typeof policy === 'object') {
-        var summary = policy.summary
-          || (policy.required ? 'Approval required for ' + (policy.required_for || 'sensitive actions') + '.' : 'No approval required.');
-        policyEl.textContent = summary;
-      }
+      policyEl.textContent = approvalPolicySummary(agent.approval_policy);
     }
+
+    var teachingName = el('agentTeachAgentName');
+    if (teachingName) teachingName.textContent = agent.name || agent.slug || 'Agent';
+    renderTeachingDrafts(state);
+  }
+
+  // =========================================================================
+  // Teach by example — local draft until Chef exposes a guidance contract
+  // =========================================================================
+
+  function renderTeachingDrafts(state) {
+    var list = el('agentTeachGuidanceList');
+    var count = el('agentTeachGuidanceCount');
+    var drafts = state.teachingDrafts || [];
+    if (count) count.textContent = String(drafts.length);
+    if (!list) return;
+    if (drafts.length === 0) {
+      list.innerHTML = ''
+        + '<div class="agent-teach-empty">'
+        +   '<span class="agent-teach-empty-icon">✦</span>'
+        +   '<strong>No examples yet</strong>'
+        +   '<p>Corrections and preferences you add will collect here for review.</p>'
+        + '</div>';
+      return;
+    }
+
+    var html = '';
+    for (var i = 0; i < drafts.length; i++) {
+      var draft = drafts[i] || {};
+      html += ''
+        + '<article class="agent-teach-guidance-card">'
+        +   '<div class="agent-teach-guidance-card-head">'
+        +     '<span>Example ' + String(i + 1) + '</span>'
+        +     '<button type="button" class="agent-teach-remove" data-teach-delete="' + String(i) + '" aria-label="Remove example">×</button>'
+        +   '</div>'
+        +   '<blockquote>' + escHtml(draft.instruction || '') + '</blockquote>'
+        +   '<span class="agent-teach-review-state"><span></span> Needs team review</span>'
+        + '</article>';
+    }
+    list.innerHTML = html;
+  }
+
+  function addTeachingExample(state) {
+    var input = el('agentTeachInput');
+    if (!input) return;
+    var example = buildTeachingExample(input.value);
+    if (!example) return;
+    state.teachingDrafts.push(example);
+    saveTeachingDrafts(state);
+    renderTeachingDrafts(state);
+
+    var messages = el('agentTeachMessages');
+    if (messages) {
+      messages.innerHTML += ''
+        + '<div class="agent-teach-message agent-teach-message--user">'
+        +   '<div><strong>You</strong><p>' + escHtml(example.instruction) + '</p></div>'
+        + '</div>'
+        + '<div class="agent-teach-message agent-teach-message--agent agent-teach-message--receipt">'
+        +   '<span class="agent-teach-avatar" aria-hidden="true">✓</span>'
+        +   '<div><strong>Captured as guidance</strong><p>This is saved as a browser draft for team review. It will not affect live runs yet.</p></div>'
+        + '</div>';
+      messages.scrollTop = messages.scrollHeight;
+    }
+    input.value = '';
+    input.focus();
+  }
+
+  function wireTeaching(state) {
+    var root = state._rootEl || document;
+    var clickHandler = function (evt) {
+      if (!evt || !evt.target || typeof evt.target.closest !== 'function') return;
+      if (evt.target.closest('#agentTeachSendBtn')) {
+        addTeachingExample(state);
+        return;
+      }
+      var remove = evt.target.closest('[data-teach-delete]');
+      if (remove) {
+        var index = Number(remove.getAttribute('data-teach-delete'));
+        if (!isNaN(index) && index >= 0 && index < state.teachingDrafts.length) {
+          state.teachingDrafts.splice(index, 1);
+          saveTeachingDrafts(state);
+          renderTeachingDrafts(state);
+        }
+      }
+    };
+    root.addEventListener('click', clickHandler);
+    state._unbindFns.push(function () { root.removeEventListener('click', clickHandler); });
+
+    var input = el('agentTeachInput');
+    if (input) {
+      var keyHandler = function (evt) {
+        if (evt.key === 'Enter' && !evt.shiftKey) {
+          evt.preventDefault();
+          addTeachingExample(state);
+        }
+      };
+      input.addEventListener('keydown', keyHandler);
+      state._unbindFns.push(function () { input.removeEventListener('keydown', keyHandler); });
+    }
+    renderTeachingDrafts(state);
   }
 
   // =========================================================================
@@ -783,7 +1078,16 @@
       if (e.target.closest('#agentDetailRunBtn')) {
         var modal = el('agentDetailRunModal');
         var input = el('agentDetailRunInput');
+        var workspace = el('agentDetailRunWorkspace');
+        var workspaceField = el('agentDetailRunWorkspaceField');
         if (input && typeof input.value !== 'undefined') input.value = '';
+        if (workspace) workspace.value = '';
+        if (agentNeedsWorkspace(state.agent)) {
+          show(workspaceField);
+          loadRunWorkspaces(state);
+        } else {
+          hide(workspaceField);
+        }
         if (modal) {
           modal.heading = 'Run: ' + (state.agent && (state.agent.name || state.agent.slug) || state.slug || '');
           modal.open = true;
@@ -968,7 +1272,7 @@
       name: ((el('agentDetailEditName') && el('agentDetailEditName').value) || '').trim(),
       description: ((el('agentDetailEditDescription') && el('agentDetailEditDescription').value) || '').trim(),
       model_slot: (el('agentDetailEditModelSlot') && el('agentDetailEditModelSlot').value) || '',
-      approval_policy: (el('agentDetailEditApprovalPolicy') && el('agentDetailEditApprovalPolicy').value) || 'none',
+      discoverable: !!(el('agentDetailEditDiscoverable') && el('agentDetailEditDiscoverable').checked),
       disabled_tools: Object.assign({}, state.editDisabledTools || {}),
       schedule_enabled: !!(el('agentDetailEditScheduleEnabled') && el('agentDetailEditScheduleEnabled').checked),
       schedule_cron: ((el('agentDetailEditScheduleCron') && el('agentDetailEditScheduleCron').value) || '').trim(),
@@ -984,6 +1288,7 @@
 
     setVal('agentDetailEditName', a.name || '');
     setVal('agentDetailEditDescription', a.description || '');
+    setChecked('agentDetailEditDiscoverable', a.discoverable === true);
 
     var slotEl = el('agentDetailEditModelSlot');
     if (slotEl) {
@@ -991,18 +1296,8 @@
       slotEl.value = a.model_slot || 'agentic';
     }
 
-    var policyEl = el('agentDetailEditApprovalPolicy');
-    if (policyEl) {
-      var policyValue = 'none';
-      if (typeof a.approval_policy === 'string') {
-        policyValue = a.approval_policy;
-      } else if (a.approval_policy && typeof a.approval_policy === 'object') {
-        if (a.approval_policy.required === false) policyValue = 'none';
-        else if (a.approval_policy.required_for === 'all') policyValue = 'all';
-        else if (a.approval_policy.required) policyValue = 'sensitive';
-      }
-      policyEl.value = policyValue;
-    }
+    var policySummaryEl = el('agentDetailEditApprovalSummary');
+    if (policySummaryEl) policySummaryEl.textContent = approvalPolicySummary(a.approval_policy);
 
     renderEditToolsCheckboxes(a.allowed_tools || []);
 
@@ -1048,7 +1343,7 @@
       var safe = escHtml(name);
       html += '<label class="agent-detail-edit-tool-row">'
             + '<input type="checkbox" class="agent-detail-edit-tool-checkbox" data-tool="' + safe + '" checked />'
-            + '<span class="agent-detail-edit-tool-name">' + safe + '</span>'
+            + '<span class="agent-detail-edit-tool-name" title="' + safe + '">' + escHtml(humanizeToolName(name)) + '</span>'
             + '</label>';
     }
     toolsList.innerHTML = html;
@@ -1062,7 +1357,7 @@
     if (cur.name !== (snap.name || '')) body.name = cur.name;
     if (cur.description !== (snap.description || '')) body.description = cur.description;
     if (cur.model_slot && cur.model_slot !== (snap.model_slot || '')) body.model_slot = cur.model_slot;
-    if (cur.approval_policy !== (snap.approval_policy || 'none')) body.approval_policy = cur.approval_policy;
+    if (cur.discoverable !== !!snap.discoverable) body.discoverable = cur.discoverable;
 
     var snapDisabled = snap.disabled_tools || {};
     var curDisabled = cur.disabled_tools || {};
@@ -1504,6 +1799,38 @@
       + ', Completed: ' + (p.completed != null ? p.completed : 0);
   }
 
+  function populateRunWorkspaces(state) {
+    var select = el('agentDetailRunWorkspace');
+    if (!select) return;
+    select.options = workspaceOptions(state.workspaces);
+    select.disabled = false;
+    if (!state.workspaces.length) setText('agentDetailRunWorkspaceHint', 'No active workspaces are available. Create or activate one before starting this agent.');
+    else setText('agentDetailRunWorkspaceHint', 'This agent uses the selected workspace’s documents, tasks, and business context.');
+  }
+
+  function loadRunWorkspaces(state) {
+    if (state.workspacesLoaded) { populateRunWorkspaces(state); return; }
+    if (state.workspacesLoading || !window.api || typeof window.api.getMatters !== 'function') return;
+    state.workspacesLoading = true;
+    var select = el('agentDetailRunWorkspace');
+    if (select) select.disabled = true;
+    setText('agentDetailRunWorkspaceHint', 'Loading active workspaces...');
+    window.api.getMatters(1, 100, { status: 'active', sort_by: 'updated_at', sort_order: 'desc' }).then(function (response) {
+      if (state.destroyed) return;
+      var matters = Array.isArray(response) ? response : ((response && (response.matters || response.data)) || []);
+      state.workspaces = Array.isArray(matters) ? matters : [];
+      state.workspacesLoaded = true;
+      state.workspacesLoading = false;
+      populateRunWorkspaces(state);
+    }).catch(function () {
+      if (state.destroyed) return;
+      state.workspaces = [];
+      state.workspacesLoading = false;
+      if (select) select.disabled = false;
+      setText('agentDetailRunWorkspaceHint', 'Workspaces could not be loaded. Close this window and try again.');
+    });
+  }
+
   function submitRun(ctx, state) {
     var input = el('agentDetailRunInput');
     var value = input && typeof input.value !== 'undefined' ? input.value : '';
@@ -1511,19 +1838,24 @@
       if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Please describe what the agent should do.');
       return;
     }
+    var workspace = el('agentDetailRunWorkspace');
+    var matterId = workspace && workspace.value ? String(workspace.value) : '';
+    if (agentNeedsWorkspace(state.agent) && !matterId) {
+      if (window.Lex && window.Lex.Toast) window.Lex.Toast.error('Choose the workspace where this agent should work.');
+      return;
+    }
     if (!window.api || typeof window.api.post !== 'function' || !state.slug) return;
 
-    window.api.post('/api/v1/agents/' + encodeURIComponent(state.slug) + '/runs', {
-      input: String(value).trim()
-    })
+    var modal = el('agentDetailRunModal');
+    if (modal) modal.loading = true;
+    window.api.post('/api/v1/agents/' + encodeURIComponent(state.slug) + '/runs', buildRunPayload(value, matterId))
       .then(function (resp) {
         if (state.destroyed) return;
         var runId = (resp && resp.run && resp.run.id)
                  || (resp && resp.data && resp.data.id)
                  || (resp && resp.id)
                  || (resp && resp.run_id);
-        var modal = el('agentDetailRunModal');
-        if (modal) modal.open = false;
+        if (modal) { modal.loading = false; modal.open = false; }
         if (window.Lex && window.Lex.Toast) window.Lex.Toast.success('Run started');
         if (runId) {
           ctx.app.setView('agentRun', { runId: runId });
@@ -1536,6 +1868,7 @@
       })
       .catch(function (err) {
         if (state.destroyed) return;
+        if (modal) modal.loading = false;
         console.error('[agent-detail] Run start failed:', err);
         var status = err && (err.status || (err.response && err.response.status));
         var msg = 'Unable to start run';
@@ -1708,6 +2041,7 @@
     wireTabs(state);
     wireRunsList(ctx, state);
     wireBannerButtons(ctx, state);
+    wireTeaching(state);
     switchTab(state, state.activeTab);
     loadAgent(state);
   }
@@ -1729,5 +2063,16 @@
     rootEl._agentDetailState = null;
   }
 
-  global.LanaAgentsApp.Views.agentDetail = { render: render, destroy: destroy };
+  global.LanaAgentsApp.Views.agentDetail = {
+    render: render,
+    destroy: destroy,
+    __test: {
+      approvalPolicySummary: approvalPolicySummary,
+      buildTeachingExample: buildTeachingExample,
+      humanizeToolName: humanizeToolName,
+      agentNeedsWorkspace: agentNeedsWorkspace,
+      contextProviderLabel: contextProviderLabel,
+      buildRunPayload: buildRunPayload
+    }
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

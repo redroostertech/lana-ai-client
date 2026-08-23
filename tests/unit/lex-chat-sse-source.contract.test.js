@@ -164,6 +164,38 @@ describe('SSEChatSource contract', () => {
     expect(api.stopConversationGeneration).not.toHaveBeenCalled();
   });
 
+  test('resetConversation makes the next send allocate a fresh canonical conversation', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(responseFromChunks([
+      'event: done\ndata: {"thread_id":"thread-new","generation_id":"generation-new","message_id":"assistant-new"}\n\n'
+    ]));
+    const api = canonicalApi({
+      createConversation: jest.fn().mockResolvedValue({
+        data: { conversationId: 'thread-new' }
+      })
+    });
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
+    await source.connect('thread-old');
+
+    source.resetConversation();
+    const events = [];
+    for await (const event of source.send('start fresh', {
+      title: 'Document Chat',
+      contextType: 'document_chat'
+    })) events.push(event);
+
+    expect(api.createConversation).toHaveBeenCalledWith({
+      title: 'Document Chat',
+      thread_type: 'ad_hoc',
+      context_type: 'document_chat'
+    });
+    expect(fetchMock.mock.calls[0][0])
+      .toBe('http://api.test/api/v1/conversations/thread-new/messages/stream');
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'done', messageId: 'assistant-new' })
+    ]);
+  });
+
   test('parses fragmented frames and final frame without trailing blank line', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(responseFromChunks([
       'event: content\ndata: {"content":"hel',

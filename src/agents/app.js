@@ -3,8 +3,8 @@
 // LanaAgents SPA controller. Modeled on src/automation/app.js.
 //
 // Mounts in src/agents/index.html (the host shell) and drives a
-// state-machine over 5 views: catalog, agentDetail, agentRun, activity,
-// activityDetail. View modules under src/agents/js/views/ register
+// state-machine over the workspace, builder, detail, live-run, outcomes,
+// and tools views. View modules under src/agents/js/views/ register
 // themselves on window.LanaAgentsApp.Views and are dispatched by
 // setView() based on URL hash + sidebar clicks.
 //
@@ -29,6 +29,7 @@
 //   '#activity'                        -> activity       ({})
 //   '#activity/<id>'                   -> activityDetail ({ id })
 //   '#create'                          -> create         ({})
+//   '#create/import'                   -> create         ({ mode: 'import' })
 //   '#tools/browse'                    -> toolsBrowse    ({})
 //
 // Sub-routes keep the parent's sidebar nav highlighted:
@@ -59,8 +60,8 @@
   // VIEW_PARENT below so the sidebar highlight stays consistent.
   // -------------------------------------------------------------------------
   var SIDEBAR_NAV_ITEMS = [
-    { id: 'catalog',  label: 'Catalog',  icon: 'bot' },
-    { id: 'activity', label: 'Activity', icon: 'workflow' }
+    { id: 'catalog',  label: 'Workspace', icon: 'layout-dashboard' },
+    { id: 'activity', label: 'Outcomes',  icon: 'sparkles' }
   ];
 
   var VIEW_IDS = {
@@ -89,12 +90,12 @@
 
   // Topbar / page title metadata. Falls back to 'Agents' for unknown views.
   var VIEW_META = {
-    catalog:        { title: 'Agents' },
+    catalog:        { title: 'Agent Studio' },
     agentDetail:    { title: 'Agent' },
     agentRun:       { title: 'Run' },
-    activity:       { title: 'Activity' },
-    activityDetail: { title: 'Run detail' },
-    create:         { title: 'Create agent' },
+    activity:       { title: 'Outcomes' },
+    activityDetail: { title: 'Outcome detail' },
+    create:         { title: 'Build an agent' },
     toolsBrowse:    { title: 'Browse tools' }
   };
 
@@ -102,7 +103,7 @@
   // State
   // -------------------------------------------------------------------------
   var state = {
-    currentView: null,    // 'catalog' | 'agentDetail' | 'agentRun' | 'activity' | 'activityDetail'
+    currentView: null,    // one of VIEW_IDS
     viewParams: {},       // view-specific params (e.g., { slug }, { runId }, { id })
     initialized: false,   // true once lex-app-ready fired and we wired the shell
     booted: false         // true once the very first setView() landed
@@ -151,10 +152,8 @@
       {
         id: 'main-actions',
         isStaticTop: true,
-        // Phase 8: full-screen create flow. The sidebar Create button now
-        // routes to the '#create' view; the legacy modal in catalog.js is
-        // kept around for reference until that PR-follow-up removes it.
-        items: [{ id: 'create', label: 'New Agent', icon: 'plus', isButton: true, onClick: 'openAgentCreateModal', variant: 'create-chat' }]
+        // The static CTA routes into the full-screen guided builder.
+        items: [{ id: 'create', label: 'Build an agent', icon: 'plus', isButton: true, onClick: 'openAgentCreateModal', variant: 'create-chat' }]
       },
       {
         id: 'navigation',
@@ -219,9 +218,9 @@
     if (!els.content) return;
     var safeId = String(viewId || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '');
     els.content.innerHTML =
-      '<div class="agents-view-error" role="alert" style="padding:24px;">' +
-        '<h2 style="margin:0 0 8px;">View unavailable</h2>' +
-        '<p style="margin:0;color:var(--lex-color-text-muted,#666);">' +
+      '<div class="agents-view-error" role="alert">' +
+        '<h2>View unavailable</h2>' +
+        '<p>' +
           'The "' + safeId + '" view module is not registered. ' +
           'View modules attach themselves to window.LanaAgentsApp.Views.' +
         '</p>' +
@@ -359,6 +358,9 @@
     if (hash === 'create') {
       return { view: VIEW_IDS.create, params: {} };
     }
+    if (hash === 'create/import') {
+      return { view: VIEW_IDS.create, params: { mode: 'import' } };
+    }
 
     // '#tools/browse' — full-screen tools-browser view.
     if (hash === 'tools/browse' || hash === 'tools') {
@@ -388,7 +390,7 @@
       case VIEW_IDS.activityDetail:
         return p.id ? '#activity/' + encodeURIComponent(p.id) : '#activity';
       case VIEW_IDS.create:
-        return '#create';
+        return p.mode === 'import' ? '#create/import' : '#create';
       case VIEW_IDS.toolsBrowse:
         return '#tools/browse';
       default:
@@ -533,12 +535,8 @@
   global.LanaAgentsApp.navigate = setView;
 
   // Wired to the sidebar's static Create button (see applySidebarSections).
-  // Phase 8: this used to open the in-view modal in the catalog template;
-  // it now navigates to the full-screen '#create' view. The function name
-  // is kept stable so the sidebar onClick string ('openAgentCreateModal')
-  // doesn't need to be updated everywhere all at once. A follow-up PR
-  // will rename to openAgentCreateView and delete the legacy modal in
-  // catalog.js (search for "LEGACY: Phase 8").
+  // The legacy function name remains because the shared sidebar resolves
+  // named callbacks, but the action opens the full-screen guided builder.
   global.openAgentCreateModal = function () {
     setView('create', {});
   };

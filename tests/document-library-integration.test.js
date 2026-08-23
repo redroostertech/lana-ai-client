@@ -23,6 +23,17 @@ function loadPageDescriptors() {
 }
 
 describe('Document Library integration', () => {
+  test('prefers the original display filename over the storage-safe filename', () => {
+    const controller = fs.readFileSync(path.join(SRC, 'js', 'document-library.js'), 'utf8');
+    const displayIndex = controller.indexOf('file.display_filename');
+    const originalIndex = controller.indexOf('file.original_filename');
+    const storageIndex = controller.indexOf('file.filename', displayIndex);
+
+    expect(displayIndex).toBeGreaterThan(-1);
+    expect(originalIndex).toBeGreaterThan(displayIndex);
+    expect(storageIndex).toBeGreaterThan(originalIndex);
+  });
+
   test('app catalog routes Document Library and legacy aliases to the shipped page', () => {
     const Apps = loadCatalog();
 
@@ -94,6 +105,22 @@ describe('Document Library integration', () => {
     expect(html.indexOf('src="js/time-utils.js"')).toBeLessThan(html.indexOf('src="js/api.js"'));
   });
 
+  test('Document and Template Library pages use the full content width with standard gutters', () => {
+    const css = fs.readFileSync(path.join(SRC, 'css', 'document-library.css'), 'utf8');
+
+    expect(css).toMatch(/\.document-library\s*\{[^}]*max-width:\s*none;[^}]*padding:\s*2rem;/s);
+    expect(css).not.toContain('max-width: 1180px');
+    expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*?\.document-library\s*\{[^}]*padding:\s*1rem;/);
+    expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.document-library\s*\{[^}]*padding:\s*0\.75rem;/);
+  });
+
+  test('the shared loader cannot intercept the page after it begins fading out', () => {
+    const loader = fs.readFileSync(path.join(SRC, 'js', 'lex', 'components', 'foundation', 'lex-loader.js'), 'utf8');
+
+    expect(loader).toMatch(/#lex-loader-overlay\s*\{[^}]*pointer-events:\s*none;/s);
+    expect(loader).toMatch(/#lex-loader-overlay\.lex-loader-visible\s*\{[^}]*pointer-events:\s*auto;/s);
+  });
+
   test('Document Library loads paginated latest-edited files and reuses shared document creation', () => {
     const controller = fs.readFileSync(path.join(SRC, 'js', 'document-library.js'), 'utf8');
 
@@ -112,6 +139,22 @@ describe('Document Library integration', () => {
     expect(controller).toContain("LexRouter.registerPageInit('document-library.html', init);");
     expect(controller).toContain("root.addEventListener('page-change'");
     expect(controller).not.toContain('officeEditorInstance');
+  });
+
+  test('Template Library instantiates editable templates through the shared creation flow', () => {
+    const controller = fs.readFileSync(path.join(SRC, 'js', 'document-library-templates.js'), 'utf8');
+    const modalController = fs.readFileSync(path.join(SRC, 'js', 'services', 'document-create-modal.js'), 'utf8');
+
+    expect(controller).toContain('id="dstUseTemplate"');
+    expect(controller).toContain('Use Template');
+    expect(controller).toContain("source: 'template_library_use'");
+    expect(controller).toContain('sourceTemplate: {');
+    expect(controller).toContain('id: base.id');
+    expect(controller).toContain('sourceMatterId: base.sourceMatterId');
+    expect(modalController).toContain("heading: state.sourceTemplate ? 'Use Template'");
+    expect(modalController).toContain('requestBody.source_template_id = state.sourceTemplate.id');
+    expect(modalController).toContain('is_template: form.isTemplate');
+    expect(modalController).toContain("Lex.Nav.go('file-editor.html'");
   });
 
   test('File Editor page is a focused editor route with its own assets', () => {
@@ -326,6 +369,8 @@ describe('Document Library integration', () => {
     expect(css).toContain('.office-review-comments-panel');
     expect(css).toContain('.office-file-review-metadata');
     expect(css).toContain('.office-show-changes-toggle');
+    expect(css).toContain('.office-show-changes-toggle:disabled');
+    expect(css).toContain('.office-lana-editor-host--release-compare');
     expect(css).toContain('.office-review-insert');
     expect(css).toContain('.office-review-delete');
     expect(css).toContain('.office-review-change:hover::after');
@@ -413,7 +458,8 @@ describe('Document Library integration', () => {
     expect(css).toContain('overflow-y: auto;');
 
     expect(controller).toContain(': docHasActiveSavedDraft(file);');
-    expect(controller).toContain('data-action="release-review-version"');
+    expect(controller).toContain("releaseButton.dataset.action = hasPendingApproval ? pendingApprovalAction : 'release-review-version'");
+    expect(controller).toContain("? pendingReleaseButtonAction(serverReview(file)) : 'release-review-version'");
     expect(controller).not.toContain('data-action="save-review-snapshot"');
     expect(controller).not.toContain('Save draft');
     expect(controller).not.toContain('>Save Draft</button>');

@@ -2,10 +2,23 @@
 
 ## Overview
 
-LanaAgents is the Electron client surface for browsing, running, and
-auditing Lana's agent platform. Users pick an agent from the catalog,
-configure and launch a run, and review past runs ("activity"). It is a
+LanaAgents is the dedicated Agent Studio for building, deploying, running,
+and reviewing Lana's persistent agents. The experience is outcome-first:
+the workspace explains the build → run → review loop, the guided builder
+keeps technical configuration behind plain-language decisions, and the
+Outcomes view brings finished work and human decisions together. It is a
 sibling of LanaWorks in the top-level app dropdown switcher.
+
+Claude migration is handled in the guided builder. A user may choose a
+`CLAUDE.md`, Markdown, or JSON agent config; the client reads it locally and
+maps its name, purpose, and recognizable tool intent onto the closest governed
+LANA template. Raw source instructions are not uploaded and the backend's
+template-owned system prompt boundary remains intact.
+
+The final deploy step supports on-demand or plain-language recurring schedules,
+optional chat discoverability, and an optional first task. A successful quiet
+deploy stays in context long enough to show a deployment receipt and clear
+choices to give the agent work or return to the workspace.
 
 ## Pattern alignment
 
@@ -24,11 +37,14 @@ full-page navigation, e.g. `window.location.href = 'agents/index.html#catalog'`.
 
 | View name | URL hash | Purpose |
 |-----------|----------|---------|
-| `catalog` | `#catalog` (default) | Browse and search available agents. |
+| `catalog` | `#catalog` (default) | Workspace home, agent roster, starting points, and recent outcomes. |
 | `agentDetail` | `#agent/:slug` | View an agent's description, tools, inputs; start a run. |
 | `agentRun` | `#run/:id` | Live view of a running or completed run: streamed steps, tool calls, output. |
-| `activity` | `#activity` | History of all agent runs across agents. |
-| `activityDetail` | `#activity/:id` | Full record of a single run: inputs, transcript, artifacts. |
+| `activity` | `#activity` | Outcome-first history of all agent work. |
+| `activityDetail` | `#activity/:id` | Full outcome record: inputs, trace, approvals, and deliverables. |
+| `create` | `#create` | Four-step guided agent builder. |
+| `create` | `#create/import` | Guided builder opened on the local Claude import path. |
+| `toolsBrowse` | `#tools/browse` | Full capability library used by the builder. |
 
 ## Files
 

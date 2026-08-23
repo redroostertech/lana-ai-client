@@ -1845,7 +1845,17 @@
       if (!moduleContext) return;
       this._moduleContext = { ...moduleContext };
       this._renderDocBadges();
-      if (moduleContext.type !== 'ui_card') {
+      const contextType = String(moduleContext.context_type || moduleContext.type || '').toLowerCase();
+      const documentContext = new Set([
+        'document_chat',
+        'document_edit',
+        'editor_selection',
+        'editor_revision',
+        'office_document',
+        'office_selection',
+        'tracked_change'
+      ]).has(contextType);
+      if (moduleContext.type !== 'ui_card' && !documentContext) {
         const active = new Set(this.activeTools || []);
         active.add('insights_chat');
         this.setActiveTools(Array.from(active));

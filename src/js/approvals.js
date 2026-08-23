@@ -679,6 +679,56 @@
     return labels[String(sourceType).toLowerCase()] || _capitalize(sourceType);
   }
 
+  function _formatByteCount(bytes) {
+    var count = Math.max(0, Number(bytes) || 0);
+    if (count < 1024) return count + ' bytes';
+    if (count < 1024 * 1024) return (count / 1024).toFixed(1) + ' KB';
+    return (count / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function _releaseSourceSummary(request) {
+    if (request.contentBase64 !== undefined) {
+      var padding = String(request.contentBase64 || '').slice(-2).split('=').length - 1;
+      var byteCount = Math.max(0, Math.floor(String(request.contentBase64 || '').length * 3 / 4) - padding);
+      return 'Stored document bytes (' + _formatByteCount(byteCount) + ')';
+    }
+    if (request.contentText !== undefined) {
+      return 'Stored document text (' + String(request.contentText || '').length + ' characters)';
+    }
+    if (request.documentId) return 'Matter document ' + request.documentId;
+    if (request.artifactId) return 'Generated artifact ' + request.artifactId;
+    return 'Stored release source';
+  }
+
+  function _renderDocumentReleasePayload(payload) {
+    var request = payload.release_request && typeof payload.release_request === 'object'
+      ? payload.release_request
+      : {};
+    var target = payload.approval_target && typeof payload.approval_target === 'object'
+      ? payload.approval_target
+      : {};
+    var rows = [
+      { key: 'File', value: request.filename || 'Document release' },
+      { key: 'Content type', value: request.contentType || '—' },
+      { key: 'Release notes', value: request.releaseNotes || '—' },
+      { key: 'Release content', value: _releaseSourceSummary(request) },
+      { key: 'Matter', value: payload.matterId || '—' },
+      { key: 'Source document', value: payload.sourceDocumentId || '—' },
+      { key: 'Edit batch', value: payload.batchId || '—' },
+      { key: 'Approval target', value: target.display_name || target.email || 'Unassigned' }
+    ];
+    var html = '<div class="apd-payload-kv">';
+    for (var i = 0; i < rows.length; i++) {
+      html += [
+        '<div class="apd-kv-row">',
+          '<div class="apd-kv-key">' + escHtml(rows[i].key) + '</div>',
+          '<div class="apd-kv-val">' + escHtml(String(rows[i].value)) + '</div>',
+        '</div>'
+      ].join('');
+    }
+    return html + '</div>';
+  }
+
   function _renderPayload(approval) {
     var container = el('apdPayloadContent');
     var card      = el('apdPayloadCard');
@@ -689,6 +739,12 @@
     // Hide payload card if there's nothing to show
     if (!payload || (typeof payload === 'object' && Object.keys(payload).length === 0)) {
       if (card) hide(card);
+      return;
+    }
+
+    if ((approval.source_type || approval.sourceType) === 'document_edit_batch_release' &&
+        typeof payload === 'object' && !Array.isArray(payload)) {
+      container.innerHTML = _renderDocumentReleasePayload(payload);
       return;
     }
 

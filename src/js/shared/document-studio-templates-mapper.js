@@ -132,7 +132,9 @@
       kind: kind,
       kindLabel: kindLabel(kind),
       id: t.id != null ? String(t.id) : '',
-      name: t.name ? String(t.name) : 'Untitled template',
+      name: t.display_filename || t.original_filename || t.name
+        ? String(t.display_filename || t.original_filename || t.name)
+        : 'Untitled template',
       description: t.description != null ? String(t.description) : '',
       documentType: t.document_type != null ? String(t.document_type) : '',
       documentTypeLabel: t.document_type_label != null ? String(t.document_type_label) : '',
@@ -254,6 +256,7 @@
       // variable_count (placeholders), status, matter scope.
       var fillFields = [];
       _pushField(fillFields, 'Document type', base.documentType);
+      _pushField(fillFields, 'Released version', base.version);
       _pushField(fillFields, 'Variables', base.variableCount);
       _pushField(fillFields, 'Workspace', base.scope === 'org' ? 'Organization' : (base.matterName || base.matterId));
       _pushField(fillFields, 'Status', base.status);

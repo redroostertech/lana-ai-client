@@ -9,6 +9,9 @@
  * workspace-scoped or organization-scoped; organization templates live in the
  * auto-provisioned "Organization Templates" system workspace
  * (POST /api/v1/matters/organization-template-workspace).
+ * The same modal also instantiates an existing editable DOCX template as a
+ * separate, regular document. The source template stays immutable; the user
+ * chooses the destination workspace and the resulting document's access.
  *
  * Creation goes through POST /api/v1/matters/{matterId}/documents/create-editable
  * and then opens the new file in the File Editor (LANA Editor embed).
@@ -41,6 +44,12 @@
     return response && response.data !== undefined && response.data !== null ? response.data : response;
   }
 
+  function documentDisplayFilename(doc) {
+    var value = doc || {};
+    return value.display_filename || value.original_filename || value.original_name ||
+      value.filename || value.name || 'Document';
+  }
+
   function matterIdentity(matter) {
     if (!matter) return '';
     return String(matter.matter_id || matter.id || '');
@@ -49,6 +58,14 @@
   function matterLabel(matter) {
     if (!matter) return '';
     return matter.name || matter.matter_name || matterIdentity(matter);
+  }
+
+  function documentNameFromTemplate(name) {
+    var value = String(name || '').trim() || 'Untitled Template';
+    var suffix = '.docx';
+    if (value.toLowerCase().endsWith(suffix)) value = value.slice(0, -suffix.length);
+    var resultSuffix = ' - Document.docx';
+    return value.slice(0, 200 - resultSuffix.length).trim() + resultSuffix;
   }
 
   function renderContent(state) {
@@ -68,19 +85,32 @@
     // on the right radios; the user can still change any of them.
     var presetTemplate = state.presetType === 'template';
     var presetOrg = presetTemplate && state.presetScope === 'organization';
-
-    return (
-      '<div class="doc-create-form">' +
-        '<div class="doc-create-field">' +
+    var useTemplate = !!state.sourceTemplate;
+    var sourceVersion = useTemplate && state.sourceTemplate.version
+      ? 'Current reusable version: ' + esc(state.sourceTemplate.version) + '. The latest released version available when you create the document will be used.'
+      : 'The latest released version will be used, or the original baseline when the template has not been released yet.';
+    var typeSection = useTemplate
+      ? '<div class="doc-create-field">' +
+          '<span class="doc-create-label">Source template</span>' +
+          '<div class="doc-create-source-template">' +
+            '<span class="doc-create-source-template-name">' + esc(state.sourceTemplate.name) + '</span>' +
+            '<span class="doc-create-source-template-scope">' + sourceVersion + ' A new, independent document will be created. The template will not be changed.</span>' +
+          '</div>' +
+        '</div>'
+      : '<div class="doc-create-field">' +
           '<span class="doc-create-label">Type</span>' +
           '<div class="doc-create-choice" role="radiogroup" aria-label="Document type">' +
             '<label><input type="radio" name="docCreateType" value="document"' + (presetTemplate ? '' : ' checked') + '><span>Document</span></label>' +
             '<label><input type="radio" name="docCreateType" value="template"' + (presetTemplate ? ' checked' : '') + '><span>Template</span></label>' +
           '</div>' +
-        '</div>' +
+        '</div>';
+
+    return (
+      '<div class="doc-create-form">' +
+        typeSection +
         '<div class="doc-create-field">' +
           '<label class="doc-create-label" for="docCreateName">Name</label>' +
-          '<input id="docCreateName" type="text" autocomplete="off" placeholder="' + (presetTemplate ? 'Untitled Template' : 'Untitled Document') + '" maxlength="200">' +
+          '<input id="docCreateName" type="text" autocomplete="off" placeholder="' + (presetTemplate ? 'Untitled Template' : 'Untitled Document') + '" maxlength="200" value="' + esc(useTemplate ? documentNameFromTemplate(state.sourceTemplate.name) : '') + '">' +
         '</div>' +
         matterSection +
         '<div class="doc-create-field doc-create-scope" data-doc-create-scope hidden>' +
@@ -100,6 +130,7 @@
           '</div>' +
           '<p class="doc-create-hint">Workspace inherits workspace access. Private is limited to you and people you share with. Organization is available to members with document access.</p>' +
         '</div>' +
+        '<p class="doc-create-error" data-doc-create-error role="alert" hidden></p>' +
       '</div>'
     );
   }
@@ -110,7 +141,7 @@
     var accessInput = modal.querySelector('input[name="docCreateAccess"]:checked');
     var nameInput = modal.querySelector('#docCreateName');
     return {
-      isTemplate: typeInput && typeInput.value === 'template',
+      isTemplate: !!(typeInput && typeInput.value === 'template'),
       scope: scopeInput ? scopeInput.value : 'matter',
       accessScope: accessInput ? accessInput.value : 'workspace',
       name: nameInput && nameInput.value ? nameInput.value.trim() : ''
@@ -205,8 +236,93 @@
     if (nameInput) setTimeout(function () { nameInput.focus(); }, 0);
   }
 
+  function closeModal(modal) {
+    if (!modal) return;
+    if (typeof modal.__docCreateCleanup === 'function') modal.__docCreateCleanup();
+    modal.open = false;
+    // Lex Modal restores focus and finishes its exit animation when `open`
+    // changes. Leave removal to that lifecycle instead of disconnecting the
+    // component before it can return focus to the invoking control.
+    if (typeof modal.removeAfterClose === 'function') modal.removeAfterClose();
+  }
+
+  function showFormError(modal, message) {
+    var host = modal && modal.querySelector ? modal.querySelector('[data-doc-create-error]') : null;
+    if (!host) return;
+    host.textContent = String(message || 'The document could not be created.');
+    host.hidden = false;
+  }
+
+  function bindSubmission(modal, state) {
+    var confirm = modal.querySelector('[data-doc-create-confirm]');
+    var cancel = modal.querySelector('[data-doc-create-cancel]');
+    var submitting = false;
+    var cleanedUp = false;
+    var ownerDocument = modal.ownerDocument || (typeof document !== 'undefined' ? document : null);
+
+    // Lex.Modal owns its header close button and document-level Escape
+    // listener. Block those dismissal paths only while the request is in
+    // flight so a late success cannot navigate after the user closed the
+    // dialog. Normal dismissal is unchanged before submission or after an
+    // inline error restores the form.
+    function blockDismissWhileSubmitting(event) {
+      if (!submitting) return;
+      var isEscape = event.type === 'keydown' && event.key === 'Escape';
+      var closeAction = event.type === 'click' && event.target && event.target.closest
+        ? event.target.closest('[data-action="close"]')
+        : null;
+      if (!isEscape && !closeAction) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+
+    function cleanupDismissGuards() {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      if (typeof modal.removeEventListener === 'function') {
+        modal.removeEventListener('click', blockDismissWhileSubmitting, true);
+      }
+      if (ownerDocument) ownerDocument.removeEventListener('keydown', blockDismissWhileSubmitting, true);
+      modal.__docCreateCleanup = null;
+    }
+
+    modal.__docCreateCleanup = cleanupDismissGuards;
+    modal.addEventListener('click', blockDismissWhileSubmitting, true);
+    modal.addEventListener('lex-close', cleanupDismissGuards, { once: true });
+    if (ownerDocument) ownerDocument.addEventListener('keydown', blockDismissWhileSubmitting, true);
+
+    if (cancel) cancel.addEventListener('click', function () {
+      if (!submitting) closeModal(modal);
+    });
+    if (!confirm) return;
+    confirm.addEventListener('click', async function () {
+      if (submitting) return;
+      var form = readForm(modal);
+      var errorHost = modal.querySelector('[data-doc-create-error]');
+      if (errorHost) errorHost.hidden = true;
+      submitting = true;
+      confirm.loading = true;
+      if (cancel) cancel.disabled = true;
+      modal.setAttribute('aria-busy', 'true');
+      try {
+        await createAndOpen(state, form);
+        closeModal(modal);
+      } catch (error) {
+        console.error('[DocumentCreate] Creation failed:', error);
+        var message = (error && error.message) || 'Failed to create the document.';
+        showFormError(modal, message);
+        toast(message, 'error');
+        submitting = false;
+        confirm.loading = false;
+        if (cancel) cancel.disabled = false;
+        modal.removeAttribute('aria-busy');
+      }
+    });
+  }
+
   function editorHandoffForDocument(doc, matterId, matterName) {
     var client = apiClient();
+    var displayFilename = documentDisplayFilename(doc);
     var sourceUrl = client.baseUrl + '/api/v1/storage/files/' + encodeURIComponent(doc.id) + '/download' +
       (matterId ? '?matter_id=' + encodeURIComponent(matterId) : '');
     return {
@@ -219,8 +335,9 @@
         matterId: matterId || '',
         matterName: matterName || '',
         kind: 'doc',
-        title: doc.filename || 'Document',
-        filename: doc.filename,
+        title: displayFilename,
+        filename: displayFilename,
+        storageFilename: doc.filename || displayFilename,
         contentType: doc.content_type || DOCX_CONTENT_TYPE,
         fileSize: doc.file_size,
         createdAt: doc.created_at,
@@ -238,8 +355,7 @@
   async function createAndOpen(state, form) {
     var client = apiClient();
     if (!client) {
-      toast('The API client is not available on this page.', 'error');
-      return;
+      throw new Error('The API client is not available on this page.');
     }
 
     var matterId;
@@ -253,23 +369,23 @@
     } else {
       var matter = state.selectedMatter;
       if (!matter || !matterIdentity(matter)) {
-        toast('Choose a workspace for the new document.', 'error');
-        open(state.reopenOptions);
-        return;
+        throw new Error('Choose a workspace for the new document.');
       }
       matterId = matterIdentity(matter);
       matterName = matterLabel(matter);
     }
 
-    toast('Creating document...', 'info');
+    toast(state.sourceTemplate ? 'Creating document from template...' : 'Creating document...', 'info');
+    var requestBody = {
+      filename: form.name || (form.isTemplate ? 'Untitled Template' : 'Untitled Document'),
+      is_template: form.isTemplate,
+      template_scope: form.isTemplate ? form.scope : undefined,
+      access_scope: form.isTemplate && form.scope === 'organization' ? 'organization' : form.accessScope
+    };
+    if (state.sourceTemplate) requestBody.source_template_id = state.sourceTemplate.id;
     var response = await client.post(
       '/api/v1/matters/' + encodeURIComponent(matterId) + '/documents/create-editable',
-      {
-        filename: form.name || (form.isTemplate ? 'Untitled Template' : 'Untitled Document'),
-        is_template: form.isTemplate,
-        template_scope: form.isTemplate ? form.scope : undefined,
-        access_scope: form.isTemplate && form.scope === 'organization' ? 'organization' : form.accessScope
-      }
+      requestBody
     );
     var payload = responseData(response);
     var doc = payload && payload.document;
@@ -291,34 +407,40 @@
       toast('Modal support is unavailable on this page.', 'error');
       return null;
     }
+    var sourceTemplate = options.sourceTemplate && options.sourceTemplate.id
+      ? {
+          id: String(options.sourceTemplate.id),
+          name: String(options.sourceTemplate.name || 'Untitled Template'),
+          sourceMatterId: String(options.sourceTemplate.sourceMatterId || ''),
+          version: options.sourceTemplate.version === undefined || options.sourceTemplate.version === null
+            ? null
+            : String(options.sourceTemplate.version)
+        }
+      : null;
     var state = {
       // Launching from a workspace pre-selects it; the picker stays visible
       // and changeable either way.
       selectedMatter: options.matterId
         ? { matter_id: options.matterId, name: options.matterName || options.matterId }
         : null,
-      presetType: options.presetType === 'template' ? 'template' : null,
+      presetType: !sourceTemplate && options.presetType === 'template' ? 'template' : null,
       presetScope: options.presetScope === 'organization' ? 'organization' : null,
-      source: options.source || 'unknown',
-      reopenOptions: options
+      sourceTemplate: sourceTemplate,
+      source: options.source || 'unknown'
     };
 
     var modal = Lex.Modal.open({
-      heading: state.presetType === 'template' ? 'New Template' : 'New Document',
+      heading: state.sourceTemplate ? 'Use Template' : (state.presetType === 'template' ? 'New Template' : 'New Document'),
       size: 'md',
       content: renderContent(state),
-      confirmText: 'Create & Open',
-      cancelText: 'Cancel',
-      closeOnOverlay: false,
-      onConfirm: function () {
-        var form = readForm(modal);
-        createAndOpen(state, form).catch(function (error) {
-          console.error('[DocumentCreate] Creation failed:', error);
-          toast((error && error.message) || 'Failed to create the document.', 'error');
-        });
-      }
+      footerContent: '<lex-btn variant="secondary" data-doc-create-cancel>Cancel</lex-btn>' +
+        '<lex-btn variant="primary" data-doc-create-confirm>' +
+          (state.sourceTemplate ? 'Create Document' : 'Create & Open') +
+        '</lex-btn>',
+      closeOnOverlay: false
     });
     bindBehavior(modal, state);
+    bindSubmission(modal, state);
     return modal;
   }
 
