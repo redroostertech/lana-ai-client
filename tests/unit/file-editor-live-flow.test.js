@@ -43,6 +43,8 @@ describe('File Editor live document boundary', () => {
     expect(contextSource).toContain('context.edit_intent = Object.assign({}, detail.edit_intent)');
     expect(contextSource).toContain('return officeFileCardContext(file, context)');
     expect(contextSource).toContain('var blockPattern = /```(?:lana-document-edit|json)?');
+    expect(contextSource).toContain('var toolCallPattern = /<tool_call>');
+    expect(contextSource).toContain("parsed.name === 'document_edit_suggestion'");
     expect(contextSource).toContain("parsed.type !== 'document_edit_suggestion'");
     expect(contextSource).toContain('editor.stageSuggestedEdit({');
     expect(contextSource).toContain('strategy: pending.strategy || suggestion.strategy');

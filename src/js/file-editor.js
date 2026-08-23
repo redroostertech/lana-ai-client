@@ -916,6 +916,20 @@
 
   function parseLanaDocumentEditSuggestion(content) {
     var raw = String(content || '');
+    function normalizedSuggestion(parsed) {
+      if (parsed && parsed.name === 'document_edit_suggestion' && parsed.arguments) {
+        parsed = typeof parsed.arguments === 'string'
+          ? JSON.parse(parsed.arguments)
+          : parsed.arguments;
+      }
+      var suggestedText = String(parsed && parsed.suggested_text || '').trim();
+      if (!parsed || parsed.type !== 'document_edit_suggestion' || !suggestedText) return null;
+      return {
+        strategy: parsed.strategy === 'replace' ? 'replace' : 'insert_after',
+        suggested_text: suggestedText,
+        rationale: String(parsed.rationale || '').slice(0, 1000)
+      };
+    }
     // Prefer the documented ```lana-document-edit fence, but accept a JSON or
     // unlabeled fence because OpenAI-compatible local models commonly
     // normalize custom fence labels to `json`. The payload discriminator is
@@ -924,16 +938,23 @@
     var match;
     while ((match = blockPattern.exec(raw))) {
       try {
-        var parsed = JSON.parse(String(match[1] || '').trim());
-        var suggestedText = String(parsed && parsed.suggested_text || '').trim();
-        if (!parsed || parsed.type !== 'document_edit_suggestion' || !suggestedText) continue;
-        return {
-          strategy: parsed.strategy === 'replace' ? 'replace' : 'insert_after',
-          suggested_text: suggestedText,
-          rationale: String(parsed.rationale || '').slice(0, 1000)
-        };
+        var suggestion = normalizedSuggestion(JSON.parse(String(match[1] || '').trim()));
+        if (suggestion) return suggestion;
       } catch (error) {
         console.warn('[file-editor] Unable to parse fenced LANA document edit suggestion:', error);
+      }
+    }
+    // Some OpenAI-compatible local models serialize a requested structured
+    // edit as a tool-call envelope even when the tool was not registered.
+    // Treat only the exact document-edit discriminator as a staged suggestion;
+    // arbitrary tool-call JSON remains inert.
+    var toolCallPattern = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi;
+    while ((match = toolCallPattern.exec(raw))) {
+      try {
+        suggestion = normalizedSuggestion(JSON.parse(String(match[1] || '').trim()));
+        if (suggestion) return suggestion;
+      } catch (error) {
+        console.warn('[file-editor] Unable to parse LANA document edit tool-call envelope:', error);
       }
     }
     return null;

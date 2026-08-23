@@ -473,6 +473,8 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain("'document_edit'");
     expect(pageJs).toContain('base.document_edit =');
     expect(pageJs).toContain('function parseDocumentEditSuggestion');
+    expect(pageJs).toContain('var toolCallPattern = /<tool_call>');
+    expect(pageJs).toContain("parsed.name === 'document_edit_suggestion'");
     expect(pageJs).toContain('(?:lana-document-edit|json)?');
     expect(pageJs).not.toContain('stageSuggestedEdit');
     expect(pageJs).toContain('Open this document in File Editor to apply LANA suggested edits.');
