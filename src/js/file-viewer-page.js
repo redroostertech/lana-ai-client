@@ -1575,14 +1575,14 @@
     }
     if (changesPanel) changesPanel.classList.toggle('hidden', !isChanges);
     if (releasesPanel) releasesPanel.classList.toggle('hidden', !isReleases);
-    if (isChanges && state.releaseComparison && state.editorInstance) {
+    if (isChanges && state.releaseComparison) {
       state.selectedReviewReleaseId = null;
       state.selectedReviewReleaseDocumentId = null;
       state.releaseComparison = null;
       state.releaseComparisonLoading = false;
-      hideAllViewers();
-      var editorEl = document.getElementById('viewerEditor');
-      if (editorEl) editorEl.classList.remove('hidden');
+      state.versionCompareMode = false;
+      state.versionCompareSelections = [];
+      restorePrimaryViewerSurface();
       renderReviewWorkflow();
       updateReviewRailCounts(state.reviewState || {});
     }

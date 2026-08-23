@@ -320,6 +320,12 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('Current view');
     expect(pageJs).toContain('selectedReviewReleaseId');
     expect(pageJs).toContain("setReviewTab('releases')");
+    expect(pageJs).toMatch(/if \(isChanges && state\.releaseComparison\)[\s\S]*state\.versionCompareMode = false;[\s\S]*state\.versionCompareSelections = \[\];[\s\S]*restorePrimaryViewerSurface\(\);/);
+    const reviewTabHandler = pageJs.slice(
+      pageJs.indexOf('function setReviewTab'),
+      pageJs.indexOf('function updateReviewRailCounts')
+    );
+    expect(reviewTabHandler).not.toContain('hideAllViewers()');
     expect(pageJs).toContain('showLoading()');
     expect(pageJs).toContain('Unreleased');
     expect(pageJs).toContain("title: 'Version '");
