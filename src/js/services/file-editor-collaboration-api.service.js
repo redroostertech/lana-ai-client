@@ -91,9 +91,15 @@
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
       throw new TypeError('Collaborator input is required.');
     }
-    var userId = requiredIdentifier(
-      input.user_id || input.userId || input.shared_with_id || input.sharedWithId,
-      'Collaborator user id'
+    var targetType = String(input.target_type || input.targetType || 'user').trim().toLowerCase();
+    if (['user', 'workspace'].indexOf(targetType) === -1) {
+      throw new TypeError('Share target type is invalid.');
+    }
+    var targetId = requiredIdentifier(
+      targetType === 'workspace'
+        ? (input.workspace_id || input.workspaceId || input.shared_with_id || input.sharedWithId)
+        : (input.user_id || input.userId || input.shared_with_id || input.sharedWithId),
+      targetType === 'workspace' ? 'Workspace id' : 'Collaborator user id'
     );
     var requestedPermissions = input.permissions || input.permission;
     var requestedList = Array.isArray(requestedPermissions)
@@ -105,10 +111,12 @@
     if (invalidPermission) throw new TypeError('Collaborator permission is invalid.');
     var permissions = normalizedPermissions(requestedPermissions);
     if (!permissions.length) permissions = ['read'];
-    return {
-      user_id: userId,
-      permissions: permissions
-    };
+    var payload = { permissions: permissions };
+    if (targetType === 'workspace') {
+      payload.target_type = 'workspace';
+      payload.workspace_id = targetId;
+    } else payload.user_id = targetId;
+    return payload;
   }
 
   function normalizeCollaborator(row) {
@@ -120,9 +128,13 @@
       row.id || row.collaborator_id || row.share_id || row.permission_id,
       'Collaborator id'
     );
-    var userId = requiredIdentifier(
-      row.user_id || row.shared_with_id || user.id,
-      'Collaborator user id'
+    var targetType = String(row.target_type || row.shared_with_type || (row.workspace_id ? 'workspace' : 'user')).toLowerCase();
+    if (['user', 'workspace'].indexOf(targetType) === -1) targetType = 'user';
+    var targetId = requiredIdentifier(
+      targetType === 'workspace'
+        ? (row.workspace_id || row.target_id || row.shared_with_id)
+        : (row.user_id || row.target_id || row.shared_with_id || user.id),
+      targetType === 'workspace' ? 'Workspace id' : 'Collaborator user id'
     );
     var firstName = row.first_name || user.first_name || '';
     var lastName = row.last_name || user.last_name || '';
@@ -131,9 +143,12 @@
     var permissions = normalizedPermissions(row.permissions || row.permission);
     return {
       id: id,
-      user_id: userId,
+      target_type: targetType,
+      target_id: targetId,
+      user_id: targetType === 'user' ? targetId : '',
+      workspace_id: targetType === 'workspace' ? targetId : '',
       name: String(name),
-      email: String(row.email || user.email || ''),
+      email: targetType === 'user' ? String(row.email || user.email || '') : '',
       permissions: permissions,
       permission: permissions[0] || '',
       shared_at: row.shared_at || row.granted_at || row.created_at || null,

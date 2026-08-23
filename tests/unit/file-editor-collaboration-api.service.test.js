@@ -98,7 +98,10 @@ describe('LanaFileEditorCollaborationApi collaborators', () => {
     await expect(service.listCollaborators('doc-1')).resolves.toEqual({
       collaborators: [{
         id: 'share-1',
+        target_type: 'user',
+        target_id: 'user-1',
         user_id: 'user-1',
+        workspace_id: '',
         name: 'Avery Stone',
         email: 'avery@example.com',
         permissions: ['read', 'write'],
@@ -130,6 +133,42 @@ describe('LanaFileEditorCollaborationApi collaborators', () => {
     );
   });
 
+  test('adds and normalizes a first-class workspace share target', async () => {
+    const workspace = {
+      id: 'share-workspace-1',
+      target_type: 'workspace',
+      target_id: 'workspace-1',
+      workspace_id: 'workspace-1',
+      name: 'Phase 5 Review Workspace',
+      permissions: ['read', 'write']
+    };
+    const api = makeApi([{
+      match: 'POST /api/v1/file-editor/documents/doc-1/collaborators',
+      reply: { data: workspace }
+    }]);
+    const service = collaborationApi.create({ api });
+
+    const result = await service.addCollaborator('doc-1', {
+      target_type: 'workspace',
+      workspace_id: 'workspace-1',
+      permission: 'write'
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      id: 'share-workspace-1',
+      target_type: 'workspace',
+      target_id: 'workspace-1',
+      workspace_id: 'workspace-1',
+      user_id: '',
+      name: 'Phase 5 Review Workspace',
+      permissions: ['read', 'write']
+    }));
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/file-editor/documents/doc-1/collaborators',
+      { target_type: 'workspace', workspace_id: 'workspace-1', permissions: ['write'] }
+    );
+  });
+
   test('removes a collaborator by server id', async () => {
     const api = makeApi([{
       match: 'DELETE /api/v1/file-editor/documents/doc-1/collaborators/share-1',
@@ -154,6 +193,9 @@ describe('LanaFileEditorCollaborationApi collaborators', () => {
     const service = collaborationApi.create({ api });
 
     await expect(service.addCollaborator('doc-1', {})).rejects.toThrow('Collaborator user id is required');
+    await expect(service.addCollaborator('doc-1', {
+      target_type: 'workspace'
+    })).rejects.toThrow('Workspace id is required');
     await expect(service.addCollaborator('doc-1', {
       user_id: 'user-1',
       permission: 'share'

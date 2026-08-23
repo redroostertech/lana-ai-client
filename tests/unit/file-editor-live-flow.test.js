@@ -351,6 +351,64 @@ describe('File Editor live document boundary', () => {
     expect(railSource).toContain('unreleasedHtml + pendingApprovalHtml + releasedChangesHistoryHtml + releasedHistoryHtml');
   });
 
+  test('persists threaded review comments with reply and resolve lifecycle controls', () => {
+    const commentSource = editor.slice(
+      editor.indexOf('function serverReviewComments(file)'),
+      editor.indexOf('function serverReviewRowAtIndex(file, index)')
+    );
+    const railSource = editor.slice(
+      editor.indexOf('function renderDocReviewRail(file)'),
+      editor.indexOf('function createFile(kind)')
+    );
+    const actionSource = editor.slice(
+      editor.indexOf("if (action === 'dock-comment')"),
+      editor.indexOf("if (action === 'release-review-version'", editor.indexOf("if (action === 'dock-comment')"))
+    );
+
+    expect(editor).toContain('function normalizeServerReviewThread(comment)');
+    expect(editor).toContain('function normalizeServerReviewReply(reply, threadId)');
+    expect(editor).toContain('function promptReplyServerReviewComment(file, commentId)');
+    expect(editor).toContain('function setServerReviewCommentResolved(file, commentId, resolved)');
+    expect(editor).toContain('comments: review.comments');
+    expect(commentSource).toContain('review.comments.map(normalizeServerReviewThread)');
+    expect(commentSource).toContain("scope: 'document'");
+    expect(commentSource).toContain("status: 'open'");
+    expect(commentSource).toContain('thread.replies.push(normalizeServerReviewReply');
+    expect(commentSource).toContain("thread.status = resolved ? 'resolved' : 'open'");
+    expect(commentSource).toContain('thread.resolved_at = resolved ? timestamp : null');
+    expect(railSource).toContain('data-comment-thread-id=');
+    expect(railSource).toContain('office-review-comment-meta');
+    expect(railSource).toContain('office-review-comment-scope');
+    expect(railSource).toContain('data-action="reply-review-comment"');
+    expect(railSource).toContain("status === 'Resolved' ? 'reopen-review-comment' : 'resolve-review-comment'");
+    expect(actionSource).toContain("action === 'reply-review-comment'");
+    expect(actionSource).toContain("action === 'resolve-review-comment' || action === 'reopen-review-comment'");
+    expect(css).toContain('.office-review-comment-replies');
+    expect(css).toContain('.office-review-comment-actions');
+  });
+
+  test('shares with people or workspaces and confirms access removal', () => {
+    const sharingSource = editor.slice(
+      editor.indexOf('async function addCollaboratorFromQuery(file, query, permissions)'),
+      editor.indexOf('async function sendSignaturePacket(file)')
+    );
+
+    expect(sharingSource).toContain('async function addWorkspaceCollaborator(file, workspaceId, permissions)');
+    expect(sharingSource).toContain("target_type: 'workspace'");
+    expect(sharingSource).toContain('workspace_id: id');
+    expect(sharingSource).toContain('async function loadShareWorkspaceOptions(file)');
+    expect(sharingSource).toContain('window.api.getMatters(1, 250');
+    expect(sharingSource).toContain('id="officeShareTargetType"');
+    expect(sharingSource).toContain('<option value="user">Person</option><option value="workspace">Workspace</option>');
+    expect(sharingSource).toContain('id="officeShareWorkspace"');
+    expect(sharingSource).toContain('function confirmRemoveCollaborator(file, collaboratorId)');
+    expect(sharingSource).toContain("heading: 'Remove Document Access'");
+    expect(sharingSource).toContain("confirmText: 'Remove access'");
+    expect(sharingSource).toContain("cancelText: 'Keep access'");
+    expect(editor).toContain('confirmRemoveCollaborator(file, actionTarget.dataset.collaboratorId)');
+    expect(editor).toContain("collaborator.target_type === 'workspace' ? 'Workspace' : 'Person'");
+  });
+
   test('registers one SPA initializer with explicit leave cleanup', () => {
     expect(editor).toContain("LexRouter.registerPageInit('file-editor.html', init);");
     expect(editor).toContain('LexRouter.registerView({ onLeave: onLeave })');

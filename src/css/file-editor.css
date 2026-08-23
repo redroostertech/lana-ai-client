@@ -1928,6 +1928,77 @@
   overflow-wrap: anywhere;
 }
 
+.office-review-comment-thread {
+  gap: 8px;
+}
+
+.office-review-comment-meta,
+.office-review-comment-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.office-review-comment-meta {
+  color: var(--lex-text-tertiary);
+  font-size: 10px;
+  justify-content: space-between;
+}
+
+.office-review-comment-meta strong {
+  color: var(--lex-text-secondary);
+  font-weight: 700;
+}
+
+.office-review-comment-scope,
+.office-review-comment-quote {
+  color: var(--lex-text-tertiary);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.office-review-comment-quote {
+  border-left: 2px solid var(--office-line-strong);
+  margin: 0 0 10px;
+  padding-left: 8px;
+}
+
+.office-review-comment-replies {
+  border-left: 2px solid var(--office-line);
+  display: grid;
+  gap: 8px;
+  margin-left: 6px;
+  padding-left: 10px;
+}
+
+.office-review-comment-reply {
+  display: grid;
+  gap: 4px;
+}
+
+.office-review-comment-actions {
+  justify-content: flex-end;
+}
+
+.office-review-comment-actions button {
+  background: var(--office-panel-bg);
+  border: 1px solid var(--office-line);
+  border-radius: var(--lex-radius-sm);
+  color: var(--lex-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  min-height: 26px;
+  padding: 0 8px;
+}
+
+.office-review-comment-actions button:hover,
+.office-review-comment-actions button:focus-visible {
+  border-color: var(--office-line-strong);
+  color: var(--lex-text-primary);
+}
+
 .office-review-empty {
   background: var(--office-rail-bg);
   border: 1px solid var(--office-line);

@@ -664,6 +664,58 @@
     return user.full_name || user.fullName || user.display_name || user.displayName || fullName || user.email || 'Reviewer';
   }
 
+  function currentReviewerIdentity() {
+    var user = currentUserRecord() || {};
+    return String(user.id || user.user_id || user.uuid || user.email || currentReviewerName());
+  }
+
+  function commentTimestamp(comment) {
+    return comment && (comment.updated_at || comment.updatedAt || comment.date || comment.created_at || comment.createdAt) || null;
+  }
+
+  function normalizeServerReviewReply(reply, threadId) {
+    if (!reply || !String(reply.text || '').trim()) return null;
+    var createdAt = commentTimestamp(reply) || nowIso();
+    return {
+      id: String(reply.id || ('reply-' + Date.now().toString(36))),
+      thread_id: String(reply.thread_id || reply.threadId || threadId || ''),
+      parent_id: String(reply.parent_id || reply.parentId || threadId || ''),
+      author: reply.author || 'Reviewer',
+      author_id: String(reply.author_id || reply.authorId || ''),
+      date: createdAt,
+      created_at: reply.created_at || reply.createdAt || createdAt,
+      updated_at: reply.updated_at || reply.updatedAt || createdAt,
+      text: String(reply.text || '').trim()
+    };
+  }
+
+  function normalizeServerReviewThread(comment) {
+    if (!comment || !String(comment.text || '').trim()) return null;
+    var id = String(comment.id || ('comment-' + Date.now().toString(36)));
+    var createdAt = commentTimestamp(comment) || nowIso();
+    var status = String(comment.status || (comment.resolved_at || comment.resolvedAt ? 'resolved' : 'open')).toLowerCase();
+    if (status !== 'resolved') status = 'open';
+    return {
+      id: id,
+      thread_id: String(comment.thread_id || comment.threadId || id),
+      parent_id: '',
+      author: comment.author || 'Reviewer',
+      author_id: String(comment.author_id || comment.authorId || ''),
+      date: createdAt,
+      created_at: comment.created_at || comment.createdAt || createdAt,
+      updated_at: comment.updated_at || comment.updatedAt || createdAt,
+      text: String(comment.text || '').trim(),
+      scope: String(comment.scope || (comment.anchor_text || comment.anchorText ? 'selection' : 'document')),
+      anchor_text: String(comment.anchor_text || comment.anchorText || ''),
+      status: status,
+      resolved_at: comment.resolved_at || comment.resolvedAt || null,
+      resolved_by: comment.resolved_by || comment.resolvedBy || null,
+      replies: (Array.isArray(comment.replies) ? comment.replies : []).map(function (reply) {
+        return normalizeServerReviewReply(reply, id);
+      }).filter(Boolean)
+    };
+  }
+
   function ensureEditorImportMap(baseUrl) {
     if (editorImportMapBase === baseUrl) return;
 
@@ -1403,7 +1455,7 @@
       var persistedComments = commentBatch &&
         commentBatch.review_metadata &&
         Array.isArray(commentBatch.review_metadata.comments)
-        ? commentBatch.review_metadata.comments.filter(Boolean)
+        ? commentBatch.review_metadata.comments.map(normalizeServerReviewThread).filter(Boolean)
         : [];
       // Merge instead of overwrite: comments added in this session may not
       // have reached the server yet when a reload lands.
@@ -1486,22 +1538,24 @@
   function serverReviewComments(file) {
     var review = serverReview(file);
     if (!review) return [];
-    var comments = review.comments.slice();
+    var comments = review.comments.map(normalizeServerReviewThread).filter(Boolean);
     var live = review.liveReviewState && Array.isArray(review.liveReviewState.comments)
       ? review.liveReviewState.comments.filter(Boolean)
       : [];
     live.forEach(function (comment) {
-      comments.push({
+      comments.push(normalizeServerReviewThread({
         id: comment.id ? String(comment.id) : '',
         author: comment.author || null,
         date: comment.date || comment.updated_at || comment.created_at || null,
-        text: comment.text || ''
-      });
+        text: comment.text || '',
+        scope: comment.scope || 'document',
+        anchor_text: comment.anchor_text || comment.anchorText || ''
+      }));
     });
     var seen = {};
     return comments.filter(function (comment) {
       if (!comment || !comment.text) return false;
-      var key = (comment.id || '') + ':' + comment.text;
+      var key = comment.id || (comment.text + ':' + comment.created_at);
       if (seen[key]) return false;
       seen[key] = true;
       return true;
@@ -3696,17 +3750,34 @@
     }).join('');
     var changeHistoryHtml = unreleasedHtml + pendingApprovalHtml + releasedChangesHistoryHtml + releasedHistoryHtml;
     var commentItems = serverFile
-      ? serverReviewComments(file).map(function (comment) {
-          return { type: 'Comment', status: 'Open', text: comment.text, author: comment.author || '' };
-        })
+      ? serverReviewComments(file)
       : (file.reviewChanges || []).filter(function (change) {
           return String(change.type || '').toLowerCase() === 'comment';
         });
     var commentsHtml = commentItems.length
       ? commentItems.map(function (comment) {
-        return '<div class="office-review-history-row"><div class="office-review-history-row-heading"><span class="office-review-history-row-title">Comment</span>' +
-          '<span class="office-review-status office-review-status--draft">' + esc(comment.status || 'Open') + '</span></div>' +
-          '<div class="office-review-comment-text">' + esc(comment.text || '') + '</div></div>';
+        var status = String(comment.status || 'open').toLowerCase() === 'resolved' ? 'Resolved' : 'Open';
+        var scope = comment.scope === 'selection' && comment.anchor_text
+          ? 'Selection: “' + comment.anchor_text + '”'
+          : 'Document comment';
+        var replies = Array.isArray(comment.replies) ? comment.replies : [];
+        var repliesHtml = replies.map(function (reply) {
+          return '<div class="office-review-comment-reply" data-comment-reply-id="' + esc(reply.id || '') + '">' +
+            '<div class="office-review-comment-meta"><strong>' + esc(reply.author || 'Reviewer') + '</strong><span>' + esc(formatTimestamp(commentTimestamp(reply))) + '</span></div>' +
+            '<div class="office-review-comment-text">' + esc(reply.text || '') + '</div></div>';
+        }).join('');
+        var serverActions = serverFile
+          ? '<div class="office-review-comment-actions"><button type="button" data-action="reply-review-comment" data-comment-id="' + esc(comment.id || '') + '">Reply</button>' +
+            '<button type="button" data-action="' + (status === 'Resolved' ? 'reopen-review-comment' : 'resolve-review-comment') + '" data-comment-id="' + esc(comment.id || '') + '">' + (status === 'Resolved' ? 'Reopen' : 'Resolve') + '</button></div>'
+          : '';
+        return '<article class="office-review-history-row office-review-comment-thread" data-comment-thread-id="' + esc(comment.id || '') + '" data-comment-status="' + esc(status.toLowerCase()) + '">' +
+          '<div class="office-review-history-row-heading"><span class="office-review-history-row-title">Comment</span>' +
+          '<span class="office-review-status office-review-status--' + (status === 'Resolved' ? 'release' : 'draft') + '">' + esc(status) + '</span></div>' +
+          '<div class="office-review-comment-meta"><strong>' + esc(comment.author || 'Reviewer') + '</strong><span>' + esc(formatTimestamp(commentTimestamp(comment))) + '</span></div>' +
+          '<div class="office-review-comment-scope">' + esc(scope) + '</div>' +
+          '<div class="office-review-comment-text">' + esc(comment.text || '') + '</div>' +
+          (repliesHtml ? '<div class="office-review-comment-replies">' + repliesHtml + '</div>' : '') +
+          serverActions + '</article>';
       }).join('')
       : '<div class="office-review-empty"><h5>No comments yet</h5><p>Add a document-level review comment.</p></div>';
     var bodyHtml = tab === 'versions'
@@ -4454,9 +4525,10 @@
       var permissions = collaborator.permissions && collaborator.permissions.length
         ? collaborator.permissions.join(', ')
         : 'read';
+      var targetLabel = collaborator.target_type === 'workspace' ? 'Workspace' : 'Person';
       return '<li><span><strong>' + esc(collaborator.name) + '</strong>' +
         (collaborator.email ? '<br><span>' + esc(collaborator.email) + '</span>' : '') + '</span>' +
-        '<span class="office-pill">' + esc(permissions) + '</span>' +
+        '<span class="office-pill">' + esc(targetLabel + ' · ' + permissions) + '</span>' +
         '<button class="office-icon-btn" type="button" data-action="remove-collaborator" data-collaborator-id="' + esc(collaborator.id) + '" aria-label="Remove ' + esc(collaborator.name) + '" title="Remove collaborator">' + toolbarIcon('x', 'Remove') + '</button></li>';
     }).join('') + '</ul>';
   }
@@ -4467,7 +4539,7 @@
     var review = docReviewModel(file);
     var activity = [];
     remote.collaborators.forEach(function (collaborator) {
-      activity.push({ text: collaborator.name + ' was granted ' + ((collaborator.permissions || []).join(', ') || 'read') + ' access.', at: collaborator.shared_at });
+      activity.push({ text: collaborator.name + (collaborator.target_type === 'workspace' ? ' workspace' : '') + ' was granted ' + ((collaborator.permissions || []).join(', ') || 'read') + ' access.', at: collaborator.shared_at });
     });
     remote.signaturePackets.forEach(function (packet) {
       activity.push({ text: 'Signature packet "' + (packet.title || file.title) + '" is ' + packet.status + '.', at: packet.updated_at || packet.created_at });
@@ -4489,7 +4561,7 @@
       }).join('') + '</ul>'
       : workflowEmpty('No tracked changes yet.');
     panel.innerHTML = '<div class="office-panel-placeholder-grid">' +
-      '<section class="office-section-card"><h2>Presence</h2>' + renderCollaboratorRows(remote) +
+      '<section class="office-section-card"><h2>Document access</h2>' + renderCollaboratorRows(remote) +
         '<div class="office-inline-actions"><button class="office-btn" type="button" data-action="share">' + toolbarIcon('user-plus', 'Add') + '<span>Add collaborator</span></button></div></section>' +
       '<section class="office-section-card"><h2>Activity</h2>' + activityHtml + '</section>' +
       '<section class="office-section-card"><h2>Versions</h2>' + versionsHtml +
@@ -5809,12 +5881,18 @@
     var add = function (text) {
       var value = String(text || '').trim();
       if (!value) return;
-      review.comments.push({
-        id: 'comment-' + Date.now().toString(36),
+      var id = 'comment-' + Date.now().toString(36);
+      review.comments.push(normalizeServerReviewThread({
+        id: id,
+        thread_id: id,
         author: currentReviewerName(),
+        author_id: currentReviewerIdentity(),
         date: nowIso(),
-        text: value
-      });
+        text: value,
+        scope: 'document',
+        status: 'open',
+        replies: []
+      }));
       applyServerReviewToFile(file);
       renderReviewDock(file);
       scheduleServerDraftSave(file);
@@ -5842,6 +5920,91 @@
     }
     var fallback = window.prompt('Add a review comment', '');
     if (fallback !== null) add(fallback);
+  }
+
+  function serverReviewThreadById(file, commentId) {
+    var review = serverReview(file);
+    var id = String(commentId || '');
+    if (!review || !id) return null;
+    for (var index = 0; index < review.comments.length; index += 1) {
+      var normalized = normalizeServerReviewThread(review.comments[index]);
+      if (!normalized) continue;
+      review.comments[index] = normalized;
+      if (normalized.id === id) return normalized;
+    }
+    return null;
+  }
+
+  function commitServerReviewCommentUpdate(file, message) {
+    var review = serverReview(file);
+    if (!review) return;
+    review.dirty = true;
+    applyServerReviewToFile(file);
+    renderReviewDock(file);
+    scheduleServerDraftSave(file);
+    if (message) toast(message);
+  }
+
+  function promptReplyServerReviewComment(file, commentId) {
+    var thread = serverReviewThreadById(file, commentId);
+    if (!thread) {
+      toast('The comment thread is no longer available.');
+      return;
+    }
+    var addReply = function (text) {
+      var value = String(text || '').trim();
+      if (!value) return;
+      var timestamp = nowIso();
+      thread.replies.push(normalizeServerReviewReply({
+        id: 'reply-' + Date.now().toString(36),
+        thread_id: thread.id,
+        parent_id: thread.id,
+        author: currentReviewerName(),
+        author_id: currentReviewerIdentity(),
+        date: timestamp,
+        text: value
+      }, thread.id));
+      thread.updated_at = timestamp;
+      commitServerReviewCommentUpdate(file, 'Reply added.');
+    };
+    if (window.Lex && Lex.Modal && typeof Lex.Modal.open === 'function') {
+      var modal = Lex.Modal.open({
+        heading: 'Reply to Comment',
+        size: 'sm',
+        content: '<div class="office-edit-change-modal">' +
+          '<p class="office-review-comment-quote">' + esc(thread.text) + '</p>' +
+          '<label for="officeReviewCommentReplyText">Reply</label>' +
+          '<textarea id="officeReviewCommentReplyText" rows="4" placeholder="Add a reply"></textarea>' +
+        '</div>',
+        confirmText: 'Add Reply',
+        cancelText: 'Cancel',
+        onConfirm: function () {
+          var input = document.getElementById('officeReviewCommentReplyText');
+          addReply(input && typeof input.value === 'string' ? input.value : '');
+        }
+      });
+      setTimeout(function () {
+        var input = modal && modal.querySelector ? modal.querySelector('#officeReviewCommentReplyText') : document.getElementById('officeReviewCommentReplyText');
+        if (input && typeof input.focus === 'function') input.focus();
+      }, 0);
+      return;
+    }
+    var fallback = window.prompt('Reply to comment', '');
+    if (fallback !== null) addReply(fallback);
+  }
+
+  function setServerReviewCommentResolved(file, commentId, resolved) {
+    var thread = serverReviewThreadById(file, commentId);
+    if (!thread) {
+      toast('The comment thread is no longer available.');
+      return;
+    }
+    var timestamp = nowIso();
+    thread.status = resolved ? 'resolved' : 'open';
+    thread.resolved_at = resolved ? timestamp : null;
+    thread.resolved_by = resolved ? currentReviewerIdentity() : null;
+    thread.updated_at = timestamp;
+    commitServerReviewCommentUpdate(file, resolved ? 'Comment resolved.' : 'Comment reopened.');
   }
 
   function serverReviewRowAtIndex(file, index) {
@@ -6163,6 +6326,58 @@
     toast('Document access granted to ' + user.label + '.');
   }
 
+  async function addWorkspaceCollaborator(file, workspaceId, permissions) {
+    var id = String(workspaceId || '').trim();
+    if (!id) throw new Error('Choose a workspace.');
+    var service = collaborationApi();
+    if (!service) throw new Error('The collaboration service is unavailable.');
+    var collaborator = await service.addCollaborator(officeRealDocumentId(file), {
+      target_type: 'workspace',
+      workspace_id: id,
+      permissions: permissions
+    });
+    await loadRemoteWorkflows(file, { force: true });
+    toast('Document access granted to ' + (collaborator.name || 'the workspace') + '.');
+  }
+
+  async function loadShareWorkspaceOptions(file) {
+    var select = el('officeShareWorkspace');
+    if (!select || !window.api || typeof window.api.getMatters !== 'function') return;
+    try {
+      var response = await window.api.getMatters(1, 250, {
+        status: 'active',
+        sort_by: 'updated_at',
+        sort_order: 'desc'
+      });
+      var currentMatter = String(file && (file.matterId || file.matter_id) || '');
+      var rows = officeMatterRows(response).map(function (row) {
+        return {
+          id: String(row.id || row.uuid || row.client_matter || ''),
+          name: String(row.workspace_name || row.matter_name || row.name || row.title || row.matter_id || 'Workspace')
+        };
+      }).filter(function (row) {
+        return row.id && row.id !== currentMatter;
+      });
+      select.innerHTML = '<option value="">Choose a workspace</option>' + rows.map(function (row) {
+        return '<option value="' + esc(row.id) + '">' + esc(row.name) + '</option>';
+      }).join('');
+      select.disabled = rows.length === 0;
+      if (!rows.length) select.innerHTML = '<option value="">No other active workspaces</option>';
+    } catch (error) {
+      select.innerHTML = '<option value="">Workspaces unavailable</option>';
+      select.disabled = true;
+    }
+  }
+
+  function syncShareTargetFields() {
+    var type = el('officeShareTargetType');
+    var value = type ? type.value : 'user';
+    var userFields = el('officeShareUserFields');
+    var workspaceFields = el('officeShareWorkspaceFields');
+    if (userFields) userFields.hidden = value !== 'user';
+    if (workspaceFields) workspaceFields.hidden = value !== 'workspace';
+  }
+
   function openShareDialog(file) {
     if (!file || !isServerWorkflowFile(file)) {
       toast('Sharing requires a server-managed document.');
@@ -6170,8 +6385,13 @@
     }
     var submit = function () {
       var input = el('officeShareUserQuery');
+      var targetType = el('officeShareTargetType');
+      var workspace = el('officeShareWorkspace');
       var permission = el('officeSharePermission');
-      addCollaboratorFromQuery(file, input ? input.value : '', permission ? [permission.value] : ['read']).catch(function (error) {
+      var operation = targetType && targetType.value === 'workspace'
+        ? addWorkspaceCollaborator(file, workspace ? workspace.value : '', permission ? [permission.value] : ['read'])
+        : addCollaboratorFromQuery(file, input ? input.value : '', permission ? [permission.value] : ['read']);
+      operation.catch(function (error) {
         toast((error && error.message) || 'The collaborator could not be added.');
       });
     };
@@ -6179,7 +6399,11 @@
       Lex.Modal.open({
         heading: 'Share Document',
         size: 'sm',
-        content: '<div class="office-signer-form"><label for="officeShareUserQuery">User name or email</label><input id="officeShareUserQuery" type="search" autocomplete="off" placeholder="person@example.com"><label for="officeSharePermission">Permission</label><select id="officeSharePermission" class="office-format-select"><option value="read">Can view</option><option value="write">Can edit</option></select></div>',
+        content: '<div class="office-signer-form"><label for="officeShareTargetType">Share with</label>' +
+          '<select id="officeShareTargetType" class="office-format-select"><option value="user">Person</option><option value="workspace">Workspace</option></select>' +
+          '<div id="officeShareUserFields"><label for="officeShareUserQuery">User name or email</label><input id="officeShareUserQuery" type="search" autocomplete="off" placeholder="person@example.com"></div>' +
+          '<div id="officeShareWorkspaceFields" hidden><label for="officeShareWorkspace">Workspace</label><select id="officeShareWorkspace" class="office-format-select" disabled><option value="">Loading workspaces...</option></select></div>' +
+          '<label for="officeSharePermission">Permission</label><select id="officeSharePermission" class="office-format-select"><option value="read">Can view</option><option value="write">Can edit</option></select></div>',
         confirmText: 'Grant access',
         cancelText: 'Cancel',
         onConfirm: submit
@@ -6187,6 +6411,9 @@
       setTimeout(function () {
         var input = el('officeShareUserQuery');
         if (input) input.focus();
+        var type = el('officeShareTargetType');
+        if (type) type.addEventListener('change', syncShareTargetFields);
+        loadShareWorkspaceOptions(file);
       }, 0);
       return;
     }
@@ -6200,6 +6427,37 @@
     await service.removeCollaborator(officeRealDocumentId(file), collaboratorId);
     await loadRemoteWorkflows(file, { force: true });
     toast('Collaborator access removed.');
+  }
+
+  function confirmRemoveCollaborator(file, collaboratorId) {
+    var remote = remoteWorkflowForFile(file);
+    var id = String(collaboratorId || '');
+    var collaborator = remote && remote.collaborators.find(function (row) {
+      return String(row.id || '') === id;
+    });
+    if (!collaborator) {
+      toast('That collaborator grant is no longer available.');
+      return;
+    }
+    var remove = function () {
+      removeCollaborator(file, id).catch(function (error) {
+        toast((error && error.message) || 'Collaborator access could not be removed.');
+      });
+    };
+    if (window.Lex && Lex.Modal && typeof Lex.Modal.open === 'function') {
+      Lex.Modal.open({
+        heading: 'Remove Document Access',
+        size: 'sm',
+        content: '<div class="office-edit-change-modal"><p>Remove <strong>' + esc(collaborator.name) +
+          '</strong> from this document? The document and its review history will not be deleted.</p></div>',
+        confirmText: 'Remove access',
+        cancelText: 'Keep access',
+        destructive: true,
+        onConfirm: remove
+      });
+      return;
+    }
+    if (window.confirm && window.confirm('Remove ' + collaborator.name + ' from this document?')) remove();
   }
 
   async function sendSignaturePacket(file) {
@@ -6461,9 +6719,7 @@
         return;
       }
       if (action === 'remove-collaborator' && file) {
-        removeCollaborator(file, actionTarget.dataset.collaboratorId).catch(function (error) {
-          toast((error && error.message) || 'Collaborator access could not be removed.');
-        });
+        confirmRemoveCollaborator(file, actionTarget.dataset.collaboratorId);
         return;
       }
       if (action === 'add-signer' && file) {
@@ -6672,6 +6928,14 @@
         } else {
           toast('Select text to add a comment.');
         }
+        return;
+      }
+      if (action === 'reply-review-comment' && file && isServerReviewFile(file)) {
+        promptReplyServerReviewComment(file, actionTarget.dataset.commentId);
+        return;
+      }
+      if ((action === 'resolve-review-comment' || action === 'reopen-review-comment') && file && isServerReviewFile(file)) {
+        setServerReviewCommentResolved(file, actionTarget.dataset.commentId, action === 'resolve-review-comment');
         return;
       }
       if (action === 'release-review-version' && file) {

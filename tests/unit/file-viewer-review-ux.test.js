@@ -563,4 +563,16 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('var openedRelease = releaseForCurrentFile(file);');
     expect(pageJs).toContain("reviewEndpoint('/documents/' + encodeURIComponent(reviewDocumentId) + '/edit-batches')");
   });
+
+  test('File Info exposes authoritative updated and release metadata after reload', () => {
+    expect(html).toContain('id="metaUpdatedAt"');
+    expect(html).toContain('id="metaCurrentVersion"');
+    expect(html).toContain('id="metaReleaseCount"');
+    expect(html).toContain('id="metaLatestReleasedAt"');
+    expect(pageJs).toContain('state.reviewReleaseMetadata = releasesResponse && releasesResponse.metadata');
+    expect(pageJs).toContain("'Version ' + currentReleaseNumber");
+    expect(pageJs).toContain('releaseMetadata.release_count');
+    expect(pageJs).toContain('releaseMetadata.latest_released_at');
+    expect(pageJs).toContain("formatDate(file.updated_at || file.created_at)");
+  });
 });

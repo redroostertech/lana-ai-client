@@ -49,6 +49,7 @@
     reviewSourceDocumentId: null,
     reviewWorkflowPromise: null,
     reviewReleases: [],
+    reviewReleaseMetadata: {},
     reviewDisplayTarget: null,
     selectedReviewReleaseId: null,
     selectedReviewReleaseDocumentId: null,
@@ -3726,6 +3727,7 @@
     state.currentReviewBatchRestoreFailed = false;
     state.reviewSourceDocumentId = null;
     state.reviewReleases = [];
+    state.reviewReleaseMetadata = {};
     state.selectedReviewReleaseId = null;
     state.selectedReviewReleaseDocumentId = null;
     state.releaseChangeHistory = [];
@@ -3773,6 +3775,9 @@
       var batchesResponse = await api.get(reviewEndpoint('/document-edit-batches' + query));
       state.reviewBatches = Array.isArray(batchesResponse && batchesResponse.data) ? batchesResponse.data : [];
       state.reviewReleases = Array.isArray(releasesResponse && releasesResponse.data) ? releasesResponse.data : [];
+      state.reviewReleaseMetadata = releasesResponse && releasesResponse.metadata
+        ? releasesResponse.metadata
+        : {};
       state.currentReviewBatch = activeDraftBatchForCurrentFile(
         state.reviewBatches,
         file,
@@ -4767,6 +4772,19 @@
   function loadMetadata(file) {
     document.getElementById('metaFileSize').textContent = formatFileSize(file.file_size);
     document.getElementById('metaUploadedAt').textContent = formatDate(file.created_at);
+    var releaseMetadata = state.reviewReleaseMetadata || {};
+    var currentReleaseNumber = Number(releaseMetadata.current_release_number || 0);
+    var releaseCount = Number(releaseMetadata.release_count !== undefined
+      ? releaseMetadata.release_count
+      : (releaseMetadata.total !== undefined ? releaseMetadata.total : state.reviewReleases.length));
+    document.getElementById('metaUpdatedAt').textContent = formatDate(file.updated_at || file.created_at);
+    document.getElementById('metaCurrentVersion').textContent = currentReleaseNumber > 0
+      ? 'Version ' + currentReleaseNumber
+      : 'Original';
+    document.getElementById('metaReleaseCount').textContent = Number.isFinite(releaseCount) ? String(releaseCount) : '0';
+    document.getElementById('metaLatestReleasedAt').textContent = releaseMetadata.latest_released_at
+      ? formatDate(releaseMetadata.latest_released_at)
+      : 'Never';
     document.getElementById('metaChunkCount').textContent =
       file.chunk_count !== undefined ? file.chunk_count.toLocaleString() : '0';
     var accessLabels = { organization: 'Organization', workspace: 'Workspace', private: 'Private' };
