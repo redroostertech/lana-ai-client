@@ -70,6 +70,7 @@
     workspaceFieldCatalog: null,
     workspaceFieldCatalogMatterId: null,
     matterLookupMapPromise: null,
+    conversationMatterId: '',
     reviewDirty: false,
     reviewSaving: false,
     reviewReleasing: false,
@@ -1386,7 +1387,7 @@
         editorBaselineReleaseId: baselineRelease && baselineRelease.id ? String(baselineRelease.id) : '',
         editorBaselineReleaseNumber: baselineRelease && baselineRelease.release_number ? Number(baselineRelease.release_number) : null,
         matterId: getCurrentMatterId() || '',
-        matterNumber: getConversationMatterId(file) || '',
+        matterNumber: getConversationMatterId(file) || state.conversationMatterId || '',
         matterName: getFileMatterDisplayName(file) || '',
         kind: fileEditorKindForFile(file),
         title: displayFilename,
@@ -4216,6 +4217,11 @@
           ? resolvedMatter.conversationMatterId
           : '';
       }
+      // Keep the resolved human/external workspace key with this loaded page.
+      // Released artifacts frequently expose only the storage UUID, while
+      // conversation creation requires the external matter key. The editor
+      // handoff happens later and must not discard this resolved identity.
+      state.conversationMatterId = conversationMatterId || '';
 
       // Configure LANA panel with file context
       var lanaPanel = document.getElementById('fileViewerLana');

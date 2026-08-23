@@ -118,7 +118,7 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain("editorMode: fileEditorKindForFile(file) === 'doc' ? 'review' : 'edit'");
     expect(pageJs).not.toContain('preferDraftShell: true');
     expect(pageJs).toContain("matterId: getCurrentMatterId() || ''");
-    expect(pageJs).toContain("matterNumber: getConversationMatterId(file) || ''");
+    expect(pageJs).toContain("matterNumber: getConversationMatterId(file) || state.conversationMatterId || ''");
     expect(pageJs).toContain('LanaDocumentReview.latestActivityIso(file, draftBatch)');
     expect(pageJs).not.toContain("reviewModeBtn.addEventListener('click'");
   });
@@ -497,6 +497,7 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('var listMatter = await resolveMatterFromList(matterId);');
     expect(pageJs).toContain('var resolvedMatter = await resolveMatterFromList(storageMatterId);');
     expect(pageJs).toContain('resolvedMatter && resolvedMatter.conversationMatterId');
+    expect(pageJs).toContain("state.conversationMatterId = conversationMatterId || ''");
     expect(pageJs).toContain('setFileBreadcrumb(file, listMatter.name, listMatter.hrefId)');
     expect(pageJs).toContain('if (isLikelyUuid(matterId) || typeof api.getMatter !==');
     expect(pageJs).toContain('api.getMatter(matterId)');
