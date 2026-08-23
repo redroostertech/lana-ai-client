@@ -4107,6 +4107,11 @@
     if (isServerReviewFile(file)) {
       var review = serverReview(file);
       if (!review) return false;
+      // Persisted rows are not a usable visual comparison until they have
+      // been reconstructed into this editor DOM. On a load/restore failure,
+      // keep Show Changes disabled instead of advertising changes that the
+      // document cannot locate or render.
+      if (review.loadFailed || review.draftDetailFailed || review.restoreFailed) return false;
       if (review.session && review.liveReviewState && typeof review.session.unreleasedRevisions === 'function') {
         try {
           if (review.session.unreleasedRevisions(review.liveReviewState).length > 0) return true;

@@ -2990,8 +2990,21 @@
     if (!ids.length) return;
     var wasRestoring = state.reviewRestoring;
     var wasDirty = state.reviewDirty;
+    var host = document.getElementById('viewerEditor');
     state.reviewRestoring = true;
+    if (host) {
+      host.setAttribute('aria-busy', 'true');
+      host.setAttribute('inert', '');
+    }
     try {
+      // File Viewer remains read-only, but host-driven revision decisions
+      // require review mode. Accept redlines already baked into the selected
+      // release before replaying its draft so Current compares only the
+      // unreleased working copy against the final previous release.
+      if (typeof state.editorInstance.setMode === 'function') {
+        state.editorInstance.setMode('review');
+        state.editorMode = 'review';
+      }
       await state.editorInstance.decide({
         decisions: ids.map(function (id) {
           return { id: id, action: 'accept' };
@@ -3008,6 +3021,11 @@
       console.warn('[FileViewerPage] Baseline revision acceptance failed:', error);
     } finally {
       state.reviewRestoring = wasRestoring;
+      forceReadOnlyDisplayMode();
+      if (host) {
+        host.removeAttribute('inert');
+        host.removeAttribute('aria-busy');
+      }
     }
   }
 
@@ -3715,6 +3733,7 @@
       await openVersionDocument(baseDocumentId, { scope: 'current' });
       return !state.currentReviewBatchRestoreFailed;
     }
+    await acceptBaselineRevisionsForReviewMode();
     var restored = await restorePersistedDraftIntoEditorWithRetry(batch);
     var visible = restored || restoredDraftHasVisibleRevisions();
     state.currentReviewBatchRestoreFailed = !visible;

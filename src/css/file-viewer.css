@@ -1451,6 +1451,17 @@ button.file-viewer-review-release:focus-visible {
   text-decoration: none;
 }
 
+.file-viewer-editor-host.file-viewer-editor-host--final .le-page span.le-rev[data-rev-type="fmt"],
+.file-viewer-editor-host.file-viewer-editor-host--final .le-page p.le-rev[data-rev-type="fmt"] {
+  background: transparent;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+.file-viewer-editor-host.file-viewer-editor-host--final .le-page .le-rev[data-rev-type="fmt"]:hover {
+  outline: none;
+}
+
 .file-viewer-editor-host.file-viewer-editor-host--original .le-page ins,
 .file-viewer-editor-host.file-viewer-editor-host--original .le-page [data-rev-type="ins"] {
   display: none;

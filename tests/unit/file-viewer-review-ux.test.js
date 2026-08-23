@@ -166,6 +166,11 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('reviewBaselineRevisionIds');
     expect(pageJs).toContain('function acceptBaselineRevisionsForReviewMode');
     expect(pageJs).toContain('decisions: ids.map(function (id)');
+    expect(pageJs).toContain('await acceptBaselineRevisionsForReviewMode()');
+    expect(pageJs).toContain("state.editorInstance.setMode('review')");
+    expect(pageJs).toContain("host.setAttribute('inert', '')");
+    expect(fileViewerCss).toContain('.file-viewer-editor-host--final .le-page span.le-rev[data-rev-type="fmt"]');
+    expect(fileViewerCss).toContain('.file-viewer-editor-host--final .le-page .le-rev[data-rev-type="fmt"]:hover');
     expect(pageJs).toContain('function unreleasedRawReviewRevisions');
     expect(pageJs).toContain('var revisions = unreleasedRawReviewRevisions(reviewState);');
     expect(pageJs).toContain('captureReviewBaselineRevisions(state.reviewState)');

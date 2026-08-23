@@ -111,6 +111,7 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('data-margin="wide"');
     expect(editor).toContain('data-action="toggle-show-changes"');
     expect(editor).toContain('function officeHasUnreleasedChanges(file)');
+    expect(editor).toContain('review.loadFailed || review.draftDetailFailed || review.restoreFailed');
     expect(editor).toContain("review.session.unreleasedRevisions(review.liveReviewState).length > 0");
     expect(editor).toContain('function officeHasReleaseComparison(file)');
     expect(editor).toContain("if (officeHasUnreleasedChanges(file)) return 'draft';");
