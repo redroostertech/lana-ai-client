@@ -284,6 +284,8 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('Persisted formatting change details could not be loaded for this version.');
     expect(pageJs).toContain('Persisted change details are unavailable for this version.');
     expect(fileViewerCss).toContain('.file-viewer-diff-warning');
+    expect(pageJs).toContain('This comparison is too large to display in full.');
+    expect(pageJs).toContain('comparison && comparison.truncated');
     expect(fileViewerCss).toContain('.file-viewer-diff-context');
     expect(pageJs).toContain('function reviewVersionSelectOptions');
     expect(pageJs).toContain('function currentReviewVersionSelectValue');
@@ -301,8 +303,10 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function selectReviewDisplayScope');
     expect(pageJs).toContain("state.showTrackedChanges = false;");
     expect(pageJs).toContain("state.showTrackedChanges = true;");
-    expect(pageJs).toContain("toggle.disabled = isOriginal;");
+    expect(pageJs).toContain("var isCurrentWithoutDraft = reviewDisplayScope() === 'current' && !hasCurrentDraftReviewChanges();");
+    expect(pageJs).toContain('toggle.disabled = displayUnavailable;');
     expect(pageJs).toContain('Original has no tracked changes to display.');
+    expect(pageJs).toContain('Current has no unreleased changes to display.');
     expect(pageJs).toContain("openReviewVersionFromSelect('original')");
     expect(pageJs).toContain("if (state.editorInstance)");
     expect(pageJs).toContain("host.classList.toggle('file-viewer-editor-host--original', isOriginalScope);");
@@ -551,6 +555,11 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function isFileAccessDenied');
     expect(pageJs).toContain("Number(error.status) === 403");
     expect(pageJs).toContain("Lex.Modal.alert('Access denied', 'You do not have access to this file.'");
+  });
+
+  test('keeps native review controls out of release-row keyboard navigation', () => {
+    expect(pageJs).toContain("event.target.closest('button,a,input,select,textarea,lex-btn,lex-select')");
+    expect(pageJs).toContain('if (nativeInteractive) return;');
   });
 
   test('file viewer uses source document lineage for released artifacts', () => {

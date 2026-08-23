@@ -2563,9 +2563,13 @@
     var unavailableHtml = unavailableReason
       ? '<div class="file-viewer-diff-warning" role="status">' + escapeHtml(unavailableReason) + '</div>'
       : '';
+    var truncatedHtml = comparison && comparison.truncated
+      ? '<div class="file-viewer-diff-warning" role="status">This comparison is too large to display in full. The visible differences are only a partial preview.</div>'
+      : '';
+    var warningHtml = truncatedHtml + unavailableHtml;
     if (!parts.length) {
-      if (formattingHtml) return unavailableHtml + formattingHtml;
-      return unavailableHtml + '<p class="file-viewer-review-releases__empty">' +
+      if (formattingHtml) return warningHtml + formattingHtml;
+      return warningHtml + '<p class="file-viewer-review-releases__empty">' +
         (unavailableReason ? 'No textual differences detected.' : 'No textual or formatting differences detected.') +
         '</p>';
     }
@@ -2582,7 +2586,7 @@
       if (!normalizedDiffText(text) && kind !== 'unchanged') return '';
       return '<span class="file-viewer-diff-part file-viewer-diff-part--' + kind + '">' + escapeHtml(text) + '</span>';
     }).join('');
-    return unavailableHtml + (rendered || '<p class="file-viewer-review-releases__empty">No textual differences detected.</p>') + formattingHtml;
+    return warningHtml + (rendered || '<p class="file-viewer-review-releases__empty">No textual differences detected.</p>') + formattingHtml;
   }
 
   function renderDiffComparison(comparison, labels) {
@@ -2637,12 +2641,16 @@
     }
     if (toggle) {
       var isOriginal = reviewDisplayScope() === 'original';
-      toggle.checked = Boolean(state.showTrackedChanges && !isOriginal);
-      toggle.disabled = isOriginal;
+      var isCurrentWithoutDraft = reviewDisplayScope() === 'current' && !hasCurrentDraftReviewChanges();
+      var displayUnavailable = isOriginal || isCurrentWithoutDraft;
+      toggle.checked = Boolean(state.showTrackedChanges && !displayUnavailable);
+      toggle.disabled = displayUnavailable;
       var toggleLabel = toggle.closest ? toggle.closest('.file-viewer-change-toggle') : null;
       if (toggleLabel) {
-        toggleLabel.classList.toggle('file-viewer-change-toggle--disabled', isOriginal);
-        toggleLabel.title = isOriginal ? 'Original has no tracked changes to display.' : '';
+        toggleLabel.classList.toggle('file-viewer-change-toggle--disabled', displayUnavailable);
+        toggleLabel.title = isOriginal
+          ? 'Original has no tracked changes to display.'
+          : (isCurrentWithoutDraft ? 'Current has no unreleased changes to display.' : '');
       }
     }
     syncReviewVersionSelect();
@@ -5361,6 +5369,10 @@
         if (event.key !== 'Enter' && event.key !== ' ') return;
         var lanaTrigger = event.target && event.target.closest ? event.target.closest('[data-lana-dock-trigger]') : null;
         if (lanaTrigger) return;
+        var nativeInteractive = event.target && event.target.closest
+          ? event.target.closest('button,a,input,select,textarea,lex-btn,lex-select')
+          : null;
+        if (nativeInteractive) return;
         var actionable = event.target && event.target.closest
           ? event.target.closest('[data-review-version-open-original],[data-review-version-open-index],[data-review-version-compare-toggle],[data-review-item-index]')
           : null;
