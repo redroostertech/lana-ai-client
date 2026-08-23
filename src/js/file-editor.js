@@ -4693,9 +4693,12 @@
         return '<li><button class="office-btn" type="button" data-action="select-signature-packet" data-packet-id="' + esc(item.id) + '">' + esc(item.title || file.title) + '</button><span class="office-pill">' + esc(item.status) + '</span></li>';
       }).join('') + '</ul></section>'
       : '';
-    var packetActions = packet && packet.status !== 'completed' && packet.status !== 'cancelled'
-      ? '<div class="office-inline-actions"><button class="office-btn" type="button" data-action="resend-signature-packet" data-packet-id="' + esc(packet.id) + '">Resend</button>' +
-        '<button class="office-btn" type="button" data-action="cancel-signature-packet" data-packet-id="' + esc(packet.id) + '">Cancel packet</button>' +
+    var packetActions = packet
+      ? '<div class="office-inline-actions">' +
+        (packet.status !== 'completed' && packet.status !== 'cancelled'
+          ? '<button class="office-btn" type="button" data-action="resend-signature-packet" data-packet-id="' + esc(packet.id) + '">Resend</button>' +
+            '<button class="office-btn" type="button" data-action="cancel-signature-packet" data-packet-id="' + esc(packet.id) + '">Cancel packet</button>'
+          : '') +
         '<button class="office-btn" type="button" data-action="new-signature-packet">Prepare another packet</button></div>'
       : '';
     panel.innerHTML = '<div class="office-signature-grid">' +
