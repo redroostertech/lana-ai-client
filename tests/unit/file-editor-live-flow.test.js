@@ -369,9 +369,12 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('function normalizeServerReviewReply(reply, threadId)');
     expect(editor).toContain('function promptReplyServerReviewComment(file, commentId)');
     expect(editor).toContain('function setServerReviewCommentResolved(file, commentId, resolved)');
+    expect(editor).toContain('function selectedServerReviewText()');
+    expect(editor).toContain("scope: anchorText ? 'selection' : 'document'");
+    expect(editor).toContain('anchor_text: anchorText');
     expect(editor).toContain('comments: review.comments');
     expect(commentSource).toContain('review.comments.map(normalizeServerReviewThread)');
-    expect(commentSource).toContain("scope: 'document'");
+    expect(commentSource).toContain("scope: anchorText ? 'selection' : 'document'");
     expect(commentSource).toContain("status: 'open'");
     expect(commentSource).toContain('thread.replies.push(normalizeServerReviewReply');
     expect(commentSource).toContain("thread.status = resolved ? 'resolved' : 'open'");

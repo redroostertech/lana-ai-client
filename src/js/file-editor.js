@@ -5933,9 +5933,22 @@
     });
   }
 
+  function selectedServerReviewText() {
+    var root = document.querySelector('#officeLanaEditorHost .lana-editor-viewer');
+    var selection = window.getSelection ? window.getSelection() : null;
+    if (!root || !selection || selection.rangeCount === 0 || selection.isCollapsed) return '';
+    var anchor = selection.anchorNode;
+    var focus = selection.focusNode;
+    if (!anchor || !focus || !root.contains(anchor) || !root.contains(focus)) return '';
+    return String(selection.toString() || '').trim().slice(0, 500);
+  }
+
   function promptAddServerReviewComment(file) {
     var review = serverReview(file);
     if (!review) return;
+    // Capture the anchor before opening the modal because moving focus to the
+    // textarea collapses the browser selection inside the embedded editor.
+    var anchorText = selectedServerReviewText();
     var add = function (text) {
       var value = String(text || '').trim();
       if (!value) return;
@@ -5947,7 +5960,8 @@
         author_id: currentReviewerIdentity(),
         date: nowIso(),
         text: value,
-        scope: 'document',
+        scope: anchorText ? 'selection' : 'document',
+        anchor_text: anchorText,
         status: 'open',
         replies: []
       }));
