@@ -3084,6 +3084,16 @@
   overflow-wrap: anywhere;
 }
 
+.office-scope-list li {
+  grid-template-columns: minmax(7rem, 0.65fr) minmax(0, 1.35fr);
+}
+
+.office-scope-list li > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 .office-signer-list li {
   align-items: center;
   grid-template-columns: minmax(0, 1fr) auto auto;
