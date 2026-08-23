@@ -374,6 +374,8 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('anchor_text: anchorText');
     expect(editor).toContain("var packetActions = packet");
     expect(editor).toContain('data-action="new-signature-packet">Prepare another packet');
+    expect(editor).toContain("var permissions = collaborator.permission");
+    expect(editor).toContain("was granted ' + permission + ' access");
     expect(editor).toContain('comments: review.comments');
     expect(commentSource).toContain('review.comments.map(normalizeServerReviewThread)');
     expect(commentSource).toContain("scope: anchorText ? 'selection' : 'document'");

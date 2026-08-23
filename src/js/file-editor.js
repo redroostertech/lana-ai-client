@@ -4580,9 +4580,8 @@
     if (!remote.loaded) return workflowEmpty(remote.loading ? 'Loading collaborators...' : (remote.error || 'Collaboration data is unavailable.'));
     if (!remote.collaborators.length) return workflowEmpty('No collaborators have been granted access.');
     return '<ul class="office-signer-list">' + remote.collaborators.map(function (collaborator) {
-      var permissions = collaborator.permissions && collaborator.permissions.length
-        ? collaborator.permissions.join(', ')
-        : 'read';
+      var permissions = collaborator.permission ||
+        (collaborator.permissions && collaborator.permissions.indexOf('write') !== -1 ? 'write' : 'read');
       var targetLabel = collaborator.target_type === 'workspace' ? 'Workspace' : 'Person';
       return '<li><span><strong>' + esc(collaborator.name) + '</strong>' +
         (collaborator.email ? '<br><span>' + esc(collaborator.email) + '</span>' : '') + '</span>' +
@@ -4597,7 +4596,9 @@
     var review = docReviewModel(file);
     var activity = [];
     remote.collaborators.forEach(function (collaborator) {
-      activity.push({ text: collaborator.name + (collaborator.target_type === 'workspace' ? ' workspace' : '') + ' was granted ' + ((collaborator.permissions || []).join(', ') || 'read') + ' access.', at: collaborator.shared_at });
+      var permission = collaborator.permission ||
+        (collaborator.permissions && collaborator.permissions.indexOf('write') !== -1 ? 'write' : 'read');
+      activity.push({ text: collaborator.name + (collaborator.target_type === 'workspace' ? ' workspace' : '') + ' was granted ' + permission + ' access.', at: collaborator.shared_at });
     });
     remote.signaturePackets.forEach(function (packet) {
       activity.push({ text: 'Signature packet "' + (packet.title || file.title) + '" is ' + packet.status + '.', at: packet.updated_at || packet.created_at });
