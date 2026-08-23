@@ -922,9 +922,12 @@
         // conversation state before the first message exists. The first
         // turn already carries the document context in its payload, so
         // queue the attach and retry silently after the first response.
-        if (String(err.message || '').toLowerCase().indexOf('persisted before its first message') !== -1) {
+        if (this._conversationRegistered !== true ||
+            String(err.message || '').toLowerCase().indexOf('persisted before its first message') !== -1) {
           this._pendingDocumentAdds = this._pendingDocumentAdds || [];
-          this._pendingDocumentAdds.push({ id, name });
+          if (!this._pendingDocumentAdds.some((document) => document.id === id)) {
+            this._pendingDocumentAdds.push({ id, name });
+          }
           return;
         }
         this._showSystemMessage('Failed to add document: ' + err.message);

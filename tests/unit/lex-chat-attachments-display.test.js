@@ -32,4 +32,10 @@ describe('lex chat attachment display contract', () => {
     expect(messageJs).toContain('lex-chat-msg-attachment--context');
     expect(messageJs).toContain('lex-chat-msg-attachment-summary');
   });
+
+  test('queues a new-thread document attach until the first message is persisted', () => {
+    expect(chatJs).toContain('this._conversationRegistered !== true');
+    expect(chatJs).toContain('this._pendingDocumentAdds.some((document) => document.id === id)');
+    expect(chatJs).toContain('this._source.addDocument(d.id, d.name, this.matterId)');
+  });
 });
