@@ -78,8 +78,9 @@
     +       '<button class="atd-approval-toggle" id="atdDiffToggle" type="button">Show technical details</button>'
     +       '<div id="atdDiffContainer" class="atd-approval-diff hidden"></div>'
     +       '<div id="atdRejectReason" class="atd-reject-reason hidden">'
-    +         '<label for="atdRejectReasonInput">What should the agent change?</label>'
-    +         '<textarea id="atdRejectReasonInput" placeholder="Optional feedback for this run"></textarea>'
+    +         '<label for="atdRejectReasonInput">What should the agent change? <span>Required</span></label>'
+    +         '<textarea id="atdRejectReasonInput" required aria-describedby="atdRejectReasonError" placeholder="Explain what needs to change before this can be approved."></textarea>'
+    +         '<span id="atdRejectReasonError" class="atd-reject-reason-error hidden" role="alert">Add feedback so the agent knows what to change.</span>'
     +       '</div>'
     +       '<div class="atd-approval-actions">'
     +         '<lex-btn id="atdRejectBtn" variant="outline" size="sm">Reject and give feedback</lex-btn>'
@@ -1495,6 +1496,41 @@
     panel.classList.remove('hidden');
   }
 
+  function normalizeRejectionFeedback(value) {
+    return String(value == null ? '' : value).trim();
+  }
+
+  function rejectionFeedbackError(value) {
+    return normalizeRejectionFeedback(value)
+      ? ''
+      : 'Add feedback so the agent knows what to change.';
+  }
+
+  function recordArtifactApprovalDecision(artifacts, approved) {
+    var decision = approved ? 'approved' : 'rejected';
+    return (artifacts || []).map(function (artifact) {
+      if (!artifact) return artifact;
+      var status = String(artifact.status || '').toLowerCase();
+      if (status !== 'proposed' && status !== 'awaiting_approval' && status !== 'pending') return artifact;
+      return Object.assign({}, artifact, {
+        status: decision,
+        approval_status: decision,
+        decision: decision
+      });
+    });
+  }
+
+  function setRejectionFeedbackError(message) {
+    var input = el('atdRejectReasonInput');
+    var error = el('atdRejectReasonError');
+    var text = String(message || '');
+    if (input) input.setAttribute('aria-invalid', text ? 'true' : 'false');
+    if (error) {
+      error.textContent = text;
+      if (text) error.classList.remove('hidden'); else error.classList.add('hidden');
+    }
+  }
+
   function collectDeliverables(task) {
     var artifacts = (task && task.artifacts) || [];
     return artifacts.filter(Boolean);
@@ -1996,7 +2032,14 @@
 
   function rejectTask(state) {
     var reasonInput = el('atdRejectReasonInput');
-    var reason = reasonInput ? reasonInput.value.trim() : '';
+    var reason = normalizeRejectionFeedback(reasonInput && reasonInput.value);
+    var validationMessage = rejectionFeedbackError(reason);
+    if (validationMessage) {
+      setRejectionFeedbackError(validationMessage);
+      if (reasonInput) reasonInput.focus();
+      return;
+    }
+    setRejectionFeedbackError('');
     var rejectBtn = el('atdRejectBtn');
     if (rejectBtn) rejectBtn.setAttribute('disabled', '');
 
@@ -2010,6 +2053,8 @@
         if (state.task) {
           state.task.events = state.task.events || [];
           state.task.events.push(rejectionEvent);
+          state.task.artifacts = recordArtifactApprovalDecision(state.task.artifacts, false);
+          renderDeliverables(state, state.task);
         }
         appendEvent(state, rejectionEvent);
         updateUIForStatus(state, 'rejected');
@@ -2156,6 +2201,15 @@
       state._unbindFns.push(function () { rejectBtn.removeEventListener('click', rejectHandler); });
     }
 
+    var rejectReasonInput = el('atdRejectReasonInput');
+    if (rejectReasonInput) {
+      var rejectReasonHandler = function () {
+        if (normalizeRejectionFeedback(rejectReasonInput.value)) setRejectionFeedbackError('');
+      };
+      rejectReasonInput.addEventListener('input', rejectReasonHandler);
+      state._unbindFns.push(function () { rejectReasonInput.removeEventListener('input', rejectReasonHandler); });
+    }
+
     var cancelBtn = el('atdCancelBtn');
     if (cancelBtn) {
       var cancelHandler = function () { cancelTask(state); };
@@ -2263,7 +2317,10 @@
       findInputPrompt: findInputPrompt,
       humanizeValue: humanizeValue,
       runScopeValue: runScopeValue,
-      outcomeGroupCounts: outcomeGroupCounts
+      outcomeGroupCounts: outcomeGroupCounts,
+      normalizeRejectionFeedback: normalizeRejectionFeedback,
+      rejectionFeedbackError: rejectionFeedbackError,
+      recordArtifactApprovalDecision: recordArtifactApprovalDecision
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -544,6 +544,24 @@ describe('activity-detail view: verification and deliverable helpers', () => {
     expect(testApi.humanizeValue('schedule.weekly')).toBe('Schedule weekly');
     expect(testApi.humanizeValue('text.prepareOverdueReminders')).toBe('Text prepare Overdue Reminders');
   });
+
+  test('requires useful feedback before rejecting an agent outcome', () => {
+    expect(testApi.normalizeRejectionFeedback('  Add the missing deadline.  '))
+      .toBe('Add the missing deadline.');
+    expect(testApi.rejectionFeedbackError('')).toContain('Add feedback');
+    expect(testApi.rejectionFeedbackError('   ')).toContain('Add feedback');
+    expect(testApi.rejectionFeedbackError('Add the missing deadline.')).toBe('');
+  });
+
+  test('immediately reflects a rejection on pending deliverables without changing completed work', () => {
+    const artifacts = testApi.recordArtifactApprovalDecision([
+      { id: 'pending', status: 'awaiting_approval', approval_status: 'pending' },
+      { id: 'applied', status: 'applied', approval_status: 'approved' }
+    ], false);
+
+    expect(artifacts[0]).toMatchObject({ status: 'rejected', approval_status: 'rejected', decision: 'rejected' });
+    expect(artifacts[1]).toMatchObject({ status: 'applied', approval_status: 'approved' });
+  });
 });
 
 // ---------------------------------------------------------------------------

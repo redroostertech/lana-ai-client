@@ -881,6 +881,13 @@ button.atd-banner-action {
   font-weight: 600;
 }
 
+.atd-reject-reason label span {
+  margin-left: 4px;
+  color: var(--lex-color-danger-600, #dc2626);
+  font-size: 0.6875rem;
+  font-weight: 650;
+}
+
 .atd-reject-reason textarea {
   width: 100%;
   min-height: 72px;
@@ -892,6 +899,18 @@ button.atd-banner-action {
   color: var(--lex-text-primary);
   background: var(--lex-bg-primary);
   font: 0.8125rem/1.5 var(--lex-font-sans, system-ui, sans-serif);
+}
+
+.atd-reject-reason textarea[aria-invalid="true"] {
+  border-color: var(--lex-color-danger-500, #ef4444);
+}
+
+.atd-reject-reason-error {
+  display: block;
+  margin-top: 6px;
+  color: var(--lex-color-danger-600, #dc2626);
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
 .atd-approval-actions {
