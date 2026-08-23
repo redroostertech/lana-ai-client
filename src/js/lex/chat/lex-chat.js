@@ -914,6 +914,10 @@
      */
     async addDocument(id, name) {
       if (!this._source) return;
+      // Capture new-thread state before awaiting. The streaming connection can
+      // register the conversation while this request is in flight; checking
+      // only inside catch would then turn the expected race into a false error.
+      const shouldDeferUntilFirstResponse = this._conversationRegistered !== true;
       try {
         const state = await this._source.addDocument(id, name, this.matterId);
         if (state) this._updateDocumentState(state);
@@ -922,7 +926,7 @@
         // conversation state before the first message exists. The first
         // turn already carries the document context in its payload, so
         // queue the attach and retry silently after the first response.
-        if (this._conversationRegistered !== true ||
+        if (shouldDeferUntilFirstResponse ||
             String(err.message || '').toLowerCase().indexOf('persisted before its first message') !== -1) {
           this._pendingDocumentAdds = this._pendingDocumentAdds || [];
           if (!this._pendingDocumentAdds.some((document) => document.id === id)) {

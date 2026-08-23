@@ -34,7 +34,8 @@ describe('lex chat attachment display contract', () => {
   });
 
   test('queues a new-thread document attach until the first message is persisted', () => {
-    expect(chatJs).toContain('this._conversationRegistered !== true');
+    expect(chatJs).toContain('const shouldDeferUntilFirstResponse = this._conversationRegistered !== true');
+    expect(chatJs).toContain('if (shouldDeferUntilFirstResponse ||');
     expect(chatJs).toContain('this._pendingDocumentAdds.some((document) => document.id === id)');
     expect(chatJs).toContain('this._source.addDocument(d.id, d.name, this.matterId)');
   });
