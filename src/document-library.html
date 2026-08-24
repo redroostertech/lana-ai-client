@@ -39,6 +39,26 @@
         <lex-btn id="documentLibraryNewBtn" variant="primary" leading-icon="file-plus" data-action="new-document">New Document</lex-btn>
       </lex-banner>
 
+      <div class="document-library-filters" role="search" aria-label="Search and filter documents">
+        <span class="document-library-filter-label" id="documentLibraryTypeFilterLabel">Document type</span>
+        <lex-segmented
+          id="documentLibraryTypeFilter"
+          aria-labelledby="documentLibraryTypeFilterLabel"
+          value=""
+          options='[{"value":"","label":"All"},{"value":"document","label":"Documents"},{"value":"spreadsheet","label":"Spreadsheets"},{"value":"presentation","label":"Presentations"},{"value":"pdf","label":"PDFs"},{"value":"image","label":"Images"}]'
+        ></lex-segmented>
+        <div class="document-library-filters-spacer"></div>
+        <label class="document-library-search-field" for="documentLibrarySearch">
+          <span class="document-library-search-label">Search documents</span>
+          <input
+            id="documentLibrarySearch"
+            type="search"
+            autocomplete="off"
+            placeholder="Search documents..."
+          >
+        </label>
+      </div>
+
       <lex-card class="document-library-recents" padding="none" aria-labelledby="documentLibraryRecentHeading">
         <div class="document-library-section-heading">
           <div>
@@ -106,6 +126,7 @@
   <script src="js/lex/components/foundation/lex-card.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="js/lex/components/form/lex-segmented.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
   <script src="js/lex/lex-page-init.js"></script>
   <script src="js/services/document-create-modal.js"></script>

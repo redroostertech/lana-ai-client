@@ -8,6 +8,9 @@
   var FILE_LIMIT = 12;
   var loadSequence = 0;
   var currentPage = 1;
+  var searchTerm = '';
+  var documentType = '';
+  var searchDebounce = null;
 
   function el(id) {
     return document.getElementById(id);
@@ -206,16 +209,17 @@
     var host = el('documentLibraryRecentFiles');
     var count = el('documentLibraryRecentCount');
     if (!host) return;
+    var filtered = Boolean(searchTerm || documentType);
     if (count) count.textContent = '0 files';
     setTableVisibility(false);
     updatePagination(null);
     host.setAttribute('aria-busy', 'false');
     host.innerHTML =
       '<div class="document-library-empty">' +
-        '<span class="document-library-empty-icon" data-document-library-icon="file-plus" aria-hidden="true"></span>' +
-        '<h3>No edited files yet</h3>' +
-        '<p>Create your first document to get started.</p>' +
-        '<lex-btn variant="secondary" leading-icon="file-plus" data-action="new-document">New Document</lex-btn>' +
+        '<span class="document-library-empty-icon" data-document-library-icon="' + (filtered ? 'search' : 'file-plus') + '" aria-hidden="true"></span>' +
+        '<h3>' + (filtered ? 'No matching documents' : 'No edited files yet') + '</h3>' +
+        '<p>' + (filtered ? 'Try a different search or document type.' : 'Create your first document to get started.') + '</p>' +
+        (filtered ? '' : '<lex-btn variant="secondary" leading-icon="file-plus" data-action="new-document">New Document</lex-btn>') +
       '</div>';
     hydrateIcons(host);
   }
@@ -306,9 +310,14 @@
     }
 
     try {
-      var response = await client.get(
-        '/api/v1/storage/documents?page=' + currentPage + '&page_size=' + FILE_LIMIT + '&sort_by=updated_at&sort_order=desc'
-      );
+      var params = new URLSearchParams();
+      params.set('page', String(currentPage));
+      params.set('page_size', String(FILE_LIMIT));
+      params.set('sort_by', 'updated_at');
+      params.set('sort_order', 'desc');
+      if (searchTerm) params.set('search', searchTerm);
+      if (documentType) params.set('document_type', documentType);
+      var response = await client.get('/api/v1/storage/documents?' + params.toString());
       if (sequence !== loadSequence || !el('documentLibrary')) return;
       var files = filesFromResponse(response);
       renderFiles(files, paginationFromResponse(response, files.length));
@@ -434,11 +443,31 @@
       var page = event.detail && event.detail.page;
       if (page) loadLatestFiles(page);
     });
+    root.addEventListener('lex-change', function (event) {
+      if (!event.target || event.target.id !== 'documentLibraryTypeFilter') return;
+      documentType = String((event.detail && event.detail.value) || '');
+      currentPage = 1;
+      loadLatestFiles(1);
+    });
+    root.addEventListener('input', function (event) {
+      if (!event.target || event.target.id !== 'documentLibrarySearch') return;
+      global.clearTimeout(searchDebounce);
+      searchDebounce = global.setTimeout(function () {
+        searchTerm = event.target.value.trim();
+        currentPage = 1;
+        loadLatestFiles(1);
+      }, 350);
+    });
   }
 
   function init() {
     var root = el('documentLibrary');
     if (!root) return;
+    var search = el('documentLibrarySearch');
+    var typeFilter = el('documentLibraryTypeFilter');
+    searchTerm = search ? search.value.trim() : '';
+    documentType = typeFilter ? String(typeFilter.value || '') : '';
+    currentPage = 1;
     bindEvents(root);
     hydrateIcons(root);
     loadLatestFiles();
@@ -448,7 +477,10 @@
     init: init,
     loadLatestFiles: loadLatestFiles,
     filesFromResponse: filesFromResponse,
-    sortLatestEdited: sortLatestEdited
+    sortLatestEdited: sortLatestEdited,
+    currentFilters: function () {
+      return { search: searchTerm, documentType: documentType, page: currentPage, pageSize: FILE_LIMIT };
+    }
   };
 
   if (global.LexRouter && typeof LexRouter.registerPageInit === 'function') {

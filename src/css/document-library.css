@@ -14,6 +14,51 @@
   margin-bottom: 16px;
 }
 
+.document-library-filters {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0 12px;
+}
+
+.document-library-filter-label,
+.document-library-search-label {
+  color: var(--lex-text-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.document-library-filters-spacer {
+  flex: 1;
+}
+
+.document-library-search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.document-library-search-field input {
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-default);
+  border-radius: 6px;
+  color: var(--lex-text-primary);
+  font: inherit;
+  font-size: 13px;
+  min-height: 34px;
+  outline: none;
+  padding: 6px 12px;
+  width: 260px;
+}
+
+.document-library-search-field input:focus-visible {
+  border-color: var(--lex-border-accent);
+  box-shadow: var(--lex-focus-ring);
+}
+
 lex-card.document-library-recents {
   display: block;
   margin: 0;
@@ -383,6 +428,19 @@ lex-card.document-library-recents {
 }
 
 @media (max-width: 600px) {
+  .document-library-filters {
+    align-items: stretch;
+  }
+
+  .document-library-filters-spacer {
+    display: none;
+  }
+
+  .document-library-search-field,
+  .document-library-search-field input {
+    width: 100%;
+  }
+
   .document-library-section-heading {
     align-items: flex-start;
     min-height: auto;

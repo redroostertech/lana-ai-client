@@ -62,6 +62,7 @@ describe('Document Library integration', () => {
       'js/lex/components/foundation/lex-banner.js',
       'js/lex/components/foundation/lex-card.js',
       'js/lex/components/foundation/lex-modal.js',
+      'js/lex/components/form/lex-segmented.js',
       'js/lex/components/data/lex-pagination.js',
       'js/services/document-create-modal.js',
       'js/document-library.js',
@@ -90,6 +91,10 @@ describe('Document Library integration', () => {
     expect(html).toContain('role="columnheader">File');
     expect(html).toContain('role="columnheader">Workspace');
     expect(html).toContain('role="columnheader">Last edited');
+    expect(html).toContain('id="documentLibrarySearch"');
+    expect(html).toContain('id="documentLibraryTypeFilter"');
+    expect(html).toContain('Search and filter documents');
+    expect(html).toContain('src="js/lex/components/form/lex-segmented.js"');
     expect(html).toContain('<lex-pagination id="documentLibraryPagination"');
     expect(html).toContain('<lex-banner');
     expect(html).toContain('data-action="new-document"');
@@ -124,8 +129,10 @@ describe('Document Library integration', () => {
   test('Document Library loads paginated latest-edited files and reuses shared document creation', () => {
     const controller = fs.readFileSync(path.join(SRC, 'js', 'document-library.js'), 'utf8');
 
-    expect(controller).toContain("'/api/v1/storage/documents?page=' + currentPage + '&page_size='");
-    expect(controller).toContain('&sort_by=updated_at&sort_order=desc');
+    expect(controller).toContain("params.set('page', String(currentPage))");
+    expect(controller).toContain("params.set('page_size', String(FILE_LIMIT))");
+    expect(controller).toContain("params.set('sort_by', 'updated_at')");
+    expect(controller).toContain("params.set('sort_order', 'desc')");
     expect(controller).toContain('LanaDocumentCreate.open');
     expect(controller).toContain("source: 'document_library'");
     expect(controller).toContain("Lex.Nav.go('file-viewer.html'");
@@ -139,6 +146,25 @@ describe('Document Library integration', () => {
     expect(controller).toContain("LexRouter.registerPageInit('document-library.html', init);");
     expect(controller).toContain("root.addEventListener('page-change'");
     expect(controller).not.toContain('officeEditorInstance');
+  });
+
+  test('Document Library search and type filters reset paging and reach the paginated API', () => {
+    const html = fs.readFileSync(path.join(SRC, 'document-library.html'), 'utf8');
+    const controller = fs.readFileSync(path.join(SRC, 'js', 'document-library.js'), 'utf8');
+
+    expect(html).toContain('{"value":"document","label":"Documents"}');
+    expect(html).toContain('{"value":"spreadsheet","label":"Spreadsheets"}');
+    expect(html).toContain('{"value":"presentation","label":"Presentations"}');
+    expect(html).toContain('{"value":"pdf","label":"PDFs"}');
+    expect(html).toContain('{"value":"image","label":"Images"}');
+    expect(controller).toContain("if (searchTerm) params.set('search', searchTerm)");
+    expect(controller).toContain("if (documentType) params.set('document_type', documentType)");
+    expect(controller).toContain("event.target.id !== 'documentLibrarySearch'");
+    expect(controller).toContain("event.target.id !== 'documentLibraryTypeFilter'");
+    expect(controller).toContain('currentPage = 1');
+    expect(controller).toContain("loadLatestFiles(1)");
+    expect(controller).toContain('No matching documents');
+    expect(controller).toContain('currentFilters: function ()');
   });
 
   test('Template Library instantiates editable templates through the shared creation flow', () => {
