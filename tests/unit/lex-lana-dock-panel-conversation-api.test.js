@@ -36,7 +36,8 @@ function makeContext(api) {
     clearTimeout,
     localStorage: {
       getItem: jest.fn(),
-      setItem: jest.fn()
+      setItem: jest.fn(),
+      removeItem: jest.fn()
     },
     document: {
       head: { appendChild: jest.fn() },
@@ -303,6 +304,103 @@ describe('LANA dock/panel conversation API routing', () => {
     });
     expect(dock._setConvo).toHaveBeenCalledWith('Opened Chat', 'Matter One');
     expect(dock._panelEl._focusComposer).toHaveBeenCalledTimes(1);
+  });
+
+  test('dock remembers only the active conversation pointer for navigation continuity', () => {
+    const { context, Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    context.window.sessionStorage = {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest.fn()
+    };
+
+    dock._rememberActiveConversation({
+      id: 'registry-1',
+      thread_id: 'conversation-1',
+      title: 'Dashboard questions',
+      subtitle: 'Matter One',
+      matter_id: 'matter-1',
+      messages: [{ content: 'Do not persist message text' }]
+    });
+
+    expect(context.window.sessionStorage.setItem).toHaveBeenCalledTimes(1);
+    expect(context.window.sessionStorage.setItem.mock.calls[0][0]).toBe('lana:lanaDock:activeConversation');
+    const payload = JSON.parse(context.window.sessionStorage.setItem.mock.calls[0][1]);
+    expect(payload).toEqual(expect.objectContaining({
+      threadId: 'conversation-1',
+      title: 'Dashboard questions',
+      matterId: 'matter-1',
+      matterName: 'Matter One'
+    }));
+    expect(payload.messages).toBeUndefined();
+  });
+
+  test('dock restores the active conversation after page navigation', async () => {
+    const { context, Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    dock._collapsed = false;
+    dock._panelEl = { _chatEl: { conversationId: null } };
+    dock.openConversation = jest.fn(() => Promise.resolve({
+      id: 'registry-1',
+      thread_id: 'conversation-1',
+      title: 'Dashboard questions',
+      subtitle: 'Matter One',
+      matter_id: 'matter-1'
+    }));
+    context.window.sessionStorage = {
+      getItem: jest.fn(() => JSON.stringify({
+        threadId: 'conversation-1',
+        title: 'Dashboard questions',
+        matterId: 'matter-1',
+        matterName: 'Matter One',
+        contextType: 'full_chat'
+      })),
+      setItem: jest.fn(),
+      removeItem: jest.fn()
+    };
+
+    await dock._restoreActiveConversation();
+
+    expect(context.window.sessionStorage.getItem).toHaveBeenCalledWith('lana:lanaDock:activeConversation');
+    expect(dock.openConversation).toHaveBeenCalledWith('conversation-1', 'matter-1', {
+      title: 'Dashboard questions',
+      matterName: 'Matter One',
+      contextType: 'full_chat'
+    });
+    expect(context.window.sessionStorage.setItem).toHaveBeenCalledWith(
+      'lana:lanaDock:activeConversation',
+      expect.stringContaining('"threadId":"conversation-1"')
+    );
+  });
+
+  test('dock clears active conversation continuity when starting a new chat', () => {
+    const { context, Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    dock.expand = jest.fn();
+    dock._clearConvo = jest.fn();
+    dock._maybeShowSuggestion = jest.fn();
+    context.window.sessionStorage = {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest.fn()
+    };
+
+    dock.newChat();
+
+    expect(context.window.sessionStorage.removeItem).toHaveBeenCalledWith('lana:lanaDock:activeConversation');
   });
 
   test('dock openWith sends an initial prompt after applying matter context', async () => {

@@ -49,6 +49,7 @@
 
   var COLLAPSED_KEY = 'lana:lanaDock:collapsed';
   var WIDTH_KEY = 'lana:lanaDock:width';
+  var ACTIVE_CONVERSATION_KEY = 'lana:lanaDock:activeConversation';
   /* Dragging this many px narrower than the minimum width dismisses the
      dock instead of resizing it (the minimum IS the default width). */
   var DISMISS_SLACK_PX = 48;
@@ -72,6 +73,71 @@
     } catch (e) {
       return null;
     }
+  }
+
+  function stringValue(value) {
+    if (value === null || value === undefined) return '';
+    return String(value);
+  }
+
+  function normalizeActiveConversationState(input) {
+    if (!input || typeof input !== 'object') return null;
+    var threadId = stringValue(
+      input.threadId ||
+      input.thread_id ||
+      input.conversationId ||
+      input.conversation_id ||
+      input.id
+    );
+    if (!threadId) return null;
+
+    var matterName = stringValue(
+      input.matterName ||
+      input.matter_name ||
+      input.workspaceName ||
+      input.workspace_name ||
+      input.subtitle
+    );
+
+    return {
+      threadId: threadId,
+      matterId: stringValue(input.matterId || input.matter_id || ''),
+      matterName: matterName,
+      title: stringValue(input.title || input.name || 'LANA Chat'),
+      subtitle: stringValue(input.subtitle || matterName),
+      contextType: stringValue(input.contextType || input.context_type || ''),
+      updatedAt: Date.now()
+    };
+  }
+
+  function readActiveConversationState() {
+    try {
+      if (!window.sessionStorage) return null;
+      var raw = window.sessionStorage.getItem(ACTIVE_CONVERSATION_KEY);
+      if (!raw) return null;
+      return normalizeActiveConversationState(JSON.parse(raw));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeActiveConversationState(input) {
+    var state = normalizeActiveConversationState(input);
+    if (!state) return null;
+    try {
+      if (window.sessionStorage) {
+        window.sessionStorage.setItem(ACTIVE_CONVERSATION_KEY, JSON.stringify(state));
+      }
+    } catch (_) {
+      return null;
+    }
+    return state;
+  }
+
+  function clearActiveConversationState() {
+    try {
+      if (window.sessionStorage) window.sessionStorage.removeItem(ACTIVE_CONVERSATION_KEY);
+    } catch (_) { /* sessionStorage can be unavailable in restricted contexts */ }
   }
 
   /* Minimize chevrons (slide the dock away to the right edge). */
@@ -497,6 +563,8 @@
       this._scopeMenuEl = null;
       this._mattersCache = null;
       this._injectedDocId = null;
+      this._restoringActiveConversation = false;
+      this._skipActiveConversationRestore = false;
       this._boundTriggerClick = this._handleDockTriggerClick.bind(this);
       this._resizeState = null;   // live pointer-drag bookkeeping
       this._baseWidthPx = 0;      // resolved default width = resize minimum
@@ -507,7 +575,9 @@
       this._collapsed = this._readStoredCollapsed();
       this._initResizeWidth();
       this._build();
+      this._skipActiveConversationRestore = this._consumePendingAction();
       this._applyState({ initial: true });
+      if (!this._skipActiveConversationRestore) this._restoreActiveConversation();
       Lex.LanaDock = Lex.LanaDock || {};
       Lex.LanaDock.get = function () { return document.querySelector('lex-lana-dock'); };
       Lex.LanaDock.toggle = function () { var d = Lex.LanaDock.get(); if (d) d.toggleDock(); };
@@ -521,7 +591,6 @@
       Lex.LanaDock.newChat = function () { var d = Lex.LanaDock.get(); if (d) return d.newChat(); };
 
       document.addEventListener('click', this._boundTriggerClick);
-      this._consumePendingAction();
     }
 
     disconnected() {
@@ -540,6 +609,7 @@
       if (!this._collapsed) return;
       this._collapsed = false;
       this._applyState();
+      if (!this._skipActiveConversationRestore) this._restoreActiveConversation();
       // Each time the dock opens from its minimized state, the RECENTS
       // dropdown starts closed — the chat itself is the point of opening.
       this._collapseRecentsDropdown();
@@ -819,6 +889,13 @@
           }
           p.openConversation(threadId, matterId, opts).then(function (thread) {
             self._setConvo(thread && thread.title ? thread.title : 'LANA Chat', (thread && thread.subtitle) || opts.matterName || '');
+            self._rememberActiveConversation(thread || {
+              threadId: threadId,
+              matterId: matterId || '',
+              matterName: opts.matterName || '',
+              title: opts.title || 'LANA Chat',
+              contextType: opts.contextType || ''
+            });
             if (typeof p._focusComposer === 'function') p._focusComposer();
             resolve(thread);
           }).catch(reject);
@@ -834,26 +911,36 @@
     _consumePendingAction() {
       var raw = null;
       try {
-        if (!window.sessionStorage) return;
+        if (!window.sessionStorage) return false;
         raw = window.sessionStorage.getItem('lana_dock_pending_action');
-        if (!raw) return;
+        if (!raw) return false;
         window.sessionStorage.removeItem('lana_dock_pending_action');
       } catch (e) {
-        return;
+        return false;
       }
 
       var action = null;
       try {
         action = JSON.parse(raw);
       } catch (e) {
-        return;
+        return false;
       }
-      if (!action || !action.type) return;
+      if (!action || !action.type) return false;
+      var recognized = (action.type === 'conversation' && action.threadId)
+        || (action.type === 'matter_chat' && action.matterId)
+        || action.type === 'new_chat';
+      if (!recognized) return false;
 
       var self = this;
       setTimeout(function () {
         if (action.type === 'conversation' && action.threadId) {
-          self.openConversation(action.threadId, action.matterId || null);
+          var opened = self.openConversation(action.threadId, action.matterId || null);
+          if (opened && typeof opened.then === 'function') {
+            opened.then(function () { self._skipActiveConversationRestore = false; })
+              .catch(function () { self._skipActiveConversationRestore = false; });
+          } else {
+            self._skipActiveConversationRestore = false;
+          }
           return;
         }
         if (action.type === 'matter_chat' && action.matterId) {
@@ -863,12 +950,15 @@
             contextType: 'full_chat',
             initialPrompt: action.initialPrompt || null
           });
+          self._skipActiveConversationRestore = false;
           return;
         }
         if (action.type === 'new_chat') {
           self.newChat();
+          self._skipActiveConversationRestore = false;
         }
       }, 300);
+      return true;
     }
 
     _handleDockTriggerClick(event) {
@@ -891,6 +981,7 @@
 
     /** Expand the dock and start a fresh conversation. */
     newChat() {
+      clearActiveConversationState();
       this.expand();
       this._clearConvo();
       this._maybeShowSuggestion();
@@ -910,6 +1001,50 @@
         }
         if (typeof panel._focusComposer === 'function') panel._focusComposer();
       }, 250);
+    }
+
+    _rememberActiveConversation(thread) {
+      return writeActiveConversationState(thread);
+    }
+
+    _patchActiveConversation(patch) {
+      var current = readActiveConversationState();
+      if (!current) return null;
+      return this._rememberActiveConversation(Object.assign({}, current, patch || {}));
+    }
+
+    _restoreActiveConversation() {
+      if (this._collapsed || this._restoringActiveConversation) return false;
+
+      var state = readActiveConversationState();
+      if (!state || !state.threadId) return false;
+
+      var panel = this._panelEl;
+      if (!panel) return false;
+
+      var chatEl = panel._chatEl;
+      if (chatEl && chatEl.conversationId === state.threadId) {
+        this._syncScopeLocal(state.matterId || null, state.matterName || state.subtitle || '');
+        this._setConvo(state.title || 'LANA Chat', state.matterName || state.subtitle || '');
+        return false;
+      }
+
+      this._restoringActiveConversation = true;
+      var self = this;
+      return this.openConversation(state.threadId, state.matterId || null, {
+        title: state.title || 'LANA Chat',
+        matterName: state.matterName || state.subtitle || '',
+        contextType: state.contextType || this.contextType || ''
+      }).then(function (thread) {
+        self._restoringActiveConversation = false;
+        self._rememberActiveConversation(thread || state);
+        return thread;
+      }).catch(function (err) {
+        self._restoringActiveConversation = false;
+        clearActiveConversationState();
+        console.warn('[lex-lana-dock] Failed to restore active conversation:', err);
+        return null;
+      });
     }
 
     _buildPanel() {
@@ -1051,6 +1186,7 @@
         if (!t) return;
         self._syncScopeLocal(t.matter_id || null, t.subtitle || '');
         self._setConvo(t.title || 'Untitled Chat', t.subtitle || '');
+        self._rememberActiveConversation(t);
       });
       // A fresh conversation registers on first response — show it, then
       // pick up the generated title once the backend has named it.
@@ -1060,6 +1196,15 @@
           self._setConvo('New Chat', self._workspaceName || '');
         }
         var convId = e.detail && e.detail.conversationId;
+        if (convId) {
+          self._rememberActiveConversation({
+            threadId: convId,
+            matterId: self._scopeMatterId || '',
+            matterName: self._workspaceName || '',
+            title: 'New Chat',
+            contextType: self.contextType || ''
+          });
+        }
         if (convId && self._panelEl && self._panelEl._threadsEl) {
           setTimeout(function () {
             // Guard against the user having switched conversations while
@@ -1075,6 +1220,7 @@
               for (var i = 0; i < list.length; i++) {
                 if (list[i].thread_id === convId || list[i].id === convId) {
                   self._setConvo(list[i].title || 'New Chat', list[i].subtitle || self._workspaceName || '');
+                  self._rememberActiveConversation(list[i]);
                   break;
                 }
               }
@@ -1192,6 +1338,12 @@
       if (this._convoEl && this._convoEl.getAttribute('data-visible') === 'true') {
         var t = this._convoEl.querySelector('.lld-convo-title').textContent;
         this._setConvo(t, matterName || '');
+        this._patchActiveConversation({
+          matterId: matterId || '',
+          matterName: matterName || '',
+          subtitle: matterName || '',
+          title: t || 'LANA Chat'
+        });
       }
       if (this._scopeMenuEl) this._scopeMenuEl.setAttribute('data-open', 'false');
     }
