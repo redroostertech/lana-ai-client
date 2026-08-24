@@ -78,10 +78,13 @@
     if (!pager) return;
     var total = pagination ? pagination.total : 0;
     var totalPages = pagination ? pagination.totalPages : 1;
-    pager.page = pagination ? pagination.page : currentPage;
-    pager.totalPages = totalPages;
-    pager.total = total;
-    pager.limit = FILE_LIMIT;
+    // Keep the public Lex component contract in sync with its rendered state.
+    // Consumers, accessibility tooling, and the other library surfaces read
+    // these declarative attributes rather than private reactive properties.
+    pager.setAttribute('page', String(pagination ? pagination.page : currentPage));
+    pager.setAttribute('total-pages', String(totalPages));
+    pager.setAttribute('total', String(total));
+    pager.setAttribute('limit', String(FILE_LIMIT));
     pager.hidden = totalPages <= 1;
   }
 
