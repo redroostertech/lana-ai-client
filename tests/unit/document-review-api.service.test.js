@@ -109,6 +109,33 @@ describe('LanaDocumentReview grouping and serialization', () => {
     expect(scripts[0].ops).toEqual([{ op: 'deleteText', range: { paragraph: 1, start: 0, end: 13 } }]);
   });
 
+  test('replays numeric revision scripts in engine order after Undo/Redo row recreation', () => {
+    const first = insChange({
+      change_key: 'revision:1',
+      anchor: { revision_id: '1' },
+      edit_script: { version: '0', ops: [{ op: 'insertText', at: { paragraph: 0, start: 0 }, text: 'first' }] }
+    });
+    const split = insChange({
+      change_key: 'revision:2',
+      anchor: { revision_id: '2' },
+      proposed_text: '¶',
+      edit_script: { version: '0', ops: [{ op: 'splitParagraph', at: { paragraph: 0, start: 5 } }] }
+    });
+    const divergent = insChange({
+      change_key: 'revision:3',
+      anchor: { revision_id: '3' },
+      edit_script: { version: '0', ops: [{ op: 'insertText', at: { paragraph: 1, start: 0 }, text: 'divergent' }] }
+    });
+
+    const scripts = review.editScriptsFromBatch({ changes: [first, divergent, split] });
+
+    expect(scripts.map((script) => script.ops[0].op)).toEqual([
+      'insertText',
+      'splitParagraph',
+      'insertText'
+    ]);
+  });
+
   test('persists semantic font before/after values without rewriting the format operation', () => {
     const session = review.createReviewSession();
     const formatOp = {

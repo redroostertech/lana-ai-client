@@ -632,7 +632,7 @@
   }
 
   function editOpsFromBatch(batch) {
-    var changes = Array.isArray(batch && batch.changes) ? batch.changes : [];
+    var changes = replayOrderedBatchChanges(batch);
     var ops = [];
     var seenScripts = {};
     for (var i = 0; i < changes.length; i++) {
@@ -654,8 +654,36 @@
     return ops;
   }
 
+  function replayRevisionSequence(change) {
+    var revisionId = change && change.anchor && (change.anchor.revision_id || change.anchor.revisionId);
+    if (revisionId === undefined || revisionId === null || revisionId === '') {
+      var keyMatch = String(change && (change.change_key || change.id) || '').match(/^revision:(\d+)$/);
+      revisionId = keyMatch ? keyMatch[1] : '';
+    }
+    return /^\d+$/.test(String(revisionId || '')) ? Number(revisionId) : null;
+  }
+
+  function replayOrderedBatchChanges(batch) {
+    var changes = Array.isArray(batch && batch.changes) ? batch.changes.slice() : [];
+    var sequenced = changes.map(function (change, index) {
+      return { change: change, index: index, sequence: replayRevisionSequence(change) };
+    });
+    // Numeric revision ids are assigned monotonically by the redline engine
+    // and survive the draft API. Repository created_at/id order can differ
+    // after Undo/Redo deletes and recreates rows, which makes structural ops
+    // replay after later insertions and fail their original anchors. Only sort
+    // when every row has the durable numeric sequence; otherwise preserve the
+    // server order exactly.
+    if (sequenced.length && sequenced.every(function (entry) { return entry.sequence !== null; })) {
+      sequenced.sort(function (left, right) {
+        return left.sequence - right.sequence || left.index - right.index;
+      });
+    }
+    return sequenced.map(function (entry) { return entry.change; });
+  }
+
   function editScriptsFromBatch(batch) {
-    var changes = displayReviewChanges(Array.isArray(batch && batch.changes) ? batch.changes : []);
+    var changes = displayReviewChanges(replayOrderedBatchChanges(batch));
     var scripts = [];
     var seenScripts = {};
     for (var i = 0; i < changes.length; i++) {
@@ -1331,6 +1359,7 @@
     inverseEditOpsForReleasedChange: inverseEditOpsForReleasedChange,
     dedupeEditOps: dedupeEditOps,
     editOpsFromBatch: editOpsFromBatch,
+    replayOrderedBatchChanges: replayOrderedBatchChanges,
     editScriptsFromBatch: editScriptsFromBatch,
     reviewRevisionKey: reviewRevisionKey,
     rawReviewRevisions: rawReviewRevisions,
