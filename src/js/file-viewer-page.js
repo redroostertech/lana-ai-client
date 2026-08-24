@@ -47,6 +47,7 @@
     pendingReviewReleaseBatch: null,
     currentReviewBatchRestoreFailed: false,
     reviewSourceDocumentId: null,
+    reviewSourceFile: null,
     reviewWorkflowPromise: null,
     reviewReleases: [],
     reviewReleaseMetadata: {},
@@ -1386,10 +1387,17 @@
   }
 
   function fileEditorHandoff(file) {
+    var sourceDocumentId = canonicalReviewSourceDocumentId(file);
+    var sourceFile = state.reviewSourceFile && String(state.reviewSourceFile.id || '') === String(sourceDocumentId)
+      ? state.reviewSourceFile
+      : file;
+    var sourceDisplayFilename = documentDisplayFilename(sourceFile);
+    if (sourceDocumentId && file && String(file.id || '') !== String(sourceDocumentId) && sourceFile === file) {
+      sourceDisplayFilename = sourceDisplayFilename.replace(/\s+-\s+released(?=\.[^.]+$|$)/i, '');
+    }
     var baselineRelease = fileEditorBaselineRelease(file);
     var baselineDocumentId = releaseDocumentId(baselineRelease) || (file && file.id ? String(file.id) : '');
     var sourceUrl = baselineDocumentId ? getFileDownloadUrl(baselineDocumentId) : '';
-    var displayFilename = documentDisplayFilename(file);
     var draftBatch = state.currentReviewBatch && isActiveReviewDraftBatch(state.currentReviewBatch)
       ? state.currentReviewBatch
       : null;
@@ -1397,32 +1405,32 @@
       source: 'file_viewer',
       referrer: fileViewerRouteForFile(file) || targetBackRoute(),
       file: {
-        id: file && file.id ? 'file-editor-' + String(file.id) : '',
-        documentId: file && file.id ? String(file.id) : '',
-        sourceDocumentId: canonicalReviewSourceDocumentId(file),
+        id: sourceDocumentId ? 'file-editor-' + String(sourceDocumentId) : '',
+        documentId: sourceDocumentId,
+        sourceDocumentId: sourceDocumentId,
         releasedDocumentId: baselineRelease && baselineDocumentId ? baselineDocumentId : '',
         editorBaselineReleaseId: baselineRelease && baselineRelease.id ? String(baselineRelease.id) : '',
         editorBaselineReleaseNumber: baselineRelease && baselineRelease.release_number ? Number(baselineRelease.release_number) : null,
         matterId: getCurrentMatterId() || '',
         matterNumber: getConversationMatterId(file) || state.conversationMatterId || '',
         matterName: getFileMatterDisplayName(file) || '',
-        kind: fileEditorKindForFile(file),
-        title: displayFilename,
-        filename: displayFilename,
-        storageFilename: file && file.filename,
-        original_filename: file && (file.original_filename || displayFilename),
-        display_filename: file && (file.display_filename || displayFilename),
-        contentType: file && (file.content_type || file.mime_type),
-        fileSize: file && file.file_size,
-        createdAt: file && file.created_at,
-        documentUpdatedAt: (file && (file.updated_at || file.created_at)) || '',
+        kind: fileEditorKindForFile(sourceFile),
+        title: sourceDisplayFilename,
+        filename: sourceDisplayFilename,
+        storageFilename: sourceFile && sourceFile.filename,
+        original_filename: sourceFile && (sourceFile.original_filename || sourceDisplayFilename),
+        display_filename: sourceDisplayFilename,
+        contentType: sourceFile && (sourceFile.content_type || sourceFile.mime_type),
+        fileSize: sourceFile && sourceFile.file_size,
+        createdAt: sourceFile && sourceFile.created_at,
+        documentUpdatedAt: (sourceFile && (sourceFile.updated_at || sourceFile.created_at)) || '',
         updatedAt: LanaDocumentReview.latestActivityIso(file, draftBatch) || (file && (file.updated_at || file.created_at)),
         lastSavedAt: draftBatch && draftBatch.updated_at ? draftBatch.updated_at : null,
-        metadata: fileMetadata(file),
-        summary: file && file.summary,
-        summaryGeneratedAt: file && file.summary_generated_at,
-        editorEngine: fileEditorKindForFile(file) === 'doc' ? 'lana-editor' : 'server-edit-model',
-        editorMode: fileEditorKindForFile(file) === 'doc' ? 'review' : 'edit',
+        metadata: fileMetadata(sourceFile),
+        summary: sourceFile && sourceFile.summary,
+        summaryGeneratedAt: sourceFile && sourceFile.summary_generated_at,
+        editorEngine: fileEditorKindForFile(sourceFile) === 'doc' ? 'lana-editor' : 'server-edit-model',
+        editorMode: fileEditorKindForFile(sourceFile) === 'doc' ? 'review' : 'edit',
         officeEditingSupported: isOfficeEditFormat(file) && officeCapabilitySupportsEditing(currentFormatCapabilities(file)),
         formatCapabilities: currentFormatCapabilities(file),
         content: visibleViewerDocumentHtml(),
@@ -1467,10 +1475,11 @@
       }
     }
     var matterId = getCurrentMatterId() || '';
+    var handoff = fileEditorHandoff(file);
     Lex.Nav.go('file-editor.html', {
-      params: { id: file.id, matter_id: matterId || null },
+      params: { id: handoff.file.documentId, matter_id: matterId || null },
       context: {
-        fileEditor: fileEditorHandoff(file),
+        fileEditor: handoff,
         referrer: fileViewerRouteForFile(file) || targetBackRoute()
       }
     });
@@ -3778,6 +3787,7 @@
     state.pendingReviewReleaseBatch = null;
     state.currentReviewBatchRestoreFailed = false;
     state.reviewSourceDocumentId = null;
+    state.reviewSourceFile = null;
     state.reviewReleases = [];
     state.reviewReleaseMetadata = {};
     state.selectedReviewReleaseId = null;
@@ -3823,6 +3833,16 @@
         });
       }
       state.reviewSourceDocumentId = reviewDocumentId;
+      if (String(file.id) === String(reviewDocumentId)) {
+        state.reviewSourceFile = file;
+      } else {
+        try {
+          state.reviewSourceFile = await api.get('/api/v1/storage/files/' + encodeURIComponent(reviewDocumentId));
+        } catch (sourceFileError) {
+          state.reviewSourceFile = null;
+          console.warn('[FileViewerPage] Source document metadata load failed:', sourceFileError);
+        }
+      }
       var query = '?document_id=' + encodeURIComponent(reviewDocumentId) + '&limit=20&sort_by=updated_at&sort_dir=desc';
       var batchesResponse = await api.get(reviewEndpoint('/document-edit-batches' + query));
       state.reviewBatches = Array.isArray(batchesResponse && batchesResponse.data) ? batchesResponse.data : [];
@@ -4377,6 +4397,7 @@
     state.currentReviewBatch = null;
     state.pendingReviewReleaseBatch = null;
     state.reviewSourceDocumentId = null;
+    state.reviewSourceFile = null;
     state.reviewWorkflowPromise = null;
     state.reviewReleases = [];
     state.reviewDisplayTarget = null;

@@ -35,7 +35,7 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain("banner.setAttribute('heading', displayFilename)");
     expect(pageJs).toContain("document.title = displayFilename + ' - LANA AI'");
     expect(pageJs).toContain('label: documentDisplayFilename(file)');
-    expect(pageJs).toContain('storageFilename: file && file.filename');
+    expect(pageJs).toContain('storageFilename: sourceFile && sourceFile.filename');
   });
 
   test('keeps file info behind explicit drawer actions', () => {
@@ -107,7 +107,11 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain("case 'viewerReviewModeBadge':");
     expect(pageJs).toContain('function openCurrentFileInFileEditor');
     expect(pageJs).toContain("Lex.Nav.go('file-editor.html'");
-    expect(pageJs).toContain('fileEditor: fileEditorHandoff(file)');
+    expect(pageJs).toContain('fileEditor: handoff');
+    expect(pageJs).toContain('var handoff = fileEditorHandoff(file);');
+    expect(pageJs).toContain('params: { id: handoff.file.documentId');
+    expect(pageJs).toContain('reviewSourceFile');
+    expect(pageJs).toContain("state.reviewSourceFile = await api.get('/api/v1/storage/files/'");
     expect(pageJs).toContain('async function openCurrentFileInFileEditor()');
     expect(pageJs).toContain('if (state.reviewWorkflowPromise)');
     expect(pageJs).toContain('await state.reviewWorkflowPromise;');
@@ -115,7 +119,7 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function fileEditorReviewChanges');
     expect(pageJs).toContain('reviewChanges: fileEditorReviewChanges()');
     expect(pageJs).toContain('versions: fileEditorVersions(file)');
-    expect(pageJs).toContain("editorMode: fileEditorKindForFile(file) === 'doc' ? 'review' : 'edit'");
+    expect(pageJs).toContain("editorMode: fileEditorKindForFile(sourceFile) === 'doc' ? 'review' : 'edit'");
     expect(pageJs).not.toContain('preferDraftShell: true');
     expect(pageJs).toContain("matterId: getCurrentMatterId() || ''");
     expect(pageJs).toContain("matterNumber: getConversationMatterId(file) || state.conversationMatterId || ''");
@@ -575,7 +579,9 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function canonicalReviewSourceDocumentId');
     expect(pageJs).toContain('function isReleasedArtifactFile');
     expect(pageJs).toContain('function releaseForCurrentFile');
-    expect(pageJs).toContain('sourceDocumentId: canonicalReviewSourceDocumentId(file)');
+    expect(pageJs).toContain('var sourceDocumentId = canonicalReviewSourceDocumentId(file);');
+    expect(pageJs).toContain('documentId: sourceDocumentId');
+    expect(pageJs).toContain('sourceDocumentId: sourceDocumentId');
     expect(pageJs).toContain('function fileEditorBaselineRelease(file)');
     expect(pageJs).toContain('var baselineDocumentId = releaseDocumentId(baselineRelease)');
     expect(pageJs).toContain('releasedDocumentId: baselineRelease && baselineDocumentId ? baselineDocumentId :');
