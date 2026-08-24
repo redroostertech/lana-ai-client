@@ -66,6 +66,28 @@ describe('Lex conversations domain API', () => {
     );
   });
 
+  test('retries a failed generation through the no-duplicate retry subresource', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true });
+    const { api, DomainClient } = loadDomain(fetchMock);
+    const client = new DomainClient(api);
+    const signal = { aborted: false };
+
+    await client.retryGeneration('thread/1', 'generation/1', {
+      client_request_id: '44444444-4444-4444-8444-444444444444'
+    }, signal);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://api.test/api/v1/conversations/thread%2F1/generations/generation%2F1/retry',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          client_request_id: '44444444-4444-4444-8444-444444444444'
+        }),
+        signal
+      })
+    );
+  });
+
   test('delegates canonical metadata/history/activity calls to the core API client', async () => {
     const fetchMock = jest.fn();
     const { api, DomainClient } = loadDomain(fetchMock);

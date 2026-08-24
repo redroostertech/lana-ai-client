@@ -162,6 +162,16 @@
       return response;
     }
 
+    async retryGeneration(conversationId, generationId, body, signal) {
+      const baseUrl = await this._resolveBaseUrl();
+      return fetch(`${baseUrl}/api/v1/conversations/${encode(conversationId)}/generations/${encode(generationId)}/retry`, {
+        method: 'POST',
+        headers: this._headers(),
+        body: JSON.stringify(body),
+        signal
+      });
+    }
+
     async getGeneration(conversationId) {
       const api = this._requireApi();
       if (typeof api.getConversationActivity === 'function') {

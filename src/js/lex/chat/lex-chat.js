@@ -220,6 +220,9 @@
       this._contextMeterEl = null;
       this._activeTurnId = null;
       this._loadConversationSeq = 0;
+      this._failedAttempt = null;
+      this._recoveryMessageEl = null;
+      this._recoverySequence = 0;
 
       // Sub-component references
       this._documentsEl = null;
@@ -326,6 +329,10 @@
       // Composer stop
       this.addEventListener('lex-composer-stop', () => {
         this.stop();
+      });
+
+      this.addEventListener('lex-chat-retry', (e) => {
+        this.retryLastFailed(e.detail || {});
       });
 
       // Composer suggestion (fallback if bridge isn't loaded)
@@ -505,6 +512,36 @@
      * Send a message through the chat source.
      */
     async send(content, opts = {}) {
+      return this._sendAttempt(content, opts, { retry: false, optionsBuilt: false });
+    }
+
+    /**
+     * Replay the most recent retryable failed turn. The stored options are the
+     * fully resolved request snapshot (workspace, attachments, chat mode), so
+     * Retry cannot silently change scope when the user changes pages or tools.
+     */
+    async retryLastFailed(detail = {}) {
+      const attempt = this._failedAttempt;
+      if (!attempt) return false;
+      if (detail.recoveryId && detail.recoveryId !== attempt.recoveryId) return false;
+      if (this._activeTurnId) {
+        this.emit('lex-chat-error', {
+          error: 'A response is already in progress.',
+          type: 'concurrent_retry'
+        });
+        return false;
+      }
+
+      this._failedAttempt = null;
+      this._setRecoveryState({ disabled: true, label: 'Retrying…', status: 'retrying' });
+      return this._sendAttempt(
+        attempt.content,
+        this._cloneRetryOptions(attempt.options),
+        { retry: true, optionsBuilt: true }
+      );
+    }
+
+    async _sendAttempt(content, opts = {}, internal = {}) {
       if (!content || !this._source) return;
       if (this._activeTurnId) {
         this._showSystemMessage('A response is already in progress.');
@@ -512,7 +549,12 @@
           error: 'A response is already in progress.',
           type: 'concurrent_send'
         });
-        return;
+        return false;
+      }
+
+      if (!internal.retry && this._failedAttempt) {
+        this._failedAttempt = null;
+        this._setRecoveryState({ disabled: true, label: 'Retry unavailable', status: 'superseded' });
       }
 
       const turnId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -528,11 +570,15 @@
       this._planReadyReceived = false;
       this._recoveryNoticeShownForConversation = null;
 
-      const sendOpts = this._buildSendOptions(opts);
+      const sendOpts = internal.optionsBuilt
+        ? this._cloneRetryOptions(opts)
+        : this._buildInitialSendOptions(opts);
       const messageAttachments = this._messageAttachmentsFromSendOptions(sendOpts);
 
-      // Add user message to thread
-      if (this._threadEl) {
+      // The original user bubble remains in place for a safe pre-admission
+      // retry. Adding it again would create a visible duplicate even when the
+      // backend correctly reuses the original turn.
+      if (this._threadEl && !internal.retry) {
         this._threadEl.addMessage('user', content, {
           attachments: messageAttachments.length ? messageAttachments : undefined
         });
@@ -552,22 +598,30 @@
       }
 
       // Emit send event
-      this.emit('lex-chat-send', { content, conversationId: this.conversationId });
+      this.emit('lex-chat-send', {
+        content,
+        conversationId: this.conversationId,
+        retry: internal.retry === true
+      });
 
       // Fire-and-forget JIT processing for any #filename mentions
       this._processMessageMentions(content);
 
-      // Connect if needed
-      if (!this._source.connected) {
-        await this._source.connect(this.conversationId);
-      }
-
       let responseStarted = false;
       let terminalReceived = false;
-      let streamErrorReceived = false;
+      let failure = null;
+      let requestStarted = false;
+      let generationAdmitted = false;
+      let admittedGenerationId = null;
       this._agenticBlockedReceived = false;
 
       try {
+        // Connection failures are retryable turns too. Keep the connect inside
+        // the same guarded lifecycle so composer/activity state always clears.
+        if (!this._source.connected) {
+          await this._source.connect(this.conversationId);
+        }
+        requestStarted = true;
         // Iterate async generator
         for await (const event of this._source.send(content, sendOpts)) {
           if (this._activeTurnId !== turnId) {
@@ -575,21 +629,75 @@
           }
           this._handleEvent(event, responseStarted);
 
+          if (event.type === 'connected') {
+            // The server emits connected only after admitGenerationWithUserMessage
+            // has committed the user row.
+            generationAdmitted = true;
+            admittedGenerationId = event.generationId || admittedGenerationId;
+          }
           if (event.type === 'content' && !responseStarted) {
             responseStarted = true;
           }
-          if (event.type === 'done' || event.type === 'stopped' || event.type === 'error' || event.type === 'agentic_error') {
+          if (event.type === 'done' || event.type === 'stopped' || event.type === 'error' ||
+              event.type === 'agentic_error' || event.type === 'retry_receipt') {
             terminalReceived = true;
           }
           if (event.type === 'error' || event.type === 'agentic_error') {
-            streamErrorReceived = true;
+            failure = this._failureFromEvent(event);
+            failure.generationAdmitted = generationAdmitted;
+            failure.retryGenerationId = event.generationId || admittedGenerationId || null;
+            failure.safeFreshRetry = generationAdmitted !== true &&
+              failure.code === 'PERSISTENCE_UNAVAILABLE';
+          }
+          if (event.type === 'retry_receipt' && ['failed', 'timed_out', 'disconnected'].includes(event.generationStatus)) {
+            failure = {
+              message: 'The prior retry did not complete.',
+              status: null,
+              details: { retryable: true },
+              code: 'RETRY_TERMINAL_FAILURE',
+              type: 'retry_receipt',
+              generationAdmitted: true,
+              retryGenerationId: event.generationId || null,
+              safeFreshRetry: false
+            };
           }
         }
       } catch (err) {
         console.error('[lex-chat] Send error:', err);
-        streamErrorReceived = true;
         terminalReceived = true;
+        failure = {
+          message: err && err.message ? err.message : 'The request could not be sent.',
+          status: err && err.status ? Number(err.status) : null,
+          details: err && err.details ? err.details : null,
+          type: 'send',
+          generationAdmitted,
+          // A failure while binding/creating the conversation precedes the
+          // streaming admission call. Once send iteration starts, a network
+          // failure is ambiguous and must not be replayed as a fresh turn.
+          safeFreshRetry: requestStarted !== true
+        };
         this.emit('lex-chat-error', { error: err.message, type: 'send', status: err.status || null });
+      }
+
+      // A stream that ends without a terminal event is an interrupted
+      // generation, even if it delivered partial text. Offer the same safe
+      // recovery instead of leaving a forever-streaming message behind.
+      if (!failure && !terminalReceived && !this._planReadyReceived && !this._agenticBlockedReceived) {
+        failure = {
+          message: responseStarted
+            ? 'The response was interrupted before it completed.'
+            : 'No response was received.',
+          status: null,
+          details: { retryable: true },
+          type: responseStarted ? 'interrupted_stream' : 'empty_stream',
+          generationAdmitted,
+          retryGenerationId: admittedGenerationId,
+          safeFreshRetry: false
+        };
+      }
+
+      if (failure && responseStarted && this._threadEl) {
+        this._threadEl.finalizeLastMessage();
       }
 
       // Finalize
@@ -599,18 +707,33 @@
         this._activeTurnId = null;
       }
 
-      // Suppress fallback when the stream intentionally yielded a plan card or
-      // blocked-state event instead of streaming content.
-      if (!responseStarted
-        && !terminalReceived
-        && !streamErrorReceived
-        && !this._planReadyReceived
-        && !this._agenticBlockedReceived
-        && this._threadEl) {
-        this._threadEl.addMessage('assistant', 'No response received.');
+      if (failure) {
+        if (internal.retry) {
+          this._setRecoveryState({ disabled: true, label: 'Retry failed', status: 'failed' });
+        }
+        if (failure.status !== 401) {
+          if (this._isRetryableFailure(failure) &&
+              (failure.safeFreshRetry === true || failure.retryGenerationId)) {
+            this._offerRetry(content, sendOpts, failure);
+          } else {
+            const persistenceNote = failure.generationAdmitted === true
+              ? ' Your message was saved; reload this conversation to check for a completed response.'
+              : '';
+            this._showSystemMessage('Error: ' + failure.message + persistenceNote);
+          }
+        }
+      } else if (internal.retry) {
+        this._setRecoveryState({ disabled: true, label: 'Retried', status: 'completed' });
+        this._recoveryMessageEl = null;
       }
 
       if (this._composerEl) this._composerEl.focus();
+      return !failure;
+    }
+
+    _buildInitialSendOptions(opts = {}) {
+      const sendOpts = this._buildSendOptions(opts);
+      return sendOpts;
     }
 
     _buildSendOptions(opts = {}) {
@@ -636,6 +759,102 @@
       if (this.contextType && !sendOpts.contextType) sendOpts.contextType = this.contextType;
       if (this.matterId) sendOpts.matterId = this.matterId;
       return sendOpts;
+    }
+
+    _failureFromEvent(event) {
+      const value = event || {};
+      const raw = value.error && typeof value.error === 'object'
+        ? (value.error.message || value.error.code)
+        : value.error;
+      return {
+        message: String(raw || value.message || 'The generation failed.'),
+        status: value.status == null ? null : Number(value.status),
+        details: value.details || null,
+        code: value.code || null,
+        type: value.type || 'stream'
+      };
+    }
+
+    _isRetryableFailure(failure) {
+      const details = failure && failure.details;
+      if (details && details.retryable === true) return true;
+      if (details && details.retryable === false) return false;
+      const status = failure && failure.status;
+      if (status == null || !Number.isFinite(Number(status))) return true;
+      const numeric = Number(status);
+      return numeric === 408 || numeric === 409 || numeric === 425 ||
+        numeric === 429 || numeric >= 500;
+    }
+
+    _cloneRetryOptions(options) {
+      let cloned;
+      if (global.structuredClone && typeof global.structuredClone === 'function') {
+        try { cloned = global.structuredClone(options || {}); } catch (_) { cloned = null; }
+      }
+      if (!cloned) {
+        const cloneValue = function (value) {
+          if (Array.isArray(value)) return value.map(cloneValue);
+          if (!value || typeof value !== 'object') return value;
+          const prototype = Object.getPrototypeOf(value);
+          if (prototype && prototype !== Object.prototype) return value;
+          const copy = {};
+          Object.keys(value).forEach(function (key) { copy[key] = cloneValue(value[key]); });
+          return copy;
+        };
+        cloned = cloneValue(options || {});
+      }
+      // Preserve an explicit client_request_id. If admission state is ever
+      // misclassified, backend idempotency must win over creating a duplicate
+      // durable user message.
+      return cloned;
+    }
+
+    _offerRetry(content, options, failure) {
+      const recoveryId = `chat-retry-${Date.now()}-${++this._recoverySequence}`;
+      const retryOptions = this._cloneRetryOptions(options);
+      if (failure && failure.retryGenerationId) {
+        retryOptions.retryGenerationId = failure.retryGenerationId;
+        // A retry generation is a distinct admission and requires its own
+        // idempotency key; the server reuses the original user_message_id.
+        delete retryOptions.clientRequestId;
+      }
+      this._failedAttempt = {
+        recoveryId,
+        content,
+        options: retryOptions
+      };
+      const message = 'Error: ' + String(failure && failure.message || 'The request failed.') +
+        ' You can retry the same request.';
+      if (this._threadEl) {
+        this._recoveryMessageEl = this._threadEl.addSystemMessage(message, {
+          recovery: {
+            recoveryId,
+            label: 'Retry',
+            disabled: false,
+            status: 'available'
+          }
+        });
+      }
+      this.emit('lex-chat-retry-available', {
+        recoveryId,
+        error: failure && failure.message || 'The request failed.'
+      });
+    }
+
+    _setRecoveryState(next) {
+      const message = this._recoveryMessageEl;
+      if (!message) return;
+      if (typeof message.setRecoveryState === 'function') {
+        message.setRecoveryState(next);
+        return;
+      }
+      const button = typeof message.querySelector === 'function'
+        ? message.querySelector('[data-chat-retry]')
+        : null;
+      if (!button) return;
+      button.textContent = next && next.label ? next.label : button.textContent;
+      if (next && next.disabled) button.setAttribute('disabled', '');
+      else button.removeAttribute('disabled');
     }
 
     _messageAttachmentsFromSendOptions(sendOpts = {}) {
@@ -779,8 +998,8 @@
         // Load history
         const result = await this._source.loadHistory(1, this.maxHistory);
         if (!isCurrentLoad() || this._activeTurnId) return;
+        let lastPersistedMessage = null;
         if (result && result.messages) {
-          let lastPersistedMessage = null;
           if (this._threadEl) {
             this._threadEl.clear();
             for (const m of result.messages) {
@@ -898,6 +1117,8 @@
       this._citations = [];
       this._references = [];
       this._artifacts = [];
+      this._failedAttempt = null;
+      this._recoveryMessageEl = null;
       this._resetContextMeter();
       if (this._threadEl) {
         this._threadEl.clear();
@@ -1346,14 +1567,27 @@
           if (this._activityEl) this._activityEl.hide();
           if (event.status === 401) {
             this._showSystemMessage('Session expired. Please log in again.');
-          } else {
-            this._showSystemMessage('Error: ' + (event.error || 'Unknown error'));
           }
+          // Non-auth failures are rendered once by _sendAttempt after it has
+          // classified the failure and decided whether to expose Retry.
           this.emit('lex-chat-error', {
             error: event.error,
             type: 'stream',
             status: event.status || null
           });
+          break;
+
+        case 'retry_receipt':
+          this.emit('lex-chat-retry-receipt', {
+            generationId: event.generationId || null,
+            userMessageId: event.userMessageId || null,
+            messageId: event.messageId || null,
+            status: event.generationStatus || null,
+            contentPersisted: event.contentPersisted === true
+          });
+          if (event.contentPersisted === true && this.conversationId) {
+            this.loadConversation(this.conversationId);
+          }
           break;
 
         case 'protocol_warning':
@@ -1523,7 +1757,21 @@
         return;
       }
 
-      this._showSystemMessage('The last user message does not have a saved assistant response yet. The previous generation may have been interrupted by a refresh. Resend the message to retry.');
+      const retryGenerationId = lastMessage.metadata &&
+        (lastMessage.metadata.generation_id || lastMessage.metadata.session_id);
+      if (!retryGenerationId) {
+        this._showSystemMessage('The last user message does not have a saved assistant response yet. Reload this conversation to check its status.');
+        return;
+      }
+      this._offerRetry(lastMessage.content, {}, {
+        message: 'The previous generation may have been interrupted by a refresh.',
+        status: null,
+        details: { retryable: true },
+        type: 'pending_generation',
+        generationAdmitted: true,
+        retryGenerationId,
+        safeFreshRetry: false
+      });
     }
 
     // ---------------------------------------------------------------------------

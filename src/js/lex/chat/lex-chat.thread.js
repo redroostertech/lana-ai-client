@@ -193,6 +193,7 @@
       if (meta.references) msg.references = meta.references;
       if (meta.artifacts) msg.artifacts = meta.artifacts;
       if (meta.attachments) msg.attachments = meta.attachments;
+      if (meta.recovery) msg.recovery = meta.recovery;
       if (meta.duration != null) msg.duration = meta.duration;
       if (meta.tokenCount != null) msg.tokenCount = meta.tokenCount;
 
@@ -214,8 +215,8 @@
     /**
      * Add a system message (centered, temporary-looking).
      */
-    addSystemMessage(content) {
-      return this.addMessage('system', content);
+    addSystemMessage(content, meta = {}) {
+      return this.addMessage('system', content, meta);
     }
 
     /**

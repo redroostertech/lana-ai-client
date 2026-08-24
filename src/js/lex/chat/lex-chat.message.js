@@ -347,6 +347,18 @@
         color: var(--lex-chat-text-muted);
         border: 1px solid var(--lex-chat-border-soft);
       }
+      .lex-chat-msg-system-copy {
+        display: block;
+      }
+      .lex-chat-msg-recovery-actions {
+        display: flex;
+        justify-content: center;
+        margin-top: 7px;
+      }
+      .lex-chat-msg-retry[disabled] {
+        cursor: default;
+        opacity: 0.65;
+      }
 
       /* Grounding refusal — subtle amber left border */
       .lex-chat-grounding-refusal {
@@ -398,7 +410,8 @@
         references: { type: Array, default: [] },
         artifacts:  { type: Array, default: [] },
         attachments: { type: Array, default: [] },
-        grounding:   { type: Object, default: null }
+        grounding:   { type: Object, default: null },
+        recovery:    { type: Object, default: null }
       };
     }
 
@@ -460,9 +473,18 @@
       const tsHtml = this._renderTimestamp();
 
       if (role === 'system') {
+        const recovery = this.recovery && this.recovery.recoveryId ? this.recovery : null;
+        const recoveryAction = recovery
+          ? `<div class="lex-chat-msg-recovery-actions">
+              <lex-btn class="lex-chat-msg-retry" data-chat-retry data-recovery-id="${ChatFormat ? ChatFormat.escapeHtml(recovery.recoveryId) : recovery.recoveryId}" variant="secondary" size="sm"${recovery.disabled ? ' disabled' : ''}>${ChatFormat ? ChatFormat.escapeHtml(recovery.label || 'Retry') : (recovery.label || 'Retry')}</lex-btn>
+            </div>`
+          : '';
         return `
           <div class="lex-chat-msg-system">
-            <div class="lex-chat-msg-system-bubble">${ChatFormat ? ChatFormat.escapeHtml(this.content) : this.content}</div>
+            <div class="lex-chat-msg-system-bubble">
+              <span class="lex-chat-msg-system-copy">${ChatFormat ? ChatFormat.escapeHtml(this.content) : this.content}</span>
+              ${recoveryAction}
+            </div>
           </div>`;
       }
 
@@ -500,6 +522,14 @@
 
     updated() {
       this._contentEl = this.querySelector('[data-content-body]');
+
+      this.delegate('click', '[data-chat-retry]', (e, target) => {
+        e.preventDefault();
+        if (target.hasAttribute('disabled')) return;
+        this.emit('lex-chat-retry', {
+          recoveryId: target.dataset.recoveryId || ''
+        });
+      });
 
       // Bind citation clicks via delegation
       this.delegate('click', '.lex-chat-citation-link', (e, target) => {
@@ -647,6 +677,11 @@
       if (!this.streaming && ChatFormat && typeof ChatFormat.renderMermaidDiagrams === 'function') {
         ChatFormat.renderMermaidDiagrams(this);
       }
+    }
+
+    setRecoveryState(next) {
+      if (!this.recovery) return;
+      this.recovery = Object.assign({}, this.recovery, next || {});
     }
 
     _renderAttachment(attachment) {

@@ -164,6 +164,79 @@ describe('SSEChatSource contract', () => {
     expect(api.stopConversationGeneration).not.toHaveBeenCalled();
   });
 
+  test('retries a failed generation without posting the user message again', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(responseFromChunks([
+      'event: connected\ndata: {"thread_id":"thread-1","generation_id":"generation-retry","user_message_id":"user-message-1","retry_of_generation_id":"generation-failed"}\n\n',
+      'event: done\ndata: {"thread_id":"thread-1","generation_id":"generation-retry","user_message_id":"user-message-1","message_id":"assistant-retry"}\n\n'
+    ]));
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
+    await source.connect('thread-1');
+
+    const events = [];
+    for await (const event of source.send('original prompt', {
+      retryGenerationId: 'generation-failed'
+    })) events.push(event);
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'http://api.test/api/v1/conversations/thread-1/generations/generation-failed/retry'
+    );
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      client_request_id: '11111111-1111-4111-8111-111111111111'
+    });
+    expect(fetchMock.mock.calls[0][1].body).not.toContain('original prompt');
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'connected',
+        generationId: 'generation-retry',
+        userMessageId: 'user-message-1',
+        retryOfGenerationId: 'generation-failed'
+      }),
+      expect.objectContaining({
+        type: 'done',
+        messageId: 'assistant-retry',
+        userMessageId: 'user-message-1'
+      })
+    ]);
+  });
+
+  test('normalizes an idempotent retry receipt without opening another stream', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: jest.fn(() => 'application/json; charset=utf-8') },
+      json: jest.fn().mockResolvedValue({
+        status: 'IDEMPOTENT_GENERATION',
+        generation_id: 'generation-existing',
+        generation_status: 'completed',
+        user_message_id: 'user-message-1',
+        message_id: 'assistant-1',
+        content_persisted: true
+      })
+    });
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
+    await source.connect('thread-1');
+
+    const events = [];
+    for await (const event of source.send('original prompt', {
+      retryGenerationId: 'generation-failed',
+      clientRequestId: '11111111-1111-4111-8111-111111111111'
+    })) events.push(event);
+
+    expect(events).toEqual([expect.objectContaining({
+      type: 'retry_receipt',
+      terminal: true,
+      generationId: 'generation-existing',
+      userMessageId: 'user-message-1',
+      messageId: 'assistant-1',
+      generationStatus: 'completed',
+      contentPersisted: true
+    })]);
+  });
+
   test('resetConversation makes the next send allocate a fresh canonical conversation', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(responseFromChunks([
       'event: done\ndata: {"thread_id":"thread-new","generation_id":"generation-new","message_id":"assistant-new"}\n\n'

@@ -251,22 +251,32 @@
           global.api.setStreamingActive();
         }
 
-        const body = {
-          message: content,
-          client_request_id: clientRequestId,
-          client_time: LanaTime.nowIso(),
-          client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-        };
-        body.conversation_id = conversationId;
-        if (options.matterId) body.matter_id = options.matterId;
-        if (options.attachments) body.attachments = options.attachments;
-        if (options.contextType) body.context_type = options.contextType;
-
-        const response = await this._conversationsApi.streamMessage(
-          conversationId,
-          body,
-          this._abortController.signal
-        );
+        const retryGenerationId = options.retryGenerationId || null;
+        let response;
+        if (retryGenerationId) {
+          response = await this._conversationsApi.retryGeneration(
+            conversationId,
+            retryGenerationId,
+            { client_request_id: clientRequestId },
+            this._abortController.signal
+          );
+        } else {
+          const body = {
+            message: content,
+            client_request_id: clientRequestId,
+            client_time: LanaTime.nowIso(),
+            client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          };
+          body.conversation_id = conversationId;
+          if (options.matterId) body.matter_id = options.matterId;
+          if (options.attachments) body.attachments = options.attachments;
+          if (options.contextType) body.context_type = options.contextType;
+          response = await this._conversationsApi.streamMessage(
+            conversationId,
+            body,
+            this._abortController.signal
+          );
+        }
 
         if (!response.ok) {
           const payload = await this._conversationsApi.readJsonSafe(response);
@@ -285,6 +295,25 @@
             terminal: true
           };
           return;
+        }
+
+        const contentType = response.headers && response.headers.get
+          ? String(response.headers.get('content-type') || '')
+          : '';
+        if (contentType.includes('application/json')) {
+          const payload = await this._conversationsApi.readJsonSafe(response);
+          if (payload && payload.status === 'IDEMPOTENT_GENERATION') {
+            yield {
+              type: 'retry_receipt',
+              terminal: true,
+              generationId: payload.generation_id || null,
+              userMessageId: payload.user_message_id || null,
+              messageId: payload.message_id || null,
+              generationStatus: payload.generation_status || null,
+              contentPersisted: payload.content_persisted === true
+            };
+            return;
+          }
         }
 
         const reader = response.body.getReader();
@@ -437,6 +466,8 @@
             type: 'connected',
             threadId: data.thread_id || null,
             generationId: data.generation_id || data.session_id || null,
+            userMessageId: data.user_message_id || null,
+            retryOfGenerationId: data.retry_of_generation_id || null,
             model: data.model || null,
             matterId: data.matter_id || null
           };
