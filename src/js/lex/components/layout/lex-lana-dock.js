@@ -965,6 +965,30 @@
           opts.matterId = ctx.matterId;
         }
 
+        if (ctx.moduleContext) {
+          if (Array.isArray(opts.attachments)) {
+            var hasArrayModuleContext = opts.attachments.some(function (attachment) {
+              return attachment && (
+                attachment.type === 'module_context' ||
+                attachment.context_type ||
+                attachment.module_context ||
+                attachment.moduleContext
+              );
+            });
+            if (!hasArrayModuleContext) {
+              opts.attachments.push({
+                type: 'module_context',
+                module_context: ctx.moduleContext
+              });
+            }
+          } else {
+            opts.attachments = opts.attachments || {};
+            if (!opts.attachments.module_context && !opts.attachments.moduleContext) {
+              opts.attachments.module_context = ctx.moduleContext;
+            }
+          }
+        }
+
         if (!ctx.documentId) return;
 
         opts.attachments = opts.attachments || {};
@@ -1081,9 +1105,9 @@
 
     /**
      * Where the user is standing. Feeds the RECENTS "This workspace" group,
-     * the suggestion bubble, and fresh dock sends that have not selected an
-     * explicit conversation scope yet.
-     * @param {Object} ctx - { matterId, matterName, documentId, documentName }
+     * the suggestion bubble, page module-context attachments, and fresh dock
+     * sends that have not selected an explicit conversation scope yet.
+     * @param {Object} ctx - { matterId, matterName, documentId, documentName, moduleContext }
      */
     setPageContext(ctx) {
       this._pageContext = ctx || null;

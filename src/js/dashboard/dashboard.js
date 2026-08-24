@@ -38,6 +38,13 @@
   /** Cache of action queue items keyed by item ID for detail modal lookup */
   var _actionItemsMap = {};
 
+  /** Compact snapshot of the visible dashboard, attached to Ask LANA sends. */
+  var _dashboardLanaContext = {
+    metrics: {},
+    actionQueue: null,
+    tasks: null
+  };
+
   // =========================================================================
   // Lifecycle tracking (Finding 7)
   // =========================================================================
@@ -96,6 +103,99 @@
   function hide(target) {
     var elem = typeof target === 'string' ? el(target) : target;
     if (elem) elem.classList.add('hidden');
+  }
+
+  function dashboardContextValue(value) {
+    if (value === null || value === undefined) return null;
+    var text = String(value).trim();
+    if (!text || text === '-') return null;
+    return text;
+  }
+
+  function dashboardContextMetric(label, value) {
+    var cleanValue = dashboardContextValue(value);
+    return cleanValue ? { label: label, value: cleanValue } : null;
+  }
+
+  function taskDisplayTitle(task) {
+    if (!task) return '';
+    return task.title || task.name || task.summary || task.description || 'Untitled task';
+  }
+
+  function actionDisplayTitle(item) {
+    if (!item) return '';
+    return item.title || item.name || item.description || item.message || 'Untitled action';
+  }
+
+  function compactDashboardRows(rows, titleFn, limit) {
+    var result = [];
+    var source = Array.isArray(rows) ? rows : [];
+    var max = Math.max(0, limit || 0);
+    for (var i = 0; i < source.length && result.length < max; i++) {
+      var item = source[i];
+      var title = dashboardContextValue(titleFn(item));
+      if (title) result.push(title);
+    }
+    return result;
+  }
+
+  function dashboardContextSummary(context) {
+    var metrics = context.metrics || {};
+    var parts = [];
+    if (metrics.activeMatters) parts.push('Active matters: ' + metrics.activeMatters.value);
+    if (metrics.teamMembers) parts.push('Team members: ' + metrics.teamMembers.value);
+    if (metrics.totalDocuments) parts.push('Total documents: ' + metrics.totalDocuments.value);
+    if (metrics.storageUsed) parts.push('Storage used: ' + metrics.storageUsed.value);
+    if (context.tasks && context.tasks.totalOpen !== null && context.tasks.totalOpen !== undefined) {
+      parts.push('Open assigned tasks: ' + context.tasks.totalOpen);
+    }
+    if (context.actionQueue && context.actionQueue.totalVisible !== null && context.actionQueue.totalVisible !== undefined) {
+      parts.push('Visible action queue items: ' + context.actionQueue.totalVisible);
+    }
+    return parts.join('\n');
+  }
+
+  function publishDashboardLanaContext(patch) {
+    if (patch && patch.metrics) {
+      _dashboardLanaContext.metrics = Object.assign({}, _dashboardLanaContext.metrics, patch.metrics);
+    }
+    if (patch && patch.actionQueue !== undefined) _dashboardLanaContext.actionQueue = patch.actionQueue;
+    if (patch && patch.tasks !== undefined) _dashboardLanaContext.tasks = patch.tasks;
+
+    var summary = dashboardContextSummary(_dashboardLanaContext);
+    if (!summary) return;
+
+    var dock = document.querySelector('lex-lana-dock');
+    if (!dock || typeof dock.setPageContext !== 'function') return;
+    dock.setPageContext({
+      moduleContext: {
+        type: 'ui_card',
+        source: 'dashboard',
+        ui_label: 'Dashboard window',
+        card_title: 'Dashboard',
+        summary: summary,
+        page: { scope: 'dashboard' },
+        details: {
+          metrics: _dashboardLanaContext.metrics,
+          action_queue: _dashboardLanaContext.actionQueue,
+          tasks: _dashboardLanaContext.tasks
+        }
+      }
+    });
+  }
+
+  function clearDashboardLanaContext() {
+    var dock = document.querySelector('lex-lana-dock');
+    if (dock && typeof dock.setPageContext === 'function') dock.setPageContext(null);
+  }
+
+  function resetDashboardLanaContext() {
+    _dashboardLanaContext = {
+      metrics: {},
+      actionQueue: null,
+      tasks: null
+    };
+    clearDashboardLanaContext();
   }
 
   /**
@@ -719,6 +819,12 @@
       contentEl.innerHTML =
         '<lex-empty icon="inbox" message="No actions pending" description="Your action queue is empty"></lex-empty>';
       show(contentEl);
+      publishDashboardLanaContext({
+        actionQueue: {
+          totalVisible: 0,
+          items: []
+        }
+      });
       return;
     }
 
@@ -812,6 +918,12 @@
     }
     contentEl.innerHTML = html;
     show(contentEl);
+    publishDashboardLanaContext({
+      actionQueue: {
+        totalVisible: items.length,
+        items: compactDashboardRows(items, actionDisplayTitle, 5)
+      }
+    });
   }
 
   // =========================================================================
@@ -1077,6 +1189,16 @@
       contentEl.innerHTML =
         '<lex-empty icon="tasks" message="No outstanding tasks" description="Assigned tasks will appear here."></lex-empty>';
       show(contentEl);
+      publishDashboardLanaContext({
+        tasks: {
+          totalOpen: 0,
+          dueToday: 0,
+          severelyDelinquent: 0,
+          today: [],
+          outstanding: [],
+          delinquent: []
+        }
+      });
       return;
     }
 
@@ -1123,6 +1245,17 @@
 
     var todayRows = todayTasks.map(renderDashboardTaskRow).join('');
     var severeRows = severelyDelinquentTasks.map(renderDashboardTaskRow).join('');
+
+    publishDashboardLanaContext({
+      tasks: {
+        totalOpen: tasks.length,
+        dueToday: todayTasks.length,
+        severelyDelinquent: severelyDelinquentTasks.length,
+        today: compactDashboardRows(todayTasks, taskDisplayTitle, 4),
+        outstanding: compactDashboardRows(outstandingTasks, taskDisplayTitle, 5),
+        delinquent: compactDashboardRows(severelyDelinquentTasks, taskDisplayTitle, 5)
+      }
+    });
 
     contentEl.innerHTML = [
       '<div class="cc-task-section">',
@@ -1815,6 +1948,15 @@
       metrics[m].value  = data[m].value;
       metrics[m].status = data[m].status;
     }
+
+    publishDashboardLanaContext({
+      metrics: {
+        activeMatters: dashboardContextMetric('Active Matters', mattersCount),
+        teamMembers: dashboardContextMetric('Team Members', usersCount),
+        totalDocuments: dashboardContextMetric('Total Documents', docsCount),
+        storageUsed: dashboardContextMetric('Storage Used', storageStr)
+      }
+    });
 
     // LANA One only: hide the meaningless "Team Members" tile + reflow to 2 cols.
     // Runs after population so the hide is never overwritten; no-op in org build.
@@ -2974,6 +3116,7 @@
    * using Promise.allSettled for graceful degradation.
    */
   async function initDashboard() {
+    resetDashboardLanaContext();
 
     // Topbar refresh button — full dashboard reload
     trackDocListener('lex-refresh', function (e) {
@@ -3430,6 +3573,8 @@
    * Clears timeouts, intervals, document listeners, and window globals.
    */
   function onLeave() {
+    clearDashboardLanaContext();
+
     // Stop heartbeat polling
     if (typeof LanaHeartbeat !== 'undefined') LanaHeartbeat.stop();
 

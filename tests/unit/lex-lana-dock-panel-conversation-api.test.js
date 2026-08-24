@@ -468,6 +468,85 @@ describe('LANA dock/panel conversation API routing', () => {
     expect(event.detail.opts).toEqual({ contextType: 'full_chat' });
   });
 
+  test('dock page context attaches module context to existing conversation sends (SCRUM-281)', () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    let beforeSend;
+    const panel = {
+      addEventListener: jest.fn((name, handler) => {
+        if (name === 'lex-lana-before-send') beforeSend = handler;
+      })
+    };
+    const moduleContext = {
+      type: 'ui_card',
+      source: 'dashboard',
+      ui_label: 'Dashboard window',
+      summary: 'Team members: 7'
+    };
+    dock._pageContext = {
+      moduleContext,
+      matterId: 'matter-1',
+      matterName: 'Matter One'
+    };
+    dock._panelEl = { _chatEl: { conversationId: 'conversation-9' } };
+
+    dock._bindPageContextSend(panel);
+    const event = { detail: { content: 'How many team members do we have?', opts: { contextType: 'full_chat' } } };
+    beforeSend(event);
+
+    expect(event.detail.opts).toEqual({
+      contextType: 'full_chat',
+      attachments: {
+        module_context: moduleContext
+      }
+    });
+  });
+
+  test('dock page context keeps explicit composer module context over page context', () => {
+    const { Component } = loadComponent(
+      'src/js/lex/components/layout/lex-lana-dock.js',
+      {},
+      'lex-lana-dock'
+    );
+    const dock = new Component();
+    let beforeSend;
+    const panel = {
+      addEventListener: jest.fn((name, handler) => {
+        if (name === 'lex-lana-before-send') beforeSend = handler;
+      })
+    };
+    const explicitContext = {
+      type: 'ui_card',
+      source: 'reporting',
+      summary: 'Selected reporting card'
+    };
+    dock._pageContext = {
+      moduleContext: {
+        type: 'ui_card',
+        source: 'dashboard',
+        summary: 'Team members: 7'
+      }
+    };
+
+    dock._bindPageContextSend(panel);
+    const event = {
+      detail: {
+        content: 'Explain this',
+        opts: {
+          contextType: 'full_chat',
+          attachments: { module_context: explicitContext }
+        }
+      }
+    };
+    beforeSend(event);
+
+    expect(event.detail.opts.attachments.module_context).toBe(explicitContext);
+  });
+
   test('dock adopts page matter scope when a conversation is created on a workspace page (SCRUM-261)', () => {
     const { Component } = loadComponent(
       'src/js/lex/components/layout/lex-lana-dock.js',
