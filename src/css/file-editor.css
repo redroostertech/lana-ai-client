@@ -791,7 +791,32 @@
 }
 
 .office-editor-review-action {
+  align-items: center;
+  display: inline-flex;
   flex: 0 0 auto;
+  gap: 8px;
+}
+
+.office-editor-review-action .office-review-refresh-btn {
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md);
+  color: var(--lex-text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--lex-label-sm-size);
+  font-weight: 700;
+  min-height: 30px;
+  padding: 0 12px;
+}
+
+.office-editor-review-action .office-review-refresh-btn:hover:not(:disabled) {
+  background: var(--lex-bg-secondary);
+}
+
+.office-editor-review-action .office-review-refresh-btn:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .office-editor-review-action .office-review-release-btn {
@@ -2338,6 +2363,14 @@
   border-bottom: 2px solid var(--lex-color-warning-500);
   border-radius: var(--lex-radius-sm);
   padding: 0 2px;
+}
+
+.office-lana-editor-host .office-review-comment-focus {
+  background: color-mix(in srgb, var(--lex-status-warning-bg) 78%, transparent);
+  box-shadow: inset 3px 0 0 var(--lex-color-warning-500);
+  outline: 2px solid color-mix(in srgb, var(--lex-color-warning-500) 52%, transparent);
+  outline-offset: 3px;
+  scroll-margin-block: 8rem;
 }
 
 .office-template-variable {

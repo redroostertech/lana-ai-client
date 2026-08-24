@@ -201,6 +201,8 @@ describe('File Editor live document boundary', () => {
     expect((html.match(/<footer\b/g) || []).length).toBe(1);
     expect(html.indexOf('id="officeEditorStatusBar"')).toBeGreaterThan(html.indexOf('id="officeReviewRailHost"'));
     expect(html).toContain('id="officeReviewFooterAction"');
+    expect(html).toContain('id="officeReviewRefreshButton"');
+    expect(html).toContain('data-action="refresh-review-workflow"');
     expect(html).toContain('id="officeReviewReleaseButton"');
     expect(editor).not.toContain('class="office-doc-inspector"');
     expect(editor).not.toContain('class="office-review-rail-footer"');
@@ -213,6 +215,8 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain("content: renderDocFileInfoRail(file, { drawer: true })");
     expect(editor).toContain("drawer.dataset.fileEditorInfo = 'true'");
     expect(editor).toContain('Release pending approval</strong>');
+    expect(editor).toContain("refreshButton.hidden = !hasPendingApproval");
+    expect(editor).toContain("toast(refreshed && refreshed.pendingReleaseBatch ? 'Approval is still pending.' : 'Review status refreshed.')");
     expect(css).toContain('.file-editor-shell #officeEditorPanel');
     expect(css).toContain('.file-editor-shell .office-lana-editor-host');
     expect(css).toContain('box-shadow: none;');
@@ -378,9 +382,12 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('function normalizeServerReviewReply(reply, threadId)');
     expect(editor).toContain('function promptReplyServerReviewComment(file, commentId)');
     expect(editor).toContain('function setServerReviewCommentResolved(file, commentId, resolved)');
-    expect(editor).toContain('function selectedServerReviewText()');
+    expect(editor).toContain('function selectedServerReviewAnchor()');
     expect(editor).toContain("scope: anchorText ? 'selection' : 'document'");
     expect(editor).toContain('anchor_text: anchorText');
+    expect(editor).toContain("anchor_id: anchorText ? 'anchor-' + id : ''");
+    expect(editor).toContain('anchor_start: anchor && anchor.anchor_start');
+    expect(editor).toContain('function locateOfficeReviewComment(file, commentId)');
     expect(editor).toContain("var packetActions = packet");
     expect(editor).toContain('data-action="new-signature-packet">Prepare another packet');
     expect(editor).toContain("var permissions = collaborator.permission");
@@ -395,6 +402,7 @@ describe('File Editor live document boundary', () => {
     expect(railSource).toContain('data-comment-thread-id=');
     expect(railSource).toContain('office-review-comment-meta');
     expect(railSource).toContain('office-review-comment-scope');
+    expect(railSource).toContain('data-action="locate-review-comment"');
     expect(railSource).toContain('data-action="reply-review-comment"');
     expect(railSource).toContain("status === 'Resolved' ? 'reopen-review-comment' : 'resolve-review-comment'");
     expect(actionSource).toContain("action === 'reply-review-comment'");

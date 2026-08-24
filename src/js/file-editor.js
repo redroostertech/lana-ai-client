@@ -167,6 +167,10 @@
     return window.LanaFileEditorWriterTools || null;
   }
 
+  function collaborationTools() {
+    return window.LanaFileEditorCollaborationTools || null;
+  }
+
   function sheetEngine() {
     return window.LanaFileEditorSheetEngine || null;
   }
@@ -695,6 +699,16 @@
     var createdAt = commentTimestamp(comment) || nowIso();
     var status = String(comment.status || (comment.resolved_at || comment.resolvedAt ? 'resolved' : 'open')).toLowerCase();
     if (status !== 'resolved') status = 'open';
+    var rawAnchorStart = comment.anchor_start !== undefined ? comment.anchor_start : comment.anchorStart;
+    var rawAnchorEnd = comment.anchor_end !== undefined ? comment.anchor_end : comment.anchorEnd;
+    var anchorStart = rawAnchorStart === null || rawAnchorStart === undefined || rawAnchorStart === ''
+      ? null
+      : Number(rawAnchorStart);
+    var anchorEnd = rawAnchorEnd === null || rawAnchorEnd === undefined || rawAnchorEnd === ''
+      ? null
+      : Number(rawAnchorEnd);
+    if (!Number.isInteger(anchorStart) || anchorStart < 0) anchorStart = null;
+    if (anchorStart === null || !Number.isInteger(anchorEnd) || anchorEnd <= anchorStart) anchorEnd = null;
     return {
       id: id,
       thread_id: String(comment.thread_id || comment.threadId || id),
@@ -707,6 +721,11 @@
       text: String(comment.text || '').trim(),
       scope: String(comment.scope || (comment.anchor_text || comment.anchorText ? 'selection' : 'document')),
       anchor_text: String(comment.anchor_text || comment.anchorText || ''),
+      anchor_id: String(comment.anchor_id || comment.anchorId || ''),
+      anchor_start: anchorStart,
+      anchor_end: anchorEnd,
+      anchor_prefix: String(comment.anchor_prefix || comment.anchorPrefix || ''),
+      anchor_suffix: String(comment.anchor_suffix || comment.anchorSuffix || ''),
       status: status,
       resolved_at: comment.resolved_at || comment.resolvedAt || null,
       resolved_by: comment.resolved_by || comment.resolvedBy || null,
@@ -3767,6 +3786,13 @@
     var pendingApprovalAction = pendingReleaseButtonAction(serverState);
     var pendingApprovalLabel = pendingReleaseButtonLabel(serverState);
     var isRequestingRelease = Boolean(serverState && serverState.releasing);
+    var refreshButton = el('officeReviewRefreshButton');
+    if (refreshButton) {
+      refreshButton.hidden = !hasPendingApproval;
+      refreshButton.disabled = false;
+      refreshButton.setAttribute('aria-disabled', 'false');
+      refreshButton.title = hasPendingApproval ? 'Refresh the current release approval status' : '';
+    }
     var releaseButton = el('officeReviewReleaseButton');
     if (releaseButton) {
       var releaseButtonEnabled = !isRequestingRelease && (hasPendingApproval || canReleaseVersion);
@@ -3872,8 +3898,12 @@
             '<div class="office-review-comment-meta"><strong>' + esc(reply.author || 'Reviewer') + '</strong><span>' + esc(formatTimestamp(commentTimestamp(reply))) + '</span></div>' +
             '<div class="office-review-comment-text">' + esc(reply.text || '') + '</div></div>';
         }).join('');
+        var locateAction = comment.scope === 'selection' && comment.anchor_text
+          ? '<button type="button" data-action="locate-review-comment" data-comment-id="' + esc(comment.id || '') + '">Locate</button>'
+          : '';
         var serverActions = serverFile
-          ? '<div class="office-review-comment-actions"><button type="button" data-action="reply-review-comment" data-comment-id="' + esc(comment.id || '') + '">Reply</button>' +
+          ? '<div class="office-review-comment-actions">' + locateAction +
+            '<button type="button" data-action="reply-review-comment" data-comment-id="' + esc(comment.id || '') + '">Reply</button>' +
             '<button type="button" data-action="' + (status === 'Resolved' ? 'reopen-review-comment' : 'resolve-review-comment') + '" data-comment-id="' + esc(comment.id || '') + '">' + (status === 'Resolved' ? 'Reopen' : 'Resolve') + '</button></div>'
           : '';
         return '<article class="office-review-history-row office-review-comment-thread" data-comment-thread-id="' + esc(comment.id || '') + '" data-comment-status="' + esc(status.toLowerCase()) + '">' +
@@ -5993,14 +6023,29 @@
     });
   }
 
-  function selectedServerReviewText() {
+  function selectedServerReviewAnchor() {
     var root = document.querySelector('#officeLanaEditorHost .lana-editor-viewer');
     var selection = window.getSelection ? window.getSelection() : null;
-    if (!root || !selection || selection.rangeCount === 0 || selection.isCollapsed) return '';
+    if (!root || !selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
     var anchor = selection.anchorNode;
     var focus = selection.focusNode;
-    if (!anchor || !focus || !root.contains(anchor) || !root.contains(focus)) return '';
-    return String(selection.toString() || '').trim().slice(0, 500);
+    if (!anchor || !focus || !root.contains(anchor) || !root.contains(focus)) return null;
+    var rawSelectionText = String(selection.toString() || '');
+    var selectedText = rawSelectionText.trim().slice(0, 500);
+    if (!selectedText) return null;
+    var result = { text: selectedText };
+    var tools = collaborationTools();
+    if (!tools || typeof tools.buildCommentAnchor !== 'function') return result;
+    try {
+      var range = selection.getRangeAt(0);
+      var prefixRange = document.createRange();
+      prefixRange.selectNodeContents(root);
+      prefixRange.setEnd(range.startContainer, range.startOffset);
+      var start = prefixRange.toString().length + Math.max(0, rawSelectionText.indexOf(selectedText));
+      var persisted = tools.buildCommentAnchor(root.textContent || '', start, start + selectedText.length, selectedText);
+      if (persisted) Object.assign(result, persisted);
+    } catch (_) {}
+    return result;
   }
 
   function promptAddServerReviewComment(file) {
@@ -6008,7 +6053,8 @@
     if (!review) return;
     // Capture the anchor before opening the modal because moving focus to the
     // textarea collapses the browser selection inside the embedded editor.
-    var anchorText = selectedServerReviewText();
+    var anchor = selectedServerReviewAnchor();
+    var anchorText = anchor ? anchor.text : '';
     var add = function (text) {
       var value = String(text || '').trim();
       if (!value) return;
@@ -6022,6 +6068,11 @@
         text: value,
         scope: anchorText ? 'selection' : 'document',
         anchor_text: anchorText,
+        anchor_id: anchorText ? 'anchor-' + id : '',
+        anchor_start: anchor && anchor.anchor_start,
+        anchor_end: anchor && anchor.anchor_end,
+        anchor_prefix: anchor && anchor.anchor_prefix,
+        anchor_suffix: anchor && anchor.anchor_suffix,
         status: 'open',
         replies: []
       }));
@@ -6065,6 +6116,83 @@
       if (normalized.id === id) return normalized;
     }
     return null;
+  }
+
+  function textBoundaryAtOffset(root, offset) {
+    if (!root || !Number.isInteger(offset) || offset < 0) return null;
+    var nodeFilter = window.NodeFilter || { SHOW_TEXT: 4 };
+    var walker = document.createTreeWalker(root, nodeFilter.SHOW_TEXT);
+    var consumed = 0;
+    var node;
+    var last = null;
+    while ((node = walker.nextNode())) {
+      last = node;
+      var length = String(node.nodeValue || '').length;
+      if (offset <= consumed + length) return { node: node, offset: offset - consumed };
+      consumed += length;
+    }
+    if (last && offset === consumed) return { node: last, offset: String(last.nodeValue || '').length };
+    return null;
+  }
+
+  function clearOfficeReviewCommentFocus(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('.office-review-comment-focus').forEach(function (node) {
+      node.classList.remove('office-review-comment-focus');
+      delete node.dataset.reviewCommentAnchor;
+    });
+  }
+
+  function locateOfficeReviewComment(file, commentId) {
+    var thread = serverReviewThreadById(file, commentId);
+    if (!thread || thread.scope !== 'selection' || !thread.anchor_text) {
+      toast('This comment has no document selection to locate.');
+      return;
+    }
+    var root = document.querySelector('#officeLanaEditorHost .lana-editor-viewer') || fallbackDocPage();
+    var tools = collaborationTools();
+    if (!root || !tools || typeof tools.resolveCommentAnchor !== 'function') {
+      toast('The document location is not available yet.');
+      return;
+    }
+    var location = tools.resolveCommentAnchor(root.textContent || '', thread);
+    if (!location) {
+      toast('The commented text is no longer present in this draft.');
+      return;
+    }
+    var start = textBoundaryAtOffset(root, location.start);
+    var end = textBoundaryAtOffset(root, location.end);
+    if (!start || !end) {
+      toast('The comment location could not be mapped into this document view.');
+      return;
+    }
+    var range = document.createRange();
+    try {
+      range.setStart(start.node, start.offset);
+      range.setEnd(end.node, end.offset);
+    } catch (_) {
+      toast('The comment location could not be selected.');
+      return;
+    }
+    var selection = window.getSelection ? window.getSelection() : null;
+    if (selection) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    clearOfficeReviewCommentFocus(root);
+    var focusNode = start.node.parentElement && start.node.parentElement.closest
+      ? start.node.parentElement.closest('.le-p,p,h1,h2,h3,h4,h5,h6,blockquote,pre,li,div')
+      : start.node.parentElement;
+    if (!focusNode || !root.contains(focusNode)) focusNode = start.node.parentElement || root;
+    focusNode.classList.add('office-review-comment-focus');
+    focusNode.dataset.reviewCommentAnchor = thread.anchor_id || thread.id;
+    focusNode.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    setTimeout(function () {
+      if (focusNode && focusNode.classList) focusNode.classList.remove('office-review-comment-focus');
+    }, 4000);
+    toast(location.strategy === 'persisted-range'
+      ? 'Comment located at its saved selection.'
+      : 'Comment located by matching its selected text.');
   }
 
   function commitServerReviewCommentUpdate(file, message) {
@@ -6864,6 +6992,12 @@
           return;
         }
         var signerRemote = remoteWorkflowForFile(file);
+        var signerTools = collaborationTools();
+        if (signerTools && typeof signerTools.hasDuplicateSigner === 'function' &&
+            signerTools.hasDuplicateSigner(signerRemote.stagedSigners, email)) {
+          toast('That signer has already been added to this packet.');
+          return;
+        }
         signerRemote.stagedSigners.push({ name: name, email: email });
         signerRemote.selectedPacketId = 'new';
         renderSignaturePanel(file, signerRemote);
@@ -6992,11 +7126,22 @@
         return;
       }
       if (action === 'refresh-review-workflow' && file && isServerReviewFile(file)) {
+        actionTarget.disabled = true;
+        actionTarget.setAttribute('aria-disabled', 'true');
+        var originalRefreshLabel = actionTarget.textContent;
+        actionTarget.textContent = 'Refreshing...';
         loadServerReview(file).then(function () {
           var refreshed = serverReview(file);
           var editor = editorForFile(file);
           if (editor && typeof editor.setMode === 'function') editor.setMode(officeEditorModeForFile(file));
+          renderChrome();
+          if (!refreshFileInfoDrawer(file)) renderReviewDock(file);
           toast(refreshed && refreshed.pendingReleaseBatch ? 'Approval is still pending.' : 'Review status refreshed.');
+        }).catch(function (error) {
+          actionTarget.disabled = false;
+          actionTarget.setAttribute('aria-disabled', 'false');
+          actionTarget.textContent = originalRefreshLabel;
+          toast((error && error.message) || 'Review status could not be refreshed.');
         });
         return;
       }
@@ -7130,6 +7275,10 @@
       if (action === 'locate-review-change' && file && file.kind === 'doc') {
         var revisionIds = String(actionTarget.dataset.reviewRevisionIds || '').split(',').filter(Boolean);
         locateOfficeReviewChange(file, revisionIds);
+        return;
+      }
+      if (action === 'locate-review-comment' && file && file.kind === 'doc') {
+        locateOfficeReviewComment(file, actionTarget.dataset.commentId || '');
         return;
       }
     });
