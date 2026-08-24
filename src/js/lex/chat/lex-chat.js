@@ -223,6 +223,9 @@
       this._failedAttempt = null;
       this._recoveryMessageEl = null;
       this._recoverySequence = 0;
+      this._activeRetryReceipt = null;
+      this._retryReceiptPollTimer = null;
+      this._retryReceiptPollDelayMs = 2000;
 
       // Sub-component references
       this._documentsEl = null;
@@ -543,6 +546,14 @@
 
     async _sendAttempt(content, opts = {}, internal = {}) {
       if (!content || !this._source) return;
+      if (this._activeRetryReceipt) {
+        this._showSystemMessage('The retried response is still in progress.');
+        this.emit('lex-chat-error', {
+          error: 'A retried response is already in progress.',
+          type: 'concurrent_retry_receipt'
+        });
+        return false;
+      }
       if (this._activeTurnId) {
         this._showSystemMessage('A response is already in progress.');
         this.emit('lex-chat-error', {
@@ -613,6 +624,7 @@
       let requestStarted = false;
       let generationAdmitted = false;
       let admittedGenerationId = null;
+      let activeRetryReceipt = null;
       this._agenticBlockedReceived = false;
 
       try {
@@ -660,6 +672,9 @@
               retryGenerationId: event.generationId || null,
               safeFreshRetry: false
             };
+          }
+          if (event.type === 'retry_receipt' && ['active', 'terminalizing'].includes(event.generationStatus)) {
+            activeRetryReceipt = event;
           }
         }
       } catch (err) {
@@ -722,6 +737,15 @@
             this._showSystemMessage('Error: ' + failure.message + persistenceNote);
           }
         }
+      } else if (internal.retry && activeRetryReceipt) {
+        this._setRecoveryState({
+          disabled: true,
+          label: 'Retry in progress…',
+          status: activeRetryReceipt.generationStatus
+        });
+        if (this._composerEl) this._composerEl.setGenerating(true);
+        if (this._activityEl) this._activityEl.show('Retry in progress…', 'thinking');
+        this._watchActiveRetryReceipt(activeRetryReceipt);
       } else if (internal.retry) {
         this._setRecoveryState({ disabled: true, label: 'Retried', status: 'completed' });
         this._recoveryMessageEl = null;
@@ -857,6 +881,59 @@
       else button.removeAttribute('disabled');
     }
 
+    _clearActiveRetryReceipt() {
+      if (this._retryReceiptPollTimer) {
+        global.clearTimeout(this._retryReceiptPollTimer);
+        this._retryReceiptPollTimer = null;
+      }
+      this._activeRetryReceipt = null;
+    }
+
+    _watchActiveRetryReceipt(receipt) {
+      this._clearActiveRetryReceipt();
+      const conversationId = this.conversationId;
+      const generationId = receipt && receipt.generationId || null;
+      this._activeRetryReceipt = { conversationId, generationId };
+
+      const poll = async () => {
+        this._retryReceiptPollTimer = null;
+        const activeReceipt = this._activeRetryReceipt;
+        if (!activeReceipt || activeReceipt.conversationId !== this.conversationId) return;
+
+        let status;
+        try {
+          status = await this._source.checkActiveGeneration(conversationId);
+        } catch (_) {
+          status = null;
+        }
+        if (!this._activeRetryReceipt || conversationId !== this.conversationId) return;
+
+        const sameGenerationActive = status && status.active === true &&
+          (!status.generationId || !generationId || status.generationId === generationId);
+        if (sameGenerationActive || !status) {
+          this._retryReceiptPollTimer = global.setTimeout(poll, this._retryReceiptPollDelayMs);
+          return;
+        }
+
+        this._activeRetryReceipt = null;
+        if (this._composerEl) this._composerEl.setGenerating(false);
+        if (this._activityEl) this._activityEl.hide();
+        this._setRecoveryState({ disabled: true, label: 'Refreshing…', status: 'refreshing' });
+        try {
+          await this.loadConversation(conversationId);
+          this._recoveryMessageEl = null;
+        } catch (_) {
+          this._setRecoveryState({
+            disabled: true,
+            label: 'Status unknown — reload',
+            status: 'unknown'
+          });
+        }
+      };
+
+      this._retryReceiptPollTimer = global.setTimeout(poll, this._retryReceiptPollDelayMs);
+    }
+
     _messageAttachmentsFromSendOptions(sendOpts = {}) {
       const attachments = sendOpts.attachments || {};
       const items = [];
@@ -979,6 +1056,7 @@
      * Load a conversation by ID.
      */
     async loadConversation(id) {
+      if (this.conversationId && this.conversationId !== id) this._clearActiveRetryReceipt();
       const loadSeq = ++this._loadConversationSeq;
       this._props.conversationId = id;
       this._resetContextMeter();
@@ -1106,6 +1184,7 @@
      * Clear the conversation.
      */
     clearConversation() {
+      this._clearActiveRetryReceipt();
       this._loadConversationSeq += 1;
       this._props.conversationId = null;
       this._conversationRegistered = false;
@@ -2171,6 +2250,7 @@
     }
 
     disconnected() {
+      this._clearActiveRetryReceipt();
       if (this._bridge) {
         this._bridge.detach();
         this._bridge = null;

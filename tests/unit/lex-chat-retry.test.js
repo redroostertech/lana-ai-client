@@ -137,6 +137,16 @@ async function* completedStream() {
   yield { type: 'done', messageId: 'assistant-1', processingTimeMs: 10 };
 }
 
+async function* activeRetryReceiptStream() {
+  yield {
+    type: 'retry_receipt',
+    terminal: true,
+    generationId: 'generation-retry-active',
+    generationStatus: 'active',
+    contentPersisted: false
+  };
+}
+
 describe('Lex Chat failed-generation recovery', () => {
   test('a proven pre-admission Retry replays the same scope without another user bubble', async () => {
     const source = {
@@ -264,6 +274,51 @@ describe('Lex Chat failed-generation recovery', () => {
       retryGenerationId: 'generation-1'
     }));
     expect(chat._threadEl.addMessage).toHaveBeenCalledTimes(1);
+  });
+
+  test('an active idempotent retry receipt stays in progress and reloads only after polling settles', async () => {
+    jest.useFakeTimers();
+    try {
+      const source = {
+        connected: true,
+        connect: jest.fn(),
+        send: jest.fn()
+          .mockImplementationOnce(() => admittedFailedStream())
+          .mockImplementationOnce(() => activeRetryReceiptStream()),
+        checkActiveGeneration: jest.fn()
+          .mockResolvedValueOnce({ active: true, generationId: 'generation-retry-active' })
+          .mockResolvedValueOnce({ active: false })
+      };
+      const { chat, recoveryMessages } = makeHarness(source);
+      chat.loadConversation = jest.fn().mockResolvedValue(undefined);
+
+      await chat.send('Retry without duplicating me');
+      const recoveryId = chat._failedAttempt.recoveryId;
+      await expect(chat.retryLastFailed({ recoveryId })).resolves.toBe(true);
+
+      expect(recoveryMessages[0].states).toEqual([
+        expect.objectContaining({ label: 'Retrying…', disabled: true }),
+        expect.objectContaining({ label: 'Retry in progress…', disabled: true, status: 'active' })
+      ]);
+      expect(chat._activeRetryReceipt).toEqual({
+        conversationId: 'conversation-1',
+        generationId: 'generation-retry-active'
+      });
+      expect(chat.loadConversation).not.toHaveBeenCalled();
+      expect(chat._composerEl.setGenerating).toHaveBeenLastCalledWith(true);
+
+      await jest.advanceTimersByTimeAsync(2000);
+      expect(source.checkActiveGeneration).toHaveBeenCalledTimes(1);
+      expect(chat.loadConversation).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(2000);
+      expect(source.checkActiveGeneration).toHaveBeenCalledTimes(2);
+      expect(chat.loadConversation).toHaveBeenCalledWith('conversation-1');
+      expect(chat._activeRetryReceipt).toBeNull();
+      expect(chat._composerEl.setGenerating).toHaveBeenLastCalledWith(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('connection failures restore the composer and expose Retry', async () => {
