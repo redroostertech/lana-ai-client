@@ -412,6 +412,116 @@
     };
   }
 
+  function cleanMentionName(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function createTaskMentionDisplay(userName) {
+    var name = cleanMentionName(userName);
+    return name ? ('@' + name) : '';
+  }
+
+  function createTaskMentionPayload(userId, userName) {
+    var name = cleanMentionName(userName).replace(/[\]\(\)]/g, ' ').replace(/\s+/g, ' ').trim();
+    return userId && name ? ('@[' + name + '](' + userId + ')') : '';
+  }
+
+  function isMentionBoundaryBefore(ch) {
+    return !ch || /\s|\(|\[|,/.test(ch);
+  }
+
+  function isMentionBoundaryAfter(ch) {
+    return !ch || /[\s.,!?;:)\]]/.test(ch);
+  }
+
+  function resetTaskCommentDraftMentions(store) {
+    if (!store) return;
+    store.commentDraftMentions = [];
+    store.commentDraftValue = '';
+  }
+
+  function isValidDraftMention(value, mention) {
+    if (!mention || !mention.display) return false;
+    var start = Number(mention.start);
+    var end = Number(mention.end);
+    if (!isFinite(start) || !isFinite(end) || start < 0 || end <= start) return false;
+    if (value.slice(start, end) !== mention.display) return false;
+    return isMentionBoundaryBefore(value.charAt(start - 1)) &&
+      isMentionBoundaryAfter(value.charAt(end));
+  }
+
+  function reconcileTaskCommentDraftMentions(store, nextValue) {
+    if (!store) return [];
+    var value = String(nextValue || '');
+    var previous = String(store.commentDraftValue || '');
+    var mentions = asArray(store.commentDraftMentions);
+
+    if (previous !== value && mentions.length) {
+      var prefix = 0;
+      while (prefix < previous.length && prefix < value.length && previous.charAt(prefix) === value.charAt(prefix)) {
+        prefix += 1;
+      }
+
+      var previousSuffix = previous.length;
+      var valueSuffix = value.length;
+      while (
+        previousSuffix > prefix &&
+        valueSuffix > prefix &&
+        previous.charAt(previousSuffix - 1) === value.charAt(valueSuffix - 1)
+      ) {
+        previousSuffix -= 1;
+        valueSuffix -= 1;
+      }
+
+      var delta = (valueSuffix - prefix) - (previousSuffix - prefix);
+      mentions = mentions.map(function (mention) {
+        var start = Number(mention.start);
+        var end = Number(mention.end);
+        if (end <= prefix) return mention;
+        if (start >= previousSuffix) {
+          return Object.assign({}, mention, {
+            start: start + delta,
+            end: end + delta
+          });
+        }
+        return null;
+      }).filter(Boolean);
+    }
+
+    store.commentDraftValue = value;
+    store.commentDraftMentions = mentions.filter(function (mention) {
+      return isValidDraftMention(value, mention);
+    });
+    return store.commentDraftMentions;
+  }
+
+  function serializeTaskCommentMentions(comment, store) {
+    var result = String(comment || '');
+    var mentions = reconcileTaskCommentDraftMentions(store, result).slice();
+    var replacementMentions = mentions.slice().sort(function (a, b) {
+      return Number(b.start) - Number(a.start);
+    });
+    var mentionedIds = [];
+    var seen = {};
+
+    mentions.forEach(function (mention) {
+      if (mention.id && !seen[mention.id]) {
+        seen[mention.id] = true;
+        mentionedIds.push(mention.id);
+      }
+    });
+
+    replacementMentions.forEach(function (mention) {
+      if (!mention || !mention.payload) return;
+      result = result.slice(0, mention.start) + mention.payload + result.slice(mention.end);
+    });
+
+    return {
+      content: result.trim(),
+      mentions: mentionedIds
+    };
+  }
+
   function getTaskDetailStore(task) {
     var metadata = taskMetadata(task);
     var key = detailKey(task);
@@ -438,6 +548,8 @@
         mentionsLoading: false,
         mentionFilter: '',
         comments: comments,
+        commentDraftMentions: [],
+        commentDraftValue: '',
         commentsRemote: false,
         commentsLoading: false,
         activity: []
@@ -904,6 +1016,7 @@
     state.viewingTask = task;
 
     var store = getTaskDetailStore(task);
+    resetTaskCommentDraftMentions(store);
 
     modal.heading = task.title || 'Task Details';
     content.innerHTML = [
@@ -1572,11 +1685,15 @@
   }
 
   function detailInputValue(name) {
+    return detailInputRawValue(name).trim();
+  }
+
+  function detailInputRawValue(name) {
     var content = el('myTaskDetailsContent');
     if (!content) return '';
     var input = content.querySelector('[data-task-input="' + name + '"]');
     if (!input) return '';
-    return String(input.value || '').trim();
+    return String(input.value || '');
   }
 
   function setDetailInputValue(name, value) {
@@ -1651,8 +1768,17 @@
     var input = content.querySelector('[data-task-input="comment"]');
     var composer = content.querySelector('.my-task-comment-composer');
     if (!input || !composer) return;
-    var value = String(input.value || '').trim();
+    var rawValue = String(input.value || '');
+    var value = rawValue.trim();
     composer.classList.toggle('has-content', !!value);
+    if (state.viewingTask) {
+      var store = getTaskDetailStore(state.viewingTask);
+      if (value) {
+        reconcileTaskCommentDraftMentions(store, rawValue);
+      } else {
+        resetTaskCommentDraftMentions(store);
+      }
+    }
   }
 
   function hideTaskMentionPicker() {
@@ -1665,6 +1791,9 @@
 
   function cancelTaskCommentCompose() {
     setDetailInputValue('comment', '');
+    if (state.viewingTask) {
+      resetTaskCommentDraftMentions(getTaskDetailStore(state.viewingTask));
+    }
     var content = el('myTaskDetailsContent');
     if (!content) return;
     var native = content.querySelector('[data-task-input="comment"] textarea');
@@ -1793,13 +1922,26 @@
     var trigger = taskMentionTrigger();
     var start = trigger ? trigger.start : (textarea.selectionStart || textarea.value.length);
     var end = trigger ? trigger.end : (textarea.selectionEnd || start);
-    var token = '@[' + userName + '](' + userId + ') ';
+    var display = createTaskMentionDisplay(userName);
+    var payload = createTaskMentionPayload(userId, userName);
+    if (!display || !payload) return;
+    var token = display + (/\s/.test(textarea.value.charAt(end)) ? '' : ' ');
 
     if (typeof textarea.setRangeText === 'function') {
       textarea.setRangeText(token, start, end, 'end');
     } else {
       textarea.value = textarea.value.slice(0, start) + token + textarea.value.slice(end);
     }
+    var store = getTaskDetailStore(state.viewingTask);
+    store.commentDraftMentions.push({
+      id: String(userId),
+      name: cleanMentionName(userName),
+      display: display,
+      payload: payload,
+      start: start,
+      end: start + display.length
+    });
+    store.commentDraftValue = textarea.value;
     input.value = textarea.value;
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
     hideTaskMentionPicker();
@@ -2243,11 +2385,17 @@
     }
 
     if (kind === 'comment') {
-      var comment = detailInputValue('comment');
+      var visibleComment = detailInputRawValue('comment');
+      var serializedComment = serializeTaskCommentMentions(visibleComment, store);
+      var comment = serializedComment.content;
       if (!comment) return;
       if (store.commentsRemote && window.api && api.createResourceComment) {
         try {
-          var commentResponse = await api.createResourceComment('task', taskUuid(task), { content: comment });
+          var commentPayload = { content: comment };
+          if (serializedComment.mentions.length) {
+            commentPayload.mentions = serializedComment.mentions;
+          }
+          var commentResponse = await api.createResourceComment('task', taskUuid(task), commentPayload);
           store.comments.unshift(normalizeComment(commentResponse && commentResponse.data ? commentResponse.data : commentResponse));
         } catch (commentError) {
           Lex.Toast.error(commentError.message || 'Failed to post comment');
@@ -2268,6 +2416,7 @@
           replies: []
         });
       }
+      resetTaskCommentDraftMentions(store);
       state.activityTabs[detailKey(task)] = 'comments';
       rerenderTaskDetails();
     }
