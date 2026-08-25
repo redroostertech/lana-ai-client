@@ -64,6 +64,9 @@ describe('documentLifecycle utility', () => {
     });
 
     expect(summarized.state).toBe('summarized');
+    expect(summarized.summaryState).toBe('summarized');
+    expect(summarized.label).toBe('Ready');
+    expect(summarized.progressLabel).toBe('Ready, summary available');
     expect(summarized.isReady).toBe(true);
     expect(summarized.isActionableInChat).toBe(true);
   });
