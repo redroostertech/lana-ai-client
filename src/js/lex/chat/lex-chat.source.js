@@ -281,17 +281,34 @@
         if (!response.ok) {
           const payload = await this._conversationsApi.readJsonSafe(response);
           if (response.status === 401) {
-            yield { type: 'error', error: 'Session expired', status: 401 };
+            yield { type: 'error', error: 'Session expired', status: 401, terminal: true };
             return;
           }
+          const responseError = payload?.error;
+          const generationId = payload?.generation_id || payload?.session_id || null;
+          const retryAfterHeader = response.headers && typeof response.headers.get === 'function'
+            ? Number(response.headers.get('Retry-After'))
+            : NaN;
+          const responseDetails = responseError?.details || null;
           yield {
             type: 'error',
-            error: payload?.error?.code || payload?.error || `HTTP ${response.status}`,
-            code: payload?.error?.code || null,
-            field: payload?.error?.field || null,
-            details: payload?.error?.details || null,
+            error: responseError?.message || responseError?.code || responseError || `HTTP ${response.status}`,
+            code: responseError?.code || null,
+            field: responseError?.field || null,
+            details: {
+              ...(responseDetails && typeof responseDetails === 'object' ? responseDetails : {}),
+              ...((response.status === 429 || response.status >= 500) ? { retryable: true } : {}),
+              ...(Number.isInteger(retryAfterHeader) && retryAfterHeader >= 0
+                ? { retryAfterSeconds: Math.min(retryAfterHeader, 86400) }
+                : {})
+            },
             requestId: payload?.request_id || response.headers.get('X-Request-ID') || null,
             status: response.status,
+            generationId,
+            // A non-streaming failure without a generation identity happened
+            // before the server admitted a durable generation. Replaying the
+            // same client_request_id is therefore the safe recovery path.
+            safeFreshRetry: !generationId,
             terminal: true
           };
           return;
@@ -356,6 +373,15 @@
                 if (event.model) this._model = event.model;
               }
               yield event;
+              if (event.terminal === true) {
+                // Terminal SSE events are authoritative. Do not wait for the
+                // server/proxy to close a failed stream before allowing the UI
+                // controller to clear its generating state.
+                if (typeof reader.cancel === 'function') {
+                  try { await reader.cancel(); } catch (_) { /* already closed */ }
+                }
+                return;
+              }
             }
           }
         }
@@ -368,9 +394,17 @@
         }
       } catch (error) {
         if (error.name === 'AbortError') {
-          yield { type: 'stopped' };
+          yield { type: 'stopped', terminal: true };
         } else {
-          yield { type: 'error', error: error.message };
+          yield {
+            type: 'error',
+            error: error.message,
+            status: error.status == null ? null : Number(error.status),
+            details: { retryable: true },
+            generationId: this._generationId,
+            safeFreshRetry: !this._generationId,
+            terminal: true
+          };
         }
       } finally {
         this._generating = false;
@@ -719,6 +753,7 @@
           }
           return {
             type: 'done',
+            terminal: true,
             messageId: data.message_id,
             userMessageId: data.user_message_id,
             generationId: data.generation_id || data.session_id || null,
@@ -779,15 +814,24 @@
           // Pass through as generic events for extension
           return { type: eventType, ...data };
 
-        case 'error':
+        case 'error': {
+          const providerStatus = Number(data.provider_status_code || data.status);
+          const retryAfterSeconds = Number(data.retry_after_seconds);
           return {
             type: 'error',
             error: data.error || data.message || data.reason_code || 'Unknown error',
             code: data.reason_code || data.code || null,
-            status: data.status || null,
+            status: Number.isInteger(providerStatus) ? providerStatus : null,
+            details: {
+              ...(typeof data.retryable === 'boolean' ? { retryable: data.retryable } : {}),
+              ...(Number.isInteger(retryAfterSeconds) && retryAfterSeconds >= 0
+                ? { retryAfterSeconds: Math.min(retryAfterSeconds, 86400) }
+                : {})
+            },
             generationId: data.generation_id || data.session_id || null,
             terminal: true
           };
+        }
 
         case 'aborted':
           return {

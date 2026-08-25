@@ -2225,10 +2225,14 @@
   padding-left: 0.45em;
 }
 
-.office-lana-editor-host.office-lana-editor-host--draft-compare .le-page span.le-rev:not(.lee-rev-baseline)[data-rev-type="fmt"] {
+.office-lana-editor-host.office-lana-editor-host--draft-compare .le-page span.le-rev:not(.lee-rev-baseline)[data-rev-type="fmt"],
+.office-lana-editor-host.office-lana-editor-host--draft-compare .le-page p.le-rev:not(.lee-rev-baseline)[data-rev-type="fmt"] {
   background: rgba(124, 92, 173, 0.2);
+  background-image: linear-gradient(90deg, rgba(124, 92, 173, 0.12), rgba(124, 92, 173, 0.025) 70%, transparent);
   box-shadow: inset 0 -2px 0 rgba(124, 92, 173, 0.65);
   text-decoration-color: #624393;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
   text-decoration-thickness: 2px;
 }
 

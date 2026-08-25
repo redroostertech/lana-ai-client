@@ -35,6 +35,20 @@ describe('Lex chat artifact promotion contract', () => {
     }]);
   });
 
+  test('repairs duplicate durable IDs already present before terminal enrichment', () => {
+    expect(promotion.mergeArtifacts([
+      { artifact_id: 'a-1', artifact_name: 'Draft memo' },
+      { artifact_id: 'a-1', persistence: { status: 'saved_as_draft' } }
+    ], [
+      { artifact_id: 'a-1', actions: [{ id: 'save_to_documents' }] }
+    ])).toEqual([{
+      artifact_id: 'a-1',
+      artifact_name: 'Draft memo',
+      persistence: { status: 'saved_as_draft' },
+      actions: [{ id: 'save_to_documents' }]
+    }]);
+  });
+
   test('renders the backend draft persistence message truthfully', () => {
     expect(promotion.getPersistenceView({
       persistence: {
@@ -110,6 +124,18 @@ describe('Lex chat artifact promotion contract', () => {
 
     expect(result.alreadyPromoted).toBe(true);
     expect(result.document.id).toBe('d-1');
+  });
+
+  test('opens promoted documents through the live storage download contract', () => {
+    const apiClient = {
+      baseUrl: 'http://127.0.0.1:8080',
+      getFileDownloadUrl: jest.fn((documentId, matterId) =>
+        `http://127.0.0.1:8080/api/v1/storage/files/${documentId}/download?matter_id=${matterId}`)
+    };
+
+    expect(promotion.getPromotedDocumentDownloadUrl(apiClient, 'd-1', 'm-1', 'token value'))
+      .toBe('http://127.0.0.1:8080/api/v1/storage/files/d-1/download?matter_id=m-1&token=token%20value');
+    expect(apiClient.getFileDownloadUrl).toHaveBeenCalledWith('d-1', 'm-1');
   });
 
   test('recognizes private insight context promotion suggestions', () => {

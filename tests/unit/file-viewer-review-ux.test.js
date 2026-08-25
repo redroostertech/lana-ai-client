@@ -486,6 +486,7 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('var toolCallPattern = /<tool_call>');
     expect(pageJs).toContain("parsed.name === 'document_edit_suggestion'");
     expect(pageJs).toContain('(?:lana-document-edit|json)?');
+    expect(pageJs).toContain('normalizedSuggestion(JSON.parse(raw.trim()))');
     expect(pageJs).not.toContain('stageSuggestedEdit');
     expect(pageJs).toContain('Open this document in File Editor to apply LANA suggested edits.');
     expect(pageJs).toContain('lex-lana-response-end');
@@ -586,6 +587,7 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('var baselineDocumentId = releaseDocumentId(baselineRelease)');
     expect(pageJs).toContain('releasedDocumentId: baselineRelease && baselineDocumentId ? baselineDocumentId :');
     expect(pageJs).toContain('editorBaselineReleaseId: baselineRelease && baselineRelease.id');
+    expect(pageJs).toContain("editorComparisonMode: reviewDisplayScope() === 'release' ? 'release' : 'draft'");
     expect(pageJs).toContain('var reviewDocumentId = String(file.id);');
     expect(pageJs).toContain('LanaDocumentReview.loadReleaseLineage({');
     expect(pageJs).toContain("'?document_id=' + encodeURIComponent(reviewDocumentId)");

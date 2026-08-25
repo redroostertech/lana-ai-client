@@ -683,6 +683,40 @@
   }
 
   function editScriptsFromBatch(batch) {
+    var replayScripts = batch && batch.review_metadata && Array.isArray(batch.review_metadata.replay_scripts)
+      ? batch.review_metadata.replay_scripts
+      : [];
+    var normalizedReplayScripts = [];
+    for (var replayIndex = 0; replayIndex < replayScripts.length; replayIndex++) {
+      var replayScript = replayScripts[replayIndex];
+      var replayOps = replayScript && Array.isArray(replayScript.ops)
+        ? replayScript.ops.filter(Boolean)
+        : [];
+      if (!replayOps.length) continue;
+      var normalizedReplay = {
+        version: '0',
+        author: replayScript.author ? String(replayScript.author) : 'Reviewer',
+        date: replayScript.date
+          ? String(replayScript.date)
+          : new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        ops: replayOps
+      };
+      var replayGroupId = replayScript.group_id || replayScript.groupId;
+      if (replayGroupId) normalizedReplay.group_id = String(replayGroupId);
+      if (Array.isArray(replayScript.op_group_ids) && replayScript.op_group_ids.length === replayOps.length) {
+        normalizedReplay.op_group_ids = replayScript.op_group_ids.map(function (groupId) {
+          return String(groupId || replayGroupId || '');
+        });
+      }
+      var replayBaseHash = replayScript.baseDocumentHash || replayScript.base_document_hash;
+      if (replayBaseHash) normalizedReplay.baseDocumentHash = String(replayBaseHash);
+      normalizedReplayScripts.push(normalizedReplay);
+    }
+    // This is the authoritative action chronology emitted by lana-editor.
+    // Older drafts do not have it and continue through the per-change fallback
+    // below, preserving full backward compatibility.
+    if (normalizedReplayScripts.length) return normalizedReplayScripts;
+
     var changes = displayReviewChanges(replayOrderedBatchChanges(batch));
     var scripts = [];
     var seenScripts = {};
@@ -704,6 +738,8 @@
         ops: scriptOps
       };
       if (groupId) normalizedScript.group_id = String(groupId);
+      var baseDocumentHash = script && (script.baseDocumentHash || script.base_document_hash);
+      if (baseDocumentHash) normalizedScript.baseDocumentHash = String(baseDocumentHash);
       var scriptKey;
       try {
         scriptKey = JSON.stringify(normalizedScript);

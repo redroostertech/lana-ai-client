@@ -615,7 +615,8 @@
         this.emit('lex-artifact-click', {
           artifactType: 'download',
           entityId: target.dataset.documentId || '',
-          entityType: 'document'
+          entityType: 'document',
+          matterId: target.dataset.matterId || ''
         });
       });
 
@@ -1046,12 +1047,15 @@
         message: 'The server did not report whether this draft was saved.'
       };
       const canonicalDocument = artifact.document || artifact.canonical_document || null;
+      const canonicalMatterId = canonicalDocument &&
+        (canonicalDocument.matter_id || canonicalDocument.client_matter) ||
+        artifact.matter_id || artifact.matterId || '';
       const canPromote = status.status === 'saved_as_draft' && action && artifactId;
       let actionButton = canPromote
         ? `<lex-btn class="lex-chat-artifact-promote" data-artifact-id="${ChatFormat.escapeHtml(artifactId)}" variant="secondary" size="sm">Save to Documents</lex-btn>`
         : '';
       if (!actionButton && status.status === 'promoted' && canonicalDocument && canonicalDocument.id) {
-        actionButton = `<lex-btn class="lex-chat-artifact-open-document" data-document-id="${ChatFormat.escapeHtml(canonicalDocument.id)}" variant="secondary" size="sm">Open Document</lex-btn>`;
+        actionButton = `<lex-btn class="lex-chat-artifact-open-document" data-document-id="${ChatFormat.escapeHtml(canonicalDocument.id)}" data-matter-id="${ChatFormat.escapeHtml(canonicalMatterId)}" variant="secondary" size="sm">Open Document</lex-btn>`;
       }
 
       return `
@@ -1239,6 +1243,7 @@
             message: update.message || 'Saved to Documents.'
           };
           artifact.document = update.document || null;
+          if (update.matterId) artifact.matter_id = update.matterId;
           artifact.actions = (artifact.actions || []).filter(function (action) {
             return !action || action.id !== 'save_to_documents';
           });
@@ -1249,6 +1254,7 @@
           var openButton = document.createElement('lex-btn');
           openButton.className = 'lex-chat-artifact-open-document';
           openButton.dataset.documentId = update.document.id;
+          openButton.dataset.matterId = update.matterId || '';
           openButton.variant = 'secondary';
           openButton.size = 'sm';
           openButton.textContent = 'Open Document';

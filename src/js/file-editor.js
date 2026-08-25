@@ -781,6 +781,7 @@
 
   function officeEditorModeForFile(file) {
     if (!file || file.kind !== 'doc') return 'view';
+    if (file.editorComparisonMode === 'release') return 'view';
     if (isServerReviewFile(file)) {
       var review = serverReview(file);
       if (!review || review.loading || !review.loaded || review.loadFailed ||
@@ -980,6 +981,16 @@
       } catch (error) {
         console.warn('[file-editor] Unable to parse fenced LANA document edit suggestion:', error);
       }
+    }
+    // Qwen/OpenAI-compatible servers may honor the JSON contract while
+    // omitting the requested Markdown fence. Accept only a whole-response JSON
+    // object with the exact discriminator; embedded or unrelated JSON remains
+    // inert and can never stage an edit.
+    try {
+      suggestion = normalizedSuggestion(JSON.parse(raw.trim()));
+      if (suggestion) return suggestion;
+    } catch (_bareJsonError) {
+      // Ordinary prose is expected here and is not an error.
     }
     // Some OpenAI-compatible local models serialize a requested structured
     // edit as a tool-call envelope even when the tool was not registered.
@@ -1200,13 +1211,17 @@
         // after the workflow and draft detail have loaded, then replay them.
         // Keeping the editor in view mode here makes applyEditScripts reject
         // every saved draft and incorrectly leaves the document read-only.
-        if (!review.loadFailed && !review.draftDetailFailed && typeof activeEditor.setMode === 'function') {
+        var releaseComparisonView = file.editorComparisonMode === 'release';
+        if (!releaseComparisonView && !review.loadFailed && !review.draftDetailFailed && typeof activeEditor.setMode === 'function') {
           activeEditor.setMode('review');
           syncOfficeHistoryControls(file, activeEditor);
         }
-        var restored = !review.loadFailed && !review.draftDetailFailed
-          ? await restoreServerDraftWithRetry(file)
-          : !review.currentDraftBatch;
+        var restored = releaseComparisonView
+          ? true
+          : !review.loadFailed && !review.draftDetailFailed
+            ? await restoreServerDraftWithRetry(file)
+            : !review.currentDraftBatch;
+        if (releaseComparisonView) review.restored = true;
         review.restoreFailed = !restored;
         if (typeof activeEditor.setMode === 'function') {
           activeEditor.setMode(officeEditorModeForFile(file));
@@ -1633,7 +1648,8 @@
     var service = documentReviewService();
     if (!review || !service || !isServerReviewFile(file)) return;
 
-    var pendingRows = serverPendingDisplayChanges(file).map(function (change, index) {
+    var releaseComparisonView = file.editorComparisonMode === 'release';
+    var pendingRows = (releaseComparisonView ? [] : serverPendingDisplayChanges(file)).map(function (change, index) {
       return officeRowFromServerChange(change, index, { section: 'unreleased' });
     });
     pendingRows.forEach(function (row) {
@@ -1641,7 +1657,7 @@
       row.tone = 'draft';
     });
 
-    var pendingApprovalRows = serverPendingApprovalDisplayChanges(file).map(function (change, index) {
+    var pendingApprovalRows = (releaseComparisonView ? [] : serverPendingApprovalDisplayChanges(file)).map(function (change, index) {
       var row = officeRowFromServerChange(change, index, { section: 'pending-approval' });
       row.status = 'Pending approval';
       row.tone = 'draft';
@@ -1780,7 +1796,13 @@
       review_metadata: {
         source: 'file_editor',
         document_name: file.filename || file.title || null,
-        comments: review.comments
+        comments: review.comments,
+        // Review rows are document-ordered for display. The editor supplies a
+        // separate action-ordered replay contract so an autosaved DOCX can be
+        // reconstructed without reordering overlapping formatting/link edits.
+        replay_scripts: Array.isArray(reviewState.replayScripts)
+          ? reviewState.replayScripts
+          : []
       }
     };
 
@@ -2454,6 +2476,7 @@
     file.releasedDocumentId = incoming.releasedDocumentId || file.releasedDocumentId || '';
     file.editorBaselineReleaseId = incoming.editorBaselineReleaseId || file.editorBaselineReleaseId || '';
     file.editorBaselineReleaseNumber = incoming.editorBaselineReleaseNumber || file.editorBaselineReleaseNumber || null;
+    file.editorComparisonMode = incoming.editorComparisonMode === 'release' ? 'release' : 'draft';
     file.documentId = incoming.documentId || file.documentId || file.releasedDocumentId || file.sourceDocumentId || '';
     file.matterId = incoming.matterId || file.matterId || '';
     file.matterNumber = incoming.matterNumber || incoming.matter_number || file.matterNumber || file.matter_number || '';
@@ -2740,6 +2763,9 @@
     }
     if (isServerReviewFile(file)) {
       var review = serverReview(file);
+      if (file.editorComparisonMode === 'release') {
+        return 'Version ' + (file.editorBaselineReleaseNumber || '\u2014') + ' - Read-only release';
+      }
       if (review && (review.saving || serverDraftSaveTimers[file.id])) return 'Saving draft...';
       if (review && review.pendingReleaseBatch) return 'Release pending approval';
       if (review && review.saveFailed) return 'Draft save failed';
@@ -3778,11 +3804,11 @@
     var serverFile = isServerReviewFile(file);
     var serverState = serverFile ? serverReview(file) : null;
     var canReleaseVersion = serverFile
-      ? Boolean(serverState && !serverState.releasing && !serverState.embedFailed && !serverState.pendingReleaseBatch &&
+      ? Boolean(file.editorComparisonMode !== 'release' && serverState && !serverState.releasing && !serverState.embedFailed && !serverState.pendingReleaseBatch &&
           serverState.loaded && !serverState.loadFailed && !serverState.draftDetailFailed && !serverState.restoreFailed &&
           (pendingChanges.length || (serverState.currentDraftBatch && serverState.currentDraftBatch.id)))
       : docHasActiveSavedDraft(file);
-    var hasPendingApproval = Boolean(serverState && serverState.pendingReleaseBatch);
+    var hasPendingApproval = Boolean(file.editorComparisonMode !== 'release' && serverState && serverState.pendingReleaseBatch);
     var pendingApprovalAction = pendingReleaseButtonAction(serverState);
     var pendingApprovalLabel = pendingReleaseButtonLabel(serverState);
     var isRequestingRelease = Boolean(serverState && serverState.releasing);
@@ -4173,6 +4199,7 @@
 
   function officeHasUnreleasedChanges(file) {
     if (!file || file.kind !== 'doc') return false;
+    if (file.editorComparisonMode === 'release') return false;
     if (isServerReviewFile(file)) {
       var review = serverReview(file);
       if (!review) return false;
@@ -4228,6 +4255,9 @@
   }
 
   function officeTrackedChangesMode(file) {
+    if (file && file.editorComparisonMode === 'release') {
+      return officeHasReleaseComparison(file) ? 'release' : 'none';
+    }
     if (officeHasUnreleasedChanges(file)) return 'draft';
     if (officeHasReleaseComparison(file)) return 'release';
     return 'none';
@@ -5859,6 +5889,14 @@
     var file = activeFile();
     var embed = file && editorForFile(file);
     syncOfficeHistoryControls(file, embed);
+    if (file && file.editorComparisonMode === 'release') {
+      document.querySelectorAll('.office-doc-toolbar [data-command], .office-doc-toolbar [data-action="insert-template-variable"]').forEach(function (control) {
+        control.disabled = true;
+        control.setAttribute('aria-disabled', 'true');
+        control.title = 'Read-only released version';
+      });
+      return;
+    }
     if (file && isServerReviewFile(file) && embed && typeof embed.selectionFormatState === 'function') {
       var embedState = null;
       try { embedState = embed.selectionFormatState(); } catch (_) { embedState = null; }
@@ -6504,25 +6542,56 @@
   async function clearEmbedFormatting(file, ranges) {
     if (!embedEditorReady(file)) return;
     try {
+      var selected = ranges || (typeof officeEditorInstance.selectionRanges === 'function' ? officeEditorInstance.selectionRanges() : []);
+      if (!selected.length) {
+        toast('Select text before clearing formatting.');
+        return;
+      }
       if (typeof officeEditorInstance.linkSelection === 'function') {
-        await officeEditorInstance.linkSelection(null, ranges || undefined);
+        await officeEditorInstance.linkSelection(null, selected);
       }
-      if (typeof officeEditorInstance.formatSelection === 'function') {
-        await officeEditorInstance.formatSelection({
-          bold: false,
-          italic: false,
-          underline: false,
-          strike: false,
-          superscript: false,
-          subscript: false,
-          color: 'auto',
-          highlight: 'none',
-          font: null,
-          size: null
-        }, ranges || undefined);
-      }
-      if (typeof officeEditorInstance.formatParagraphs === 'function') {
-        await officeEditorInstance.formatParagraphs({ style: null, align: null, list: null, indent: null, horizontalRule: null }, ranges || undefined);
+      var clearMarks = {
+        bold: false,
+        italic: false,
+        underline: false,
+        strike: false,
+        superscript: false,
+        subscript: false,
+        color: 'auto',
+        highlight: 'none',
+        font: null,
+        size: null
+      };
+      var clearParagraph = { style: null, align: null, list: null, indent: null, horizontalRule: null };
+      if (typeof officeEditorInstance.applyEdits === 'function') {
+        var paragraphIds = {};
+        var clearOps = selected.map(function (range) {
+          paragraphIds[String(range.paragraph)] = range.paragraph;
+          return {
+            op: 'formatText',
+            range: { paragraph: range.paragraph, start: range.start, end: range.end },
+            marks: clearMarks
+          };
+        });
+        Object.keys(paragraphIds).forEach(function (paragraphKey) {
+          clearOps.push({
+            op: 'formatParagraph',
+            at: { paragraph: paragraphIds[paragraphKey] },
+            set: clearParagraph
+          });
+        });
+        // Text and paragraph formatting are independent redline families and
+        // can be committed atomically. This makes the first change/save event
+        // represent the complete Clear Formatting action, including list and
+        // horizontal-rule removal, instead of exposing a half-cleared state.
+        await officeEditorInstance.applyEdits(clearOps);
+      } else {
+        if (typeof officeEditorInstance.formatSelection === 'function') {
+          await officeEditorInstance.formatSelection(clearMarks, selected);
+        }
+        if (typeof officeEditorInstance.formatParagraphs === 'function') {
+          await officeEditorInstance.formatParagraphs(clearParagraph, selected);
+        }
       }
     } catch (error) {
       toast((error && error.message) || 'Formatting could not be cleared.');
@@ -6799,6 +6868,7 @@
       if (!command) return;
       var value = commandTarget.dataset.value || commandTarget.value || null;
       var commandFile = activeFile();
+      if (commandFile && commandFile.editorComparisonMode === 'release') return;
       if (commandFile && isServerReviewFile(commandFile)) {
         handleEmbedToolbarCommand(commandFile, command, value);
         return;
@@ -7635,7 +7705,7 @@
     leavingEditor = true;
     var file = activeFile();
     var target = safeEditorReferrer(editorReferrer) ||
-      (file ? 'file-viewer.html?id=' + encodeURIComponent(officeRealDocumentId(file)) : 'document-library.html');
+      (file ? 'file-viewer.html?id=' + encodeURIComponent(officeRealDocumentId(file)) : 'file-viewer.html');
     if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') Lex.Nav.go(target);
     else window.location.href = target;
   }

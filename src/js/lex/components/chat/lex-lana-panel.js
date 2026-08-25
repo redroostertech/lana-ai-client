@@ -844,8 +844,16 @@
 
       if (artifactType === 'download' || !artifactType) {
         var token = localStorage.getItem('token') || '';
-        var baseUrl = (window.api && window.api.baseUrl) ? window.api.baseUrl : '';
-        window.open(baseUrl + '/api/v1/documents/' + encodeURIComponent(entityId) + '/download?token=' + encodeURIComponent(token), '_blank');
+        var helpers = window.Lex && window.Lex.Chat && window.Lex.Chat.ArtifactPromotion;
+        var matterId = detail.matterId || this.matterId || '';
+        var downloadUrl = helpers && typeof helpers.getPromotedDocumentDownloadUrl === 'function'
+          ? helpers.getPromotedDocumentDownloadUrl(window.api, entityId, matterId, token)
+          : '';
+        if (!downloadUrl) {
+          this._toast('error', 'The document download is unavailable.');
+          return;
+        }
+        window.open(downloadUrl, '_blank');
       }
     }
 
@@ -942,7 +950,8 @@
             messageElement.updateArtifactPromotion(artifactId, {
               tone: 'success',
               message: msg,
-              document: result.document
+              document: result.document,
+              matterId: self.matterId || result.matterId || ''
             });
           }
           self._toast('success', result.alreadyPromoted ? 'Document was already saved' : 'Saved to Documents');

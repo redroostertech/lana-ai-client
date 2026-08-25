@@ -82,6 +82,33 @@
     return count === 1 ? singular : (plural || `${singular}s`);
   }
 
+  function artifactIdentity(artifact) {
+    if (!artifact || typeof artifact !== 'object') return '';
+    const artifactId = artifact.artifact_id || artifact.id;
+    if (artifactId) return `artifact:${artifactId}`;
+    if (artifact.entity_type && artifact.entity_id) {
+      return `entity:${artifact.entity_type}:${artifact.entity_id}`;
+    }
+    return '';
+  }
+
+  function mergeArtifactEvents(existing, incoming) {
+    const artifacts = [];
+    if (Array.isArray(existing)) artifacts.push(...existing);
+    if (Array.isArray(incoming)) artifacts.push(...incoming);
+
+    const merged = [];
+    artifacts.forEach((artifact) => {
+      const identity = artifactIdentity(artifact);
+      const index = identity
+        ? merged.findIndex((candidate) => artifactIdentity(candidate) === identity)
+        : -1;
+      if (index === -1) merged.push(artifact);
+      else merged[index] = Object.assign({}, merged[index], artifact);
+    });
+    return merged;
+  }
+
   function formatRagComplete(event) {
     const chunks = Number(event.chunksFound);
     const docs = Number(event.documentsSearched);
@@ -225,6 +252,7 @@
       this._recoverySequence = 0;
       this._activeRetryReceipt = null;
       this._retryReceiptPollTimer = null;
+      this._retryAvailabilityTimer = null;
       this._retryReceiptPollDelayMs = 2000;
 
       // Sub-component references
@@ -536,6 +564,7 @@
       }
 
       this._failedAttempt = null;
+      this._clearRetryAvailabilityTimer();
       this._setRecoveryState({ disabled: true, label: 'Retrying…', status: 'retrying' });
       return this._sendAttempt(
         attempt.content,
@@ -659,7 +688,7 @@
             failure.generationAdmitted = generationAdmitted;
             failure.retryGenerationId = event.generationId || admittedGenerationId || null;
             failure.safeFreshRetry = generationAdmitted !== true &&
-              failure.code === 'PERSISTENCE_UNAVAILABLE';
+              (failure.code === 'PERSISTENCE_UNAVAILABLE' || event.safeFreshRetry === true);
           }
           if (event.type === 'retry_receipt' && ['failed', 'timed_out', 'disconnected'].includes(event.generationStatus)) {
             failure = {
@@ -794,6 +823,9 @@
         message: String(raw || value.message || 'The generation failed.'),
         status: value.status == null ? null : Number(value.status),
         details: value.details || null,
+        retryAfterSeconds: Number.isInteger(Number(value.details && value.details.retryAfterSeconds))
+          ? Math.max(0, Math.min(Number(value.details.retryAfterSeconds), 86400))
+          : 0,
         code: value.code || null,
         type: value.type || 'stream'
       };
@@ -834,6 +866,7 @@
     }
 
     _offerRetry(content, options, failure) {
+      this._clearRetryAvailabilityTimer();
       const recoveryId = `chat-retry-${Date.now()}-${++this._recoverySequence}`;
       const retryOptions = this._cloneRetryOptions(options);
       if (failure && failure.retryGenerationId) {
@@ -847,21 +880,38 @@
         content,
         options: retryOptions
       };
+      const retryAfterSeconds = failure && Number.isInteger(failure.retryAfterSeconds)
+        ? Math.max(0, failure.retryAfterSeconds)
+        : 0;
       const message = 'Error: ' + String(failure && failure.message || 'The request failed.') +
-        ' You can retry the same request.';
+        (retryAfterSeconds > 0
+          ? ` Try again in ${retryAfterSeconds} second${retryAfterSeconds === 1 ? '' : 's'}.`
+          : ' You can retry the same request.');
       if (this._threadEl) {
         this._recoveryMessageEl = this._threadEl.addSystemMessage(message, {
           recovery: {
             recoveryId,
-            label: 'Retry',
-            disabled: false,
-            status: 'available'
+            label: retryAfterSeconds > 0 ? `Retry in ${retryAfterSeconds}s` : 'Retry',
+            disabled: retryAfterSeconds > 0,
+            status: retryAfterSeconds > 0 ? 'waiting' : 'available'
           }
         });
       }
+      if (retryAfterSeconds > 0) {
+        this._retryAvailabilityTimer = global.setTimeout(() => {
+          this._retryAvailabilityTimer = null;
+          if (!this._failedAttempt || this._failedAttempt.recoveryId !== recoveryId) return;
+          this._setRecoveryState({ disabled: false, label: 'Retry', status: 'available' });
+          this.emit('lex-chat-retry-available', {
+            recoveryId,
+            error: failure && failure.message || 'The request failed.'
+          });
+        }, retryAfterSeconds * 1000);
+      }
       this.emit('lex-chat-retry-available', {
         recoveryId,
-        error: failure && failure.message || 'The request failed.'
+        error: failure && failure.message || 'The request failed.',
+        availableAfterSeconds: retryAfterSeconds
       });
     }
 
@@ -887,6 +937,13 @@
         this._retryReceiptPollTimer = null;
       }
       this._activeRetryReceipt = null;
+    }
+
+    _clearRetryAvailabilityTimer() {
+      if (this._retryAvailabilityTimer) {
+        global.clearTimeout(this._retryAvailabilityTimer);
+        this._retryAvailabilityTimer = null;
+      }
     }
 
     _watchActiveRetryReceipt(receipt) {
@@ -1185,6 +1242,7 @@
      */
     clearConversation() {
       this._clearActiveRetryReceipt();
+      this._clearRetryAvailabilityTimer();
       this._loadConversationSeq += 1;
       this._props.conversationId = null;
       this._conversationRegistered = false;
@@ -1444,9 +1502,7 @@
 
         case 'agentic_complete':
           if (event.artifacts) {
-            this._artifacts = Chat.ArtifactPromotion
-              ? Chat.ArtifactPromotion.mergeArtifacts(this._artifacts, event.artifacts)
-              : this._artifacts.concat(event.artifacts);
+            this._artifacts = this._mergeArtifacts(event.artifacts);
             this._ensureAssistantMessageForArtifacts();
           }
           this.emit('lex-chat-artifacts', { artifacts: event.artifacts || [] });
@@ -1489,9 +1545,7 @@
 
         case 'agentic_artifacts':
           if (event.artifacts) {
-            this._artifacts = Chat.ArtifactPromotion
-              ? Chat.ArtifactPromotion.mergeArtifacts(this._artifacts, event.artifacts)
-              : this._artifacts.concat(event.artifacts);
+            this._artifacts = this._mergeArtifacts(event.artifacts);
             this._ensureAssistantMessageForArtifacts();
           }
           this.emit('lex-chat-artifacts', { artifacts: event.artifacts || [] });
@@ -1681,6 +1735,16 @@
     // ---------------------------------------------------------------------------
     // Internal helpers
     // ---------------------------------------------------------------------------
+
+    _mergeArtifacts(incoming) {
+      if (Chat.ArtifactPromotion && typeof Chat.ArtifactPromotion.mergeArtifacts === 'function') {
+        return Chat.ArtifactPromotion.mergeArtifacts(this._artifacts, incoming);
+      }
+      // Artifact identity is a data-integrity concern, not a presentation
+      // concern. Keep the SSE paths safe even on a page that omitted the
+      // promotion-card helper.
+      return mergeArtifactEvents(this._artifacts, incoming);
+    }
 
     _ensureAssistantMessageForArtifacts() {
       if (!this._threadEl || !this._artifacts || this._artifacts.length === 0) return;

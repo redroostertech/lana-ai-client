@@ -339,6 +339,65 @@ describe('Lex Chat failed-generation recovery', () => {
     expect(recoveryMessages[0].recovery).toEqual(expect.objectContaining({ label: 'Retry' }));
   });
 
+  test('terminal transport errors restore the UI and expose a safe Retry', async () => {
+    async function* transportFailure() {
+      yield {
+        type: 'error',
+        error: 'Failed to fetch',
+        details: { retryable: true },
+        safeFreshRetry: true,
+        terminal: true
+      };
+    }
+    const source = {
+      connected: true,
+      connect: jest.fn(),
+      send: jest.fn(() => transportFailure())
+    };
+    const { chat, recoveryMessages } = makeHarness(source);
+
+    await expect(chat.send('Recover this request')).resolves.toBe(false);
+
+    expect(chat._activeTurnId).toBeNull();
+    expect(chat._composerEl.setGenerating).toHaveBeenLastCalledWith(false);
+    expect(chat._activityEl.hide).toHaveBeenCalled();
+    expect(recoveryMessages).toHaveLength(1);
+    expect(recoveryMessages[0].recovery).toEqual(expect.objectContaining({
+      label: 'Retry',
+      disabled: false
+    }));
+  });
+
+  test('honors provider Retry-After before enabling the same-generation retry', async () => {
+    jest.useFakeTimers();
+    try {
+      const source = { connected: true, connect: jest.fn(), send: jest.fn() };
+      const { chat, recoveryMessages } = makeHarness(source);
+
+      chat._offerRetry('Try this again', {}, {
+        message: 'The model is busy.',
+        retryGenerationId: 'generation-1',
+        retryAfterSeconds: 30
+      });
+
+      expect(recoveryMessages[0].content).toContain('Try again in 30 seconds.');
+      expect(recoveryMessages[0].recovery).toEqual(expect.objectContaining({
+        label: 'Retry in 30s',
+        disabled: true,
+        status: 'waiting'
+      }));
+
+      jest.advanceTimersByTime(30000);
+      expect(recoveryMessages[0].recovery).toEqual(expect.objectContaining({
+        label: 'Retry',
+        disabled: false,
+        status: 'available'
+      }));
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('an interrupted persisted user turn retries its generation without resending a user row', () => {
     const source = { connected: true, connect: jest.fn(), send: jest.fn() };
     const { chat, recoveryMessages } = makeHarness(source);

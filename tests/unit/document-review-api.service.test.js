@@ -109,6 +109,38 @@ describe('LanaDocumentReview grouping and serialization', () => {
     expect(scripts[0].ops).toEqual([{ op: 'deleteText', range: { paragraph: 1, start: 0, end: 13 } }]);
   });
 
+  test('prefers the saved user-action replay chronology over document-ordered review rows', () => {
+    const bold = { op: 'formatText', range: { paragraph: 0, start: 0, end: 5 }, marks: { bold: true } };
+    const replace = { op: 'replaceText', range: { paragraph: 0, start: 6, end: 10 }, text: 'linked' };
+    const clear = { op: 'formatText', range: { paragraph: 0, start: 0, end: 5 }, marks: { bold: false } };
+    const scripts = review.editScriptsFromBatch({
+      review_metadata: {
+        replay_scripts: [
+          { version: '0', group_id: 'bold', baseDocumentHash: 'visible-text/1:sha256:abc', ops: [bold] },
+          { version: '0', group_id: 'replace', op_group_ids: ['replace'], ops: [replace] },
+          { version: '0', group_id: 'clear', ops: [clear] }
+        ]
+      },
+      changes: [
+        insChange({ edit_script: { version: '0', ops: [replace] } }),
+        insChange({ change_key: 'revision:9', edit_script: { version: '0', ops: [bold, clear] } })
+      ]
+    });
+
+    expect(scripts.map((script) => script.group_id)).toEqual(['bold', 'replace', 'clear']);
+    expect(scripts.map((script) => script.ops[0])).toEqual([bold, replace, clear]);
+    expect(scripts[0].baseDocumentHash).toBe('visible-text/1:sha256:abc');
+    expect(scripts[1].op_group_ids).toEqual(['replace']);
+  });
+
+  test('falls back to per-change replay when chronology metadata is absent or empty', () => {
+    const change = insChange();
+    expect(review.editScriptsFromBatch({ review_metadata: { replay_scripts: [] }, changes: [change] }))
+      .toHaveLength(1);
+    expect(review.editScriptsFromBatch({ changes: [change] })[0].ops)
+      .toEqual(change.edit_script.ops);
+  });
+
   test('replays numeric revision scripts in engine order after Undo/Redo row recreation', () => {
     const first = insChange({
       change_key: 'revision:1',

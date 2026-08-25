@@ -49,6 +49,7 @@ describe('File Editor live document boundary', () => {
     expect(contextSource).toContain('var toolCallPattern = /<tool_call>');
     expect(contextSource).toContain("parsed.name === 'document_edit_suggestion'");
     expect(contextSource).toContain("parsed.type !== 'document_edit_suggestion'");
+    expect(contextSource).toContain('normalizedSuggestion(JSON.parse(raw.trim()))');
     expect(contextSource).toContain('editor.stageSuggestedEdit({');
     expect(contextSource).toContain('strategy: pending.strategy || suggestion.strategy');
     expect(contextSource).toContain("detail.context.kind === 'selection'");
@@ -77,6 +78,17 @@ describe('File Editor live document boundary', () => {
     expect(html).toContain('id="officeSignaturePanel"');
     expect(html).toContain('id="officeReviewRailHost"');
     expect(html).toContain('id="officeContextToolbarHost"');
+  });
+
+  test('returns empty and failed editor routes to File Viewer', () => {
+    const navigationSource = editor.slice(
+      editor.indexOf('async function navigateBackFromEditor()'),
+      editor.indexOf('async function onEnter()')
+    );
+
+    expect(navigationSource).toContain("file-viewer.html?id='");
+    expect(navigationSource).toContain(": 'file-viewer.html'");
+    expect(navigationSource).not.toContain("'document-library.html'");
   });
 
   test('keeps the full document toolbar and ruler in the persistent header', () => {
@@ -116,11 +128,13 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('data-margin="wide"');
     expect(editor).toContain('data-action="toggle-show-changes"');
     expect(editor).toContain('function officeHasUnreleasedChanges(file)');
+    expect(editor).toContain("if (file.editorComparisonMode === 'release') return false;");
     expect(editor).toContain('review.loadFailed || review.draftDetailFailed || review.restoreFailed');
     expect(editor).toContain("review.session.unreleasedRevisions(review.liveReviewState).length > 0");
     expect(editor).toContain('function officeHasReleaseComparison(file)');
     expect(editor).toContain("if (officeHasUnreleasedChanges(file)) return 'draft';");
     expect(editor).toContain("if (officeHasReleaseComparison(file)) return 'release';");
+    expect(editor).toContain("return officeHasReleaseComparison(file) ? 'release' : 'none';");
     expect(editor).toContain('Show or hide this release against the previous release');
     expect(editor).toContain("return 'Current release vs previous release'");
     expect(editor).toContain("return 'Unreleased vs last release'");
@@ -141,6 +155,7 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('function officeReleaseDeltaRevisionIds(file)');
     expect(editor).toContain("mark.classList.toggle('lee-rev-release-delta'");
     expect(css).toContain('.office-lana-editor-host--draft-compare .le-page .le-p:has(.le-rev:not(.lee-rev-baseline))');
+    expect(css).toContain('p.le-rev:not(.lee-rev-baseline)[data-rev-type="fmt"]');
     expect(css).toContain('.le-rev.lee-rev-review-focus[data-rev-type="fmt"]');
     expect(css).toContain('.office-changes-legend');
 
@@ -153,6 +168,24 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain("['officeTokenCount', 'Tokens '");
     expect(editor).toContain("['officeParagraphCount', 'Paragraphs '");
     expect(editor).toContain("['officeReadingTime', 'Reading time '");
+  });
+
+  test('clears run and paragraph formatting as one complete tracked mutation', () => {
+    const clearSource = editor.slice(
+      editor.indexOf('async function clearEmbedFormatting(file, ranges)'),
+      editor.indexOf('function activateOfficePanel(name, options)')
+    );
+
+    expect(clearSource).toContain("op: 'formatText'");
+    expect(clearSource).toContain("op: 'formatParagraph'");
+    expect(clearSource).toContain('horizontalRule: null');
+    expect(clearSource).toContain('await officeEditorInstance.applyEdits(clearOps)');
+    expect(clearSource.indexOf("op: 'formatText'")).toBeLessThan(clearSource.indexOf("op: 'formatParagraph'"));
+  });
+
+  test('persists the editor action chronology separately from document-ordered review rows', () => {
+    expect(editor).toContain('replay_scripts: Array.isArray(reviewState.replayScripts)');
+    expect(editor).toContain('? reviewState.replayScripts');
   });
 
   test('renders semantic formatting revisions from the shared review datasource', () => {
@@ -223,7 +256,7 @@ describe('File Editor live document boundary', () => {
   });
 
   test('uses durable URL identity and never hands off authorization headers', () => {
-    expect(viewer).toContain("params: { id: file.id, matter_id: matterId || null }");
+    expect(viewer).toContain("params: { id: handoff.file.documentId, matter_id: matterId || null }");
     expect(createModal).toContain('params: { id: doc.id, matter_id: matterId }');
     expect(viewer).not.toContain('sourceHeaders: getAuthHeaders()');
     expect(createModal).not.toContain("sourceHeaders: { Authorization:");
@@ -355,6 +388,7 @@ describe('File Editor live document boundary', () => {
     expect(applySource).toContain("row.status = 'Pending'");
     expect(applySource).toContain("row.status = 'Pending approval'");
     expect(applySource).toContain("var editorBaselineReleaseId = String(file.editorBaselineReleaseId || '')");
+    expect(applySource).toContain("var releaseComparisonView = file.editorComparisonMode === 'release'");
     expect(applySource).toContain('group.release.id');
     expect(applySource).toContain('pendingRows.concat(pendingApprovalRows, releasedRows)');
     expect(railSource).toContain("change.serverSection === 'pending-approval'");

@@ -288,6 +288,68 @@ describe('SSEChatSource contract', () => {
     ]);
   });
 
+  test('cancels and completes immediately after a terminal SSE error', async () => {
+    const encoded = new TextEncoder().encode(
+      'event: error\ndata: {"reason_code":"LLM_MODEL_UNAVAILABLE","generation_id":"generation-1","provider_status_code":503,"retryable":true,"retry_after_seconds":30}\n\n'
+    );
+    const neverFinishes = new Promise(() => {});
+    const reader = {
+      read: jest.fn()
+        .mockResolvedValueOnce({ done: false, value: encoded })
+        .mockImplementation(() => neverFinishes),
+      cancel: jest.fn().mockResolvedValue(undefined)
+    };
+    const response = {
+      ok: true,
+      status: 200,
+      headers: { get: jest.fn(() => 'text/event-stream') },
+      body: { getReader: () => reader }
+    };
+    const fetchMock = jest.fn().mockResolvedValue(response);
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
+    const stream = source.send('hello');
+
+    await expect(stream.next()).resolves.toEqual({
+      done: false,
+      value: expect.objectContaining({
+        type: 'error',
+        code: 'LLM_MODEL_UNAVAILABLE',
+        generationId: 'generation-1',
+        status: 503,
+        details: { retryable: true, retryAfterSeconds: 30 },
+        terminal: true
+      })
+    });
+    await expect(stream.next()).resolves.toEqual({ done: true, value: undefined });
+
+    expect(reader.cancel).toHaveBeenCalledTimes(1);
+    expect(reader.read).toHaveBeenCalledTimes(1);
+    expect(source.generating).toBe(false);
+  });
+
+  test('normalizes a fetch failure as terminal and safely retryable before admission', async () => {
+    const fetchMock = jest.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
+
+    const events = [];
+    for await (const event of source.send('hello')) events.push(event);
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'error',
+        error: 'Failed to fetch',
+        details: { retryable: true },
+        safeFreshRetry: true,
+        terminal: true
+      })
+    ]);
+    expect(source.generating).toBe(false);
+  });
+
   test('normalizes unified context and retrieval progress events', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(responseFromChunks([
       'event: tool_progress\ndata: {"tool_name":"attachment_rag","message":"Searching the attached document embeddings for relevant evidence...","scan_type":"embedding","file_count":2,"chunks_found":4}\n\n',

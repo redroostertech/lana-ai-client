@@ -384,6 +384,15 @@
         console.warn('[FileViewerPage] Unable to parse fenced LANA document edit suggestion:', error);
       }
     }
+    // Accept an exact whole-response edit object when a compatible local model
+    // omits the requested fence. The discriminator remains mandatory, so
+    // unrelated JSON and JSON embedded in prose cannot become an edit.
+    try {
+      suggestion = normalizedSuggestion(JSON.parse(raw.trim()));
+      if (suggestion) return suggestion;
+    } catch (_bareJsonError) {
+      // Non-JSON assistant prose is the common path.
+    }
     var toolCallPattern = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi;
     while ((match = toolCallPattern.exec(raw))) {
       try {
@@ -1411,6 +1420,7 @@
         releasedDocumentId: baselineRelease && baselineDocumentId ? baselineDocumentId : '',
         editorBaselineReleaseId: baselineRelease && baselineRelease.id ? String(baselineRelease.id) : '',
         editorBaselineReleaseNumber: baselineRelease && baselineRelease.release_number ? Number(baselineRelease.release_number) : null,
+        editorComparisonMode: reviewDisplayScope() === 'release' ? 'release' : 'draft',
         matterId: getCurrentMatterId() || '',
         matterNumber: getConversationMatterId(file) || state.conversationMatterId || '',
         matterName: getFileMatterDisplayName(file) || '',

@@ -24,8 +24,10 @@
   }
 
   function mergeArtifacts(existing, incoming) {
-    var merged = Array.isArray(existing) ? existing.slice() : [];
-    var additions = Array.isArray(incoming) ? incoming : [];
+    var merged = [];
+    var additions = [];
+    if (Array.isArray(existing)) additions = additions.concat(existing);
+    if (Array.isArray(incoming)) additions = additions.concat(incoming);
 
     for (var i = 0; i < additions.length; i += 1) {
       var next = additions[i];
@@ -125,6 +127,19 @@
       ingestion: data.ingestion || null,
       alreadyPromoted: data.already_promoted === true
     };
+  }
+
+  function getPromotedDocumentDownloadUrl(apiClient, documentId, matterId, token) {
+    if (!apiClient || !documentId) return '';
+    var baseUrl = String(apiClient.baseUrl || '');
+    var url = typeof apiClient.getFileDownloadUrl === 'function' && matterId
+      ? apiClient.getFileDownloadUrl(documentId, matterId)
+      : baseUrl + '/api/v1/storage/files/' + encodeURIComponent(documentId) + '/download' +
+        (matterId ? '?matter_id=' + encodeURIComponent(matterId) : '');
+    if (token) {
+      url += (url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(token);
+    }
+    return url;
   }
 
   function getContextPromotionId(item) {
@@ -249,6 +264,7 @@
     getPersistenceView: getPersistenceView,
     getPromotionRequest: getPromotionRequest,
     normalizePromotionResponse: normalizePromotionResponse,
+    getPromotedDocumentDownloadUrl: getPromotedDocumentDownloadUrl,
     getContextPromotionId: getContextPromotionId,
     getContextPromotionView: getContextPromotionView,
     getApproveContextPromotionAction: getApproveContextPromotionAction,
