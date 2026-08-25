@@ -133,6 +133,54 @@
     return result;
   }
 
+  function firstDefined() {
+    for (var i = 0; i < arguments.length; i++) {
+      if (arguments[i] !== undefined && arguments[i] !== null && arguments[i] !== '') {
+        return arguments[i];
+      }
+    }
+    return '';
+  }
+
+  function firstArray() {
+    for (var i = 0; i < arguments.length; i++) {
+      if (Array.isArray(arguments[i])) return arguments[i];
+    }
+    return [];
+  }
+
+  function normalizeMentionUser(item) {
+    item = item || {};
+    var joinedName = [item.first_name, item.last_name].filter(Boolean).join(' ');
+    var name = firstDefined(
+      item.name,
+      item.user_name,
+      item.full_name,
+      item.display_name,
+      joinedName,
+      item.email,
+      'User'
+    );
+    return {
+      id: String(firstDefined(item.id, item.user_id, item.uuid, item.email, name)),
+      name: String(name),
+      email: String(firstDefined(item.email, item.user_email, item.username, '')),
+      role: String(firstDefined(item.role_name, item.role, item.access_type, ''))
+    };
+  }
+
+  function normalizeMentionableUsersResponse(response) {
+    if (!response) return [];
+    if (response.data && !Array.isArray(response.data)) return normalizeMentionableUsersResponse(response.data);
+    return firstArray(
+      response.users,
+      response.items,
+      response.results,
+      response.data,
+      Array.isArray(response) ? response : []
+    ).map(normalizeMentionUser);
+  }
+
   // Escape a string for safe inclusion inside a single-quoted JS string literal
   // that itself lives in an HTML double-quoted attribute (e.g. onclick="..."
   // where args are wrapped in '...'). NO regex — per LEX-COMPONENT-RULES.
@@ -3795,7 +3843,7 @@
   async function _loadMentionableUsers(matterId) {
     try {
       var response = await api.getMentionableUsers(matterId);
-      _mentionableUsers = response.data || [];
+      _mentionableUsers = normalizeMentionableUsersResponse(response);
     } catch (error) {
       console.error('[Comments] Failed to load mentionable users:', error);
       _mentionableUsers = [];
@@ -4120,8 +4168,8 @@
       if (hasAtTrigger) {
         _currentMentionFilter = text.substring(atIdx + 1).toLowerCase();
         var filtered = _mentionableUsers.filter(function (u) {
-          return u.name.toLowerCase().indexOf(_currentMentionFilter) !== -1 ||
-                 u.email.toLowerCase().indexOf(_currentMentionFilter) !== -1;
+          var searchText = [u.name, u.email, u.role].filter(Boolean).join(' ').toLowerCase();
+          return searchText.indexOf(_currentMentionFilter) !== -1;
         });
         _showMentionDropdown(filtered);
         if (documentDropdown) documentDropdown.classList.add('hidden');
