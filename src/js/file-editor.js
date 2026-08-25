@@ -42,6 +42,7 @@
   var activeFilter = 'all';
   var rightRailMode = 'review';
   var reviewRailTab = 'changes';
+  var reviewCommentFilter = 'all';
   var fileInfoMode = 'view';
   var selectedCell = 'A1';
   var activeSlide = 0;
@@ -709,6 +710,7 @@
       : Number(rawAnchorEnd);
     if (!Number.isInteger(anchorStart) || anchorStart < 0) anchorStart = null;
     if (anchorStart === null || !Number.isInteger(anchorEnd) || anchorEnd <= anchorStart) anchorEnd = null;
+    var releasedIn = comment.released_in || comment.releasedIn || null;
     return {
       id: id,
       thread_id: String(comment.thread_id || comment.threadId || id),
@@ -729,6 +731,8 @@
       status: status,
       resolved_at: comment.resolved_at || comment.resolvedAt || null,
       resolved_by: comment.resolved_by || comment.resolvedBy || null,
+      released_in: releasedIn,
+      read_only: comment.read_only === true || comment.readOnly === true || Boolean(releasedIn),
       replies: (Array.isArray(comment.replies) ? comment.replies : []).map(function (reply) {
         return normalizeServerReviewReply(reply, id);
       }).filter(Boolean)
@@ -781,6 +785,7 @@
 
   function officeEditorModeForFile(file) {
     if (!file || file.kind !== 'doc') return 'view';
+    if (file.canWrite === false) return 'view';
     if (file.editorComparisonMode === 'release') return 'view';
     if (isServerReviewFile(file)) {
       var review = serverReview(file);
@@ -1530,6 +1535,7 @@
       review.releaseChangeGroups = await service.loadReleaseChangeGroups({
         api: window.api,
         matterId: review.matterId,
+        documentId: review.sourceDocumentId,
         releases: workflow.releases
       });
       var commentBatch = review.currentDraftBatch || review.pendingReleaseBatch;
@@ -1538,12 +1544,35 @@
         Array.isArray(commentBatch.review_metadata.comments)
         ? commentBatch.review_metadata.comments.map(normalizeServerReviewThread).filter(Boolean)
         : [];
+      var releasedComments = [];
+      review.releaseChangeGroups.forEach(function (group) {
+        var metadata = group && group.review_metadata;
+        var comments = metadata && Array.isArray(metadata.comments) ? metadata.comments : [];
+        var release = group && group.release ? group.release : {};
+        comments.forEach(function (comment) {
+          var normalized = normalizeServerReviewThread(Object.assign({}, comment, {
+            released_in: {
+              id: release.id || group.release_id || '',
+              release_number: release.release_number || null,
+              released_at: release.released_at || null
+            },
+            read_only: true
+          }));
+          if (normalized) releasedComments.push(normalized);
+        });
+      });
       // Merge instead of overwrite: comments added in this session may not
       // have reached the server yet when a reload lands.
       var mergedComments = persistedComments.slice();
       var seenCommentIds = {};
       mergedComments.forEach(function (comment) {
         if (comment && comment.id) seenCommentIds[String(comment.id)] = true;
+      });
+      releasedComments.forEach(function (comment) {
+        if (!comment) return;
+        if (comment.id && seenCommentIds[String(comment.id)]) return;
+        mergedComments.push(comment);
+        if (comment.id) seenCommentIds[String(comment.id)] = true;
       });
       (review.comments || []).forEach(function (comment) {
         if (!comment) return;
@@ -1731,6 +1760,7 @@
 
   function scheduleServerDraftSave(file) {
     if (!isServerReviewFile(file)) return;
+    if (file.canWrite === false) return;
     if (serverDraftSaveTimers[file.id]) clearTimeout(serverDraftSaveTimers[file.id]);
     serverDraftSaveTimers[file.id] = setTimeout(function () {
       delete serverDraftSaveTimers[file.id];
@@ -1741,6 +1771,9 @@
 
   async function saveServerDraft(file, options) {
     var opts = options || {};
+    if (file && file.canWrite === false) {
+      throw new Error('Edit permission is required to save this document.');
+    }
     var review = serverReview(file);
     var service = documentReviewService();
     var editor = editorForFile(file);
@@ -1782,7 +1815,10 @@
       renderChrome();
       throw new Error('The saved draft was not restored, so saving is disabled to prevent data loss.');
     }
-    if (!changes.length && !persistedCount && !review.comments.length) {
+    var persistableComments = review.comments.filter(function (comment) {
+      return comment && comment.read_only !== true;
+    });
+    if (!changes.length && !persistedCount && !persistableComments.length) {
       review.dirty = false;
       renderChrome();
       return null;
@@ -1796,7 +1832,7 @@
       review_metadata: {
         source: 'file_editor',
         document_name: file.filename || file.title || null,
-        comments: review.comments,
+        comments: persistableComments,
         // Review rows are document-ordered for display. The editor supplies a
         // separate action-ordered replay contract so an autosaved DOCX can be
         // reconstructed without reordering overlapping formatting/link edits.
@@ -1936,6 +1972,11 @@
     var review = serverReview(file);
     if (!review) return;
     if (reviewState) review.liveReviewState = reviewState;
+    // setMode() emits the same review-state event as a document mutation.
+    // A read-only principal may temporarily enter review mode while persisted
+    // edit scripts are replayed for display, but that setup work must never be
+    // treated as a new draft or trigger an unauthorized autosave.
+    if (file.canWrite === false) return;
     if (review.restoring || review.loadFailed ||
         review.draftDetailFailed || review.restoreFailed) return;
     review.dirty = true;
@@ -2146,6 +2187,7 @@
         var result = await service.releaseBatch({
           api: window.api,
           matterId: review.matterId,
+          documentId: review.sourceDocumentId,
           batchId: releasingBatchId,
           payload: payload
         });
@@ -2177,7 +2219,7 @@
           review.restored = true;
           review.restoreFailed = false;
           review.dirty = false;
-          if (typeof editor.setMode === 'function') editor.setMode('review');
+          if (typeof editor.setMode === 'function') editor.setMode(officeEditorModeForFile(file));
           toast('Release approval requested. You can keep editing in a new draft.');
         } else {
           toast('Version released.');
@@ -2212,6 +2254,7 @@
       var result = await service.releaseBatch({
         api: window.api,
         matterId: review.matterId,
+        documentId: review.sourceDocumentId,
         batchId: review.pendingReleaseBatch.id,
         payload: { retry_approval: true }
       });
@@ -2246,6 +2289,7 @@
       var result = await service.releaseBatch({
         api: window.api,
         matterId: review.matterId,
+        documentId: review.sourceDocumentId,
         batchId: review.pendingReleaseBatch.id,
         payload: {
           approved: true,
@@ -2498,6 +2542,8 @@
     file.summaryGeneratedAt = incoming.summaryGeneratedAt || file.summaryGeneratedAt || file.updatedAt;
     file.editorEngine = incoming.editorEngine || file.editorEngine;
     file.editorMode = incoming.editorMode || file.editorMode || 'review';
+    file.canWrite = incoming.canWrite === undefined ? (file.canWrite !== false) : incoming.canWrite === true;
+    file.canShare = incoming.canShare === undefined ? (file.canShare !== false) : incoming.canShare === true;
     file.preferDraftShell = incoming.preferDraftShell === true || file.preferDraftShell === true;
     file.openedFromFileViewer = handoff.source === 'file_viewer' || file.openedFromFileViewer;
     file.sourceUrl = incoming.sourceUrl || file.sourceUrl;
@@ -2520,6 +2566,7 @@
     rightRailMode = 'review';
     fileInfoMode = 'view';
     reviewRailTab = 'changes';
+    reviewCommentFilter = 'all';
     saveState();
   }
 
@@ -2686,6 +2733,8 @@
         loading: false,
         loaded: false,
         error: '',
+        canShare: file.canShare !== false,
+        collaboratorsUnavailable: false,
         collaborators: [],
         signaturePackets: [],
         stagedSigners: [],
@@ -2712,12 +2761,21 @@
     renderRemotePanels(file);
     try {
       var documentId = officeRealDocumentId(file);
-      var results = await Promise.all([
+      var results = await Promise.allSettled([
         service.listCollaborators(documentId),
         service.listSignaturePackets(documentId)
       ]);
-      remote.collaborators = results[0].collaborators || [];
-      remote.signaturePackets = results[1].signature_packets || [];
+      remote.canShare = file.canShare !== false && results[0].status === 'fulfilled';
+      remote.collaboratorsUnavailable = results[0].status === 'rejected';
+      remote.collaborators = results[0].status === 'fulfilled'
+        ? (results[0].value.collaborators || [])
+        : [];
+      remote.signaturePackets = results[1].status === 'fulfilled'
+        ? (results[1].value.signature_packets || [])
+        : [];
+      remote.error = results[1].status === 'rejected'
+        ? ((results[1].reason && results[1].reason.message) || 'Signature workflows could not be loaded.')
+        : '';
       if (!remote.selectedPacketId && remote.signaturePackets.length) {
         remote.selectedPacketId = remote.signaturePackets[0].id;
       }
@@ -3672,7 +3730,7 @@
 
   function renderDocFileInfoRail(file, options) {
     var metadata = officeFileMetadata(file);
-    var mode = fileInfoMode === 'edit' ? 'edit' : 'view';
+    var mode = fileInfoMode === 'edit' && file.canWrite !== false ? 'edit' : 'view';
     var mimeType = officeFileMimeType(file);
     var docType = officeDocumentType(file);
     var stats = file && file.kind === 'doc' && !isServerReviewFile(file) && writerTools()
@@ -3714,7 +3772,7 @@
     var detailsHtml = workflowNotice +
       '<div class="office-file-info-subhead"><h3>File Metadata</h3><div class="office-file-info-toggle" role="tablist" aria-label="File metadata mode">' +
       '<button class="' + (mode === 'view' ? 'is-active' : '') + '" type="button" data-action="set-file-info-mode" data-file-info-mode="view">View</button>' +
-      '<button class="' + (mode === 'edit' ? 'is-active' : '') + '" type="button" data-action="set-file-info-mode" data-file-info-mode="edit">Edit</button></div></div>' +
+      '<button class="' + (mode === 'edit' ? 'is-active' : '') + '" type="button" data-action="set-file-info-mode" data-file-info-mode="edit"' + (file.canWrite === false ? ' disabled aria-disabled="true" title="Edit permission required"' : '') + '>Edit</button></div></div>' +
       '<div class="office-file-info-body">' +
       '<section class="office-file-info-card">' +
       '<div><span>' + toolbarIcon('database', 'Size') + '<strong>Size</strong></span><b>' + esc(formatFileSize(officeFileSize(file))) + '</b></div>' +
@@ -3780,12 +3838,26 @@
       throw new Error('Server metadata is unavailable for this document.');
     }
     var documentId = officeRealDocumentId(file);
-    var response = await window.api.patch('/api/v1/storage/files/' + encodeURIComponent(documentId) + '/metadata', metadata);
+    var currentMetadata = officeFileMetadata(file);
+    var nextMetadata = Object.assign({}, metadata);
+    var changed = ['document_type', 'tags', 'notes', 'editor_margin_preset'].some(function (key) {
+      if (nextMetadata[key] === undefined) return false;
+      var currentValue = key === 'document_type'
+        ? officeDocumentType(file)
+        : (currentMetadata[key] === undefined || currentMetadata[key] === null ? '' : currentMetadata[key]);
+      return nextMetadata[key] !== currentValue;
+    });
+    if (!changed) {
+      return { success: true, status: 'success', changed: false, metadata: currentMetadata, updated_at: file.documentUpdatedAt || null };
+    }
+    if (file.documentUpdatedAt) nextMetadata.expected_updated_at = file.documentUpdatedAt;
+    var response = await window.api.patch('/api/v1/storage/files/' + encodeURIComponent(documentId) + '/metadata', nextMetadata);
     if (!response || (response.success !== true && response.status !== 'success')) {
       throw new Error((response && (response.error || response.detail || response.message)) || 'Metadata could not be saved.');
     }
     file.metadata = Object.assign({}, officeFileMetadata(file), metadata);
-    file.updatedAt = nowIso();
+    file.documentUpdatedAt = response.updated_at || file.documentUpdatedAt || '';
+    file.updatedAt = response.updated_at || nowIso();
     return response;
   }
 
@@ -3804,7 +3876,7 @@
     var serverFile = isServerReviewFile(file);
     var serverState = serverFile ? serverReview(file) : null;
     var canReleaseVersion = serverFile
-      ? Boolean(file.editorComparisonMode !== 'release' && serverState && !serverState.releasing && !serverState.embedFailed && !serverState.pendingReleaseBatch &&
+      ? Boolean(file.canWrite !== false && file.editorComparisonMode !== 'release' && serverState && !serverState.releasing && !serverState.embedFailed && !serverState.pendingReleaseBatch &&
           serverState.loaded && !serverState.loadFailed && !serverState.draftDetailFailed && !serverState.restoreFailed &&
           (pendingChanges.length || (serverState.currentDraftBatch && serverState.currentDraftBatch.id)))
       : docHasActiveSavedDraft(file);
@@ -3821,7 +3893,7 @@
     }
     var releaseButton = el('officeReviewReleaseButton');
     if (releaseButton) {
-      var releaseButtonEnabled = !isRequestingRelease && (hasPendingApproval || canReleaseVersion);
+      var releaseButtonEnabled = file.canWrite !== false && !isRequestingRelease && (hasPendingApproval || canReleaseVersion);
       releaseButton.dataset.action = hasPendingApproval ? pendingApprovalAction : 'release-review-version';
       releaseButton.disabled = !releaseButtonEnabled;
       releaseButton.setAttribute('aria-disabled', releaseButtonEnabled ? 'false' : 'true');
@@ -3912,8 +3984,19 @@
       : (file.reviewChanges || []).filter(function (change) {
           return String(change.type || '').toLowerCase() === 'comment';
         });
-    var commentsHtml = commentItems.length
-      ? commentItems.map(function (comment) {
+    var commentCounts = commentItems.reduce(function (counts, comment) {
+      var status = String(comment && comment.status || 'open').toLowerCase() === 'resolved' ? 'resolved' : 'open';
+      counts.all += 1;
+      counts[status] += 1;
+      return counts;
+    }, { all: 0, open: 0, resolved: 0 });
+    var visibleComments = reviewCommentFilter === 'open' || reviewCommentFilter === 'resolved'
+      ? commentItems.filter(function (comment) {
+          return (String(comment && comment.status || 'open').toLowerCase() === 'resolved' ? 'resolved' : 'open') === reviewCommentFilter;
+        })
+      : commentItems;
+    var commentsHtml = visibleComments.length
+      ? visibleComments.map(function (comment) {
         var status = String(comment.status || 'open').toLowerCase() === 'resolved' ? 'Resolved' : 'Open';
         var scope = comment.scope === 'selection' && comment.anchor_text
           ? 'Selection: “' + comment.anchor_text + '”'
@@ -3928,9 +4011,11 @@
           ? '<button type="button" data-action="locate-review-comment" data-comment-id="' + esc(comment.id || '') + '">Locate</button>'
           : '';
         var serverActions = serverFile
-          ? '<div class="office-review-comment-actions">' + locateAction +
+          ? '<div class="office-review-comment-actions">' + locateAction + (comment.read_only
+            ? '<span class="office-review-comment-read-only">Released discussion</span>'
+            :
             '<button type="button" data-action="reply-review-comment" data-comment-id="' + esc(comment.id || '') + '">Reply</button>' +
-            '<button type="button" data-action="' + (status === 'Resolved' ? 'reopen-review-comment' : 'resolve-review-comment') + '" data-comment-id="' + esc(comment.id || '') + '">' + (status === 'Resolved' ? 'Reopen' : 'Resolve') + '</button></div>'
+            '<button type="button" data-action="' + (status === 'Resolved' ? 'reopen-review-comment' : 'resolve-review-comment') + '" data-comment-id="' + esc(comment.id || '') + '">' + (status === 'Resolved' ? 'Reopen' : 'Resolve') + '</button>') + '</div>'
           : '';
         return '<article class="office-review-history-row office-review-comment-thread" data-comment-thread-id="' + esc(comment.id || '') + '" data-comment-status="' + esc(status.toLowerCase()) + '">' +
           '<div class="office-review-history-row-heading"><span class="office-review-history-row-title">Comment</span>' +
@@ -3941,7 +4026,17 @@
           (repliesHtml ? '<div class="office-review-comment-replies">' + repliesHtml + '</div>' : '') +
           serverActions + '</article>';
       }).join('')
-      : '<div class="office-review-empty"><h5>No comments yet</h5><p>Add a document-level review comment.</p></div>';
+      : '<div class="office-review-empty"><h5>No ' + esc(reviewCommentFilter === 'all' ? '' : reviewCommentFilter + ' ') +
+        'comments</h5><p>' + (reviewCommentFilter === 'all'
+          ? 'Add a document-level review comment.'
+          : 'Choose another filter or add a comment.') + '</p></div>';
+    var commentFiltersHtml = '<div class="office-review-comment-filters" role="group" aria-label="Filter comments">' +
+      ['all', 'open', 'resolved'].map(function (filter) {
+        var selected = reviewCommentFilter === filter;
+        return '<button type="button" data-action="set-review-comment-filter" data-comment-filter="' + filter + '"' +
+          ' aria-pressed="' + (selected ? 'true' : 'false') + '" class="' + (selected ? 'is-active' : '') + '">' +
+          esc(filter.charAt(0).toUpperCase() + filter.slice(1)) + ' <span>' + esc(commentCounts[filter]) + '</span></button>';
+      }).join('') + '</div>';
     var bodyHtml = tab === 'versions'
       ? versions.map(function (version) {
         return '<section class="office-review-history-group"><header class="office-review-history-header"><h5>' + esc(version.title) + '</h5><span>' + esc(version.status || 'Draft') + '</span></header>' +
@@ -3950,7 +4045,8 @@
       : tab === 'comments'
         ? '<section class="office-review-comments-panel"><button type="button" data-action="dock-comment"' +
           '>' +
-          toolbarIcon('message-square-plus', 'Com') + '<span>Add comment</span></button><div class="office-review-history-rows">' + commentsHtml + '</div></section>'
+          toolbarIcon('message-square-plus', 'Com') + '<span>Add comment</span></button>' + commentFiltersHtml +
+          '<div class="office-review-history-rows" aria-live="polite">' + commentsHtml + '</div></section>'
         : changeHistoryHtml;
     return '<aside class="office-review-rail" aria-label="Review rail">' +
       '<div class="office-review-rail-card">' +
@@ -4033,9 +4129,23 @@
     var meta = el('officeFileMeta');
     if (titleInput && titleInput.value !== file.title) titleInput.value = file.title || '';
     var officeEdit = ensureOfficeEdit(file);
-    if (titleInput) titleInput.disabled = Boolean(officeEdit && (officeEdit.loading || officeEdit.saving || officeEdit.error));
+    var canWrite = file.canWrite !== false;
+    var canShare = file.canShare !== false;
+    if (titleInput) titleInput.disabled = !canWrite || Boolean(officeEdit && (officeEdit.loading || officeEdit.saving || officeEdit.error));
     var saveButton = document.querySelector('[data-action="save"]');
-    if (saveButton) saveButton.disabled = Boolean(officeEdit && (officeEdit.loading || officeEdit.saving || officeEdit.error));
+    if (saveButton) saveButton.disabled = !canWrite || Boolean(officeEdit && (officeEdit.loading || officeEdit.saving || officeEdit.error));
+    var shareButton = document.querySelector('.office-editor-bar [data-action="share"]');
+    if (shareButton) {
+      shareButton.disabled = !canShare;
+      shareButton.setAttribute('aria-disabled', canShare ? 'false' : 'true');
+      shareButton.title = canShare ? 'Share document' : 'You do not have permission to share this document';
+    }
+    var signButton = document.querySelector('.office-editor-bar [data-action="sign"]');
+    if (signButton) {
+      signButton.disabled = !canWrite;
+      signButton.setAttribute('aria-disabled', canWrite ? 'false' : 'true');
+      signButton.title = canWrite ? 'Prepare for signature' : 'Edit permission is required to prepare a signature packet';
+    }
     if (meta) {
       meta.textContent = KIND_LABELS[file.kind] + ' - Updated ' + formatTime(file.updatedAt) + ' - ' + savedStatusLabel(file);
     }
@@ -4699,7 +4809,7 @@
       return '<li><span><strong>' + esc(collaborator.name) + '</strong>' +
         (collaborator.email ? '<br><span>' + esc(collaborator.email) + '</span>' : '') + '</span>' +
         '<span class="office-pill">' + esc(targetLabel + ' · ' + permissions) + '</span>' +
-        '<button class="office-icon-btn" type="button" data-action="remove-collaborator" data-collaborator-id="' + esc(collaborator.id) + '" aria-label="Remove ' + esc(collaborator.name) + '" title="Remove collaborator">' + toolbarIcon('x', 'Remove') + '</button></li>';
+        '<button class="office-icon-btn" type="button" data-action="remove-collaborator" data-collaborator-id="' + esc(collaborator.id) + '" aria-label="Remove ' + esc(collaborator.name) + '" title="Remove collaborator"' + (remote.canShare ? '' : ' disabled aria-disabled="true"') + '>' + toolbarIcon('x', 'Remove') + '</button></li>';
     }).join('') + '</ul>';
   }
 
@@ -4732,9 +4842,12 @@
         return '<li><span>' + esc(change.title || change.type || 'Tracked change') + '</span><span class="office-pill">' + esc(change.status || 'Pending') + '</span></li>';
       }).join('') + '</ul>'
       : workflowEmpty('No tracked changes yet.');
+    var accessRows = remote.collaboratorsUnavailable
+      ? workflowEmpty('Collaborator details require share permission.')
+      : renderCollaboratorRows(remote);
     panel.innerHTML = '<div class="office-panel-placeholder-grid">' +
-      '<section class="office-section-card"><h2>Document access</h2>' + renderCollaboratorRows(remote) +
-        '<div class="office-inline-actions"><button class="office-btn" type="button" data-action="share">' + toolbarIcon('user-plus', 'Add') + '<span>Add collaborator</span></button></div></section>' +
+      '<section class="office-section-card"><h2>Document access</h2>' + accessRows +
+        '<div class="office-inline-actions"><button class="office-btn" type="button" data-action="share"' + (remote.canShare ? '' : ' disabled aria-disabled="true"') + '>' + toolbarIcon('user-plus', 'Add') + '<span>Add collaborator</span></button></div></section>' +
       '<section class="office-section-card"><h2>Activity</h2>' + activityHtml + '</section>' +
       '<section class="office-section-card"><h2>Versions</h2>' + versionsHtml +
         '<div class="office-inline-actions office-inline-actions--release-only"><button class="office-btn" type="button" data-action="' +
@@ -5889,11 +6002,11 @@
     var file = activeFile();
     var embed = file && editorForFile(file);
     syncOfficeHistoryControls(file, embed);
-    if (file && file.editorComparisonMode === 'release') {
+    if (file && (file.editorComparisonMode === 'release' || file.canWrite === false)) {
       document.querySelectorAll('.office-doc-toolbar [data-command], .office-doc-toolbar [data-action="insert-template-variable"]').forEach(function (control) {
         control.disabled = true;
         control.setAttribute('aria-disabled', 'true');
-        control.title = 'Read-only released version';
+        control.title = file.editorComparisonMode === 'release' ? 'Read-only released version' : 'Edit permission required';
       });
       return;
     }
@@ -6868,6 +6981,7 @@
       if (!command) return;
       var value = commandTarget.dataset.value || commandTarget.value || null;
       var commandFile = activeFile();
+      if (commandFile && commandFile.canWrite === false) return;
       if (commandFile && commandFile.editorComparisonMode === 'release') return;
       if (commandFile && isServerReviewFile(commandFile)) {
         handleEmbedToolbarCommand(commandFile, command, value);
@@ -7041,10 +7155,18 @@
         return;
       }
       if (action === 'share') {
+        if (file && file.canShare === false) {
+          toast('You do not have permission to share this document.');
+          return;
+        }
         openShareDialog(file);
         return;
       }
       if (action === 'sign') {
+        if (file && file.canWrite === false) {
+          toast('Edit permission is required to prepare a signature packet.');
+          return;
+        }
         activateOfficePanel('signatures', { newPacket: true });
         return;
       }
@@ -7115,6 +7237,10 @@
         return;
       }
       if (action === 'save' && file) {
+        if (file.canWrite === false) {
+          toast('This document is read-only.');
+          return;
+        }
         if (isServerOfficeFile(file)) {
           saveOfficeEditModel(file).then(function () {
             toast('Office file saved.');
@@ -7145,6 +7271,10 @@
         return;
       }
       if (action === 'add-selection-comment') {
+        if (file && file.canWrite === false) {
+          toast('Edit permission is required to add comments.');
+          return;
+        }
         addSelectionComment();
         return;
       }
@@ -7170,11 +7300,19 @@
         return;
       }
       if (action === 'set-file-info-mode') {
+        if (actionTarget.dataset.fileInfoMode === 'edit' && file && file.canWrite === false) {
+          toast('Edit permission is required to update metadata.');
+          return;
+        }
         fileInfoMode = actionTarget.dataset.fileInfoMode === 'edit' ? 'edit' : 'view';
         if (!refreshFileInfoDrawer(file)) renderReviewDock(file);
         return;
       }
       if (action === 'save-file-info' && file) {
+        if (file.canWrite === false) {
+          toast('Edit permission is required to update metadata.');
+          return;
+        }
         var docTypeInput = el('officeMetaDocType');
         var tagsInput = el('officeMetaTags');
         var notesInput = el('officeMetaNotes');
@@ -7184,14 +7322,21 @@
           notes: notesInput ? notesInput.value.trim() : ''
         };
         actionTarget.disabled = true;
-        saveServerFileMetadata(file, nextMetadata).then(function () {
+        saveServerFileMetadata(file, nextMetadata).then(function (response) {
           fileInfoMode = 'view';
           renderChrome();
           if (!refreshFileInfoDrawer(file)) renderReviewDock(file);
-          toast('File metadata saved.');
+          toast(response && response.changed === false ? 'No metadata changes to save.' : 'File metadata saved.');
         }).catch(function (error) {
+          if (error && error.status === 409 && error.data) {
+            var latest = error.data.current_metadata;
+            if (latest && typeof latest === 'object') file.metadata = Object.assign({}, officeFileMetadata(file), latest);
+            if (error.data.current_updated_at) file.documentUpdatedAt = error.data.current_updated_at;
+          }
           actionTarget.disabled = false;
-          toast((error && error.message) || 'File metadata could not be saved.');
+          toast(error && error.status === 409
+            ? 'Metadata changed on the server. Review your values and save again.'
+            : ((error && error.message) || 'File metadata could not be saved.'));
         });
         return;
       }
@@ -7237,6 +7382,12 @@
       if (action === 'set-review-tab') {
         var nextReviewTab = actionTarget.dataset.reviewTab || 'changes';
         reviewRailTab = nextReviewTab === 'versions' || nextReviewTab === 'comments' ? nextReviewTab : 'changes';
+        renderReviewDock(file);
+        return;
+      }
+      if (action === 'set-review-comment-filter') {
+        var nextCommentFilter = actionTarget.dataset.commentFilter || 'all';
+        reviewCommentFilter = nextCommentFilter === 'open' || nextCommentFilter === 'resolved' ? nextCommentFilter : 'all';
         renderReviewDock(file);
         return;
       }
@@ -7290,6 +7441,10 @@
         return;
       }
       if (action === 'release-review-version' && file) {
+        if (file.canWrite === false) {
+          toast('Edit permission is required to release a version.');
+          return;
+        }
         if (isServerReviewFile(file)) {
           releaseServerVersion(file);
           return;
@@ -7298,6 +7453,10 @@
         return;
       }
       if (action === 'set-doc-margin' && file && file.kind === 'doc') {
+        if (file.canWrite === false) {
+          toast('Edit permission is required to change document margins.');
+          return;
+        }
         var margin = actionTarget.dataset.margin || 'normal';
         file.marginPreset = margin === 'narrow' || margin === 'wide' ? margin : 'normal';
         var frame = document.querySelector('.office-doc-frame');
@@ -7475,6 +7634,10 @@
       }
       if (event.target && event.target.id === 'officeFileTitle') {
         var titleFile = activeFile();
+        if (titleFile && titleFile.canWrite === false) {
+          event.target.value = titleFile.filename || titleFile.title || '';
+          return;
+        }
         renameServerDocument(titleFile, event.target.value).catch(function (error) {
           if (titleFile) event.target.value = titleFile.filename || titleFile.title || '';
           toast((error && error.message) || 'The file could not be renamed.');
@@ -7599,6 +7762,7 @@
     matterId = matterId || String(file.client_matter || file.matter_id || '').trim();
     var conversationMatter = await resolveOfficeConversationMatterContext(matterId);
     var kind = officeKindForRouteFile(file);
+    var access = file.access && typeof file.access === 'object' ? file.access : {};
     var capabilities = file.format_capabilities || file.formatCapabilities || null;
     if ((kind === 'sheet' || kind === 'deck') && matterId) {
       var capabilityResponse = await window.api.get(
@@ -7649,6 +7813,11 @@
           summaryGeneratedAt: file.summary_generated_at || '',
           editorEngine: kind === 'doc' ? 'lana-editor' : 'server-edit-model',
           editorMode: kind === 'doc' ? 'review' : 'edit',
+          // The metadata endpoint is the authority for document-scoped
+          // capabilities. Fail closed if an older/malformed response omits
+          // them instead of silently granting edit or reshare access.
+          canWrite: access.can_write === true,
+          canShare: access.can_share === true,
           officeEditingSupported: kind === 'sheet' || kind === 'deck',
           formatCapabilities: capabilities || {},
           sourceUrl: sourceUrl

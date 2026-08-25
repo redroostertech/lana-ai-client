@@ -382,13 +382,14 @@ describe('LanaDocumentReview API workflows', () => {
   test('distinguishes an unavailable release batch detail from a valid empty release', async () => {
     var api = makeApi([
       {
-        match: 'GET /api/v1/matters/MATT-1/document-edit-batches/batch-ok',
-        reply: { data: { id: 'batch-ok', changes: [] } }
+        match: 'GET /api/v1/matters/MATT-1/documents/source-doc/edit-batches/batch-ok',
+        reply: { data: { id: 'batch-ok', changes: [], review_metadata: { comments: [{ id: 'comment-1' }] } } }
       }
     ]);
     var groups = await review.loadReleaseChangeGroups({
       api,
       matterId: 'MATT-1',
+      documentId: 'source-doc',
       releases: [
         { id: 'release-ok', edit_batch_id: 'batch-ok' },
         { id: 'release-failed', edit_batch_id: 'batch-5xx' },
@@ -397,7 +398,12 @@ describe('LanaDocumentReview API workflows', () => {
     });
 
     expect(groups).toEqual([
-      expect.objectContaining({ release_id: 'release-ok', changes: [], failed: false }),
+      expect.objectContaining({
+        release_id: 'release-ok',
+        changes: [],
+        review_metadata: { comments: [{ id: 'comment-1' }] },
+        failed: false
+      }),
       expect.objectContaining({ release_id: 'release-failed', changes: [], failed: true }),
       expect.objectContaining({ release_id: 'release-without-batch', changes: [], failed: true })
     ]);
@@ -417,11 +423,11 @@ describe('LanaDocumentReview API workflows', () => {
         }
       },
       {
-        match: /^GET \/api\/v1\/matters\/MATT-1\/document-edit-batches\?document_id=source-doc/,
+        match: /^GET \/api\/v1\/matters\/MATT-1\/documents\/source-doc\/edit-batches\?/,
         reply: { data: [{ id: 'draft-original', status: 'draft', base_file_version_id: 'source-fv-1' }] }
       },
       {
-        match: 'GET /api/v1/matters/MATT-1/document-edit-batches/draft-original',
+        match: 'GET /api/v1/matters/MATT-1/documents/source-doc/edit-batches/draft-original',
         reply: { data: { id: 'draft-original', status: 'draft', base_file_version_id: 'source-fv-1', changes: [{ change_key: 'c1', edit_script: insertScript }] } }
       }
     ]);
@@ -445,11 +451,11 @@ describe('LanaDocumentReview API workflows', () => {
         reply: { data: [{ id: 'rel-7', released_document_id: 'released-doc', file_version_id: 'fv-7', release_number: 7, edit_batch_id: 'batch-7' }], metadata: { source_document_id: 'source-doc' } }
       },
       {
-        match: /^GET \/api\/v1\/matters\/MATT-1\/document-edit-batches\?document_id=source-doc/,
+        match: /^GET \/api\/v1\/matters\/MATT-1\/documents\/source-doc\/edit-batches\?/,
         reply: { data: [{ id: 'draft-1', status: 'draft', base_file_version_id: 'fv-7' }, { id: 'old-1', status: 'released' }] }
       },
       {
-        match: 'GET /api/v1/matters/MATT-1/document-edit-batches/draft-1',
+        match: 'GET /api/v1/matters/MATT-1/documents/source-doc/edit-batches/draft-1',
         reply: { data: { id: 'draft-1', status: 'draft', base_file_version_id: 'fv-7', changes: [{ change_key: 'c1', edit_script: { version: '0', ops: [{ op: 'insertText', at: { paragraph: 0, start: 0 }, text: 'Release draft' }] } }] } }
       }
     ]);
@@ -478,7 +484,7 @@ describe('LanaDocumentReview API workflows', () => {
         reply: { data: [release], metadata: { source_document_id: 'source-doc' } }
       },
       {
-        match: /^GET \/api\/v1\/matters\/MATT-1\/document-edit-batches\?document_id=source-doc/,
+        match: /^GET \/api\/v1\/matters\/MATT-1\/documents\/source-doc\/edit-batches\?/,
         reply: { data: [{ id: 'stale-draft', status: 'draft', base_file_version_id: 'fv-7' }] }
       }
     ]);
@@ -487,12 +493,12 @@ describe('LanaDocumentReview API workflows', () => {
 
     expect(workflow.currentBaseFileVersionId).toBe('fv-8');
     expect(workflow.currentDraftBatch).toBeNull();
-    expect(api.calls.some((call) => call.endpoint.includes('/document-edit-batches/stale-draft'))).toBe(false);
+    expect(api.calls.some((call) => call.endpoint.includes('/edit-batches/stale-draft'))).toBe(false);
   });
 
   test('saveDraftBatch PATCHes an active draft and POSTs a new one', async () => {
     const api = makeApi([
-      { match: 'PATCH /api/v1/matters/MATT-1/document-edit-batches/draft-1', reply: { data: { id: 'draft-1', status: 'draft' } } },
+      { match: 'PATCH /api/v1/matters/MATT-1/documents/source-doc/edit-batches/draft-1', reply: { data: { id: 'draft-1', status: 'draft' } } },
       { match: 'POST /api/v1/matters/MATT-1/documents/source-doc/edit-batches', reply: { data: { id: 'draft-2', status: 'draft' } } }
     ]);
 
@@ -518,7 +524,7 @@ describe('LanaDocumentReview API workflows', () => {
 
   test('saveDraftBatch PATCH forwards current editor operations without rewriting them', async () => {
     const api = makeApi([
-      { match: 'PATCH /api/v1/matters/MATT-1/document-edit-batches/draft-1', reply: { data: { id: 'draft-1', status: 'draft' } } }
+      { match: 'PATCH /api/v1/matters/MATT-1/documents/source-doc/edit-batches/draft-1', reply: { data: { id: 'draft-1', status: 'draft' } } }
     ]);
     const formatOp = {
       op: 'formatText',
@@ -547,6 +553,26 @@ describe('LanaDocumentReview API workflows', () => {
     expect(api.calls[0].payload.changes[0].edit_script.ops[0]).toEqual(formatOp);
   });
 
+  test('releases through the same document-scoped batch boundary', async () => {
+    const api = makeApi([
+      {
+        match: 'POST /api/v1/matters/MATT-1/documents/source-doc/edit-batches/draft-1/release',
+        reply: { data: { batch: { id: 'draft-1', status: 'pending_release' }, approval_required: true } }
+      }
+    ]);
+
+    const result = await review.releaseBatch({
+      api,
+      matterId: 'MATT-1',
+      documentId: 'source-doc',
+      batchId: 'draft-1',
+      payload: { content_text: 'final' }
+    });
+
+    expect(result).toMatchObject({ approval_required: true });
+    expect(api.calls[0].endpoint).toContain('/documents/source-doc/edit-batches/draft-1/release');
+  });
+
   test('loadWorkflow hydrates pending-release batch detail for approval-safe rendering', async () => {
     const api = makeApi([
       {
@@ -554,11 +580,11 @@ describe('LanaDocumentReview API workflows', () => {
         reply: { data: [], metadata: { source_document_id: 'source-doc' } }
       },
       {
-        match: /^GET \/api\/v1\/matters\/MATT-1\/document-edit-batches\?document_id=source-doc/,
+        match: /^GET \/api\/v1\/matters\/MATT-1\/documents\/source-doc\/edit-batches\?/,
         reply: { data: [{ id: 'pending-1', status: 'pending_release' }] }
       },
       {
-        match: 'GET /api/v1/matters/MATT-1/document-edit-batches/pending-1',
+        match: 'GET /api/v1/matters/MATT-1/documents/source-doc/edit-batches/pending-1',
         reply: {
           data: {
             id: 'pending-1',

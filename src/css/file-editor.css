@@ -1941,6 +1941,44 @@
   padding: 0 10px;
 }
 
+.office-review-comment-filters {
+  background: var(--office-rail-bg);
+  border: 1px solid var(--office-line);
+  border-radius: var(--lex-radius-md);
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 4px;
+}
+
+.office-review-comment-filters button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--lex-radius-sm);
+  color: var(--lex-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  gap: 4px;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 6px;
+}
+
+.office-review-comment-filters button.is-active {
+  background: var(--office-panel-bg);
+  border-color: var(--office-line-strong);
+  color: var(--lex-text-primary);
+}
+
+.office-review-comment-filters button span {
+  color: var(--lex-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
 .office-review-comments-panel svg {
   height: var(--lex-icon-small);
   width: var(--lex-icon-small);

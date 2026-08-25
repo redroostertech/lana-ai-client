@@ -47,6 +47,14 @@
     return '/api/v1/matters/' + encodeURIComponent(matterId) + path;
   }
 
+  function documentBatchEndpoint(matterId, documentId, path) {
+    if (!documentId) throw new Error('A source document is required for this review operation.');
+    return matterEndpoint(
+      matterId,
+      '/documents/' + encodeURIComponent(documentId) + '/edit-batches' + (path || '')
+    );
+  }
+
   function responseData(response) {
     return response && response.data !== undefined && response.data !== null ? response.data : response;
   }
@@ -1029,15 +1037,17 @@
   async function hydrateBatchDetail(options) {
     var api = options && options.api;
     var matterId = options && options.matterId;
+    var documentId = String(options && options.documentId || '');
     var batch = options && options.batch;
     if (!batch || !batch.id || Array.isArray(batch.changes)) {
       return { batch: batch || null, failed: false, error: null };
     }
     if (!api) throw new Error('hydrateBatchDetail requires an api client.');
     try {
-      var response = await api.get(matterEndpoint(
+      var response = await api.get(documentBatchEndpoint(
         matterId,
-        '/document-edit-batches/' + encodeURIComponent(batch.id)
+        documentId,
+        '/' + encodeURIComponent(batch.id)
       ));
       return {
         batch: responseData(response) || batch,
@@ -1122,8 +1132,8 @@
     var currentBaseFileVersionId = openedRelease && openedRelease.file_version_id
       ? String(openedRelease.file_version_id)
       : '';
-    var query = '?document_id=' + encodeURIComponent(sourceDocumentId) + '&limit=20&sort_by=updated_at&sort_dir=desc';
-    var batchesResponse = await api.get(matterEndpoint(matterId, '/document-edit-batches' + query));
+    var query = '?limit=20&sort_by=updated_at&sort_dir=desc';
+    var batchesResponse = await api.get(documentBatchEndpoint(matterId, sourceDocumentId, query));
     var batches = Array.isArray(batchesResponse && batchesResponse.data) ? batchesResponse.data : [];
     var currentDraftBatch = activeDraftBatchForBaseVersion(
       batches,
@@ -1135,13 +1145,13 @@
     var pendingDetailFailed = false;
 
     if (currentDraftBatch && currentDraftBatch.id && options.loadDraftDetail !== false) {
-      var draftDetail = await hydrateBatchDetail({ api: api, matterId: matterId, batch: currentDraftBatch });
+      var draftDetail = await hydrateBatchDetail({ api: api, matterId: matterId, documentId: sourceDocumentId, batch: currentDraftBatch });
       currentDraftBatch = draftDetail.batch;
       draftDetailFailed = draftDetail.failed;
     }
 
     if (pendingReleaseBatch && pendingReleaseBatch.id && options.loadDraftDetail !== false) {
-      var pendingDetail = await hydrateBatchDetail({ api: api, matterId: matterId, batch: pendingReleaseBatch });
+      var pendingDetail = await hydrateBatchDetail({ api: api, matterId: matterId, documentId: sourceDocumentId, batch: pendingReleaseBatch });
       pendingReleaseBatch = pendingDetail.batch;
       pendingDetailFailed = pendingDetail.failed;
     }
@@ -1163,6 +1173,7 @@
   async function loadReleaseChangeGroups(options) {
     var api = options.api;
     var matterId = options.matterId;
+    var documentId = String(options.documentId || '');
     var releases = Array.isArray(options.releases) ? options.releases : [];
     var groups = new Array(releases.length);
     var cursor = 0;
@@ -1180,12 +1191,13 @@
           };
         } else {
           try {
-            var batchResponse = await api.get(matterEndpoint(matterId, '/document-edit-batches/' + encodeURIComponent(release.edit_batch_id)));
+            var batchResponse = await api.get(documentBatchEndpoint(matterId, documentId, '/' + encodeURIComponent(release.edit_batch_id)));
             var batch = responseData(batchResponse);
             groups[index] = {
               release_id: release.id,
               release: release,
               changes: Array.isArray(batch && batch.changes) ? batch.changes : [],
+              review_metadata: batch && batch.review_metadata ? batch.review_metadata : {},
               failed: false
             };
           } catch (error) {
@@ -1210,17 +1222,17 @@
     var matterId = options.matterId;
     var payload = options.payload || {};
     var batch = options.batch || null;
+    var documentId = String(options.documentId || '');
+    if (!documentId) throw new Error('saveDraftBatch requires a documentId.');
     var response;
     if (batch && batch.id && isActiveDraftBatch(batch)) {
       response = await api.patch(
-        matterEndpoint(matterId, '/document-edit-batches/' + encodeURIComponent(batch.id)),
+        documentBatchEndpoint(matterId, documentId, '/' + encodeURIComponent(batch.id)),
         payload
       );
     } else {
-      var documentId = String(options.documentId || '');
-      if (!documentId) throw new Error('saveDraftBatch requires a documentId to create a draft.');
       response = await api.post(
-        matterEndpoint(matterId, '/documents/' + encodeURIComponent(documentId) + '/edit-batches'),
+        documentBatchEndpoint(matterId, documentId, ''),
         payload
       );
     }
@@ -1231,10 +1243,11 @@
   async function releaseBatch(options) {
     var api = options.api;
     var matterId = options.matterId;
+    var documentId = String(options.documentId || '');
     var batchId = options.batchId;
     if (!batchId) throw new Error('releaseBatch requires a batchId.');
     var response = await api.post(
-      matterEndpoint(matterId, '/document-edit-batches/' + encodeURIComponent(batchId) + '/release'),
+      documentBatchEndpoint(matterId, documentId, '/' + encodeURIComponent(batchId) + '/release'),
       options.payload || {}
     );
     return responseData(response);

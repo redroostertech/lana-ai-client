@@ -49,6 +49,7 @@
     reviewSourceDocumentId: null,
     reviewSourceFile: null,
     reviewWorkflowPromise: null,
+    editorNavigationRequested: false,
     reviewReleases: [],
     reviewReleaseMetadata: {},
     reviewDisplayTarget: null,
@@ -1441,6 +1442,8 @@
         summaryGeneratedAt: sourceFile && sourceFile.summary_generated_at,
         editorEngine: fileEditorKindForFile(sourceFile) === 'doc' ? 'lana-editor' : 'server-edit-model',
         editorMode: fileEditorKindForFile(sourceFile) === 'doc' ? 'review' : 'edit',
+        canWrite: Boolean(sourceFile && sourceFile.access && sourceFile.access.can_write === true),
+        canShare: Boolean(sourceFile && sourceFile.access && sourceFile.access.can_share === true),
         officeEditingSupported: isOfficeEditFormat(file) && officeCapabilitySupportsEditing(currentFormatCapabilities(file)),
         formatCapabilities: currentFormatCapabilities(file),
         content: visibleViewerDocumentHtml(),
@@ -1451,7 +1454,7 @@
     };
   }
 
-  async function openCurrentFileInFileEditor() {
+  function openCurrentFileInFileEditor() {
     var file = state.currentFile;
     if (!file || !file.id) {
       notify('No file is open to edit.', 'error');
@@ -1463,27 +1466,11 @@
         : 'This format is read-only. Convert it to DOCX before opening File Editor.', 'error');
       return;
     }
-    var openButton = document.getElementById('viewerReviewModeBadge');
-    if (openButton) {
-      openButton.disabled = true;
-      openButton.setAttribute('aria-busy', 'true');
-    }
-    try {
-      if (state.reviewWorkflowPromise) {
-        await state.reviewWorkflowPromise;
-      } else if (canReviewFile(file) && !state.reviewSourceDocumentId) {
-        state.reviewWorkflowPromise = loadReviewWorkflow(file);
-        await state.reviewWorkflowPromise;
-      }
-    } catch (error) {
-      notify((error && error.message) || 'Review history could not be prepared for File Editor.', 'error');
-      return;
-    } finally {
-      if (openButton) {
-        openButton.disabled = false;
-        openButton.removeAttribute('aria-busy');
-      }
-    }
+    // File Editor performs its own authoritative document/review load. Do not
+    // await Viewer's background lineage workflow here: that workflow may
+    // canonicalize the source route to the latest release, which would unload
+    // this page and swallow the user's click before navigation occurs.
+    state.editorNavigationRequested = true;
     var matterId = getCurrentMatterId() || '';
     var handoff = fileEditorHandoff(file);
     Lex.Nav.go('file-editor.html', {
@@ -2505,6 +2492,11 @@
   }
 
   function openLatestReleasedDocumentIfAvailable(file) {
+    // A user-initiated File Editor handoff takes precedence over the Viewer's
+    // background latest-release canonicalization. Without this guard, the
+    // router can replace a queued editor route with a second viewer route when
+    // the review workflow finishes during the click.
+    if (state.editorNavigationRequested) return false;
     if (shouldHonorExplicitVersionView(file)) return false;
     if (isReleasedArtifactFile(file) || releaseForCurrentFile(file)) return false;
     var latest = latestReviewRelease();
@@ -2782,7 +2774,7 @@
     }
     if (!release.edit_batch_id) return { changes: [], failed: Boolean(release.id) };
     try {
-      var batchResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(release.edit_batch_id)));
+      var batchResponse = await api.get(reviewDocumentBatchEndpoint('', '/' + encodeURIComponent(release.edit_batch_id)));
       var batch = batchResponse && batchResponse.data ? batchResponse.data : batchResponse;
       return {
         changes: Array.isArray(batch && batch.changes) ? batch.changes : [],
@@ -2964,7 +2956,7 @@
     var changes = [];
     if (release.edit_batch_id) {
       try {
-        var batchResponse = await api.get(reviewEndpoint('/document-edit-batches/' + encodeURIComponent(release.edit_batch_id)));
+        var batchResponse = await api.get(reviewDocumentBatchEndpoint('', '/' + encodeURIComponent(release.edit_batch_id)));
         var batch = batchResponse && batchResponse.data ? batchResponse.data : batchResponse;
         changes = Array.isArray(batch && batch.changes) ? batch.changes : [];
       } catch (error) {
@@ -3404,6 +3396,19 @@
     return '/api/v1/matters/' + encodeURIComponent(matterId) + path;
   }
 
+  function reviewDocumentBatchEndpoint(documentId, path) {
+    var sourceDocumentId = String(
+      documentId ||
+      state.reviewSourceDocumentId ||
+      canonicalReviewSourceDocumentId(state.currentFile) ||
+      ''
+    );
+    if (!sourceDocumentId) throw new Error('A source document is required for this review operation.');
+    return reviewEndpoint(
+      '/documents/' + encodeURIComponent(sourceDocumentId) + '/edit-batches' + (path || '')
+    );
+  }
+
   function currentReviewState() {
     if (state.editorInstance && typeof state.editorInstance.reviewState === 'function') {
       try {
@@ -3754,6 +3759,7 @@
     var result = await LanaDocumentReview.hydrateBatchDetail({
       api: api,
       matterId: getCurrentMatterId(),
+      documentId: state.reviewSourceDocumentId || canonicalReviewSourceDocumentId(state.currentFile),
       batch: batch
     });
     if (result.failed) {
@@ -3853,8 +3859,8 @@
           console.warn('[FileViewerPage] Source document metadata load failed:', sourceFileError);
         }
       }
-      var query = '?document_id=' + encodeURIComponent(reviewDocumentId) + '&limit=20&sort_by=updated_at&sort_dir=desc';
-      var batchesResponse = await api.get(reviewEndpoint('/document-edit-batches' + query));
+      var query = '?limit=20&sort_by=updated_at&sort_dir=desc';
+      var batchesResponse = await api.get(reviewDocumentBatchEndpoint(reviewDocumentId, query));
       state.reviewBatches = Array.isArray(batchesResponse && batchesResponse.data) ? batchesResponse.data : [];
       state.reviewReleases = Array.isArray(releasesResponse && releasesResponse.data) ? releasesResponse.data : [];
       state.reviewReleaseMetadata = releasesResponse && releasesResponse.metadata
@@ -3890,6 +3896,7 @@
     return LanaDocumentReview.loadReleaseChangeGroups({
       api: api,
       matterId: getCurrentMatterId(),
+      documentId: state.reviewSourceDocumentId || canonicalReviewSourceDocumentId(state.currentFile),
       releases: releases
     });
   }
@@ -4028,13 +4035,13 @@
         && state.currentReviewBatch.id
         && (state.currentReviewBatch.status === 'draft' || state.currentReviewBatch.status === 'proposed')) {
         response = await api.patch(
-          reviewEndpoint('/document-edit-batches/' + encodeURIComponent(state.currentReviewBatch.id)),
+          reviewDocumentBatchEndpoint('', '/' + encodeURIComponent(state.currentReviewBatch.id)),
           payload
         );
       } else {
         var reviewDocumentId = String(state.currentFile.id);
         response = await api.post(
-          reviewEndpoint('/documents/' + encodeURIComponent(reviewDocumentId) + '/edit-batches'),
+          reviewDocumentBatchEndpoint(reviewDocumentId, ''),
           payload
         );
       }
@@ -4070,7 +4077,7 @@
         if (!bytes) throw new Error('No document bytes are available to release.');
         var releaseBytes = await acceptedReleaseBytesForEditor(state.currentFile, bytes);
         var response = await api.post(
-          reviewEndpoint('/document-edit-batches/' + encodeURIComponent(batch.id) + '/release'),
+          reviewDocumentBatchEndpoint('', '/' + encodeURIComponent(batch.id) + '/release'),
           releasePayloadForEditorBytes(state.currentFile, releaseBytes)
         );
         state.currentReviewBatch = response && response.data && response.data.batch
@@ -4409,6 +4416,7 @@
     state.reviewSourceDocumentId = null;
     state.reviewSourceFile = null;
     state.reviewWorkflowPromise = null;
+    state.editorNavigationRequested = false;
     state.reviewReleases = [];
     state.reviewDisplayTarget = null;
     state.selectedReviewReleaseId = null;

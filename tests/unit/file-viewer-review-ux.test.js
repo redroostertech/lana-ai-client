@@ -112,9 +112,16 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('params: { id: handoff.file.documentId');
     expect(pageJs).toContain('reviewSourceFile');
     expect(pageJs).toContain("state.reviewSourceFile = await api.get('/api/v1/storage/files/'");
-    expect(pageJs).toContain('async function openCurrentFileInFileEditor()');
-    expect(pageJs).toContain('if (state.reviewWorkflowPromise)');
-    expect(pageJs).toContain('await state.reviewWorkflowPromise;');
+    expect(pageJs).toContain('function openCurrentFileInFileEditor()');
+    const openEditorSource = pageJs.slice(
+      pageJs.indexOf('function openCurrentFileInFileEditor()'),
+      pageJs.indexOf('function targetBackRoute()')
+    );
+    expect(openEditorSource).not.toContain('await state.reviewWorkflowPromise');
+    expect(openEditorSource).not.toContain("state.reviewWorkflowPromise = loadReviewWorkflow(file)");
+    expect(openEditorSource).toContain('state.editorNavigationRequested = true');
+    expect(pageJs).toContain('if (state.editorNavigationRequested) return false;');
+    expect(pageJs).toContain('state.editorNavigationRequested = false;');
     expect(pageJs).toContain('function visibleViewerDocumentHtml');
     expect(pageJs).toContain('function fileEditorReviewChanges');
     expect(pageJs).toContain('reviewChanges: fileEditorReviewChanges()');
@@ -590,11 +597,11 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain("editorComparisonMode: reviewDisplayScope() === 'release' ? 'release' : 'draft'");
     expect(pageJs).toContain('var reviewDocumentId = String(file.id);');
     expect(pageJs).toContain('LanaDocumentReview.loadReleaseLineage({');
-    expect(pageJs).toContain("'?document_id=' + encodeURIComponent(reviewDocumentId)");
+    expect(pageJs).toContain("reviewDocumentBatchEndpoint(reviewDocumentId, query)");
     expect(pageJs).toContain('state.reviewReleases = Array.isArray(releasesResponse && releasesResponse.data)');
     expect(pageJs).toContain('if (isReleasedArtifactFile(file) || releaseForCurrentFile(file)) return false;');
     expect(pageJs).toContain('var openedRelease = releaseForCurrentFile(file);');
-    expect(pageJs).toContain("reviewEndpoint('/documents/' + encodeURIComponent(reviewDocumentId) + '/edit-batches')");
+    expect(pageJs).toContain("reviewDocumentBatchEndpoint(reviewDocumentId, '')");
   });
 
   test('File Info exposes authoritative updated and release metadata after reload', () => {

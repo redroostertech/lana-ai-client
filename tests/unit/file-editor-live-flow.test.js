@@ -255,6 +255,27 @@ describe('File Editor live document boundary', () => {
     expect(css).toContain('box-shadow: none;');
   });
 
+  test('saves File Info metadata idempotently and recovers from optimistic conflicts', () => {
+    const saveSource = editor.slice(
+      editor.indexOf('async function saveServerFileMetadata(file, metadata)'),
+      editor.indexOf('function renderDocReviewRail(file)')
+    );
+    const actionSource = editor.slice(
+      editor.indexOf("if (action === 'save-file-info'"),
+      editor.indexOf("if (action === 'refresh-review-workflow'", editor.indexOf("if (action === 'save-file-info'"))
+    );
+
+    expect(saveSource).toContain("['document_type', 'tags', 'notes', 'editor_margin_preset'].some");
+    expect(saveSource).toContain('changed: false');
+    expect(saveSource).toContain('nextMetadata.expected_updated_at = file.documentUpdatedAt');
+    expect(saveSource).toContain('file.documentUpdatedAt = response.updated_at');
+    expect(actionSource).toContain("response && response.changed === false ? 'No metadata changes to save.'");
+    expect(actionSource).toContain('error && error.status === 409');
+    expect(actionSource).toContain('error.data.current_metadata');
+    expect(actionSource).toContain('error.data.current_updated_at');
+    expect(actionSource).toContain('Metadata changed on the server. Review your values and save again.');
+  });
+
   test('uses durable URL identity and never hands off authorization headers', () => {
     expect(viewer).toContain("params: { id: handoff.file.documentId, matter_id: matterId || null }");
     expect(createModal).toContain('params: { id: doc.id, matter_id: matterId }');
@@ -426,7 +447,11 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('data-action="new-signature-packet">Prepare another packet');
     expect(editor).toContain("var permissions = collaborator.permission");
     expect(editor).toContain("was granted ' + permission + ' access");
-    expect(editor).toContain('comments: review.comments');
+    expect(editor).toContain('var releasedComments = []');
+    expect(editor).toContain('group && group.review_metadata');
+    expect(editor).toContain('read_only: true');
+    expect(editor).toContain('var persistableComments = review.comments.filter');
+    expect(editor).toContain('comments: persistableComments');
     expect(commentSource).toContain('review.comments.map(normalizeServerReviewThread)');
     expect(commentSource).toContain("scope: anchorText ? 'selection' : 'document'");
     expect(commentSource).toContain("status: 'open'");
@@ -437,12 +462,17 @@ describe('File Editor live document boundary', () => {
     expect(railSource).toContain('office-review-comment-meta');
     expect(railSource).toContain('office-review-comment-scope');
     expect(railSource).toContain('data-action="locate-review-comment"');
+    expect(railSource).toContain('data-action="set-review-comment-filter"');
+    expect(railSource).toContain('aria-label="Filter comments"');
+    expect(railSource).toContain("{ all: 0, open: 0, resolved: 0 }");
     expect(railSource).toContain('data-action="reply-review-comment"');
+    expect(railSource).toContain('Released discussion');
     expect(railSource).toContain("status === 'Resolved' ? 'reopen-review-comment' : 'resolve-review-comment'");
     expect(actionSource).toContain("action === 'reply-review-comment'");
     expect(actionSource).toContain("action === 'resolve-review-comment' || action === 'reopen-review-comment'");
     expect(css).toContain('.office-review-comment-replies');
     expect(css).toContain('.office-review-comment-actions');
+    expect(css).toContain('.office-review-comment-filters');
   });
 
   test('shares with people or workspaces and confirms access removal', () => {
@@ -465,6 +495,30 @@ describe('File Editor live document boundary', () => {
     expect(sharingSource).toContain("cancelText: 'Keep access'");
     expect(editor).toContain('confirmRemoveCollaborator(file, actionTarget.dataset.collaboratorId)');
     expect(editor).toContain("collaborator.target_type === 'workspace' ? 'Workspace' : 'Person'");
+  });
+
+  test('honors document read, write, and share capabilities without widening workspace access', () => {
+    expect(viewer).toContain('canWrite: Boolean(sourceFile && sourceFile.access && sourceFile.access.can_write === true)');
+    expect(viewer).toContain('canShare: Boolean(sourceFile && sourceFile.access && sourceFile.access.can_share === true)');
+    expect(editor).toContain("var access = file.access && typeof file.access === 'object' ? file.access : {}");
+    expect(editor).toContain('canWrite: access.can_write === true');
+    expect(editor).toContain('canShare: access.can_share === true');
+    expect(editor).toContain("if (file.canWrite === false) return 'view'");
+    expect(editor).toContain("if (file && file.canWrite === false) {\n      throw new Error('Edit permission is required to save this document.');");
+    const embedEventSource = editor.slice(
+      editor.indexOf('function handleServerEmbedEvent(file, reviewState)'),
+      editor.indexOf('async function revertServerReviewChange(file, row)')
+    );
+    expect(embedEventSource).toContain('if (file.canWrite === false) return;');
+    expect(embedEventSource.indexOf('if (file.canWrite === false) return;'))
+      .toBeLessThan(embedEventSource.indexOf('review.dirty = true;'));
+    expect(editor).toContain('shareButton.disabled = !canShare');
+    expect(editor).toContain('signButton.disabled = !canWrite');
+    expect(editor).toContain("file.editorComparisonMode === 'release' || file.canWrite === false");
+    expect(editor).toContain('var results = await Promise.allSettled([');
+    expect(editor).toContain("remote.collaboratorsUnavailable = results[0].status === 'rejected'");
+    expect(editor).toContain('Collaborator details require share permission.');
+    expect(editor).toContain("toast('This document is read-only.')");
   });
 
   test('registers one SPA initializer with explicit leave cleanup', () => {
