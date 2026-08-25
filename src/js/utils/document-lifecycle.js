@@ -175,9 +175,9 @@
 
     if (summaryState === 'summarized') {
       display.state = 'summarized';
-      display.label = 'Summarized';
+      display.label = 'Ready';
       display.badgeClass = 'bg-green-100 text-green-700';
-      display.progressLabel = 'Ready and summarized';
+      display.progressLabel = 'Ready, summary available';
       display.secondaryLabel = 'AI summary available';
       display.isReady = true;
       display.isTerminal = true;
