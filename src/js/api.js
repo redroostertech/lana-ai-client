@@ -2037,8 +2037,8 @@ class ApiClient {
 
   // Archive / Unarchive — soft-hide a matter from default lists without
   // deleting it. Backend sets archived_at + status='archived'.
-  async archiveMatter(matterId) {
-    return this.post(`/api/v1/matters/${matterId}/archive`, {});
+  async archiveMatter(matterId, payload = {}) {
+    return this.post(`/api/v1/matters/${matterId}/archive`, payload || {});
   }
 
   async unarchiveMatter(matterId) {
@@ -2499,6 +2499,35 @@ class ApiClient {
   }
 
   /**
+   * Get generic import insights for a workspace.
+   * @param {string} matterId - The workspace/matter ID
+   * @param {Object} options - Limit options
+   * @returns {Promise<Object>} Import insight rollup
+   */
+  async getMatterImportInsights(matterId, options = {}) {
+    const params = new URLSearchParams();
+    if (options.recentLimit) params.append('recentLimit', options.recentLimit);
+    if (options.promotedLimit) params.append('promotedLimit', options.promotedLimit);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.get(`/api/v1/matters/${encodeURIComponent(matterId)}/imports/insights${query}`);
+  }
+
+  /**
+   * Get Growth Engine rollup for a workspace.
+   * @param {string} matterId - The workspace/matter ID
+   * @param {Object} options - Limit options
+   * @returns {Promise<Object>} Growth Engine rollup
+   */
+  async getMatterGrowthEngineRollup(matterId, options = {}) {
+    const params = new URLSearchParams();
+    if (options.recentLimit) params.append('recentLimit', options.recentLimit);
+    if (options.promotedLimit) params.append('promotedLimit', options.promotedLimit);
+    if (options.signalLimit) params.append('signalLimit', options.signalLimit);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.get(`/api/v1/matters/${encodeURIComponent(matterId)}/growth-engine/rollup${query}`);
+  }
+
+  /**
    * Get pending connector matches requiring user review
    * @param {string} matterId - The matter ID
    * @param {Object} options - Query options (page, limit, status, entity_type, sort, order, search)
@@ -2625,10 +2654,11 @@ class ApiClient {
   /**
    * Quick complete a LANA-native task
    * @param {string} taskId - The task ID
+   * @param {Object} payload - Optional closeout/commentary payload
    * @returns {Promise<Object>} Completed task
    */
-  async completeTask(taskId) {
-    return this.patch(`/api/v1/matters/tasks/${taskId}/complete`, {});
+  async completeTask(taskId, payload = {}) {
+    return this.patch(`/api/v1/matters/tasks/${taskId}/complete`, payload || {});
   }
 
   /**

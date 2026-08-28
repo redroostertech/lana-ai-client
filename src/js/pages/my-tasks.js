@@ -14,6 +14,7 @@
     selectedTargetType: 'unassigned',  // unassigned | user | organization
     selectedAssigneeId: null,
     selectedAssigneeLabel: null,
+    closeoutTask: null,
     // Create Task Plan modal selection
     planSelectedMatterId: null,
     planSelectedMatterName: null
@@ -1118,6 +1119,70 @@
     if (refs.toggle) refs.toggle.setAttribute('aria-expanded', 'false');
   }
 
+  function closeoutValue(id) {
+    return String((el(id) || {}).value || '').trim();
+  }
+
+  function readTaskCloseoutCommentary() {
+    var commentary = {
+      reason: closeoutValue('myTaskCloseoutReason'),
+      went_well: closeoutValue('myTaskCloseoutWentWell'),
+      could_be_better: closeoutValue('myTaskCloseoutCouldImprove'),
+      action_items: closeoutValue('myTaskCloseoutActionItems')
+    };
+    return commentary.reason || commentary.went_well || commentary.could_be_better || commentary.action_items
+      ? commentary
+      : null;
+  }
+
+  function resetTaskCloseoutCommentary() {
+    ['myTaskCloseoutReason', 'myTaskCloseoutWentWell', 'myTaskCloseoutCouldImprove', 'myTaskCloseoutActionItems'].forEach(function (id) {
+      var field = el(id);
+      if (field) field.value = '';
+    });
+  }
+
+  function openTaskCloseoutModal(task) {
+    state.closeoutTask = task || null;
+    resetTaskCloseoutCommentary();
+    var modal = el('myTaskCloseoutModal');
+    if (modal) modal.open = true;
+  }
+
+  function closeTaskCloseoutModal() {
+    var modal = el('myTaskCloseoutModal');
+    if (modal) modal.open = false;
+    state.closeoutTask = null;
+    resetTaskCloseoutCommentary();
+  }
+
+  async function completeTaskWithCloseout(task, closeoutCommentary) {
+    if (!task || !task.id) return;
+    await api.completeTask(task.id, closeoutCommentary ? { closeout_commentary: closeoutCommentary } : {});
+    task.status = 'complete';
+  }
+
+  async function confirmTaskCloseout() {
+    var task = state.closeoutTask;
+    if (!task) return;
+    var saveBtn = el('myTaskCloseoutSaveBtn');
+    var skipBtn = el('myTaskCloseoutSkipBtn');
+    if (saveBtn) saveBtn.loading = true;
+    if (skipBtn) skipBtn.disabled = true;
+    try {
+      await completeTaskWithCloseout(task, readTaskCloseoutCommentary());
+      Lex.Toast.success('Task marked complete');
+      closeTaskCloseoutModal();
+      closeTaskDetails();
+      loadTasks();
+    } catch (error) {
+      Lex.Toast.error(error.message || 'Unable to mark task complete');
+    } finally {
+      if (saveBtn) saveBtn.loading = false;
+      if (skipBtn) skipBtn.disabled = false;
+    }
+  }
+
   // Inline status change from the details list. Mirrors the Mark Complete /
   // Reopen endpoints so the 'complete' transition goes through completeTask.
   async function setTaskStatus(rawStatus) {
@@ -1125,12 +1190,12 @@
     if (!task || !task.id) return;
     var next = normalizeStatus(rawStatus);
     if (next === normalizeStatus(task.status)) return;
+    if (next === 'complete') {
+      openTaskCloseoutModal(task);
+      return;
+    }
     try {
-      if (next === 'complete') {
-        await api.completeTask(task.id);
-      } else {
-        await api.updateTask(task.id, { status: next });
-      }
+      await api.updateTask(task.id, { status: next });
       task.status = next;
       Lex.Toast.success('Status updated');
       openTaskDetails(task);
@@ -1642,14 +1707,7 @@
     }
 
     if (action === 'complete') {
-      try {
-        await api.completeTask(task.id);
-        Lex.Toast.success('Task marked complete');
-        closeTaskDetails();
-        loadTasks();
-      } catch (error) {
-        Lex.Toast.error(error.message || 'Unable to mark task complete');
-      }
+      openTaskCloseoutModal(task);
       return;
     }
 
@@ -2857,6 +2915,8 @@
     var cancelBtn = el('myTaskCancelBtn');
     var matterPickBtn = el('myTaskMatterPickBtn');
     var userPickBtn = el('myTaskUserPickBtn');
+    var closeoutSaveBtn = el('myTaskCloseoutSaveBtn');
+    var closeoutSkipBtn = el('myTaskCloseoutSkipBtn');
 
     if (createForm) {
       createForm.addEventListener('submit', submitNewTask);
@@ -2865,6 +2925,13 @@
     if (cancelBtn) cancelBtn.addEventListener('click', closeNewTaskModal);
     if (matterPickBtn) matterPickBtn.addEventListener('click', openMatterPicker);
     if (userPickBtn) userPickBtn.addEventListener('click', openUserPicker);
+    if (closeoutSaveBtn) closeoutSaveBtn.addEventListener('click', confirmTaskCloseout);
+    if (closeoutSkipBtn) {
+      closeoutSkipBtn.addEventListener('click', function () {
+        resetTaskCloseoutCommentary();
+        confirmTaskCloseout();
+      });
+    }
 
     // The clear (×) button is a child of the matter picker-trigger button.
     // Catch it here BEFORE the click bubbles to the trigger and re-opens

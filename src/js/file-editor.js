@@ -3833,10 +3833,11 @@
     hydrateIcons(drawer);
   }
 
-  async function saveServerFileMetadata(file, metadata) {
+  async function saveServerFileMetadata(file, metadata, options) {
     if (!isServerWorkflowFile(file) || !window.api || typeof window.api.patch !== 'function') {
       throw new Error('Server metadata is unavailable for this document.');
     }
+    var retryOnConflict = !options || options.retryOnConflict !== false;
     var documentId = officeRealDocumentId(file);
     var currentMetadata = officeFileMetadata(file);
     var nextMetadata = Object.assign({}, metadata);
@@ -3851,7 +3852,18 @@
       return { success: true, status: 'success', changed: false, metadata: currentMetadata, updated_at: file.documentUpdatedAt || null };
     }
     if (file.documentUpdatedAt) nextMetadata.expected_updated_at = file.documentUpdatedAt;
-    var response = await window.api.patch('/api/v1/storage/files/' + encodeURIComponent(documentId) + '/metadata', nextMetadata);
+    var response;
+    try {
+      response = await window.api.patch('/api/v1/storage/files/' + encodeURIComponent(documentId) + '/metadata', nextMetadata);
+    } catch (error) {
+      if (retryOnConflict && error && error.status === 409 && error.data) {
+        var latest = error.data.current_metadata;
+        if (latest && typeof latest === 'object') file.metadata = Object.assign({}, officeFileMetadata(file), latest);
+        if (error.data.current_updated_at) file.documentUpdatedAt = error.data.current_updated_at;
+        return saveServerFileMetadata(file, metadata, { retryOnConflict: false });
+      }
+      throw error;
+    }
     if (!response || (response.success !== true && response.status !== 'success')) {
       throw new Error((response && (response.error || response.detail || response.message)) || 'Metadata could not be saved.');
     }
@@ -3946,7 +3958,8 @@
         : (change.isInsertion ? '' : '<span class="office-review-diff-remove">- ' + esc(before) + '</span>') +
           (change.isDeletion ? '' : '<span class="office-review-diff-add">+ ' + esc(after) + '</span>');
       var rowClass = 'office-review-history-row' + (batchItems.length ? ' office-review-history-row--batch' : '');
-      return '<div class="' + rowClass + '">' +
+      var rowRevisionAttr = revisionIds.length ? ' data-review-revision-ids="' + esc(revisionIds.join(',')) + '"' : '';
+      return '<div class="' + rowClass + '"' + rowRevisionAttr + '>' +
         '<div class="office-review-history-row-heading"><span class="office-review-history-row-title">' + esc(change.title || 'Replacement') + '</span>' +
         '<span class="office-review-status office-review-status--' + (change.tone || 'draft') + '">' + esc(status) + '</span>' + actions + '</div>' +
         '<div class="office-review-diff">' + diffHtml + '</div>' +
@@ -4421,6 +4434,24 @@
     return matched;
   }
 
+  function focusOfficeReviewHistoryRow(file, revisionIds) {
+    var ids = Array.isArray(revisionIds) ? revisionIds.map(String).filter(Boolean) : [];
+    var wanted = {};
+    ids.forEach(function (id) { wanted[id] = true; });
+    var matched = null;
+    Array.from(document.querySelectorAll('.office-review-history-row[data-review-revision-ids]')).forEach(function (row) {
+      var rowIds = String(row.getAttribute('data-review-revision-ids') || '').split(',').filter(Boolean);
+      var focused = rowIds.some(function (id) { return wanted[String(id)] === true; });
+      row.classList.toggle('office-review-history-row--located', focused);
+      if (focused && !matched) matched = row;
+    });
+    if (!matched) return null;
+    if (!matched.hasAttribute('tabindex')) matched.setAttribute('tabindex', '-1');
+    if (typeof matched.focus === 'function') matched.focus({ preventScroll: true });
+    matched.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    return matched;
+  }
+
   function locateOfficeReviewChange(file, revisionIds) {
     if (!file || !Array.isArray(revisionIds) || !revisionIds.length) {
       toast('This history entry has no document location.');
@@ -4431,6 +4462,10 @@
     syncOfficeShowChangesControl(file);
     var matched = applyOfficeReviewFocusTags(file);
     if (!matched.length) {
+      if (focusOfficeReviewHistoryRow(file, revisionIds)) {
+        toast('Change located in the review history.');
+        return;
+      }
       toast('This change belongs to another released version. Open that version to locate it in the document.');
       return;
     }
@@ -7457,6 +7492,7 @@
           toast('Edit permission is required to change document margins.');
           return;
         }
+        var previousMargin = file.marginPreset || 'normal';
         var margin = actionTarget.dataset.margin || 'normal';
         file.marginPreset = margin === 'narrow' || margin === 'wide' ? margin : 'normal';
         var frame = document.querySelector('.office-doc-frame');
@@ -7472,6 +7508,14 @@
           saveServerFileMetadata(file, { editor_margin_preset: file.marginPreset }).then(function () {
             toast('Document margin view saved.');
           }).catch(function (error) {
+            file.marginPreset = previousMargin === 'narrow' || previousMargin === 'wide' ? previousMargin : 'normal';
+            ['narrow', 'normal', 'wide'].forEach(function (preset) {
+              if (frame) frame.classList.toggle('office-margin-' + preset, preset === file.marginPreset);
+              if (ruler) ruler.classList.toggle('office-doc-ruler-' + preset, preset === file.marginPreset);
+            });
+            document.querySelectorAll('.office-ruler-actions [data-action="set-doc-margin"]').forEach(function (button) {
+              button.classList.toggle('is-active', button.dataset.margin === file.marginPreset);
+            });
             toast((error && error.message) || 'The margin setting could not be saved.');
           });
         } else {

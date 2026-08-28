@@ -191,6 +191,17 @@
           </lex-select>
         </div>
 
+        <div id="taskCloseoutCommentary" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+          <div>
+            <p class="text-sm font-medium text-gray-800">Completion notes</p>
+            <p class="text-xs text-gray-500">Optional context for reporting, retrospectives, and follow-up planning.</p>
+          </div>
+          <lex-textarea id="taskCloseoutReason" label="Why is this being completed?" rows="2" placeholder="Outcome, decision, or reason..."></lex-textarea>
+          <lex-textarea id="taskCloseoutWentWell" label="What went well?" rows="2" placeholder="Wins or useful signals..."></lex-textarea>
+          <lex-textarea id="taskCloseoutCouldImprove" label="What could be better?" rows="2" placeholder="Risks, misses, or improvements..."></lex-textarea>
+          <lex-textarea id="taskCloseoutActionItems" label="Action items" rows="2" placeholder="One follow-up per line..."></lex-textarea>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <div class="flex items-end gap-2">
@@ -952,11 +963,21 @@
 
   <!-- Status Change Modal -->
   <lex-modal id="statusChangeModal" heading="Change Status" size="md" hide-actions close-on-overlay>
-    <div class="p-6 space-y-4 flex flex-col min-h-[420px]">
+    <div class="p-4 sm:p-6 space-y-3 sm:space-y-4 flex flex-col max-h-[calc(100vh-4rem)] overflow-y-auto">
       <p class="text-sm text-gray-600">Select a new status for this matter:</p>
       <lex-select id="statusChangeSelect" label="New Status"
         options='[{"value":"active","label":"Active"},{"value":"pending","label":"Pending"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'>
       </lex-select>
+      <div id="workspaceCloseoutCommentary" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+        <div>
+          <p class="text-sm font-medium text-gray-800">Closeout notes</p>
+          <p class="text-xs text-gray-500">Optional context for Insights, retrospectives, and next-step planning.</p>
+        </div>
+        <lex-textarea id="workspaceCloseoutReason" label="Why is this workspace closing?" rows="1" placeholder="Outcome, reason, or decision..."></lex-textarea>
+        <lex-textarea id="workspaceCloseoutWentWell" label="What went well?" rows="1" placeholder="Wins, useful sources, or repeatable patterns..."></lex-textarea>
+        <lex-textarea id="workspaceCloseoutCouldImprove" label="What could be better?" rows="1" placeholder="Issues, gaps, or lessons learned..."></lex-textarea>
+        <lex-textarea id="workspaceCloseoutActionItems" label="Action items" rows="1" placeholder="One follow-up per line..."></lex-textarea>
+      </div>
       <div class="mt-auto flex justify-end gap-3 pt-4 border-t border-gray-200">
         <lex-btn onclick="closeStatusChangeModal()" variant="secondary">Cancel</lex-btn>
         <lex-btn onclick="confirmStatusChange()" variant="primary">Update Status</lex-btn>

@@ -125,6 +125,29 @@
     </main>
 
     <lex-modal
+      id="myTaskCloseoutModal"
+      heading="Complete Task"
+      size="md"
+      hide-actions
+      data-hoist
+    >
+      <div class="p-5 space-y-4">
+        <div>
+          <p class="text-sm font-medium" style="color: var(--lex-text-primary)">Completion notes</p>
+          <p class="text-xs" style="color: var(--lex-text-secondary)">Optional context for reporting, retrospectives, and follow-up planning.</p>
+        </div>
+        <lex-textarea id="myTaskCloseoutReason" label="Why is this being completed?" rows="2" placeholder="Outcome, decision, or reason..."></lex-textarea>
+        <lex-textarea id="myTaskCloseoutWentWell" label="What went well?" rows="2" placeholder="Wins or useful signals..."></lex-textarea>
+        <lex-textarea id="myTaskCloseoutCouldImprove" label="What could be better?" rows="2" placeholder="Risks, misses, or improvements..."></lex-textarea>
+        <lex-textarea id="myTaskCloseoutActionItems" label="Action items" rows="2" placeholder="One follow-up per line..."></lex-textarea>
+        <div class="my-task-modal-actions">
+          <lex-btn id="myTaskCloseoutSkipBtn" variant="secondary" size="md">Skip</lex-btn>
+          <lex-btn id="myTaskCloseoutSaveBtn" variant="primary" size="md">Complete Task</lex-btn>
+        </div>
+      </div>
+    </lex-modal>
+
+    <lex-modal
       id="myTaskCreateModal"
       heading="Create Task"
       size="lg"

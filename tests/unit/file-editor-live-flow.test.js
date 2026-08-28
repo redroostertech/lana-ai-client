@@ -257,7 +257,7 @@ describe('File Editor live document boundary', () => {
 
   test('saves File Info metadata idempotently and recovers from optimistic conflicts', () => {
     const saveSource = editor.slice(
-      editor.indexOf('async function saveServerFileMetadata(file, metadata)'),
+      editor.indexOf('async function saveServerFileMetadata(file, metadata'),
       editor.indexOf('function renderDocReviewRail(file)')
     );
     const actionSource = editor.slice(
@@ -268,12 +268,16 @@ describe('File Editor live document boundary', () => {
     expect(saveSource).toContain("['document_type', 'tags', 'notes', 'editor_margin_preset'].some");
     expect(saveSource).toContain('changed: false');
     expect(saveSource).toContain('nextMetadata.expected_updated_at = file.documentUpdatedAt');
+    expect(saveSource).toContain('retryOnConflict && error && error.status === 409');
+    expect(saveSource).toContain("return saveServerFileMetadata(file, metadata, { retryOnConflict: false })");
     expect(saveSource).toContain('file.documentUpdatedAt = response.updated_at');
     expect(actionSource).toContain("response && response.changed === false ? 'No metadata changes to save.'");
     expect(actionSource).toContain('error && error.status === 409');
     expect(actionSource).toContain('error.data.current_metadata');
     expect(actionSource).toContain('error.data.current_updated_at');
     expect(actionSource).toContain('Metadata changed on the server. Review your values and save again.');
+    expect(editor).toContain('var previousMargin = file.marginPreset ||');
+    expect(editor).toContain('file.marginPreset = previousMargin ===');
   });
 
   test('uses durable URL identity and never hands off authorization headers', () => {
@@ -416,7 +420,10 @@ describe('File Editor live document boundary', () => {
     expect(railSource).toContain("change.serverSection !== 'pending-approval'");
     expect(railSource).toContain("hasPendingApproval ? 'New draft' : 'Unreleased'");
     expect(railSource).toContain('<h5>Pending approval</h5>');
+    expect(railSource).toContain('data-review-revision-ids');
     expect(railSource).toContain('unreleasedHtml + pendingApprovalHtml + releasedChangesHistoryHtml + releasedHistoryHtml');
+    expect(editor).toContain('function focusOfficeReviewHistoryRow(file, revisionIds)');
+    expect(editor).toContain("toast('Change located in the review history.')");
   });
 
   test('persists threaded review comments with reply and resolve lifecycle controls', () => {

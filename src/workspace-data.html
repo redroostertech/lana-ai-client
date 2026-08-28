@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/lex-chat.css">
+  <link rel="stylesheet" href="css/workspace-summary.css">
   <!-- lana-ask-btn.css replaced by self-contained lex-ask-lana-btn component -->
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <script src="js/tailwind-loader.js"></script>
@@ -74,7 +75,10 @@
                   placeholder="Search records..."
                   style="width:240px;padding:6px 12px;border:1px solid var(--lex-border-default, #e5e7eb);border-radius:6px;font-size:13px;outline:none;"
                 >
+                <lex-btn id="wsDataImportBtn" variant="primary" size="sm" leading-icon="upload">Import CSV</lex-btn>
               </div>
+              <div id="wsDataImportStrip" class="ws-import-strip" hidden></div>
+              <div id="wsDataImportHistory" class="ws-import-history" data-testid="workspace-csv-import-history" hidden></div>
               <lex-table
                 id="wsDataTable"
                 columns="external_id,entity_type,connector_id,raw_data,ai_action"
@@ -109,6 +113,185 @@
         ></lex-lana-panel>
 
       </div>
+
+      <lex-modal id="wsDataImportModal" heading="Import CSV" size="full" hide-actions="true">
+        <div class="ws-import-wizard" data-import-wizard>
+          <div class="ws-import-rail">
+            <div class="ws-import-step is-active" data-step-marker="upload">
+              <span>1</span>
+              <div>
+                <strong>Upload</strong>
+                <small>Select a CSV file</small>
+              </div>
+            </div>
+            <div class="ws-import-step" data-step-marker="mapping">
+              <span>2</span>
+              <div>
+                <strong>Mapping</strong>
+                <small>Review inferred fields</small>
+              </div>
+            </div>
+            <div class="ws-import-step" data-step-marker="validation">
+              <span>3</span>
+              <div>
+                <strong>Validate</strong>
+                <small>Spot-check rows</small>
+              </div>
+            </div>
+            <div class="ws-import-step" data-step-marker="promotion">
+              <span>4</span>
+              <div>
+                <strong>Promote</strong>
+                <small>Import records</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="ws-import-body">
+            <section class="ws-import-pane is-active" data-step-pane="upload">
+              <lex-card padding="lg">
+                <div class="ws-import-pane-head">
+                  <div>
+                    <h3>Upload CSV</h3>
+                    <p>Stage a CSV against this workspace and infer an initial field mapping.</p>
+                  </div>
+                  <lex-badge id="wsImportUploadBadge" label="Ready" color="gray" size="sm"></lex-badge>
+                </div>
+                <label class="ws-import-drop" for="wsImportFile">
+                  <input id="wsImportFile" type="file" accept=".csv,text/csv">
+                  <span class="ws-import-drop-icon">CSV</span>
+                  <strong id="wsImportFileName">Choose a CSV file</strong>
+                  <small id="wsImportFileMeta">Up to the backend CSV upload limit</small>
+                </label>
+                <div class="ws-import-form-grid">
+                  <label>
+                    <span>Source name</span>
+                    <input id="wsImportSourceName" type="text" placeholder="CSV source name">
+                  </label>
+                  <label>
+                    <span>Timezone</span>
+                    <input id="wsImportTimezone" type="text" value="UTC">
+                  </label>
+                </div>
+                <div class="ws-import-footer">
+                  <lex-btn id="wsImportCancelUpload" variant="secondary" size="sm">Cancel</lex-btn>
+                  <lex-btn id="wsImportUploadAction" variant="primary" size="sm" leading-icon="upload">Upload and Infer</lex-btn>
+                </div>
+              </lex-card>
+            </section>
+
+            <section class="ws-import-pane" data-step-pane="mapping">
+              <div class="ws-import-pane-head">
+                <div>
+                  <h3>Column Mapping</h3>
+                  <p>Adjust how CSV columns map to the target entity before validation.</p>
+                </div>
+                <div class="ws-import-inline-actions">
+                  <lex-badge id="wsImportMappingBadge" label="Not uploaded" color="gray" size="sm"></lex-badge>
+                </div>
+              </div>
+              <div id="wsImportPreviewSummary" class="ws-import-summary"></div>
+              <div class="ws-import-entity-row">
+                <label>
+                  <span>Target entity</span>
+                  <select id="wsImportEntityType"></select>
+                </label>
+              </div>
+              <div class="ws-import-table-wrap">
+                <table class="ws-import-map-table">
+                  <thead>
+                    <tr>
+                      <th>CSV Column</th>
+                      <th>Target Field</th>
+                      <th>Sample Values</th>
+                      <th>Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody id="wsImportMappingRows"></tbody>
+                </table>
+              </div>
+              <div
+                id="wsImportCustomFieldApproval"
+                class="ws-import-custom-approval"
+                data-testid="workspace-csv-custom-field-approval"
+                hidden
+              >
+                <div class="ws-import-custom-approval-copy">
+                  <strong>Custom field approval required</strong>
+                  <p>These CSV columns will be saved outside the standard entity schema as named custom fields.</p>
+                  <ul id="wsImportCustomFieldList" class="ws-import-custom-field-list"></ul>
+                </div>
+                <lex-checkbox
+                  id="wsImportCustomFieldApproved"
+                  data-testid="workspace-csv-custom-field-approved"
+                  label="I approve importing these columns as custom fields"
+                ></lex-checkbox>
+              </div>
+              <div class="ws-import-footer">
+                <lex-btn id="wsImportBackToUpload" variant="secondary" size="sm">Back</lex-btn>
+                <lex-btn id="wsImportSaveMapping" variant="secondary" size="sm">Save Mapping</lex-btn>
+                <lex-btn id="wsImportValidateAction" variant="primary" size="sm">Validate Rows</lex-btn>
+              </div>
+            </section>
+
+            <section class="ws-import-pane" data-step-pane="validation">
+              <div class="ws-import-pane-head">
+                <div>
+                  <h3>Validation</h3>
+                  <p>Review row outcomes and spot-check mapped values before importing.</p>
+                </div>
+                <lex-badge id="wsImportValidationBadge" label="Not validated" color="gray" size="sm"></lex-badge>
+              </div>
+              <div id="wsImportValidationSummary" class="ws-import-summary"></div>
+              <div class="ws-import-table-wrap">
+                <table class="ws-import-row-table">
+                  <thead>
+                    <tr>
+                      <th class="ws-import-select-heading">Import</th>
+                      <th>Row</th>
+                      <th>Status</th>
+                      <th>Mapped Data</th>
+                      <th>Issues</th>
+                    </tr>
+                  </thead>
+                  <tbody id="wsImportValidationRows"></tbody>
+                </table>
+              </div>
+              <div class="ws-import-spot-check">
+                <lex-checkbox
+                  id="wsImportSpotCheckConfirmed"
+                  data-testid="workspace-csv-import-spot-check-confirmed"
+                  label="I reviewed the mapped values and selected rows for this import"
+                ></lex-checkbox>
+              </div>
+              <div id="wsImportPlan" class="ws-import-plan" data-testid="workspace-csv-import-plan" hidden></div>
+              <div class="ws-import-footer">
+                <lex-btn id="wsImportBackToMapping" variant="secondary" size="sm">Back</lex-btn>
+                <lex-btn id="wsImportRefreshRows" variant="secondary" size="sm">Refresh Rows</lex-btn>
+                <lex-btn id="wsImportPromoteAction" variant="primary" size="sm">Promote Import</lex-btn>
+              </div>
+            </section>
+
+            <section class="ws-import-pane" data-step-pane="promotion">
+              <lex-card padding="lg">
+                <div class="ws-import-pane-head">
+                  <div>
+                    <h3>Import Result</h3>
+                    <p>Promotion creates connected data records from validated rows and preserves row lineage.</p>
+                  </div>
+                  <lex-badge id="wsImportPromotionBadge" label="Not imported" color="gray" size="sm"></lex-badge>
+                </div>
+                <div id="wsImportPromotionSummary" class="ws-import-summary"></div>
+                <div id="wsImportPromotionRows" class="ws-import-result-list"></div>
+                <div class="ws-import-footer">
+                  <lex-btn id="wsImportCloseDone" variant="secondary" size="sm">Close</lex-btn>
+                  <lex-btn id="wsImportReloadData" variant="primary" size="sm">Refresh Connected Data</lex-btn>
+                </div>
+              </lex-card>
+            </section>
+          </div>
+        </div>
+      </lex-modal>
 
     </main>
 
@@ -153,6 +336,7 @@
   <script src="js/lex/components/foundation/lex-spinner.js"></script>
   <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
@@ -165,6 +349,7 @@
   <script src="js/lex/components/foundation/lex-banner.js"></script>
   <script src="js/lex/components/foundation/lex-card.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
+  <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>

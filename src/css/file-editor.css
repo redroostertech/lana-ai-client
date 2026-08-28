@@ -1743,8 +1743,13 @@
 }
 
 .office-review-history-row:hover::before,
-.office-review-history-row:focus-within::before {
+.office-review-history-row:focus-within::before,
+.office-review-history-row--located::before {
   opacity: 1;
+}
+
+.office-review-history-row--located {
+  background: var(--office-hover);
 }
 
 .office-review-history-row-heading {

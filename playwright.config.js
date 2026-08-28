@@ -30,7 +30,7 @@ module.exports = defineConfig({
     name: 'chromium',
     use: { ...devices['Desktop Chrome'] },
   }],
-  webServer: usesLocalClient && hasAuth ? {
+  webServer: usesLocalClient ? {
     command: 'node scripts/serve-agent-studio.js',
     url: clientUrl + '/agents/index.html',
     reuseExistingServer: true,

@@ -1016,7 +1016,12 @@
     try {
       // Fetch contacts and connector data
       var contacts = (currentMatterData && currentMatterData.contacts) || matter.contacts || [];
-      var response = await api.getMatterConnectorData(matter.matter_id);
+      var responses = await Promise.all([
+        api.getMatterConnectorData(matter.matter_id),
+        loadGrowthRollupForSummary(matter.matter_id)
+      ]);
+      var response = responses[0];
+      var growthInsights = normalizeGrowthImportInsights(responses[1]);
       var dataGroups = response.data || {};
 
       // Flatten connector records
@@ -1055,10 +1060,14 @@
         })
       }) + '>';
 
-      if (totalCount === 0) {
+      if (totalCount === 0 && !growthInsights.hasData) {
         html += '<lex-empty size="inline" icon="users" message="No connected data" description="Add contacts or connector records."></lex-empty>';
       } else {
         html += '<div class="space-y-3">';
+
+        if (growthInsights.hasData) {
+          html += buildGrowthEngineSnapshotHtml(growthInsights, matter);
+        }
 
         // Contacts chips
         if (contacts.length > 0) {
@@ -1100,6 +1109,10 @@
 
         html += '</div>';
       }
+      html += '<div class="wsum-connected-data-actions">' +
+        '<lex-btn size="sm" variant="primary" leading-icon="upload" data-wsum-import-csv="true" data-testid="workspace-summary-import-csv">Import CSV</lex-btn>' +
+        '<a href="workspace-data.html?id=' + encodeURIComponent(matter.matter_id) + '" class="wsum-connected-data-link">View all data</a>' +
+      '</div>';
       html += '</lex-card>';
 
       section.innerHTML = html;
@@ -1117,10 +1130,184 @@
           }
         });
       }
+      var importBtn = section.querySelector('[data-wsum-import-csv="true"]');
+      if (importBtn) {
+        importBtn.addEventListener('click', function () {
+          window.location.href = _workspaceCsvImportHref(matter.matter_id);
+        });
+      }
     } catch (error) {
       console.error('[renderUnifiedConnectedDataDock] Error:', error);
       section.innerHTML = '';
     }
+  }
+
+  function _workspaceCsvImportHref(matterId) {
+    return 'workspace-data.html?id=' + encodeURIComponent(matterId || '') + '&import=csv';
+  }
+
+  function loadGrowthRollupForSummary(matterId) {
+    var fallback = function () {
+      return api.getMatterImportInsights
+        ? api.getMatterImportInsights(matterId, { recentLimit: 3, promotedLimit: 8 }).catch(function () { return null; })
+        : Promise.resolve(null);
+    };
+    if (!api.getMatterGrowthEngineRollup) return fallback();
+    return api.getMatterGrowthEngineRollup(matterId, { recentLimit: 3, promotedLimit: 8, signalLimit: 4 })
+      .then(function (result) {
+        var normalized = normalizeGrowthImportInsights(result);
+        return normalized.hasData ? result : fallback();
+      })
+      .catch(function () { return fallback(); });
+  }
+
+  function normalizeGrowthImportInsights(response) {
+    var payload = response && response.data !== undefined ? response.data : response;
+    if (!payload || payload.data !== undefined) payload = payload && payload.data;
+    payload = payload || {};
+    var counts = payload.counts || {};
+    var importCounts = counts.imports || {};
+    var canonicalCounts = counts.canonical || {};
+    var summary = importCounts.summary || payload.summary || counts || {};
+    var recent = payload.recent || {};
+    var sessions = firstArray(recent.imports, payload.recent_sessions, payload.recentSessions, payload.recent_imports, payload.recentImports);
+    var rowTypes = firstArray(importCounts.rows_by_entity_type, payload.rows_by_entity_type, payload.rowsByEntityType,
+      payload.sessions_by_entity_type, payload.sessionsByEntityType);
+    var promotedEntities = firstArray(recent.promoted_entities, payload.promoted_entities, payload.promotedEntities);
+    var canonicalTypes = firstArray(canonicalCounts.by_entity_type, canonicalCounts.byEntityType);
+    var growthCounts = normalizeGrowthCategoryCounts(canonicalTypes.length ? canonicalTypes : rowTypes, promotedEntities);
+    var totalRows = numberFrom(summary, ['total_rows', 'totalRows', 'rows', 'record_count', 'recordCount']);
+    var promotedRows = numberFrom(summary, ['promoted_rows', 'promotedRows', 'imported_rows', 'importedRows']);
+    var duplicateRows = numberFrom(summary, ['duplicate_rows', 'duplicateRows']);
+    var invalidRows = numberFrom(summary, ['invalid_rows', 'invalidRows']);
+    var failedRows = numberFrom(summary, ['failed_rows', 'failedRows']);
+    var skippedRows = numberFrom(summary, ['skipped_rows', 'skippedRows']);
+    var sourceCount = numberFrom(summary, ['session_count', 'sessionCount', 'source_count', 'sourceCount']);
+    var reviewRows = duplicateRows + invalidRows + failedRows;
+    if (!sourceCount && sessions.length) sourceCount = sessions.length;
+    if (!hasGrowthCategoryCounts(growthCounts) && (promotedRows || totalRows)) {
+      growthCounts.prospects = promotedRows || totalRows;
+    }
+
+    return {
+      hasData: !!(totalRows || promotedRows || reviewRows || skippedRows || sourceCount || sessions.length ||
+        rowTypes.length || promotedEntities.length || canonicalTypes.length),
+      totalRows: totalRows,
+      promotedRows: promotedRows,
+      sourceCount: sourceCount,
+      reviewRows: reviewRows,
+      skippedRows: skippedRows,
+      growthCounts: growthCounts,
+      latestSource: sessions[0] && (sessions[0].source_name || sessions[0].sourceName || sessions[0].name || ''),
+      entityTypes: normalizeGrowthEntityTypes(canonicalTypes.length ? canonicalTypes : rowTypes, promotedEntities),
+      recentSessions: sessions.slice(0, 3)
+    };
+  }
+
+  function normalizeGrowthCategoryCounts(rowTypes, promotedEntities) {
+    var counts = { prospects: 0, campaigns: 0, opportunities: 0, tasks: 0 };
+    function add(type, count) {
+      type = normalizeGrowthCategory(type);
+      count = Math.max(0, Number(count || 0));
+      if (!type || !count) return;
+      counts[type] += count;
+    }
+    for (var i = 0; i < rowTypes.length; i++) {
+      add(rowTypes[i].entity_type || rowTypes[i].entityType || rowTypes[i].target_entity_type || rowTypes[i].targetEntityType,
+        rowTypes[i].promoted_rows || rowTypes[i].promotedRows || rowTypes[i].row_count || rowTypes[i].rowCount || rowTypes[i].count);
+    }
+    if (!rowTypes.length) {
+      for (var j = 0; j < promotedEntities.length; j++) {
+        add(promotedEntities[j].entity_type || promotedEntities[j].entityType, 1);
+      }
+    }
+    return counts;
+  }
+
+  function normalizeGrowthCategory(type) {
+    var key = String(type || '').trim().toLowerCase();
+    if (key === 'campaign' || key === 'marketing_campaign') return 'campaigns';
+    if (key === 'opportunity' || key === 'deal' || key === 'pipeline_opportunity') return 'opportunities';
+    if (key === 'task' || key === 'todo' || key === 'work_item') return 'tasks';
+    if (key === 'lead' || key === 'prospect' || key === 'contact') return 'prospects';
+    return '';
+  }
+
+  function hasGrowthCategoryCounts(counts) {
+    return !!(counts && (counts.prospects || counts.campaigns || counts.opportunities || counts.tasks));
+  }
+
+  function normalizeGrowthEntityTypes(rowTypes, promotedEntities) {
+    var counts = {};
+    function add(type, count) {
+      type = String(type || '').trim().toLowerCase();
+      if (!type) return;
+      counts[type] = (counts[type] || 0) + Math.max(0, Number(count || 0));
+    }
+    for (var i = 0; i < rowTypes.length; i++) {
+      add(rowTypes[i].entity_type || rowTypes[i].entityType || rowTypes[i].target_entity_type || rowTypes[i].targetEntityType,
+        rowTypes[i].promoted_rows || rowTypes[i].promotedRows || rowTypes[i].row_count || rowTypes[i].rowCount || rowTypes[i].count);
+    }
+    if (!rowTypes.length) {
+      for (var j = 0; j < promotedEntities.length; j++) {
+        add(promotedEntities[j].entity_type || promotedEntities[j].entityType, 1);
+      }
+    }
+    return Object.keys(counts).sort().map(function (type) {
+      return { entityType: type, count: counts[type] };
+    }).slice(0, 4);
+  }
+
+  function numberFrom(source, keys) {
+    source = source || {};
+    for (var i = 0; i < keys.length; i++) {
+      if (source[keys[i]] !== undefined && source[keys[i]] !== null && source[keys[i]] !== '') {
+        var value = Number(source[keys[i]]);
+        return isNaN(value) ? 0 : value;
+      }
+    }
+    return 0;
+  }
+
+  function buildGrowthEngineSnapshotHtml(growth, matter) {
+    var counts = growth.growthCounts || { prospects: 0, campaigns: 0, opportunities: 0, tasks: 0 };
+    var entityHtml = '<div class="wsum-growth-entities">' +
+      '<span>Source runs <strong>' + escapeHtml(String(growth.sourceCount || 0)) + '</strong></span>' +
+      '<span>Promoted <strong>' + escapeHtml(String(growth.promotedRows || 0)) + '</strong></span>' +
+      '<span>Needs review <strong>' + escapeHtml(String(growth.reviewRows || 0)) + '</strong></span>' +
+      '</div>';
+    var recentHtml = growth.latestSource
+      ? '<p class="wsum-growth-recent">Latest source: ' + escapeHtml(growth.latestSource) + '</p>'
+      : '';
+    var totalImported = growth.totalRows || growth.promotedRows || 0;
+    var summary = totalImported
+      ? totalImported + ' imported ' + wsumPlural(totalImported, 'record', 'records') + ' across growth follow-up.'
+      : 'Imported growth records will appear here after a CSV import or connected-data sync.';
+    return '<section class="wsum-growth-snapshot" data-testid="workspace-summary-growth-engine">' +
+      '<div class="wsum-growth-head">' +
+        '<div>' +
+          '<strong>Growth Engine</strong>' +
+          '<p>' + escapeHtml(summary) + '</p>' +
+        '</div>' +
+        '<a href="workspace-data.html?id=' + encodeURIComponent(matter.matter_id) + '" class="wsum-connected-data-link">Open data</a>' +
+      '</div>' +
+      '<div class="wsum-growth-metrics">' +
+        growthMetricHtml('Prospects', counts.prospects, matter, 'lead') +
+        growthMetricHtml('Campaigns', counts.campaigns, matter, 'campaign') +
+        growthMetricHtml('Opportunities', counts.opportunities, matter, 'opportunity') +
+        growthMetricHtml('Tasks', counts.tasks, matter, 'task') +
+      '</div>' +
+      entityHtml +
+      recentHtml +
+    '</section>';
+  }
+
+  function growthMetricHtml(label, value, matter, entityType) {
+    var href = 'workspace-data.html?id=' + encodeURIComponent((matter && matter.matter_id) || '') +
+      '&entity_type=' + encodeURIComponent(entityType || '');
+    return '<a class="wsum-growth-metric" href="' + href + '" data-growth-entity="' + escapeAttr(entityType || '') + '">' +
+      '<span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(String(value || 0)) + '</strong>' +
+      '</a>';
   }
 
   function buildContactChip(contact, index, matterId) {
@@ -6544,6 +6731,8 @@
 
     var taskStatusEl = document.getElementById('taskStatus');
     if (taskStatusEl) taskStatusEl.value = 'pending';
+    setTaskCloseoutVisibility('pending');
+    resetCloseoutCommentary('taskCloseout');
     var taskPriorityEl = document.getElementById('taskPriority');
     if (taskPriorityEl) taskPriorityEl.value = 'normal';
     var taskCreatePriorityEl = document.getElementById('taskCreatePriority');
@@ -6595,6 +6784,8 @@
 
       var statusEl = document.getElementById('taskStatus');
       if (statusEl) statusEl.value = task.status || 'pending';
+      setTaskCloseoutVisibility(task.status || 'pending');
+      resetCloseoutCommentary('taskCloseout');
 
       var priorityEl = document.getElementById('taskPriority');
       if (priorityEl) priorityEl.value = task.priority || 'normal';
@@ -6616,13 +6807,57 @@
   // Quick Complete Task
   async function quickCompleteTask(taskId) {
     try {
-      await api.completeTask(taskId);
-      Lex.Toast.success('Task completed');
-      await refreshCurrentMatter();
+      await editTask(taskId);
+      var statusEl = document.getElementById('taskStatus');
+      if (statusEl) statusEl.value = 'complete';
+      setTaskCloseoutVisibility('complete');
     } catch (err) {
       console.error('Complete task error:', err);
-      Lex.Toast.error('Failed to complete task');
+      Lex.Toast.error('Failed to open completion notes');
     }
+  }
+
+  function isCloseoutTaskStatus(status) {
+    var value = String(status || '').trim().toLowerCase();
+    return value === 'complete' || value === 'completed';
+  }
+
+  function isCloseoutWorkspaceStatus(status) {
+    var value = String(status || '').trim().toLowerCase();
+    return value === 'closed' || value === 'archived';
+  }
+
+  function setTaskCloseoutVisibility(status) {
+    var panel = document.getElementById('taskCloseoutCommentary');
+    if (panel) panel.classList.toggle('hidden', !isCloseoutTaskStatus(status));
+  }
+
+  function setWorkspaceCloseoutVisibility(status) {
+    var panel = document.getElementById('workspaceCloseoutCommentary');
+    if (panel) panel.classList.toggle('hidden', !isCloseoutWorkspaceStatus(status));
+  }
+
+  function readCloseoutCommentary(prefix) {
+    function value(id) {
+      return String((document.getElementById(prefix + id) || {}).value || '').trim();
+    }
+
+    var commentary = {
+      reason: value('Reason'),
+      went_well: value('WentWell'),
+      could_be_better: value('CouldImprove'),
+      action_items: value('ActionItems')
+    };
+
+    var hasContent = commentary.reason || commentary.went_well || commentary.could_be_better || commentary.action_items;
+    return hasContent ? commentary : null;
+  }
+
+  function resetCloseoutCommentary(prefix) {
+    ['Reason', 'WentWell', 'CouldImprove', 'ActionItems'].forEach(function (suffix) {
+      var el = document.getElementById(prefix + suffix);
+      if (el) el.value = '';
+    });
   }
 
   // Inline delete confirmation
@@ -6705,6 +6940,13 @@
     if (!isEdit && !descriptionValue) {
       Lex.Toast.error('Description is required');
       return;
+    }
+
+    if (isEdit && isCloseoutTaskStatus(taskData.status)) {
+      var taskCloseout = readCloseoutCommentary('taskCloseout');
+      if (taskCloseout) {
+        taskData.closeout_commentary = taskCloseout;
+      }
     }
 
     var submitBtn = setTaskSubmitLoading(isEdit ? 'Updating...' : (workspaceTaskSuggestionState ? 'Creating...' : 'Generating...'));
@@ -9118,6 +9360,8 @@
 
     var selectEl = document.getElementById('statusChangeSelect');
     if (selectEl) selectEl.value = matter.status || 'active';
+    setWorkspaceCloseoutVisibility(matter.status || 'active');
+    resetCloseoutCommentary('workspaceCloseout');
 
     modal.open = true;
   }
@@ -9136,22 +9380,29 @@
     var newStatus = selectEl ? (selectEl.value || 'active') : 'active';
     var matterId = currentMatterData.matter_id;
     var currentStatus = (currentMatterData.matter && currentMatterData.matter.status) || 'active';
+    var closeoutPayload = {};
+    var workspaceCloseout = isCloseoutWorkspaceStatus(newStatus)
+      ? readCloseoutCommentary('workspaceCloseout')
+      : null;
+    if (workspaceCloseout) {
+      closeoutPayload.closeout_commentary = workspaceCloseout;
+    }
 
     try {
       // Archive / Unarchive transitions go through dedicated endpoints —
       // PUT /matters/:id rejects status='archived' as a validation error
       // because archived is a soft-delete state managed via its own route.
       if (newStatus === 'archived' && currentStatus !== 'archived') {
-        await api.archiveMatter(matterId);
+        await api.archiveMatter(matterId, closeoutPayload);
       } else if (currentStatus === 'archived' && newStatus !== 'archived') {
         // Coming out of archived → unarchive first, then apply the chosen
         // status if it isn't 'active' (unarchive defaults to 'active').
         await api.unarchiveMatter(matterId);
         if (newStatus !== 'active') {
-          await api.updateMatter(matterId, { status: newStatus });
+          await api.updateMatter(matterId, Object.assign({ status: newStatus }, closeoutPayload));
         }
       } else {
-        await api.updateMatter(matterId, { status: newStatus });
+        await api.updateMatter(matterId, Object.assign({ status: newStatus }, closeoutPayload));
       }
 
       Lex.Toast.success('Status updated to ' + newStatus.charAt(0).toUpperCase() + newStatus.substring(1));
@@ -9178,6 +9429,28 @@
   window.confirmStatusChange = confirmStatusChange;
   window.closeStatusChangeModal = closeStatusChangeModal;
   ['openStatusChangeModal', 'confirmStatusChange', 'closeStatusChangeModal'].forEach(_trackGlobal);
+
+  function wireCloseoutCommentaryControls() {
+    var taskStatus = document.getElementById('taskStatus');
+    if (taskStatus && !taskStatus.dataset.closeoutWired) {
+      taskStatus.dataset.closeoutWired = 'true';
+      var syncTaskCloseout = function () { setTaskCloseoutVisibility(taskStatus.value); };
+      taskStatus.addEventListener('lex-change', syncTaskCloseout);
+      taskStatus.addEventListener('change', syncTaskCloseout);
+      syncTaskCloseout();
+    }
+
+    var workspaceStatus = document.getElementById('statusChangeSelect');
+    if (workspaceStatus && !workspaceStatus.dataset.closeoutWired) {
+      workspaceStatus.dataset.closeoutWired = 'true';
+      var syncWorkspaceCloseout = function () { setWorkspaceCloseoutVisibility(workspaceStatus.value); };
+      workspaceStatus.addEventListener('lex-change', syncWorkspaceCloseout);
+      workspaceStatus.addEventListener('change', syncWorkspaceCloseout);
+      syncWorkspaceCloseout();
+    }
+  }
+
+  wireCloseoutCommentaryControls();
 
   // =========================================================================
   // Connected Data Tab — full tab view

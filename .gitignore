@@ -24,6 +24,7 @@ coverage/
 *.lcov
 .nyc_output/
 lib-cov/
+qa-evidence/
 
 # Build output
 dist/
