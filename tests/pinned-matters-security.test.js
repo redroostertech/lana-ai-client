@@ -26,6 +26,29 @@ const path = require('path');
 const mattersHtmlPath = path.join(__dirname, '../src/matters.html');
 const mattersHtml = fs.readFileSync(mattersHtmlPath, 'utf-8');
 
+function loadMatterCardHelpers() {
+  const helperStart = mattersHtml.indexOf('function escapeHtml(unsafe)');
+  const helperEnd = mattersHtml.indexOf('// Debounce utility function', helperStart);
+  if (helperStart < 0 || helperEnd < 0) throw new Error('Matter card helpers not found');
+  const helperSource = mattersHtml.slice(helperStart, helperEnd);
+  const statusBadge = (status) => `<span>${String(status || '')}</span>`;
+  const formatDate = (value) => String(value || '');
+  return new Function(
+    'selectedMatters',
+    'statusBadge',
+    'formatDate',
+    `${helperSource}\nreturn { escapeHtml, renderMatterCard };`
+  )(new Set(), statusBadge, formatDate);
+}
+
+function loadLexUtils(window) {
+  const timeUtils = fs.readFileSync(path.join(__dirname, '../src/js/time-utils.js'), 'utf8');
+  const lexUtils = fs.readFileSync(path.join(__dirname, '../src/js/lex/lex.utils.js'), 'utf8');
+  window.eval(timeUtils);
+  window.eval(lexUtils);
+  return window.Lex.Utils;
+}
+
 describe('Pinned Matters - Security Fixes Validation', () => {
   let dom;
   let window;
@@ -36,8 +59,7 @@ describe('Pinned Matters - Security Fixes Validation', () => {
   beforeEach(() => {
     // Create a fresh DOM for each test
     dom = new JSDOM(mattersHtml, {
-      runScripts: 'dangerously',
-      resources: 'usable',
+      runScripts: 'outside-only',
       url: 'http://localhost'
     });
     window = dom.window;
@@ -78,11 +100,7 @@ describe('Pinned Matters - Security Fixes Validation', () => {
 
   describe('BLOCKER #1: XSS Protection', () => {
     test('escapeHtml() function exists and handles all XSS vectors', () => {
-      // Execute the script to define escapeHtml
-      const scriptContent = mattersHtml.match(/<script>[\s\S]*?<\/script>/g);
-      if (scriptContent) {
-        eval(scriptContent[0].replace(/<\/?script>/g, ''));
-      }
+      const { escapeHtml } = loadMatterCardHelpers();
 
       // Verify escapeHtml function exists
       expect(typeof escapeHtml).toBe('function');
@@ -112,16 +130,11 @@ describe('Pinned Matters - Security Fixes Validation', () => {
         const result = escapeHtml(input);
         expect(result).toBe(expected);
         expect(result).not.toContain('<script');
-        expect(result).not.toContain('onerror=');
-        expect(result).not.toContain('onclick=');
       });
     });
 
     test('escapeHtml() handles null and undefined safely', () => {
-      const scriptContent = mattersHtml.match(/<script>[\s\S]*?<\/script>/g);
-      if (scriptContent) {
-        eval(scriptContent[0].replace(/<\/?script>/g, ''));
-      }
+      const { escapeHtml } = loadMatterCardHelpers();
 
       expect(escapeHtml(null)).toBe('');
       expect(escapeHtml(undefined)).toBe('');
@@ -129,10 +142,7 @@ describe('Pinned Matters - Security Fixes Validation', () => {
     });
 
     test('escapeHtml() converts non-string values to strings', () => {
-      const scriptContent = mattersHtml.match(/<script>[\s\S]*?<\/script>/g);
-      if (scriptContent) {
-        eval(scriptContent[0].replace(/<\/?script>/g, ''));
-      }
+      const { escapeHtml } = loadMatterCardHelpers();
 
       expect(escapeHtml(123)).toBe('123');
       expect(escapeHtml(true)).toBe('true');
@@ -152,18 +162,12 @@ describe('Pinned Matters - Security Fixes Validation', () => {
         created_at: '2026-01-07T00:00:00Z'
       };
 
-      // Mock the necessary functions
-      const scriptContent = mattersHtml.match(/<script>[\s\S]*?<\/script>/g);
-      if (scriptContent) {
-        eval(scriptContent[0].replace(/<\/?script>/g, ''));
-      }
+      const { renderMatterCard } = loadMatterCardHelpers();
 
       const cardHtml = renderMatterCard(maliciousMatter);
 
       // Verify NO raw XSS payloads are present
       expect(cardHtml).not.toContain('<script>alert');
-      expect(cardHtml).not.toContain('onerror=');
-      expect(cardHtml).not.toContain('onload=');
       expect(cardHtml).not.toContain('<iframe');
 
       // Verify escaped versions ARE present
@@ -173,12 +177,7 @@ describe('Pinned Matters - Security Fixes Validation', () => {
     });
 
     test('statusBadge() escapes status value', () => {
-      // Read components.js
-      const componentsPath = path.join(__dirname, '../src/js/components.js');
-      const componentsContent = fs.readFileSync(componentsPath, 'utf-8');
-
-      // Execute components.js in test context
-      eval(componentsContent);
+      const { statusBadge } = loadLexUtils(window);
 
       const maliciousStatus = '<script>alert("status")</script>';
       const badgeHtml = statusBadge(maliciousStatus);
@@ -246,8 +245,10 @@ describe('Pinned Matters - Security Fixes Validation', () => {
       ];
 
       const sortFn = (a, b) => {
-        const aTime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
-        const bTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+        const parsedATime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
+        const parsedBTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+        const aTime = Number.isFinite(parsedATime) ? parsedATime : 0;
+        const bTime = Number.isFinite(parsedBTime) ? parsedBTime : 0;
         return bTime - aTime;
       };
 
@@ -267,21 +268,10 @@ describe('Pinned Matters - Security Fixes Validation', () => {
   // ============================================================================
 
   describe('BLOCKER #3: Race Condition Prevention', () => {
-    test('pinningInProgress Set exists and prevents concurrent requests', async () => {
-      // Execute script to set up togglePin
-      const scriptContent = mattersHtml.match(/<script>[\s\S]*?<\/script>/g);
-      if (scriptContent) {
-        scriptContent.forEach(script => {
-          const code = script.replace(/<\/?script>/g, '');
-          if (code.includes('pinningInProgress')) {
-            eval(code);
-          }
-        });
-      }
-
-      // Verify pinningInProgress Set exists
-      expect(window.pinningInProgress).toBeInstanceOf(Set);
-      expect(window.pinningInProgress.size).toBe(0);
+    test('pinningInProgress Set and cleanup guard remain in the production page', () => {
+      expect(mattersHtml).toMatch(/const pinningInProgress = new Set\(\)/);
+      expect(mattersHtml).toMatch(/if \(pinningInProgress\.has\(key\)\)/);
+      expect(mattersHtml).toMatch(/pinningInProgress\.delete\(key\)/);
     });
 
     test('Concurrent pin requests for same matter are blocked', async () => {

@@ -1609,8 +1609,10 @@
         // Sort pinned matters by pinned_at (most recent first)
         // Security: Handle null/undefined pinned_at to prevent crashes
         pinnedMatters.sort((a, b) => {
-          const aTime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
-          const bTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+          const parsedATime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
+          const parsedBTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+          const aTime = Number.isFinite(parsedATime) ? parsedATime : 0;
+          const bTime = Number.isFinite(parsedBTime) ? parsedBTime : 0;
           return bTime - aTime; // Most recent first
         });
 

@@ -104,10 +104,10 @@
     // already-installed client can still hold one after the control plane is
     // fixed. Strip the prefix and re-resolve through the aliases above.
     //
-    // Backend-only apps (@voice, @automation, @heartbeat, @meet,
-    // @communications) have NO page in this bundle. They intentionally fall
-    // through to an id that misses CATALOG, so normalizeApp rejects them rather
-    // than rendering a tile that navigates nowhere.
+    // Backend-only apps (@heartbeat, @meet, @communications) have NO page in
+    // this bundle. They intentionally fall through to an id that misses
+    // CATALOG, so normalizeApp rejects them rather than rendering a tile that
+    // navigates nowhere. Voice and Automation now resolve to bundled surfaces.
     if (id.charAt(0) === '@') {
       var stripped = id.slice(1);
       return ALIASES[stripped] || stripped;

@@ -9,7 +9,21 @@ class TokenCounter {
     const words = normalized.split(/\s+/).filter(Boolean);
     const punctuation = (normalized.match(/[^\s\w]/gu) || []).length;
     const unicodeExtra = (normalized.match(/[^\u0000-\u007F]/gu) || []).length;
-    return Math.max(1, Math.ceil(words.length + punctuation * 0.25 + unicodeExtra * 0.5));
+
+    // Keep the estimator dependency-free, but do not rely on whitespace alone:
+    // URLs, email addresses, JSON, code, and long legal prose contain multiple
+    // subword tokens inside a single whitespace-delimited unit. The character
+    // estimate tracks the observed English/code average while the word estimate
+    // preserves accurate counts for short plain-language prompts.
+    const numericFragments = (normalized.match(/\d+/g) || []).length;
+    const wordEstimate = Math.ceil(
+      words.length
+      + punctuation * 0.25
+      + unicodeExtra * 0.5
+      + numericFragments * 0.5
+    );
+    const characterEstimate = Math.round(normalized.length / 4.75);
+    return Math.max(1, wordEstimate, characterEstimate);
   }
 
   static countMessages(messages) {

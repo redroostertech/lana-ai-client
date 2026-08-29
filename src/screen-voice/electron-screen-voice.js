@@ -1031,7 +1031,11 @@ class ElectronScreenVoice {
     this.controller.session.decision = decision;
     this.previewDecision = decision;
     this.rememberConversationTurn('assistant', decision.displayResponse || decision.spokenResponse);
-    if (this.settings.voiceOutputEnabled && decision.spokenResponse) {
+    if (
+      this.settings.voiceOutputEnabled
+      && decision.spokenResponse
+      && typeof this.api.synthesize === 'function'
+    ) {
       this.api.synthesize(decision.spokenResponse, this.controller.signal).then((speech) => {
         if (speech.available && speech.audio?.base64) this.send('screen-voice:play-audio', speech.audio);
       }).catch(() => { /* Voice output is optional; the visible result remains authoritative. */ });

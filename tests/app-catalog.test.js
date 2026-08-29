@@ -67,9 +67,25 @@ describe('LanaClientApps.normalizeApp', () => {
   });
 
   test('backend-only apps with no client page are rejected, not rendered', () => {
-    for (const id of ['@voice', '@automation', '@heartbeat', '@meet', '@communications']) {
+    for (const id of ['@heartbeat', '@meet', '@communications']) {
       expect(Apps.normalizeApp({ id, label: 'X', route: '/x' })).toBeNull();
     }
+  });
+
+  test('legacy Voice and Automation ids resolve to their bundled client surfaces', () => {
+    const voice = Apps.normalizeApp({ id: '@voice', label: 'Voice', route: '/voice' });
+    expect(voice).toEqual(expect.objectContaining({
+      id: 'lana-voice',
+      route: 'voice/index.html'
+    }));
+    expect(fs.existsSync(path.join(SRC, voice.route))).toBe(true);
+
+    const automation = Apps.normalizeApp({ id: '@automation', label: 'Automation', route: '/automation' });
+    expect(automation).toEqual(expect.objectContaining({
+      id: 'lana-automations',
+      route: 'automation/index.html'
+    }));
+    expect(fs.existsSync(path.join(SRC, automation.route))).toBe(true);
   });
 
   test('an unknown app cannot conjure itself into the switcher', () => {
@@ -184,7 +200,7 @@ describe('embedded route objects (docs/EMBEDDED-APPS-SPEC.md)', () => {
       legalNsights,
       { id: '@voice', label: 'Voice', route: '/voice' }
     ]);
-    expect(list.map((a) => a.id)).toEqual(['lana-insights', 'legal-nsights']);
+    expect(list.map((a) => a.id)).toEqual(['lana-insights', 'legal-nsights', 'lana-voice']);
   });
 });
 
@@ -195,15 +211,15 @@ describe('LanaClientApps.normalizeAppList', () => {
       { id: '@voice', label: 'Voice', route: '/voice' },
       { id: '@agents', label: 'Agents', route: '/agents' }
     ]);
-    expect(list.map((a) => a.id)).toEqual(['lana-insights', 'lana-agents']);
+    expect(list.map((a) => a.id)).toEqual(['lana-insights', 'lana-voice', 'lana-agents']);
   });
 
   test('a fully unresolvable legacy payload falls back instead of emptying the switcher', () => {
     // A cached enabled_apps holding ONLY backend-only ids must not strand the
     // user with no way back to the workspace.
     const list = Apps.normalizeAppList([
-      { id: '@voice', label: 'Voice', route: '/voice' },
-      { id: '@automation', label: 'Automation', route: '/automation' }
+      { id: '@heartbeat', label: 'Heartbeat', route: '/heartbeat' },
+      { id: '@communications', label: 'Communications', route: '/communications' }
     ]);
     expect(list.length).toBeGreaterThan(0);
     for (const app of list) {
