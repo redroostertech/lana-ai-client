@@ -1428,6 +1428,100 @@ test.describe('Workspace connected data CSV import', () => {
     expect(calls.validation).toBeUndefined();
   });
 
+  test('shows lifecycle status guidance and preserves nurture custom field suggestions', async ({ page }) => {
+    const calls = {};
+    const previewMapping = {
+      entityType: 'lead',
+      mappings: [
+        { sourceColumn: 'Name', targetField: 'name', targetPath: 'name', status: 'mapped', confidence: 0.98 },
+        { sourceColumn: 'Email', targetField: 'email', targetPath: 'email', status: 'mapped', confidence: 0.99 },
+        { sourceColumn: 'Source', targetField: 'lead_source', targetPath: 'lead_source', status: 'mapped', confidence: 0.82 },
+        {
+          sourceColumn: 'Status',
+          targetField: 'custom_fields',
+          targetPath: 'custom_fields.nurture_segment',
+          customFieldKey: 'nurture_segment',
+          suggestedCustomFieldKey: 'nurture_segment',
+          status: 'custom_field',
+          confidence: 0.7,
+          reason: 'lifecycle_status_requires_custom_field',
+          guidance: {
+            action: 'suggest_custom_field',
+            code: 'LIFECYCLE_STATUS_REQUIRES_CUSTOM_FIELD',
+            message: '"Nurture" in "Status" is not a canonical lead status. Map it to custom_fields.nurture_segment or choose a canonical lead status before promotion.',
+          },
+        },
+      ],
+      customFieldPolicy: {
+        approved: false,
+        approvedKeys: [],
+        suggestedKeys: ['nurture_segment'],
+      },
+    };
+
+    await installMockSession(page);
+    await installWorkspaceDataApiStubs(page, calls, { previewMapping });
+
+    await page.goto(`/workspace-data.html?id=${WORKSPACE_ID}`);
+    await clickControl(page, [
+      '[data-testid="workspace-csv-import-open"]',
+      '#wsDataImportBtn',
+      'lex-btn:has-text("Import CSV")',
+      'button:has-text("Import CSV")',
+    ], 'CSV import trigger');
+
+    const fileInput = await firstVisible(page, [
+      '#wsImportFile',
+      'input[type="file"][accept*="csv"]',
+      'input[type="file"][accept*=".csv"]',
+    ], 'CSV file input');
+    await fileInput.setInputFiles({
+      name: 'workspace-contacts.csv',
+      mimeType: 'text/csv',
+      buffer: CSV_BUFFER,
+    });
+    await clickControl(page, ['#wsImportUploadAction', 'lex-btn:has-text("Upload and Infer")'], 'CSV upload/infer control');
+    await expect.poll(() => calls.preview).not.toBeUndefined();
+
+    const statusMappingRow = page.locator('#wsImportMappingRows tr').filter({
+      has: page.locator('.ws-import-column-name:text-is("Status")'),
+    }).first();
+    await expect(statusMappingRow).toHaveClass(/is-custom-field/);
+    await expect(statusMappingRow.locator('[data-custom-preview]')).toContainText(/Custom field:\s*Nurture Segment/i);
+    await expect(statusMappingRow.locator('[data-custom-preview]')).toContainText(/custom_fields\.nurture_segment/i);
+    await expect(statusMappingRow.locator('[data-testid="workspace-csv-mapping-guidance"]'))
+      .toContainText(/not a canonical lead status/i);
+
+    const customApproval = page.locator('[data-testid="workspace-csv-custom-field-approval"]');
+    await expect(customApproval).toBeVisible();
+    await expect(customApproval).toContainText(/Status/i);
+    await expect(customApproval).toContainText(/Nurture Segment/i);
+    await expect(customApproval).toContainText(/custom_fields\.nurture_segment/i);
+
+    await expect(page.locator('#wsImportValidateAction')).toHaveAttribute('disabled', /.*/);
+    await expect(page.locator('[data-testid="workspace-csv-custom-field-approved"]')).not.toHaveAttribute('disabled', /.*/);
+    await page.locator('[data-testid="workspace-csv-custom-field-approved"]').click();
+    await clickControl(page, ['#wsImportValidateAction', 'lex-btn:has-text("Validate")'], 'CSV validation control');
+    await expect.poll(() => calls.validation).not.toBeUndefined();
+
+    const mappingBody = JSON.parse(calls.mapping.body || '{}');
+    expect(mappingBody.mapping.mappings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceColumn: 'Status',
+        targetField: 'custom_fields',
+        targetPath: 'custom_fields.nurture_segment',
+        customFieldKey: 'nurture_segment',
+        suggestedCustomFieldKey: 'nurture_segment',
+        status: 'custom_field',
+      }),
+    ]));
+    expect(mappingBody.mapping.customFieldPolicy).toEqual(expect.objectContaining({
+      required: true,
+      approved: true,
+      approvedKeys: ['nurture_segment'],
+    }));
+  });
+
   test('requires typed import plan confirmation for opportunity imports', async ({ page }) => {
     const calls = {};
 

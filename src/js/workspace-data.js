@@ -1361,6 +1361,7 @@
       if (btn) btn.disabled = _importWizard.busy;
     }
     _syncImportPromoteButton();
+    _syncImportCustomFieldApproval();
     _syncImportMappingActionButtons();
   }
 
@@ -1530,6 +1531,7 @@
     var customKey = _customFieldKeyFromMapping(row);
     var confidence = _formatConfidence(row.confidence);
     var sample = _sampleValuesForColumn(row.sourceColumn);
+    var guidance = _mappingGuidanceText(row);
     var fieldOptions = fields.slice();
     if (targetField && targetField !== 'custom_fields' && fieldOptions.indexOf(targetField) === -1) {
       fieldOptions.unshift(targetField);
@@ -1538,6 +1540,9 @@
     var readableCustomLabel = _formatFieldLabel(customKey || row.sourceColumn);
     var customPath = 'custom_fields.' + (customKey || _toCustomFieldKey(row.sourceColumn));
     var customPreviewHidden = mode === 'custom' ? '' : ' hidden';
+    var guidanceHtml = guidance
+      ? '<div class="ws-import-mapping-guidance" data-testid="workspace-csv-mapping-guidance">' + _escHtml(guidance) + '</div>'
+      : '';
 
     var selectHtml =
       '<select class="ws-import-map-mode" data-map-index="' + index + '" data-testid="workspace-csv-mapping-target">' +
@@ -1558,6 +1563,7 @@
           '<strong>Custom field:</strong> ' + _escHtml(readableCustomLabel) +
           '<span>' + _escHtml(customPath) + '</span>' +
         '</div>' +
+        guidanceHtml +
       '</div></td>' +
       '<td><div class="ws-import-samples">' + _escHtml(sample || '-') + '</div></td>' +
       '<td>' + _escHtml(confidence) + '</td>' +
@@ -2862,12 +2868,13 @@
           reason: prev.reason || 'user_unmapped'
         });
       } else if (mode === 'custom') {
-        var customKey = (keyEl && keyEl.value.trim()) || _toCustomFieldKey(source);
+        var customKey = (keyEl && keyEl.value.trim()) || prev.suggestedCustomFieldKey || _toCustomFieldKey(source);
         mappings.push({
           sourceColumn: source,
           targetField: 'custom_fields',
           targetPath: 'custom_fields.' + customKey,
           customFieldKey: customKey,
+          suggestedCustomFieldKey: prev.suggestedCustomFieldKey || customKey,
           status: 'custom_field',
           confidence: prev.confidence || 0.5,
           reason: prev.reason || 'user_custom_field'
@@ -2937,9 +2944,11 @@
         targetField: row.targetField || row.target_field || null,
         targetPath: row.targetPath || row.target_path || null,
         customFieldKey: row.customFieldKey || row.custom_field_key || '',
+        suggestedCustomFieldKey: row.suggestedCustomFieldKey || row.suggested_custom_field_key || '',
         status: row.status || 'unmapped',
         confidence: Number(row.confidence || 0),
-        reason: row.reason || ''
+        reason: row.reason || '',
+        guidance: row.guidance || row.mappingGuidance || row.mapping_guidance || null
       };
     }).filter(function (row) {
       return row.sourceColumn;
@@ -2964,7 +2973,25 @@
     if (targetPath.indexOf('custom_fields.') === 0) {
       return targetPath.slice('custom_fields.'.length).trim();
     }
+    var suggestedKey = row.suggestedCustomFieldKey || row.suggested_custom_field_key;
+    if (suggestedKey) return String(suggestedKey).trim();
     return _toCustomFieldKey(row.sourceColumn || row.source_column || '');
+  }
+
+  function _mappingGuidanceText(row) {
+    row = row || {};
+    var guidance = row.guidance || row.mappingGuidance || row.mapping_guidance;
+    if (typeof guidance === 'string') return guidance;
+    if (guidance && typeof guidance === 'object') {
+      return guidance.message || guidance.detail || guidance.description || '';
+    }
+    if (row.reason === 'lifecycle_status_requires_custom_field') {
+      return 'This lifecycle label is not a canonical lead status. Save it as a custom field or choose a canonical lead status before promotion.';
+    }
+    if (row.reason === 'lifecycle_status_normalized') {
+      return 'Business lifecycle labels in this column will be normalized to canonical lead statuses during validation.';
+    }
+    return '';
   }
 
   function _normalizeImportRows(rows) {
