@@ -68,6 +68,7 @@ DEMO_MODE=false
 AUTO_DISCOVERY_MODE=true  # Default to auto-discovery mode
 PORT="8080"  # Default port
 PUBLISH_RELEASE=false  # Whether to create GitHub release
+RELEASE_CHANNEL="prerelease"  # prerelease | release (see --prerelease / --release)
 
 # Config file path (in public_html directory)
 CONFIG_FILE="$PROJECT_ROOT/public_html/js/config.js"
@@ -144,6 +145,9 @@ OPTIONS:
     --dev                                Build in development mode
     --demo                               Enable demo mode (no server connection)
     --publish                            Create GitHub release and upload artifacts
+                                         (defaults to the pre-release channel)
+    --prerelease                         Publish, marked as a GitHub pre-release (default)
+    --release                            Publish as a full release and mark it Latest
     --help                               Show this help message
 
 EXAMPLES:
@@ -226,6 +230,16 @@ parse_args() {
                 ;;
             --publish)
                 PUBLISH_RELEASE=true
+                shift
+                ;;
+            --prerelease|--pre-release)
+                PUBLISH_RELEASE=true
+                RELEASE_CHANNEL="prerelease"
+                shift
+                ;;
+            --release)
+                PUBLISH_RELEASE=true
+                RELEASE_CHANNEL="release"
                 shift
                 ;;
             --help)
@@ -710,10 +724,14 @@ create_github_release() {
         print_info "Release ${RELEASE_TAG} already exists, updating notes..."
         echo "$RELEASE_NOTES" | gh release edit "${RELEASE_TAG}" --notes-file - 2>/dev/null || true
     else
-        echo "$RELEASE_NOTES" | gh release create "${RELEASE_TAG}" \
-            --title "${RELEASE_TAG}" \
-            --notes-file - \
-            --draft
+        GH_CREATE_FLAGS=(--title "${RELEASE_TAG}" --notes-file - --draft)
+        if [ "$RELEASE_CHANNEL" = "prerelease" ]; then
+            GH_CREATE_FLAGS+=(--prerelease)
+            print_info "Channel: pre-release"
+        else
+            print_info "Channel: full release"
+        fi
+        echo "$RELEASE_NOTES" | gh release create "${RELEASE_TAG}" "${GH_CREATE_FLAGS[@]}"
         if [ $? -ne 0 ]; then
             print_error "Failed to create GitHub release ${RELEASE_TAG}"
             return 1
@@ -778,7 +796,13 @@ create_github_release() {
     # Step 5: Publish the release (remove draft status)
     # -------------------------------------------------------------------------
     print_info "Publishing release ${RELEASE_TAG}..."
-    gh release edit "${RELEASE_TAG}" --draft=false
+    # Set the channel explicitly here too, so an existing release that is being
+    # updated (rather than newly created) still lands on the right channel.
+    if [ "$RELEASE_CHANNEL" = "prerelease" ]; then
+        gh release edit "${RELEASE_TAG}" --draft=false --prerelease
+    else
+        gh release edit "${RELEASE_TAG}" --draft=false --prerelease=false --latest
+    fi
 
     print_success "GitHub release ${RELEASE_TAG} published with release notes and artifacts!"
     echo ""

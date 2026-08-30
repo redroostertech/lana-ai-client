@@ -46,6 +46,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const net = require('net');
 const tls = require('tls');
@@ -248,7 +249,18 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) { usage(); return; }
 
-  if (args['env-file']) loadEnvFile(args['env-file']);
+  // Explicit --env-file wins. Otherwise fall back to the consolidated machine
+  // credential store (~/.lana-client/credentials), which is the single place
+  // EMAIL_* / RELEASE_EMAIL_TO live alongside the Apple + GitHub release creds.
+  if (args['env-file']) {
+    loadEnvFile(args['env-file']);
+  } else {
+    const defaultCreds = path.join(os.homedir(), '.lana-client', 'credentials');
+    if (fs.existsSync(defaultCreds)) {
+      loadEnvFile(defaultCreds);
+      console.log('Credentials  :', defaultCreds);
+    }
+  }
 
   const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.EMAIL_PORT || '587', 10);
