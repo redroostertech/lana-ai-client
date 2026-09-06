@@ -4,10 +4,14 @@
  * Save button) ever rendered. The footer markup is built by the pure
  * buildDrawerFooterButtons helper, covered here without a DOM.
  */
+const fs = require('fs');
 const path = require('path');
 
+const drawerPath = path.join(__dirname, '../../src/js/lex/components/foundation/lex-drawer.js');
+const drawerSource = fs.readFileSync(drawerPath, 'utf8');
+
 const { buildDrawerFooterButtons } = require(
-  path.join(__dirname, '../../src/js/lex/components/foundation/lex-drawer.js')
+  drawerPath
 );
 
 const esc = (s) => String(s == null ? '' : s)
@@ -63,5 +67,11 @@ describe('buildDrawerFooterButtons', () => {
     const html = buildDrawerFooterButtons([{ label: 'NoId' }], esc);
     expect(html).not.toContain('id=');
     expect(html).toContain('>NoId</button>');
+  });
+
+  test('anchors the overlay and panel within the visual viewport', () => {
+    expect(drawerSource).toContain('width: 100vw;');
+    expect(drawerSource).toContain('max-width: 100vw;');
+    expect(drawerSource).toContain('box-sizing: border-box;');
   });
 });

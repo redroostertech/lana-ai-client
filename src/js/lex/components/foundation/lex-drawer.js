@@ -55,9 +55,12 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
 
       .lex-drawer-overlay {
         position: fixed;
-        inset: 0;
+        inset: 0 auto 0 0;
+        width: 100vw;
+        max-width: 100vw;
         z-index: var(--lex-z-modal, 40);
         display: flex;
+        overflow: hidden;
       }
 
       .lex-drawer-overlay--right {
@@ -79,6 +82,7 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
 
       .lex-drawer-panel {
         position: relative;
+        box-sizing: border-box;
         height: 100vh;
         height: 100dvh;
         display: flex;

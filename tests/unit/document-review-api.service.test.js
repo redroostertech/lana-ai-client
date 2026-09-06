@@ -328,6 +328,37 @@ describe('LanaDocumentReview API workflows', () => {
     )).toBe('released-doc-8');
   });
 
+  test('resolves a pending-window successor to its approved parent release', () => {
+    expect(review.draftBaseDocumentId(
+      {
+        id: 'successor-1',
+        base_file_version_id: 'source-fv-1',
+        review_metadata: { base_pending_release_batch_id: 'batch-1' }
+      },
+      [{ id: 'release-1', edit_batch_id: 'batch-1', file_version_id: 'release-fv-1', released_document_id: 'released-doc-1' }],
+      'source-doc'
+    )).toBe('released-doc-1');
+  });
+
+  test('requires the pending accepted baseline until a linked successor has an immutable parent release', () => {
+    const pending = { id: 'pending-1', status: 'pending_release' };
+    const successor = {
+      id: 'draft-2',
+      status: 'draft',
+      review_metadata: { base_pending_release_batch_id: 'pending-1' }
+    };
+
+    expect(review.requiresPendingReleaseBaseline(null, pending, [])).toBe(true);
+    expect(review.requiresPendingReleaseBaseline(successor, pending, [])).toBe(true);
+    expect(review.requiresPendingReleaseBaseline(successor, pending, [
+      { id: 'release-1', edit_batch_id: 'pending-1', released_document_id: 'released-doc-1' }
+    ])).toBe(false);
+    expect(review.requiresPendingReleaseBaseline({
+      ...successor,
+      review_metadata: { base_pending_release_batch_id: 'different-pending' }
+    }, pending, [])).toBe(false);
+  });
+
   test('uses server predecessor identity when a release parent is outside the loaded 20-row rail', () => {
     var visibleReleases = [];
     for (var releaseNumber = 40; releaseNumber >= 21; releaseNumber -= 1) {

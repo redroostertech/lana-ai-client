@@ -892,7 +892,19 @@
     renderReviewDock(file);
   }
 
-  async function editorInputForFile(file) {
+  async function editorInputForFile(file, reviewBaseDocumentId) {
+    var openedDocumentId = officeRealDocumentId(file);
+    var baseDocumentId = String(reviewBaseDocumentId || '');
+    if (baseDocumentId && baseDocumentId !== openedDocumentId && window.api &&
+        typeof window.api.getFileDownloadUrl === 'function') {
+      var baseUrl = window.api.getFileDownloadUrl(baseDocumentId, file.matterId || undefined);
+      var baseResponse = await fetch(baseUrl, { headers: currentAuthHeaders() });
+      if (!baseResponse.ok) throw new Error('Unable to load the saved draft baseline for LANA Editor.');
+      var baseBytes = await baseResponse.arrayBuffer();
+      return new File([baseBytes], file.filename || file.title || 'document', {
+        type: file.contentType || ''
+      });
+    }
     if (file.sourceFile || file.sourceBlob || file.sourceBytes) {
       return file.sourceFile || file.sourceBlob || file.sourceBytes;
     }
@@ -1080,6 +1092,8 @@
     }
 
     var serverFile = isServerReviewFile(file);
+    var needsMount = officeEditorFileId !== file.id || officeEditorHostEl !== host || !officeEditorInstance;
+    var review = serverFile ? ensureServerReview(file) : null;
     try {
       var baseUrl = getEditorServiceBase();
       var health = await fetch(baseUrl + '/v1/health', { method: 'GET' });
@@ -1090,7 +1104,19 @@
         throw new Error('editor embed module unavailable');
       }
       if (mountGeneration !== editorMountGeneration) return;
-      var input = await editorInputForFile(file);
+      var reviewBaseDocumentId = '';
+      if (review && needsMount) {
+        await loadServerReview(file);
+        var reviewService = documentReviewService();
+        if (!review.loadFailed && reviewService && typeof reviewService.draftBaseDocumentId === 'function') {
+          reviewBaseDocumentId = reviewService.draftBaseDocumentId(
+            review.currentDraftBatch,
+            review.releases,
+            review.sourceDocumentId
+          );
+        }
+      }
+      var input = await editorInputForFile(file, reviewBaseDocumentId);
       if (!input) throw new Error('document bytes unavailable');
       if (mountGeneration !== editorMountGeneration) return;
 
@@ -1107,7 +1133,6 @@
       // renderDoc rebuilds the canvas HTML, so the mounted instance can be
       // bound to a node that is no longer in the document. Remount whenever
       // the host element changed, not only when the active file changed.
-      var needsMount = officeEditorFileId !== file.id || officeEditorHostEl !== host || !officeEditorInstance;
       if (needsMount) {
         if (officeEditorInstance && typeof officeEditorInstance.shutdown === 'function') {
           officeEditorInstance.shutdown();
@@ -1199,8 +1224,11 @@
       if (status) status.textContent = serverFile ? 'Loading saved draft...' : 'LANA Editor';
 
       if (serverFile && needsMount) {
-        var review = ensureServerReview(file);
+        review = review || ensureServerReview(file);
         review.embedFailed = false;
+        var pendingBaselineRestored = await restorePendingReleaseBaselineIntoEmbed(file);
+        if (!pendingBaselineRestored) throw new Error('The pending release baseline could not be restored.');
+        if (mountGeneration !== editorMountGeneration || editorForFile(file) !== activeEditor) return;
         review.session.reset();
         review.restored = false;
         var openedState = null;
@@ -1210,7 +1238,6 @@
         // captured; tag the already-rendered marks now that the ids are known.
         applyOfficeBaselineRevisionTags(file);
         review.liveReviewState = openedState;
-        await loadServerReview(file);
         if (mountGeneration !== editorMountGeneration || editorForFile(file) !== activeEditor) return;
         // Persisted edit scripts are review operations. Unlock review mode only
         // after the workflow and draft detail have loaded, then replay them.
@@ -1832,6 +1859,9 @@
       review_metadata: {
         source: 'file_editor',
         document_name: file.filename || file.title || null,
+        base_pending_release_batch_id: review.pendingReleaseBatch && review.pendingReleaseBatch.id
+          ? String(review.pendingReleaseBatch.id)
+          : null,
         comments: persistableComments,
         // Review rows are document-ordered for display. The editor supplies a
         // separate action-ordered replay contract so an autosaved DOCX can be
@@ -1954,6 +1984,41 @@
     } finally {
       review.restoring = false;
     }
+  }
+
+  async function restorePendingReleaseBaselineIntoEmbed(file) {
+    var review = serverReview(file);
+    var service = documentReviewService();
+    var editor = editorForFile(file);
+    if (!review || !service || !editor) return true;
+    if (!service.requiresPendingReleaseBaseline(
+      review.currentDraftBatch,
+      review.pendingReleaseBatch,
+      review.releases
+    )) return true;
+    if (review.pendingDetailFailed || typeof editor.bytes !== 'function') return false;
+    var scripts = service.editScriptsFromBatch(review.pendingReleaseBatch);
+    var ops = scripts.length ? [] : service.editOpsFromBatch(review.pendingReleaseBatch);
+    if (!scripts.length && !ops.length) return true;
+    if (typeof editor.setMode === 'function') editor.setMode('review');
+    if (scripts.length && typeof editor.applyEditScripts === 'function') {
+      for (var scriptIndex = 0; scriptIndex < scripts.length; scriptIndex += 1) {
+        await editor.applyEditScripts([scripts[scriptIndex]]);
+      }
+    } else if (typeof editor.applyEdits === 'function') {
+      await editor.applyEdits(ops);
+    } else {
+      return false;
+    }
+    var accepted = await service.acceptAllBytes({
+      editorServiceBase: getEditorServiceBase(),
+      bytes: editor.bytes(),
+      contentType: file.contentType || service.DOCX_CONTENT_TYPE
+    });
+    await editor.open_file(new File([accepted], file.filename || file.title || 'document.docx', {
+      type: file.contentType || service.DOCX_CONTENT_TYPE
+    }));
+    return true;
   }
 
   async function restoreServerDraftWithRetry(file) {

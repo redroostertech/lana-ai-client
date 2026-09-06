@@ -988,6 +988,21 @@
     return null;
   }
 
+  function requiresPendingReleaseBaseline(currentDraftBatch, pendingReleaseBatch, releases) {
+    if (!pendingReleaseBatch || !pendingReleaseBatch.id) return false;
+    var pendingId = String(pendingReleaseBatch.id);
+    var items = Array.isArray(releases) ? releases : [];
+    var parentReleased = items.some(function (release) {
+      return release && String(release.edit_batch_id || '') === pendingId;
+    });
+    if (parentReleased) return false;
+    if (!currentDraftBatch) return true;
+    var metadata = currentDraftBatch.review_metadata && typeof currentDraftBatch.review_metadata === 'object'
+      ? currentDraftBatch.review_metadata
+      : {};
+    return String(metadata.base_pending_release_batch_id || '') === pendingId;
+  }
+
   /**
    * Resolve the immutable document whose bytes a saved draft was authored
    * against. Batches created from a released artifact keep that release's
@@ -996,11 +1011,23 @@
    */
   function draftBaseDocumentId(batch, releases, sourceDocumentId) {
     var fallback = sourceDocumentId ? String(sourceDocumentId) : '';
+    var reviewMetadata = batch && batch.review_metadata && typeof batch.review_metadata === 'object'
+      ? batch.review_metadata
+      : {};
+    var parentPendingBatchId = String(reviewMetadata.base_pending_release_batch_id || '');
+    var items = Array.isArray(releases) ? releases : [];
+    if (parentPendingBatchId) {
+      for (var parentIndex = 0; parentIndex < items.length; parentIndex += 1) {
+        var parentRelease = items[parentIndex];
+        if (!parentRelease || String(parentRelease.edit_batch_id || '') !== parentPendingBatchId) continue;
+        var parentReleasedDocumentId = parentRelease.released_document_id || parentRelease.document_id;
+        if (parentReleasedDocumentId) return String(parentReleasedDocumentId);
+      }
+    }
     var baseFileVersionId = batch && batch.base_file_version_id
       ? String(batch.base_file_version_id)
       : '';
     if (!baseFileVersionId) return fallback;
-    var items = Array.isArray(releases) ? releases : [];
     for (var i = 0; i < items.length; i++) {
       var release = items[i];
       if (!release) continue;
@@ -1420,6 +1447,7 @@
     activeDraftBatchFromList: activeDraftBatchFromList,
     activeDraftBatchForBaseVersion: activeDraftBatchForBaseVersion,
     pendingReleaseBatchFromList: pendingReleaseBatchFromList,
+    requiresPendingReleaseBaseline: requiresPendingReleaseBaseline,
     draftBaseDocumentId: draftBaseDocumentId,
     previousReleaseDocumentId: previousReleaseDocumentId,
     hydrateBatchDetail: hydrateBatchDetail,

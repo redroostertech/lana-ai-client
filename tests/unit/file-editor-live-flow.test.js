@@ -188,6 +188,45 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('? reviewState.replayScripts');
   });
 
+  test('loads a pending-window successor draft on its immutable release baseline', () => {
+    const mountSource = editor.slice(
+      editor.indexOf('async function mountLanaEditorForFile(file)'),
+      editor.indexOf('function nowIso()')
+    );
+    const workflowAt = mountSource.indexOf('await loadServerReview(file)');
+    const baseAt = mountSource.indexOf('reviewService.draftBaseDocumentId(', workflowAt);
+    const inputAt = mountSource.indexOf('editorInputForFile(file, reviewBaseDocumentId)', baseAt);
+
+    expect(editor).toContain('base_pending_release_batch_id: review.pendingReleaseBatch');
+    expect(workflowAt).toBeGreaterThan(-1);
+    expect(baseAt).toBeGreaterThan(workflowAt);
+    expect(inputAt).toBeGreaterThan(baseAt);
+  });
+
+  test('reconstructs pending release bytes before capturing a successor baseline', () => {
+    const mountSource = editor.slice(
+      editor.indexOf('async function mountLanaEditorForFile(file)'),
+      editor.indexOf('function nowIso()')
+    );
+    const restoreAt = mountSource.indexOf('await restorePendingReleaseBaselineIntoEmbed(file)');
+    const baselineAt = mountSource.indexOf('review.session.captureBaseline(openedState)');
+    const helperSource = editor.slice(
+      editor.indexOf('async function restorePendingReleaseBaselineIntoEmbed(file)'),
+      editor.indexOf('async function restoreServerDraftWithRetry(file)')
+    );
+
+    expect(restoreAt).toBeGreaterThan(-1);
+    expect(baselineAt).toBeGreaterThan(restoreAt);
+    expect(mountSource).toContain("if (!pendingBaselineRestored) throw new Error('The pending release baseline could not be restored.')");
+    expect(helperSource).toContain('service.requiresPendingReleaseBaseline(');
+    expect(helperSource).toContain('review.currentDraftBatch,');
+    expect(helperSource).toContain('review.pendingReleaseBatch,');
+    expect(helperSource).toContain('review.releases');
+    expect(helperSource).toContain('service.editScriptsFromBatch(review.pendingReleaseBatch)');
+    expect(helperSource).toContain('await service.acceptAllBytes({');
+    expect(helperSource).toContain('await editor.open_file(new File([accepted]');
+  });
+
   test('renders semantic formatting revisions from the shared review datasource', () => {
     expect(editor).toContain('service.formatChangeDetailsFromRevision(item)');
     expect(editor).toContain('? service.changeLabel(item)');
