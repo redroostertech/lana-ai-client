@@ -169,9 +169,11 @@
         top: calc(100% + 4px);
         left: 0;
         min-width: 100%;
-        width: max-content;
+        width: 100%;
+        box-sizing: border-box;
         max-height: 240px;
         overflow-y: auto;
+        overflow-x: hidden;
         background: var(--lex-select-dropdown-bg, var(--lex-bg-primary));
         border: 1px solid var(--lex-border-default);
         border-radius: var(--lex-input-radius);
@@ -221,7 +223,7 @@
         font-size: var(--lex-form-font-size, 0.8125rem);
         color: var(--lex-text-primary);
         transition: background 0.1s ease;
-        white-space: nowrap;
+        white-space: normal;
       }
 
       .lex-select-option:hover,
@@ -248,6 +250,7 @@
       .lex-select-option-label {
         flex: 1;
         min-width: 0;
+        overflow-wrap: anywhere;
       }
 
       .lex-select-option-desc {
