@@ -302,8 +302,9 @@ electron-dist/
 *.deb
 *.rpm
 
-# Claude Code local settings
-.claude/
+# Claude Code shared project configuration (agents, plans, and guidance)
+# Keep only machine-specific permissions private.
+.claude/settings.local.json
 
 # =============================================================================
 # Tiptap Bundle (generated)

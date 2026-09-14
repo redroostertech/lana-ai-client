@@ -2260,7 +2260,9 @@
     }, {
       value: 'current',
       label: 'Current draft',
-      description: hasCurrentDraftReviewChanges() ? 'Live unreleased edits' : 'Current document view',
+      description: state.pendingReviewReleaseBatch
+        ? 'Saved draft pending release approval'
+        : (hasCurrentDraftReviewChanges() ? 'Live unreleased edits' : 'Current document view'),
       group: 'Working copy'
     }];
     var releases = reviewReleasesNewestFirst();
@@ -3935,6 +3937,8 @@
         statusEl.textContent = 'This format is read-only. Convert it to DOCX before review edits.';
       } else if (state.currentReviewBatchRestoreFailed) {
         statusEl.textContent = 'Saved draft details could not be loaded.';
+      } else if (state.pendingReviewReleaseBatch) {
+        statusEl.textContent = 'Saved review draft is pending release approval.';
       } else if (state.currentReviewBatch && hasReviewWork) {
         statusEl.textContent = 'Draft saved. Open File Editor to edit or release it.';
       } else if (hasReviewWork) {

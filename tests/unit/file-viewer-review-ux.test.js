@@ -167,6 +167,8 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).not.toContain('await state.editorInstance.applyEditScripts(scripts)');
     expect(pageJs).toContain('state.currentReviewBatchRestoreFailed');
     expect(pageJs).toContain('Saved draft details could not be loaded.');
+    expect(pageJs).toContain('Saved review draft is pending release approval.');
+    expect(pageJs).toContain('Saved draft pending release approval');
     expect(pageJs).toContain('function currentReviewBatchDisplayChanges');
     expect(pageJs).toContain('function activeDraftBatchForCurrentFile');
     expect(pageJs).toContain('String(batches[i].base_file_version_id || \'\') === baseFileVersionId');
@@ -308,7 +310,8 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain("group: 'Document'");
     expect(pageJs).toContain("group: 'Working copy'");
     expect(pageJs).toContain("group: 'Versions'");
-    expect(pageJs).toContain("description: hasCurrentDraftReviewChanges() ? 'Live unreleased edits' : 'Current document view'");
+    expect(pageJs).toContain("? 'Saved draft pending release approval'");
+    expect(pageJs).toContain("hasCurrentDraftReviewChanges() ? 'Live unreleased edits' : 'Current document view'");
     expect(pageJs).toContain("if (state.reviewDisplayTarget === 'original') return 'original';");
     expect(pageJs).toContain("if (hasCurrentDraftReviewChanges()) return 'current';");
     expect(pageJs).toContain('function selectReviewDisplayScope');
