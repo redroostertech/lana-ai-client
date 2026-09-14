@@ -30,7 +30,7 @@ A **My** doc can be **promoted to Org** — but only when lana-ai is present/lin
 | Concern | Exists | File |
 |---|---|---|
 | App registry / dropdown | ✅ keyed catalog; apps gated on org `enabled_apps` → `lana_saved_server.enabledApps` → sidebar | `src/js/app-catalog.js`, `src/js/lex/components/layout/lex-sidebar.js` |
-| Consolidated doc Library | ✅ merges deck-studio presentations + `/api/v1/storage/documents` into one table | `src/doc-studio/app.js` — `libraryItems()` (~L1965), `loadLibrary()` (~L2106) |
+| Consolidated doc Library | ✅ merges deck-studio presentations + `/api/v1/storage/library/files` into one table | `src/doc-studio/app.js`, `libraryItems()` and `loadLibrary()` |
 | Org doc authoring | ✅ doc-studio creates org/matter-scoped docs, decks, signatures (stored in LANA-AI) | `src/doc-studio/app.js` |
 | File viewing | ✅ standalone viewer surface | `src/file-viewer.html`, `src/js/file-viewer-page.js` |
 | Loopback bridge | ⚠️ reactive only — `lana-brain` in `KNOWN_APPS`, `/lana-bridge/companion/request-token`, `/lana-bridge/health` (port 7890). **No vault read.** | `electron-bridge.js`, `electron-main.js` (~L1255) |

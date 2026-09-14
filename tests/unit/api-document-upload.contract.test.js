@@ -92,4 +92,32 @@ describe('ApiClient document upload contract', () => {
     await expect(api.uploadDocument({ name: 'missing.docx', size: 1 }, 'matter-uuid'))
       .rejects.toThrow('Upload completed without a document result');
   });
+
+  test('uses V2 file paths for replacement, deletion, and processing', async () => {
+    const { api } = loadApi();
+    api.delete = jest.fn().mockResolvedValue({});
+    api.post = jest.fn().mockResolvedValue({});
+    api.get = jest.fn().mockResolvedValue({});
+
+    await api.deleteDocument('file-1');
+    await api.deleteDocument('file-1', { hard: true });
+    await api.replaceDocument('file-1', { name: 'updated.pdf' });
+    await api.triggerDocumentProcessing('file-1', 'view');
+    await api.getDocumentProcessingStatus('file-1');
+
+    expect(api.delete).toHaveBeenNthCalledWith(1, '/api/v1/storage/files/file-1');
+    expect(api.delete).toHaveBeenNthCalledWith(2, '/api/v1/storage/files/file-1/permanent');
+    expect(api.post).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/storage/files/file-1/versions',
+      expect.anything(),
+      expect.any(Object)
+    );
+    expect(api.post).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/storage/files/file-1/processing',
+      { triggered_by: 'view' }
+    );
+    expect(api.get).toHaveBeenCalledWith('/api/v1/storage/files/file-1/processing');
+  });
 });

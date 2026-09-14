@@ -477,7 +477,7 @@
   // ── Matters load ─────────────────────────────────────────────────────
 
   /**
-   * Load all matters for the root view from /api/v1/storage/root.
+   * Load all matters for the root view from /api/v1/storage/matters.
    * Supports pagination, search, sort, and source filter.
    * @param {Object} [opts]
    * @param {boolean} [opts.silent] - When true, skip the loading spinner
@@ -514,7 +514,7 @@
         params.append('source', storageState.sourceFilter);
       }
 
-      var response = await api.get('/api/v1/storage/root?' + params.toString());
+      var response = await api.get('/api/v1/storage/matters?' + params.toString());
 
       if (response.success && response.matters) {
         storageState.folders = response.matters.map(function (matter) {
@@ -635,7 +635,7 @@
     emptyEl && emptyEl.classList.add('hidden');
 
     // Matters arrive already sorted SERVER-SIDE: loadMatters passes sort + order
-    // to /api/v1/storage/root, which sorts the full matter set by name /
+    // to /api/v1/storage/matters, which sorts the full matter set by name /
     // created_at / updated_at / document_count / folder_count and returns the
     // correct page. Render in the returned order. (The previous code re-sorted the
     // page here and hard-coded name ascending, which silently overrode the server
@@ -740,7 +740,7 @@
   // ── Files load (search-only) ─────────────────────────────────────────
 
   /**
-   * Map the matters sort field to a /storage/documents sort_by value. The files
+   * Map the matters sort field to a /storage/library/files sort_by value. The files
    * endpoint maps 'name' -> filename internally, supports created_at / updated_at
    * directly, and does not understand the matters-only counts; those fall back to
    * 'name'.
@@ -754,7 +754,7 @@
 
   /**
    * Load matching files for the current search query from
-   * /api/v1/storage/documents and render the Files section. Files are fetched
+   * /api/v1/storage/library/files and render the Files section. Files are fetched
    * ONLY while searching: when the query is empty the section is cleared and
    * hidden so the default root view stays matters-only. The Source filter applies
    * to matters only and is intentionally not passed to this endpoint.
@@ -777,7 +777,7 @@
         sort_order: storageState.sortOrder
       });
 
-      var response = await api.get('/api/v1/storage/documents?' + params.toString());
+      var response = await api.get('/api/v1/storage/library/files?' + params.toString());
       var files = (response && (response.files || response.documents)) || [];
       storageState.files = Array.isArray(files) ? files : [];
     } catch (error) {

@@ -218,7 +218,7 @@ Implementation approach:
 
 1. Introduce a new service wrapper:
    - `document-lifecycle.service.js`
-2. Let it read readiness from the canonical processing-status endpoint initially
+2. Let it read readiness from the canonical file processing endpoint initially
 3. Update chat callers to use readiness semantics instead of extraction semantics
 4. Deprecate `DocumentProcessingService`
 5. After backend cleanup, either:
@@ -261,9 +261,9 @@ The client can ship Phase 1-3 without waiting on new APIs by deriving lifecycle 
 
 These endpoints are now semantically stale and should be aligned:
 
-- `GET /api/v1/storage/:id/extraction-status`
-- `POST /api/v1/storage/:id/trigger-processing`
-- `GET /api/v1/storage/:id/processing-status`
+- `GET /api/v1/storage/files/:id/extraction-status`
+- `POST /api/v1/storage/files/:id/processing`
+- `GET /api/v1/storage/files/:id/processing`
 
 Why:
 
@@ -272,7 +272,7 @@ Why:
 
 Recommended backend contract target:
 
-- `GET /api/v1/storage/:id/lifecycle-status`
+- `GET /api/v1/storage/files/:id/lifecycle-status`
 
 Suggested payload:
 

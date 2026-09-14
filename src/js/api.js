@@ -1415,7 +1415,7 @@ class ApiClient {
     }
 
     // -------------------- STORAGE --------------------
-    if (path === '/api/v1/storage/root' && method === 'GET') {
+    if (path === '/api/v1/storage/matters' && method === 'GET') {
       const result = paginate(matters);
       return { success: true, matters: result.items, pagination: result.pagination };
     }
@@ -1430,7 +1430,7 @@ class ApiClient {
       return { status: 'success', folders: items, data: { folders: items } };
     }
 
-    if (path === '/api/v1/storage/documents' && method === 'GET') {
+    if (path === '/api/v1/storage/library/files' && method === 'GET') {
       const clientMatter = queryParams.get('client_matter');
       const search = (queryParams.get('search') || '').toLowerCase();
       const sortBy = queryParams.get('sort_by') || 'created_at';
@@ -2935,18 +2935,18 @@ class ApiClient {
   }
 
   /**
-   * Delete a document (Universal endpoint - works for all sources)
+   * Delete a file through the V2 file endpoint.
    * @param {string} documentId - The document ID
    * @returns {Promise<Object>} Deletion result
    */
   async deleteDocument(documentId, options) {
     const hard = !!(options && options.hard);
-    const path = `/api/v1/storage/${documentId}` + (hard ? '?hard=true' : '');
+    const path = `/api/v1/storage/files/${documentId}` + (hard ? '/permanent' : '');
     return this.delete(path);
   }
 
   /**
-   * Replace/update a document file (Universal endpoint - works for all sources)
+   * Replace a document by adding a new file version.
    * Triggers re-vectorization automatically
    * @param {string} documentId - The document ID to replace
    * @param {File} file - The new file to upload
@@ -2957,7 +2957,7 @@ class ApiClient {
     const formData = new FormData();
     formData.append('file', file);
 
-    return this.put(`/api/v1/storage/${documentId}`, formData, {
+    return this.post(`/api/v1/storage/files/${documentId}/versions`, formData, {
       onUploadProgress: onProgress ? (progressEvent) => {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         onProgress(percentCompleted);
@@ -3488,7 +3488,7 @@ class ApiClient {
    * @returns {Promise<Object>}
    */
   async triggerDocumentProcessing(documentId, triggeredBy) {
-    return this.post(`/api/v1/storage/${documentId}/trigger-processing`, {
+    return this.post(`/api/v1/storage/files/${documentId}/processing`, {
       triggered_by: triggeredBy
     });
   }
@@ -3499,7 +3499,7 @@ class ApiClient {
    * @returns {Promise<Object>}
    */
   async getDocumentProcessingStatus(documentId) {
-    return this.get(`/api/v1/storage/${documentId}/processing-status`);
+    return this.get(`/api/v1/storage/files/${documentId}/processing`);
   }
 
   /**

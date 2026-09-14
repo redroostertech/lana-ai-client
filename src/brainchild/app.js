@@ -156,7 +156,7 @@
     }
 
     try {
-      var docResponse = await apiFetch('/api/v1/storage/documents?page_size=200&sort_by=updated_at&sort_order=desc');
+      var docResponse = await apiFetch('/api/v1/storage/library/files?page_size=200&sort_by=updated_at&sort_order=desc');
       if (!docResponse.ok) throw new Error('Request failed with ' + docResponse.status);
       var docPayload = await docResponse.json();
       documents = Array.isArray(docPayload.documents)

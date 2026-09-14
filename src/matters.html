@@ -3651,7 +3651,7 @@
             Toast.info('Retriggering document ingestion...');
 
             // Call the retry endpoint
-            const result = await api.post(`/api/v1/storage/documents/${fileId}/retry-ingestion`, {});
+            const result = await api.post(`/api/v1/storage/files/${fileId}/retry-ingestion`, {});
 
             Toast.success('Document processing started. This may take a few minutes.');
 
@@ -3757,7 +3757,7 @@
 
       try {
         // Fetch file using download-by-key endpoint
-        const url = `${api.baseUrl}/api/v1/storage/download-by-key?storage_key=${encodeURIComponent(storageKey)}&matter_id=${matterId}`;
+        const url = `${api.baseUrl}/api/v1/storage/objects/download?storage_key=${encodeURIComponent(storageKey)}&matter_id=${matterId}`;
         const response = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${api.token}`
@@ -3862,7 +3862,7 @@
           try {
             Toast.info('Deleting file...');
             // We'll need to create a delete endpoint for orphaned files
-            await api.delete(`/api/v1/storage/orphaned?storage_key=${encodeURIComponent(storageKey)}`);
+            await api.delete(`/api/v1/storage/objects?storage_key=${encodeURIComponent(storageKey)}`);
             Toast.success('File deleted successfully');
 
             // Refresh the matter view to update orphaned files list
@@ -4094,7 +4094,7 @@
     // Download orphaned document with authentication (using storage key)
     window.downloadOrphanedDocument = async function(storageKey, matterId, filename) {
       try {
-        const url = `${api.baseUrl}/api/v1/storage/download-by-key?storage_key=${encodeURIComponent(storageKey)}&matter_id=${matterId}`;
+        const url = `${api.baseUrl}/api/v1/storage/objects/download?storage_key=${encodeURIComponent(storageKey)}&matter_id=${matterId}`;
         const response = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${api.token}`

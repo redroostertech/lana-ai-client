@@ -2059,7 +2059,7 @@ async function loadLibrary() {
   }
 
   try {
-    const response = await apiFetch('/api/v1/storage/documents?page_size=200&sort_by=updated_at&sort_order=desc');
+    const response = await apiFetch('/api/v1/storage/library/files?page_size=200&sort_by=updated_at&sort_order=desc');
     if (!response.ok) {
       throw new Error(`Request failed with ${response.status}`);
     }

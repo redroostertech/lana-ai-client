@@ -1019,7 +1019,7 @@
         (async function () {
           try {
             toastInfo('Retriggering document ingestion...');
-            await api.post('/api/v1/storage/documents/' + fileId + '/retry-ingestion', {});
+            await api.post('/api/v1/storage/files/' + fileId + '/retry-ingestion', {});
             toastSuccess('Document processing started. This may take a few minutes.');
             setTimeout(function () { refresh(); }, 2000);
           } catch (error) {
@@ -1309,7 +1309,7 @@
         (async function () {
           try {
             toastInfo('Deleting file...');
-            await api.delete('/api/v1/storage/orphaned?storage_key=' + encodeURIComponent(storageKey));
+            await api.delete('/api/v1/storage/objects?storage_key=' + encodeURIComponent(storageKey));
             toastSuccess('File deleted successfully');
             await refresh();
           } catch (error) {

@@ -1987,7 +1987,7 @@
         }
 
         const resp = await fetch(
-          apiClient.baseUrl + '/api/v1/storage/download/' + encodeURIComponent(docId),
+          apiClient.baseUrl + '/api/v1/storage/files/' + encodeURIComponent(docId) + '/download',
           { headers: { 'Authorization': 'Bearer ' + (apiClient.token || localStorage.getItem('token') || '') } }
         );
 

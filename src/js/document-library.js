@@ -320,7 +320,7 @@
       params.set('sort_order', 'desc');
       if (searchTerm) params.set('search', searchTerm);
       if (documentType) params.set('document_type', documentType);
-      var response = await client.get('/api/v1/storage/documents?' + params.toString());
+      var response = await client.get('/api/v1/storage/library/files?' + params.toString());
       if (sequence !== loadSequence || !el('documentLibrary')) return;
       var files = filesFromResponse(response);
       renderFiles(files, paginationFromResponse(response, files.length));

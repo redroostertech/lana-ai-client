@@ -4162,7 +4162,7 @@
       try {
         if (isUpload) {
           // Cancel upload session
-          await api.delete(`/api/v1/storage/upload/${jobId}`);
+          await api.delete(`/api/v1/storage/upload-sessions/${jobId}`);
         } else {
           // Cancel ingest job
           await api.post(`/api/v1/storage/jobs/${jobId}/cancel`, {});

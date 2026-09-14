@@ -154,7 +154,7 @@
    * normalizeLibraryItems(payload, scope)
    *
    * payload: {
-   *   documents:     [storage DTO, ...],   // /api/v1/storage/documents
+   *   documents:     [storage DTO, ...],   // /api/v1/storage/library/files
    *   presentations: [presentation DTO],   // /api/v1/deck-studio/presentations
    *   notes:         [brainchild note DTO]  // loopback vault (Phase B)
    * }

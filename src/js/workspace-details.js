@@ -9039,7 +9039,7 @@
     if (errorDownloadBtn) errorDownloadBtn.onclick = function () { downloadOrphanedDocument(storageKey, fileName); };
 
     try {
-      var url = api.baseUrl + '/api/v1/storage/download-by-key?storage_key=' + encodeURIComponent(storageKey) + '&matter_id=' + (matterId || '');
+      var url = api.baseUrl + '/api/v1/storage/objects/download?storage_key=' + encodeURIComponent(storageKey) + '&matter_id=' + (matterId || '');
       var response = await fetch(url, {
         headers: { 'Authorization': 'Bearer ' + api.token }
       });
@@ -9144,7 +9144,7 @@
     var matterId = currentMatterData ? currentMatterData.matter_id : null;
 
     try {
-      var url = api.baseUrl + '/api/v1/storage/download-by-key?storage_key=' + encodeURIComponent(storageKey) + '&matter_id=' + (matterId || '');
+      var url = api.baseUrl + '/api/v1/storage/objects/download?storage_key=' + encodeURIComponent(storageKey) + '&matter_id=' + (matterId || '');
       var response = await fetch(url, {
         headers: { 'Authorization': 'Bearer ' + api.token }
       });
