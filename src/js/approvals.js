@@ -94,7 +94,12 @@
       workflow: 'Workflow',
       chat:     'Chat',
       skill:    'Skill',
-      manual:   'Manual'
+      manual:   'Manual',
+      // A held document waiting on a privilege decision. Without an entry here
+      // the badge rendered the raw source type, "privilege_review", to a
+      // reviewer being asked to decide whether privileged material may be
+      // disclosed. The fallback is safe, it is just not a label.
+      privilege_review: 'Privilege Review'
     };
     var label = labels[s] || escHtml(s);
     return '<span class="apr-source">' + escHtml(label) + '</span>';
@@ -675,7 +680,13 @@
 
   function _formatSourceType(sourceType) {
     if (!sourceType) return '—';
-    var labels = { workflow: 'Workflow', chat: 'Chat', skill: 'Skill', manual: 'Manual' };
+    var labels = {
+      workflow: 'Workflow',
+      chat: 'Chat',
+      skill: 'Skill',
+      manual: 'Manual',
+      privilege_review: 'Privilege Review'
+    };
     return labels[String(sourceType).toLowerCase()] || _capitalize(sourceType);
   }
 
