@@ -88,20 +88,33 @@
    * @param {string} sourceType — workflow | chat | skill | manual
    * @returns {string}
    */
+  /**
+   * The display name for every approval source type, in one place.
+   *
+   * This used to be two copies: one inside sourceBadge() for the inbox list
+   * and one inside _formatSourceType() for the detail header. Adding a source
+   * type to one of them fixed half the screen and looked finished. That is how
+   * `privilege_review` nearly shipped rendering as a raw string to a reviewer
+   * deciding whether privileged material may be disclosed.
+   *
+   * An unknown type still falls back to something readable rather than
+   * failing, so a new source type is never invisible, just unlabelled.
+   */
+  var SOURCE_TYPE_LABELS = {
+    workflow:         'Workflow',
+    chat:             'Chat',
+    skill:            'Skill',
+    manual:           'Manual',
+    privilege_review: 'Privilege Review'
+  };
+
+  function sourceTypeLabel(sourceType) {
+    return SOURCE_TYPE_LABELS[String(sourceType || '').toLowerCase()] || null;
+  }
+
   function sourceBadge(sourceType) {
     var s = String(sourceType || '').toLowerCase();
-    var labels = {
-      workflow: 'Workflow',
-      chat:     'Chat',
-      skill:    'Skill',
-      manual:   'Manual',
-      // A held document waiting on a privilege decision. Without an entry here
-      // the badge rendered the raw source type, "privilege_review", to a
-      // reviewer being asked to decide whether privileged material may be
-      // disclosed. The fallback is safe, it is just not a label.
-      privilege_review: 'Privilege Review'
-    };
-    var label = labels[s] || escHtml(s);
+    var label = sourceTypeLabel(s) || escHtml(s);
     return '<span class="apr-source">' + escHtml(label) + '</span>';
   }
 
@@ -680,14 +693,7 @@
 
   function _formatSourceType(sourceType) {
     if (!sourceType) return '—';
-    var labels = {
-      workflow: 'Workflow',
-      chat: 'Chat',
-      skill: 'Skill',
-      manual: 'Manual',
-      privilege_review: 'Privilege Review'
-    };
-    return labels[String(sourceType).toLowerCase()] || _capitalize(sourceType);
+    return sourceTypeLabel(sourceType) || _capitalize(sourceType);
   }
 
   function _formatByteCount(bytes) {
