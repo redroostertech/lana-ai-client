@@ -15,6 +15,7 @@
   var _dateFrom = '';
   var _dateTo = '';
   var _selectedIds = {};
+  var ADMIN_BILLABLE_ROLES = ['system_admin', 'org_admin', 'organization_admin', 'admin'];
 
   /**
    * Render the billable hours tab for a matter.
@@ -107,6 +108,7 @@
     var url = '/api/v1/billable-hours/summary?matter_id=' + encodeURIComponent(matter.matter_id);
     if (_dateFrom) url += '&date_from=' + encodeURIComponent(_dateFrom);
     if (_dateTo) url += '&date_to=' + encodeURIComponent(_dateTo);
+    url = _appendAdminScope(url);
 
     api.get(url)
       .then(function (result) {
@@ -159,6 +161,7 @@
       '&status=all&limit=' + _pageSize + '&page=' + _currentPage;
     if (_dateFrom) url += '&date_from=' + encodeURIComponent(_dateFrom);
     if (_dateTo) url += '&date_to=' + encodeURIComponent(_dateTo);
+    url = _appendAdminScope(url);
 
     api.get(url)
       .then(function (result) {
@@ -271,6 +274,53 @@
       }
     }
     return html;
+  }
+
+  function _appendAdminScope(url) {
+    if (_isAdminBillableHoursUser()) {
+      return url + '&all_users=true';
+    }
+    return url;
+  }
+
+  function _isAdminBillableHoursUser() {
+    var user = null;
+    if (typeof api !== 'undefined' && api && api.user) {
+      user = api.user;
+    }
+    if (!user && typeof Lex !== 'undefined' && Lex.state && Lex.state.user) {
+      user = Lex.state.user;
+    }
+    if (!user) {
+      try {
+        var stored = localStorage.getItem('user');
+        user = stored ? JSON.parse(stored) : null;
+      } catch (e) {
+        user = null;
+      }
+    }
+    if (!user) return false;
+
+    if (_isAdminRole(user.role_name || user.role)) return true;
+
+    var roles = user.roles || user.role_names || [];
+    if (!Array.isArray(roles)) roles = [roles];
+    for (var i = 0; i < roles.length; i++) {
+      if (_isAdminRole(roles[i])) return true;
+    }
+
+    return false;
+  }
+
+  function _isAdminRole(role) {
+    var roleName = '';
+    if (typeof role === 'string') {
+      roleName = role;
+    } else if (role && typeof role === 'object') {
+      roleName = role.name || role.role_name || role.role || '';
+    }
+    roleName = String(roleName).toLowerCase();
+    return ADMIN_BILLABLE_ROLES.indexOf(roleName) !== -1;
   }
 
   // ─────────────────────────────────────────────────────────────
