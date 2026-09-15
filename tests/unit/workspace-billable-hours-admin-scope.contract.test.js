@@ -57,6 +57,10 @@ function executeWithUser(user) {
   };
 
   vm.createContext(context);
+  // workspace-details.html loads time-utils.js before this script; mirror that
+  // so the real LanaTime clock is available, as it is in the app.
+  vm.runInContext(read('src/js/time-utils.js'), context);
+  context.LanaTime = context.window.LanaTime;
   vm.runInContext(read('src/js/workspace-billable-hours.js'), context);
   context.window.renderBillableHoursTab({ matter_id: 'matter-1' });
   return apiCalls;
