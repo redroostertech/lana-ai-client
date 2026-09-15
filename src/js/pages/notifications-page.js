@@ -35,6 +35,7 @@
     storage_warning: { bg: 'var(--lex-status-warning-bg)', text: 'var(--lex-status-warning-text)' },
     error: { bg: 'var(--lex-status-danger-bg)', text: 'var(--lex-status-danger-text)' },
     processing_failed: { bg: 'var(--lex-status-danger-bg)', text: 'var(--lex-status-danger-text)' },
+    approval_resume_failed: { bg: 'var(--lex-status-danger-bg)', text: 'var(--lex-status-danger-text)' },
     system_alert: { bg: 'var(--lex-status-danger-bg)', text: 'var(--lex-status-danger-text)' },
     security: { bg: 'var(--lex-status-danger-bg)', text: 'var(--lex-status-danger-text)' },
     comment: { bg: 'var(--lex-bg-accent-muted)', text: 'var(--lex-text-accent)' },
@@ -454,7 +455,7 @@
     var key = ICONS[type] ? type : (type && type.indexOf('comment') === 0 ? 'comment' : 'info');
     if (type && type.indexOf('document') === 0) key = 'document';
     if (type === 'system_alert' || type === 'storage_warning') key = 'warning';
-    if (type === 'processing_failed' || type === 'security') key = 'error';
+    if (type === 'processing_failed' || type === 'approval_resume_failed' || type === 'security') key = 'error';
     return '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">' + (ICONS[key] || ICONS.info) + '</svg>';
   }
 
