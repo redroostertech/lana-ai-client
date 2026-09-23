@@ -1491,6 +1491,18 @@
           }
           break;
 
+        // LANA has gone as far as she honestly can and is asking.
+        //
+        // Rendered as a DECISION so answering is one tap. The user still has the
+        // composer, and `allow_custom` is always on, because a question that
+        // cannot be walked away from is the failure mode that makes people stop
+        // using a tool. The backend treats an off-topic reply as `abstained`
+        // and simply runs a normal turn.
+        case 'uncertainty':
+          if (this._activityEl) this._activityEl.hide();
+          this._insertUncertaintyBlock(event);
+          break;
+
         case 'plan_ready':
           // Backend generated a plan that requires user approval before execution.
           // Hide the activity indicator and insert a plan card into the thread.
@@ -1825,6 +1837,65 @@
       }
 
       return el;
+    }
+
+    /**
+     * Render an open question as a decision block.
+     *
+     * Reuses the existing `decision` block rather than adding a component: it
+     * already renders selectable cards, already allows a custom reply, and
+     * already routes the answer back through ActionBridge as a follow-up
+     * message, which is exactly the round trip the backend contract expects.
+     *
+     * The LABEL is what gets sent, never the id. The backend classifies the
+     * reply against the candidates it offered and matches on the label; sending
+     * an opaque id would put a string the user never saw into their own
+     * transcript.
+     */
+    _insertUncertaintyBlock(event) {
+      if (!this._threadEl || !this._threadEl._container) return;
+      if (!global.Lex || !global.Lex.BlockRenderer) return;
+
+      var welcome = this._threadEl._container.querySelector('.lex-chat-welcome');
+      if (welcome) welcome.remove();
+
+      var candidates = Array.isArray(event.candidates) ? event.candidates : [];
+      var options = candidates.map(function (candidate) {
+        var label = String((candidate && candidate.label) || '').trim();
+        if (!label) return null;
+        return { label: label, value: label };
+      }).filter(Boolean);
+
+      // A confirmation is still a choice, and it needs its "no". Without an
+      // explicit decline the only way to say no is to ignore the question,
+      // which reads as the product having stalled.
+      if (options.length === 1 && event.resolvesBy === 'confirmation') {
+        options = [
+          { label: 'Yes, ' + options[0].label, value: 'Yes, ' + options[0].label },
+          { label: 'No, not that one', value: 'No, not that one' }
+        ];
+      }
+      if (options.length === 0) return;
+
+      var host = document.createElement('div');
+      host.className = 'lex-chat-uncertainty';
+      this._threadEl._container.appendChild(host);
+
+      global.Lex.BlockRenderer.render(host, [{
+        type: 'decision',
+        prompt: event.prompt || 'Which did you mean?',
+        options: options,
+        // ALWAYS true. The escape hatch is the anti-trap rule, not a nicety.
+        allow_custom: true,
+        custom_placeholder: 'Something else...'
+      }]);
+
+      if (this._threadEl.scrollToBottom) this._threadEl.scrollToBottom();
+      this.emit('lex-chat-uncertainty', {
+        uncertaintyKind: event.uncertaintyKind,
+        resolvesBy: event.resolvesBy,
+        candidates: candidates.length
+      });
     }
 
     _insertPlanCard(event) {

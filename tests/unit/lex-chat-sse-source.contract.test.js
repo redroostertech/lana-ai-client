@@ -350,6 +350,59 @@ describe('SSEChatSource contract', () => {
     expect(source.generating).toBe(false);
   });
 
+  test('normalizes an uncertainty question into typed data, not prose', async () => {
+    // LANA has gone as far as she honestly can and stopped to ask. The answer
+    // space has to survive the wire intact, because the whole point of the
+    // backend contract is that replying takes one tap rather than the user
+    // retyping an exact stored name they have no way to know.
+    const fetchMock = jest.fn().mockResolvedValueOnce(responseFromChunks([
+      'event: uncertainty\ndata: {"uncertainty_kind":"ambiguous_target","prompt":"Did you mean Automatic Document Summarization?","candidates":[{"id":"e078331c","label":"Automatic Document Summarization"}],"looked_for":"run the document summary automation","resolves_by":"confirmation"}\n\n',
+      'event: done\ndata: {"thread_id":"thread-1","generation_id":"generation-1","message_id":"assistant-1"}\n\n'
+    ]));
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
+
+    const events = [];
+    for await (const event of source.send('run the document summary automation')) events.push(event);
+
+    expect(events[0]).toEqual(expect.objectContaining({
+      type: 'uncertainty',
+      uncertaintyKind: 'ambiguous_target',
+      prompt: 'Did you mean Automatic Document Summarization?',
+      lookedFor: 'run the document summary automation',
+      resolvesBy: 'confirmation'
+    }));
+    // The candidates are the answer space. Losing them turns a one-tap
+    // question back into prose the user has to answer by typing.
+    expect(events[0].candidates).toEqual([
+      { id: 'e078331c', label: 'Automatic Document Summarization' }
+    ]);
+  });
+
+  test('an uncertainty with no candidates still carries its prompt', async () => {
+    // Control arm. "Open the contract and highlight the clause" has no
+    // candidate list and is the most useful ask in the design, so a mapping
+    // that required candidates would silently drop it.
+    const fetchMock = jest.fn().mockResolvedValueOnce(responseFromChunks([
+      'event: uncertainty\ndata: {"uncertainty_kind":"evidence_not_located","prompt":"Open the contract and highlight the indemnity clause.","resolves_by":"gesture"}\n\n',
+      'event: done\ndata: {"thread_id":"thread-1","generation_id":"generation-1","message_id":"assistant-1"}\n\n'
+    ]));
+    const api = canonicalApi();
+    const { Source } = loadSource(fetchMock, { api });
+    const source = new Source({ api });
+
+    const events = [];
+    for await (const event of source.send('where is the indemnity clause')) events.push(event);
+
+    expect(events[0]).toEqual(expect.objectContaining({
+      type: 'uncertainty',
+      uncertaintyKind: 'evidence_not_located',
+      resolvesBy: 'gesture'
+    }));
+    expect(events[0].candidates).toEqual([]);
+  });
+
   test('normalizes unified context and retrieval progress events', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(responseFromChunks([
       'event: tool_progress\ndata: {"tool_name":"attachment_rag","message":"Searching the attached document embeddings for relevant evidence...","scan_type":"embedding","file_count":2,"chunks_found":4}\n\n',
