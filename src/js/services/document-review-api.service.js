@@ -87,6 +87,33 @@
     return operation === 'fmt' || operation === 'format' || operation === 'formatting';
   }
 
+  /**
+   * "row" or "column" when the change is a tracked table structure edit (a
+   * row inserted or deleted, a column's cells inserted or deleted), read from
+   * the live revision or from the persisted metadata; null otherwise.
+   */
+  function structureChangeKind(change) {
+    if (!change) return null;
+    var kind = change.structureKind || change.structure_kind ||
+      (change.metadata && change.metadata.structure_change && change.metadata.structure_change.kind) || null;
+    return kind === 'row' || kind === 'column' ? kind : null;
+  }
+
+  function structureChangeLabel(change) {
+    var kind = structureChangeKind(change);
+    if (!kind) return null;
+    var noun = kind === 'row' ? 'Row' : 'Column';
+    if (isDeletionChange(change)) return noun + ' deleted';
+    if (isInsertionChange(change)) return noun + ' inserted';
+    return null;
+  }
+
+  /** What an inserted row or column reads as when it holds no text yet. */
+  function structureInsertedText(change) {
+    var kind = structureChangeKind(change);
+    return kind === 'row' ? 'New row' : kind === 'column' ? 'New column' : '';
+  }
+
   var FORMAT_PROPERTY_LABELS = {
     font: 'Font',
     size: 'Size',
@@ -190,11 +217,15 @@
       var formatDetails = formatChangeDetailsFromRevision(change);
       if (formatDetails) return formatDetails.proposedText;
     }
-    return change.proposed_text || (isInsertionChange(change) ? reviewItemText(change) : '');
+    var proposed = change.proposed_text || (isInsertionChange(change) ? reviewItemText(change) : '');
+    if (!proposed && isInsertionChange(change)) return structureInsertedText(change);
+    return proposed;
   }
 
   function changeLabel(item) {
     if (item && item.operation === 'replace') return 'Replacement';
+    var structureLabel = structureChangeLabel(item);
+    if (structureLabel) return structureLabel;
     if (isFormattingChange(item)) {
       var details = formatChangeDetailsFromRevision(item);
       // A column resize is recorded as a table property change (w:tblGridChange); it reads as one.
@@ -771,6 +802,174 @@
   }
 
   // =========================================================================
+  // Annotations: highlights, comment threads and redline notes. They live in
+  // the draft batch's review_metadata.comments beside the change list, so
+  // they ride with the draft, release with it and revert with it. A thread
+  // carries a kind, a colour for highlights, and a structured anchor the
+  // editor can draw: visible-text/1 (paragraph and offsets, the redline
+  // service's own space) for DOCX, pdf-page/1 (page and rects in points) for
+  // a PDF. Older comments carry only the flat text offsets and keep working.
+  // =========================================================================
+
+  var ANNOTATION_KINDS = ['comment', 'highlight', 'redline'];
+  var HIGHLIGHT_COLORS = [
+    { value: '#FFE066', label: 'Yellow' },
+    { value: '#86EFAC', label: 'Green' },
+    { value: '#93C5FD', label: 'Blue' },
+    { value: '#F9A8D4', label: 'Pink' }
+  ];
+  var DEFAULT_HIGHLIGHT_COLOR = HIGHLIGHT_COLORS[0].value;
+  var ANNOTATION_TEXT_LIMIT = 2000;
+
+  function annotationKind(item) {
+    var kind = String((item && item.kind) || 'comment').toLowerCase();
+    return ANNOTATION_KINDS.indexOf(kind) === -1 ? 'comment' : kind;
+  }
+
+  /** The item's colour as #RRGGBB; a highlight without one takes the default, anything else none. */
+  function annotationColor(item, kind) {
+    var value = String((item && item.color) || '').trim();
+    if (/^#[0-9a-f]{6}$/i.test(value)) return value.toUpperCase();
+    return (kind || annotationKind(item)) === 'highlight' ? DEFAULT_HIGHLIGHT_COLOR : '';
+  }
+
+  function annotationLabel(item) {
+    var kind = annotationKind(item);
+    if (kind === 'highlight') return 'Highlight';
+    if (kind === 'redline') return 'Suggested change';
+    return 'Comment';
+  }
+
+  function nonNegativeInteger(value) {
+    var number = Number(value);
+    return Number.isInteger(number) && number >= 0 ? number : null;
+  }
+
+  /** A structured anchor in one of the two spaces, or null when it is not one. */
+  function normalizeAnnotationAnchor(anchor) {
+    if (!anchor || typeof anchor !== 'object') return null;
+    if (anchor.space === 'visible-text/1' && Array.isArray(anchor.ranges)) {
+      var ranges = anchor.ranges.map(function (range) {
+        var paragraph = nonNegativeInteger(range && range.paragraph);
+        var start = nonNegativeInteger(range && range.start);
+        var end = nonNegativeInteger(range && range.end);
+        return paragraph !== null && start !== null && end !== null && end > start
+          ? { paragraph: paragraph, start: start, end: end }
+          : null;
+      }).filter(Boolean);
+      if (!ranges.length) return null;
+      var textAnchor = { space: 'visible-text/1', ranges: ranges };
+      if (anchor.text) textAnchor.text = String(anchor.text).slice(0, ANNOTATION_TEXT_LIMIT);
+      if (anchor.hash) textAnchor.hash = String(anchor.hash);
+      return textAnchor;
+    }
+    if (anchor.space === 'pdf-page/1' && Array.isArray(anchor.rects)) {
+      var page = Number(anchor.page);
+      var rects = anchor.rects.map(function (rect) {
+        var values = ['x', 'y', 'w', 'h'].map(function (key) { return Number(rect && rect[key]); });
+        var finite = values.every(function (value) { return Number.isFinite(value); });
+        return finite && values[0] >= 0 && values[1] >= 0 && values[2] > 0 && values[3] > 0
+          ? { x: values[0], y: values[1], w: values[2], h: values[3] }
+          : null;
+      }).filter(Boolean);
+      if (!Number.isInteger(page) || page < 1 || !rects.length) return null;
+      return { space: 'pdf-page/1', page: page, rects: rects };
+    }
+    return null;
+  }
+
+  /** The threads the editor can draw: those with a structured anchor, as the embed takes them. */
+  function embedAnnotationsFrom(threads) {
+    return (Array.isArray(threads) ? threads : []).map(function (thread) {
+      var anchor = normalizeAnnotationAnchor(thread && thread.anchor);
+      if (!thread || !thread.id || !anchor) return null;
+      var kind = annotationKind(thread);
+      return {
+        id: String(thread.id),
+        kind: kind,
+        color: annotationColor(thread, kind) || null,
+        anchor: anchor,
+        resolved: String(thread.status || '').toLowerCase() === 'resolved'
+      };
+    }).filter(Boolean);
+  }
+
+  /**
+   * A new thread in the persisted shape: an id from the kind and the clock, the
+   * author, the anchor and quote, open with no replies. A highlight may carry
+   * no text; a comment or a suggested change must.
+   */
+  function buildAnnotationThread(input) {
+    var source = input || {};
+    var kind = annotationKind(source);
+    var text = String(source.text || '').trim();
+    if (!text && kind !== 'highlight') return null;
+    var anchor = normalizeAnnotationAnchor(source.anchor);
+    var quote = String(source.quote || (anchor && anchor.text) || '').trim();
+    var now = source.date || new Date().toISOString();
+    var id = String(source.id || (kind + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)));
+    var thread = {
+      id: id,
+      thread_id: id,
+      kind: kind,
+      color: annotationColor(source, kind),
+      author: source.author || 'Reviewer',
+      author_id: String(source.author_id || source.authorId || ''),
+      date: now,
+      created_at: now,
+      updated_at: now,
+      text: text,
+      scope: anchor || quote ? 'selection' : 'document',
+      anchor_text: quote.slice(0, 500),
+      anchor: anchor,
+      status: 'open',
+      replies: []
+    };
+    if (kind === 'redline') thread.proposed_text = String(source.proposed_text || source.proposedText || '').trim();
+    return thread;
+  }
+
+  /**
+   * The open suggested changes among a document's threads: the ones a
+   * converted copy can accept as tracked edits. Each needs the suggested text
+   * and something to find on the page (the text as printed, else the quote).
+   */
+  function openSuggestedChanges(threads) {
+    return (Array.isArray(threads) ? threads : []).filter(function (thread) {
+      if (!thread || annotationKind(thread) !== 'redline') return false;
+      if (String(thread.status || 'open').toLowerCase() === 'resolved') return false;
+      var proposed = String(thread.proposed_text || thread.proposedText || '').trim();
+      var printed = String(thread.anchor_text || (thread.anchor && thread.anchor.text) || '').trim();
+      return proposed.length > 0 && printed.length > 0 && !/^Page \d+$/.test(printed);
+    });
+  }
+
+  /** The threads persisted on a batch. */
+  function batchReviewThreads(batch) {
+    var metadata = batch && batch.review_metadata;
+    return metadata && Array.isArray(metadata.comments) ? metadata.comments.filter(Boolean) : [];
+  }
+
+  /** Threads shipped in released versions, read-only and stamped with their release. */
+  function releasedReviewThreads(groups) {
+    var out = [];
+    (Array.isArray(groups) ? groups : []).forEach(function (group) {
+      var release = group && group.release ? group.release : {};
+      batchReviewThreads(group).forEach(function (thread) {
+        out.push(Object.assign({}, thread, {
+          released_in: {
+            id: release.id || (group && group.release_id) || '',
+            release_number: release.release_number || null,
+            released_at: release.released_at || null
+          },
+          read_only: true
+        }));
+      });
+    });
+    return out;
+  }
+
+  // =========================================================================
   // Review session: baseline tracking + persistable serialization
   // =========================================================================
 
@@ -785,7 +984,8 @@
       proposed_text: changeProposedText(revision),
       format_kind: revision.formatKind || revision.format_kind || null,
       format_before: revision.formatBefore || revision.format_before || null,
-      format_after: revision.formatAfter || revision.format_after || null
+      format_after: revision.formatAfter || revision.format_after || null,
+      structure_kind: structureChangeKind(revision)
     };
     try {
       return JSON.stringify(payload);
@@ -821,12 +1021,14 @@
           after: formatDetails.after
         };
       }
+      var structureKind = structureChangeKind(revision);
+      if (structureKind) metadata.structure_change = { kind: structureKind };
       return {
         change_key: 'revision:' + id,
         status: 'proposed',
         operation: type === 'del' ? 'delete' : (type === 'ins' ? 'insert' : (type === 'fmt' ? 'format' : type)),
         original_text: type === 'del' ? text : (formatDetails ? formatDetails.originalText : null),
-        proposed_text: type === 'ins' ? text : (formatDetails ? formatDetails.proposedText : null),
+        proposed_text: type === 'ins' ? (text || structureInsertedText(revision) || text) : (formatDetails ? formatDetails.proposedText : null),
         edit_script: editScript,
         anchor: {
           type: 'editor_revision',
@@ -1421,10 +1623,22 @@
     formatValueText: formatValueText,
     formatSummary: formatSummary,
     formatChangeDetailsFromRevision: formatChangeDetailsFromRevision,
+    structureChangeKind: structureChangeKind,
     changeOriginalText: changeOriginalText,
     changeProposedText: changeProposedText,
     changeLabel: changeLabel,
     changeStatus: changeStatus,
+    annotationKind: annotationKind,
+    annotationColor: annotationColor,
+    annotationLabel: annotationLabel,
+    normalizeAnnotationAnchor: normalizeAnnotationAnchor,
+    embedAnnotationsFrom: embedAnnotationsFrom,
+    buildAnnotationThread: buildAnnotationThread,
+    openSuggestedChanges: openSuggestedChanges,
+    batchReviewThreads: batchReviewThreads,
+    releasedReviewThreads: releasedReviewThreads,
+    HIGHLIGHT_COLORS: HIGHLIGHT_COLORS.map(function (color) { return Object.assign({}, color); }),
+    DEFAULT_HIGHLIGHT_COLOR: DEFAULT_HIGHLIGHT_COLOR,
     sourceChangesForReviewChange: sourceChangesForReviewChange,
     editScriptKeyForChange: editScriptKeyForChange,
     editScriptGroupIdForChange: editScriptGroupIdForChange,

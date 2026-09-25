@@ -698,7 +698,12 @@
   }
 
   function normalizeServerReviewThread(comment) {
-    if (!comment || !String(comment.text || '').trim()) return null;
+    if (!comment) return null;
+    var reviewService = documentReviewService();
+    var kind = reviewService && typeof reviewService.annotationKind === 'function' ? reviewService.annotationKind(comment) : 'comment';
+    var text = String(comment.text || '').trim();
+    // A highlight is a mark on the text, not a message: it may carry no text of its own.
+    if (!text && kind !== 'highlight') return null;
     var id = String(comment.id || ('comment-' + Date.now().toString(36)));
     var createdAt = commentTimestamp(comment) || nowIso();
     var status = String(comment.status || (comment.resolved_at || comment.resolvedAt ? 'resolved' : 'open')).toLowerCase();
@@ -723,8 +728,12 @@
       date: createdAt,
       created_at: comment.created_at || comment.createdAt || createdAt,
       updated_at: comment.updated_at || comment.updatedAt || createdAt,
-      text: String(comment.text || '').trim(),
-      scope: String(comment.scope || (comment.anchor_text || comment.anchorText ? 'selection' : 'document')),
+      text: text,
+      kind: kind,
+      color: reviewService && typeof reviewService.annotationColor === 'function' ? reviewService.annotationColor(comment, kind) : '',
+      anchor: reviewService && typeof reviewService.normalizeAnnotationAnchor === 'function' ? reviewService.normalizeAnnotationAnchor(comment.anchor) : null,
+      proposed_text: String(comment.proposed_text || comment.proposedText || ''),
+      scope: String(comment.scope || (comment.anchor_text || comment.anchorText || comment.anchor ? 'selection' : 'document')),
       anchor_text: String(comment.anchor_text || comment.anchorText || ''),
       anchor_id: String(comment.anchor_id || comment.anchorId || ''),
       anchor_start: anchorStart,
@@ -1162,6 +1171,7 @@
             applyOfficeBaselineRevisionTags(file);
             updateOfficeEditorDocumentStats(file, event && event.counts ? event.counts : null);
             syncOfficeHistoryControls(file, mountedEditor);
+            syncEmbedAnnotations(file);
             if (isServerReviewFile(file)) return;
             syncOfficeEditorReviewState(file, event && event.reviewState ? event.reviewState : null);
           });
@@ -1195,6 +1205,10 @@
           mountedEditor.on('lana-context-requested', function (detail) {
             if (editorForFile(file) !== mountedEditor) return;
             openLanaForEmbedContext(file, detail);
+          });
+          mountedEditor.on('annotation-selected', function (detail) {
+            if (editorForFile(file) !== mountedEditor) return;
+            focusServerReviewComment(file, detail && detail.id);
           });
           mountedEditor.on('edit-rejected', function (detail) {
             if (editorForFile(file) !== mountedEditor) return;
@@ -1532,6 +1546,7 @@
         pendingDetailFailed: false,
         session: documentReviewService().createReviewSession(),
         comments: [],
+        sourceSuggestions: null,
         liveReviewState: null,
         dirty: false,
         restoring: false,
@@ -1629,6 +1644,7 @@
         mergedComments.push(comment);
       });
       review.comments = mergedComments;
+      review.sourceSuggestions = await loadSourceSuggestions(file, review);
       review.loaded = true;
       review.loadFailed = false;
     } catch (error) {
@@ -1641,6 +1657,107 @@
     renderChrome();
     renderReviewDock(file);
     return review;
+  }
+
+  /**
+   * For a converted copy, the open suggested changes reviewers made on its
+   * source PDF: they live on the PDF's own draft, and this copy can accept
+   * each one as a tracked edit.
+   */
+  async function loadSourceSuggestions(file, review) {
+    var service = documentReviewService();
+    var metadata = officeFileMetadata(file);
+    var originalId = metadata.source === 'document_format_conversion' && metadata.original_document_id
+      ? String(metadata.original_document_id)
+      : '';
+    var empty = { documentId: originalId, batch: null, items: [] };
+    if (!originalId || !review || !review.matterId || !service || typeof service.openSuggestedChanges !== 'function') return empty;
+    try {
+      var workflow = await service.loadWorkflow({ api: window.api, matterId: review.matterId, documentId: originalId });
+      var batch = workflow.currentDraftBatch || workflow.pendingReleaseBatch || null;
+      return { documentId: originalId, batch: batch, items: service.openSuggestedChanges(service.batchReviewThreads(batch)) };
+    } catch (error) {
+      console.warn('[file-editor] Source PDF suggestions could not be loaded:', error && error.message ? error.message : error);
+      return empty;
+    }
+  }
+
+  function renderSourceSuggestions(file) {
+    var review = serverReview(file);
+    var source = review && review.sourceSuggestions;
+    if (!source || !Array.isArray(source.items) || !source.items.length) return '';
+    return '<section class="office-review-history-group office-review-source-suggestions">' +
+      '<header class="office-review-history-header"><h5>Suggested changes from the PDF</h5><span>' + esc(source.items.length) + '</span></header>' +
+      '<div class="office-review-history-rows">' + source.items.map(function (item) {
+        var printed = String(item.anchor_text || (item.anchor && item.anchor.text) || '');
+        return '<article class="office-review-history-row office-review-comment-thread office-review-comment-thread--redline" data-source-suggestion-id="' + esc(item.id || '') + '">' +
+          '<div class="office-review-history-row-heading"><span class="office-review-history-row-title">Suggested change</span>' +
+          '<span class="office-review-status office-review-status--draft">From PDF</span></div>' +
+          '<div class="office-review-comment-meta"><strong>' + esc(item.author || 'Reviewer') + '</strong><span>' + esc(formatTimestamp(commentTimestamp(item))) + '</span></div>' +
+          '<div class="office-review-comment-scope">Printed: “' + esc(printed) + '”</div>' +
+          '<div class="office-review-comment-proposed">Suggested: ' + esc(item.proposed_text || '') + '</div>' +
+          (item.text ? '<div class="office-review-comment-text">' + esc(item.text) + '</div>' : '') +
+          '<div class="office-review-comment-actions"><button type="button" data-action="accept-source-suggestion" data-suggestion-id="' + esc(item.id || '') + '">Accept into edit</button></div>' +
+          '</article>';
+      }).join('') + '</div></section>';
+  }
+
+  /**
+   * Finds the printed text in this copy, replaces it with the suggestion as a
+   * tracked edit, and marks the suggestion resolved on the PDF's draft so it
+   * is not offered again.
+   */
+  async function acceptSourceSuggestion(file, suggestionId) {
+    var review = serverReview(file);
+    var editor = editorForFile(file);
+    var service = documentReviewService();
+    var source = review && review.sourceSuggestions;
+    var items = source && Array.isArray(source.items) ? source.items : [];
+    var item = items.filter(function (entry) { return String(entry.id || '') === String(suggestionId || ''); })[0];
+    if (!item || !editor || typeof editor.findText !== 'function' || typeof editor.applyEdits !== 'function') {
+      toast('The suggestion is no longer available.');
+      return;
+    }
+    if (file.canWrite === false) {
+      toast('Edit permission is required to accept a suggestion.');
+      return;
+    }
+    var printed = String(item.anchor_text || (item.anchor && item.anchor.text) || '').trim();
+    var anchor = editor.findText(printed);
+    if (!anchor || !anchor.ranges || !anchor.ranges.length) {
+      toast('The printed text was not found in this copy. Find it and make the change by hand.');
+      return;
+    }
+    var range = anchor.ranges[0];
+    await editor.applyEdits([{
+      op: 'replaceText',
+      range: { paragraph: range.paragraph, start: range.start, end: range.end },
+      text: String(item.proposed_text || '')
+    }]);
+    if (service && source.batch && typeof service.isActiveDraftBatch === 'function' && service.isActiveDraftBatch(source.batch)) {
+      try {
+        var stamp = nowIso();
+        var threads = service.batchReviewThreads(source.batch).map(function (thread) {
+          if (String(thread.id || '') !== String(item.id || '')) return thread;
+          return Object.assign({}, thread, { status: 'resolved', resolved_at: stamp, resolved_by: currentReviewerIdentity(), updated_at: stamp });
+        });
+        var metadata = Object.assign({}, source.batch.review_metadata || {}, { comments: threads });
+        source.batch = await service.saveDraftBatch({
+          api: window.api,
+          matterId: review.matterId,
+          documentId: source.documentId,
+          batch: source.batch,
+          payload: { review_metadata: metadata }
+        }) || source.batch;
+        source.items = service.openSuggestedChanges(threads);
+      } catch (error) {
+        console.warn('[file-editor] Suggestion could not be marked resolved on the PDF:', error && error.message ? error.message : error);
+      }
+    } else {
+      source.items = items.filter(function (entry) { return entry !== item; });
+    }
+    renderReviewDock(file);
+    toast('Suggested change applied as a tracked edit.');
   }
 
   function serverPendingDisplayChanges(file) {
@@ -1713,7 +1830,7 @@
     });
     var seen = {};
     return comments.filter(function (comment) {
-      if (!comment || !comment.text) return false;
+      if (!comment || (!comment.text && comment.kind !== 'highlight')) return false;
       var key = comment.id || (comment.text + ':' + comment.created_at);
       if (seen[key]) return false;
       seen[key] = true;
@@ -4102,31 +4219,43 @@
     var commentsHtml = visibleComments.length
       ? visibleComments.map(function (comment) {
         var status = String(comment.status || 'open').toLowerCase() === 'resolved' ? 'Resolved' : 'Open';
+        var kind = comment.kind === 'highlight' || comment.kind === 'redline' ? comment.kind : 'comment';
+        var kindLabel = kind === 'highlight' ? 'Highlight' : kind === 'redline' ? 'Suggested change' : 'Comment';
+        var swatch = kind === 'highlight'
+          ? '<span class="office-review-annotation-swatch" data-color="' + esc(comment.color || '') + '"></span>'
+          : '';
         var scope = comment.scope === 'selection' && comment.anchor_text
           ? 'Selection: “' + comment.anchor_text + '”'
-          : 'Document comment';
+          : (comment.anchor && comment.anchor.space === 'pdf-page/1' ? 'Page ' + comment.anchor.page : 'Document comment');
         var replies = Array.isArray(comment.replies) ? comment.replies : [];
         var repliesHtml = replies.map(function (reply) {
           return '<div class="office-review-comment-reply" data-comment-reply-id="' + esc(reply.id || '') + '">' +
             '<div class="office-review-comment-meta"><strong>' + esc(reply.author || 'Reviewer') + '</strong><span>' + esc(formatTimestamp(commentTimestamp(reply))) + '</span></div>' +
             '<div class="office-review-comment-text">' + esc(reply.text || '') + '</div></div>';
         }).join('');
-        var locateAction = comment.scope === 'selection' && comment.anchor_text
+        var locateAction = (comment.scope === 'selection' && comment.anchor_text) || comment.anchor
           ? '<button type="button" data-action="locate-review-comment" data-comment-id="' + esc(comment.id || '') + '">Locate</button>'
           : '';
+        var threadActions = kind === 'highlight'
+          ? ''
+          : '<button type="button" data-action="reply-review-comment" data-comment-id="' + esc(comment.id || '') + '">Reply</button>' +
+            '<button type="button" data-action="' + (status === 'Resolved' ? 'reopen-review-comment' : 'resolve-review-comment') + '" data-comment-id="' + esc(comment.id || '') + '">' + (status === 'Resolved' ? 'Reopen' : 'Resolve') + '</button>';
+        var deleteAction = '<button type="button" data-action="delete-review-comment" data-comment-id="' + esc(comment.id || '') + '">Delete</button>';
         var serverActions = serverFile
           ? '<div class="office-review-comment-actions">' + locateAction + (comment.read_only
             ? '<span class="office-review-comment-read-only">Released discussion</span>'
-            :
-            '<button type="button" data-action="reply-review-comment" data-comment-id="' + esc(comment.id || '') + '">Reply</button>' +
-            '<button type="button" data-action="' + (status === 'Resolved' ? 'reopen-review-comment' : 'resolve-review-comment') + '" data-comment-id="' + esc(comment.id || '') + '">' + (status === 'Resolved' ? 'Reopen' : 'Resolve') + '</button>') + '</div>'
+            : threadActions + deleteAction) + '</div>'
           : '';
-        return '<article class="office-review-history-row office-review-comment-thread" data-comment-thread-id="' + esc(comment.id || '') + '" data-comment-status="' + esc(status.toLowerCase()) + '">' +
-          '<div class="office-review-history-row-heading"><span class="office-review-history-row-title">Comment</span>' +
+        var proposedHtml = kind === 'redline' && comment.proposed_text
+          ? '<div class="office-review-comment-proposed">Suggested: ' + esc(comment.proposed_text) + '</div>'
+          : '';
+        return '<article class="office-review-history-row office-review-comment-thread office-review-comment-thread--' + kind + '" data-comment-thread-id="' + esc(comment.id || '') + '" data-comment-status="' + esc(status.toLowerCase()) + '">' +
+          '<div class="office-review-history-row-heading"><span class="office-review-history-row-title">' + swatch + esc(kindLabel) + '</span>' +
           '<span class="office-review-status office-review-status--' + (status === 'Resolved' ? 'release' : 'draft') + '">' + esc(status) + '</span></div>' +
           '<div class="office-review-comment-meta"><strong>' + esc(comment.author || 'Reviewer') + '</strong><span>' + esc(formatTimestamp(commentTimestamp(comment))) + '</span></div>' +
           '<div class="office-review-comment-scope">' + esc(scope) + '</div>' +
-          '<div class="office-review-comment-text">' + esc(comment.text || '') + '</div>' +
+          (comment.text ? '<div class="office-review-comment-text">' + esc(comment.text) + '</div>' : '') +
+          proposedHtml +
           (repliesHtml ? '<div class="office-review-comment-replies">' + repliesHtml + '</div>' : '') +
           serverActions + '</article>';
       }).join('')
@@ -4149,8 +4278,8 @@
       : tab === 'comments'
         ? '<section class="office-review-comments-panel"><button type="button" data-action="dock-comment"' +
           '>' +
-          toolbarIcon('message-square-plus', 'Com') + '<span>Add comment</span></button>' + commentFiltersHtml +
-          '<div class="office-review-history-rows" aria-live="polite">' + commentsHtml + '</div></section>'
+          toolbarIcon('message-square-plus', 'Com') + '<span>Add comment</span></button>' + renderHighlightPicker() + commentFiltersHtml +
+          '<div class="office-review-history-rows" aria-live="polite">' + commentsHtml + '</div>' + renderSourceSuggestions(file) + '</section>'
         : changeHistoryHtml;
     return '<aside class="office-review-rail" aria-label="Review rail">' +
       '<div class="office-review-rail-card">' +
@@ -4372,6 +4501,17 @@
     }
   }
 
+  /** Four colours that mark the current selection as a highlight saved with the draft. */
+  function renderHighlightPicker() {
+    var reviewService = documentReviewService();
+    var colors = reviewService && Array.isArray(reviewService.HIGHLIGHT_COLORS) ? reviewService.HIGHLIGHT_COLORS : [];
+    if (!colors.length) return '';
+    return '<div class="office-review-highlight-picker" role="group" aria-label="Highlight selection"><span>Highlight</span>' +
+      colors.map(function (color) {
+        return '<button type="button" class="office-review-annotation-swatch office-review-annotation-swatch--pick" data-action="dock-highlight" data-color="' + esc(color.value) + '" aria-label="Highlight selection ' + esc(color.label.toLowerCase()) + '" title="Highlight selection ' + esc(color.label.toLowerCase()) + '"></button>';
+      }).join('') + '</div>';
+  }
+
   function renderReviewDock(file) {
     var workspace = document.querySelector('.office-workspace');
     var host = el('officeReviewRailHost');
@@ -4383,6 +4523,7 @@
     if (!host) return;
     host.classList.toggle('is-hidden', !show);
     host.innerHTML = show ? (rightRailMode === 'file-info' ? renderDocFileInfoRail(file) : renderDocReviewRail(file)) : '';
+    if (show && file && file.kind === 'doc') syncEmbedAnnotations(file);
   }
 
   function syncLanaDockContext(file) {
@@ -6319,6 +6460,14 @@
     var selectedText = rawSelectionText.trim().slice(0, 500);
     if (!selectedText) return null;
     var result = { text: selectedText };
+    // The editor's own coordinates (paragraph and offsets in the redline
+    // service's anchor space) let the embed draw the mark and survive edits.
+    if (officeEditorInstance && typeof officeEditorInstance.annotationAnchorFromSelection === 'function') {
+      try {
+        var modelAnchor = officeEditorInstance.annotationAnchorFromSelection();
+        if (modelAnchor) result.anchor = modelAnchor;
+      } catch (_) {}
+    }
     var tools = collaborationTools();
     if (!tools || typeof tools.buildCommentAnchor !== 'function') return result;
     try {
@@ -6347,6 +6496,7 @@
       review.comments.push(normalizeServerReviewThread({
         id: id,
         thread_id: id,
+        kind: 'comment',
         author: currentReviewerName(),
         author_id: currentReviewerIdentity(),
         date: nowIso(),
@@ -6358,6 +6508,7 @@
         anchor_end: anchor && anchor.anchor_end,
         anchor_prefix: anchor && anchor.anchor_prefix,
         anchor_suffix: anchor && anchor.anchor_suffix,
+        anchor: anchor && anchor.anchor ? anchor.anchor : null,
         status: 'open',
         replies: []
       }));
@@ -6388,6 +6539,80 @@
     }
     var fallback = window.prompt('Add a review comment', '');
     if (fallback !== null) add(fallback);
+  }
+
+  /** A highlight on the current selection, in the given colour, saved with the draft like a comment. */
+  function addServerReviewHighlight(file, color) {
+    var review = serverReview(file);
+    if (!review) return;
+    var anchor = selectedServerReviewAnchor();
+    if (!anchor || !anchor.text) {
+      toast('Select text to highlight.');
+      return;
+    }
+    var id = 'highlight-' + Date.now().toString(36);
+    review.comments.push(normalizeServerReviewThread({
+      id: id,
+      thread_id: id,
+      kind: 'highlight',
+      color: color || '',
+      author: currentReviewerName(),
+      author_id: currentReviewerIdentity(),
+      date: nowIso(),
+      text: '',
+      scope: 'selection',
+      anchor_text: anchor.text,
+      anchor_id: 'anchor-' + id,
+      anchor_start: anchor.anchor_start,
+      anchor_end: anchor.anchor_end,
+      anchor_prefix: anchor.anchor_prefix,
+      anchor_suffix: anchor.anchor_suffix,
+      anchor: anchor.anchor || null,
+      status: 'open',
+      replies: []
+    }));
+    commitServerReviewCommentUpdate(file, 'Highlight added.');
+  }
+
+  /** Removes an unreleased highlight, comment or note from the draft; released ones stay. */
+  function deleteServerReviewComment(file, commentId) {
+    var review = serverReview(file);
+    var id = String(commentId || '');
+    if (!review || !id) return;
+    var kept = review.comments.filter(function (comment) {
+      var normalized = normalizeServerReviewThread(comment);
+      return !normalized || normalized.id !== id || normalized.read_only;
+    });
+    if (kept.length === review.comments.length) {
+      toast('The item is no longer available.');
+      return;
+    }
+    review.comments = kept;
+    commitServerReviewCommentUpdate(file, 'Removed.');
+  }
+
+  /** Hands the draft's anchored threads to the embed, which draws them over the pages. */
+  function syncEmbedAnnotations(file) {
+    var editor = editorForFile(file);
+    var reviewService = documentReviewService();
+    if (!editor || typeof editor.setAnnotations !== 'function' || !reviewService || typeof reviewService.embedAnnotationsFrom !== 'function') return;
+    if (!isServerReviewFile(file)) return;
+    try {
+      editor.setAnnotations(reviewService.embedAnnotationsFrom(serverReviewComments(file)));
+    } catch (_) {}
+  }
+
+  /** A pin was clicked in the document: show its card in the rail. */
+  function focusServerReviewComment(file, commentId) {
+    var id = String(commentId || '');
+    if (!id) return;
+    reviewRailTab = 'comments';
+    renderReviewDock(file);
+    var card = document.querySelector('[data-comment-thread-id="' + id.replace(/["\\]/g, '') + '"]');
+    if (!card) return;
+    if (typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    card.classList.add('is-located');
+    setTimeout(function () { card.classList.remove('is-located'); }, 1600);
   }
 
   function serverReviewThreadById(file, commentId) {
@@ -6430,6 +6655,12 @@
 
   function locateOfficeReviewComment(file, commentId) {
     var thread = serverReviewThreadById(file, commentId);
+    var editor = editorForFile(file);
+    if (thread && thread.anchor && editor && typeof editor.locateAnnotation === 'function') {
+      var located = false;
+      try { located = editor.locateAnnotation(thread.id); } catch (_) { located = false; }
+      if (located) return;
+    }
     if (!thread || thread.scope !== 'selection' || !thread.anchor_text) {
       toast('This comment has no document selection to locate.');
       return;
@@ -7566,6 +7797,20 @@
         } else {
           toast('Select text to add a comment.');
         }
+        return;
+      }
+      if (action === 'accept-source-suggestion' && file && isServerReviewFile(file)) {
+        acceptSourceSuggestion(file, actionTarget.dataset.suggestionId).catch(function (error) {
+          toast((error && error.message) || 'The suggestion could not be applied.');
+        });
+        return;
+      }
+      if (action === 'dock-highlight' && file && isServerReviewFile(file)) {
+        addServerReviewHighlight(file, actionTarget.dataset.color || '');
+        return;
+      }
+      if (action === 'delete-review-comment' && file && isServerReviewFile(file)) {
+        deleteServerReviewComment(file, actionTarget.dataset.commentId);
         return;
       }
       if (action === 'reply-review-comment' && file && isServerReviewFile(file)) {

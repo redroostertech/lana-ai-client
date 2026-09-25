@@ -309,6 +309,39 @@ describe('LanaDocumentReview grouping and serialization', () => {
     });
   });
 
+  test('tracked table rows and columns read as "Row inserted", "Row deleted", "Column inserted", "Column deleted", and persist their kind', () => {
+    // The editor marks an inserted or deleted row (w:ins / w:del in w:trPr)
+    // and a column's cells (w:cellIns / w:cellDel) as ins/del revisions
+    // carrying structureKind; the row's text is what a deletion shows.
+    var insertedRow = { id: 'r1', type: 'ins', author: 'Michael', date: '2026-09-25T21:00:00Z', text: '', structureKind: 'row', editScript: { version: '0', ops: [{ op: 'insertTableRow', table: 0, row: 1, position: 'after' }] } };
+    var deletedRow = { id: 'r2', type: 'del', author: 'Michael', date: '2026-09-25T21:00:00Z', text: 'Revolving Afterpay $4,486.57', structureKind: 'row', editScript: { version: '0', ops: [{ op: 'deleteTableRow', table: 0, row: 3 }] } };
+    var insertedColumn = { id: 'c1', type: 'ins', author: 'Michael', date: '2026-09-25T21:00:00Z', text: '', structureKind: 'column', editScript: { version: '0', ops: [{ op: 'insertTableColumn', table: 0, column: 0, position: 'before' }] } };
+    var deletedColumn = { id: 'c2', type: 'del', author: 'Michael', date: '2026-09-25T21:00:00Z', text: 'Credit', structureKind: 'column', editScript: { version: '0', ops: [{ op: 'deleteTableColumn', table: 0, column: 1 }] } };
+
+    expect(review.changeLabel(insertedRow)).toBe('Row inserted');
+    expect(review.changeLabel(deletedRow)).toBe('Row deleted');
+    expect(review.changeLabel(insertedColumn)).toBe('Column inserted');
+    expect(review.changeLabel(deletedColumn)).toBe('Column deleted');
+    expect(review.changeProposedText(insertedRow)).toBe('New row');
+    expect(review.changeProposedText(insertedColumn)).toBe('New column');
+    expect(review.changeOriginalText(deletedRow)).toBe('Revolving Afterpay $4,486.57');
+
+    var session = review.createReviewSession();
+    var changes = session.persistableChanges({ revisions: [insertedRow, deletedRow, insertedColumn, deletedColumn] });
+    expect(changes).toHaveLength(4);
+    expect(changes[0]).toMatchObject({ operation: 'insert', proposed_text: 'New row', metadata: { structure_change: { kind: 'row' } }, edit_script: { ops: [{ op: 'insertTableRow', table: 0, row: 1, position: 'after' }] } });
+    expect(changes[1]).toMatchObject({ operation: 'delete', original_text: 'Revolving Afterpay $4,486.57', metadata: { structure_change: { kind: 'row' } } });
+    expect(changes[3]).toMatchObject({ operation: 'delete', metadata: { structure_change: { kind: 'column' } } });
+    // A persisted row read back (no live structureKind) keeps its label through the metadata.
+    expect(review.changeLabel({ operation: 'insert', proposed_text: 'New row', metadata: { structure_change: { kind: 'row' } } })).toBe('Row inserted');
+    expect(review.changeLabel(review.persistedDraftChangePayload(changes[3]))).toBe('Column deleted');
+
+    // Control arm: plain insertions and deletions keep their labels and text.
+    expect(review.changeLabel({ type: 'ins', text: 'plain' })).toBe('Insertion');
+    expect(review.changeProposedText({ type: 'ins', text: '' })).toBe('');
+    expect(review.changeLabel({ type: 'del', text: 'x' })).toBe('Deletion');
+  });
+
   test('preserves every current Lana Editor operation and its script provenance', () => {
     const ops = [
       { op: 'insertText', at: { paragraph: 0, start: 0 }, text: 'A' },
@@ -319,7 +352,11 @@ describe('LanaDocumentReview grouping and serialization', () => {
       { op: 'formatParagraph', at: { paragraph: 0 }, set: { align: 'center' } },
       { op: 'splitParagraph', at: { paragraph: 0, start: 1 } },
       { op: 'mergeParagraphs', at: { paragraph: 0 } },
-      { op: 'resizeTableColumns', table: 0, widths: [1600, 1400, 3000] }
+      { op: 'resizeTableColumns', table: 0, widths: [1600, 1400, 3000] },
+      { op: 'insertTableRow', table: 0, row: 0, position: 'after' },
+      { op: 'deleteTableRow', table: 0, row: 1 },
+      { op: 'insertTableColumn', table: 0, column: 0, position: 'before', width: 720 },
+      { op: 'deleteTableColumn', table: 0, column: 1 }
     ];
     const baseDocumentHash = 'visible-text/1:sha256:' + 'a'.repeat(64);
     const session = review.createReviewSession();
@@ -722,5 +759,80 @@ describe('LanaDocumentReview dates and release payloads', () => {
     expect(payload.filename).toBe('affidavit-template - released.docx');
     expect(payload.content_base64).toEqual(expect.any(String));
     expect(payload.approved).toBe(false);
+  });
+
+  describe('annotations kept with the draft', () => {
+    const textAnchor = { space: 'visible-text/1', ranges: [{ paragraph: 3, start: 8, end: 17 }], text: '$5,000.00' };
+    const pageAnchor = { space: 'pdf-page/1', page: 2, rects: [{ x: 72, y: 144.5, w: 200, h: 14 }] };
+
+    test('reads kinds, colours and both anchor spaces, and refuses bad geometry, an unknown space or a bad colour', () => {
+      expect(review.annotationKind({ kind: 'highlight' })).toBe('highlight');
+      expect(review.annotationKind({ kind: 'REDLINE' })).toBe('redline');
+      expect(review.annotationKind({})).toBe('comment');
+      expect(review.annotationKind({ kind: 'sticker' })).toBe('comment');
+      expect(review.annotationColor({ kind: 'highlight' })).toBe('#FFE066');
+      expect(review.annotationColor({ kind: 'highlight', color: '#86efac' })).toBe('#86EFAC');
+      expect(review.annotationColor({ kind: 'comment' })).toBe('');
+      expect(review.annotationColor({ kind: 'highlight', color: 'yellow' })).toBe('#FFE066');
+      expect(review.annotationLabel({ kind: 'redline' })).toBe('Suggested change');
+
+      expect(review.normalizeAnnotationAnchor(textAnchor)).toEqual(textAnchor);
+      expect(review.normalizeAnnotationAnchor(pageAnchor)).toEqual(pageAnchor);
+      expect(review.normalizeAnnotationAnchor({ space: 'visible-text/1', ranges: [{ paragraph: 1, start: 9, end: 3 }] })).toBeNull();
+      expect(review.normalizeAnnotationAnchor({ space: 'pdf-page/1', page: 0, rects: pageAnchor.rects })).toBeNull();
+      expect(review.normalizeAnnotationAnchor({ space: 'pdf-page/1', page: 1, rects: [{ x: 1, y: 1, w: 0, h: 4 }] })).toBeNull();
+      expect(review.normalizeAnnotationAnchor({ space: 'dom-offsets/1', start: 1, end: 2 })).toBeNull();
+      expect(review.normalizeAnnotationAnchor(null)).toBeNull();
+    });
+
+    test('builds a new thread in the persisted shape: a highlight without text, a comment or note only with text', () => {
+      const highlight = review.buildAnnotationThread({ kind: 'highlight', author: 'Michael', author_id: 'u-1', anchor: pageAnchor, date: '2026-09-25T20:00:00Z' });
+      expect(highlight).toMatchObject({ kind: 'highlight', color: '#FFE066', author: 'Michael', author_id: 'u-1', text: '', scope: 'selection', anchor: pageAnchor, status: 'open', replies: [], created_at: '2026-09-25T20:00:00Z' });
+      expect(highlight.id).toMatch(/^highlight-/);
+      expect(highlight.thread_id).toBe(highlight.id);
+      const note = review.buildAnnotationThread({ kind: 'redline', text: 'Payee is wrong', proposed_text: 'Title Bond Agency LLC', anchor: textAnchor });
+      expect(note).toMatchObject({ kind: 'redline', proposed_text: 'Title Bond Agency LLC', anchor_text: '$5,000.00', anchor: textAnchor });
+      expect(review.buildAnnotationThread({ kind: 'comment', text: '   ', anchor: pageAnchor })).toBeNull();
+      expect(review.buildAnnotationThread({ kind: 'redline', text: '', anchor: pageAnchor })).toBeNull();
+      // A comment with no anchor is a document comment.
+      expect(review.buildAnnotationThread({ text: 'General' }).scope).toBe('document');
+    });
+
+    test('picks the open suggested changes a converted copy can accept: a suggestion with text to find and text to put in its place', () => {
+      const threads = [
+        { id: 's1', kind: 'redline', text: 'Wrong payee', proposed_text: 'Title Bond Agency LLC', anchor_text: 'Title Bond Agenc', anchor: pageAnchor },
+        { id: 's2', kind: 'redline', text: 'Done', proposed_text: 'x', anchor_text: 'y', status: 'resolved' },
+        { id: 's3', kind: 'redline', text: 'No printed text', proposed_text: 'x', anchor_text: 'Page 2', anchor: pageAnchor },
+        { id: 's4', kind: 'redline', text: 'No suggestion', proposed_text: '', anchor_text: 'y' },
+        { id: 'c1', kind: 'comment', text: 'A comment', anchor_text: 'y' },
+        { id: 's5', kind: 'redline', text: 'From the quote', proposed_text: 'z', anchor: { space: 'visible-text/1', ranges: [{ paragraph: 1, start: 0, end: 3 }], text: 'abc' } }
+      ];
+      expect(review.openSuggestedChanges(threads).map((thread) => thread.id)).toEqual(['s1', 's5']);
+      expect(review.openSuggestedChanges(null)).toEqual([]);
+    });
+
+    test('hands the embed only the threads it can draw, with resolved state and colour, and reads threads from batches and releases', () => {
+      const threads = [
+        { id: 'h1', kind: 'highlight', anchor: textAnchor, status: 'open' },
+        { id: 'c1', text: 'Check', anchor: pageAnchor, status: 'resolved' },
+        { id: 'legacy', text: 'Older comment', anchor_text: 'Deposit', anchor_start: 12, anchor_end: 19 },
+        { id: '', kind: 'highlight', anchor: textAnchor },
+        { id: 'broken', kind: 'highlight', anchor: { space: 'pdf-page/1', page: 1, rects: [] } }
+      ];
+      expect(review.embedAnnotationsFrom(threads)).toEqual([
+        { id: 'h1', kind: 'highlight', color: '#FFE066', anchor: textAnchor, resolved: false },
+        { id: 'c1', kind: 'comment', color: null, anchor: pageAnchor, resolved: true }
+      ]);
+      expect(review.embedAnnotationsFrom(null)).toEqual([]);
+
+      expect(review.batchReviewThreads({ review_metadata: { comments: threads.slice(0, 2) } })).toEqual(threads.slice(0, 2));
+      expect(review.batchReviewThreads({ review_metadata: {} })).toEqual([]);
+      expect(review.batchReviewThreads(null)).toEqual([]);
+      const released = review.releasedReviewThreads([
+        { release_id: 'rel-1', release: { id: 'rel-1', release_number: 3, released_at: '2026-09-25T20:00:00Z' }, review_metadata: { comments: [threads[1]] } },
+        { release_id: 'rel-2', review_metadata: { comments: [] } }
+      ]);
+      expect(released).toEqual([Object.assign({}, threads[1], { released_in: { id: 'rel-1', release_number: 3, released_at: '2026-09-25T20:00:00Z' }, read_only: true })]);
+    });
   });
 });

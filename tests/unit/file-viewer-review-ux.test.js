@@ -68,7 +68,9 @@ describe('file-viewer review UX foundation', () => {
     expect(html).toContain('"label":"Versions"');
     expect(html).not.toContain('"label":"Releases"');
     expect(html).toContain('id="reviewPanelReleases"');
-    expect(html).not.toContain('id="reviewPanelComments"');
+    // Since 2026-09-25 the rail also lists the draft's highlights, comments and
+    // suggested changes (owner: annotations on both the PDF and DOCX views).
+    expect(html).toContain('id="reviewPanelComments"');
     expect(fileViewerCss).toContain('.file-viewer-review-header');
     expect(fileViewerCss).toContain('border-radius: var(--lex-radius-md, 8px) var(--lex-radius-md, 8px) 0 0');
     expect(fileViewerCss).toContain('background: var(--lex-bg-primary)');
@@ -634,5 +636,42 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('releaseMetadata.release_count');
     expect(pageJs).toContain('releaseMetadata.latest_released_at');
     expect(pageJs).toContain("formatDate(file.updated_at || file.created_at)");
+  });
+
+  test('the viewer lists the draft\'s annotations in a Comments tab and draws them in the read-only view', () => {
+    expect(html).toContain('{"value":"comments","label":"Comments"}');
+    expect(html).toContain('id="reviewPanelComments"');
+    expect(html).toContain('id="reviewCommentsList"');
+    expect(pageJs).toContain("state.reviewTab = tab === 'releases' || tab === 'comments' || tab === 'insights' ? tab : 'changes';");
+    expect(pageJs).toContain('function renderReviewComments()');
+    expect(pageJs).toContain('LanaDocumentReview.releasedReviewThreads(state.releaseChangeGroups)');
+    expect(pageJs).toContain('editor.setAnnotations(LanaDocumentReview.embedAnnotationsFrom(reviewAnnotationThreads()));');
+    expect(pageJs).toContain("editor.on('annotation-selected', function (detail) {");
+    expect(pageJs).toContain('locateReviewAnnotation(card.getAttribute(\'data-review-annotation-id\'))');
+    // Saving from the viewer keeps the persisted threads whole instead of flattening them to text.
+    expect(pageJs).toContain('var persisted = LanaDocumentReview.batchReviewThreads(state.currentReviewBatch);');
+    expect(pageJs).toContain('comments: persisted.concat(embedComments)');
+    expect(serviceJs).toContain('function embedAnnotationsFrom(threads)');
+    expect(fileViewerCss).toContain('.file-viewer-annotation-swatch');
+    expect(fileViewerCss).toContain('.file-viewer-review-item.is-located');
+  });
+
+  test('a PDF in a workspace takes highlights, comments and suggested changes drawn as regions, saved with its own draft', () => {
+    expect(html).toContain('id="viewerAnnotateControls"');
+    expect(html).toContain('data-annotate-mode="highlight"');
+    expect(html).toContain('data-annotate-mode="redline"');
+    expect(pageJs).toContain('function canAnnotateInViewer(file, editor)');
+    expect(pageJs).toContain("return Boolean(isPdf && getFileMatterId(file) && editor && typeof editor.enableRegionSelect === 'function');");
+    expect(pageJs).toContain('setReviewRailVisible(canReviewFile(file) || annotatable);');
+    expect(pageJs).toContain("editor.on('annotation-region-selected', function (detail) {");
+    expect(pageJs).toContain('editor.enableRegionSelect(Boolean(state.annotateMode));');
+    expect(pageJs).toContain('var thread = LanaDocumentReview.buildAnnotationThread(input);');
+    // The draft batch is the store: PATCH the open draft, else POST a new one with no changes.
+    expect(pageJs).toContain("response = await api.patch(reviewDocumentBatchEndpoint('', '/' + encodeURIComponent(batch.id)), payload);");
+    expect(pageJs).toContain("response = await api.post(reviewDocumentBatchEndpoint(String(file.id), ''), payload);");
+    expect(pageJs).toContain('data-review-annotation-delete="');
+    expect(pageJs).toContain("if (!proposed) {");
+    expect(fileViewerCss).toContain('.file-viewer-annotate-btn.is-active');
+    expect(serviceJs).toContain('function buildAnnotationThread(input)');
   });
 });

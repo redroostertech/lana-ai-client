@@ -17,7 +17,7 @@ describe('file viewer insights panel', () => {
   });
 
   test('the page loads insights beside the document, shows the rail for non-review files, delegates the actions, and resets per file', () => {
-    expect(pageJs).toContain("state.reviewTab = tab === 'releases' || tab === 'insights' ? tab : 'changes';");
+    expect(pageJs).toContain("state.reviewTab = tab === 'releases' || tab === 'comments' || tab === 'insights' ? tab : 'changes';");
     expect(pageJs).toContain("if (insightsPanel) insightsPanel.classList.toggle('hidden', state.reviewTab !== 'insights');");
     expect(pageJs).toContain('await loadFileContent(response);\n      // Insights load beside the document');
     expect(pageJs).toContain("rail.classList.add('file-viewer-review-rail--insights-only');");

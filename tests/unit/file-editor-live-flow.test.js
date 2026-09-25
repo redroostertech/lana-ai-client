@@ -584,4 +584,43 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('save.finally(function () { shutdownEditorInstance(departingEditor); })');
     expect(editor).toContain("} else {\n    init();\n  }");
   });
+
+  test('highlights and comments anchor in the editor, draw through the embed, and can be removed before release', () => {
+    // A highlight is a mark with no text; the thread keeps its kind, colour and the embed's anchor.
+    expect(editor).toContain("if (!text && kind !== 'highlight') return null;");
+    expect(editor).toContain('anchor: reviewService && typeof reviewService.normalizeAnnotationAnchor === \'function\' ? reviewService.normalizeAnnotationAnchor(comment.anchor) : null,');
+    expect(editor).toContain('officeEditorInstance.annotationAnchorFromSelection()');
+    expect(editor).toContain('function addServerReviewHighlight(file, color)');
+    expect(editor).toContain("toast('Select text to highlight.');");
+    expect(editor).toContain('function deleteServerReviewComment(file, commentId)');
+    expect(editor).toContain('return !normalized || normalized.id !== id || normalized.read_only;');
+    // The embed draws the threads on every render, and a pin click opens the card.
+    expect(editor).toContain('editor.setAnnotations(reviewService.embedAnnotationsFrom(serverReviewComments(file)));');
+    expect(editor).toContain("mountedEditor.on('annotation-selected', function (detail) {");
+    expect(editor).toContain("if (show && file && file.kind === 'doc') syncEmbedAnnotations(file);");
+    expect(editor).toContain('located = editor.locateAnnotation(thread.id);');
+    // Rail: colour picker, kind on the card, Delete beside Reply and Resolve.
+    expect(editor).toContain('data-action="dock-highlight" data-color="');
+    expect(editor).toContain("if (action === 'dock-highlight' && file && isServerReviewFile(file)) {");
+    expect(editor).toContain("if (action === 'delete-review-comment' && file && isServerReviewFile(file)) {");
+    expect(editor).toContain('data-action="delete-review-comment"');
+    expect(editor).toContain("var kindLabel = kind === 'highlight' ? 'Highlight' : kind === 'redline' ? 'Suggested change' : 'Comment';");
+    expect(css).toContain('.office-review-annotation-swatch[data-color="#86EFAC"]');
+    expect(css).toContain('.office-review-comment-thread.is-located');
+  });
+
+  test('a converted copy offers the suggested changes made on its source PDF and accepts one as a tracked edit', () => {
+    expect(editor).toContain('async function loadSourceSuggestions(file, review)');
+    expect(editor).toContain("var originalId = metadata.source === 'document_format_conversion' && metadata.original_document_id");
+    expect(editor).toContain('items: service.openSuggestedChanges(service.batchReviewThreads(batch))');
+    expect(editor).toContain('<h5>Suggested changes from the PDF</h5>');
+    expect(editor).toContain('data-action="accept-source-suggestion"');
+    expect(editor).toContain('var anchor = editor.findText(printed);');
+    expect(editor).toContain("op: 'replaceText',");
+    expect(editor).toContain("toast('The printed text was not found in this copy. Find it and make the change by hand.');");
+    // Accepting marks the suggestion resolved on the PDF's own draft, only when that draft is still active.
+    expect(editor).toContain("service.isActiveDraftBatch(source.batch)");
+    expect(editor).toContain("return Object.assign({}, thread, { status: 'resolved', resolved_at: stamp, resolved_by: currentReviewerIdentity(), updated_at: stamp });");
+    expect(editor).toContain("if (file.canWrite === false) {\n      toast('Edit permission is required to accept a suggestion.');");
+  });
 });
