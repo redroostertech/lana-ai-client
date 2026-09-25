@@ -303,6 +303,12 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function reviewVersionSelectOptions');
     expect(pageJs).toContain('function currentReviewVersionSelectValue');
     expect(pageJs).toContain('function openReviewVersionFromSelect');
+    // Owner, 2026-09-25: every editable copy of a PDF is offered, newest first, each opened by its own id.
+    expect(pageJs).toContain('function editableCopiesForCurrentFile');
+    expect(pageJs).toContain("conversion.copies");
+    expect(pageJs).toContain("value: 'editable-copy:' + editableCopy.id");
+    expect(pageJs).toContain("value.indexOf('editable-copy:') === 0");
+    expect(pageJs).toContain("'Editable copy (latest)'");
     expect(pageJs).toContain('function hasCurrentDraftReviewChanges');
     expect(pageJs).toContain("value: 'original'");
     expect(pageJs).toContain("value: 'current'");

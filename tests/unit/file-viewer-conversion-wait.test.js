@@ -126,10 +126,10 @@ describe('File Viewer document halves', () => {
   // Owner, 2026-09-25: "Original is always the pdf but the editable is always
   // the docx"; the other half is offered under Document in the Display menu.
   test('the Display menu offers the editable copy under the PDF and the original PDF under the copy', () => {
-    expect(viewer).toContain("value: 'editable-copy'");
+    expect(viewer).toContain("value: 'editable-copy:' + editableCopy.id");
     expect(viewer).toContain("value: 'source-original'");
     expect(viewer).toContain("label: conversionSource ? 'Editable copy' : 'Original'");
-    expect(viewer).toContain("if (value === 'editable-copy') {");
+    expect(viewer).toContain("if (value === 'editable-copy' || value.indexOf('editable-copy:') === 0) {");
     expect(viewer).toContain("if (value === 'source-original') {");
     expect(viewer).toContain('function openDocumentHalf(documentId)');
   });
@@ -138,7 +138,7 @@ describe('File Viewer document halves', () => {
     expect(viewer).toContain("title: 'Editable copy available'");
     expect(viewer).toContain("action: 'openEditableCopy'");
     expect(viewer).toContain("viewerAction === 'openEditableCopy'");
-    expect(viewer).toContain('capabilities.conversion && capabilities.conversion.existing_copy');
+    expect(viewer).toContain('conversion.existing_copy ? [conversion.existing_copy] : []');
     expect(viewer).toContain('capabilities.derived_from');
   });
 

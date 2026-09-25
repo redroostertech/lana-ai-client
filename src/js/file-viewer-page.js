@@ -2259,9 +2259,33 @@
   // half is open, the other is offered under "Document" instead of being a
   // second file to hunt for in the matter list.
   function editableCopyForCurrentFile() {
+    var copies = editableCopiesForCurrentFile();
+    return copies.length > 0 ? copies[0] : null;
+  }
+
+  // Every editable copy converted from this PDF, newest first. Older servers
+  // send only the newest as existing_copy.
+  function editableCopiesForCurrentFile() {
     var capabilities = state.formatCapabilities || {};
-    var copy = capabilities.conversion && capabilities.conversion.existing_copy;
-    return copy && copy.id ? copy : null;
+    var conversion = capabilities.conversion || {};
+    var copies = Array.isArray(conversion.copies) ? conversion.copies : (conversion.existing_copy ? [conversion.existing_copy] : []);
+    return copies.filter(function (copy) { return copy && copy.id; });
+  }
+
+  function editableCopyById(copyId) {
+    var copies = editableCopiesForCurrentFile();
+    for (var i = 0; i < copies.length; i++) {
+      if (String(copies[i].id) === String(copyId)) return copies[i];
+    }
+    return null;
+  }
+
+  // Several copies of one PDF are usually made on the same day, so the time tells them apart.
+  function formatCopyMoment(value) {
+    if (!value) return '';
+    var date = new Date(value);
+    if (isNaN(date.getTime())) return String(value);
+    return date.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   }
 
   function conversionSourceForCurrentFile() {
@@ -2271,7 +2295,7 @@
   }
 
   function reviewVersionSelectOptions() {
-    var editableCopy = editableCopyForCurrentFile();
+    var editableCopies = editableCopiesForCurrentFile();
     var conversionSource = conversionSourceForCurrentFile();
     var options = [];
     if (conversionSource) {
@@ -2288,11 +2312,12 @@
       description: conversionSource ? 'DOCX converted from the PDF' : 'Source document',
       group: 'Document'
     });
-    if (editableCopy) {
+    for (var c = 0; c < editableCopies.length; c++) {
+      var editableCopy = editableCopies[c];
       options.push({
-        value: 'editable-copy',
-        label: 'Editable copy',
-        description: 'DOCX converted from this PDF' + (editableCopy.created_at ? ' · ' + formatDate(editableCopy.created_at) : ''),
+        value: 'editable-copy:' + editableCopy.id,
+        label: c === 0 ? 'Editable copy (latest)' : 'Editable copy',
+        description: 'DOCX converted from this PDF' + (editableCopy.created_at ? ' · ' + formatCopyMoment(editableCopy.created_at) : ''),
         group: 'Document'
       });
     }
@@ -2478,8 +2503,8 @@
 
   async function openReviewVersionFromSelect(value) {
     if (!value) return;
-    if (value === 'editable-copy') {
-      var copy = editableCopyForCurrentFile();
+    if (value === 'editable-copy' || value.indexOf('editable-copy:') === 0) {
+      var copy = value.indexOf(':') > 0 ? editableCopyById(value.slice(value.indexOf(':') + 1)) : editableCopyForCurrentFile();
       openDocumentHalf(copy && copy.id);
       return;
     }
