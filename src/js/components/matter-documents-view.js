@@ -361,16 +361,32 @@
       return label ? '<span class="mdv-role-badge">' + esc(label) + '</span>' : '';
     }
 
-    /** Files in display order, sources followed by their nested copies. */
+    // At most five copies are listed under a document; the rest are reached
+    // from the document view, whose Display menu lists every copy and version.
+    function nestedChildren(item) {
+      var grouping = documentGrouping();
+      var children = item.children || [];
+      return grouping ? grouping.visibleChildren(children) : { shown: children, hiddenCount: 0 };
+    }
+
+    /** Files in display order, sources followed by their listed copies. */
     function flattenFileItems(items) {
       var files = [];
       for (var i = 0; i < items.length; i++) {
         if (items[i].kind !== 'file') continue;
         files.push(items[i].file);
-        var children = items[i].children || [];
-        for (var c = 0; c < children.length; c++) files.push(children[c]);
+        var shown = nestedChildren(items[i]).shown;
+        for (var c = 0; c < shown.length; c++) files.push(shown[c]);
       }
       return files;
+    }
+
+    function showMoreRow(sourceFile, hiddenCount) {
+      var label = 'Show ' + hiddenCount + ' more';
+      return '<button type="button" class="mdv-file-row mdv-file-row--derived mdv-file-row--more" data-action="open" data-doc-id="' + esc(sourceFile.id) + '" title="Open the document and choose from the Display menu">' +
+        '<span class="mdv-more-label">' + esc(label) + '</span>' +
+        '<span class="mdv-more-hint">Open the document to choose from its copies and versions</span>' +
+      '</button>';
     }
 
     function findFile(fileId) {
@@ -731,8 +747,9 @@
     function renderItem(item) {
       if (item.kind === 'artifact') return artifactRow(item.artifact);
       var rows = [fileRow(item.file)];
-      var children = item.children || [];
-      for (var i = 0; i < children.length; i++) rows.push(fileRow(children[i], { nested: true }));
+      var nested = nestedChildren(item);
+      for (var i = 0; i < nested.shown.length; i++) rows.push(fileRow(nested.shown[i], { nested: true }));
+      if (nested.hiddenCount > 0) rows.push(showMoreRow(item.file, nested.hiddenCount));
       return rows.join('');
     }
 
@@ -838,7 +855,7 @@
             return;
           }
           pageSelectable.push(fileSelectKey(item.file.id));
-          (item.children || []).forEach(function (child) { pageSelectable.push(fileSelectKey(child.id)); });
+          nestedChildren(item).shown.forEach(function (child) { pageSelectable.push(fileSelectKey(child.id)); });
         });
         var allChecked = pageSelectable.length > 0 && pageSelectable.every(function (key) { return state.selected[key]; });
         batchHtml =

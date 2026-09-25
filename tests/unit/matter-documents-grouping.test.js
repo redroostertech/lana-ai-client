@@ -40,18 +40,37 @@ describe('matter documents grouping', () => {
   });
 });
 
+describe('nested row cap', () => {
+  const copies = (n) => Array.from({ length: n }, (_, i) => ({ id: 'c' + i }));
+
+  test('shows at most five copies and counts the rest', () => {
+    expect(grouping.MAX_NESTED_ROWS).toBe(5);
+    expect(grouping.visibleChildren(copies(7))).toEqual({ shown: copies(5), hiddenCount: 2 });
+    expect(grouping.visibleChildren(copies(5))).toEqual({ shown: copies(5), hiddenCount: 0 });
+    expect(grouping.visibleChildren([])).toEqual({ shown: [], hiddenCount: 0 });
+    expect(grouping.visibleChildren(copies(3), 2)).toEqual({ shown: copies(2), hiddenCount: 1 });
+  });
+});
+
 describe('matter documents view wiring', () => {
   const component = fs.readFileSync(path.join(SRC, 'js/components/matter-documents-view.js'), 'utf8');
   const css = fs.readFileSync(path.join(SRC, 'css/components/matter-documents-view.css'), 'utf8');
 
   test('the list renders copies as nested rows with a role badge and counts them as part of their document', () => {
     expect(component).toContain("documentGrouping().groupDerivedDocuments(files).groups");
-    expect(component).toContain("rows.push(fileRow(children[i], { nested: true }))");
+    expect(component).toContain("rows.push(fileRow(nested.shown[i], { nested: true }))");
     expect(component).toContain("mdv-file-row--derived");
     expect(component).toContain('function derivedRoleBadgeHtml(file)');
     expect(component).toContain('var documentCount = state.files.length - templateCount - derivedCount;');
     expect(css).toContain('.mdv-file-row--derived');
     expect(css).toContain('.mdv-role-badge');
+  });
+
+  test('past five copies the list offers Show more, which opens the source document', () => {
+    expect(component).toContain('if (nested.hiddenCount > 0) rows.push(showMoreRow(item.file, nested.hiddenCount));');
+    expect(component).toContain('class="mdv-file-row mdv-file-row--derived mdv-file-row--more" data-action="open" data-doc-id="\' + esc(sourceFile.id) + \'"');
+    expect(component).toContain("nestedChildren(item).shown.forEach(function (child) { pageSelectable.push(fileSelectKey(child.id)); });");
+    expect(css).toContain('.mdv-file-row--more');
   });
 
   test('every page that mounts the list loads the grouping module first', () => {

@@ -65,10 +65,24 @@
     return { groups: groups, derivedCount: derivedCount };
   }
 
+  var MAX_NESTED_ROWS = 5;
+
+  /**
+   * The nested rows a list shows for one document: at most `max` copies, and
+   * how many more exist. The rest live in the document view's Display menu.
+   */
+  function visibleChildren(children, max) {
+    var list = Array.isArray(children) ? children : [];
+    var limit = Number.isFinite(Number(max)) && Number(max) > 0 ? Math.floor(Number(max)) : MAX_NESTED_ROWS;
+    return { shown: list.slice(0, limit), hiddenCount: Math.max(list.length - limit, 0) };
+  }
+
   var service = {
+    MAX_NESTED_ROWS: MAX_NESTED_ROWS,
     derivedParentId: derivedParentId,
     derivedRoleLabel: derivedRoleLabel,
-    groupDerivedDocuments: groupDerivedDocuments
+    groupDerivedDocuments: groupDerivedDocuments,
+    visibleChildren: visibleChildren
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = service;
   global.LanaDocumentGrouping = service;

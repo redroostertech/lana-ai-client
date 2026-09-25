@@ -187,6 +187,30 @@
   width: 0.9rem;
 }
 
+/* The "Show N more" row under a document: a button shaped like a nested row. */
+.mdv-file-row--more {
+  align-items: baseline;
+  color: var(--lex-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  gap: 0.5rem;
+  text-align: left;
+  width: calc(100% - 2.5rem);
+}
+
+.mdv-file-row--more:hover {
+  color: var(--lex-text-primary);
+}
+
+.mdv-more-label {
+  color: var(--lex-text-primary);
+  font-weight: var(--lex-weight-semibold, 600);
+}
+
+.mdv-more-hint {
+  font-size: var(--lex-body-xs-size, 0.75rem);
+}
+
 .mdv-role-badge {
   background: var(--lex-bg-secondary);
   border: 1px solid var(--lex-border-default);
