@@ -971,6 +971,9 @@
       var capabilities = response && response.data ? response.data : response;
       if (capabilities && typeof capabilities === 'object') {
         state.formatCapabilities = Object.assign({}, state.formatCapabilities, capabilities);
+        // The Display menu offers the editable copy or the original PDF from
+        // these capabilities; refresh it now that they are known.
+        syncReviewVersionSelect();
       }
     } catch (error) {
       console.warn('[FileViewerPage] Format capabilities unavailable; using local fallback:', error);
@@ -2251,20 +2254,56 @@
       && state.currentReviewBatch.changes.length > 0);
   }
 
+  // The PDF and its editable DOCX copy are one document to the user: the
+  // original is always the PDF, the editable is always the DOCX. Whichever
+  // half is open, the other is offered under "Document" instead of being a
+  // second file to hunt for in the matter list.
+  function editableCopyForCurrentFile() {
+    var capabilities = state.formatCapabilities || {};
+    var copy = capabilities.conversion && capabilities.conversion.existing_copy;
+    return copy && copy.id ? copy : null;
+  }
+
+  function conversionSourceForCurrentFile() {
+    var capabilities = state.formatCapabilities || {};
+    var source = capabilities.derived_from;
+    return source && source.id ? source : null;
+  }
+
   function reviewVersionSelectOptions() {
-    var options = [{
+    var editableCopy = editableCopyForCurrentFile();
+    var conversionSource = conversionSourceForCurrentFile();
+    var options = [];
+    if (conversionSource) {
+      options.push({
+        value: 'source-original',
+        label: 'Original PDF',
+        description: conversionSource.filename || 'Scanned source this copy was converted from',
+        group: 'Document'
+      });
+    }
+    options.push({
       value: 'original',
-      label: 'Original',
-      description: 'Source document',
+      label: conversionSource ? 'Editable copy' : 'Original',
+      description: conversionSource ? 'DOCX converted from the PDF' : 'Source document',
       group: 'Document'
-    }, {
+    });
+    if (editableCopy) {
+      options.push({
+        value: 'editable-copy',
+        label: 'Editable copy',
+        description: 'DOCX converted from this PDF' + (editableCopy.created_at ? ' · ' + formatDate(editableCopy.created_at) : ''),
+        group: 'Document'
+      });
+    }
+    options.push({
       value: 'current',
       label: 'Current draft',
       description: state.pendingReviewReleaseBatch
         ? 'Saved draft pending release approval'
         : (hasCurrentDraftReviewChanges() ? 'Live unreleased edits' : 'Current document view'),
       group: 'Working copy'
-    }];
+    });
     var releases = reviewReleasesNewestFirst();
     for (var i = 0; i < releases.length; i++) {
       var release = releases[i].release;
@@ -2429,8 +2468,26 @@
     refreshReviewDisplayScope();
   }
 
+  function openDocumentHalf(documentId) {
+    if (!documentId) return;
+    var params = new URLSearchParams({ id: documentId });
+    Lex.Nav.go('file-viewer.html?' + params.toString(), {
+      context: fileViewerNavContext(state.currentFile)
+    });
+  }
+
   async function openReviewVersionFromSelect(value) {
     if (!value) return;
+    if (value === 'editable-copy') {
+      var copy = editableCopyForCurrentFile();
+      openDocumentHalf(copy && copy.id);
+      return;
+    }
+    if (value === 'source-original') {
+      var source = conversionSourceForCurrentFile();
+      openDocumentHalf(source && source.id);
+      return;
+    }
     if (value === 'current') {
       await restoreCurrentDraftForDisplay();
       return;
@@ -4461,14 +4518,24 @@
   async function loadPDF(file) {
     var capabilities = currentFormatCapabilities(file);
     var canConvert = !!(capabilities.conversion && capabilities.conversion.target_format === 'docx' && capabilities.conversion.available === true);
-    showFormatNotice({
-      title: 'PDF opens read-only',
-      message: canConvert
-        ? 'Convert this PDF to DOCX before making review edits. You can export the reviewed DOCX back to PDF when the version is ready.'
-        : 'This PDF is read-only here. DOCX conversion will appear when the server reports conversion support.',
-      action: canConvert ? 'convertPdfToDocx' : null,
-      actionLabel: state.formatConversionRunning ? 'Converting...' : 'Convert to DOCX'
-    });
+    var existingCopy = editableCopyForCurrentFile();
+    if (existingCopy) {
+      showFormatNotice({
+        title: 'Editable copy available',
+        message: 'This PDF already has an editable DOCX copy' + (existingCopy.created_at ? ', made ' + formatDate(existingCopy.created_at) : '') + '. Open it to review or edit; the PDF stays the original.',
+        action: 'openEditableCopy',
+        actionLabel: 'Open editable copy'
+      });
+    } else {
+      showFormatNotice({
+        title: 'PDF opens read-only',
+        message: canConvert
+          ? 'Convert this PDF to DOCX before making review edits. The PDF stays the original; the copy appears under Document in the Display menu.'
+          : 'This PDF is read-only here. DOCX conversion will appear when the server reports conversion support.',
+        action: canConvert ? 'convertPdfToDocx' : null,
+        actionLabel: state.formatConversionRunning ? 'Converting...' : 'Convert to DOCX'
+      });
+    }
     if (isDemoMode()) {
       var demoIframe = document.getElementById('viewerIframe');
       demoIframe.srcdoc = '<html><body style="font-family:system-ui,sans-serif;padding:32px;background:#f8fafc;color:#0f172a;"><h1 style="margin-top:0;">' +
@@ -5454,8 +5521,12 @@
       formatNotice.addEventListener('click', function (event) {
         var actionTarget = event.target && event.target.closest ? event.target.closest('[data-viewer-action]') : null;
         if (!actionTarget) return;
-        if (actionTarget.getAttribute('data-viewer-action') === 'convertPdfToDocx') {
+        var viewerAction = actionTarget.getAttribute('data-viewer-action');
+        if (viewerAction === 'convertPdfToDocx') {
           convertCurrentPdfToDocx();
+        } else if (viewerAction === 'openEditableCopy') {
+          var existing = editableCopyForCurrentFile();
+          openDocumentHalf(existing && existing.id);
         }
       });
     }

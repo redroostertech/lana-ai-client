@@ -121,3 +121,29 @@ describe('File Viewer notice placement', () => {
     expect(css).toContain('.file-viewer-format-notice--static');
   });
 });
+
+describe('File Viewer document halves', () => {
+  // Owner, 2026-09-25: "Original is always the pdf but the editable is always
+  // the docx"; the other half is offered under Document in the Display menu.
+  test('the Display menu offers the editable copy under the PDF and the original PDF under the copy', () => {
+    expect(viewer).toContain("value: 'editable-copy'");
+    expect(viewer).toContain("value: 'source-original'");
+    expect(viewer).toContain("label: conversionSource ? 'Editable copy' : 'Original'");
+    expect(viewer).toContain("if (value === 'editable-copy') {");
+    expect(viewer).toContain("if (value === 'source-original') {");
+    expect(viewer).toContain('function openDocumentHalf(documentId)');
+  });
+
+  test('a PDF that already has a copy offers to open it instead of converting again', () => {
+    expect(viewer).toContain("title: 'Editable copy available'");
+    expect(viewer).toContain("action: 'openEditableCopy'");
+    expect(viewer).toContain("viewerAction === 'openEditableCopy'");
+    expect(viewer).toContain('capabilities.conversion && capabilities.conversion.existing_copy');
+    expect(viewer).toContain('capabilities.derived_from');
+  });
+
+  test('the picker refreshes once the server capabilities arrive', () => {
+    const loader = viewer.slice(viewer.indexOf('async function loadFormatCapabilities'), viewer.indexOf('function currentFormatCapabilities'));
+    expect(loader).toContain('syncReviewVersionSelect();');
+  });
+});
