@@ -748,6 +748,19 @@ describe('LanaDocumentReview dates and release payloads', () => {
       expect(review.normalizeAnnotationAnchor(null)).toBeNull();
     });
 
+    test('builds a new thread in the persisted shape: a highlight without text, a comment or note only with text', () => {
+      const highlight = review.buildAnnotationThread({ kind: 'highlight', author: 'Michael', author_id: 'u-1', anchor: pageAnchor, date: '2026-09-25T20:00:00Z' });
+      expect(highlight).toMatchObject({ kind: 'highlight', color: '#FFE066', author: 'Michael', author_id: 'u-1', text: '', scope: 'selection', anchor: pageAnchor, status: 'open', replies: [], created_at: '2026-09-25T20:00:00Z' });
+      expect(highlight.id).toMatch(/^highlight-/);
+      expect(highlight.thread_id).toBe(highlight.id);
+      const note = review.buildAnnotationThread({ kind: 'redline', text: 'Payee is wrong', proposed_text: 'Title Bond Agency LLC', anchor: textAnchor });
+      expect(note).toMatchObject({ kind: 'redline', proposed_text: 'Title Bond Agency LLC', anchor_text: '$5,000.00', anchor: textAnchor });
+      expect(review.buildAnnotationThread({ kind: 'comment', text: '   ', anchor: pageAnchor })).toBeNull();
+      expect(review.buildAnnotationThread({ kind: 'redline', text: '', anchor: pageAnchor })).toBeNull();
+      // A comment with no anchor is a document comment.
+      expect(review.buildAnnotationThread({ text: 'General' }).scope).toBe('document');
+    });
+
     test('hands the embed only the threads it can draw, with resolved state and colour, and reads threads from batches and releases', () => {
       const threads = [
         { id: 'h1', kind: 'highlight', anchor: textAnchor, status: 'open' },

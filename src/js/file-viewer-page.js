@@ -42,6 +42,7 @@
     reviewBaselineRevisionIds: [],
     reviewBaselineAcceptedForReview: false,
     reviewTab: 'changes',
+    annotateMode: null,
     reviewCounts: { changes: 0, comments: 0 },
     reviewBatches: [],
     currentReviewBatch: null,
@@ -895,6 +896,14 @@
       user.lastName || user.last_name || ''
     ].join(' ').trim();
     return user.full_name || user.fullName || user.display_name || user.displayName || fullName || user.email || 'Reviewer';
+  }
+
+  function currentReviewerIdentity() {
+    var user = api && api.user ? api.user : null;
+    if (!user) {
+      try { user = JSON.parse(localStorage.getItem('user') || 'null'); } catch (_) { user = null; }
+    }
+    return user && (user.id || user.user_id || user.userId) ? String(user.id || user.user_id || user.userId) : '';
   }
 
   function normalizeBaseUrl(value) {
@@ -3659,8 +3668,11 @@
         : '';
       var replies = Array.isArray(thread.replies) ? thread.replies.filter(Boolean) : [];
       var date = thread.date || thread.created_at || '';
-      return '<button type="button" class="file-viewer-review-item file-viewer-review-item--annotation file-viewer-review-item--' + kind + '" data-review-annotation-id="' + escapeHtml(thread.id || '') + '">' +
-        '<span class="file-viewer-review-item-meta"><span>' + escapeHtml(thread.author || 'Reviewer') + '</span><span>' + escapeHtml(date ? formatDate(date) : '') + '</span></span>' +
+      var deletable = !thread.read_only && canSaveViewerAnnotations();
+      return '<div role="button" tabindex="0" class="file-viewer-review-item file-viewer-review-item--annotation file-viewer-review-item--' + kind + '" data-review-annotation-id="' + escapeHtml(thread.id || '') + '">' +
+        '<span class="file-viewer-review-item-meta"><span>' + escapeHtml(thread.author || 'Reviewer') + '</span><span>' + escapeHtml(date ? formatDate(date) : '') + '</span>' +
+          (deletable ? '<button type="button" class="file-viewer-review-item-delete" data-review-annotation-delete="' + escapeHtml(thread.id || '') + '" aria-label="Delete this ' + escapeHtml(LanaDocumentReview.annotationLabel(thread).toLowerCase()) + '">Delete</button>' : '') +
+        '</span>' +
         '<span class="file-viewer-review-item-title-row"><span class="file-viewer-review-item-title">' + swatch + escapeHtml(LanaDocumentReview.annotationLabel(thread)) + '</span>' +
           renderReviewStatusBadge({ label: status, tone: status === 'Resolved' ? 'release' : 'draft' }) + '</span>' +
         (quote ? '<span class="file-viewer-review-item-quote">' + escapeHtml(quote) + '</span>' : '') +
@@ -3668,8 +3680,188 @@
         (kind === 'redline' && thread.proposed_text ? '<span class="file-viewer-review-item-text file-viewer-review-item-text--proposed">Suggested: ' + escapeHtml(thread.proposed_text) + '</span>' : '') +
         (replies.length ? '<span class="file-viewer-review-item-version">' + replies.length + (replies.length === 1 ? ' reply' : ' replies') + '</span>' : '') +
         (releasedIn ? '<span class="file-viewer-review-item-version">' + escapeHtml(releasedIn) + '</span>' : '') +
-        '</button>';
+        '</div>';
     }).join('');
+  }
+
+  // ---- creating annotations from the viewer (PDF pages) ----
+
+  /** A PDF in a workspace, shown through the embed, takes region annotations. */
+  function canAnnotateInViewer(file, editor) {
+    var mimeType = String(file && (file.content_type || file.mime_type) || '').toLowerCase();
+    var filename = String(file && file.filename || '').toLowerCase();
+    var isPdf = mimeType === 'application/pdf' || filename.endsWith('.pdf');
+    return Boolean(isPdf && getFileMatterId(file) && editor && typeof editor.enableRegionSelect === 'function');
+  }
+
+  /** Threads can be added or removed from the viewer when the file sits in a workspace. */
+  function canSaveViewerAnnotations() {
+    return Boolean(state.currentFile && getCurrentMatterId() && state.editorInstance);
+  }
+
+  function setViewerAnnotateControlsVisible(visible) {
+    var controls = document.getElementById('viewerAnnotateControls');
+    if (controls) controls.classList.toggle('hidden', !visible);
+    if (!visible) setViewerAnnotateMode(null);
+  }
+
+  function setViewerAnnotateMode(mode) {
+    var next = mode === 'highlight' || mode === 'comment' || mode === 'redline' ? mode : null;
+    state.annotateMode = state.annotateMode === next ? null : next;
+    var buttons = document.querySelectorAll('#viewerAnnotateControls [data-annotate-mode]');
+    Array.prototype.forEach.call(buttons, function (button) {
+      var active = button.getAttribute('data-annotate-mode') === state.annotateMode;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    var hint = document.getElementById('viewerAnnotateHint');
+    if (hint) hint.classList.toggle('hidden', !state.annotateMode);
+    var editor = state.editorInstance;
+    if (editor && typeof editor.enableRegionSelect === 'function') {
+      try { editor.enableRegionSelect(Boolean(state.annotateMode)); } catch (_) {}
+    }
+  }
+
+  /** Persists the full thread list on the document's draft batch and redraws. */
+  async function saveViewerAnnotationThreads(threads) {
+    var file = state.currentFile;
+    if (!file || !getCurrentMatterId()) throw new Error('This file is not associated with a workspace.');
+    var existing = state.currentReviewBatch && state.currentReviewBatch.review_metadata ? state.currentReviewBatch.review_metadata : {};
+    var payload = {
+      title: draftBatchTitle(),
+      summary: threads.length + ' annotation' + (threads.length === 1 ? '' : 's') + ' captured from File Viewer.',
+      status: 'draft',
+      review_metadata: Object.assign({}, existing, {
+        source: existing.source || 'file_viewer',
+        document_name: file.filename || null,
+        comments: threads
+      })
+    };
+    state.reviewSaving = true;
+    renderReviewWorkflow();
+    try {
+      var response;
+      var batch = state.currentReviewBatch;
+      if (batch && batch.id && (batch.status === 'draft' || batch.status === 'proposed')) {
+        response = await api.patch(reviewDocumentBatchEndpoint('', '/' + encodeURIComponent(batch.id)), payload);
+      } else {
+        payload.changes = [];
+        response = await api.post(reviewDocumentBatchEndpoint(String(file.id), ''), payload);
+      }
+      state.currentReviewBatch = response && response.data ? response.data : response;
+    } finally {
+      state.reviewSaving = false;
+      renderReviewWorkflow();
+    }
+    renderReviewComments();
+    syncViewerAnnotations();
+  }
+
+  async function commitViewerAnnotation(input) {
+    var thread = LanaDocumentReview.buildAnnotationThread(input);
+    if (!thread) return;
+    var threads = LanaDocumentReview.batchReviewThreads(state.currentReviewBatch).concat([thread]);
+    await saveViewerAnnotationThreads(threads);
+    notify(LanaDocumentReview.annotationLabel(thread) + ' saved with the document.', 'success');
+  }
+
+  async function deleteViewerAnnotation(annotationId) {
+    var id = String(annotationId || '');
+    var threads = LanaDocumentReview.batchReviewThreads(state.currentReviewBatch);
+    var kept = threads.filter(function (thread) { return String(thread.id || '') !== id; });
+    if (kept.length === threads.length) return;
+    await saveViewerAnnotationThreads(kept);
+    notify('Removed.', 'success');
+  }
+
+  /** The region the user dragged on a PDF page, in page points, becomes the annotation the active mode asks for. */
+  async function handleViewerRegionSelected(detail) {
+    var mode = state.annotateMode;
+    if (!mode || !detail || !detail.anchor || !canSaveViewerAnnotations()) return;
+    var base = {
+      author: currentReviewerName(),
+      author_id: currentReviewerIdentity(),
+      anchor: detail.anchor,
+      quote: 'Page ' + detail.page
+    };
+    if (mode === 'highlight') {
+      await commitViewerAnnotation(Object.assign({ kind: 'highlight' }, base));
+      return;
+    }
+    if (mode === 'comment') {
+      promptViewerAnnotationText({
+        heading: 'Add Comment',
+        fields: [{ id: 'viewerAnnotationText', label: 'Comment', rows: 4, placeholder: 'What should the reader know about this region?' }]
+      }, function (values) {
+        return commitViewerAnnotation(Object.assign({ kind: 'comment', text: values.viewerAnnotationText }, base));
+      });
+      return;
+    }
+    promptViewerAnnotationText({
+      heading: 'Suggest a Change',
+      fields: [
+        { id: 'viewerAnnotationPrinted', label: 'Text as printed (optional)', rows: 2, placeholder: 'The words in the box, as they read now' },
+        { id: 'viewerAnnotationProposed', label: 'Suggested text', rows: 3, placeholder: 'What it should say' },
+        { id: 'viewerAnnotationText', label: 'Why', rows: 2, placeholder: 'A short reason' }
+      ]
+    }, function (values) {
+      var printed = String(values.viewerAnnotationPrinted || '').trim();
+      var proposed = String(values.viewerAnnotationProposed || '').trim();
+      if (!proposed) {
+        notify('A suggested change needs the suggested text.', 'error');
+        return Promise.resolve();
+      }
+      var why = String(values.viewerAnnotationText || '').trim();
+      return commitViewerAnnotation(Object.assign({
+        kind: 'redline',
+        text: why || ('Replace with: ' + proposed),
+        proposed_text: proposed,
+        quote: printed || base.quote
+      }, base));
+    });
+  }
+
+  /** A small modal with one or more text fields; onConfirm gets their values. */
+  function promptViewerAnnotationText(spec, onConfirm) {
+    var content = '<div class="file-viewer-edit-change-modal">' + spec.fields.map(function (field) {
+      return '<label class="file-viewer-edit-change-modal__label" for="' + escapeHtml(field.id) + '">' + escapeHtml(field.label) + '</label>' +
+        '<textarea id="' + escapeHtml(field.id) + '" class="file-viewer-edit-change-modal__textarea" rows="' + (field.rows || 3) + '" placeholder="' + escapeHtml(field.placeholder || '') + '"></textarea>';
+    }).join('') + '</div>';
+    var read = function () {
+      var values = {};
+      spec.fields.forEach(function (field) {
+        var input = document.getElementById(field.id);
+        values[field.id] = input && typeof input.value === 'string' ? input.value : '';
+      });
+      return values;
+    };
+    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.open === 'function') {
+      var modal = Lex.Modal.open({
+        heading: spec.heading,
+        size: 'sm',
+        content: content,
+        confirmText: 'Save',
+        cancelText: 'Cancel',
+        onConfirm: function () {
+          Promise.resolve(onConfirm(read())).catch(function (error) {
+            notify((error && error.message) || 'The annotation could not be saved.', 'error');
+          });
+        }
+      });
+      setTimeout(function () {
+        var first = modal && modal.querySelector ? modal.querySelector('#' + spec.fields[0].id) : document.getElementById(spec.fields[0].id);
+        if (first && typeof first.focus === 'function') first.focus();
+      }, 0);
+      return;
+    }
+    var values = {};
+    spec.fields.forEach(function (field) {
+      var answer = window.prompt(field.label, '');
+      values[field.id] = answer === null ? '' : answer;
+    });
+    Promise.resolve(onConfirm(values)).catch(function (error) {
+      notify((error && error.message) || 'The annotation could not be saved.', 'error');
+    });
   }
 
   /** Draw the draft's annotations in the embed; nothing when the editor is not up yet. */
@@ -4852,6 +5044,12 @@
       editor.on('annotation-selected', function (detail) {
         focusReviewAnnotationCard(detail && detail.id);
       });
+      editor.on('annotation-region-selected', function (detail) {
+        handleViewerRegionSelected(detail).catch(function (error) {
+          console.error('[FileViewerPage] Annotation failed:', error);
+          notify((error && error.message) || 'The annotation could not be saved.', 'error');
+        });
+      });
       editor.on('document-loaded', function (event) {
         // Every render rebuilds the pages; the draft's annotations go back on.
         syncViewerAnnotations();
@@ -4934,14 +5132,24 @@
         updateReviewRailCounts(state.reviewState);
       }
       applyTrackedChangesDisplay();
-      setReviewRailVisible(canReviewFile(file));
+      var annotatable = canAnnotateInViewer(file, editor);
+      setReviewRailVisible(canReviewFile(file) || annotatable);
       if (canReviewFile(file)) {
         state.reviewWorkflowPromise = loadReviewWorkflow(file);
         await state.reviewWorkflowPromise;
         await restoreCurrentPersistedDraftIfNeeded();
+      } else if (annotatable) {
+        // A PDF takes highlights, comments and suggested changes drawn as
+        // regions on its pages; they save with the document's own draft, and
+        // the text itself is edited in the converted copy.
+        state.reviewWorkflowPromise = loadReviewWorkflow(file);
+        await state.reviewWorkflowPromise;
+        setReviewTab('comments');
+        renderReviewWorkflow('Highlights, comments and suggested changes on this PDF save with the document. Convert it to DOCX to edit the text.');
       } else {
         renderReviewWorkflow('This format is read-only. Convert it to DOCX before review edits.');
       }
+      setViewerAnnotateControlsVisible(annotatable);
       hideLoading();
       return true;
     } catch (error) {
@@ -5701,8 +5909,30 @@
     var reviewCommentsList = document.getElementById('reviewCommentsList');
     if (reviewCommentsList) {
       reviewCommentsList.addEventListener('click', function (event) {
+        var remove = event.target && event.target.closest ? event.target.closest('[data-review-annotation-delete]') : null;
+        if (remove) {
+          event.stopPropagation();
+          deleteViewerAnnotation(remove.getAttribute('data-review-annotation-delete')).catch(function (error) {
+            notify((error && error.message) || 'The item could not be removed.', 'error');
+          });
+          return;
+        }
         var card = event.target && event.target.closest ? event.target.closest('[data-review-annotation-id]') : null;
         if (card) locateReviewAnnotation(card.getAttribute('data-review-annotation-id'));
+      });
+      reviewCommentsList.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        var card = event.target && event.target.closest ? event.target.closest('[data-review-annotation-id]') : null;
+        if (!card || event.target !== card) return;
+        event.preventDefault();
+        locateReviewAnnotation(card.getAttribute('data-review-annotation-id'));
+      });
+    }
+    var annotateControls = document.getElementById('viewerAnnotateControls');
+    if (annotateControls) {
+      annotateControls.addEventListener('click', function (event) {
+        var button = event.target && event.target.closest ? event.target.closest('[data-annotate-mode]') : null;
+        if (button) setViewerAnnotateMode(button.getAttribute('data-annotate-mode'));
       });
     }
     var reviewTabs = document.getElementById('reviewTabs');

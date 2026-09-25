@@ -863,6 +863,41 @@
     }).filter(Boolean);
   }
 
+  /**
+   * A new thread in the persisted shape: an id from the kind and the clock, the
+   * author, the anchor and quote, open with no replies. A highlight may carry
+   * no text; a comment or a suggested change must.
+   */
+  function buildAnnotationThread(input) {
+    var source = input || {};
+    var kind = annotationKind(source);
+    var text = String(source.text || '').trim();
+    if (!text && kind !== 'highlight') return null;
+    var anchor = normalizeAnnotationAnchor(source.anchor);
+    var quote = String(source.quote || (anchor && anchor.text) || '').trim();
+    var now = source.date || new Date().toISOString();
+    var id = String(source.id || (kind + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)));
+    var thread = {
+      id: id,
+      thread_id: id,
+      kind: kind,
+      color: annotationColor(source, kind),
+      author: source.author || 'Reviewer',
+      author_id: String(source.author_id || source.authorId || ''),
+      date: now,
+      created_at: now,
+      updated_at: now,
+      text: text,
+      scope: anchor || quote ? 'selection' : 'document',
+      anchor_text: quote.slice(0, 500),
+      anchor: anchor,
+      status: 'open',
+      replies: []
+    };
+    if (kind === 'redline') thread.proposed_text = String(source.proposed_text || source.proposedText || '').trim();
+    return thread;
+  }
+
   /** The threads persisted on a batch. */
   function batchReviewThreads(batch) {
     var metadata = batch && batch.review_metadata;
@@ -1548,6 +1583,7 @@
     annotationLabel: annotationLabel,
     normalizeAnnotationAnchor: normalizeAnnotationAnchor,
     embedAnnotationsFrom: embedAnnotationsFrom,
+    buildAnnotationThread: buildAnnotationThread,
     batchReviewThreads: batchReviewThreads,
     releasedReviewThreads: releasedReviewThreads,
     HIGHLIGHT_COLORS: HIGHLIGHT_COLORS.map(function (color) { return Object.assign({}, color); }),

@@ -655,4 +655,23 @@ describe('file-viewer review UX foundation', () => {
     expect(fileViewerCss).toContain('.file-viewer-annotation-swatch');
     expect(fileViewerCss).toContain('.file-viewer-review-item.is-located');
   });
+
+  test('a PDF in a workspace takes highlights, comments and suggested changes drawn as regions, saved with its own draft', () => {
+    expect(html).toContain('id="viewerAnnotateControls"');
+    expect(html).toContain('data-annotate-mode="highlight"');
+    expect(html).toContain('data-annotate-mode="redline"');
+    expect(pageJs).toContain('function canAnnotateInViewer(file, editor)');
+    expect(pageJs).toContain("return Boolean(isPdf && getFileMatterId(file) && editor && typeof editor.enableRegionSelect === 'function');");
+    expect(pageJs).toContain('setReviewRailVisible(canReviewFile(file) || annotatable);');
+    expect(pageJs).toContain("editor.on('annotation-region-selected', function (detail) {");
+    expect(pageJs).toContain('editor.enableRegionSelect(Boolean(state.annotateMode));');
+    expect(pageJs).toContain('var thread = LanaDocumentReview.buildAnnotationThread(input);');
+    // The draft batch is the store: PATCH the open draft, else POST a new one with no changes.
+    expect(pageJs).toContain("response = await api.patch(reviewDocumentBatchEndpoint('', '/' + encodeURIComponent(batch.id)), payload);");
+    expect(pageJs).toContain("response = await api.post(reviewDocumentBatchEndpoint(String(file.id), ''), payload);");
+    expect(pageJs).toContain('data-review-annotation-delete="');
+    expect(pageJs).toContain("if (!proposed) {");
+    expect(fileViewerCss).toContain('.file-viewer-annotate-btn.is-active');
+    expect(serviceJs).toContain('function buildAnnotationThread(input)');
+  });
 });
