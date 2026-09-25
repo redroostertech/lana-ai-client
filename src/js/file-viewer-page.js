@@ -4908,7 +4908,7 @@
     state.formatConversionRunning = true;
     showFormatNotice({
       title: 'Converting PDF to DOCX',
-      message: 'Reading the layout (headings, lists and tables) and any scanned pages. This takes about half a minute for every five scanned pages; the page will open the editable copy when it is ready.',
+      message: 'Reading the layout (headings, lists, tables and pictures) and any scanned pages. This takes about a minute for every five scanned pages; the page will open the editable copy when it is ready.',
       action: 'convertPdfToDocx',
       actionLabel: 'Converting...'
     });
@@ -4963,8 +4963,9 @@
     }
   }
 
-  // Docling reads a scanned page in roughly six seconds; a long statement can
-  // take a couple of minutes. The server bounds its own wait (DOCLING_TIMEOUT_MS).
+  // Docling reads a scanned page in roughly twelve seconds with pictures kept
+  // (measured 2026-09-25: five pages in about a minute); a long statement can
+  // take a few minutes. The server bounds its own wait (DOCLING_TIMEOUT_MS).
   var PDF_CONVERSION_TIMEOUT_MS = 180000;
   var CONVERTED_COPY_POLL_MS = 5000;
   var CONVERTED_COPY_WAIT_MS = 180000;

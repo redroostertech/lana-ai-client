@@ -88,7 +88,7 @@ describe('File Viewer conversion wait', () => {
   test('asks for a realistic conversion limit and says how long it takes', () => {
     expect(viewer).toContain('var PDF_CONVERSION_TIMEOUT_MS = 180000;');
     expect(viewer).toContain('{ timeout: PDF_CONVERSION_TIMEOUT_MS }');
-    expect(viewer).toContain('about half a minute for every five scanned pages');
+    expect(viewer).toContain('about a minute for every five scanned pages');
   });
 
   test('a timeout is not reported as a failure while the server is still converting', () => {
