@@ -96,6 +96,17 @@ button.file-viewer-mode-badge:hover {
   display: none;
 }
 
+/* The notice row above the scrolling content pane: same ground as the pane,
+   aligned with its 16px padding, and never part of the scroll. */
+.file-viewer-content-column {
+  background-color: var(--lex-bg-secondary);
+}
+
+.file-viewer-format-notice--static {
+  flex: 0 0 auto;
+  margin: 16px 16px 0;
+}
+
 .file-viewer-format-notice__copy {
   display: grid;
   gap: 3px;

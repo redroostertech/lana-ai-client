@@ -104,3 +104,20 @@ describe('File Viewer conversion wait', () => {
     expect(catchBlock).toContain('setViewerDisplayControlsVisible(false);');
   });
 });
+
+describe('File Viewer notice placement', () => {
+  const html = fs.readFileSync(path.join(SRC, 'file-viewer.html'), 'utf8');
+  const css = fs.readFileSync(path.join(SRC, 'css/file-viewer.css'), 'utf8');
+
+  test('the format notice sits above the scrolling content pane, not inside it', () => {
+    const notice = html.indexOf('id="viewerFormatNotice"');
+    const pane = html.indexOf('id="viewerContent"');
+    expect(notice).toBeGreaterThan(-1);
+    expect(notice).toBeLessThan(pane);
+    const column = html.indexOf('file-viewer-content-column');
+    expect(column).toBeGreaterThan(-1);
+    expect(column).toBeLessThan(notice);
+    expect(html).toContain('file-viewer-format-notice--static');
+    expect(css).toContain('.file-viewer-format-notice--static');
+  });
+});
