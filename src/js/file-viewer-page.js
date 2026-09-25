@@ -1581,12 +1581,15 @@
   }
 
   function setReviewTab(tab) {
-    state.reviewTab = tab === 'releases' ? tab : 'changes';
+    state.reviewTab = tab === 'releases' || tab === 'comments' ? tab : 'changes';
     var tabs = document.getElementById('reviewTabs');
     var changesPanel = document.getElementById('reviewPanelChanges');
     var releasesPanel = document.getElementById('reviewPanelReleases');
+    var commentsPanel = document.getElementById('reviewPanelComments');
     var isChanges = state.reviewTab === 'changes';
     var isReleases = state.reviewTab === 'releases';
+    if (commentsPanel) commentsPanel.classList.toggle('hidden', state.reviewTab !== 'comments');
+    if (state.reviewTab === 'comments') renderReviewComments();
 
     if (tabs && tabs.value !== state.reviewTab) {
       tabs.value = state.reviewTab;
@@ -3585,21 +3588,119 @@
   }
 
   function reviewMetadata(reviewState) {
+    // The threads saved with the draft (highlights, comments, notes with their
+    // anchors) travel through untouched; the embed's own comments.xml entries
+    // are added only when nothing persisted already carries them.
+    var persisted = LanaDocumentReview.batchReviewThreads(state.currentReviewBatch);
+    var seen = {};
+    persisted.forEach(function (thread) { if (thread && thread.id) seen[String(thread.id)] = true; });
     var comments = Array.isArray(reviewState && reviewState.comments) ? reviewState.comments : [];
+    var embedComments = comments.map(function (comment, index) {
+      return {
+        id: comment && comment.id ? String(comment.id) : String(index + 1),
+        author: comment && comment.author ? comment.author : null,
+        date: comment && comment.date ? comment.date : null,
+        text: comment && comment.text ? comment.text : ''
+      };
+    }).filter(function (comment) { return comment.text && !seen[comment.id]; });
     return {
       source: 'file_viewer',
       editor_mode: state.editorMode,
       document_name: (reviewState && reviewState.documentName) || (state.currentFile && state.currentFile.filename) || null,
       counts: state.reviewCounts,
-      comments: comments.map(function (comment, index) {
-        return {
-          id: comment && comment.id ? String(comment.id) : String(index + 1),
-          author: comment && comment.author ? comment.author : null,
-          date: comment && comment.date ? comment.date : null,
-          text: comment && comment.text ? comment.text : ''
-        };
-      })
+      comments: persisted.concat(embedComments)
     };
+  }
+
+  // =========================================================================
+  // Annotations: the draft's highlights, comments and suggested changes,
+  // listed in the rail and drawn in the read-only view
+  // =========================================================================
+
+  /** Every thread the viewer shows: the current draft's, then released ones read-only. */
+  function reviewAnnotationThreads() {
+    var draft = LanaDocumentReview.batchReviewThreads(state.currentReviewBatch || state.pendingReviewReleaseBatch);
+    var released = LanaDocumentReview.releasedReviewThreads(state.releaseChangeGroups);
+    var seen = {};
+    return draft.concat(released).filter(function (thread) {
+      if (!thread) return false;
+      var key = thread.id ? String(thread.id) : '';
+      if (key && seen[key]) return false;
+      if (key) seen[key] = true;
+      var kind = LanaDocumentReview.annotationKind(thread);
+      return kind === 'highlight' || String(thread.text || '').trim().length > 0;
+    });
+  }
+
+  function reviewAnnotationQuote(thread) {
+    if (thread && thread.anchor && thread.anchor.text) return String(thread.anchor.text);
+    if (thread && thread.anchor_text) return String(thread.anchor_text);
+    if (thread && thread.anchor && thread.anchor.space === 'pdf-page/1') return 'Page ' + thread.anchor.page;
+    return '';
+  }
+
+  function renderReviewComments() {
+    var list = document.getElementById('reviewCommentsList');
+    var empty = document.getElementById('reviewCommentsEmptyText');
+    if (!list) return;
+    var threads = reviewAnnotationThreads();
+    var emptyBox = empty && empty.closest ? empty.closest('.file-viewer-review-empty') : null;
+    if (emptyBox) emptyBox.classList.toggle('hidden', threads.length > 0);
+    list.innerHTML = threads.map(function (thread) {
+      var kind = LanaDocumentReview.annotationKind(thread);
+      var status = String(thread.status || 'open').toLowerCase() === 'resolved' ? 'Resolved' : 'Open';
+      var quote = reviewAnnotationQuote(thread);
+      var color = LanaDocumentReview.annotationColor(thread, kind);
+      var swatch = kind === 'highlight'
+        ? '<span class="file-viewer-annotation-swatch" data-color="' + escapeHtml(color) + '"></span>'
+        : '';
+      var releasedIn = thread.released_in && thread.released_in.release_number
+        ? 'Released in Version ' + thread.released_in.release_number
+        : '';
+      var replies = Array.isArray(thread.replies) ? thread.replies.filter(Boolean) : [];
+      var date = thread.date || thread.created_at || '';
+      return '<button type="button" class="file-viewer-review-item file-viewer-review-item--annotation file-viewer-review-item--' + kind + '" data-review-annotation-id="' + escapeHtml(thread.id || '') + '">' +
+        '<span class="file-viewer-review-item-meta"><span>' + escapeHtml(thread.author || 'Reviewer') + '</span><span>' + escapeHtml(date ? formatDate(date) : '') + '</span></span>' +
+        '<span class="file-viewer-review-item-title-row"><span class="file-viewer-review-item-title">' + swatch + escapeHtml(LanaDocumentReview.annotationLabel(thread)) + '</span>' +
+          renderReviewStatusBadge({ label: status, tone: status === 'Resolved' ? 'release' : 'draft' }) + '</span>' +
+        (quote ? '<span class="file-viewer-review-item-quote">' + escapeHtml(quote) + '</span>' : '') +
+        (thread.text ? '<span class="file-viewer-review-item-text">' + escapeHtml(thread.text) + '</span>' : '') +
+        (kind === 'redline' && thread.proposed_text ? '<span class="file-viewer-review-item-text file-viewer-review-item-text--proposed">Suggested: ' + escapeHtml(thread.proposed_text) + '</span>' : '') +
+        (replies.length ? '<span class="file-viewer-review-item-version">' + replies.length + (replies.length === 1 ? ' reply' : ' replies') + '</span>' : '') +
+        (releasedIn ? '<span class="file-viewer-review-item-version">' + escapeHtml(releasedIn) + '</span>' : '') +
+        '</button>';
+    }).join('');
+  }
+
+  /** Draw the draft's annotations in the embed; nothing when the editor is not up yet. */
+  function syncViewerAnnotations() {
+    var editor = state.editorInstance;
+    if (!editor || typeof editor.setAnnotations !== 'function') return;
+    try {
+      editor.setAnnotations(LanaDocumentReview.embedAnnotationsFrom(reviewAnnotationThreads()));
+    } catch (error) {
+      console.warn('[FileViewerPage] Annotation overlay failed:', error);
+    }
+  }
+
+  function locateReviewAnnotation(annotationId) {
+    var editor = state.editorInstance;
+    var id = String(annotationId || '');
+    if (!id || !editor || typeof editor.locateAnnotation !== 'function') return;
+    var located = false;
+    try { located = editor.locateAnnotation(id); } catch (_) { located = false; }
+    if (!located) notify('This item is not on the current view of the document.', 'info');
+  }
+
+  function focusReviewAnnotationCard(annotationId) {
+    var id = String(annotationId || '');
+    if (!id) return;
+    setReviewTab('comments');
+    var card = document.querySelector('[data-review-annotation-id="' + id.replace(/["\\]/g, '') + '"]');
+    if (!card) return;
+    if (typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    card.classList.add('is-located');
+    setTimeout(function () { card.classList.remove('is-located'); }, 1600);
   }
 
   function draftBatchTitle() {
@@ -3982,6 +4083,8 @@
         : [];
       renderReviewWorkflow();
       updateReviewRailCounts(state.reviewState || {});
+      renderReviewComments();
+      syncViewerAnnotations();
     } catch (error) {
       console.warn('[FileViewerPage] Review workflow load failed:', error);
       renderReviewWorkflow('Unable to load review history.');
@@ -4746,7 +4849,12 @@
       state.editorInstance = editor;
       state.editorMode = 'view';
 
+      editor.on('annotation-selected', function (detail) {
+        focusReviewAnnotationCard(detail && detail.id);
+      });
       editor.on('document-loaded', function (event) {
+        // Every render rebuilds the pages; the draft's annotations go back on.
+        syncViewerAnnotations();
         // counts carries render totals (pages, paragraphs, tables, page
         // breaks); the revision list lives on the embed's review state.
         var loadedReviewState = null;
@@ -5588,6 +5696,13 @@
           notify((error && error.message) || 'Failed to open selected version', 'error');
           syncReviewVersionSelect();
         });
+      });
+    }
+    var reviewCommentsList = document.getElementById('reviewCommentsList');
+    if (reviewCommentsList) {
+      reviewCommentsList.addEventListener('click', function (event) {
+        var card = event.target && event.target.closest ? event.target.closest('[data-review-annotation-id]') : null;
+        if (card) locateReviewAnnotation(card.getAttribute('data-review-annotation-id'));
       });
     }
     var reviewTabs = document.getElementById('reviewTabs');

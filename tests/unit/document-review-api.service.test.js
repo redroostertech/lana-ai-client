@@ -723,4 +723,53 @@ describe('LanaDocumentReview dates and release payloads', () => {
     expect(payload.content_base64).toEqual(expect.any(String));
     expect(payload.approved).toBe(false);
   });
+
+  describe('annotations kept with the draft', () => {
+    const textAnchor = { space: 'visible-text/1', ranges: [{ paragraph: 3, start: 8, end: 17 }], text: '$5,000.00' };
+    const pageAnchor = { space: 'pdf-page/1', page: 2, rects: [{ x: 72, y: 144.5, w: 200, h: 14 }] };
+
+    test('reads kinds, colours and both anchor spaces, and refuses bad geometry, an unknown space or a bad colour', () => {
+      expect(review.annotationKind({ kind: 'highlight' })).toBe('highlight');
+      expect(review.annotationKind({ kind: 'REDLINE' })).toBe('redline');
+      expect(review.annotationKind({})).toBe('comment');
+      expect(review.annotationKind({ kind: 'sticker' })).toBe('comment');
+      expect(review.annotationColor({ kind: 'highlight' })).toBe('#FFE066');
+      expect(review.annotationColor({ kind: 'highlight', color: '#86efac' })).toBe('#86EFAC');
+      expect(review.annotationColor({ kind: 'comment' })).toBe('');
+      expect(review.annotationColor({ kind: 'highlight', color: 'yellow' })).toBe('#FFE066');
+      expect(review.annotationLabel({ kind: 'redline' })).toBe('Suggested change');
+
+      expect(review.normalizeAnnotationAnchor(textAnchor)).toEqual(textAnchor);
+      expect(review.normalizeAnnotationAnchor(pageAnchor)).toEqual(pageAnchor);
+      expect(review.normalizeAnnotationAnchor({ space: 'visible-text/1', ranges: [{ paragraph: 1, start: 9, end: 3 }] })).toBeNull();
+      expect(review.normalizeAnnotationAnchor({ space: 'pdf-page/1', page: 0, rects: pageAnchor.rects })).toBeNull();
+      expect(review.normalizeAnnotationAnchor({ space: 'pdf-page/1', page: 1, rects: [{ x: 1, y: 1, w: 0, h: 4 }] })).toBeNull();
+      expect(review.normalizeAnnotationAnchor({ space: 'dom-offsets/1', start: 1, end: 2 })).toBeNull();
+      expect(review.normalizeAnnotationAnchor(null)).toBeNull();
+    });
+
+    test('hands the embed only the threads it can draw, with resolved state and colour, and reads threads from batches and releases', () => {
+      const threads = [
+        { id: 'h1', kind: 'highlight', anchor: textAnchor, status: 'open' },
+        { id: 'c1', text: 'Check', anchor: pageAnchor, status: 'resolved' },
+        { id: 'legacy', text: 'Older comment', anchor_text: 'Deposit', anchor_start: 12, anchor_end: 19 },
+        { id: '', kind: 'highlight', anchor: textAnchor },
+        { id: 'broken', kind: 'highlight', anchor: { space: 'pdf-page/1', page: 1, rects: [] } }
+      ];
+      expect(review.embedAnnotationsFrom(threads)).toEqual([
+        { id: 'h1', kind: 'highlight', color: '#FFE066', anchor: textAnchor, resolved: false },
+        { id: 'c1', kind: 'comment', color: null, anchor: pageAnchor, resolved: true }
+      ]);
+      expect(review.embedAnnotationsFrom(null)).toEqual([]);
+
+      expect(review.batchReviewThreads({ review_metadata: { comments: threads.slice(0, 2) } })).toEqual(threads.slice(0, 2));
+      expect(review.batchReviewThreads({ review_metadata: {} })).toEqual([]);
+      expect(review.batchReviewThreads(null)).toEqual([]);
+      const released = review.releasedReviewThreads([
+        { release_id: 'rel-1', release: { id: 'rel-1', release_number: 3, released_at: '2026-09-25T20:00:00Z' }, review_metadata: { comments: [threads[1]] } },
+        { release_id: 'rel-2', review_metadata: { comments: [] } }
+      ]);
+      expect(released).toEqual([Object.assign({}, threads[1], { released_in: { id: 'rel-1', release_number: 3, released_at: '2026-09-25T20:00:00Z' }, read_only: true })]);
+    });
+  });
 });

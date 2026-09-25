@@ -584,4 +584,28 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain('save.finally(function () { shutdownEditorInstance(departingEditor); })');
     expect(editor).toContain("} else {\n    init();\n  }");
   });
+
+  test('highlights and comments anchor in the editor, draw through the embed, and can be removed before release', () => {
+    // A highlight is a mark with no text; the thread keeps its kind, colour and the embed's anchor.
+    expect(editor).toContain("if (!text && kind !== 'highlight') return null;");
+    expect(editor).toContain('anchor: reviewService && typeof reviewService.normalizeAnnotationAnchor === \'function\' ? reviewService.normalizeAnnotationAnchor(comment.anchor) : null,');
+    expect(editor).toContain('officeEditorInstance.annotationAnchorFromSelection()');
+    expect(editor).toContain('function addServerReviewHighlight(file, color)');
+    expect(editor).toContain("toast('Select text to highlight.');");
+    expect(editor).toContain('function deleteServerReviewComment(file, commentId)');
+    expect(editor).toContain('return !normalized || normalized.id !== id || normalized.read_only;');
+    // The embed draws the threads on every render, and a pin click opens the card.
+    expect(editor).toContain('editor.setAnnotations(reviewService.embedAnnotationsFrom(serverReviewComments(file)));');
+    expect(editor).toContain("mountedEditor.on('annotation-selected', function (detail) {");
+    expect(editor).toContain("if (show && file && file.kind === 'doc') syncEmbedAnnotations(file);");
+    expect(editor).toContain('located = editor.locateAnnotation(thread.id);');
+    // Rail: colour picker, kind on the card, Delete beside Reply and Resolve.
+    expect(editor).toContain('data-action="dock-highlight" data-color="');
+    expect(editor).toContain("if (action === 'dock-highlight' && file && isServerReviewFile(file)) {");
+    expect(editor).toContain("if (action === 'delete-review-comment' && file && isServerReviewFile(file)) {");
+    expect(editor).toContain('data-action="delete-review-comment"');
+    expect(editor).toContain("var kindLabel = kind === 'highlight' ? 'Highlight' : kind === 'redline' ? 'Suggested change' : 'Comment';");
+    expect(css).toContain('.office-review-annotation-swatch[data-color="#86EFAC"]');
+    expect(css).toContain('.office-review-comment-thread.is-located');
+  });
 });

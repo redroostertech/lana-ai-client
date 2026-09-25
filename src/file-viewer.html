@@ -182,7 +182,7 @@
             id="reviewTabs"
             value="changes"
             size="sm"
-            options='[{"value":"changes","label":"Change History"},{"value":"releases","label":"Versions"}]'>
+            options='[{"value":"changes","label":"Change History"},{"value":"releases","label":"Versions"},{"value":"comments","label":"Comments"}]'>
           </lex-segmented>
         </div>
 
@@ -193,6 +193,13 @@
               <p id="reviewChangesEmptyText">No tracked changes reported by the editor.</p>
             </div>
             <div id="reviewChangesList" class="file-viewer-review-list"></div>
+          </section>
+          <section id="reviewPanelComments" class="hidden file-viewer-review-panel" role="tabpanel" aria-labelledby="reviewTabComments">
+            <div class="file-viewer-review-empty">
+              <h5>No comments</h5>
+              <p id="reviewCommentsEmptyText">Highlights, comments and suggested changes saved with the draft appear here.</p>
+            </div>
+            <div id="reviewCommentsList" class="file-viewer-review-list"></div>
           </section>
           <section id="reviewPanelReleases" class="hidden file-viewer-review-panel" role="tabpanel" aria-labelledby="reviewTabReleases">
             <div id="reviewReleasesList" class="file-viewer-review-releases__list">
