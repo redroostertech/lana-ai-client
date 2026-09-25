@@ -267,6 +267,48 @@ describe('LanaDocumentReview grouping and serialization', () => {
     expect(paragraph.proposedText).toBe('Alignment: Justified');
   });
 
+  test('a tracked column resize reads as "Table resized" with its widths, and persists as a table format change', () => {
+    // The editor records a drag on a column boundary as w:tblGridChange and
+    // surfaces it as a fmt revision of kind "table" with the widths in points.
+    const resizeOp = { op: 'resizeTableColumns', table: 0, widths: [1600, 1400, 3000] };
+    const revision = {
+      id: 'tbl-1',
+      type: 'fmt',
+      author: 'Michael',
+      date: '2026-09-25T20:00:00Z',
+      formatKind: 'table',
+      formatBefore: { columnWidths: [100, 100, 100] },
+      formatAfter: { columnWidths: [80, 70, 150] },
+      editScript: { version: '0', ops: [resizeOp] }
+    };
+    const details = review.formatChangeDetailsFromRevision(revision);
+    expect(details.kind).toBe('table');
+    expect(details.properties).toEqual(['columnWidths']);
+    expect(details.originalText).toBe('Column widths: 100 pt, 100 pt, 100 pt');
+    expect(details.proposedText).toBe('Column widths: 80 pt, 70 pt, 150 pt');
+    expect(review.changeLabel(revision)).toBe('Table resized');
+
+    // A lone cell record (a resize Word made, read back per cell) reads as its width.
+    const cell = review.formatChangeDetailsFromRevision({ type: 'fmt', formatKind: 'table', formatBefore: { cellWidth: 100 }, formatAfter: { cellWidth: 120 } });
+    expect(cell.originalText).toBe('Cell width: 100 pt');
+    expect(review.changeLabel({ type: 'fmt', formatKind: 'table', formatBefore: { cellWidth: 100 }, formatAfter: { cellWidth: 120 } })).toBe('Table resized');
+
+    // Control arm: a single-property text change keeps its own label, and an unchanged table is no change at all.
+    expect(review.changeLabel({ type: 'fmt', formatKind: 'text', formatBefore: { font: 'Arial' }, formatAfter: { font: 'Times New Roman' } })).toBe('Font');
+    expect(review.formatChangeDetailsFromRevision({ type: 'fmt', formatKind: 'table', formatBefore: { columnWidths: [100, 100] }, formatAfter: { columnWidths: [100, 100] } })).toBeNull();
+
+    const session = review.createReviewSession();
+    const changes = session.persistableChanges({ revisions: [revision] });
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      operation: 'format',
+      original_text: 'Column widths: 100 pt, 100 pt, 100 pt',
+      proposed_text: 'Column widths: 80 pt, 70 pt, 150 pt',
+      edit_script: { ops: [resizeOp] },
+      metadata: { format_change: { kind: 'table', properties: ['columnWidths'], before: { columnWidths: [100, 100, 100] }, after: { columnWidths: [80, 70, 150] } } }
+    });
+  });
+
   test('preserves every current Lana Editor operation and its script provenance', () => {
     const ops = [
       { op: 'insertText', at: { paragraph: 0, start: 0 }, text: 'A' },
@@ -276,7 +318,8 @@ describe('LanaDocumentReview grouping and serialization', () => {
       { op: 'formatText', range: { paragraph: 0, start: 0, end: 1 }, marks: { bold: true } },
       { op: 'formatParagraph', at: { paragraph: 0 }, set: { align: 'center' } },
       { op: 'splitParagraph', at: { paragraph: 0, start: 1 } },
-      { op: 'mergeParagraphs', at: { paragraph: 0 } }
+      { op: 'mergeParagraphs', at: { paragraph: 0 } },
+      { op: 'resizeTableColumns', table: 0, widths: [1600, 1400, 3000] }
     ];
     const baseDocumentHash = 'visible-text/1:sha256:' + 'a'.repeat(64);
     const session = review.createReviewSession();

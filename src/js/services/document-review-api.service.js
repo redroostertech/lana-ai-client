@@ -102,13 +102,16 @@
     style: 'Style',
     list: 'List',
     indent: 'Indent',
-    horizontalRule: 'Horizontal rule'
+    horizontalRule: 'Horizontal rule',
+    columnWidths: 'Column widths',
+    cellWidth: 'Cell width'
   };
 
   var FORMAT_PROPERTY_ORDER = [
     'font', 'size', 'bold', 'italic', 'underline', 'strike',
     'superscript', 'subscript', 'color', 'highlight', 'alignment',
-    'style', 'list', 'indent', 'horizontalRule'
+    'style', 'list', 'indent', 'horizontalRule',
+    'columnWidths', 'cellWidth'
   ];
 
   function sameFormatValue(left, right) {
@@ -122,6 +125,10 @@
     if (typeof value === 'boolean') return value ? 'On' : 'Off';
     if (key === 'size') return String(value) + ' pt';
     if (key === 'indent') return String(value) + ' pt';
+    if (key === 'cellWidth') return String(value) + ' pt';
+    if (key === 'columnWidths' && Array.isArray(value)) {
+      return value.map(function (width) { return String(width) + ' pt'; }).join(', ');
+    }
     if (key === 'alignment') {
       var alignment = String(value);
       if (alignment === 'both') return 'Justified';
@@ -159,7 +166,7 @@
     });
     if (!properties.length) return null;
     return {
-      kind: kind === 'paragraph' ? 'paragraph' : 'text',
+      kind: kind === 'paragraph' ? 'paragraph' : kind === 'table' ? 'table' : 'text',
       properties: properties,
       before: before,
       after: after,
@@ -190,6 +197,8 @@
     if (item && item.operation === 'replace') return 'Replacement';
     if (isFormattingChange(item)) {
       var details = formatChangeDetailsFromRevision(item);
+      // A column resize is recorded as a table property change (w:tblGridChange); it reads as one.
+      if (details && details.kind === 'table') return 'Table resized';
       return details && details.properties.length === 1
         ? FORMAT_PROPERTY_LABELS[details.properties[0]]
         : 'Formatting';
