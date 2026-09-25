@@ -182,7 +182,7 @@
             id="reviewTabs"
             value="changes"
             size="sm"
-            options='[{"value":"changes","label":"Change History"},{"value":"releases","label":"Versions"}]'>
+            options='[{"value":"changes","label":"Change History"},{"value":"releases","label":"Versions"},{"value":"insights","label":"Insights"}]'>
           </lex-segmented>
         </div>
 
@@ -197,6 +197,14 @@
           <section id="reviewPanelReleases" class="hidden file-viewer-review-panel" role="tabpanel" aria-labelledby="reviewTabReleases">
             <div id="reviewReleasesList" class="file-viewer-review-releases__list">
               <p class="file-viewer-review-releases__empty">No released versions yet.</p>
+            </div>
+          </section>
+          <section id="reviewPanelInsights" class="hidden file-viewer-review-panel" role="tabpanel" aria-labelledby="reviewTabInsights">
+            <div id="reviewInsightsBody" class="file-viewer-insights-body">
+              <div class="file-viewer-review-empty">
+                <h5>Reading insights</h5>
+                <p>Type, summary, callouts and suggestions appear here once the document has been read.</p>
+              </div>
             </div>
           </section>
         </div>
@@ -553,6 +561,7 @@
   <!-- Shared services -->
   <script src="js/services/docx-template-modal.js"></script>
   <script src="js/services/document-review-api.service.js"></script>
+  <script src="js/services/document-enrichment.service.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/file-viewer-page.js"></script>

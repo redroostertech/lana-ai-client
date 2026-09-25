@@ -1496,3 +1496,187 @@ button.file-viewer-review-release:focus-visible {
 .file-viewer-editor-host .lee-root {
   min-height: 100%;
 }
+
+/* Insights: what the document reader found (type, summary, callouts,
+   entities) and the suggestions a reviewer accepts into contacts, parties and
+   deadlines. A document that cannot be reviewed still shows this rail with
+   only the Insights tab; the review workflow footer stays out of the way. */
+.file-viewer-review-rail--insights-only .file-viewer-review-workflow {
+  display: none;
+}
+
+.file-viewer-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.file-viewer-insights__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  color: var(--lex-text-tertiary);
+}
+
+.file-viewer-insights__status--failed,
+.file-viewer-insights__status--partial {
+  color: var(--lex-color-warning-700, #92400e);
+}
+
+.file-viewer-insights__section {
+  display: grid;
+  gap: 6px;
+}
+
+.file-viewer-insights__title {
+  margin: 0;
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  font-weight: var(--lex-weight-semibold, 600);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lex-text-tertiary);
+}
+
+.file-viewer-insights__count {
+  font-weight: var(--lex-weight-regular, 400);
+}
+
+.file-viewer-insights__classification {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-viewer-insights__type {
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  font-weight: var(--lex-weight-semibold, 600);
+  color: var(--lex-text-primary);
+}
+
+.file-viewer-insights__classification--abstained .file-viewer-insights__type {
+  color: var(--lex-text-secondary);
+  font-weight: var(--lex-weight-medium, 500);
+}
+
+.file-viewer-insights__confidence {
+  font-size: 0.6875rem;
+  color: var(--lex-text-tertiary);
+}
+
+.file-viewer-insights__purpose,
+.file-viewer-insights__summary {
+  margin: 0;
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  line-height: 1.5;
+  color: var(--lex-text-secondary);
+  white-space: pre-line;
+}
+
+.file-viewer-insights__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-viewer-insights__item {
+  border: 1px solid var(--lex-border-subtle, var(--lex-border-default));
+  border-radius: var(--lex-radius-md, 6px);
+  background: var(--lex-bg-primary);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.file-viewer-insights__item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-viewer-insights__badge {
+  flex-shrink: 0;
+  border-radius: var(--lex-radius-full, 999px);
+  background: var(--lex-bg-accent-soft);
+  color: var(--lex-text-accent);
+  font-size: 0.625rem;
+  font-weight: var(--lex-weight-semibold, 600);
+  line-height: 1;
+  padding: 3px 6px;
+}
+
+.file-viewer-insights__item-title {
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  font-weight: var(--lex-weight-semibold, 600);
+  color: var(--lex-text-primary);
+}
+
+.file-viewer-insights__item-detail,
+.file-viewer-insights__item-text {
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  color: var(--lex-text-secondary);
+  line-height: 1.45;
+}
+
+.file-viewer-insights__evidence {
+  margin: 0;
+  padding: 4px 8px;
+  border-left: 2px solid var(--lex-border-accent);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  color: var(--lex-text-tertiary);
+  font-style: italic;
+}
+
+.file-viewer-insights__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.file-viewer-insights__decision {
+  font-size: 0.6875rem;
+  color: var(--lex-text-tertiary);
+}
+
+.file-viewer-insights__entity-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.file-viewer-insights__entity-kind {
+  font-size: 0.6875rem;
+  color: var(--lex-text-tertiary);
+  min-width: 88px;
+}
+
+.file-viewer-insights__entity-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.file-viewer-insights__chip {
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  background: var(--lex-bg-secondary);
+  border: 1px solid var(--lex-border-subtle, var(--lex-border-default));
+  border-radius: var(--lex-radius-full, 999px);
+  padding: 2px 8px;
+  color: var(--lex-text-primary);
+}
+
+.file-viewer-insights__chip em {
+  color: var(--lex-text-tertiary);
+  font-style: normal;
+}
+
+.file-viewer-insights__list--decided .file-viewer-insights__item {
+  opacity: 0.75;
+}

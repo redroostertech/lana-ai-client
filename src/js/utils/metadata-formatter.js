@@ -381,24 +381,21 @@ function truncateText(text, maxLength = 300) {
  * @returns {object} - Formatted entities with arrays
  */
 function formatExtractedEntities(extractedEntities) {
-  if (!extractedEntities || typeof extractedEntities !== 'object') {
-    return {
-      caseNumbers: [],
-      organizations: [],
-      people: [],
-      dates: [],
-      locations: [],
-      matterIds: []
-    };
-  }
-
+  // Two writers share this column: the legacy shape (case_numbers, matter_ids)
+  // and the document enrichment lane (people, organizations, dates, locations,
+  // amounts, emails, phones). Read both; a missing key is an empty list.
+  var source = extractedEntities && typeof extractedEntities === 'object' ? extractedEntities : {};
+  var list = function (key) { return Array.isArray(source[key]) ? source[key] : []; };
   return {
-    caseNumbers: Array.isArray(extractedEntities.case_numbers) ? extractedEntities.case_numbers : [],
-    organizations: Array.isArray(extractedEntities.organizations) ? extractedEntities.organizations : [],
-    people: Array.isArray(extractedEntities.people) ? extractedEntities.people : [],
-    dates: Array.isArray(extractedEntities.dates) ? extractedEntities.dates.map(d => formatDate(d)) : [],
-    locations: Array.isArray(extractedEntities.locations) ? extractedEntities.locations : [],
-    matterIds: Array.isArray(extractedEntities.matter_ids) ? extractedEntities.matter_ids : []
+    caseNumbers: list('case_numbers'),
+    organizations: list('organizations'),
+    people: list('people'),
+    dates: list('dates').map(d => formatDate(d)),
+    locations: list('locations'),
+    matterIds: list('matter_ids'),
+    amounts: list('amounts'),
+    emails: list('emails'),
+    phones: list('phones')
   };
 }
 

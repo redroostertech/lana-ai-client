@@ -42,6 +42,8 @@
     reviewBaselineRevisionIds: [],
     reviewBaselineAcceptedForReview: false,
     reviewTab: 'changes',
+    enrichment: null,
+    enrichmentRerunFrom: null,
     reviewCounts: { changes: 0, comments: 0 },
     reviewBatches: [],
     currentReviewBatch: null,
@@ -1581,12 +1583,14 @@
   }
 
   function setReviewTab(tab) {
-    state.reviewTab = tab === 'releases' ? tab : 'changes';
+    state.reviewTab = tab === 'releases' || tab === 'insights' ? tab : 'changes';
     var tabs = document.getElementById('reviewTabs');
     var changesPanel = document.getElementById('reviewPanelChanges');
     var releasesPanel = document.getElementById('reviewPanelReleases');
+    var insightsPanel = document.getElementById('reviewPanelInsights');
     var isChanges = state.reviewTab === 'changes';
     var isReleases = state.reviewTab === 'releases';
+    if (insightsPanel) insightsPanel.classList.toggle('hidden', state.reviewTab !== 'insights');
 
     if (tabs && tabs.value !== state.reviewTab) {
       tabs.value = state.reviewTab;
@@ -4466,6 +4470,9 @@
       // Load content + metadata
       await loadFormatCapabilities(response);
       await loadFileContent(response);
+      // Insights load beside the document, never ahead of it: a slow or
+      // missing enrichment must not delay the page.
+      loadEnrichmentPanel(response);
       loadMetadata(response);
       if (window.LanaActivityEvents && typeof window.LanaActivityEvents.documentOpened === 'function') {
         window.LanaActivityEvents.documentOpened(response, { surface: 'file_viewer' });
@@ -4526,6 +4533,7 @@
     state.reviewSaving = false;
     state.reviewReleasing = false;
     setReviewRailVisible(false);
+    resetEnrichmentPanel();
     updateReviewRailCounts({ revisions: 0, comments: 0 });
     var mimeType = file.content_type || '';
     var ext = file.filename.split('.').pop().toLowerCase();
@@ -5480,6 +5488,121 @@
   window.viewFvDocxTemplate = viewFvDocxTemplate;
 
   // =========================================================================
+  // Insights: document enrichment panel
+  // =========================================================================
+
+  var ENRICHMENT_POLL_MS = 10000;
+  var ENRICHMENT_POLL_LIMIT = 18;
+
+  function enrichmentService() {
+    return typeof LanaDocumentEnrichment !== 'undefined' ? LanaDocumentEnrichment : null;
+  }
+
+  function enrichmentTarget() {
+    var file = state.currentFile;
+    if (!file || !file.id) return null;
+    return { matterId: getFileMatterId(file) || '', documentId: String(file.id) };
+  }
+
+  function resetEnrichmentPanel() {
+    state.enrichment = null;
+    state.enrichmentRerunFrom = null;
+    var rail = document.getElementById('reviewRail');
+    if (rail) rail.classList.remove('file-viewer-review-rail--insights-only');
+    var body = document.getElementById('reviewInsightsBody');
+    if (body) {
+      body.innerHTML = '<div class="file-viewer-review-empty"><h5>Reading insights</h5><p>Type, summary, callouts and suggestions appear here once the document has been read.</p></div>';
+    }
+  }
+
+  function renderEnrichmentPanel(payload) {
+    var body = document.getElementById('reviewInsightsBody');
+    var service = enrichmentService();
+    if (!body || !service) return;
+    var vm = service.viewModel(payload);
+    body.innerHTML = service.renderPanelHtml(vm);
+    state.enrichment = payload || null;
+    // A document that cannot be reviewed (a PDF, an image) still has insights:
+    // show the rail with this tab and keep the review workflow out of it.
+    var rail = document.getElementById('reviewRail');
+    if (rail && rail.classList.contains('hidden') && vm.enabled && vm.available) {
+      rail.classList.add('file-viewer-review-rail--insights-only');
+      setReviewRailVisible(true);
+      setReviewTab('insights');
+    }
+  }
+
+  async function loadEnrichmentPanel(file) {
+    var service = enrichmentService();
+    var target = enrichmentTarget();
+    if (!service || !target || !file || String(file.id) !== target.documentId) return null;
+    try {
+      var payload = await service.load(api, target.matterId, target.documentId);
+      if (!state.currentFile || String(state.currentFile.id) !== target.documentId) return null;
+      renderEnrichmentPanel(payload);
+      return payload;
+    } catch (error) {
+      console.warn('[FileViewerPage] Insights unavailable:', error);
+      var body = document.getElementById('reviewInsightsBody');
+      if (body) {
+        body.innerHTML = '<div class="file-viewer-review-empty"><h5>Insights unavailable</h5><p>' +
+          escapeHtml(error && error.message ? error.message : 'Could not load insights.') + '</p></div>';
+      }
+      return null;
+    }
+  }
+
+  /** After a rerun: refresh until a newer run than the one we started from has finished. */
+  function pollEnrichmentUntilDone(documentId) {
+    var attempts = 0;
+    var timer = setInterval(async function () {
+      attempts += 1;
+      if (!state.currentFile || String(state.currentFile.id) !== documentId || attempts > ENRICHMENT_POLL_LIMIT) {
+        clearInterval(timer);
+        return;
+      }
+      var payload = await loadEnrichmentPanel(state.currentFile);
+      var run = payload && payload.enrichment ? payload.enrichment : null;
+      var settled = run && run.status !== 'queued' && run.status !== 'running';
+      if (settled && run.id !== state.enrichmentRerunFrom) clearInterval(timer);
+    }, ENRICHMENT_POLL_MS);
+  }
+
+  async function onEnrichmentAction(event) {
+    var button = event.target && event.target.closest ? event.target.closest('[data-enrichment-action]') : null;
+    if (!button) return;
+    var service = enrichmentService();
+    var target = enrichmentTarget();
+    if (!service || !target) return;
+    var action = button.getAttribute('data-enrichment-action');
+    var suggestionId = button.getAttribute('data-suggestion-id');
+    button.disabled = true;
+    try {
+      if (action === 'accept' && suggestionId) {
+        var accepted = await service.accept(api, target.matterId, target.documentId, suggestionId, {});
+        var created = accepted && accepted.suggestion ? accepted.suggestion.created_record_type : '';
+        notify(created === 'contact' ? 'Contact added.'
+          : created === 'matter_party' ? 'Party added to the matter.'
+            : created === 'calendar_event' ? 'Deadline added to the calendar.'
+              : 'Suggestion accepted.', 'success');
+      } else if (action === 'dismiss' && suggestionId) {
+        await service.dismiss(api, target.matterId, target.documentId, suggestionId, '');
+        notify('Suggestion dismissed.', 'success');
+      } else if (action === 'rerun') {
+        state.enrichmentRerunFrom = state.enrichment && state.enrichment.enrichment ? state.enrichment.enrichment.id : null;
+        await service.rerun(api, target.matterId, target.documentId);
+        notify('Reading the document again. Insights refresh when it finishes.', 'info');
+        pollEnrichmentUntilDone(target.documentId);
+        return;
+      }
+      await loadEnrichmentPanel(state.currentFile);
+    } catch (error) {
+      notify(error && error.message ? error.message : 'The action could not be completed.', 'error');
+      button.disabled = false;
+    }
+  }
+
+  // =========================================================================
   // Initialization
   // =========================================================================
 
@@ -5509,6 +5632,8 @@
 
     // Wire up event listeners
     document.getElementById('viewerErrorBack').addEventListener('click', navigateBack);
+    var insightsPanel = document.getElementById('reviewPanelInsights');
+    if (insightsPanel) insightsPanel.addEventListener('click', onEnrichmentAction);
     document.addEventListener('topbar-back-click', interceptShellBack, true);
     document.getElementById('viewerErrorDownload').addEventListener('click', function () {
       if (state.currentFile) {
