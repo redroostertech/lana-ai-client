@@ -761,6 +761,19 @@ describe('LanaDocumentReview dates and release payloads', () => {
       expect(review.buildAnnotationThread({ text: 'General' }).scope).toBe('document');
     });
 
+    test('picks the open suggested changes a converted copy can accept: a suggestion with text to find and text to put in its place', () => {
+      const threads = [
+        { id: 's1', kind: 'redline', text: 'Wrong payee', proposed_text: 'Title Bond Agency LLC', anchor_text: 'Title Bond Agenc', anchor: pageAnchor },
+        { id: 's2', kind: 'redline', text: 'Done', proposed_text: 'x', anchor_text: 'y', status: 'resolved' },
+        { id: 's3', kind: 'redline', text: 'No printed text', proposed_text: 'x', anchor_text: 'Page 2', anchor: pageAnchor },
+        { id: 's4', kind: 'redline', text: 'No suggestion', proposed_text: '', anchor_text: 'y' },
+        { id: 'c1', kind: 'comment', text: 'A comment', anchor_text: 'y' },
+        { id: 's5', kind: 'redline', text: 'From the quote', proposed_text: 'z', anchor: { space: 'visible-text/1', ranges: [{ paragraph: 1, start: 0, end: 3 }], text: 'abc' } }
+      ];
+      expect(review.openSuggestedChanges(threads).map((thread) => thread.id)).toEqual(['s1', 's5']);
+      expect(review.openSuggestedChanges(null)).toEqual([]);
+    });
+
     test('hands the embed only the threads it can draw, with resolved state and colour, and reads threads from batches and releases', () => {
       const threads = [
         { id: 'h1', kind: 'highlight', anchor: textAnchor, status: 'open' },

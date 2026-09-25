@@ -1546,6 +1546,7 @@
         pendingDetailFailed: false,
         session: documentReviewService().createReviewSession(),
         comments: [],
+        sourceSuggestions: null,
         liveReviewState: null,
         dirty: false,
         restoring: false,
@@ -1643,6 +1644,7 @@
         mergedComments.push(comment);
       });
       review.comments = mergedComments;
+      review.sourceSuggestions = await loadSourceSuggestions(file, review);
       review.loaded = true;
       review.loadFailed = false;
     } catch (error) {
@@ -1655,6 +1657,107 @@
     renderChrome();
     renderReviewDock(file);
     return review;
+  }
+
+  /**
+   * For a converted copy, the open suggested changes reviewers made on its
+   * source PDF: they live on the PDF's own draft, and this copy can accept
+   * each one as a tracked edit.
+   */
+  async function loadSourceSuggestions(file, review) {
+    var service = documentReviewService();
+    var metadata = officeFileMetadata(file);
+    var originalId = metadata.source === 'document_format_conversion' && metadata.original_document_id
+      ? String(metadata.original_document_id)
+      : '';
+    var empty = { documentId: originalId, batch: null, items: [] };
+    if (!originalId || !review || !review.matterId || !service || typeof service.openSuggestedChanges !== 'function') return empty;
+    try {
+      var workflow = await service.loadWorkflow({ api: window.api, matterId: review.matterId, documentId: originalId });
+      var batch = workflow.currentDraftBatch || workflow.pendingReleaseBatch || null;
+      return { documentId: originalId, batch: batch, items: service.openSuggestedChanges(service.batchReviewThreads(batch)) };
+    } catch (error) {
+      console.warn('[file-editor] Source PDF suggestions could not be loaded:', error && error.message ? error.message : error);
+      return empty;
+    }
+  }
+
+  function renderSourceSuggestions(file) {
+    var review = serverReview(file);
+    var source = review && review.sourceSuggestions;
+    if (!source || !Array.isArray(source.items) || !source.items.length) return '';
+    return '<section class="office-review-history-group office-review-source-suggestions">' +
+      '<header class="office-review-history-header"><h5>Suggested changes from the PDF</h5><span>' + esc(source.items.length) + '</span></header>' +
+      '<div class="office-review-history-rows">' + source.items.map(function (item) {
+        var printed = String(item.anchor_text || (item.anchor && item.anchor.text) || '');
+        return '<article class="office-review-history-row office-review-comment-thread office-review-comment-thread--redline" data-source-suggestion-id="' + esc(item.id || '') + '">' +
+          '<div class="office-review-history-row-heading"><span class="office-review-history-row-title">Suggested change</span>' +
+          '<span class="office-review-status office-review-status--draft">From PDF</span></div>' +
+          '<div class="office-review-comment-meta"><strong>' + esc(item.author || 'Reviewer') + '</strong><span>' + esc(formatTimestamp(commentTimestamp(item))) + '</span></div>' +
+          '<div class="office-review-comment-scope">Printed: “' + esc(printed) + '”</div>' +
+          '<div class="office-review-comment-proposed">Suggested: ' + esc(item.proposed_text || '') + '</div>' +
+          (item.text ? '<div class="office-review-comment-text">' + esc(item.text) + '</div>' : '') +
+          '<div class="office-review-comment-actions"><button type="button" data-action="accept-source-suggestion" data-suggestion-id="' + esc(item.id || '') + '">Accept into edit</button></div>' +
+          '</article>';
+      }).join('') + '</div></section>';
+  }
+
+  /**
+   * Finds the printed text in this copy, replaces it with the suggestion as a
+   * tracked edit, and marks the suggestion resolved on the PDF's draft so it
+   * is not offered again.
+   */
+  async function acceptSourceSuggestion(file, suggestionId) {
+    var review = serverReview(file);
+    var editor = editorForFile(file);
+    var service = documentReviewService();
+    var source = review && review.sourceSuggestions;
+    var items = source && Array.isArray(source.items) ? source.items : [];
+    var item = items.filter(function (entry) { return String(entry.id || '') === String(suggestionId || ''); })[0];
+    if (!item || !editor || typeof editor.findText !== 'function' || typeof editor.applyEdits !== 'function') {
+      toast('The suggestion is no longer available.');
+      return;
+    }
+    if (file.canWrite === false) {
+      toast('Edit permission is required to accept a suggestion.');
+      return;
+    }
+    var printed = String(item.anchor_text || (item.anchor && item.anchor.text) || '').trim();
+    var anchor = editor.findText(printed);
+    if (!anchor || !anchor.ranges || !anchor.ranges.length) {
+      toast('The printed text was not found in this copy. Find it and make the change by hand.');
+      return;
+    }
+    var range = anchor.ranges[0];
+    await editor.applyEdits([{
+      op: 'replaceText',
+      range: { paragraph: range.paragraph, start: range.start, end: range.end },
+      text: String(item.proposed_text || '')
+    }]);
+    if (service && source.batch && typeof service.isActiveDraftBatch === 'function' && service.isActiveDraftBatch(source.batch)) {
+      try {
+        var stamp = nowIso();
+        var threads = service.batchReviewThreads(source.batch).map(function (thread) {
+          if (String(thread.id || '') !== String(item.id || '')) return thread;
+          return Object.assign({}, thread, { status: 'resolved', resolved_at: stamp, resolved_by: currentReviewerIdentity(), updated_at: stamp });
+        });
+        var metadata = Object.assign({}, source.batch.review_metadata || {}, { comments: threads });
+        source.batch = await service.saveDraftBatch({
+          api: window.api,
+          matterId: review.matterId,
+          documentId: source.documentId,
+          batch: source.batch,
+          payload: { review_metadata: metadata }
+        }) || source.batch;
+        source.items = service.openSuggestedChanges(threads);
+      } catch (error) {
+        console.warn('[file-editor] Suggestion could not be marked resolved on the PDF:', error && error.message ? error.message : error);
+      }
+    } else {
+      source.items = items.filter(function (entry) { return entry !== item; });
+    }
+    renderReviewDock(file);
+    toast('Suggested change applied as a tracked edit.');
   }
 
   function serverPendingDisplayChanges(file) {
@@ -4176,7 +4279,7 @@
         ? '<section class="office-review-comments-panel"><button type="button" data-action="dock-comment"' +
           '>' +
           toolbarIcon('message-square-plus', 'Com') + '<span>Add comment</span></button>' + renderHighlightPicker() + commentFiltersHtml +
-          '<div class="office-review-history-rows" aria-live="polite">' + commentsHtml + '</div></section>'
+          '<div class="office-review-history-rows" aria-live="polite">' + commentsHtml + '</div>' + renderSourceSuggestions(file) + '</section>'
         : changeHistoryHtml;
     return '<aside class="office-review-rail" aria-label="Review rail">' +
       '<div class="office-review-rail-card">' +
@@ -7694,6 +7797,12 @@
         } else {
           toast('Select text to add a comment.');
         }
+        return;
+      }
+      if (action === 'accept-source-suggestion' && file && isServerReviewFile(file)) {
+        acceptSourceSuggestion(file, actionTarget.dataset.suggestionId).catch(function (error) {
+          toast((error && error.message) || 'The suggestion could not be applied.');
+        });
         return;
       }
       if (action === 'dock-highlight' && file && isServerReviewFile(file)) {

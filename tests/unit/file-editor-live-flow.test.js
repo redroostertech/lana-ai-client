@@ -608,4 +608,19 @@ describe('File Editor live document boundary', () => {
     expect(css).toContain('.office-review-annotation-swatch[data-color="#86EFAC"]');
     expect(css).toContain('.office-review-comment-thread.is-located');
   });
+
+  test('a converted copy offers the suggested changes made on its source PDF and accepts one as a tracked edit', () => {
+    expect(editor).toContain('async function loadSourceSuggestions(file, review)');
+    expect(editor).toContain("var originalId = metadata.source === 'document_format_conversion' && metadata.original_document_id");
+    expect(editor).toContain('items: service.openSuggestedChanges(service.batchReviewThreads(batch))');
+    expect(editor).toContain('<h5>Suggested changes from the PDF</h5>');
+    expect(editor).toContain('data-action="accept-source-suggestion"');
+    expect(editor).toContain('var anchor = editor.findText(printed);');
+    expect(editor).toContain("op: 'replaceText',");
+    expect(editor).toContain("toast('The printed text was not found in this copy. Find it and make the change by hand.');");
+    // Accepting marks the suggestion resolved on the PDF's own draft, only when that draft is still active.
+    expect(editor).toContain("service.isActiveDraftBatch(source.batch)");
+    expect(editor).toContain("return Object.assign({}, thread, { status: 'resolved', resolved_at: stamp, resolved_by: currentReviewerIdentity(), updated_at: stamp });");
+    expect(editor).toContain("if (file.canWrite === false) {\n      toast('Edit permission is required to accept a suggestion.');");
+  });
 });

@@ -898,6 +898,21 @@
     return thread;
   }
 
+  /**
+   * The open suggested changes among a document's threads: the ones a
+   * converted copy can accept as tracked edits. Each needs the suggested text
+   * and something to find on the page (the text as printed, else the quote).
+   */
+  function openSuggestedChanges(threads) {
+    return (Array.isArray(threads) ? threads : []).filter(function (thread) {
+      if (!thread || annotationKind(thread) !== 'redline') return false;
+      if (String(thread.status || 'open').toLowerCase() === 'resolved') return false;
+      var proposed = String(thread.proposed_text || thread.proposedText || '').trim();
+      var printed = String(thread.anchor_text || (thread.anchor && thread.anchor.text) || '').trim();
+      return proposed.length > 0 && printed.length > 0 && !/^Page \d+$/.test(printed);
+    });
+  }
+
   /** The threads persisted on a batch. */
   function batchReviewThreads(batch) {
     var metadata = batch && batch.review_metadata;
@@ -1584,6 +1599,7 @@
     normalizeAnnotationAnchor: normalizeAnnotationAnchor,
     embedAnnotationsFrom: embedAnnotationsFrom,
     buildAnnotationThread: buildAnnotationThread,
+    openSuggestedChanges: openSuggestedChanges,
     batchReviewThreads: batchReviewThreads,
     releasedReviewThreads: releasedReviewThreads,
     HIGHLIGHT_COLORS: HIGHLIGHT_COLORS.map(function (color) { return Object.assign({}, color); }),
