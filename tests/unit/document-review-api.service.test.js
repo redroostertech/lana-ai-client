@@ -309,6 +309,39 @@ describe('LanaDocumentReview grouping and serialization', () => {
     });
   });
 
+  test('tracked table rows and columns read as "Row inserted", "Row deleted", "Column inserted", "Column deleted", and persist their kind', () => {
+    // The editor marks an inserted or deleted row (w:ins / w:del in w:trPr)
+    // and a column's cells (w:cellIns / w:cellDel) as ins/del revisions
+    // carrying structureKind; the row's text is what a deletion shows.
+    var insertedRow = { id: 'r1', type: 'ins', author: 'Michael', date: '2026-09-25T21:00:00Z', text: '', structureKind: 'row', editScript: { version: '0', ops: [{ op: 'insertTableRow', table: 0, row: 1, position: 'after' }] } };
+    var deletedRow = { id: 'r2', type: 'del', author: 'Michael', date: '2026-09-25T21:00:00Z', text: 'Revolving Afterpay $4,486.57', structureKind: 'row', editScript: { version: '0', ops: [{ op: 'deleteTableRow', table: 0, row: 3 }] } };
+    var insertedColumn = { id: 'c1', type: 'ins', author: 'Michael', date: '2026-09-25T21:00:00Z', text: '', structureKind: 'column', editScript: { version: '0', ops: [{ op: 'insertTableColumn', table: 0, column: 0, position: 'before' }] } };
+    var deletedColumn = { id: 'c2', type: 'del', author: 'Michael', date: '2026-09-25T21:00:00Z', text: 'Credit', structureKind: 'column', editScript: { version: '0', ops: [{ op: 'deleteTableColumn', table: 0, column: 1 }] } };
+
+    expect(review.changeLabel(insertedRow)).toBe('Row inserted');
+    expect(review.changeLabel(deletedRow)).toBe('Row deleted');
+    expect(review.changeLabel(insertedColumn)).toBe('Column inserted');
+    expect(review.changeLabel(deletedColumn)).toBe('Column deleted');
+    expect(review.changeProposedText(insertedRow)).toBe('New row');
+    expect(review.changeProposedText(insertedColumn)).toBe('New column');
+    expect(review.changeOriginalText(deletedRow)).toBe('Revolving Afterpay $4,486.57');
+
+    var session = review.createReviewSession();
+    var changes = session.persistableChanges({ revisions: [insertedRow, deletedRow, insertedColumn, deletedColumn] });
+    expect(changes).toHaveLength(4);
+    expect(changes[0]).toMatchObject({ operation: 'insert', proposed_text: 'New row', metadata: { structure_change: { kind: 'row' } }, edit_script: { ops: [{ op: 'insertTableRow', table: 0, row: 1, position: 'after' }] } });
+    expect(changes[1]).toMatchObject({ operation: 'delete', original_text: 'Revolving Afterpay $4,486.57', metadata: { structure_change: { kind: 'row' } } });
+    expect(changes[3]).toMatchObject({ operation: 'delete', metadata: { structure_change: { kind: 'column' } } });
+    // A persisted row read back (no live structureKind) keeps its label through the metadata.
+    expect(review.changeLabel({ operation: 'insert', proposed_text: 'New row', metadata: { structure_change: { kind: 'row' } } })).toBe('Row inserted');
+    expect(review.changeLabel(review.persistedDraftChangePayload(changes[3]))).toBe('Column deleted');
+
+    // Control arm: plain insertions and deletions keep their labels and text.
+    expect(review.changeLabel({ type: 'ins', text: 'plain' })).toBe('Insertion');
+    expect(review.changeProposedText({ type: 'ins', text: '' })).toBe('');
+    expect(review.changeLabel({ type: 'del', text: 'x' })).toBe('Deletion');
+  });
+
   test('preserves every current Lana Editor operation and its script provenance', () => {
     const ops = [
       { op: 'insertText', at: { paragraph: 0, start: 0 }, text: 'A' },
@@ -319,7 +352,11 @@ describe('LanaDocumentReview grouping and serialization', () => {
       { op: 'formatParagraph', at: { paragraph: 0 }, set: { align: 'center' } },
       { op: 'splitParagraph', at: { paragraph: 0, start: 1 } },
       { op: 'mergeParagraphs', at: { paragraph: 0 } },
-      { op: 'resizeTableColumns', table: 0, widths: [1600, 1400, 3000] }
+      { op: 'resizeTableColumns', table: 0, widths: [1600, 1400, 3000] },
+      { op: 'insertTableRow', table: 0, row: 0, position: 'after' },
+      { op: 'deleteTableRow', table: 0, row: 1 },
+      { op: 'insertTableColumn', table: 0, column: 0, position: 'before', width: 720 },
+      { op: 'deleteTableColumn', table: 0, column: 1 }
     ];
     const baseDocumentHash = 'visible-text/1:sha256:' + 'a'.repeat(64);
     const session = review.createReviewSession();

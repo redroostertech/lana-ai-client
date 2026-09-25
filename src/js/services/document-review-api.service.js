@@ -87,6 +87,33 @@
     return operation === 'fmt' || operation === 'format' || operation === 'formatting';
   }
 
+  /**
+   * "row" or "column" when the change is a tracked table structure edit (a
+   * row inserted or deleted, a column's cells inserted or deleted), read from
+   * the live revision or from the persisted metadata; null otherwise.
+   */
+  function structureChangeKind(change) {
+    if (!change) return null;
+    var kind = change.structureKind || change.structure_kind ||
+      (change.metadata && change.metadata.structure_change && change.metadata.structure_change.kind) || null;
+    return kind === 'row' || kind === 'column' ? kind : null;
+  }
+
+  function structureChangeLabel(change) {
+    var kind = structureChangeKind(change);
+    if (!kind) return null;
+    var noun = kind === 'row' ? 'Row' : 'Column';
+    if (isDeletionChange(change)) return noun + ' deleted';
+    if (isInsertionChange(change)) return noun + ' inserted';
+    return null;
+  }
+
+  /** What an inserted row or column reads as when it holds no text yet. */
+  function structureInsertedText(change) {
+    var kind = structureChangeKind(change);
+    return kind === 'row' ? 'New row' : kind === 'column' ? 'New column' : '';
+  }
+
   var FORMAT_PROPERTY_LABELS = {
     font: 'Font',
     size: 'Size',
@@ -190,11 +217,15 @@
       var formatDetails = formatChangeDetailsFromRevision(change);
       if (formatDetails) return formatDetails.proposedText;
     }
-    return change.proposed_text || (isInsertionChange(change) ? reviewItemText(change) : '');
+    var proposed = change.proposed_text || (isInsertionChange(change) ? reviewItemText(change) : '');
+    if (!proposed && isInsertionChange(change)) return structureInsertedText(change);
+    return proposed;
   }
 
   function changeLabel(item) {
     if (item && item.operation === 'replace') return 'Replacement';
+    var structureLabel = structureChangeLabel(item);
+    if (structureLabel) return structureLabel;
     if (isFormattingChange(item)) {
       var details = formatChangeDetailsFromRevision(item);
       // A column resize is recorded as a table property change (w:tblGridChange); it reads as one.
@@ -785,7 +816,8 @@
       proposed_text: changeProposedText(revision),
       format_kind: revision.formatKind || revision.format_kind || null,
       format_before: revision.formatBefore || revision.format_before || null,
-      format_after: revision.formatAfter || revision.format_after || null
+      format_after: revision.formatAfter || revision.format_after || null,
+      structure_kind: structureChangeKind(revision)
     };
     try {
       return JSON.stringify(payload);
@@ -821,12 +853,14 @@
           after: formatDetails.after
         };
       }
+      var structureKind = structureChangeKind(revision);
+      if (structureKind) metadata.structure_change = { kind: structureKind };
       return {
         change_key: 'revision:' + id,
         status: 'proposed',
         operation: type === 'del' ? 'delete' : (type === 'ins' ? 'insert' : (type === 'fmt' ? 'format' : type)),
         original_text: type === 'del' ? text : (formatDetails ? formatDetails.originalText : null),
-        proposed_text: type === 'ins' ? text : (formatDetails ? formatDetails.proposedText : null),
+        proposed_text: type === 'ins' ? (text || structureInsertedText(revision) || text) : (formatDetails ? formatDetails.proposedText : null),
         edit_script: editScript,
         anchor: {
           type: 'editor_revision',
@@ -1421,6 +1455,7 @@
     formatValueText: formatValueText,
     formatSummary: formatSummary,
     formatChangeDetailsFromRevision: formatChangeDetailsFromRevision,
+    structureChangeKind: structureChangeKind,
     changeOriginalText: changeOriginalText,
     changeProposedText: changeProposedText,
     changeLabel: changeLabel,
