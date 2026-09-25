@@ -1422,6 +1422,25 @@
     }
   }
 
+  // The plain contenteditable page only knows paragraphs. A document that
+  // came from a Word file (tables, lists, headings, page breaks) must not be
+  // edited or saved there: typing would overwrite the layout with flattened
+  // text. The guard module decides from the file record; this reads the
+  // surface state (is the embed showing this file?).
+  function richSourceFallbackLockReason(file) {
+    var guard = typeof window !== 'undefined' ? window.LanaRichDocumentGuard : null;
+    if (!guard || !file || file.kind !== 'doc') return null;
+    if (isServerReviewFile(file)) return null; // server files already lock on embed failure
+    return guard.fallbackLockReason(file, {
+      embedMounted: Boolean(editorForFile(file)),
+      editorEnabled: isLanaEditorEnabled()
+    });
+  }
+
+  function richSourceFallbackLocked(file) {
+    return Boolean(richSourceFallbackLockReason(file));
+  }
+
   function isServerReviewFile(file) {
     // Any doc handed off with a real matter + source document identity is a
     // server-managed document, regardless of which surface created it
@@ -4683,6 +4702,7 @@
     var comparisonMode = officeTrackedChangesMode(file);
     var canShowChanges = comparisonMode !== 'none';
     var showChanges = canShowChanges && file.showChanges !== false;
+    var richLockReason = richSourceFallbackLockReason(file);
     var docContent = renderDocContentWithReviewMarks(file);
     // Tracked documents edit through the LANA Editor embed. The prototype
     // toolbar is the product surface, so every control remains visible and
@@ -4698,7 +4718,7 @@
         '<button type="button" data-command="redo" data-format="redo" title="Redo" disabled aria-disabled="true">' + toolbarIcon('redo-2', 'Redo') + '</button>') +
       toolbarGroup('Style',
         '<select class="office-format-select" data-command="formatBlock" aria-label="Paragraph style"' + embedBlockedAttrs + '>' +
-        '<option value="p">Normal</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="h4">Heading 4</option><option value="subheading">Subheading</option><option value="blockquote">Quote</option><option value="pre">Code</option><option value="caption">Caption</option><option value="footnote">Footnote</option></select>' +
+        '<option value="p">Normal</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="h4">Heading 4</option><option value="h5">Heading 5</option><option value="h6">Heading 6</option><option value="subheading">Subheading</option><option value="blockquote">Quote</option><option value="pre">Code</option><option value="caption">Caption</option><option value="footnote">Footnote</option></select>' +
         '<select class="office-format-select" data-command="fontName" aria-label="Font family"' + embedBlockedAttrs + '>' +
         '<option value="Arial">Arial</option><option value="Georgia">Georgia</option><option value="Times New Roman">Times</option><option value="Courier New">Mono</option></select>' +
         '<select class="office-format-select office-format-select-narrow" data-command="fontSize" aria-label="Font size"' + embedBlockedAttrs + '>' +
@@ -4757,7 +4777,8 @@
 
     panel.innerHTML = '<div class="office-doc-canvas">' +
       '<div class="office-doc-frame office-margin-' + marginPreset + '"><div class="office-doc-main-row"><div class="office-doc-viewport"><div class="office-doc-stage">' +
-      '<article id="officeDocPage" class="office-doc-page" contenteditable="' + (isServerReviewFile(file) ? 'false' : 'true') + '" spellcheck="true">' + docContent + '</article>' +
+      (richLockReason ? '<div id="officeRichFallbackNotice" class="file-editor-pending-approval" role="alert"><strong>Editing is unavailable.</strong> ' + esc(richLockReason) + '</div>' : '') +
+      '<article id="officeDocPage" class="office-doc-page" contenteditable="' + (isServerReviewFile(file) || richLockReason ? 'false' : 'true') + '" spellcheck="true">' + docContent + '</article>' +
       '<div id="officeLanaEditorHost" class="office-lana-editor-host' + (showChanges ? '' : ' office-lana-editor-host--final') + '" hidden></div>' +
       '<div id="officeSelectionToolbar" class="office-selection-toolbar" hidden aria-label="Selection tools">' +
       '<button type="button" data-command="bold" title="Bold" aria-label="Bold">B</button>' +
@@ -5888,6 +5909,9 @@
     var opts = options || {};
     var file = activeFile();
     var page = fallbackDocPage();
+    // A flattened preview of a rich document is never the document; do not
+    // let it become the saved content.
+    if (file && richSourceFallbackLocked(file)) return;
     if (file && page) {
       var raw = page.innerHTML;
       var clean = cleanOfficeDocContent(raw);
@@ -6009,7 +6033,7 @@
     if (block.classList && block.classList.contains('office-doc-caption')) return 'caption';
     if (block.classList && block.classList.contains('office-doc-footnote')) return 'footnote';
     var tag = String(block.tagName || '').toLowerCase();
-    if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'blockquote' || tag === 'pre') return tag;
+    if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6' || tag === 'blockquote' || tag === 'pre') return tag;
     return 'p';
   }
 
@@ -6041,7 +6065,7 @@
   }
 
   function replacementTagForParagraphStyle(style) {
-    if (style === 'h1' || style === 'h2' || style === 'h3' || style === 'h4' || style === 'blockquote' || style === 'pre') return style;
+    if (style === 'h1' || style === 'h2' || style === 'h3' || style === 'h4' || style === 'h5' || style === 'h6' || style === 'blockquote' || style === 'pre') return style;
     return 'p';
   }
 
@@ -6102,11 +6126,14 @@
     var file = activeFile();
     var embed = file && editorForFile(file);
     syncOfficeHistoryControls(file, embed);
-    if (file && (file.editorComparisonMode === 'release' || file.canWrite === false)) {
+    var richLocked = file ? richSourceFallbackLocked(file) : false;
+    if (file && (file.editorComparisonMode === 'release' || file.canWrite === false || richLocked)) {
       document.querySelectorAll('.office-doc-toolbar [data-command], .office-doc-toolbar [data-action="insert-template-variable"]').forEach(function (control) {
         control.disabled = true;
         control.setAttribute('aria-disabled', 'true');
-        control.title = file.editorComparisonMode === 'release' ? 'Read-only released version' : 'Edit permission required';
+        control.title = file.editorComparisonMode === 'release'
+          ? 'Read-only released version'
+          : (richLocked ? 'Read-only: LANA Editor is unavailable and this document has layout the plain editor cannot keep' : 'Edit permission required');
       });
       return;
     }
@@ -6138,7 +6165,7 @@
         var styleSelect = document.querySelector('.office-doc-toolbar select[data-command="formatBlock"]');
         if (styleSelect && embedState.style !== 'mixed') {
           var styleValues = {
-            Heading1: 'h1', Heading2: 'h2', Heading3: 'h3', Heading4: 'h4',
+            Heading1: 'h1', Heading2: 'h2', Heading3: 'h3', Heading4: 'h4', Heading5: 'h5', Heading6: 'h6',
             Subtitle: 'subheading', Quote: 'blockquote', Code: 'pre', Caption: 'caption', FootnoteText: 'footnote'
           };
           styleSelect.value = styleValues[embedState.style] || 'p';
@@ -6605,6 +6632,8 @@
         h2: 'Heading2',
         h3: 'Heading3',
         h4: 'Heading4',
+        h5: 'Heading5',
+        h6: 'Heading6',
         subheading: 'Subtitle',
         blockquote: 'Quote',
         pre: 'Code',

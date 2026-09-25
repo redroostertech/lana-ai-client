@@ -4643,17 +4643,23 @@
       state.editorMode = 'view';
 
       editor.on('document-loaded', function (event) {
-        updateReviewRailCounts(event && event.counts ? event.counts : null);
+        // counts carries render totals (pages, paragraphs, tables, page
+        // breaks); the revision list lives on the embed's review state.
+        var loadedReviewState = null;
+        try { loadedReviewState = typeof editor.reviewState === 'function' ? editor.reviewState() : null; } catch (_) { loadedReviewState = null; }
+        var counts = event && event.counts ? event.counts : null;
+        updateReviewRailCounts(Object.assign({}, counts || {}, loadedReviewState || {}));
         trackEditorEvent('document_loaded', file, {
           document_id: file.id,
           document_name: file.filename,
           mode: event && event.mode,
-          counts: event && event.counts ? {
-            pages: event.counts.pages,
-            paragraphs: event.counts.paragraphs,
-            tables: event.counts.tables,
-            revisions: event.counts.revisions,
-            comments: event.counts.comments
+          counts: counts ? {
+            pages: counts.pages,
+            paragraphs: counts.paragraphs,
+            tables: counts.tables,
+            page_breaks: counts.pageBreaks,
+            revisions: loadedReviewState && Array.isArray(loadedReviewState.revisions) ? loadedReviewState.revisions.length : null,
+            comments: counts.comments
           } : null
         });
       });
