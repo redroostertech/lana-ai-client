@@ -351,6 +351,28 @@
       return file.original_filename || file.filename || '';
     }
 
+    function documentGrouping() {
+      return (typeof window !== 'undefined' && window.LanaDocumentGrouping) ? window.LanaDocumentGrouping : null;
+    }
+
+    function derivedRoleBadgeHtml(file) {
+      var grouping = documentGrouping();
+      var label = grouping ? grouping.derivedRoleLabel(file) : '';
+      return label ? '<span class="mdv-role-badge">' + esc(label) + '</span>' : '';
+    }
+
+    /** Files in display order, sources followed by their nested copies. */
+    function flattenFileItems(items) {
+      var files = [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].kind !== 'file') continue;
+        files.push(items[i].file);
+        var children = items[i].children || [];
+        for (var c = 0; c < children.length; c++) files.push(children[c]);
+      }
+      return files;
+    }
+
     function findFile(fileId) {
       for (var i = 0; i < state.files.length; i++) {
         if (String(state.files[i].id) === String(fileId)) return state.files[i];
@@ -428,8 +450,14 @@
         files = [];
       }
 
-      for (var i = 0; i < files.length; i++) {
-        items.push({ kind: 'file', file: files[i] });
+      // A converted copy sits under its PDF: one row per document, the copy
+      // nested beneath it (LanaDocumentGrouping; the copy's metadata names its
+      // source). Without the grouping module every file stays top-level.
+      var grouped = documentGrouping()
+        ? documentGrouping().groupDerivedDocuments(files).groups
+        : files.map(function (f) { return { file: f, children: [] }; });
+      for (var i = 0; i < grouped.length; i++) {
+        items.push({ kind: 'file', file: grouped[i].file, children: grouped[i].children });
       }
 
       if (enableArtifacts && state.filter !== 'template' && state.filter !== 'document') {
@@ -444,7 +472,11 @@
           if (item.kind === 'artifact') {
             return artifactTitle(item.artifact).toLowerCase().indexOf(needle) !== -1;
           }
-          return fileName(item.file).toLowerCase().indexOf(needle) !== -1;
+          if (fileName(item.file).toLowerCase().indexOf(needle) !== -1) return true;
+          // A match on the copy keeps the whole document visible.
+          return (item.children || []).some(function (child) {
+            return fileName(child).toLowerCase().indexOf(needle) !== -1;
+          });
         });
       }
 
@@ -578,7 +610,8 @@
 
     // -- List row renderer ---------------------------------------------------
 
-    function fileRow(file) {
+    function fileRow(file, options) {
+      var nested = Boolean(options && options.nested);
       var name = fileName(file);
       var lifecycle = getDocumentLifecycle(file);
       var statusDisplay = getDocumentStatusDisplay(file);
@@ -595,13 +628,14 @@
         : '';
 
       return [
-        '<div class="mdv-file-row" data-doc-id="' + esc(file.id) + '" data-doc-type="' + (file.is_template ? 'template' : 'document') + '">',
+        '<div class="mdv-file-row' + (nested ? ' mdv-file-row--derived' : '') + '" data-doc-id="' + esc(file.id) + '" data-doc-type="' + (file.is_template ? 'template' : 'document') + '">',
         (enableBatch ? '  <div class="mdv-file-select">' + selectCheckbox(file) + '</div>' : ''),
         '  <div class="mdv-file-icon">' + fileIconHtml(file) + '</div>',
         '  <div class="mdv-file-main">',
         '    <div class="mdv-file-top">',
         '      ' + openControl,
         '      <div class="mdv-file-tags">',
+        '        ' + derivedRoleBadgeHtml(file),
         '        ' + templateBadgeHtml(file),
         '        ' + workflowBadgesHtml(file),
         '        ' + docStatusBadge(file),
@@ -643,7 +677,7 @@
         '  <div class="mdv-card-body">',
         '    <div class="mdv-card-icon">' + fileIconHtml(file) + '</div>',
         '    ' + openControl,
-        '    <div class="mdv-card-meta">' + templateBadgeHtml(file) + docStatusBadge(file) + '</div>',
+        '    <div class="mdv-card-meta">' + derivedRoleBadgeHtml(file) + templateBadgeHtml(file) + docStatusBadge(file) + '</div>',
         '    <div class="mdv-card-sub">' + esc(formatSize(file.file_size)) + '</div>',
         '  </div>',
         '</div>'
@@ -695,7 +729,11 @@
     }
 
     function renderItem(item) {
-      return item.kind === 'artifact' ? artifactRow(item.artifact) : fileRow(item.file);
+      if (item.kind === 'artifact') return artifactRow(item.artifact);
+      var rows = [fileRow(item.file)];
+      var children = item.children || [];
+      for (var i = 0; i < children.length; i++) rows.push(fileRow(children[i], { nested: true }));
+      return rows.join('');
     }
 
     // -- Orphaned files section ---------------------------------------------
@@ -760,8 +798,9 @@
         }
       }
       var artifactCount = enableArtifacts ? state.artifacts.length : 0;
-      var documentCount = state.files.length - templateCount;
-      var allCount = state.files.length + artifactCount;
+      var derivedCount = documentGrouping() ? documentGrouping().groupDerivedDocuments(state.files).derivedCount : 0;
+      var documentCount = state.files.length - templateCount - derivedCount;
+      var allCount = state.files.length - derivedCount + artifactCount;
 
       var headerHtml = '';
       if (onCreateDocStudio && enableDocStudio) {
@@ -792,10 +831,14 @@
       var batchHtml = '';
       if (enableBatch) {
         var selectedCount = countSelected();
-        var pageSelectable = pageItems.map(function (item) {
-          return item.kind === 'artifact'
-            ? artifactSelectKey(artifactId(item.artifact))
-            : fileSelectKey(item.file.id);
+        var pageSelectable = [];
+        pageItems.forEach(function (item) {
+          if (item.kind === 'artifact') {
+            pageSelectable.push(artifactSelectKey(artifactId(item.artifact)));
+            return;
+          }
+          pageSelectable.push(fileSelectKey(item.file.id));
+          (item.children || []).forEach(function (child) { pageSelectable.push(fileSelectKey(child.id)); });
         });
         var allChecked = pageSelectable.length > 0 && pageSelectable.every(function (key) { return state.selected[key]; });
         batchHtml =
@@ -823,7 +866,7 @@
             : '<div class="mdv-empty">No documents in this workspace</div>')
           : '';
       } else if (state.viewMode === 'grid') {
-        var gridFiles = pageItems.filter(function (item) { return item.kind === 'file'; }).map(function (item) { return item.file; });
+        var gridFiles = flattenFileItems(pageItems);
         listHtml = '<div class="mdv-grid">' + gridFiles.map(fileCard).join('') + '</div>';
       } else {
         listHtml = '<div class="mdv-list">' + pageItems.map(renderItem).join('') + '</div>';
