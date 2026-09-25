@@ -585,7 +585,11 @@ class ApiClient {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+      // A caller may extend the limit for a request that legitimately runs
+      // long (a PDF conversion waits on layout analysis and OCR, about half a
+      // minute per five scanned pages); options.signal can only shorten it.
+      const requestTimeout = Number(options.timeout) > 0 ? Number(options.timeout) : this.timeout;
+      const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
       // Honor a caller-supplied AbortSignal (e.g. a per-request timeout) in
       // addition to the internal request timeout: abort the fetch if either
       // fires. Without this, a caller's signal passed via options would be

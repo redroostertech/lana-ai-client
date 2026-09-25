@@ -4739,6 +4739,10 @@
         host.innerHTML = '';
         host.classList.add('hidden');
       }
+      // The card was opened for the embed before the mount; without this the
+      // fallback preview renders above an empty white card.
+      setViewerDocumentCardVisible(false);
+      setViewerDisplayControlsVisible(false);
       console.warn('[FileViewerPage] LANA Editor unavailable; falling back to DOCX preview:', error && error.message ? error.message : error);
       return false;
     }
@@ -4837,20 +4841,41 @@
     state.formatConversionRunning = true;
     showFormatNotice({
       title: 'Converting PDF to DOCX',
-      message: 'Creating an editable DOCX copy from the PDF text. Review the converted document before releasing any version.',
+      message: 'Reading the layout (headings, lists and tables) and any scanned pages. This takes about half a minute for every five scanned pages; the page will open the editable copy when it is ready.',
       action: 'convertPdfToDocx',
       actionLabel: 'Converting...'
     });
     var action = document.querySelector('[data-viewer-action="convertPdfToDocx"]');
     if (action) action.disabled = true;
+    var startedAt = Date.now();
 
     try {
-      var response = await api.post(
-        reviewEndpoint('/documents/' + encodeURIComponent(file.id) + '/convert-format'),
-        { target_format: 'docx' }
-      );
-      var data = response && response.data ? response.data : response;
-      var converted = data && data.converted_document;
+      var converted = null;
+      try {
+        var response = await api.post(
+          reviewEndpoint('/documents/' + encodeURIComponent(file.id) + '/convert-format'),
+          { target_format: 'docx' },
+          // The server converts synchronously and waits on layout analysis;
+          // the default 30 s limit expired exactly as a nine-page scan
+          // finished (measured 2026-09-25), so the copy existed but the page
+          // reported a failure.
+          { timeout: PDF_CONVERSION_TIMEOUT_MS }
+        );
+        var data = response && response.data ? response.data : response;
+        converted = data && data.converted_document;
+      } catch (requestError) {
+        if (!requestError || requestError.status !== 408) throw requestError;
+        // The request timed out but the server keeps converting. Watch the
+        // matter for the copy instead of reporting a failure that is not one.
+        showFormatNotice({
+          title: 'Still converting',
+          message: 'The conversion is taking longer than expected but is still running on the server. Waiting for the editable copy to appear in this matter.',
+          action: 'convertPdfToDocx',
+          actionLabel: 'Converting...'
+        });
+        converted = await waitForConvertedCopy(file, startedAt);
+        if (!converted) throw new Error('The conversion is still running. Refresh the matter in a minute to find the editable copy.');
+      }
       if (!converted || !converted.id) throw new Error('Conversion did not return a document.');
       notify('Editable DOCX created', 'success');
       var params = new URLSearchParams({ id: converted.id });
@@ -4869,6 +4894,51 @@
     } finally {
       state.formatConversionRunning = false;
     }
+  }
+
+  // Docling reads a scanned page in roughly six seconds; a long statement can
+  // take a couple of minutes. The server bounds its own wait (DOCLING_TIMEOUT_MS).
+  var PDF_CONVERSION_TIMEOUT_MS = 180000;
+  var CONVERTED_COPY_POLL_MS = 5000;
+  var CONVERTED_COPY_WAIT_MS = 180000;
+
+  function normalizeDocumentName(value) {
+    return String(value || '').toLowerCase().replace(/\.[a-z0-9]+$/, '').replace(/[\s_]+/g, ' ').trim();
+  }
+
+  /** The copy the server names for a converted PDF: "<name> - editable.docx". */
+  function expectedConvertedName(file) {
+    return normalizeDocumentName(file && file.filename) + ' - editable';
+  }
+
+  /**
+   * Polls the matter's documents for the converted copy of `file` created at
+   * or after `startedAt`. Resolves the document row, or null when the wait
+   * runs out. Never throws: a listing error just ends the wait.
+   */
+  async function waitForConvertedCopy(file, startedAt) {
+    var matterId = getCurrentMatterId();
+    if (!matterId) return null;
+    var wanted = expectedConvertedName(file);
+    var earliest = (Number(startedAt) || Date.now()) - 60000;
+    var deadline = Date.now() + CONVERTED_COPY_WAIT_MS;
+    while (Date.now() < deadline) {
+      try {
+        var listing = await api.get('/api/v1/matters/' + encodeURIComponent(matterId) + '/documents?limit=50');
+        var docs = listing && Array.isArray(listing.documents) ? listing.documents : [];
+        for (var i = 0; i < docs.length; i++) {
+          var doc = docs[i];
+          if (!doc || normalizeDocumentName(doc.filename) !== wanted) continue;
+          var createdAt = Date.parse(doc.created_at || '');
+          if (Number.isFinite(createdAt) && createdAt < earliest) continue;
+          return doc;
+        }
+      } catch (_) {
+        return null;
+      }
+      await new Promise(function (resolve) { setTimeout(resolve, CONVERTED_COPY_POLL_MS); });
+    }
+    return null;
   }
 
   // =========================================================================
