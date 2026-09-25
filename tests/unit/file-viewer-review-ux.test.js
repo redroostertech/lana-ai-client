@@ -526,7 +526,8 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function setFileBreadcrumb');
     expect(pageJs).toContain('function hydrateFileBreadcrumbMatterLabel');
     expect(pageJs).toContain("label: matterLabel || getFileMatterDisplayName(file) || 'Workspace'");
-    expect(pageJs).toContain("href: 'workspace-details.html?id=' + encodeURIComponent(hrefId)");
+    expect(pageJs).toContain("var matterRoute = 'workspace-details.html?id=' + encodeURIComponent(hrefId);");
+    expect(pageJs).toContain('href: matterRoute');
     expect(pageJs).toContain('var listMatter = await resolveMatterFromList(matterId);');
     expect(pageJs).toContain('var resolvedMatter = await resolveMatterFromList(storageMatterId);');
     expect(pageJs).toContain('resolvedMatter && resolvedMatter.conversationMatterId');
@@ -578,6 +579,16 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain("Lex.Nav.go('dashboard.html');");
     expect(pageJs).not.toContain("return 'library.html';");
     expect(pageJs).not.toContain("referrer: 'file-viewer.html?id='");
+  });
+
+  test('file viewer hands File Editor its own return route and never relies on history once a file is open', () => {
+    // Without these the editor sends the user back to a viewer that has no
+    // referrer, the viewer's Back falls to browser history, and history is the
+    // editor: the two pages bounce the user between them.
+    expect(pageJs).toContain('viewerReferrer: targetBackRoute()');
+    expect(pageJs).toContain("state.matterReturnRoute = matterId ? matterRoute : '';");
+    expect(pageJs).toContain('if (state.matterReturnRoute) return state.matterReturnRoute;');
+    expect(pageJs).toContain("return state.currentFile ? 'document-library.html' : '';");
   });
 
   test('shows a dedicated access-denied modal when the metadata API returns 403', () => {

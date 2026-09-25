@@ -65,6 +65,9 @@
   var editorLoadError = '';
   var editorRouteLoading = false;
   var editorReferrer = '';
+  // The page File Viewer itself returns to. The viewer forgets it on the way
+  // here, so we carry it and hand it back on every route to the viewer.
+  var viewerReferrer = '';
   var leavingEditor = false;
   var officeEditorDocumentStats = {};
   var officeRemoteWorkflows = {};
@@ -2280,10 +2283,7 @@
           toast('Version released.');
           if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
             leavingEditor = true;
-            Lex.Nav.go('file-viewer.html', {
-              params: { id: releasedDocument.id },
-              context: { referrer: editorReferrer || 'document-library.html' }
-            });
+            Lex.Nav.go('file-viewer.html', viewerNavOptions({ id: releasedDocument.id }));
             return;
           }
         } else if (result && result.approval_required) {
@@ -2390,10 +2390,7 @@
       review.pendingApprovalStatus = '';
       if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
         leavingEditor = true;
-        Lex.Nav.go('file-viewer.html', {
-          params: { id: releasedDocument.id },
-          context: { referrer: editorReferrer || 'document-library.html' }
-        });
+        Lex.Nav.go('file-viewer.html', viewerNavOptions({ id: releasedDocument.id }));
         return;
       }
       await loadServerReview(file);
@@ -2557,6 +2554,15 @@
     return route;
   }
 
+  // Navigation options for any route back to File Viewer. The viewer treats a
+  // viewer route as no referrer at all, so it must be given its own return
+  // page or its Back falls to browser history, which is this editor.
+  function viewerNavOptions(params) {
+    var options = params ? { params: params } : {};
+    if (viewerReferrer) options.context = { referrer: viewerReferrer };
+    return options;
+  }
+
   function applyFileEditorContext(ctx) {
     var handoff = ctx && ctx.fileEditor ? ctx.fileEditor : null;
     var incoming = handoff && handoff.file ? handoff.file : null;
@@ -2571,6 +2577,7 @@
     }
     editorReferrer = safeEditorReferrer(handoff.referrer || (ctx && ctx.referrer)) ||
       ('file-viewer.html?id=' + encodeURIComponent(incoming.documentId || incoming.sourceDocumentId || ''));
+    viewerReferrer = safeEditorReferrer(handoff.viewerReferrer || (ctx && ctx.viewerReferrer));
 
     var file = null;
     for (var i = 0; i < state.files.length; i += 1) {
@@ -8013,7 +8020,7 @@
     var file = activeFile();
     var target = safeEditorReferrer(editorReferrer) ||
       (file ? 'file-viewer.html?id=' + encodeURIComponent(officeRealDocumentId(file)) : 'file-viewer.html');
-    if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') Lex.Nav.go(target);
+    if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') Lex.Nav.go(target, viewerNavOptions());
     else window.location.href = target;
   }
 

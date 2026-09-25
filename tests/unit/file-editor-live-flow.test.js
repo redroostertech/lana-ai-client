@@ -91,6 +91,17 @@ describe('File Editor live document boundary', () => {
     expect(navigationSource).not.toContain("'document-library.html'");
   });
 
+  test('every route back to File Viewer carries the viewer\'s own return page', () => {
+    // The viewer drops a viewer route as its referrer, so handing it
+    // editorReferrer (always a viewer route) left it with nothing and its Back
+    // went to browser history, which is this editor. The viewer's return page
+    // travels in on the handoff and travels back out on every exit.
+    expect(editor).toContain("viewerReferrer = safeEditorReferrer(handoff.viewerReferrer || (ctx && ctx.viewerReferrer));");
+    expect(editor).toContain('Lex.Nav.go(target, viewerNavOptions());');
+    expect(editor.split('viewerNavOptions({ id: releasedDocument.id })').length - 1).toBe(2);
+    expect(editor).not.toContain('context: { referrer: editorReferrer');
+  });
+
   test('keeps the full document toolbar and ruler in the persistent header', () => {
     [
       'undo',

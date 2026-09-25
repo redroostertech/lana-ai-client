@@ -29,6 +29,7 @@
     fileId: null,
     currentFile: null,
     referrerPage: null,
+    matterReturnRoute: '',
     metadataMode: 'view',
     metadataChanged: false,
     originalMetadata: {},
@@ -835,11 +836,13 @@
     var crumbItems = [];
     var matterId = getFileMatterId(file);
     var hrefId = matterHrefId || matterId;
+    var matterRoute = 'workspace-details.html?id=' + encodeURIComponent(hrefId);
+    state.matterReturnRoute = matterId ? matterRoute : '';
     if (matterId) {
       crumbItems.push({ label: 'Workspaces & Matters', href: 'workspaces.html' });
       crumbItems.push({
         label: matterLabel || getFileMatterDisplayName(file) || 'Workspace',
-        href: 'workspace-details.html?id=' + encodeURIComponent(hrefId)
+        href: matterRoute
       });
     }
     crumbItems.push({ label: documentDisplayFilename(file) || 'File' });
@@ -1260,8 +1263,14 @@
     return value;
   }
 
+  // Where the viewer goes when nobody told it: the matter the file lives in
+  // (the page the breadcrumb links to), else the document library. Only a
+  // viewer with no file open falls back to browser history. History is the
+  // wrong answer once File Editor has been opened from here, because the
+  // previous entry is then the editor, and the two pages bounce the user.
   function fallbackBackReferrer() {
-    return '';
+    if (state.matterReturnRoute) return state.matterReturnRoute;
+    return state.currentFile ? 'document-library.html' : '';
   }
 
   function fileViewerRouteForFile(file) {
@@ -1480,7 +1489,10 @@
       params: { id: handoff.file.documentId, matter_id: matterId || null },
       context: {
         fileEditor: handoff,
-        referrer: fileViewerRouteForFile(file) || targetBackRoute()
+        referrer: fileViewerRouteForFile(file) || targetBackRoute(),
+        // The editor hands this back when it returns here, so Back from the
+        // viewer still leaves for the page the user came from.
+        viewerReferrer: targetBackRoute()
       }
     });
   }
