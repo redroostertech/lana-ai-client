@@ -1679,6 +1679,8 @@ button.file-viewer-review-release:focus-visible {
 
 .file-viewer-insights__list--decided .file-viewer-insights__item {
   opacity: 0.75;
+}
+
 /* Annotations listed in the viewer's Comments tab */
 .file-viewer-annotation-swatch {
   display: inline-block;
