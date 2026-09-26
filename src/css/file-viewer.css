@@ -1651,6 +1651,15 @@ button.file-viewer-review-release:focus-visible {
   flex-wrap: wrap;
 }
 
+/* Only the empty-state's own action (a bare sibling of lex-empty, which
+   centers its own icon/heading/description) needs centering; the same base
+   class is reused as a left-aligned accept/dismiss toolbar under a
+   suggestion's text (renderSuggestion in document-enrichment.service.js),
+   which must stay flex-start. */
+.file-viewer-insights__actions--center {
+  justify-content: center;
+}
+
 .file-viewer-insights__decision {
   font-size: 0.6875rem;
   color: var(--lex-text-tertiary);

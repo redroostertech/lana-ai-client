@@ -111,12 +111,23 @@ describe('document enrichment panel html', () => {
     expect(html).toContain('<lex-btn type="button" variant="secondary" size="sm" data-enrichment-action="dismiss" data-suggestion-id="sug-1">Dismiss</lex-btn>');
     expect(html).not.toContain('class="file-viewer-insights__badge"');
     expect(html).not.toContain('class="file-viewer-review-action');
+    // Control arm for the assertion below: the accept/dismiss toolbar under a
+    // suggestion is a plain, left-aligned "file-viewer-insights__actions" div,
+    // not the centered empty-state modifier.
+    expect(html).toContain('<div class="file-viewer-insights__actions">');
+    expect(html).not.toContain('file-viewer-insights__actions--center');
     const off = enrichment.renderPanelHtml(enrichment.viewModel({ enabled: false }));
     expect(off).toContain('<lex-empty size="compact" message="Insights are off"');
     expect(off).not.toContain('file-viewer-review-empty');
     const unavailable = enrichment.renderPanelHtml(enrichment.viewModel({ enabled: true, enrichment: null }));
     expect(unavailable).toContain('<lex-empty size="compact" message="No insights yet"');
     expect(unavailable).toContain('<lex-btn type="button" variant="secondary" size="sm" data-enrichment-action="rerun">Read this document</lex-btn>');
+    // Reported 2026-09-26: the empty-state's own button rendered flush-left
+    // against the centered icon/heading/description above it. It needs the
+    // centering modifier; the accept/dismiss toolbar under a suggestion's
+    // text (below) reuses the same base class but must stay left-aligned, so
+    // it must NOT carry this modifier.
+    expect(unavailable).toContain('class="file-viewer-insights__actions file-viewer-insights__actions--center"');
     const nothing = enrichment.renderPanelHtml(enrichment.viewModel({ enabled: true, enrichment: { id: 'e', status: 'completed', entities: [], callouts: [] }, suggestions: [] }));
     expect(nothing).toContain('<lex-empty size="compact" message="Nothing to report"');
   });

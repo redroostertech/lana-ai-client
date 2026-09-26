@@ -224,7 +224,7 @@
     }
     if (!vm.available) {
       return '<lex-empty size="compact" message="No insights yet" description="This document has not been read for insights."></lex-empty>' +
-        '<div class="file-viewer-insights__actions"><lex-btn type="button" variant="secondary" size="sm" data-enrichment-action="rerun">Read this document</lex-btn></div>';
+        '<div class="file-viewer-insights__actions file-viewer-insights__actions--center"><lex-btn type="button" variant="secondary" size="sm" data-enrichment-action="rerun">Read this document</lex-btn></div>';
     }
     var parts = [];
     parts.push('<div class="file-viewer-insights__status file-viewer-insights__status--' + escapeHtml(vm.status) + '">' +

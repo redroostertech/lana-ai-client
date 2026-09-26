@@ -63,7 +63,7 @@ describe('file-viewer review UX foundation', () => {
     expect(html).toContain('<lex-segmented');
     expect(html).toContain('id="reviewTabs"');
     expect(html).toContain('"value":"changes"');
-    expect(html).toContain('"label":"Change History"');
+    expect(html).toContain('"label":"History"');
     expect(html).toContain('"value":"releases"');
     expect(html).toContain('"label":"Versions"');
     expect(html).not.toContain('"label":"Releases"');
@@ -695,11 +695,26 @@ describe('file-viewer review UX foundation', () => {
     return bodyEnd === -1 ? null : css.slice(bodyStart, bodyEnd);
   }
 
-  test('the four-tab review strip (Change History, Versions, Comments, Insights) scrolls instead of clipping its last tab past the rail', () => {
+  test('the four-tab review strip (History, Versions, Comments, Insights) fits without clipping, and scrolls instead of clipping if it ever overflows again', () => {
     // Reported 2026-09-26: with four tabs, dividing the strip into equal
     // shares (flex: 1 1 0) pushed "Insights" past the card's own edge, since
     // a flex item cannot shrink below its own text's width (lex-seg-item is
     // white-space: nowrap) without something raising that floor explicitly.
+    //
+    // The actual default-case fix is shortening "Change History" to
+    // "History" (asserted above, and confirmed against the real rendered
+    // component with Playwright driving a real Electron window: at the
+    // rail's own declared width and at its declared 320px minimum, the four
+    // tabs' combined natural width now equals the strip's available width
+    // exactly, so nothing overflows by default). jsdom has no real layout
+    // engine, so that measurement cannot be asserted here directly.
+    //
+    // overflow-x: auto plus min-width: max-content stay as defense in depth:
+    // a scroll bar is the right degraded behavior for a strip that overflows
+    // again (a longer localized label, a fifth tab), even though this CSS
+    // alone was proven insufficient as the primary fix, since macOS overlay
+    // scrollbars are invisible until hovered and looked identical to the
+    // original hard clip when nothing shortened the labels first.
     const strip = ruleBodyFor(fileViewerCss, '.file-viewer-review-tabs');
     expect(strip).not.toBeNull();
     expect(strip).toContain('overflow-x: auto');
@@ -712,5 +727,22 @@ describe('file-viewer review UX foundation', () => {
     // bare substring match would also accept with the declaration removed.
     // The semicolon is only ever on the real declaration.
     expect(item).toContain('min-width: max-content;');
+  });
+
+  test('the insights empty-state "Read this document" button centers under the icon, heading and description above it', () => {
+    // Reported 2026-09-26: the button rendered flush-left because
+    // .file-viewer-insights__actions is a bare flex row (defaults to
+    // flex-start), while the shared base class is also reused, unchanged, as
+    // a left-aligned accept/dismiss toolbar under a suggestion's text
+    // (document-enrichment.service.js renderSuggestion). Centering the base
+    // class directly would misalign that toolbar, so the empty state gets
+    // its own modifier instead.
+    const base = ruleBodyFor(fileViewerCss, '.file-viewer-insights__actions');
+    expect(base).not.toBeNull();
+    expect(base).not.toContain('justify-content');
+
+    const centered = ruleBodyFor(fileViewerCss, '.file-viewer-insights__actions--center');
+    expect(centered).not.toBeNull();
+    expect(centered).toContain('justify-content: center;');
   });
 });
