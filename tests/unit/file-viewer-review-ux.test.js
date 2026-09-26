@@ -681,4 +681,36 @@ describe('file-viewer review UX foundation', () => {
     expect(fileViewerCss).toContain('.file-viewer-annotate-btn.is-active');
     expect(serviceJs).toContain('function buildAnnotationThread(input)');
   });
+
+  // The declaration block a selector actually owns, not just "this string is
+  // somewhere in a 5,000-line file": a bare toContain on the whole stylesheet
+  // would pass even if the declaration below sat under some other selector,
+  // which is exactly the shape of check that let the missing brace in this
+  // same file pass every test earlier (2026-09-25).
+  function ruleBodyFor(css, selector) {
+    const openBrace = css.indexOf(selector + ' {');
+    if (openBrace === -1) return null;
+    const bodyStart = css.indexOf('{', openBrace) + 1;
+    const bodyEnd = css.indexOf('}', bodyStart);
+    return bodyEnd === -1 ? null : css.slice(bodyStart, bodyEnd);
+  }
+
+  test('the four-tab review strip (Change History, Versions, Comments, Insights) scrolls instead of clipping its last tab past the rail', () => {
+    // Reported 2026-09-26: with four tabs, dividing the strip into equal
+    // shares (flex: 1 1 0) pushed "Insights" past the card's own edge, since
+    // a flex item cannot shrink below its own text's width (lex-seg-item is
+    // white-space: nowrap) without something raising that floor explicitly.
+    const strip = ruleBodyFor(fileViewerCss, '.file-viewer-review-tabs');
+    expect(strip).not.toBeNull();
+    expect(strip).toContain('overflow-x: auto');
+
+    const item = ruleBodyFor(fileViewerCss, '.file-viewer-review-tabs .lex-seg-item');
+    expect(item).not.toBeNull();
+    expect(item).toContain('flex: 1 1 0;');
+    // The declaration, not just the phrase: the block's own explanatory
+    // comment says "min-width: max-content is a pure lower bound", which a
+    // bare substring match would also accept with the declaration removed.
+    // The semicolon is only ever on the real declaration.
+    expect(item).toContain('min-width: max-content;');
+  });
 });

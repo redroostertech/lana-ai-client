@@ -322,6 +322,10 @@ button.file-viewer-mode-badge:hover {
   border-left: 1px solid var(--lex-border-subtle, var(--lex-border-default));
   border-bottom: 1px solid var(--lex-border-subtle, var(--lex-border-default));
   background: var(--lex-bg-primary);
+  /* Four tabs (Change History, Versions, Comments, Insights) can be wider,
+     combined, than the rail is; scroll the strip itself rather than letting
+     the rightmost tab spill past the card's own edge. */
+  overflow-x: auto;
 }
 
 .file-viewer-review-tabs lex-segmented,
@@ -335,6 +339,15 @@ button.file-viewer-mode-badge:hover {
 
 .file-viewer-review-tabs .lex-seg-item {
   flex: 1 1 0;
+  /* flex: 1 1 0 divides the strip into equal shares; with four tabs that
+     share can fall below "Change History" or "Insights" own width. Without a
+     floor a flex item shrinks past its own text, and lex-seg-item's
+     white-space: nowrap (lex-segmented.js) has nowhere to wrap that text to,
+     so it overflowed the rail instead. min-width: max-content is a pure lower
+     bound: with two or three short tabs the equal share already clears it and
+     nothing changes; with four it stops the shrink at each tab's own
+     readable width and the strip becomes scrollable instead of clipped. */
+  min-width: max-content;
 }
 
 .file-viewer-review-body {
