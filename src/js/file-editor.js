@@ -4218,9 +4218,10 @@
       : commentItems;
     var commentsHtml = visibleComments.length
       ? visibleComments.map(function (comment) {
-        var status = String(comment.status || 'open').toLowerCase() === 'resolved' ? 'Resolved' : 'Open';
+        var statusInfo = documentReviewService().annotationStatusLabel(comment);
+        var status = statusInfo.label;
         var kind = comment.kind === 'highlight' || comment.kind === 'redline' ? comment.kind : 'comment';
-        var kindLabel = kind === 'highlight' ? 'Highlight' : kind === 'redline' ? 'Suggested change' : 'Comment';
+        var kindLabel = documentReviewService().annotationLabel(comment);
         var swatch = kind === 'highlight'
           ? '<span class="office-review-annotation-swatch" data-color="' + esc(comment.color || '') + '"></span>'
           : '';
@@ -4251,8 +4252,8 @@
           : '';
         return '<article class="office-review-history-row office-review-comment-thread office-review-comment-thread--' + kind + '" data-comment-thread-id="' + esc(comment.id || '') + '" data-comment-status="' + esc(status.toLowerCase()) + '">' +
           '<div class="office-review-history-row-heading"><span class="office-review-history-row-title">' + swatch + esc(kindLabel) + '</span>' +
-          '<span class="office-review-status office-review-status--' + (status === 'Resolved' ? 'release' : 'draft') + '">' + esc(status) + '</span></div>' +
-          '<div class="office-review-comment-meta"><strong>' + esc(comment.author || 'Reviewer') + '</strong><span>' + esc(formatTimestamp(commentTimestamp(comment))) + '</span></div>' +
+          '<span class="office-review-status office-review-status--' + statusInfo.tone + '">' + esc(status) + '</span></div>' +
+          '<div class="office-review-comment-meta"><strong>' + esc(documentReviewService().annotationAuthorLabel(comment)) + '</strong><span>' + esc(formatTimestamp(commentTimestamp(comment))) + '</span></div>' +
           '<div class="office-review-comment-scope">' + esc(scope) + '</div>' +
           (comment.text ? '<div class="office-review-comment-text">' + esc(comment.text) + '</div>' : '') +
           proposedHtml +
@@ -6516,29 +6517,26 @@
       renderReviewDock(file);
       scheduleServerDraftSave(file);
     };
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      var modal = Lex.Modal.open({
-        heading: 'Add Comment',
-        size: 'sm',
-        content: '<div class="office-edit-change-modal">' +
-          '<label for="officeReviewCommentText">Comment</label>' +
-          '<textarea id="officeReviewCommentText" rows="4" placeholder="Add a review comment"></textarea>' +
-        '</div>',
-        confirmText: 'Add Comment',
-        cancelText: 'Cancel',
-        onConfirm: function () {
-          var input = document.getElementById('officeReviewCommentText');
-          add(input && typeof input.value === 'string' ? input.value : '');
-        }
-      });
-      setTimeout(function () {
-        var input = modal && modal.querySelector ? modal.querySelector('#officeReviewCommentText') : document.getElementById('officeReviewCommentText');
-        if (input && typeof input.focus === 'function') input.focus();
-      }, 0);
-      return;
-    }
-    var fallback = window.prompt('Add a review comment', '');
-    if (fallback !== null) add(fallback);
+    // lex-modal.js is loaded unconditionally before this page's own script,
+    // so Lex.Modal.open is always available here; no window.prompt fallback.
+    var modal = Lex.Modal.open({
+      heading: 'Add Comment',
+      size: 'sm',
+      content: '<div class="office-edit-change-modal">' +
+        '<label for="officeReviewCommentText">Comment</label>' +
+        '<textarea id="officeReviewCommentText" rows="4" placeholder="Add a review comment"></textarea>' +
+      '</div>',
+      confirmText: 'Add Comment',
+      cancelText: 'Cancel',
+      onConfirm: function () {
+        var input = document.getElementById('officeReviewCommentText');
+        add(input && typeof input.value === 'string' ? input.value : '');
+      }
+    });
+    setTimeout(function () {
+      var input = modal && modal.querySelector ? modal.querySelector('#officeReviewCommentText') : document.getElementById('officeReviewCommentText');
+      if (input && typeof input.focus === 'function') input.focus();
+    }, 0);
   }
 
   /** A highlight on the current selection, in the given colour, saved with the draft like a comment. */
@@ -6604,15 +6602,11 @@
 
   /** A pin was clicked in the document: show its card in the rail. */
   function focusServerReviewComment(file, commentId) {
-    var id = String(commentId || '');
-    if (!id) return;
-    reviewRailTab = 'comments';
-    renderReviewDock(file);
-    var card = document.querySelector('[data-comment-thread-id="' + id.replace(/["\\]/g, '') + '"]');
-    if (!card) return;
-    if (typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    card.classList.add('is-located');
-    setTimeout(function () { card.classList.remove('is-located'); }, 1600);
+    documentReviewService().focusAnnotationCardInDom({
+      annotationId: commentId,
+      attribute: 'data-comment-thread-id',
+      activateTab: function () { reviewRailTab = 'comments'; renderReviewDock(file); }
+    });
   }
 
   function serverReviewThreadById(file, commentId) {
@@ -6743,30 +6737,27 @@
       thread.updated_at = timestamp;
       commitServerReviewCommentUpdate(file, 'Reply added.');
     };
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      var modal = Lex.Modal.open({
-        heading: 'Reply to Comment',
-        size: 'sm',
-        content: '<div class="office-edit-change-modal">' +
-          '<p class="office-review-comment-quote">' + esc(thread.text) + '</p>' +
-          '<label for="officeReviewCommentReplyText">Reply</label>' +
-          '<textarea id="officeReviewCommentReplyText" rows="4" placeholder="Add a reply"></textarea>' +
-        '</div>',
-        confirmText: 'Add Reply',
-        cancelText: 'Cancel',
-        onConfirm: function () {
-          var input = document.getElementById('officeReviewCommentReplyText');
-          addReply(input && typeof input.value === 'string' ? input.value : '');
-        }
-      });
-      setTimeout(function () {
-        var input = modal && modal.querySelector ? modal.querySelector('#officeReviewCommentReplyText') : document.getElementById('officeReviewCommentReplyText');
-        if (input && typeof input.focus === 'function') input.focus();
-      }, 0);
-      return;
-    }
-    var fallback = window.prompt('Reply to comment', '');
-    if (fallback !== null) addReply(fallback);
+    // lex-modal.js is loaded unconditionally before this page's own script,
+    // so Lex.Modal.open is always available here; no window.prompt fallback.
+    var modal = Lex.Modal.open({
+      heading: 'Reply to Comment',
+      size: 'sm',
+      content: '<div class="office-edit-change-modal">' +
+        '<p class="office-review-comment-quote">' + esc(thread.text) + '</p>' +
+        '<label for="officeReviewCommentReplyText">Reply</label>' +
+        '<textarea id="officeReviewCommentReplyText" rows="4" placeholder="Add a reply"></textarea>' +
+      '</div>',
+      confirmText: 'Add Reply',
+      cancelText: 'Cancel',
+      onConfirm: function () {
+        var input = document.getElementById('officeReviewCommentReplyText');
+        addReply(input && typeof input.value === 'string' ? input.value : '');
+      }
+    });
+    setTimeout(function () {
+      var input = modal && modal.querySelector ? modal.querySelector('#officeReviewCommentReplyText') : document.getElementById('officeReviewCommentReplyText');
+      if (input && typeof input.focus === 'function') input.focus();
+    }, 0);
   }
 
   function setServerReviewCommentResolved(file, commentId, resolved) {
@@ -6799,30 +6790,27 @@
         toast((error && error.message) || 'Failed to edit review change.');
       });
     };
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      var modal = Lex.Modal.open({
-        heading: 'Edit Draft Change',
-        size: 'md',
-        content: '<div class="office-edit-change-modal">' +
-          '<p>Edit the proposed text for this unreleased change. The pending tracked change is replaced with a new tracked change at the same document location.</p>' +
-          '<label for="officeEditChangeText">Proposed text</label>' +
-          '<textarea id="officeEditChangeText" rows="6">' + esc(currentText) + '</textarea>' +
-        '</div>',
-        confirmText: 'Update Change',
-        cancelText: 'Cancel',
-        onConfirm: function () {
-          var input = document.getElementById('officeEditChangeText');
-          run(input && typeof input.value === 'string' ? input.value : currentText);
-        }
-      });
-      setTimeout(function () {
-        var input = modal && modal.querySelector ? modal.querySelector('#officeEditChangeText') : document.getElementById('officeEditChangeText');
-        if (input && typeof input.focus === 'function') input.focus();
-      }, 0);
-      return;
-    }
-    var fallback = window.prompt('Edit proposed text', currentText);
-    if (fallback !== null) run(fallback);
+    // lex-modal.js is loaded unconditionally before this page's own script,
+    // so Lex.Modal.open is always available here; no window.prompt fallback.
+    var modal = Lex.Modal.open({
+      heading: 'Edit Draft Change',
+      size: 'md',
+      content: '<div class="office-edit-change-modal">' +
+        '<p>Edit the proposed text for this unreleased change. The pending tracked change is replaced with a new tracked change at the same document location.</p>' +
+        '<label for="officeEditChangeText">Proposed text</label>' +
+        '<textarea id="officeEditChangeText" rows="6">' + esc(currentText) + '</textarea>' +
+      '</div>',
+      confirmText: 'Update Change',
+      cancelText: 'Cancel',
+      onConfirm: function () {
+        var input = document.getElementById('officeEditChangeText');
+        run(input && typeof input.value === 'string' ? input.value : currentText);
+      }
+    });
+    setTimeout(function () {
+      var input = modal && modal.querySelector ? modal.querySelector('#officeEditChangeText') : document.getElementById('officeEditChangeText');
+      if (input && typeof input.focus === 'function') input.focus();
+    }, 0);
   }
 
   var EMBED_MARK_COMMANDS = {

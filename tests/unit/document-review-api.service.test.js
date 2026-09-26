@@ -775,6 +775,9 @@ describe('LanaDocumentReview dates and release payloads', () => {
       expect(review.annotationColor({ kind: 'comment' })).toBe('');
       expect(review.annotationColor({ kind: 'highlight', color: 'yellow' })).toBe('#FFE066');
       expect(review.annotationLabel({ kind: 'redline' })).toBe('Suggested change');
+      expect(review.annotationLabel({ kind: 'highlight' })).toBe('Highlight');
+      expect(review.annotationLabel({ kind: 'comment' })).toBe('Comment');
+      expect(review.annotationLabel({})).toBe('Comment');
 
       expect(review.normalizeAnnotationAnchor(textAnchor)).toEqual(textAnchor);
       expect(review.normalizeAnnotationAnchor(pageAnchor)).toEqual(pageAnchor);
@@ -833,6 +836,128 @@ describe('LanaDocumentReview dates and release payloads', () => {
         { release_id: 'rel-2', review_metadata: { comments: [] } }
       ]);
       expect(released).toEqual([Object.assign({}, threads[1], { released_in: { id: 'rel-1', release_number: 3, released_at: '2026-09-25T20:00:00Z' }, read_only: true })]);
+    });
+  });
+
+  describe('annotation card presentation shared by the viewer and the editor', () => {
+    beforeEach(() => { jest.useFakeTimers(); });
+    afterEach(() => { jest.runOnlyPendingTimers(); jest.useRealTimers(); });
+
+    test('annotationStatusLabel reads Open or Resolved with the tone both pages used for it', () => {
+      expect(review.annotationStatusLabel({ status: 'open' })).toEqual({ label: 'Open', tone: 'draft', resolved: false });
+      expect(review.annotationStatusLabel({ status: 'resolved' })).toEqual({ label: 'Resolved', tone: 'release', resolved: true });
+      expect(review.annotationStatusLabel({ status: 'RESOLVED' })).toEqual({ label: 'Resolved', tone: 'release', resolved: true });
+      // Control arm: no status at all defaults to open, same as both pages' inline ternary did.
+      expect(review.annotationStatusLabel({})).toEqual({ label: 'Open', tone: 'draft', resolved: false });
+      expect(review.annotationStatusLabel(null)).toEqual({ label: 'Open', tone: 'draft', resolved: false });
+    });
+
+    test('annotationAuthorLabel falls back to Reviewer for a thread with no author', () => {
+      expect(review.annotationAuthorLabel({ author: 'Michael' })).toBe('Michael');
+      // Control arm: a thread with no author.
+      expect(review.annotationAuthorLabel({})).toBe('Reviewer');
+      expect(review.annotationAuthorLabel(null)).toBe('Reviewer');
+    });
+
+    function fakeCard() {
+      const classes = new Set();
+      return {
+        scrollIntoView: jest.fn(),
+        classList: {
+          add: (name) => classes.add(name),
+          remove: (name) => classes.delete(name),
+          has: (name) => classes.has(name)
+        }
+      };
+    }
+
+    test('focusAnnotationCardInDom finds the card by its attribute, activates the tab first, scrolls and pulses it', () => {
+      const card = fakeCard();
+      const querySelector = jest.fn(() => card);
+      const activateTab = jest.fn();
+      const found = review.focusAnnotationCardInDom({
+        annotationId: 'c-1',
+        attribute: 'data-comment-thread-id',
+        activateTab,
+        document: { querySelector }
+      });
+      expect(found).toBe(true);
+      expect(activateTab).toHaveBeenCalledTimes(1);
+      expect(querySelector).toHaveBeenCalledWith('[data-comment-thread-id="c-1"]');
+      expect(card.scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' });
+      expect(card.classList.has('is-located')).toBe(true);
+      jest.advanceTimersByTime(1600);
+      expect(card.classList.has('is-located')).toBe(false);
+    });
+
+    test('focusAnnotationCardInDom defaults to the viewer attribute name when none is given', () => {
+      const card = fakeCard();
+      const querySelector = jest.fn(() => card);
+      review.focusAnnotationCardInDom({ annotationId: 'a"1', document: { querySelector } });
+      // Control arm: a quote in the id is stripped without using a regex.
+      expect(querySelector).toHaveBeenCalledWith('[data-review-annotation-id="a1"]');
+    });
+
+    test('focusAnnotationCardInDom control arms: no id, and no matching card', () => {
+      const querySelector = jest.fn(() => null);
+      expect(review.focusAnnotationCardInDom({ annotationId: '', document: { querySelector } })).toBe(false);
+      expect(querySelector).not.toHaveBeenCalled();
+      expect(review.focusAnnotationCardInDom({ annotationId: 'missing', document: { querySelector } })).toBe(false);
+      expect(review.focusAnnotationCardInDom({ annotationId: 'x' })).toBe(false);
+    });
+  });
+
+  describe('reviewVersionSelectOptions', () => {
+    test('lists the scanned source, the editable copies newest first, the current draft, then every release', () => {
+      const options = review.reviewVersionSelectOptions({
+        conversionSource: { id: 'src-1', filename: 'scan.pdf' },
+        editableCopies: [{ id: 'copy-2', created_at: '2026-09-25T20:00:00Z' }, { id: 'copy-1', created_at: '2026-09-24T20:00:00Z' }],
+        hasCurrentDraftChanges: true,
+        pendingRelease: false,
+        releases: [{ id: 'rel-2', release_number: 2, released_at: '2026-09-20T00:00:00Z' }],
+        formatCopyMoment: (value) => 'moment:' + value,
+        formatDate: (value) => 'date:' + value
+      });
+      expect(options.map((option) => option.value)).toEqual([
+        'source-original', 'original', 'editable-copy:copy-2', 'editable-copy:copy-1', 'current', 'release:rel-2'
+      ]);
+      expect(options[0]).toMatchObject({ label: 'Original PDF', description: 'scan.pdf', group: 'Document' });
+      expect(options[1]).toMatchObject({ label: 'Editable copy', group: 'Document' });
+      expect(options[2]).toMatchObject({ label: 'Editable copy (latest)', description: 'DOCX converted from this PDF · moment:2026-09-25T20:00:00Z' });
+      expect(options[3]).toMatchObject({ label: 'Editable copy' });
+      expect(options[4]).toMatchObject({ label: 'Current draft', description: 'Live unreleased edits', group: 'Working copy' });
+      expect(options[5]).toMatchObject({ label: 'Version 2', description: 'Version 2 · date:2026-09-20T00:00:00Z', group: 'Versions' });
+    });
+
+    test('without a conversion source the original is the source document and there is no scanned-source option', () => {
+      const options = review.reviewVersionSelectOptions({ editableCopies: [], hasCurrentDraftChanges: false, releases: [] });
+      expect(options[0]).toMatchObject({ value: 'original', label: 'Original', description: 'Source document' });
+      expect(options.some((option) => option.value === 'source-original')).toBe(false);
+    });
+
+    test('a pending release takes precedence over live unreleased edits in the current draft description', () => {
+      const options = review.reviewVersionSelectOptions({ hasCurrentDraftChanges: true, pendingRelease: true, releases: [] });
+      const current = options.find((option) => option.value === 'current');
+      expect(current.description).toBe('Saved draft pending release approval');
+    });
+
+    test('with no unreleased edits the current draft reads as the current document view', () => {
+      const options = review.reviewVersionSelectOptions({ hasCurrentDraftChanges: false, pendingRelease: false, releases: [] });
+      const current = options.find((option) => option.value === 'current');
+      expect(current.description).toBe('Current document view');
+    });
+
+    test('control arm: an empty releases list, no editable copies, and no formatters given', () => {
+      const options = review.reviewVersionSelectOptions({});
+      expect(options.map((option) => option.value)).toEqual(['original', 'current']);
+      expect(options).toEqual(review.reviewVersionSelectOptions());
+    });
+
+    test('a release with no id gets an unusable empty value rather than throwing', () => {
+      const options = review.reviewVersionSelectOptions({ releases: [{ release_number: 1 }] });
+      const releaseOption = options.find((option) => option.group === 'Versions');
+      expect(releaseOption.value).toBe('');
+      expect(releaseOption.label).toBe('Version 1');
     });
   });
 });

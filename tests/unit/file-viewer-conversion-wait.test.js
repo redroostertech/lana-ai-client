@@ -6,6 +6,7 @@ const vm = require('vm');
 
 const SRC = path.join(__dirname, '../../src');
 const viewer = fs.readFileSync(path.join(SRC, 'js/file-viewer-page.js'), 'utf8');
+const serviceJs = fs.readFileSync(path.join(SRC, 'js/services/document-review-api.service.js'), 'utf8');
 
 // A PDF conversion waits on layout analysis and OCR on the server; measured
 // 2026-09-25, a nine-page scan took 30 s and the client's default 30 s
@@ -126,10 +127,16 @@ describe('File Viewer document halves', () => {
   // Owner, 2026-09-25: "Original is always the pdf but the editable is always
   // the docx"; the other half is offered under Document in the Display menu.
   test('the Display menu offers the editable copy under the PDF and the original PDF under the copy', () => {
-    expect(viewer).toContain("value: 'editable-copy:' + editableCopy.id");
-    expect(viewer).toContain("value: 'source-original'");
-    expect(viewer).toContain("label: conversionSource ? 'Editable copy' : 'Original'");
-    expect(viewer).toContain("if (value === 'editable-copy' || value.indexOf('editable-copy:') === 0) {");
+    // The option list itself moved to LanaDocumentReview.reviewVersionSelectOptions
+    // (see tests/unit/document-review-api.service.test.js for real coverage);
+    // the page only consumes the moved value shape when opening a selection.
+    expect(serviceJs).toContain("value: 'editable-copy:' + editableCopy.id");
+    expect(serviceJs).toContain("value: 'source-original'");
+    expect(serviceJs).toContain("label: conversionSource ? 'Editable copy' : 'Original'");
+    // The bare 'editable-copy' value stopped being produced in commit
+    // f7ff696; that branch is confirmed dead and was removed.
+    expect(viewer).toContain("if (value.indexOf('editable-copy:') === 0) {");
+    expect(viewer).not.toContain("value === 'editable-copy'");
     expect(viewer).toContain("if (value === 'source-original') {");
     expect(viewer).toContain('function openDocumentHalf(documentId)');
   });

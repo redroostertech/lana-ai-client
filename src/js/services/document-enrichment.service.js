@@ -30,6 +30,14 @@
   };
 
   function escapeHtml(value) {
+    // Delegate to the canonical Lex.Utils escaper when it is loaded (every
+    // real page load); this module is also require()'d directly in tests
+    // with no window/Lex set up, so it keeps this local fallback for that
+    // path (a typeof guard, never a bare window reference, so it stays safe
+    // to run in Node).
+    if (typeof Lex !== 'undefined' && Lex.Utils && typeof Lex.Utils.escapeHtml === 'function') {
+      return Lex.Utils.escapeHtml(value);
+    }
     return String(value === null || value === undefined ? '' : value)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -186,13 +194,13 @@
   function renderSuggestion(row, open) {
     var actions = open
       ? '<div class="file-viewer-insights__actions">' +
-          '<button type="button" class="file-viewer-review-action file-viewer-review-action--primary" data-enrichment-action="accept" data-suggestion-id="' + escapeHtml(row.id) + '">' + escapeHtml(row.verb) + '</button>' +
-          '<button type="button" class="file-viewer-review-action" data-enrichment-action="dismiss" data-suggestion-id="' + escapeHtml(row.id) + '">Dismiss</button>' +
+          '<lex-btn type="button" variant="primary" size="sm" data-enrichment-action="accept" data-suggestion-id="' + escapeHtml(row.id) + '">' + escapeHtml(row.verb) + '</lex-btn>' +
+          '<lex-btn type="button" variant="secondary" size="sm" data-enrichment-action="dismiss" data-suggestion-id="' + escapeHtml(row.id) + '">Dismiss</lex-btn>' +
         '</div>'
       : '<span class="file-viewer-insights__decision">' + escapeHtml(humanize(row.status)) + (row.dismissReason ? ': ' + escapeHtml(row.dismissReason) : '') + '</span>';
     return '<li class="file-viewer-insights__item" data-suggestion-id="' + escapeHtml(row.id) + '" data-suggestion-status="' + escapeHtml(row.status) + '">' +
       '<div class="file-viewer-insights__item-head">' +
-        '<span class="file-viewer-insights__badge">' + escapeHtml(row.targetLabel) + '</span>' +
+        '<lex-badge label="' + escapeHtml(row.targetLabel) + '" color="indigo" size="sm"></lex-badge>' +
         '<span class="file-viewer-insights__item-title">' + escapeHtml(row.title) + '</span>' +
       '</div>' +
       (row.detail ? '<div class="file-viewer-insights__item-detail">' + escapeHtml(row.detail) + '</div>' : '') +
@@ -212,16 +220,16 @@
   /** The panel as HTML. Every value is escaped; actions carry data attributes the page delegates on. */
   function renderPanelHtml(vm) {
     if (!vm || !vm.enabled) {
-      return '<div class="file-viewer-review-empty"><h5>Insights are off</h5><p>Document enrichment is turned off on this deployment.</p></div>';
+      return '<lex-empty size="compact" message="Insights are off" description="Document enrichment is turned off on this deployment."></lex-empty>';
     }
     if (!vm.available) {
-      return '<div class="file-viewer-review-empty"><h5>No insights yet</h5><p>This document has not been read for insights.</p>' +
-        '<div class="file-viewer-insights__actions"><button type="button" class="file-viewer-review-action" data-enrichment-action="rerun">Read this document</button></div></div>';
+      return '<lex-empty size="compact" message="No insights yet" description="This document has not been read for insights."></lex-empty>' +
+        '<div class="file-viewer-insights__actions"><lex-btn type="button" variant="secondary" size="sm" data-enrichment-action="rerun">Read this document</lex-btn></div>';
     }
     var parts = [];
     parts.push('<div class="file-viewer-insights__status file-viewer-insights__status--' + escapeHtml(vm.status) + '">' +
       '<span>' + escapeHtml(vm.statusLabel) + (vm.truncated ? ', first part of a long document' : '') + '</span>' +
-      '<button type="button" class="file-viewer-review-action file-viewer-insights__rerun" data-enrichment-action="rerun">Read again</button>' +
+      '<lex-btn type="button" variant="secondary" size="sm" class="file-viewer-insights__rerun" data-enrichment-action="rerun">Read again</lex-btn>' +
     '</div>');
     if (vm.classification) {
       parts.push(renderSection('Document type',
@@ -260,7 +268,7 @@
       parts.push(renderSection('Decided', '<ul class="file-viewer-insights__list file-viewer-insights__list--decided">' + vm.suggestions.decided.map(function (row) { return renderSuggestion(row, false); }).join('') + '</ul>', String(vm.suggestions.decided.length)));
     }
     if (parts.length === 1) {
-      parts.push('<div class="file-viewer-review-empty"><h5>Nothing to report</h5><p>The reader found no type, summary or entities in this document.</p></div>');
+      parts.push('<lex-empty size="compact" message="Nothing to report" description="The reader found no type, summary or entities in this document."></lex-empty>');
     }
     return '<div class="file-viewer-insights">' + parts.join('') + '</div>';
   }

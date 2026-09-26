@@ -969,6 +969,113 @@
     return out;
   }
 
+  /** Open or Resolved, with the same tone both pages already used for it. */
+  function annotationStatusLabel(thread) {
+    var resolved = String((thread && thread.status) || 'open').toLowerCase() === 'resolved';
+    return { label: resolved ? 'Resolved' : 'Open', tone: resolved ? 'release' : 'draft', resolved: resolved };
+  }
+
+  /** The author line for a thread card; a thread with no author reads as "Reviewer". */
+  function annotationAuthorLabel(thread) {
+    return (thread && thread.author) || 'Reviewer';
+  }
+
+  /**
+   * Finds the on-screen card for an annotation or comment thread, scrolls it
+   * into view and pulses it with the "is-located" class both pages already
+   * use for this. Both pages did this by hand under a different id attribute
+   * and a different way of switching to the Comments tab first; those two
+   * differences are the only reason this takes options instead of just an id.
+   */
+  function focusAnnotationCardInDom(options) {
+    var opts = options || {};
+    var id = String(opts.annotationId || '');
+    if (!id) return false;
+    if (typeof opts.activateTab === 'function') opts.activateTab();
+    var doc = opts.document || (typeof document !== 'undefined' ? document : null);
+    if (!doc || typeof doc.querySelector !== 'function') return false;
+    var attribute = opts.attribute || 'data-review-annotation-id';
+    // No regex: strip the two characters that would break out of the
+    // attribute selector's quoted value.
+    var safeId = id.split('"').join('').split('\\').join('');
+    var card = doc.querySelector('[' + attribute + '="' + safeId + '"]');
+    if (!card) return false;
+    if (typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (card.classList && typeof card.classList.add === 'function') {
+      card.classList.add('is-located');
+      var pulseMs = Number.isFinite(opts.pulseMs) ? opts.pulseMs : 1600;
+      setTimeout(function () { card.classList.remove('is-located'); }, pulseMs);
+    }
+    return true;
+  }
+
+  /**
+   * The Display picker's option list: the scanned source (if this is a
+   * converted copy), the original/editable-copy document, every other
+   * editable copy of the same PDF, the current working draft, then every
+   * release, newest first. A pure function of the review lineage so the
+   * picker and its tests build the same list from the same inputs; the two
+   * date formatters are passed in because the timezone/locale rules they
+   * apply stay page-local (see the escapeHtml/confidenceLabel/formatCopyMoment
+   * note in the consolidation plan for why formatCopyMoment does not move
+   * here itself).
+   */
+  function reviewVersionSelectOptions(input) {
+    var opts = input || {};
+    var conversionSource = opts.conversionSource || null;
+    var editableCopies = Array.isArray(opts.editableCopies) ? opts.editableCopies : [];
+    var hasCurrentDraftChanges = Boolean(opts.hasCurrentDraftChanges);
+    var pendingRelease = Boolean(opts.pendingRelease);
+    var releases = Array.isArray(opts.releases) ? opts.releases : [];
+    var formatCopyMoment = typeof opts.formatCopyMoment === 'function' ? opts.formatCopyMoment : function () { return ''; };
+    var formatDate = typeof opts.formatDate === 'function' ? opts.formatDate : function () { return ''; };
+
+    var options = [];
+    if (conversionSource) {
+      options.push({
+        value: 'source-original',
+        label: 'Original PDF',
+        description: conversionSource.filename || 'Scanned source this copy was converted from',
+        group: 'Document'
+      });
+    }
+    options.push({
+      value: 'original',
+      label: conversionSource ? 'Editable copy' : 'Original',
+      description: conversionSource ? 'DOCX converted from the PDF' : 'Source document',
+      group: 'Document'
+    });
+    for (var c = 0; c < editableCopies.length; c++) {
+      var editableCopy = editableCopies[c];
+      options.push({
+        value: 'editable-copy:' + editableCopy.id,
+        label: c === 0 ? 'Editable copy (latest)' : 'Editable copy',
+        description: 'DOCX converted from this PDF' + (editableCopy.created_at ? ' · ' + formatCopyMoment(editableCopy.created_at) : ''),
+        group: 'Document'
+      });
+    }
+    options.push({
+      value: 'current',
+      label: 'Current draft',
+      description: pendingRelease
+        ? 'Saved draft pending release approval'
+        : (hasCurrentDraftChanges ? 'Live unreleased edits' : 'Current document view'),
+      group: 'Working copy'
+    });
+    for (var i = 0; i < releases.length; i++) {
+      var release = releases[i];
+      var label = release.released_document_filename || ('Version ' + release.release_number);
+      var releasedAt = release.released_at ? formatDate(release.released_at) : '';
+      options.push({
+        value: release && release.id ? 'release:' + release.id : '',
+        label: label,
+        description: 'Version ' + (release.release_number || '') + (releasedAt ? ' · ' + releasedAt : ''),
+        group: 'Versions'
+      });
+    }
+    return options;
+  }
+
   // =========================================================================
   // Review session: baseline tracking + persistable serialization
   // =========================================================================
@@ -1637,6 +1744,10 @@
     openSuggestedChanges: openSuggestedChanges,
     batchReviewThreads: batchReviewThreads,
     releasedReviewThreads: releasedReviewThreads,
+    annotationStatusLabel: annotationStatusLabel,
+    annotationAuthorLabel: annotationAuthorLabel,
+    focusAnnotationCardInDom: focusAnnotationCardInDom,
+    reviewVersionSelectOptions: reviewVersionSelectOptions,
     HIGHLIGHT_COLORS: HIGHLIGHT_COLORS.map(function (color) { return Object.assign({}, color); }),
     DEFAULT_HIGHLIGHT_COLOR: DEFAULT_HIGHLIGHT_COLOR,
     sourceChangesForReviewChange: sourceChangesForReviewChange,

@@ -95,6 +95,7 @@
   // =========================================================================
 
   function escapeHtml(text) {
+    if (window.Lex && Lex.Utils && typeof Lex.Utils.escapeHtml === 'function') return Lex.Utils.escapeHtml(text);
     if (!text) return '';
     var str = String(text);
     var out = '';
@@ -2322,54 +2323,21 @@
     return source && source.id ? source : null;
   }
 
+  // The pure option-building logic lives in LanaDocumentReview so it is
+  // unit-tested directly; this wrapper only gathers the current lineage out
+  // of page state. formatCopyMoment and formatDate stay page-local (they
+  // apply the reviewer's own locale/timezone; see the consolidation plan for
+  // why that doesn't move into the shared, timezone-agnostic service).
   function reviewVersionSelectOptions() {
-    var editableCopies = editableCopiesForCurrentFile();
-    var conversionSource = conversionSourceForCurrentFile();
-    var options = [];
-    if (conversionSource) {
-      options.push({
-        value: 'source-original',
-        label: 'Original PDF',
-        description: conversionSource.filename || 'Scanned source this copy was converted from',
-        group: 'Document'
-      });
-    }
-    options.push({
-      value: 'original',
-      label: conversionSource ? 'Editable copy' : 'Original',
-      description: conversionSource ? 'DOCX converted from the PDF' : 'Source document',
-      group: 'Document'
+    return LanaDocumentReview.reviewVersionSelectOptions({
+      conversionSource: conversionSourceForCurrentFile(),
+      editableCopies: editableCopiesForCurrentFile(),
+      hasCurrentDraftChanges: hasCurrentDraftReviewChanges(),
+      pendingRelease: Boolean(state.pendingReviewReleaseBatch),
+      releases: reviewReleasesNewestFirst().map(function (entry) { return entry.release; }),
+      formatCopyMoment: formatCopyMoment,
+      formatDate: formatDate
     });
-    for (var c = 0; c < editableCopies.length; c++) {
-      var editableCopy = editableCopies[c];
-      options.push({
-        value: 'editable-copy:' + editableCopy.id,
-        label: c === 0 ? 'Editable copy (latest)' : 'Editable copy',
-        description: 'DOCX converted from this PDF' + (editableCopy.created_at ? ' · ' + formatCopyMoment(editableCopy.created_at) : ''),
-        group: 'Document'
-      });
-    }
-    options.push({
-      value: 'current',
-      label: 'Current draft',
-      description: state.pendingReviewReleaseBatch
-        ? 'Saved draft pending release approval'
-        : (hasCurrentDraftReviewChanges() ? 'Live unreleased edits' : 'Current document view'),
-      group: 'Working copy'
-    });
-    var releases = reviewReleasesNewestFirst();
-    for (var i = 0; i < releases.length; i++) {
-      var release = releases[i].release;
-      var label = release.released_document_filename || ('Version ' + release.release_number);
-      var releasedAt = release.released_at ? formatDate(release.released_at) : '';
-      options.push({
-        value: reviewVersionSelectValueForRelease(release),
-        label: label,
-        description: 'Version ' + (release.release_number || '') + (releasedAt ? ' · ' + releasedAt : ''),
-        group: 'Versions'
-      });
-    }
-    return options;
   }
 
   function currentReviewVersionSelectValue() {
@@ -2531,8 +2499,8 @@
 
   async function openReviewVersionFromSelect(value) {
     if (!value) return;
-    if (value === 'editable-copy' || value.indexOf('editable-copy:') === 0) {
-      var copy = value.indexOf(':') > 0 ? editableCopyById(value.slice(value.indexOf(':') + 1)) : editableCopyForCurrentFile();
+    if (value.indexOf('editable-copy:') === 0) {
+      var copy = editableCopyById(value.slice(value.indexOf(':') + 1));
       openDocumentHalf(copy && copy.id);
       return;
     }
@@ -3296,28 +3264,20 @@
         notify((error && error.message) || 'Failed to edit review change', 'error');
       });
     };
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      var modal = Lex.Modal.open({
-        heading: 'Edit Draft Change',
-        size: 'md',
-        content: editReviewChangeContent(change),
-        confirmText: 'Update Change',
-        cancelText: 'Cancel',
-        onConfirm: run
-      });
-      setTimeout(function () {
-        var input = modal && modal.querySelector ? modal.querySelector('#reviewEditChangeText') : document.getElementById('reviewEditChangeText');
-        if (input && typeof input.focus === 'function') input.focus();
-      }, 0);
-      return;
-    }
-    var fallback = window.prompt('Edit proposed text', changeProposedText(change) || '');
-    if (fallback !== null) {
-      editUnreleasedReviewChange(change, fallback).catch(function (error) {
-        console.error('[FileViewerPage] Edit review change failed:', error);
-        notify((error && error.message) || 'Failed to edit review change', 'error');
-      });
-    }
+    // lex-modal.js is loaded unconditionally before this page's own script,
+    // so Lex.Modal.open is always available here; no window.prompt fallback.
+    var modal = Lex.Modal.open({
+      heading: 'Edit Draft Change',
+      size: 'md',
+      content: editReviewChangeContent(change),
+      confirmText: 'Update Change',
+      cancelText: 'Cancel',
+      onConfirm: run
+    });
+    setTimeout(function () {
+      var input = modal && modal.querySelector ? modal.querySelector('#reviewEditChangeText') : document.getElementById('reviewEditChangeText');
+      if (input && typeof input.focus === 'function') input.focus();
+    }, 0);
   }
 
   function releasedDisplayChangesForReleaseId(releaseId) {
@@ -3661,7 +3621,7 @@
     if (emptyBox) emptyBox.classList.toggle('hidden', threads.length > 0);
     list.innerHTML = threads.map(function (thread) {
       var kind = LanaDocumentReview.annotationKind(thread);
-      var status = String(thread.status || 'open').toLowerCase() === 'resolved' ? 'Resolved' : 'Open';
+      var statusInfo = LanaDocumentReview.annotationStatusLabel(thread);
       var quote = reviewAnnotationQuote(thread);
       var color = LanaDocumentReview.annotationColor(thread, kind);
       var swatch = kind === 'highlight'
@@ -3674,11 +3634,11 @@
       var date = thread.date || thread.created_at || '';
       var deletable = !thread.read_only && canSaveViewerAnnotations();
       return '<div role="button" tabindex="0" class="file-viewer-review-item file-viewer-review-item--annotation file-viewer-review-item--' + kind + '" data-review-annotation-id="' + escapeHtml(thread.id || '') + '">' +
-        '<span class="file-viewer-review-item-meta"><span>' + escapeHtml(thread.author || 'Reviewer') + '</span><span>' + escapeHtml(date ? formatDate(date) : '') + '</span>' +
+        '<span class="file-viewer-review-item-meta"><span>' + escapeHtml(LanaDocumentReview.annotationAuthorLabel(thread)) + '</span><span>' + escapeHtml(date ? formatDate(date) : '') + '</span>' +
           (deletable ? '<button type="button" class="file-viewer-review-item-delete" data-review-annotation-delete="' + escapeHtml(thread.id || '') + '" aria-label="Delete this ' + escapeHtml(LanaDocumentReview.annotationLabel(thread).toLowerCase()) + '">Delete</button>' : '') +
         '</span>' +
         '<span class="file-viewer-review-item-title-row"><span class="file-viewer-review-item-title">' + swatch + escapeHtml(LanaDocumentReview.annotationLabel(thread)) + '</span>' +
-          renderReviewStatusBadge({ label: status, tone: status === 'Resolved' ? 'release' : 'draft' }) + '</span>' +
+          renderReviewStatusBadge({ label: statusInfo.label, tone: statusInfo.tone }) + '</span>' +
         (quote ? '<span class="file-viewer-review-item-quote">' + escapeHtml(quote) + '</span>' : '') +
         (thread.text ? '<span class="file-viewer-review-item-text">' + escapeHtml(thread.text) + '</span>' : '') +
         (kind === 'redline' && thread.proposed_text ? '<span class="file-viewer-review-item-text file-viewer-review-item-text--proposed">Suggested: ' + escapeHtml(thread.proposed_text) + '</span>' : '') +
@@ -3839,33 +3799,24 @@
       });
       return values;
     };
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      var modal = Lex.Modal.open({
-        heading: spec.heading,
-        size: 'sm',
-        content: content,
-        confirmText: 'Save',
-        cancelText: 'Cancel',
-        onConfirm: function () {
-          Promise.resolve(onConfirm(read())).catch(function (error) {
-            notify((error && error.message) || 'The annotation could not be saved.', 'error');
-          });
-        }
-      });
-      setTimeout(function () {
-        var first = modal && modal.querySelector ? modal.querySelector('#' + spec.fields[0].id) : document.getElementById(spec.fields[0].id);
-        if (first && typeof first.focus === 'function') first.focus();
-      }, 0);
-      return;
-    }
-    var values = {};
-    spec.fields.forEach(function (field) {
-      var answer = window.prompt(field.label, '');
-      values[field.id] = answer === null ? '' : answer;
+    // lex-modal.js is loaded unconditionally before this page's own script,
+    // so Lex.Modal.open is always available here; no window.prompt fallback.
+    var modal = Lex.Modal.open({
+      heading: spec.heading,
+      size: 'sm',
+      content: content,
+      confirmText: 'Save',
+      cancelText: 'Cancel',
+      onConfirm: function () {
+        Promise.resolve(onConfirm(read())).catch(function (error) {
+          notify((error && error.message) || 'The annotation could not be saved.', 'error');
+        });
+      }
     });
-    Promise.resolve(onConfirm(values)).catch(function (error) {
-      notify((error && error.message) || 'The annotation could not be saved.', 'error');
-    });
+    setTimeout(function () {
+      var first = modal && modal.querySelector ? modal.querySelector('#' + spec.fields[0].id) : document.getElementById(spec.fields[0].id);
+      if (first && typeof first.focus === 'function') first.focus();
+    }, 0);
   }
 
   /** Draw the draft's annotations in the embed; nothing when the editor is not up yet. */
@@ -3889,14 +3840,11 @@
   }
 
   function focusReviewAnnotationCard(annotationId) {
-    var id = String(annotationId || '');
-    if (!id) return;
-    setReviewTab('comments');
-    var card = document.querySelector('[data-review-annotation-id="' + id.replace(/["\\]/g, '') + '"]');
-    if (!card) return;
-    if (typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    card.classList.add('is-located');
-    setTimeout(function () { card.classList.remove('is-located'); }, 1600);
+    LanaDocumentReview.focusAnnotationCardInDom({
+      annotationId: annotationId,
+      attribute: 'data-review-annotation-id',
+      activateTab: function () { setReviewTab('comments'); }
+    });
   }
 
   function draftBatchTitle() {

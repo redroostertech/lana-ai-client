@@ -577,4 +577,9 @@
   global.Utils.formatFileSize = formatFileSize;
   global.Utils.truncate       = truncateText;
 
+  // Lets a Node-side module require() this file and reuse Lex.Utils instead
+  // of keeping its own copy, wherever the caller has already set up the
+  // window/LanaTime globals this file depends on.
+  if (typeof module !== 'undefined' && module.exports) module.exports = global.Lex.Utils;
+
 })(window);

@@ -170,7 +170,7 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('state.currentReviewBatchRestoreFailed');
     expect(pageJs).toContain('Saved draft details could not be loaded.');
     expect(pageJs).toContain('Saved review draft is pending release approval.');
-    expect(pageJs).toContain('Saved draft pending release approval');
+    expect(serviceJs).toContain('Saved draft pending release approval');
     expect(pageJs).toContain('function currentReviewBatchDisplayChanges');
     expect(pageJs).toContain('function activeDraftBatchForCurrentFile');
     expect(pageJs).toContain('String(batches[i].base_file_version_id || \'\') === baseFileVersionId');
@@ -308,18 +308,25 @@ describe('file-viewer review UX foundation', () => {
     // Owner, 2026-09-25: every editable copy of a PDF is offered, newest first, each opened by its own id.
     expect(pageJs).toContain('function editableCopiesForCurrentFile');
     expect(pageJs).toContain("conversion.copies");
-    expect(pageJs).toContain("value: 'editable-copy:' + editableCopy.id");
     expect(pageJs).toContain("value.indexOf('editable-copy:') === 0");
-    expect(pageJs).toContain("'Editable copy (latest)'");
     expect(pageJs).toContain('function hasCurrentDraftReviewChanges');
-    expect(pageJs).toContain("value: 'original'");
-    expect(pageJs).toContain("value: 'current'");
-    expect(pageJs).toContain("label: 'Current draft'");
-    expect(pageJs).toContain("group: 'Document'");
-    expect(pageJs).toContain("group: 'Working copy'");
-    expect(pageJs).toContain("group: 'Versions'");
-    expect(pageJs).toContain("? 'Saved draft pending release approval'");
-    expect(pageJs).toContain("hasCurrentDraftReviewChanges() ? 'Live unreleased edits' : 'Current document view'");
+    // The option list's own contents (value/label/group strings, and the
+    // pending-release vs live-unreleased-edits description branches) moved
+    // to LanaDocumentReview.reviewVersionSelectOptions and are covered by
+    // real unit tests in tests/unit/document-review-api.service.test.js; the
+    // page only gathers state into that call now.
+    expect(pageJs).toContain('return LanaDocumentReview.reviewVersionSelectOptions({');
+    expect(pageJs).toContain('formatCopyMoment: formatCopyMoment,');
+    expect(serviceJs).toContain("value: 'editable-copy:' + editableCopy.id");
+    expect(serviceJs).toContain("'Editable copy (latest)'");
+    expect(serviceJs).toContain("value: 'original'");
+    expect(serviceJs).toContain("value: 'current'");
+    expect(serviceJs).toContain("label: 'Current draft'");
+    expect(serviceJs).toContain("group: 'Document'");
+    expect(serviceJs).toContain("group: 'Working copy'");
+    expect(serviceJs).toContain("group: 'Versions'");
+    expect(serviceJs).toContain("? 'Saved draft pending release approval'");
+    expect(serviceJs).toContain("hasCurrentDraftChanges ? 'Live unreleased edits' : 'Current document view'");
     expect(pageJs).toContain("if (state.reviewDisplayTarget === 'original') return 'original';");
     expect(pageJs).toContain("if (hasCurrentDraftReviewChanges()) return 'current';");
     expect(pageJs).toContain('function selectReviewDisplayScope');

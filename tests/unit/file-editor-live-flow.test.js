@@ -604,7 +604,10 @@ describe('File Editor live document boundary', () => {
     expect(editor).toContain("if (action === 'dock-highlight' && file && isServerReviewFile(file)) {");
     expect(editor).toContain("if (action === 'delete-review-comment' && file && isServerReviewFile(file)) {");
     expect(editor).toContain('data-action="delete-review-comment"');
-    expect(editor).toContain("var kindLabel = kind === 'highlight' ? 'Highlight' : kind === 'redline' ? 'Suggested change' : 'Comment';");
+    // The kind-label mapping moved to the shared LanaDocumentReview.annotationLabel
+    // (already covered by tests/unit/document-review-api.service.test.js);
+    // the editor now delegates instead of keeping its own copy.
+    expect(editor).toContain('var kindLabel = documentReviewService().annotationLabel(comment);');
     expect(css).toContain('.office-review-annotation-swatch[data-color="#86EFAC"]');
     expect(css).toContain('.office-review-comment-thread.is-located');
   });

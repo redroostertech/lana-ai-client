@@ -91,6 +91,35 @@ describe('document enrichment panel html', () => {
     expect(enrichment.renderPanelHtml(enrichment.viewModel({ enabled: true, enrichment: null }))).toContain('No insights yet');
     expect(enrichment.renderPanelHtml(enrichment.viewModel({ enabled: false }))).toContain('Insights are off');
   });
+
+  test('escapeHtml delegates to Lex.Utils.escapeHtml when it is loaded, and keeps its own fallback otherwise', () => {
+    expect(enrichment.escapeHtml('<b>')).toBe('&lt;b&gt;');
+    global.Lex = { Utils: { escapeHtml: (value) => 'STUB(' + value + ')' } };
+    try {
+      expect(enrichment.escapeHtml('<b>')).toBe('STUB(<b>)');
+    } finally {
+      delete global.Lex;
+    }
+    // Control arm: back to the local fallback once Lex is gone again.
+    expect(enrichment.escapeHtml('<b>')).toBe('&lt;b&gt;');
+  });
+
+  test('renders Insights badges, buttons and empty states as Lex elements', () => {
+    const html = enrichment.renderPanelHtml(enrichment.viewModel(PAYLOAD));
+    expect(html).toContain('<lex-badge label="Contact" color="indigo" size="sm"></lex-badge>');
+    expect(html).toContain('<lex-btn type="button" variant="primary" size="sm" data-enrichment-action="accept" data-suggestion-id="sug-1">');
+    expect(html).toContain('<lex-btn type="button" variant="secondary" size="sm" data-enrichment-action="dismiss" data-suggestion-id="sug-1">Dismiss</lex-btn>');
+    expect(html).not.toContain('class="file-viewer-insights__badge"');
+    expect(html).not.toContain('class="file-viewer-review-action');
+    const off = enrichment.renderPanelHtml(enrichment.viewModel({ enabled: false }));
+    expect(off).toContain('<lex-empty size="compact" message="Insights are off"');
+    expect(off).not.toContain('file-viewer-review-empty');
+    const unavailable = enrichment.renderPanelHtml(enrichment.viewModel({ enabled: true, enrichment: null }));
+    expect(unavailable).toContain('<lex-empty size="compact" message="No insights yet"');
+    expect(unavailable).toContain('<lex-btn type="button" variant="secondary" size="sm" data-enrichment-action="rerun">Read this document</lex-btn>');
+    const nothing = enrichment.renderPanelHtml(enrichment.viewModel({ enabled: true, enrichment: { id: 'e', status: 'completed', entities: [], callouts: [] }, suggestions: [] }));
+    expect(nothing).toContain('<lex-empty size="compact" message="Nothing to report"');
+  });
 });
 
 describe('document enrichment api wrappers', () => {
