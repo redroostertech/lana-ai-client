@@ -10,15 +10,15 @@ const baseConfig = {
   sourcemap: true,
 };
 
-Promise.all([
-  esbuild.build({
-    ...baseConfig,
-    outfile: 'src/js/tiptap-bundle-built.js',
-  }),
-  esbuild.build({
-    ...baseConfig,
-    outfile: 'public_html/js/tiptap-bundle-built.js',
-  }),
-]).then(() => {
-  console.log('✓ Tiptap bundles created successfully');
-}).catch(() => process.exit(1));
+const OUTFILES = [
+  'src/js/tiptap-bundle-built.js',
+  'public_html/js/tiptap-bundle-built.js',
+];
+
+module.exports = { baseConfig, OUTFILES };
+
+if (require.main === module) {
+  Promise.all(OUTFILES.map((outfile) => esbuild.build({ ...baseConfig, outfile }))).then(() => {
+    console.log('✓ Tiptap bundles created successfully');
+  }).catch(() => process.exit(1));
+}

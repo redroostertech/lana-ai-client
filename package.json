@@ -21,7 +21,7 @@
     "prestart": "npm run generate-version",
     "start": "node --max-old-space-size=2048 src/index.js",
     "start:prod": "node --max-old-space-size=16384 src/index.js",
-    "dev": "nodemon --max-old-space-size=2048 src/index.js",
+    "dev": "node --watch --max-old-space-size=2048 src/index.js",
     "test": "jest",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
@@ -39,7 +39,7 @@
     "electron": "electron electron-main.js --disable-gpu-driver-bug-workarounds",
     "preelectron:dev": "npm run build:tiptap && npm run css:dev && node scripts/build-screen-voice-helper.js",
     "electron:dev": "NODE_ENV=development npx electron electron-main.js --disable-gpu-driver-bug-workarounds",
-    "electron:dev:watch": "nodemon --watch electron-main.js --watch electron-preload.js --watch electron-storage.js --watch electron-discovery.js --watch electron-logger.js --watch electron-updater-custom.js --watch js --watch public_html --watch src/js/tiptap-bundle.js --watch src/css --ext js,html,css,json --exec \"npm run build:tiptap && npm run css:dev && NODE_ENV=development electron electron-main.js --disable-gpu-driver-bug-workarounds\"",
+    "electron:dev:watch": "node --watch-path=electron-main.js --watch-path=electron-preload.js --watch-path=electron-storage.js --watch-path=electron-discovery.js --watch-path=electron-logger.js --watch-path=electron-updater-custom.js --watch-path=js --watch-path=public_html --watch-path=src/js/tiptap-bundle.js --watch-path=src/css scripts/electron-dev-watch.js",
     "electron:rebuild": "electron-rebuild -f -w bcrypt",
     "postinstall": "node scripts/postinstall-electron.js",
     "build:client": "npm run bundle-electron && electron-builder -c electron-builder.client.json",
@@ -110,7 +110,10 @@
     "@istanbuljs/load-nyc-config": {
       "js-yaml": "4.3.2"
     },
-    "postcss-selector-parser": "7.1.6"
+    "postcss-selector-parser": "7.1.6",
+    "tailwindcss": {
+      "chokidar": "4.0.3"
+    }
   },
   "devDependencies": {
     "@electron/rebuild": "4.2.1",
@@ -126,7 +129,6 @@
     "jest-junit": "17.0.0",
     "jsdom": "26.1.0",
     "lucide-static": "0.574.0",
-    "nodemon": "3.1.14",
     "png-to-ico": "2.1.8",
     "postcss": "8.5.29",
     "postcss-cli": "12.0.0",
@@ -139,7 +141,6 @@
     "electron-winstaller@5.4.0": false,
     "esbuild@0.27.2": false,
     "fsevents@2.3.2": false,
-    "fsevents@2.3.3": false,
     "@parcel/watcher@2.6.0": false,
     "unrs-resolver@1.12.2": false
   }
