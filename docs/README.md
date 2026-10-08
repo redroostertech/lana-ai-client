@@ -42,7 +42,7 @@ LanaAI Chef is a Node.js backend service that provides:
 ### Software
 - **macOS**: 13.0 (Ventura) or later
 - **Xcode Command Line Tools**: Required for Homebrew
-- **Node.js**: 20 LTS or later
+- **Node.js**: exactly 24.21.0 (npm 11), the version pinned in `package.json` `engines`
 - **Python**: 3.11 (for Unstructured.io)
 
 ---
@@ -147,7 +147,7 @@ This is the main installation script that sets up everything:
 - PostgreSQL 17 with pgvector extension
 - MinIO (S3-compatible object storage)
 - Ollama (local LLM inference)
-- Node.js 20 LTS
+- Node.js 24.21.0 (the pinned runtime; the backend `install.sh` provisions it and the script refuses to run without it)
 - PM2 (process manager)
 - Python 3.11 + Unstructured.io
 - All npm dependencies

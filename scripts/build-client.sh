@@ -276,18 +276,22 @@ parse_args() {
 # Pre-flight Checks
 ###############################################################################
 
+# The exact Node release pinned in package.json "engines".
+node_pin() {
+    sed -nE 's/^[[:space:]]*"node":[[:space:]]*"([0-9.]+)".*/\1/p' "$PROJECT_ROOT/package.json" | head -1
+}
+
 check_requirements() {
     print_step "Checking requirements..."
 
     # Check Node.js
     if ! command -v node &> /dev/null; then
-        print_error "Node.js is not installed. Please install Node.js 18+ first."
+        print_error "Node.js is not installed. Please install Node.js $(node_pin) first."
         exit 1
     fi
 
-    NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-    if [ "$NODE_VERSION" -lt 18 ]; then
-        print_error "Node.js version 18+ is required. Current version: $(node -v)"
+    if [ "$(node -v)" != "v$(node_pin)" ]; then
+        print_error "Node.js $(node_pin) is required (package.json engines). Current version: $(node -v)"
         exit 1
     fi
 

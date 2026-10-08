@@ -11,7 +11,9 @@ npm install
 npm run electron:dev
 ```
 
-Use Node 24.21.0 (npm 11), the exact version in `engines`. Electron 44 no longer downloads its binary from its own install script, so the root `postinstall` (`install-electron`) fetches it into `node_modules/electron/dist` during `npm install` / `npm ci`. npm 11 then warns that bcrypt, esbuild, sharp and electron-winstaller have install scripts not covered by `allowScripts`. That is expected: the first three load their bundled prebuilt binaries without those scripts, and electron-winstaller's script only serves the Squirrel.Windows target, which this app does not build.
+Use Node 24.21.0 (npm 11), the exact version in `engines`. Electron 44 no longer downloads its binary from its own install script, so the root `postinstall` (`scripts/postinstall-electron.js`, which runs Electron's `install.js`) fetches it into `node_modules/electron/dist` during `npm install` / `npm ci`. Set `ELECTRON_SKIP_BINARY_DOWNLOAD=1` to skip that download (for example in a job that only runs Jest); packaging and Playwright jobs must leave it unset. With `npm install --omit=dev` there is no Electron package, and the postinstall prints a one-line notice and does nothing.
+
+npm 11 gates dependency install scripts behind `allowScripts`. The `allowScripts` block in `package.json` records an explicit, version-pinned denial for each of them, so installs print no install-script warnings: bcrypt, esbuild, fsevents, @parcel/watcher and unrs-resolver load their prebuilt binaries (bundled or from platform packages) without their scripts, and electron-winstaller's script only serves the Squirrel.Windows target, which this app does not build. When one of those packages changes version, npm lists it again under `npm install-scripts ls`; review it and update the pinned entry.
 
 `electron:dev` runs `NODE_ENV=development npx electron electron-main.js`. Its `preelectron:dev` hook first builds the TipTap bundle, Tailwind CSS, and the screen-voice helper, so no separate build step is needed.
 

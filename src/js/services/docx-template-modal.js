@@ -346,7 +346,9 @@
     })
     .then(function (resp) { return resp.arrayBuffer(); })
     .then(function (arrayBuf) {
-      return pdfjsLib.getDocument({ data: arrayBuf }).promise;
+      // The vendored pdf.js is 3.11.174. isEvalSupported: false closes
+      // CVE-2024-4367 (script execution from a crafted font in the PDF).
+      return pdfjsLib.getDocument({ data: arrayBuf, isEvalSupported: false }).promise;
     })
     .then(function (pdfDoc) {
       viewer.innerHTML = '';
