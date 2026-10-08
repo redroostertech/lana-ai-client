@@ -41,6 +41,7 @@
     "electron:dev": "NODE_ENV=development npx electron electron-main.js --disable-gpu-driver-bug-workarounds",
     "electron:dev:watch": "nodemon --watch electron-main.js --watch electron-preload.js --watch electron-storage.js --watch electron-discovery.js --watch electron-logger.js --watch electron-updater-custom.js --watch js --watch public_html --watch src/js/tiptap-bundle.js --watch src/css --ext js,html,css,json --exec \"npm run build:tiptap && npm run css:dev && NODE_ENV=development electron electron-main.js --disable-gpu-driver-bug-workarounds\"",
     "electron:rebuild": "electron-rebuild -f -w bcrypt",
+    "postinstall": "install-electron",
     "postinstall:electron": "npm run electron:rebuild",
     "build:client": "npm run bundle-electron && electron-builder -c electron-builder.client.json",
     "build:mac": "npm run bundle-electron && electron-builder --mac -c electron-builder.client.json",

@@ -321,7 +321,8 @@ dist/
 Run the Electron app locally with Chrome DevTools enabled for debugging:
 
 ```bash
-# First time setup (rebuilds native modules for Electron)
+# First time setup on Node 24.21.0 (postinstall downloads the Electron
+# binary; electron:rebuild rebuilds native modules for Electron)
 npm install && npm run electron:rebuild
 
 # Run with DevTools open

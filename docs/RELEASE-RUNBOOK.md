@@ -11,6 +11,8 @@ npm install
 npm run electron:dev
 ```
 
+Use Node 24.21.0 (npm 11), the exact version in `engines`. Electron 44 no longer downloads its binary from its own install script, so the root `postinstall` (`install-electron`) fetches it into `node_modules/electron/dist` during `npm install` / `npm ci`. npm 11 then warns that bcrypt, esbuild, sharp and electron-winstaller have install scripts not covered by `allowScripts`. That is expected: the first three load their bundled prebuilt binaries without those scripts, and electron-winstaller's script only serves the Squirrel.Windows target, which this app does not build.
+
 `electron:dev` runs `NODE_ENV=development npx electron electron-main.js`. Its `preelectron:dev` hook first builds the TipTap bundle, Tailwind CSS, and the screen-voice helper, so no separate build step is needed.
 
 Run unit tests:
