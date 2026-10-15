@@ -187,7 +187,7 @@ describe('Document Library integration', () => {
     const fileEditorHtml = fs.readFileSync(path.join(SRC, 'file-editor.html'), 'utf8');
     const descriptors = loadPageDescriptors();
 
-    expect(fileEditorHtml).toContain('<title>File Editor - LANA One</title>');
+    expect(fileEditorHtml).toContain('<title>File Editor - LANA AI</title>');
     expect(fileEditorHtml).toContain('page-title="File Editor"');
     expect(fileEditorHtml).toContain('class="office-shell file-editor-shell"');
     expect(fileEditorHtml).not.toContain('LANA File Editor');

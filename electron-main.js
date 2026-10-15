@@ -1115,8 +1115,8 @@ function createApplicationMenu() {
           click: () => {
             dialog.showMessageBox({
               type: 'info',
-              title: 'About LANA One',
-              message: 'LANA One Desktop Client',
+              title: 'About Lana AI',
+              message: 'Lana AI Desktop Client',
               detail: `Version: ${getAppVersion()}\nElectron: ${process.versions.electron}\nChrome: ${process.versions.chrome}\nNode: ${process.versions.node}`
             });
           }

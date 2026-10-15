@@ -291,7 +291,7 @@ window.DesktopNotifications = window.DesktopNotifications || (function() {
     const id = notification.id || '';
     if (id && getSeenIds().has(id)) return false;
 
-    const title = formatDisplayText(notification.display_title || notification.title || 'LANA One notification');
+    const title = formatDisplayText(notification.display_title || notification.title || 'LANA AI notification');
     const body = formatDisplayText(notification.display_message || notification.body || notification.message || '');
     const desktopNotification = new Notification(title, {
       body,

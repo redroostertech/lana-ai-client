@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - LANA One</title>
+    <title>Admin Dashboard - Lana AI</title>
     <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
     <script src="../js/error-reporter.js"></script>
@@ -23,7 +23,7 @@
     #lana-preloader {
       position: fixed;
       inset: 0;
-      background: #111111;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -71,13 +71,14 @@
 
   <!-- Pure HTML/CSS Preloader - Shows immediately, hidden by JS when ready -->
   <div id="lana-preloader">
-    <svg class="preloader-logo" viewBox="358 382 539 539" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LANA One">
-      <path fill="#F5F5F4" d="M358,384 L731,384 L731,474 L450,474 L450,767 L358,767Z"/>
-      <path fill="#F5F5F4" d="M897,919 L524,919 L524,829 L805,829 L805,536 L897,536Z"/>
-      <path fill="#F5F5F4" d="M550,578 L624,537 L661,537 L661,780 L602,780 L602,600 L550,627Z"/>
+    <svg class="preloader-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="45" fill="white" opacity="0.15"/>
+      <circle cx="50" cy="50" r="35" fill="white" opacity="0.3"/>
+      <circle cx="50" cy="50" r="25" fill="white"/>
+      <text x="50" y="58" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#667eea" text-anchor="middle">L</text>
     </svg>
     <div class="preloader-spinner"></div>
-    <div class="preloader-text">Loading LANA One...</div>
+    <div class="preloader-text">Loading LanaAI...</div>
   </div>
 
   <!-- App content - wrapped for FOUC prevention -->

@@ -124,7 +124,7 @@ const ArticleSystem = (function() {
     const section = article.section;
 
     // Update page title
-    document.title = `${article.title} - LANA One Help`;
+    document.title = `${article.title} - LanaAI Help`;
     var pageTitleEl = document.getElementById('pageTitle');
     if (pageTitleEl) pageTitleEl.textContent = article.title;
     // Lex shell: update topbar heading

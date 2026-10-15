@@ -4683,7 +4683,7 @@
       hydrateFileBreadcrumbMatterLabel(response);
 
       // Update page title
-      document.title = displayFilename + ' - LANA One';
+      document.title = displayFilename + ' - LANA AI';
 
       // Flush the banner re-render queued by the setAttribute calls above so
       // subsequent class toggles target the final rendered DOM nodes, not

@@ -80,12 +80,12 @@ describe('LanaEmbedHost.resolveEmbedApp', () => {
       setPage: jest.fn(),
       querySelector: jest.fn((selector) => selector === 'lex-sidebar' ? sidebar : null)
     };
-    const doc = { title: 'Embedded App - LANA One' };
+    const doc = { title: 'Embedded App - LANA AI' };
 
     configureShell(shell, { label: 'Legal NSights' }, doc);
 
     expect(shell.setPage).toHaveBeenCalledWith({ title: 'Legal NSights' });
-    expect(doc.title).toBe('Legal NSights - LANA One');
+    expect(doc.title).toBe('Legal NSights - LANA AI');
     expect(sidebar.collapsed).toBe(true);
   });
 
