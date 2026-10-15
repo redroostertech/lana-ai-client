@@ -1463,7 +1463,7 @@
         sections:      { type: Array,   default: [] },
         activeId:      { type: String,  default: '' },
         logoSrc:       { type: String,  default: '' },
-        logoAlt:       { type: String,  default: 'LANA AI' },
+        logoAlt:       { type: String,  default: 'LANA One' },
         logoHref:      { type: String,  default: 'dashboard.html' },
         userName:      { type: String,  default: '' },
         userInitials:  { type: String,  default: '' },

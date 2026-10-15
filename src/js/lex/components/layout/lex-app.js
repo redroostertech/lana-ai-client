@@ -320,7 +320,7 @@
         pageTitle:    { type: String,  default: '' },
         activeNavId:  { type: String,  default: '' },
         logoSrc:      { type: String,  default: 'img/logo-light.png' },
-        logoAlt:      { type: String,  default: 'LANA AI' },
+        logoAlt:      { type: String,  default: 'LANA One' },
         logoHref:     { type: String,  default: 'dashboard.html' },
         loading:      { type: Boolean, default: false },
         sidebarOpen:  { type: Boolean, default: false, reflect: true },
