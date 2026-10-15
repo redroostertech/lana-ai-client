@@ -20,11 +20,12 @@ const Store = require('electron-store');
  * the PNG master first because nativeImage loads it more reliably than ICNS.
  */
 function appIconCandidates() {
+  const dir = BRAND_FLAVOR === 'lana-one' ? 'icons-lana-one' : 'icons';
   return [
-    path.join(__dirname, 'build', 'icons', 'icon-1024.png'),
-    path.join(__dirname, 'build', 'icons', 'icon-512.png'),
-    path.join(__dirname, 'build', 'icons', 'icon.png'),
-    path.join(__dirname, 'build', 'icons', 'icon.icns'),
+    path.join(__dirname, 'build', dir, 'icon-1024.png'),
+    path.join(__dirname, 'build', dir, 'icon-512.png'),
+    path.join(__dirname, 'build', dir, 'icon.png'),
+    path.join(__dirname, 'build', dir, 'icon.icns'),
   ];
 }
 
@@ -32,6 +33,15 @@ function appIconCandidates() {
 const packageJson = require('./package.json');
 app.setName(packageJson.productName || 'Lana AI');
 app.setVersion(packageJson.version);
+
+// Which product this is: the LANA client ("lana") or LANA One ("lana-one").
+// Fixed at build time by package.json lanaFlavor; LANA_FLAVOR overrides it
+// only in an unpackaged app (src/js/brand/lana-brand.js). Pages get it
+// through the preload.
+const { resolveFlavor } = require('./src/js/brand/lana-brand');
+const BRAND_FLAVOR = resolveFlavor({ env: process.env, packageJson, isPackaged: app.isPackaged });
+const BRAND_ARG = '--lana-flavor=' + BRAND_FLAVOR;
+const WINDOW_ICON = path.join(__dirname, 'build', BRAND_FLAVOR === 'lana-one' ? 'icons-lana-one' : 'icons', 'icon-256.png');
 
 function applyDockIcon() {
   if (process.platform !== 'darwin' || !app.dock) return false;
@@ -816,11 +826,12 @@ function createWindow(serverUrl = null) {
     minWidth: 1024,
     minHeight: 768,
     backgroundColor: '#1a1a1a',
-    icon: path.join(__dirname, 'build/icons/icon-256.png'),
+    icon: WINDOW_ICON,
     webPreferences: {
       nodeIntegration: false, // Disable Node.js integration for security
       contextIsolation: true, // Enable context isolation for security
       preload: path.join(__dirname, 'electron-preload.js'), // Preload script for secure IPC
+      additionalArguments: [BRAND_ARG], // read by the preload: which product's look
       sandbox: false, // Disable sandbox to allow file:// navigation
       webSecurity: false, // Disable for file:// protocol to work with absolute paths
       allowRunningInsecureContent: false,
@@ -907,11 +918,12 @@ function createLoginWindow() {
     minWidth: 1024,
     minHeight: 768,
     backgroundColor: '#f3f4f6',
-    icon: path.join(__dirname, 'build/icons/icon-256.png'),
+    icon: WINDOW_ICON,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'electron-preload.js'),
+      additionalArguments: [BRAND_ARG],
       sandbox: false,
       webSecurity: false
     },
@@ -1115,8 +1127,8 @@ function createApplicationMenu() {
           click: () => {
             dialog.showMessageBox({
               type: 'info',
-              title: 'About Lana AI',
-              message: 'Lana AI Desktop Client',
+              title: BRAND_FLAVOR === 'lana-one' ? 'About LANA One' : 'About Lana AI',
+              message: BRAND_FLAVOR === 'lana-one' ? 'LANA One' : 'Lana AI Desktop Client',
               detail: `Version: ${getAppVersion()}\nElectron: ${process.versions.electron}\nChrome: ${process.versions.chrome}\nNode: ${process.versions.node}`
             });
           }
@@ -2099,6 +2111,7 @@ app.whenReady().then(async () => {
     try {
       screenVoice = new ElectronScreenVoice({
         rootDir: __dirname,
+        brandFlavor: BRAND_FLAVOR,
         getMainWindow: () => mainWindow,
         getSavedServer: () => getSavedServer(),
         openClientSettings: openScreenVoiceSettings,

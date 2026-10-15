@@ -1,7 +1,7 @@
 {
   "appId": "com.redroostertech.lana-ai-client",
   "productName": "Lana AI Client",
-  "copyright": "Copyright © 2025 Red Rooster Technologies",
+  "copyright": "Copyright © 2026 RedRooster Technologies Inc.",
   "directories": {
     "output": "dist",
     "buildResources": "build"

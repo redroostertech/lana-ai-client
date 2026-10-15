@@ -1,3 +1,9 @@
+// LANA One shows its own mark (the window is opened with ?flavor=, see
+// electron-screen-voice.js); the LANA client keeps its corner mark.
+if (new URLSearchParams(window.location.search).get('flavor') === 'lana-one') {
+  const mark = document.querySelector('.voice-mark');
+  if (mark) mark.setAttribute('src', 'lana-one-mark-light.svg');
+}
 (function () {
   'use strict';
 

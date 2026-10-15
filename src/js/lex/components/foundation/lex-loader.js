@@ -17,6 +17,14 @@
 
   const BRAND_NAME = 'LANA';
 
+  // LANA One (window.lanaBrand from the preload, src/js/brand/lana-brand.js)
+  // shows its mark: top-left bracket, bottom-right bracket, the 1.
+  const IS_LANA_ONE = !!(window.lanaBrand && window.lanaBrand.flavor === 'lana-one');
+  const MARK_VIEWBOX = '358 382 539 539';
+  const MARK_TL = 'M358,384 L731,384 L731,474 L450,474 L450,767 L358,767Z';
+  const MARK_BR = 'M897,919 L524,919 L524,829 L805,829 L805,536 L897,536Z';
+  const MARK_ONE = 'M550,578 L624,537 L661,537 L661,780 L602,780 L602,600 L550,627Z';
+
   // Singleton reference
   let overlay = null;
   let hideTimer = null;
@@ -171,6 +179,60 @@
         to { opacity: 1; transform: translateY(0); filter: blur(0); }
       }
 
+      /* ── LANA One mark (flavor "lana-one", see lana-brand.js) ── */
+      /* The two brackets slide in from opposite corners, then the 1 appears.
+         Units inside the SVG are its own (viewBox 539 wide), so 110 there is
+         about 20px on screen. Ink follows the theme via --loader-text-color. */
+
+      .lex-loader-logo-wrapper-mark { padding: 0; }
+
+      .lex-loader-mark {
+        display: block;
+        width: clamp(72px, 14vw, 112px);
+        height: clamp(72px, 14vw, 112px);
+        fill: var(--loader-text-color);
+        overflow: visible;
+      }
+
+      .lex-loader-mark-tl {
+        opacity: 0;
+        animation: lex-loader-markSlideTL 1.4s var(--animation-timing) forwards;
+      }
+
+      .lex-loader-mark-br {
+        opacity: 0;
+        animation: lex-loader-markSlideBR 1.4s var(--animation-timing) forwards;
+      }
+
+      .lex-loader-mark-one {
+        opacity: 0;
+        animation: lex-loader-markRevealOne 1s var(--text-timing) 0.6s forwards;
+      }
+
+      @keyframes lex-loader-markSlideTL {
+        0%   { opacity: 0; transform: translate(-110px, -110px); }
+        100% { opacity: 1; transform: translate(0, 0); }
+      }
+
+      @keyframes lex-loader-markSlideBR {
+        0%   { opacity: 0; transform: translate(110px, 110px); }
+        100% { opacity: 1; transform: translate(0, 0); }
+      }
+
+      @keyframes lex-loader-markRevealOne {
+        0%   { opacity: 0; transform: translateY(50px); filter: blur(40px); }
+        100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .lex-loader-mark-tl,
+        .lex-loader-mark-br,
+        .lex-loader-mark-one {
+          animation: none;
+          opacity: 1;
+        }
+      }
+
       /* ── Progress bar ───────────────────────────────────── */
 
       .lex-loader-progress-track {
@@ -229,10 +291,16 @@
         ${ripplesHTML}
       </div>
 
-      <div class="lex-loader-logo-wrapper">
+      <div class="lex-loader-logo-wrapper${IS_LANA_ONE ? ' lex-loader-logo-wrapper-mark' : ''}">
+        ${IS_LANA_ONE ? `
+        <svg class="lex-loader-mark" viewBox="${MARK_VIEWBOX}" aria-hidden="true" focusable="false">
+          <path class="lex-loader-mark-tl" d="${MARK_TL}" />
+          <path class="lex-loader-mark-br" d="${MARK_BR}" />
+          <path class="lex-loader-mark-one" d="${MARK_ONE}" />
+        </svg>` : `
         <svg class="lex-loader-corner lex-loader-corner-tl" viewBox="0 0 50 50"><path d="M 1 50 V 1 H 50" /></svg>
         <div class="lex-loader-logo-text">${lettersHTML}</div>
-        <svg class="lex-loader-corner lex-loader-corner-br" viewBox="0 0 50 50"><path d="M 0 49 H 49 V 0" /></svg>
+        <svg class="lex-loader-corner lex-loader-corner-br" viewBox="0 0 50 50"><path d="M 0 49 H 49 V 0" /></svg>`}
       </div>
 
       <div class="lex-loader-progress-track">

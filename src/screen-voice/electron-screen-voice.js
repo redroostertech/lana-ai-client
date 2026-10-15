@@ -76,6 +76,7 @@ class ElectronScreenVoice {
     this.logInfo = options.logInfo || (() => {});
     this.logError = options.logError || (() => {});
     this.rootDir = options.rootDir || path.resolve(__dirname, '..', '..');
+    this.brandFlavor = options.brandFlavor || 'lana';
     this.controller = new VoiceSessionController();
     this.adapter = options.adapter || createDesktopAdapter({ clipboard, rootDir: this.rootDir });
     this.settingsStore = options.settingsStore || new Store({ name: 'screen-voice-settings', defaults: DEFAULT_SETTINGS });
@@ -165,7 +166,7 @@ class ElectronScreenVoice {
     this.overlay.setAlwaysOnTop(true, 'floating');
     this.overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     const rendererRoot = app.isPackaged ? 'public_html' : 'src';
-    this.overlay.loadFile(path.join(this.rootDir, rendererRoot, 'screen-voice', 'overlay', 'index.html'));
+    this.overlay.loadFile(path.join(this.rootDir, rendererRoot, 'screen-voice', 'overlay', 'index.html'), { query: { flavor: this.brandFlavor } });
     this.overlay.on('focus', () => { this.sendPermissionStatus().catch(() => {}); });
     this.overlay.on('closed', () => { this.overlay = null; });
     this.positionOverlay();

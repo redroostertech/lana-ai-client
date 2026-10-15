@@ -65,6 +65,8 @@ async function bundle() {
     main: 'electron-main.js',
     author: pkg.author,
     description: pkg.description,
+    // Which product this build is (src/js/brand/lana-brand.js).
+    lanaFlavor: pkg.lanaFlavor,
     dependencies: {
       'electron-store': pkg.dependencies['electron-store']
     }

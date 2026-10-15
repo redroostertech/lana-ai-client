@@ -4,6 +4,7 @@
   },
   "name": "lana-ai",
   "productName": "Lana AI",
+  "lanaFlavor": "lana",
   "version": "4.1.0-pre.45eb279",
   "buildNumber": "1",
   "releaseType": "stable",

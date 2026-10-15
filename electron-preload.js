@@ -9,6 +9,16 @@
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
+const { resolveFlavor, brandFor, applyBrandToDocument } = require('./src/js/brand/lana-brand');
+
+// Which product's look this page gets. The main process passes its build-time
+// flavor as --lana-flavor (src/js/brand/lana-brand.js). In "lana-one" the page is
+// rebranded as it is parsed; in "lana" nothing is touched.
+const brandArg = process.argv.find((a) => a.startsWith('--lana-flavor='));
+// isPackaged: true so only the main process's answer counts; it already applied LANA_FLAVOR.
+const brandFlavor = resolveFlavor({ packageJson: { lanaFlavor: brandArg ? brandArg.slice('--lana-flavor='.length) : '' }, isPackaged: true });
+contextBridge.exposeInMainWorld('lanaBrand', { flavor: brandFlavor, name: brandFor(brandFlavor).name });
+applyBrandToDocument(document, brandFlavor);
 
 /**
  * Expose protected methods that allow the renderer process to use
