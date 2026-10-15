@@ -2,7 +2,7 @@
  * LANA AI Version Information
  *
  * AUTO-GENERATED - DO NOT EDIT MANUALLY
- * Generated: 2026-08-31T12:26:08.820Z
+ * Generated: 2026-10-15T20:58:52.037Z
  *
  * To update version:
  * 1. Edit package.json (version, buildNumber, releaseType)
@@ -10,11 +10,11 @@
  */
 
 module.exports = {
-  version: '4.1.0-pre.45eb279',
+  version: '4.1.0',
   buildNumber: '1',
   releaseType: 'stable',
-  displayVersion: '4.1.0-pre.45eb279',
-  buildDate: '2026-08-31T12:26:08.820Z',
+  displayVersion: '4.1.0',
+  buildDate: '2026-10-15T20:58:52.037Z',
 
   /**
    * Get full version string
