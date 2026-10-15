@@ -38,8 +38,11 @@ app.setVersion(packageJson.version);
 // Fixed at build time by package.json lanaFlavor; LANA_FLAVOR overrides it
 // only in an unpackaged app (src/js/brand/lana-brand.js). Pages get it
 // through the preload.
-const { resolveFlavor } = require('./src/js/brand/lana-brand');
-const BRAND_FLAVOR = resolveFlavor({ env: process.env, packageJson, isPackaged: app.isPackaged });
+// The stamp is read from the running app's package.json on disk: packageJson
+// above is inlined into the bundle at build time, so inside LANA One it is the
+// client's, not LANA One's.
+const { resolveFlavor, readAppPackageJson } = require('./src/js/brand/lana-brand');
+const BRAND_FLAVOR = resolveFlavor({ env: process.env, packageJson: readAppPackageJson(app.getAppPath()), isPackaged: app.isPackaged });
 const BRAND_ARG = '--lana-flavor=' + BRAND_FLAVOR;
 const WINDOW_ICON = path.join(__dirname, 'build', BRAND_FLAVOR === 'lana-one' ? 'icons-lana-one' : 'icons', 'icon-256.png');
 

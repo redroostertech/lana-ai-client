@@ -11,8 +11,9 @@
  * legacy page loader as the page is parsed, before it is painted.
  *
  * The flavor is fixed at build time by `lanaFlavor` in the app's package.json
- * (the client's says "lana"; LANA One's says "lana-one", and a packaged LANA
- * One runs this code with its own package.json). An unpackaged app also reads
+ * (the client's says "lana"; LANA One's says "lana-one"), read from disk at run
+ * time (readAppPackageJson), so the bundled client inside LANA One sees LANA
+ * One's file. An unpackaged app also reads
  * LANA_FLAVOR, so either look can be run locally. A packaged app ignores it,
  * so a stray variable cannot rebrand a customer's app.
  */
@@ -60,6 +61,27 @@ function resolveFlavor({ env = {}, packageJson = {}, isPackaged = false } = {}) 
   }
   const stamped = String(packageJson.lanaFlavor || '').trim().toLowerCase();
   return FLAVORS[stamped] ? stamped : DEFAULT_FLAVOR;
+}
+
+/**
+ * The running app's own package.json, read from disk at run time.
+ *
+ * Not `require('./package.json')`: esbuild inlines that at bundle time, so the
+ * bundled client carried the CLIENT's package.json into LANA One, and packaged
+ * LANA One came up as "lana". app.getAppPath() is the app that is actually
+ * running: LANA One's asar there, the client's in the client, this checkout in
+ * development.
+ *
+ * @param {string} appPath - app.getAppPath()
+ * @param {object} [fsImpl]
+ * @returns {object} the parsed package.json, or {} if it cannot be read
+ */
+function readAppPackageJson(appPath, fsImpl = require('fs')) {
+  try {
+    return JSON.parse(fsImpl.readFileSync(require('path').join(appPath, 'package.json'), 'utf8'));
+  } catch (_err) {
+    return {};
+  }
 }
 
 function brandFor(flavor) {
@@ -163,5 +185,5 @@ function applyBrandToDocument(doc, flavor) {
 
 module.exports = {
   DEFAULT_FLAVOR, FLAVORS, MARK_VIEWBOX, MARK_PATHS, FAVICON_HREF,
-  resolveFlavor, brandFor, lanaOneLogo, applyBrandToDocument,
+  resolveFlavor, readAppPackageJson, brandFor, lanaOneLogo, applyBrandToDocument,
 };

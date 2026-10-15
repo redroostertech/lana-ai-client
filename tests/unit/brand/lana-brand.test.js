@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 const {
-  resolveFlavor, brandFor, lanaOneLogo, applyBrandToDocument, FAVICON_HREF,
+  resolveFlavor, readAppPackageJson, brandFor, lanaOneLogo, applyBrandToDocument, FAVICON_HREF,
 } = require('../../../src/js/brand/lana-brand');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
@@ -126,4 +126,30 @@ test('every LANA One asset the flavor points at ships with the client', () => {
   ]) {
     expect(fs.existsSync(path.join(ROOT, rel))).toBe(true);
   }
+});
+
+describe('readAppPackageJson', () => {
+  // The bundler inlines require('./package.json'), so a packaged LANA One saw
+  // the client's stamp. The flavor must come from the running app's file.
+  test('reads the package.json of the given app folder at run time', () => {
+    const os = require('os');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lana-brand-app-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'lana-one', lanaFlavor: 'lana-one' }));
+      const pkg = readAppPackageJson(dir);
+      expect(resolveFlavor({ packageJson: pkg, isPackaged: true })).toBe('lana-one');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('an app folder without a readable package.json means the LANA client', () => {
+    expect(readAppPackageJson('/nonexistent/app')).toEqual({});
+    expect(resolveFlavor({ packageJson: readAppPackageJson('/nonexistent/app'), isPackaged: true })).toBe('lana');
+  });
+
+  test('electron-main resolves the flavor from the app folder, not the inlined package.json', () => {
+    const main = fs.readFileSync(path.join(ROOT, 'electron-main.js'), 'utf8');
+    expect(main).toMatch(/resolveFlavor\(\{[^}]*packageJson: readAppPackageJson\(app\.getAppPath\(\)\)/);
+  });
 });
