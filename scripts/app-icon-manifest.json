@@ -1,5 +1,5 @@
 {
-  "_comment": "Sizes (px) derive from build/icons/icon.png by scripts/generate-app-icons.js. The master is rendered from build/icons/app-icon.svg: the LANA One mark (two corner brackets and a 1) in dark ink on a white macOS-style rounded tile with a faint edge. Sources and the dark-tile variant are in build/brand/lana-one. The 16/32/48/64/128/256 PNGs are folded into icon.ico on Windows.",
+  "_comment": "Sizes (px) derive from build/icons/icon.png by scripts/generate-app-icons.js. The master is rendered from build/icons/app-icon.svg, using the RedRooster corner mark with macOS-standard transparent padding and a rounded gradient surface. The 16/32/48/64/128/256 PNGs are folded into icon.ico on Windows.",
   "master": "build/icons/icon.png",
   "outputDir": "build/icons",
   "sizes": [16, 32, 48, 64, 128, 256, 512, 1024],
