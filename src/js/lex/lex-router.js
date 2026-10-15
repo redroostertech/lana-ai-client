@@ -137,7 +137,7 @@
   let _pageDescriptors = {};
 
   const DEFAULT_DESCRIPTOR = {
-    title: 'LANA AI',
+    title: 'LANA One',
     activeNav: '',
     scripts: [],
     stylesheets: []

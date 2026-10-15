@@ -33,7 +33,7 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain('function documentDisplayFilename(file)');
     expect(pageJs).toContain('value.display_filename || value.original_filename');
     expect(pageJs).toContain("banner.setAttribute('heading', displayFilename)");
-    expect(pageJs).toContain("document.title = displayFilename + ' - LANA AI'");
+    expect(pageJs).toContain("document.title = displayFilename + ' - LANA One'");
     expect(pageJs).toContain('label: documentDisplayFilename(file)');
     expect(pageJs).toContain('storageFilename: sourceFile && sourceFile.filename');
   });

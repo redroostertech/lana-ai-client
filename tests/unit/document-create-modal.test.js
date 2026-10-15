@@ -203,7 +203,7 @@ describe('Template Library', () => {
   });
 
   test('library page presents Template Library with a New Template CTA preset to organization scope', () => {
-    expect(templatesPageHtml).toContain('<title>Template Library - LANA AI</title>');
+    expect(templatesPageHtml).toContain('<title>Template Library - LANA One</title>');
     expect(templatesPageHtml).toContain('page-title="Template Library"');
     expect(templatesPageHtml).toContain('id="dstNewTemplate"');
     expect(templatesPageHtml).toContain('id="dstKindFilterLabel">Template type');

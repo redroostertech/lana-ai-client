@@ -544,7 +544,7 @@
       if (changedProps.has('pageTitle')) {
         const topbar = this.$('lex-topbar');
         if (topbar) topbar.heading = this.pageTitle;
-        document.title = this.pageTitle ? this.pageTitle + ' - LANA AI' : 'LANA AI';
+        document.title = this.pageTitle ? this.pageTitle + ' - LANA One' : 'LANA One';
       }
 
       if (changedProps.has('activeNavId')) {

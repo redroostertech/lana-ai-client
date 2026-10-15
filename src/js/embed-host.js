@@ -168,7 +168,7 @@
     } else {
       shell.pageTitle = app.label;
     }
-    if (targetDoc) targetDoc.title = app.label + ' - LANA AI';
+    if (targetDoc) targetDoc.title = app.label + ' - LANA One';
 
     shell.sidebarCollapsed = true;
 
