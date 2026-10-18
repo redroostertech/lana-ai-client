@@ -906,6 +906,15 @@ class DrilldownRenderer {
    * Render summary statistics (detects structure and delegates)
    */
   renderSummary() {
+    const acquisitionSummary = window.AcquisitionSourcePresentation?.renderDrilldownSummary(this.currentData, this.currentConfig);
+    if (acquisitionSummary != null) {
+      const container = document.getElementById('drilldown-summary-container');
+      const summary = document.getElementById('drilldown-summary');
+      container.classList.remove('hidden');
+      summary.className = '';
+      summary.innerHTML = acquisitionSummary;
+      return;
+    }
     console.log('[DrilldownRenderer] renderSummary() called');
     console.log('[DrilldownRenderer] Summary config check:', {
       hasSections: !!(this.currentConfig.summary?.sections),

@@ -130,6 +130,48 @@ function renderCard(metric) {
 function bindDetails(container, open) {
   container.querySelectorAll('[data-acquisition-details]').forEach(button => button.addEventListener('click', () => open(button.dataset.acquisitionDetails)));
 }
+function renderDrilldownSummary(data, context = {}) {
+  const key = data?.metadata?.canonical_metric_key;
+  if (![PEOPLE, MONEY].includes(key)) return null;
+  const summary = data.summary, receipt = summary?.observation_receipt;
+  const unavailable = () => renderAcquisitionSource(null);
+  const sameInstant = (left, right) => Number.isFinite(Date.parse(left)) && Date.parse(left) === Date.parse(right);
+  const currencyCode = value => typeof value === 'string' && value.length === 3
+    && [...value].every(letter => letter.charCodeAt(0) >= 65 && letter.charCodeAt(0) <= 90);
+  // Display guards only. Never derive a headline from the filtered page or
+  // turn a detail response into a fabricated calculation receipt.
+  if (receipt?.version !== 'acquisition-source-observation-v1' || receipt.aggregation !== 'whole_window'
+    || (context.organizationId && context.organizationId !== receipt.organization_id)
+    || (context.periodStart && !sameInstant(context.periodStart, receipt.window?.start))
+    || (context.periodEnd && !sameInstant(context.periodEnd, receipt.window?.end_exclusive))
+    || !['complete', 'partial', 'missing'].includes(summary.coverage_status)
+    || summary.coverage_status !== receipt.status || data.status !== receipt.status
+    || summary.period_start !== receipt.window?.start || summary.period_end_exclusive !== receipt.window?.end_exclusive
+    || summary.observed_end_exclusive !== receipt.interval?.end_exclusive || summary.as_of !== receipt.as_of
+    || summary.timezone !== receipt.timezone || !instant(summary.as_of)
+    || !summary.coverage || !counts.every(field => count(summary.coverage[field]))
+    || JSON.stringify(summary.coverage) !== JSON.stringify(receipt.coverage)
+    || !Array.isArray(summary.currency_totals) || JSON.stringify(summary.currency_totals) !== JSON.stringify(receipt.currency_totals)
+    || summary.currency_totals.some(total => !total || !currencyCode(total.currency) || !decimal(total.amount) || !count(total.count))
+    || !Array.isArray(receipt.observations) || receipt.observations.some(row => !row || typeof row !== 'object')) return unavailable();
+  const filters = summary.applied_filters || {}, channel = filters.channel_key == null ? null
+    : receipt.observations.find(row => row.channel_key === filters.channel_key);
+  if ((filters.channel_key != null && !channel) || (filters.currency != null && !currencyCode(filters.currency))) return unavailable();
+  const labels = ['Eligible records', 'Proven people', 'Unresolved records', 'Unknown record dates', 'Unknown-channel people',
+    'Conflicting-source people', 'Won opportunities', 'Covered won opportunities', 'Unknown amount', 'Unknown currency',
+    'Unattributed won opportunities', 'Ambiguous identities'];
+  const totals = key === MONEY ? summary.currency_totals.map(total => '<p>' + escapeHtml(total.currency) + ': '
+    + escapeHtml(total.amount) + ' (' + total.count + ' covered won opportunities)</p>').join('') : '';
+  return '<lex-card heading="Whole-report totals"><p>Coverage: ' + escapeHtml(summary.coverage_status)
+    + '. These totals cover the whole reporting window, not the selected page or filters.</p>'
+    + (summary.coverage_status === 'missing' ? '<p>Missing evidence is not zero.</p>' : '') + totals
+    + '<p>' + counts.map((field, index) => labels[index] + ': ' + summary.coverage[field]).join('. ') + '.</p>'
+    + '<p>Reporting period: ' + escapeHtml(summary.period_start) + ' to ' + escapeHtml(summary.period_end_exclusive)
+    + ' (exclusive). Observed through ' + escapeHtml(summary.observed_end_exclusive) + '; as of ' + escapeHtml(summary.as_of)
+    + ' (' + escapeHtml(summary.timezone) + ').</p><p>Selected channel: ' + escapeHtml(channel ? channel.label : 'All')
+    + (channel ? ' (' + escapeHtml(origin(channel.channel_key)) + ')' : '') + '. Selected currency: ' + escapeHtml(filters.currency || 'All') + '.</p>'
+    + (key === MONEY ? '<p>Signed won amounts, including negatives. Currencies remain separate; no combined total or conversion.</p>' : '') + '</lex-card>';
+}
 function visualization(viz, data, renderSibling, open) {
   const resolve = ref => typeof ref === 'string' ? (data.metrics || []).find(metric => metric.key === ref) : ref;
   const metrics = (viz.metrics || []).map(resolve).filter(Boolean);
@@ -140,7 +182,7 @@ function visualization(viz, data, renderSibling, open) {
   if (siblings.length) { const rendered = renderSibling({ ...viz, metrics: siblings }); if (rendered) container.appendChild(rendered); }
   return container;
 }
-const api = { PEOPLE, MONEY, isAcquisitionSource, acquisitionSourcePresentation, renderAcquisitionSource, renderCard, bindDetails, visualization };
+const api = { PEOPLE, MONEY, isAcquisitionSource, acquisitionSourcePresentation, renderAcquisitionSource, renderDrilldownSummary, renderCard, bindDetails, visualization };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (global) global.AcquisitionSourcePresentation = api;
 })(typeof window !== 'undefined' ? window : globalThis);

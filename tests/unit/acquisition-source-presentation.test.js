@@ -119,3 +119,50 @@ test('known source namespace and uncertainty cannot be relabeled as complete', (
   foreign.value[0].key = foreign.current[0].key = JSON.stringify(key);
   expect(helper.renderCard(foreign)).toContain('evidence unavailable');
 });
+
+test('actual drilldown summary preserves whole-report exact currencies and coverage on a filtered partial page', () => {
+  const Renderer = require('../../src/js/drilldown-renderer');
+  const m = metric(), receipt = m.metadata.observation_receipt;
+  const savedDocument = global.document, savedWindow = global.window;
+  const summaryNode = {}, container = { classList: { remove: jest.fn(), add: jest.fn() } };
+  global.document = { getElementById: id => id === 'drilldown-summary' ? summaryNode : container };
+  global.window = { AcquisitionSourcePresentation: helper };
+  const renderer = Object.create(Renderer.prototype);
+  renderer.currentConfig = { organizationId: receipt.organization_id, periodStart: receipt.window.start,
+    periodEnd: receipt.window.end_exclusive, summary: { fields: [{ field: 'won_count', label: 'Won', format: { type: 'number' } }] } };
+  renderer.currentData = { status: receipt.status, rows: [{ amount: '12.00000000000000000002', currency: 'USD' }],
+    metadata: { canonical_metric_key: helper.MONEY, observation_receipt: receipt },
+    summary: { coverage_status: receipt.status, coverage: receipt.coverage, currency_totals: receipt.currency_totals,
+      period_start: receipt.window.start, period_end_exclusive: receipt.window.end_exclusive,
+      observed_end_exclusive: receipt.interval.end_exclusive, as_of: receipt.as_of, timezone: receipt.timezone,
+      applied_filters: { channel_key: receipt.observations[1].channel_key, currency: 'USD' }, observation_receipt: receipt, won_count: 2 } };
+  // Generic summary remains a real control, not a mock returning source values.
+  summaryNode.querySelectorAll = () => [];
+  try {
+    renderer.renderSummary();
+    expect(summaryNode.innerHTML).toContain('-9007199254740993.0123456789');
+    expect(summaryNode.innerHTML).toContain('12.00000000000000000002');
+    expect(summaryNode.innerHTML).toContain('EUR'); expect(summaryNode.innerHTML).toContain('USD');
+    expect(summaryNode.innerHTML).toContain('Whole-report totals');
+    expect(summaryNode.innerHTML).toContain('Unknown amount: 0');
+    expect(summaryNode.innerHTML).toContain('Selected currency: USD');
+    expect(summaryNode.innerHTML).toContain('&lt;Referral&gt;');
+    renderer.currentConfig.organizationId = 'different-org';
+    renderer.renderSummary();
+    expect(summaryNode.innerHTML).toContain('Acquisition-source evidence unavailable');
+    expect(summaryNode.innerHTML).not.toContain('-9007199254740993');
+    renderer.currentConfig.organizationId = receipt.organization_id;
+    const observations = receipt.observations;
+    for (const invalid of [{}, [null]]) {
+      receipt.observations = invalid;
+      expect(() => renderer.renderSummary()).not.toThrow();
+      expect(summaryNode.innerHTML).toContain('Acquisition-source evidence unavailable');
+    }
+    receipt.observations = observations;
+    renderer.renderSummary();
+    expect(summaryNode.innerHTML).toContain('-9007199254740993.0123456789');
+    renderer.currentData.metadata = { canonical_metric_key: 'custom.top_performing_sources' };
+    renderer.renderSummary();
+    expect(summaryNode.innerHTML).toContain('Won'); expect(summaryNode.innerHTML).not.toContain('Acquisition-source evidence unavailable');
+  } finally { global.document = savedDocument; global.window = savedWindow; }
+});
