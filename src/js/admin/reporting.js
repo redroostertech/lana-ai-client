@@ -556,6 +556,7 @@
   // ==========================================================================
 
   function renderMetricChart(metric, canvasId) {
+    if (window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.isAcquisitionSource(metric)) return;
     if (window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.isCurrentPipeline(metric)) return;
     if (!Array.isArray(metric.current)) {
       renderEmptyState(canvasId, 'No distribution data available');
@@ -1225,6 +1226,8 @@
   }
 
   function createMetricCard(metric) {
+    var acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.renderCard(metric);
+    if (acquisition) return acquisition;
     var pipeline = window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.renderCard(metric);
     if (pipeline) return pipeline;
     if (Array.isArray(metric.current)) {
@@ -1427,6 +1430,7 @@
     if (!grid) return;
     grid.innerHTML = metrics.map(function (metric) { return createMetricCard(metric); }).join('');
     if (window.CurrentPipelinePresentation) window.CurrentPipelinePresentation.bindDetails(grid, openGenericDrilldown);
+    if (window.AcquisitionSourcePresentation) window.AcquisitionSourcePresentation.bindDetails(grid, openGenericDrilldown);
 
     requestAnimationFrame(function () { fitAllMetricCardText(grid); });
 
@@ -1789,6 +1793,9 @@
   }
 
   function renderVisualization(viz, data, uniqueId) {
+    var acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.visualization(viz, data,
+      function (sibling) { return renderVisualization(sibling, data, uniqueId); }, openGenericDrilldown);
+    if (acquisition) return acquisition;
     var pipeline = window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.visualization(viz, data,
       function (sibling) { return renderVisualization(sibling, data, uniqueId); }, openGenericDrilldown);
     if (pipeline) return pipeline;
@@ -1834,6 +1841,7 @@
     grid.id = 'grid-' + uniqueId;
     grid.innerHTML = viz.metrics.map(function (metric) { return createMetricCard(metric); }).join('');
     if (window.CurrentPipelinePresentation) window.CurrentPipelinePresentation.bindDetails(grid, openGenericDrilldown);
+    if (window.AcquisitionSourcePresentation) window.AcquisitionSourcePresentation.bindDetails(grid, openGenericDrilldown);
     div.appendChild(grid);
 
     requestAnimationFrame(function () { fitAllMetricCardText(grid); });

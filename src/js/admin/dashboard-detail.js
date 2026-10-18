@@ -662,6 +662,16 @@
   }
 
   function renderMetricCard(metric) {
+    var acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.acquisitionSourcePresentation(metric);
+    if (acquisition) {
+      var acquisitionId = metric.metric_key || metric.key;
+      metricInfoById[acquisitionId] = metric;
+      return '<article class="dash-metric-card"><div class="dash-metric-card__top"><div class="dash-metric-card__title">'
+        + escapeHtml(metric.title || metric.name || 'Acquisition sources') + '</div>'
+        + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="'
+        + escapeHtml(acquisitionId) + '">i</button></div>'
+        + window.AcquisitionSourcePresentation.renderAcquisitionSource(acquisition) + '</article>';
+    }
     var pipeline = window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.currentPipelinePresentation(metric);
     if (pipeline) {
       var pipelineId = metric.metric_key || metric.key;

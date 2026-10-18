@@ -82,6 +82,16 @@ describe('drilldown metadata request contract', () => {
     await renderer.exportData('csv');
     expect(fetchBody()).toMatchObject({ ...PERIOD, drill_source: '', pipeline_id: '', position: 0 });
   });
+  test('acquisition source drilldown retains reporting window and qualified source/currency selectors', async () => {
+    const channel = JSON.stringify(['acquisition', 'host-org', 'source', 'integration-a', 'crm', 'Referral']);
+    metadata('report_period');
+    await renderer.open('funnel-analysis-attribution', 'top_performing_sources', {
+      ...PERIOD, organizationId: 'host-org', filters: { channel_key: [channel], currency: ['EUR'] }
+    });
+    expect(window.api.post.mock.calls[0][1]).toMatchObject({ ...PERIOD, filters: { channel_key: [channel], currency: ['EUR'] } });
+    await renderer.exportData('csv');
+    expect(fetchBody()).toMatchObject({ ...PERIOD, filters: { channel_key: [channel], currency: ['EUR'] } });
+  });
   test('legacy browser execute and distinct preserve date shape', async () => {
     configure(undefined); window.api = null;
     await renderer.fetchData();

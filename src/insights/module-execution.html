@@ -24,6 +24,7 @@
   <script src="../js/vendor/marked.min.js?v=20260105"></script>
   <script src="../js/drilldown-renderer.js?v=20260201&bust=7"></script>
   <script src="../js/shared/current-pipeline-presentation.js"></script>
+  <script src="../js/shared/acquisition-source-presentation.js"></script>
 
   <!-- Raw Data Viewer for drill-down tables -->
   <link rel="stylesheet" href="raw-data-viewer.css">
@@ -1403,6 +1404,7 @@
 
     // Render metric chart (for array results - horizontal bar chart)
     function renderMetricChart(metric, canvasId) {
+      if (window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.isAcquisitionSource(metric)) return;
       if (window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.isCurrentPipeline(metric)) return;
       // Check if metric has array result (for distribution metrics)
       if (!Array.isArray(metric.current)) {
@@ -5674,6 +5676,8 @@
 
     // Create metric card
     function createMetricCard(metric) {
+      const acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.renderCard(metric);
+      if (acquisition) return acquisition;
       const pipeline = window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.renderCard(metric);
       if (pipeline) return pipeline;
       // Check if this is an array result (distribution metric)
@@ -5838,6 +5842,7 @@
       const grid = document.getElementById('metricsGrid');
       grid.innerHTML = metrics.map(metric => createMetricCard(metric)).join('');
       if (window.CurrentPipelinePresentation) window.CurrentPipelinePresentation.bindDetails(grid, openGenericDrilldown);
+      if (window.AcquisitionSourcePresentation) window.AcquisitionSourcePresentation.bindDetails(grid, openGenericDrilldown);
 
       // After DOM is updated, render any pie charts for array results
       setTimeout(() => {
@@ -5959,6 +5964,9 @@
      * Render a single visualization based on its type
      */
     function renderVisualization(viz, data, uniqueId) {
+      const acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.visualization(viz, data,
+        sibling => renderVisualization(sibling, data, uniqueId), openGenericDrilldown);
+      if (acquisition) return acquisition;
       const pipeline = window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.visualization(viz, data,
         sibling => renderVisualization(sibling, data, uniqueId), openGenericDrilldown);
       if (pipeline) return pipeline;
@@ -6002,6 +6010,7 @@
       const metricsHTML = viz.metrics.map(metric => createMetricCard(metric)).join('');
       grid.innerHTML = metricsHTML;
       if (window.CurrentPipelinePresentation) window.CurrentPipelinePresentation.bindDetails(grid, openGenericDrilldown);
+      if (window.AcquisitionSourcePresentation) window.AcquisitionSourcePresentation.bindDetails(grid, openGenericDrilldown);
 
       div.appendChild(grid);
 

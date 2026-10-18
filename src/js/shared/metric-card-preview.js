@@ -123,6 +123,8 @@
   // ---------------------------------------------------------------------------
   function renderDashboardPreviewCard(metric) {
     var m = metric || {};
+    var acquisition = scope().AcquisitionSourcePresentation;
+    if (acquisition && acquisition.isAcquisitionSource(m)) return acquisition.renderCard(m);
     var pipeline = scope().CurrentPipelinePresentation;
     if (pipeline && pipeline.isCurrentPipeline(m)) return pipeline.renderCard(m);
     var title = m.title || m.key || 'Metric';
@@ -195,6 +197,8 @@
   // own drilldown section).
   // ---------------------------------------------------------------------------
   function renderReportPreviewCard(metric) {
+    var acquisition = scope().AcquisitionSourcePresentation;
+    if (acquisition && acquisition.isAcquisitionSource(metric)) return acquisition.renderCard(metric);
     var pipeline = scope().CurrentPipelinePresentation;
     if (pipeline && pipeline.isCurrentPipeline(metric)) return pipeline.renderCard(metric);
     var m = metric || {};
