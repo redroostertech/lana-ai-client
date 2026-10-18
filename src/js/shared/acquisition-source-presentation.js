@@ -170,9 +170,82 @@ function renderDrilldownSummary(data, context = {}) {
     + ' (exclusive). Observed through ' + escapeHtml(summary.observed_end_exclusive) + '; as of ' + escapeHtml(summary.as_of)
     + ' (' + escapeHtml(summary.timezone) + ').</p><p>Selected channel: ' + escapeHtml(channel ? channel.label : 'All')
     + (channel ? ' (' + escapeHtml(origin(channel.channel_key)) + ')' : '') + '. Selected currency: ' + escapeHtml(filters.currency || 'All') + '.</p>'
-    + (key === MONEY ? '<p>Signed won amounts, including negatives. Currencies remain separate; no combined total or conversion.</p>' : '') + '</lex-card>';
+    + (key === MONEY ? '<p>Signed won amounts, including negatives. Currencies remain separate; no combined total or conversion.</p>' : '') + '</lex-card>'
+    + (key === PEOPLE && summary.source_quality_report
+      ? renderSourceQualityReport(JSON.stringify(summary.source_quality_report.current?.acquisition_receipt) === JSON.stringify(receipt)
+        ? summary.source_quality_report : null) : '');
+}
+function sourceQualityPresentation(report) {
+  const validScore = row => row === null || (row && typeof row === 'object'
+    && ['acquired_person_count', 'covered_score_person_count', 'unscored_person_count', 'invalid_score_person_count',
+      'conflicting_score_person_count', 'unknown_score_clock_person_count'].every(key => Number.isSafeInteger(row[key]) && row[key] >= 0)
+    && (row.covered_score_person_count === 0 ? row.score_mean === null
+      : Number.isFinite(row.score_mean) && row.score_mean >= 0 && row.score_mean <= 100));
+  const validReceipt = receipt => receipt && receipt.version === 'source-quality-observation-v1'
+    && ['complete', 'partial', 'missing'].includes(receipt.status) && Array.isArray(receipt.observations)
+    && typeof receipt.organization_id === 'string' && typeof receipt.timezone === 'string'
+    && [receipt.as_of, receipt.window?.start, receipt.window?.end_exclusive, receipt.interval?.end_exclusive]
+      .every(value => Number.isFinite(Date.parse(value)));
+  if (report?.version !== 'source-quality-report-v1' || !validReceipt(report.current)
+    || !['none', 'previous_period', 'previous_calendar'].includes(report.comparison_mode)
+    || (report.comparison_mode === 'none' ? report.prior !== null : !validReceipt(report.prior))
+    || !Array.isArray(report.rows)) { return null; }
+  if (report.prior && ['organization_id', 'as_of', 'timezone', 'declaration_digest'].some(key =>
+    report.current[key] !== report.prior[key])) { return null; }
+  const current = new Map(report.current.observations.map(row => [row?.channel_key, row]));
+  const prior = new Map((report.prior?.observations || []).map(row => [row?.channel_key, row]));
+  if (new Set(report.rows.map(row => row?.channel_key)).size !== report.rows.length
+    || report.rows.length !== new Set([...current.keys(), ...prior.keys()]).size) { return null; }
+  for (const row of report.rows) {
+    if (!row || typeof row.channel_key !== 'string' || typeof row.label !== 'string'
+      || !validScore(row.current) || !validScore(row.prior)
+      || JSON.stringify(row.current) !== JSON.stringify(current.get(row.channel_key) || null)
+      || JSON.stringify(row.prior) !== JSON.stringify(prior.get(row.channel_key) || null)
+      || ['person_change_percent', 'quality_change_points'].some(key => row[key] !== null && !Number.isFinite(row[key]))) { return null; }
+  }
+  return { report, chartData: report.rows.filter(row => row.current?.covered_score_person_count > 0).map(row => ({
+    source_name: row.label + ' (' + row.channel_key + ')', avg_quality_score: row.current.score_mean,
+    covered_score_person_count: row.current.covered_score_person_count })) };
+}
+function renderSourceQualityReport(report) {
+  const presentation = sourceQualityPresentation(report);
+  if (!presentation) { return '<p class="muted">Source quality evidence unavailable.</p>'; }
+  const text = value => value === null || value === undefined ? 'Unavailable' : escapeHtml(String(value));
+  const score = (row, field) => text(row ? row[field] : null);
+  const exclusions = row => row ? ['unscored_person_count', 'invalid_score_person_count', 'conflicting_score_person_count',
+    'unknown_score_clock_person_count'].map(key => row[key]).join(' / ') : 'Unavailable';
+  const rows = report.rows.map(row => '<tr><td>' + escapeHtml(row.label) + ' (' + escapeHtml(row.channel_key) + ')</td>'
+    + '<td>' + score(row.current, 'acquired_person_count') + '</td><td>' + score(row.current, 'covered_score_person_count')
+    + '</td><td>' + score(row.current, 'score_mean') + '</td><td>' + exclusions(row.current)
+    + '</td><td>' + score(row.prior, 'acquired_person_count') + '</td><td>' + score(row.prior, 'covered_score_person_count')
+    + '</td><td>' + score(row.prior, 'score_mean') + '</td><td>' + text(row.person_change_percent)
+    + '</td><td>' + text(row.quality_change_points) + '</td></tr>').join('');
+  return '<section><h4>Proven-person source quality</h4><p>Coverage: ' + escapeHtml(report.current.status)
+    + '. Acquired people and people with covered scores are separate denominators. Means cover only scored people; zero scores are retained.</p>'
+    + '<p>Current: ' + escapeHtml(report.current.window.start) + ' to ' + escapeHtml(report.current.window.end_exclusive)
+    + ' (exclusive). Observed through ' + escapeHtml(report.current.interval.end_exclusive)
+    + '; as of ' + escapeHtml(report.current.as_of) + ' (' + escapeHtml(report.current.timezone) + ').</p>'
+    + (report.prior ? '<p>Prior: ' + escapeHtml(report.prior.window.start) + ' to ' + escapeHtml(report.prior.window.end_exclusive)
+      + ' (exclusive); coverage: ' + escapeHtml(report.prior.status) + '; comparison: ' + escapeHtml(report.comparison_mode) + '.</p>'
+      : '<p>Prior comparison disabled.</p>')
+    + '<p>Booking-axis unavailable. Booking, attendance and response-time evidence is not admitted. Quality is not conversion.</p>'
+    + '<div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr><th>Acquisition channel</th><th>Acquired people</th>'
+    + '<th>Scored people</th><th>Mean score / 100</th><th>Unscored / invalid / conflicting / unknown clock</th>'
+    + '<th>Prior acquired</th><th>Prior scored</th><th>Prior mean / 100</th><th>Acquired-person change (%)</th><th>Quality change (points)</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+    + '<p>Unavailable growth is not zero. Full report totals and comparison are not recomputed from a filtered page.</p></section>';
 }
 function visualization(viz, data, renderSibling, open) {
+  if (viz.dataSource === 'governed_source_quality_v1') {
+    const container = document.createElement('div'); container.innerHTML = renderSourceQualityReport(viz.source_quality_report);
+    const presentation = sourceQualityPresentation(viz.source_quality_report);
+    if (presentation && viz.id === 'source_performance' && presentation.chartData.length) {
+      const chart = renderSibling({ ...viz, dataSource: undefined, type: 'grouped_bar_chart', data: presentation.chartData,
+        metrics: [], series: [{ type: 'bar', field: 'avg_quality_score', label: 'Covered person quality score', color: '#3b82f6' }] });
+      if (chart) { container.appendChild(chart); }
+    }
+    return container;
+  }
   const resolve = ref => typeof ref === 'string' ? (data.metrics || []).find(metric => metric.key === ref) : ref;
   const metrics = (viz.metrics || []).map(resolve).filter(Boolean);
   if (!metrics.some(isAcquisitionSource)) return null;
@@ -182,7 +255,8 @@ function visualization(viz, data, renderSibling, open) {
   if (siblings.length) { const rendered = renderSibling({ ...viz, metrics: siblings }); if (rendered) container.appendChild(rendered); }
   return container;
 }
-const api = { PEOPLE, MONEY, isAcquisitionSource, acquisitionSourcePresentation, renderAcquisitionSource, renderDrilldownSummary, renderCard, bindDetails, visualization };
+const api = { PEOPLE, MONEY, isAcquisitionSource, acquisitionSourcePresentation, renderAcquisitionSource, renderDrilldownSummary, renderCard, bindDetails, visualization,
+  sourceQualityPresentation, renderSourceQualityReport };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (global) global.AcquisitionSourcePresentation = api;
 })(typeof window !== 'undefined' ? window : globalThis);

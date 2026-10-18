@@ -3,6 +3,18 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const helper = require('../../src/js/shared/acquisition-source-presentation');
 const sourceRoot = path.join(__dirname, '../../src');
 const clone = value => JSON.parse(JSON.stringify(value));
+function qualityReport() {
+  const acquisition = metric(true).metadata.observation_receipt;
+  const rows = acquisition.observations.map(row => ({ channel_key: row.channel_key, channel_kind: row.channel_kind, label: row.label,
+    acquired_person_count: 1, covered_score_person_count: 1, unscored_person_count: 0, invalid_score_person_count: 0,
+    conflicting_score_person_count: 0, unknown_score_clock_person_count: 0, score_sum: 0, score_mean: 0 }));
+  const current = { version: 'source-quality-observation-v1', organization_id: acquisition.organization_id,
+    status: 'complete', window: acquisition.window, interval: acquisition.interval, as_of: acquisition.as_of,
+    timezone: acquisition.timezone, declaration_digest: acquisition.declaration_digest, acquisition_receipt: acquisition, observations: rows };
+  return { version: 'source-quality-report-v1', current, prior: null, comparison_mode: 'none',
+    rows: rows.map(row => ({ channel_key: row.channel_key, channel_kind: row.channel_kind, label: row.label, current: row, prior: null,
+      person_change: null, person_change_percent: null, quality_change_points: null })) };
+}
 function metric(people = false) {
   const org = '87000000-0000-4000-8000-000000000001', start = '2026-01-01T00:00:00.000Z', end = '2026-02-01T00:00:00.000Z';
   const observations = ['EUR', 'USD'].map((currency, index) => ({ period_start: start, period_end_exclusive: end,
@@ -43,6 +55,29 @@ test('actual dashboard and reporting cards preserve all exact signed currencies 
     expect(html).toContain('87000000-0000-4000-8000-000000000002');
     expect(html).toContain('87000000-0000-4000-8000-000000000003');
   }
+});
+
+test('source quality preserves grouped quality chart, exact denominators and explicit unsupported bubble axis', () => {
+  const report = qualityReport(), saved = global.document;
+  const container = { innerHTML: '', appendChild: jest.fn() };
+  global.document = { createElement: () => container };
+  try {
+    const render = jest.fn(() => ({ chart: true }));
+    const viz = { id: 'source_performance', type: 'grouped_bar_chart', dataSource: 'governed_source_quality_v1', source_quality_report: report };
+    expect(helper.visualization(viz, {}, render)).toBe(container);
+    expect(render).toHaveBeenCalledWith(expect.objectContaining({ type: 'grouped_bar_chart',
+      data: expect.arrayContaining([expect.objectContaining({ avg_quality_score: 0, covered_score_person_count: 1 })]),
+      series: [expect.objectContaining({ field: 'avg_quality_score' })] }));
+    expect(container.innerHTML).toContain('Scored people'); expect(container.innerHTML).toContain('Acquired people');
+    expect(container.innerHTML).toContain('&lt;Referral&gt;'); expect(container.innerHTML).not.toContain('<Referral>');
+    expect(container.innerHTML).toContain('Unavailable growth is not zero');
+    render.mockClear(); helper.visualization({ ...viz, id: 'source_quality_bubble', type: 'bubble_chart' }, {}, render);
+    expect(render).not.toHaveBeenCalled(); expect(container.innerHTML).toContain('Booking-axis unavailable');
+    const bad = clone(report); bad.rows[0] = null;
+    expect(helper.sourceQualityPresentation(bad)).toBeNull();
+    helper.visualization({ ...viz, source_quality_report: bad }, {}, render);
+    expect(render).not.toHaveBeenCalled(); expect(container.innerHTML).toContain('Source quality evidence unavailable');
+  } finally { global.document = saved; }
 });
 test('people are displayed as counts, not money or fabricated marketing ROI', () => {
   const html = helper.renderCard(metric(true));
@@ -164,5 +199,14 @@ test('actual drilldown summary preserves whole-report exact currencies and cover
     renderer.currentData.metadata = { canonical_metric_key: 'custom.top_performing_sources' };
     renderer.renderSummary();
     expect(summaryNode.innerHTML).toContain('Won'); expect(summaryNode.innerHTML).not.toContain('Acquisition-source evidence unavailable');
+    const report = qualityReport();
+    renderer.currentData.metadata = { canonical_metric_key: helper.PEOPLE };
+    renderer.currentData.summary.source_quality_report = report;
+    renderer.renderSummary();
+    expect(summaryNode.innerHTML).toContain('Proven-person source quality');
+    expect(summaryNode.innerHTML).toContain('Scored people'); expect(summaryNode.innerHTML).toContain('Prior comparison disabled');
+    expect(summaryNode.innerHTML).not.toContain('[object Object]');
+    renderer.currentData.summary.source_quality_report.current.acquisition_receipt = { ...report.current.acquisition_receipt, organization_id: 'foreign' };
+    renderer.renderSummary(); expect(summaryNode.innerHTML).toContain('Source quality evidence unavailable');
   } finally { global.document = savedDocument; global.window = savedWindow; }
 });
