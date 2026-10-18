@@ -14,13 +14,25 @@ function metric(status = 'complete') {
       unknown_identity_count: 0, duplicate_identity_count: 0, unknown_status_count: 0,
       unknown_amount_count: status === 'partial' ? 1 : 0, unknown_currency_count: 0 },
     currency_totals: totals, conservation_verified: true };
-  const value = totals.map(row => ({ key: row.currency, label: row.currency, currency: row.currency, value: row.signed_amount,
+  const value = totals.map(row => ({ key: row.currency, label: row.currency, currency: row.currency, value: row.positive_amount,
     positive_amount: row.positive_amount, negative_amount: row.negative_amount,
     positive_count: row.positive_count, negative_count: row.negative_count, zero_count: row.zero_count }));
   return { key: KEY, metric_key: KEY, title: 'Pipeline', name: 'Pipeline', value, current: value, format: 'distribution',
     unit: 'currency', aggregation: 'current_snapshot', status, metadata: { observation_receipt: receipt,
-      definition_version: receipt.definition_version, organization_id: receipt.organization_id, canonical_metric_key: KEY, provenance: 'calculated' } };
+      definition_version: 'current-open-active-positive-pipeline-v1', organization_id: receipt.organization_id, canonical_metric_key: KEY, provenance: 'calculated' } };
 }
+
+test('positive-only policy is explicit and stale signed calculations cannot certify current totals', () => {
+  const m = metric();
+  const shown = helper().currentPipelinePresentation(m);
+  expect(shown.status).toBe('complete');
+  expect(shown.rows.every(row => row.value === '0')).toBe(true);
+  const html = helper().renderCurrentPipeline(shown);
+  expect(html).toContain('Pipeline amount'); expect(html).toContain('Excluded negative amount');
+  m.metadata.definition_version = m.metadata.observation_receipt.definition_version;
+  for (const row of m.value) row.value = row.negative_amount;
+  expect(helper().currentPipelinePresentation(m).status).toBe('unverified');
+});
 function helper() {
   const file = path.join(sourceRoot, 'js/shared/current-pipeline-presentation.js');
   return fs.existsSync(file) ? require(file) : undefined;

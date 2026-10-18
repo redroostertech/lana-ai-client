@@ -8,6 +8,7 @@ function escapeHtml(value) {
 }
 const KEY = 'core.funnel-analysis-attribution.current_pipeline_value';
 const DEFINITION = 'current-open-active-opportunity-stock-evidence-v1';
+const POLICY = 'current-open-active-positive-pipeline-v1';
 const coverageKeys = ['admitted_record_count', 'eligible_opportunity_count', 'covered_opportunity_count',
   'unknown_identity_count', 'duplicate_identity_count', 'unknown_status_count', 'unknown_amount_count', 'unknown_currency_count'];
 const amountKeys = ['positive_amount', 'negative_amount'];
@@ -57,7 +58,7 @@ function matchesRows(rows, receipt) {
   return Array.isArray(rows) && rows.length === receipt.currency_totals.length && rows.every((row, index) => {
     const evidence = receipt.currency_totals[index];
     return row && row.key === evidence.currency && row.label === evidence.currency && row.currency === evidence.currency
-      && row.value === evidence.signed_amount && [...amountKeys, ...countKeys].every(key => row[key] === evidence[key]);
+      && row.value === evidence.positive_amount && [...amountKeys, ...countKeys].every(key => row[key] === evidence[key]);
   });
 }
 function currentPipelinePresentation(metric) {
@@ -66,7 +67,7 @@ function currentPipelinePresentation(metric) {
   const metadata = metric.metadata, receipt = metadata?.observation_receipt;
   if (metric.error || metric.override || metric.manual_override || metadata?.override || metadata?.manual_override
     || metadata?.canonical_metric_key !== KEY || metadata.provenance !== 'calculated'
-    || metadata.definition_version !== DEFINITION || !validReceipt(receipt, metadata)
+    || metadata.definition_version !== POLICY || !validReceipt(receipt, metadata)
     || metric.format !== 'distribution' || metric.unit !== 'currency' || metric.aggregation !== 'current_snapshot'
     || metric.status !== receipt.status) return unavailable;
   const fields = ['current', 'value'].filter(key => Object.prototype.hasOwnProperty.call(metric, key));
@@ -79,9 +80,9 @@ function renderCurrentPipeline(presentation) {
   const label = status === 'partial' ? 'Partial coverage. These are known covered amounts, not a complete pipeline total.'
     : status === 'empty' ? 'No open or active opportunities in the admitted records.' : 'Complete coverage of admitted records.';
   const table = rows.length ? '<div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead><tr>'
-    + '<th>Currency</th><th>Signed amount</th><th>Positive amount</th><th>Negative amount</th>'
+    + '<th>Currency</th><th>Pipeline amount</th><th>Excluded negative amount</th>'
     + '<th>Positive opportunities</th><th>Negative opportunities</th><th>Zero opportunities</th></tr></thead><tbody>'
-    + rows.map(row => '<tr>' + [row.currency, row.value, row.positive_amount, row.negative_amount,
+    + rows.map(row => '<tr>' + [row.currency, row.value, row.negative_amount,
       row.positive_count, row.negative_count, row.zero_count].map(value => '<td>' + escapeHtml(String(value)) + '</td>').join('') + '</tr>').join('')
     + '</tbody></table></div>' : '<p>No covered currency amounts.</p>';
   return '<section class="current-pipeline"><p>Current stock. Observed as of ' + escapeHtml(receipt.as_of)
