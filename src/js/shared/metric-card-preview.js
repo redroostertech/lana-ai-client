@@ -123,6 +123,8 @@
   // ---------------------------------------------------------------------------
   function renderDashboardPreviewCard(metric) {
     var m = metric || {};
+    var pipeline = scope().CurrentPipelinePresentation;
+    if (pipeline && pipeline.isCurrentPipeline(m)) return pipeline.renderCard(m);
     var title = m.title || m.key || 'Metric';
     var value = formatValue(m.value, m.format);
 
@@ -193,6 +195,8 @@
   // own drilldown section).
   // ---------------------------------------------------------------------------
   function renderReportPreviewCard(metric) {
+    var pipeline = scope().CurrentPipelinePresentation;
+    if (pipeline && pipeline.isCurrentPipeline(metric)) return pipeline.renderCard(metric);
     var m = metric || {};
     var name = m.name || m.title || m.key || 'Metric';
     var format = m.format;

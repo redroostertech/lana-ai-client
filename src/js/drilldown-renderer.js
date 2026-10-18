@@ -41,6 +41,7 @@ class DrilldownRenderer {
     this.contextGeneration = 0;
     this.dataGeneration = 0;
     this.filterPopoverCleanup = null;
+    this.facetLabels = new Map();
 
     // Active breakdown card filter: { column: string, value: string, key: string } or null.
     // Only one breakdown filter active at a time (v1 single-card filter rule).
@@ -352,6 +353,7 @@ class DrilldownRenderer {
    */
   async open(moduleKey, metricKey, options = {}) {
     const generation = ++this.contextGeneration;
+    this.facetLabels.clear();
     this.filterPopoverCleanup?.();
     // Initialize if not already done (lazy initialization)
     this.init();
@@ -1574,6 +1576,9 @@ class DrilldownRenderer {
     if (!this.currentConfig) {
       return { values: [], hasMore: false, error: 'No drilldown context' };
     }
+    if (this.currentConfig.columns?.find(column => column.field === columnField)?.filterable === false) {
+      return { values: [], hasMore: false, error: 'Filtering is not supported for this column' };
+    }
 
     const endpoint = `/api/v1/modules/${this.currentConfig.moduleKey}/metrics/${this.currentConfig.metricKey}/drilldown/distinct/${encodeURIComponent(columnField)}`;
 
@@ -1618,6 +1623,7 @@ class DrilldownRenderer {
    * Single-instance: opening one closes any prior info or filter popover.
    */
   openColumnFilterPopover(anchorEl, col) {
+    if (col.filterable === false) return;
     this.filterPopoverCleanup?.();
     const context = this.currentConfig;
     const generation = this.contextGeneration;
@@ -1693,7 +1699,7 @@ class DrilldownRenderer {
       const visible = term
         ? loadedValues.filter(v => {
             const raw = String(v.value);
-            const label = labelByValue[raw] || raw;
+            const label = typeof v.label === 'string' ? v.label : labelByValue[raw] || raw;
             return raw.toLowerCase().includes(term) || label.toLowerCase().includes(term);
           })
         : loadedValues;
@@ -1707,7 +1713,7 @@ class DrilldownRenderer {
 
       const rowsHtml = visible.map(v => {
         const raw = String(v.value);
-        const label = labelByValue[raw] || raw;
+        const label = typeof v.label === 'string' ? v.label : labelByValue[raw] || raw;
         const isChecked = checkedState.has(raw) ? 'checked' : '';
         return `
           <label class="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 px-1 rounded">
@@ -1795,6 +1801,8 @@ class DrilldownRenderer {
       if (!document.body.contains(pop)) return;
       if (!isCurrent()) { close(); return; }
       loadedValues = values || [];
+      this.facetLabels.set(field, new Map(loadedValues.filter(value => typeof value.label === 'string')
+        .map(value => [String(value.value), value.label])));
       renderList();
       if (error) {
         hintEl.textContent = `Could not load values: ${error}`;
@@ -1842,7 +1850,8 @@ class DrilldownRenderer {
       const label = columnHeaders[field] || field;
       let display;
       if (Array.isArray(value)) {
-        const labels = value.map(v => (columnOptionLabels[field] && columnOptionLabels[field][String(v)]) || String(v));
+        const labels = value.map(v => this.facetLabels.get(field)?.get(String(v))
+          ?? (columnOptionLabels[field] && columnOptionLabels[field][String(v)]) ?? String(v));
         if (labels.length === 0) {
           display = '';
         } else if (labels.length <= 2) {
@@ -1900,7 +1909,7 @@ class DrilldownRenderer {
           <div class="flex items-center ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : ''}">
             <span>${col.header}</span>
             ${col.description ? `<span class="ml-1 inline-flex" data-col-info="${this.escapeHtml(col.field)}" data-col-info-text="${this.escapeHtml(col.description)}" data-col-info-header="${this.escapeHtml(col.header)}" title="${this.escapeHtml(col.description)}" onclick="event.stopPropagation()" style="cursor: help;"><svg class="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></span>` : ''}
-            <span class="ml-1 inline-flex" data-col-filter="${this.escapeHtml(col.field)}" data-col-header="${this.escapeHtml(col.header)}" onclick="event.stopPropagation()" style="cursor: pointer;" title="Filter ${this.escapeHtml(col.header)}"><svg class="h-3.5 w-3.5 ${filterIconColor} hover:text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg></span>
+            ${col.filterable === false ? '' : `<span class="ml-1 inline-flex cursor-pointer" data-col-filter="${this.escapeHtml(col.field)}" data-col-header="${this.escapeHtml(col.header)}" title="Filter ${this.escapeHtml(col.header)}"><svg class="h-3.5 w-3.5 ${filterIconColor} hover:text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg></span>`}
             ${sortable ? `<span class="ml-1 text-gray-400">${sortIcon}</span>` : ''}
           </div>
         </th>

@@ -324,6 +324,44 @@ describe('drilldown metadata request contract', () => {
     jest.spyOn(global, 'setTimeout').mockImplementation(callback => { callback(); return 0; });
     return { pop, subnodes, attached, anchor: { getBoundingClientRect: () => ({}) } };
   }
+  test.each([false, true, undefined])('column filterable %s controls both affordance and direct fetch', async filterable => {
+    configure('current_snapshot');
+    renderer.currentConfig.columns = [{ field: 'value', header: 'Amount', type: 'text', filterable }];
+    renderer.currentData = { rows: [{ value: '-9007199254740993.0123456789' }] };
+    const filter = { dataset: { colFilter: 'value' }, addEventListener: jest.fn() };
+    document.querySelectorAll = selector => selector === '[data-col-filter]' && filterable !== false ? [filter] : [];
+    renderer.openColumnFilterPopover = jest.fn();
+    renderer.renderActiveFilters = jest.fn(); renderer.attachTooltipHandlers = jest.fn();
+    renderer.renderTable();
+    const html = nodes.get('drilldown-table-header').innerHTML;
+    expect(html.includes('data-col-filter="value"')).toBe(filterable !== false);
+    if (filterable !== false) {
+      const event = { stopPropagation: jest.fn() };
+      filter.addEventListener.mock.calls[0][1](event);
+      expect(event.stopPropagation).toHaveBeenCalledTimes(1);
+      expect(renderer.openColumnFilterPopover).toHaveBeenCalledWith(filter, renderer.currentConfig.columns[0]);
+      expect(html).toContain('cursor-pointer');
+    }
+    expect(nodes.get('drilldown-table-body').innerHTML).toContain('-9007199254740993.0123456789');
+    await renderer.fetchDistinctValues('value');
+    expect(window.api.post).toHaveBeenCalledTimes(filterable === false ? 0 : 1);
+  });
+  test('facet labels are presentation only: duplicate source labels retain distinct qualified values and null sentinel', async () => {
+    configure('current_snapshot');
+    const fixture = popoverFixture();
+    const keys = ['["connector","org","a","crm"]', '["connector","org","b","crm"]', 'null'];
+    renderer.filters = { source: keys };
+    window.api.post.mockResolvedValueOnce({ data: { values: keys.map((value, index) => ({ value,
+      label: index === 2 ? 'Unknown provenance' : 'Same source', count: 1 })) } });
+    const loading = jest.spyOn(renderer, 'fetchDistinctValues');
+    renderer.openColumnFilterPopover(fixture.anchor, { field: 'source', header: 'Source' });
+    await loading.mock.results[0].value;
+    const html = fixture.subnodes.get('[data-role="body"]').innerHTML;
+    expect(html).toContain('Same source'); expect(html).toContain('Unknown provenance');
+    fixture.subnodes.get('[data-action="apply"]').handlers.click();
+    expect(renderer.filters.source).toEqual(keys);
+    expect(window.api.post.mock.calls[1][1].filters.source).toEqual(keys);
+  });
   test.each(['unchanged', 'close', 'new-open'])('distinct popover completion is owned by original context: %s', async change => {
     configure('current_snapshot');
     const fixture = popoverFixture();
