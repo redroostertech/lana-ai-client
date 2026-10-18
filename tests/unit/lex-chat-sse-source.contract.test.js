@@ -95,6 +95,23 @@ function responseFromChunks(chunks, status = 200) {
 }
 
 describe('SSEChatSource contract', () => {
+  test('live and history adapters preserve exact display labels separately from document routing', async () => {
+    const citations = [{ document_id: 'doc-original', filename: 'E2E-_.pdf',
+      display_filename: 'E2E (देवनागरी) [2026].pdf', source_type: 'document' }];
+    const api = canonicalApi({ get: jest.fn().mockResolvedValue({
+      messages: [{ id: 'answer-1', role: 'assistant', content: 'Answer.', metadata: { citations } }],
+      pagination: { hasMore: false }
+    }) });
+    const { Source } = loadSource(jest.fn(), { api });
+    const source = new Source({ api });
+    await source.connect('thread-1');
+    expect(source._mapEvent('citations', { citations }).citations).toEqual(citations);
+    const history = await source.loadHistory(1, 20);
+    expect(history.messages[0].citations).toEqual(citations);
+    expect(citations[0].filename).toBe('E2E-_.pdf');
+    expect(citations[0].document_id).toBe('doc-original');
+  });
+
   test('creates a canonical conversation before first-message streaming', async () => {
     const fetchMock = jest.fn()
       .mockResolvedValueOnce(responseFromChunks([

@@ -2102,11 +2102,13 @@
     async _showCitationSourceDetails(detail) {
       let citation = detail && detail.citation ? detail.citation : {};
       citation = await this._hydrateDomainPackCitation(citation);
-      const label = citation.label || citation.filename || citation.citation || detail.filename || 'Source';
+      const displayName = typeof Chat.documentCitationDisplayName === 'function'
+        ? Chat.documentCitationDisplayName(citation) : null;
+      const label = displayName || citation.label || citation.filename || citation.citation || detail.filename || 'Source';
       const sourceKind = this._getCitationSourceKind(citation);
       const sourceType = sourceKind.label;
       const authorityId = citation.authority_id || citation.authorityId || citation.sourceRef || citation.id || '';
-      const citationText = citation.citation || citation.label || citation.filename || '';
+      const citationText = citation.citation || displayName || citation.label || citation.filename || '';
       const excerpt = citation.excerpt || citation.snippet || citation.chunk_text || citation.content || citation.text || '';
       const pack = citation.domain_pack || citation.domainPack || null;
       const locator = citation.locator || {};
