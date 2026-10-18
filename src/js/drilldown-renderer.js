@@ -38,6 +38,9 @@ class DrilldownRenderer {
     this.searchQuery = '';
     this.initialized = false;
     this.currentTableView = null; // Stores current table view filter state
+    this.contextGeneration = 0;
+    this.dataGeneration = 0;
+    this.filterPopoverCleanup = null;
 
     // Active breakdown card filter: { column: string, value: string, key: string } or null.
     // Only one breakdown filter active at a time (v1 single-card filter rule).
@@ -348,16 +351,13 @@ class DrilldownRenderer {
    * @param {string} periodEnd - End date (ISO 8601)
    */
   async open(moduleKey, metricKey, options = {}) {
+    const generation = ++this.contextGeneration;
+    this.filterPopoverCleanup?.();
     // Initialize if not already done (lazy initialization)
     this.init();
 
-    // Extract options (support both object and legacy separate params)
-    const { periodStart, periodEnd, organizationId, ...extraFilters } = options;
-
-    if (!periodStart || !periodEnd) {
-      console.error('[DrilldownRenderer] Missing periodStart or periodEnd in options');
-      return;
-    }
+    const { periodStart, periodEnd, organizationId, filters = {}, search = '',
+      sortBy, sortDirection, viewFilter, viewType, ...extraFilters } = options;
 
     // Show modal
     this.modal.classList.remove('hidden');
@@ -370,10 +370,16 @@ class DrilldownRenderer {
     this.filters = {};
     this.searchQuery = '';
     this.activeBreakdownFilter = null;
+    this.currentConfig = null;
+    this.currentData = null;
+    this.currentViewFilter = viewFilter;
+    this.currentViewType = viewType;
+    this.filters = filters;
+    this.searchQuery = search;
 
     // Clear search input so previous drilldown's query is not persisted
     const searchInput = document.getElementById('drilldown-search');
-    if (searchInput) searchInput.value = '';
+    if (searchInput) searchInput.value = search;
 
     // Show loading state
     this.showLoading();
@@ -381,15 +387,30 @@ class DrilldownRenderer {
     try {
       // Fetch drilldown configuration
       const config = await this.fetchDrilldownConfig(moduleKey, metricKey);
+      if (generation !== this.contextGeneration) return;
+      if (!config.drilldown || typeof config.drilldown !== 'object' || Array.isArray(config.drilldown)) {
+        throw new Error('Invalid drilldown metadata');
+      }
+      // Presentation metadata cannot replace the host-selected request context.
+      for (const field of ['moduleKey', 'metricKey', 'organizationId', 'periodStart', 'periodEnd', 'extraFilters']) {
+        if (Object.hasOwn(config.drilldown, field)) {
+          throw new Error(`Drilldown metadata cannot override ${field}`);
+        }
+      }
+      this.getTemporalMode(config.drilldown);
       this.currentConfig = {
+        ...config.drilldown,
         moduleKey,
         metricKey,
         periodStart,
         periodEnd,
         organizationId,
-        extraFilters,
-        ...config.drilldown
+        extraFilters
       };
+
+      // A current snapshot deliberately ignores the surrounding report dates.
+      // Legacy metadata still requires them. Validate before any data request.
+      this.buildRequestBody('execute');
 
       // Update modal header
       document.getElementById('drilldown-title').textContent = config.drilldown.title || 'Drilldown Data';
@@ -400,6 +421,8 @@ class DrilldownRenderer {
         this.sortBy = config.drilldown.defaultSort.field;
         this.sortDirection = config.drilldown.defaultSort.direction || 'asc';
       }
+      if (sortBy !== undefined) this.sortBy = sortBy;
+      if (sortDirection !== undefined) this.sortDirection = sortDirection;
 
       // Inject custom CSS to override browser autofill styling
       this.injectCustomCSS();
@@ -407,9 +430,59 @@ class DrilldownRenderer {
       // Fetch and render data
       await this.fetchData();
     } catch (error) {
+      if (generation !== this.contextGeneration) return;
+      this.currentConfig = null;
       console.error('[DrilldownRenderer] Error opening drilldown:', error);
       this.showError(error.message || 'Failed to load drilldown configuration');
     }
+  }
+
+  getTemporalMode(config = this.currentConfig) {
+    const mode = Object.hasOwn(config, 'temporal_mode') ? config.temporal_mode : 'report_period';
+    if (mode !== 'report_period' && mode !== 'current_snapshot') {
+      throw new Error('Unsupported drilldown temporal_mode');
+    }
+    return mode;
+  }
+
+  /** Map UI state to the endpoint shape; the server validates business scope. */
+  buildRequestBody(action, { columnField, format } = {}) {
+    if (!['execute', 'distinct', 'export'].includes(action)) throw new Error('Unsupported drilldown action');
+    const config = this.currentConfig;
+    const mode = this.getTemporalMode(config);
+    const extras = config.extraFilters || {};
+    const reserved = ['moduleKey', 'module_key', 'metricKey', 'metric_key', 'registryKey',
+      'organizationId', 'organization_id', 'tenantId', 'tenant_id',
+      'periodStart', 'periodEnd', 'period_start', 'period_end', 'startDate', 'endDate',
+      'page', 'pageSize', 'page_size', 'limit', 'offset', 'filters', 'search',
+      'sortBy', 'sortDirection', 'sort_by', 'sort_direction', 'format', 'temporal_mode',
+      'extraFilters', '__proto__', 'constructor', 'prototype'];
+    if (typeof extras !== 'object' || Array.isArray(extras)) throw new Error('Invalid drilldown extra selectors');
+    for (const field of Object.keys(extras)) {
+      if (reserved.includes(field)) throw new Error(`Drilldown extra selectors cannot override ${field}`);
+    }
+    const body = { ...extras, filters: { ...this.filters }, search: this.searchQuery || '' };
+    if (mode === 'report_period') {
+      if (!config.periodStart || !config.periodEnd) throw new Error('Missing periodStart or periodEnd in options');
+      body.periodStart = config.periodStart;
+      body.periodEnd = config.periodEnd;
+    }
+    if (action === 'distinct') {
+      delete body.filters[columnField];
+    } else {
+      body.organizationId = config.organizationId;
+      body.sortBy = this.sortBy;
+      body.sortDirection = this.sortDirection;
+      if (action === 'execute') {
+        body.page = this.currentPage;
+        body.pageSize = this.pageSize;
+      } else {
+        body.format = format;
+      }
+    }
+    if (this.currentViewFilter) body.viewFilter = this.currentViewFilter;
+    if (this.currentViewType) body.viewType = this.currentViewType;
+    return body;
   }
 
   /**
@@ -459,6 +532,8 @@ class DrilldownRenderer {
    * Close the drilldown modal
    */
   close() {
+    this.contextGeneration++;
+    this.filterPopoverCleanup?.();
     if (!this.modal) {
       this.modal = document.getElementById('drilldown-modal');
     }
@@ -508,42 +583,23 @@ class DrilldownRenderer {
    */
   async fetchData() {
     if (!this.currentConfig) return;
+    const context = this.currentConfig;
+    const generation = this.contextGeneration;
+    const requestGeneration = ++this.dataGeneration;
+    const isCurrent = () => generation === this.contextGeneration
+      && context === this.currentConfig && requestGeneration === this.dataGeneration;
 
     this.showLoading();
 
     try {
       let result;
+      const requestBody = this.buildRequestBody('execute');
 
       // Use global api helper instead of fetch to support Electron backend URLs
       // Check both window.api and global api (defined in api.js)
       const apiClient = window.api || (typeof api !== 'undefined' ? api : null);
 
       if (apiClient) {
-        const requestBody = {
-          periodStart: this.currentConfig.periodStart,
-          periodEnd: this.currentConfig.periodEnd,
-          organizationId: this.currentConfig.organizationId,
-          page: this.currentPage,
-          pageSize: this.pageSize,
-          sortBy: this.sortBy,
-          sortDirection: this.sortDirection,
-          filters: this.filters,
-          search: this.searchQuery
-        };
-
-        // Add extra filters passed from funnel stage click etc.
-        if (this.currentConfig.extraFilters) {
-          Object.assign(requestBody, this.currentConfig.extraFilters);
-        }
-
-        // Add view filter if set (from clicking summary cards)
-        if (this.currentViewFilter) {
-          requestBody.viewFilter = this.currentViewFilter;
-        }
-        if (this.currentViewType) {
-          requestBody.viewType = this.currentViewType;
-        }
-
         console.log('[DrilldownRenderer] Executing drilldown request:', {
           moduleKey: this.currentConfig.moduleKey,
           metricKey: this.currentConfig.metricKey,
@@ -551,7 +607,7 @@ class DrilldownRenderer {
         });
 
         const response = await apiClient.post(
-          `/api/v1/modules/${this.currentConfig.moduleKey}/metrics/${this.currentConfig.metricKey}/drilldown/execute`,
+          `/api/v1/modules/${context.moduleKey}/metrics/${context.metricKey}/drilldown/execute`,
           requestBody
         );
         result = response;
@@ -559,33 +615,8 @@ class DrilldownRenderer {
         console.log('[DrilldownRenderer] Received response:', result);
       } else {
         // Fallback to fetch for non-Electron environments
-        const requestBody = {
-          periodStart: this.currentConfig.periodStart,
-          periodEnd: this.currentConfig.periodEnd,
-          organizationId: this.currentConfig.organizationId,
-          page: this.currentPage,
-          pageSize: this.pageSize,
-          sortBy: this.sortBy,
-          sortDirection: this.sortDirection,
-          filters: this.filters,
-          search: this.searchQuery
-        };
-
-        // Add extra filters passed from funnel stage click etc.
-        if (this.currentConfig.extraFilters) {
-          Object.assign(requestBody, this.currentConfig.extraFilters);
-        }
-
-        // Add view filter if set (from clicking summary cards)
-        if (this.currentViewFilter) {
-          requestBody.viewFilter = this.currentViewFilter;
-        }
-        if (this.currentViewType) {
-          requestBody.viewType = this.currentViewType;
-        }
-
         const response = await fetch(
-          `/api/v1/modules/${this.currentConfig.moduleKey}/metrics/${this.currentConfig.metricKey}/drilldown/execute`,
+          `/api/v1/modules/${context.moduleKey}/metrics/${context.metricKey}/drilldown/execute`,
           {
             method: 'POST',
             headers: {
@@ -605,6 +636,7 @@ class DrilldownRenderer {
         console.log('[DrilldownRenderer] Received response (fetch):', result);
       }
 
+      if (!isCurrent()) return;
       console.log('[DrilldownRenderer] Setting currentData:', result.data);
       console.log('[DrilldownRenderer] Data structure check:', {
         hasData: !!result.data,
@@ -621,6 +653,7 @@ class DrilldownRenderer {
       // Render the data
       this.render();
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('[DrilldownRenderer] Error fetching drilldown data:', error);
       this.showError(error.message || 'Failed to load drilldown data');
     }
@@ -1542,27 +1575,10 @@ class DrilldownRenderer {
       return { values: [], hasMore: false, error: 'No drilldown context' };
     }
 
-    // Exclude the column being filtered so the popover shows the full set.
-    const filtersCopy = {};
-    for (const [k, v] of Object.entries(this.filters || {})) {
-      if (k !== columnField) filtersCopy[k] = v;
-    }
-
-    const requestBody = {
-      periodStart: this.currentConfig.periodStart,
-      periodEnd: this.currentConfig.periodEnd,
-      filters: filtersCopy,
-      search: this.searchQuery || '',
-    };
-    if (this.currentConfig.extraFilters) {
-      Object.assign(requestBody, this.currentConfig.extraFilters);
-    }
-    if (this.currentViewFilter) requestBody.viewFilter = this.currentViewFilter;
-    if (this.currentViewType) requestBody.viewType = this.currentViewType;
-
     const endpoint = `/api/v1/modules/${this.currentConfig.moduleKey}/metrics/${this.currentConfig.metricKey}/drilldown/distinct/${encodeURIComponent(columnField)}`;
 
     try {
+      const requestBody = this.buildRequestBody('distinct', { columnField });
       const apiClient = window.api || (typeof api !== 'undefined' ? api : null);
       let result;
       if (apiClient) {
@@ -1602,6 +1618,10 @@ class DrilldownRenderer {
    * Single-instance: opening one closes any prior info or filter popover.
    */
   openColumnFilterPopover(anchorEl, col) {
+    this.filterPopoverCleanup?.();
+    const context = this.currentConfig;
+    const generation = this.contextGeneration;
+    const isCurrent = () => context === this.currentConfig && generation === this.contextGeneration;
     document.getElementById('drilldown-col-filter-popover')?.remove();
     document.getElementById('drilldown-col-info-popover')?.remove();
 
@@ -1654,11 +1674,13 @@ class DrilldownRenderer {
       pop.remove();
       document.removeEventListener('mousedown', onOutside, true);
       document.removeEventListener('keydown', onKey, true);
+      if (this.filterPopoverCleanup === close) this.filterPopoverCleanup = null;
     };
     const onOutside = (e) => { if (!pop.contains(e.target)) close(); };
     const onKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); close(); }
     };
+    this.filterPopoverCleanup = close;
 
     // Live checkbox state lives outside the DOM so search keystrokes can
     // re-render the visible list without losing what the user has checked.
@@ -1666,6 +1688,7 @@ class DrilldownRenderer {
     let loadedValues = [];
 
     const renderList = () => {
+      if (!isCurrent() || !document.body.contains(pop)) { close(); return; }
       const term = (searchEl.value || '').trim().toLowerCase();
       const visible = term
         ? loadedValues.filter(v => {
@@ -1737,6 +1760,7 @@ class DrilldownRenderer {
     });
 
     const apply = () => {
+      if (!isCurrent() || !document.body.contains(pop)) { close(); return; }
       const selected = Array.from(checkedState);
       if (selected.length === 0) {
         delete this.filters[field];
@@ -1750,6 +1774,7 @@ class DrilldownRenderer {
     };
     pop.querySelector('[data-action="cancel"]').addEventListener('click', close);
     pop.querySelector('[data-action="clear"]').addEventListener('click', () => {
+      if (!isCurrent() || !document.body.contains(pop)) { close(); return; }
       delete this.filters[field];
       close();
       this.currentPage = 1;
@@ -1759,6 +1784,7 @@ class DrilldownRenderer {
     pop.querySelector('[data-action="apply"]').addEventListener('click', apply);
 
     setTimeout(() => {
+      if (!isCurrent() || !document.body.contains(pop)) { close(); return; }
       document.addEventListener('mousedown', onOutside, true);
       document.addEventListener('keydown', onKey, true);
     }, 0);
@@ -1767,6 +1793,7 @@ class DrilldownRenderer {
     // lands the popover is gone; we no-op via the document.body check.
     this.fetchDistinctValues(field).then(({ values, hasMore, error }) => {
       if (!document.body.contains(pop)) return;
+      if (!isCurrent()) { close(); return; }
       loadedValues = values || [];
       renderList();
       if (error) {
@@ -2457,21 +2484,20 @@ class DrilldownRenderer {
     if (!this.currentConfig) return;
 
     try {
+      // An explicitly requested download remains owned by its original metric,
+      // even when the user closes this modal or opens another while it loads.
+      const context = this.currentConfig;
+      const filename = `${context.metricKey}_${LanaTime.formatUtcDateOnly()}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+      const requestBody = this.buildRequestBody('export', { format });
       const response = await fetch(
-        `/api/v1/modules/${this.currentConfig.moduleKey}/metrics/${this.currentConfig.metricKey}/drilldown/export`,
+        `/api/v1/modules/${context.moduleKey}/metrics/${context.metricKey}/drilldown/export`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.getAuthToken()}`
           },
-          body: JSON.stringify({
-            periodStart: this.currentConfig.periodStart,
-            periodEnd: this.currentConfig.periodEnd,
-            format: format,
-            filters: this.filters,
-            search: this.searchQuery
-          })
+          body: JSON.stringify(requestBody)
         }
       );
 
@@ -2484,7 +2510,7 @@ class DrilldownRenderer {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${this.currentConfig.metricKey}_${LanaTime.formatUtcDateOnly()}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
