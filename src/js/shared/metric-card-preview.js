@@ -123,6 +123,8 @@
   // ---------------------------------------------------------------------------
   function renderDashboardPreviewCard(metric) {
     var m = metric || {};
+    var intake = scope().OpportunityIntakePresentation;
+    if (intake && intake.isOpportunityIntake(m)) return intake.renderCard(m);
     var acquisition = scope().AcquisitionSourcePresentation;
     if (acquisition && acquisition.isAcquisitionSource(m)) return acquisition.renderCard(m);
     var pipeline = scope().CurrentPipelinePresentation;
@@ -197,6 +199,8 @@
   // own drilldown section).
   // ---------------------------------------------------------------------------
   function renderReportPreviewCard(metric) {
+    var intake = scope().OpportunityIntakePresentation;
+    if (intake && intake.isOpportunityIntake(metric)) return intake.renderCard(metric);
     var acquisition = scope().AcquisitionSourcePresentation;
     if (acquisition && acquisition.isAcquisitionSource(metric)) return acquisition.renderCard(metric);
     var pipeline = scope().CurrentPipelinePresentation;

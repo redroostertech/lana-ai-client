@@ -662,6 +662,16 @@
   }
 
   function renderMetricCard(metric) {
+    var intake = window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.opportunityIntakePresentation(metric);
+    if (intake) {
+      var intakeId = metric.metric_key || metric.key;
+      metricInfoById[intakeId] = metric;
+      return '<article class="dash-metric-card"><div class="dash-metric-card__top"><div class="dash-metric-card__title">'
+        + escapeHtml(metric.title || metric.name || 'Opportunity intake') + '</div>'
+        + '<button class="dash-metric-card__info" type="button" aria-label="Metric details" data-metric-info="'
+        + escapeHtml(intakeId) + '">i</button></div>'
+        + window.OpportunityIntakePresentation.renderOpportunityIntake(intake, metric) + '</article>';
+    }
     var acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.acquisitionSourcePresentation(metric);
     if (acquisition) {
       var acquisitionId = metric.metric_key || metric.key;

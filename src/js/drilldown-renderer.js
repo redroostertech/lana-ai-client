@@ -906,6 +906,15 @@ class DrilldownRenderer {
    * Render summary statistics (detects structure and delegates)
    */
   renderSummary() {
+    const intakeSummary = window.OpportunityIntakePresentation?.renderDrilldownSummary(this.currentData, this.currentConfig);
+    if (intakeSummary != null) {
+      const container = document.getElementById('drilldown-summary-container');
+      const summary = document.getElementById('drilldown-summary');
+      container.classList.remove('hidden');
+      summary.className = '';
+      summary.innerHTML = intakeSummary;
+      return;
+    }
     const acquisitionSummary = window.AcquisitionSourcePresentation?.renderDrilldownSummary(this.currentData, this.currentConfig);
     if (acquisitionSummary != null) {
       const container = document.getElementById('drilldown-summary-container');
