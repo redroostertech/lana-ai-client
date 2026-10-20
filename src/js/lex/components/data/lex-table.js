@@ -30,6 +30,8 @@
        table.setColumnFilterOptions({ type: { options: [{ value: 'pdf', label: 'PDFs' }] },
                                       updated_at: { single: true, options: [...] } });
      Selections arrive in lex-query-change as filters[col] = { operator: 'in', value: [...] }.
+   Client-side tables can give supplied options a predicate instead of exact matching
+   (e.g. date ranges): created_at: { single: true, options: [...], match: (cell, values) => bool }.
 
    Events: row-click, sort-change, selection-change, bulk-action, lex-filter-change,
            lex-query-change (server paging)
@@ -502,6 +504,8 @@
     // Page-supplied filter values per column: { col: { options: [{ value, label }],
     // single } }. They replace values derived from the loaded rows, so a
     // server-paged table can offer every value, not one page's. single = radios.
+    // match(cellValue, selectedValues) -> bool replaces exact matching on a
+    // client-side table (server-paged tables send the selection to the API).
     setColumnFilterOptions(map) {
       this._columnFilterOptions = map && typeof map === 'object' ? map : {};
       this._scheduleUpdate();
@@ -793,9 +797,11 @@
           .map(v => ({ value: String(v), label: String(v) }));
       const inputType = config && config.single ? 'radio' : 'checkbox';
       const currentFilter = this.dataSource?._filters?.get(col);
-      const checkedVals = currentFilter && currentFilter.operator === 'in'
-        ? (Array.isArray(currentFilter.value) ? currentFilter.value : String(currentFilter.value).split(',')).map(String)
-        : (currentFilter ? [String(currentFilter.value)] : []);
+      const checkedVals = !currentFilter ? []
+        : currentFilter.operator === 'match' ? currentFilter.value.values.map(String)
+        : currentFilter.operator === 'in'
+          ? (Array.isArray(currentFilter.value) ? currentFilter.value : String(currentFilter.value).split(',')).map(String)
+          : [String(currentFilter.value)];
 
       let html = `<div class="lex-th-filter-dropdown${alignEnd ? ' lex-th-filter-dropdown--end' : ''}" data-col-filter-dropdown>`;
       if (options.length > 12) {
@@ -1136,7 +1142,12 @@
         const checks = this.$$('[data-col-check]:checked');
         const values = checks.map(c => c.dataset.colCheck);
         if (values.length > 0 && this.dataSource && this._colFilterOpen) {
-          this.dataSource.setFilter(this._colFilterOpen, 'in', values);
+          const config = this._columnFilterOptions[this._colFilterOpen];
+          if (!this.serverPaging && config && typeof config.match === 'function') {
+            this.dataSource.setFilter(this._colFilterOpen, 'match', { values, test: cell => config.match(cell, values) });
+          } else {
+            this.dataSource.setFilter(this._colFilterOpen, 'in', values);
+          }
         }
         this._colFilterOpen = null;
         this._scheduleUpdate();

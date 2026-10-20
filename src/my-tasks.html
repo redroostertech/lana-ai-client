@@ -67,7 +67,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
             <lex-select
               id="myTasksSort"
-              options='[{"value":"updated_at","label":"Last Updated"},{"value":"due_date","label":"Due Date"},{"value":"title","label":"Task"},{"value":"status","label":"Status"},{"value":"priority","label":"Priority"}]'
+              options='[{"value":"updated_at","label":"Last Updated"},{"value":"due_date","label":"Due Date"},{"value":"created_at","label":"Created"},{"value":"title","label":"Task"},{"value":"status","label":"Status"},{"value":"priority","label":"Priority"}]'
               value="updated_at"
             ></lex-select>
           </div>
@@ -100,8 +100,8 @@
       <lex-table
         id="myTasksTable"
         class="my-tasks-table lex-table--card"
-        columns="title,workspace_matter,status,priority,due_date"
-        labels="Task,Workspace | Matter,Status,Priority,Due"
+        columns="title,workspace_matter,status,priority,due_date,created_at"
+        labels="Task,Workspace | Matter,Status,Priority,Due,Created"
         column-filters
         sort-by="updated_at"
         sort-dir="desc"
@@ -346,6 +346,7 @@
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
   <script src="js/lex/components/layout/lex-conversation-item.js"></script>

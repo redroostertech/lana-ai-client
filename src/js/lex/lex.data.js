@@ -181,6 +181,8 @@
           const set = Array.isArray(filter) ? filter : String(filter).split(',');
           return set.some(v => String(cell).toLowerCase() === String(v).trim().toLowerCase());
         }
+        case 'match':
+          return !filter || typeof filter.test !== 'function' || !!filter.test(cell);
         case 'between': {
           const [min, max] = Array.isArray(filter) ? filter : String(filter).split(',');
           const num = Number(cell);

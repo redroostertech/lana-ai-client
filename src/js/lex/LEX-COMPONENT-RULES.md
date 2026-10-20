@@ -678,6 +678,12 @@ table.requestServerQuery({ resetPage: true });   // after a filter outside the t
 ```
 **RULE:** with `server-paging`, list in `sortable-columns` only what the API can sort, and keep filters outside the table (column filters would only see one page).
 
+**Supplied column-filter options:** `table.setColumnFilterOptions({ col: { options: [{ value, label }], single } })` replaces the values derived from the rows (a server-paged table shows a filter only on columns given options). On a client-side table, add `match(cellValue, selectedValues)` to filter by predicate instead of exact value, e.g. date ranges:
+```javascript
+table.setColumnFilterOptions({ created_at: { single: true, options: LanaLibraryColumnFilters.EDITED_RANGE_OPTIONS,
+  match: (cell, values) => LanaLibraryColumnFilters.inEditedRange(cell, values[0]) } });
+```
+
 **Selection API:**
 ```javascript
 table.select('id');  table.deselect('id');

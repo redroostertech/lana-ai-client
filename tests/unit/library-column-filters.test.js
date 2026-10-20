@@ -90,4 +90,17 @@ describe('library-column-filters', () => {
     await expect(filters.loadWorkspaceOptions({ get: async () => { throw new Error('down'); } })).resolves.toEqual([]);
     await expect(filters.loadWorkspaceOptions(null)).resolves.toEqual([]);
   });
+
+  test('inEditedRange matches timestamps with the same bounds the server filters use', () => {
+    expect(filters.inEditedRange('2026-10-20T10:00:00Z', 'today', now, 'UTC')).toBe(true);
+    expect(filters.inEditedRange('2026-10-19T23:59:00Z', 'today', now, 'UTC')).toBe(false);
+    expect(filters.inEditedRange('2026-10-15T00:00:00Z', '7d', now)).toBe(true);
+    expect(filters.inEditedRange('2026-10-01T00:00:00Z', '7d', now)).toBe(false);
+    expect(filters.inEditedRange('2026-10-01T00:00:00Z', '30d', now)).toBe(true);
+    expect(filters.inEditedRange('2026-08-01T00:00:00Z', 'older', now)).toBe(true);
+    expect(filters.inEditedRange('2026-10-01T00:00:00Z', 'older', now)).toBe(false);
+    expect(filters.inEditedRange('', '7d', now)).toBe(false);
+    expect(filters.inEditedRange('not a date', 'older', now)).toBe(false);
+    expect(filters.inEditedRange('2026-08-01T00:00:00Z', undefined, now)).toBe(true);
+  });
 });
