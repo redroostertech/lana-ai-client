@@ -1223,6 +1223,7 @@
       status: statusLabel(task.status),
       priority: priorityLabel(task.priority || 'normal'),
       due_date: task.due_date || '',
+      created_at: task.created_at || '',
       updated_at: task.updated_at || '',
       _raw: task
     };
@@ -1257,6 +1258,23 @@
       },
       due_date: function (val) {
         return val ? esc(formatDate(val)) : '<span class="my-task-detail__muted">—</span>';
+      },
+      created_at: function (val) {
+        return val ? '<span class="my-task-table__created">' + esc(Lex.Utils.formatDateTime(val)) + '</span>' : '<span class="my-task-detail__muted">—</span>';
+      }
+    };
+  }
+
+  // Created filters by date range (Today / 7 / 30 days / older), the same
+  // ranges the library tables offer, matched in the user's timezone.
+  function columnFilterOptions() {
+    var ranges = window.LanaLibraryColumnFilters;
+    if (!ranges) return {};
+    return {
+      created_at: {
+        single: true,
+        options: ranges.EDITED_RANGE_OPTIONS,
+        match: function (cell, values) { return ranges.inEditedRange(cell, values[0]); }
       }
     };
   }
@@ -2622,6 +2640,9 @@
       // active for the initial render (lex-table caches them on the element).
       if (typeof table.setCellRenderers === 'function') {
         table.setCellRenderers(cellRenderers());
+      }
+      if (typeof table.setColumnFilterOptions === 'function') {
+        table.setColumnFilterOptions(columnFilterOptions());
       }
 
       // lex-table emits `row-click` for any non-button/input/anchor click

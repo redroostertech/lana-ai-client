@@ -93,6 +93,27 @@
   }
 
   /**
+   * Whether a timestamp falls in a range option, using the same bounds the
+   * server-filtered tables send. For client-side tables.
+   * @param {string} value - ISO timestamp (API time, UTC)
+   * @param {string} range - an EDITED_RANGE_OPTIONS value
+   * @param {Date} [now]
+   * @param {string} [timeZone]
+   * @returns {boolean}
+   */
+  function inEditedRange(value, range, now, timeZone) {
+    var bounds = editedRangeBounds(range, now, timeZone);
+    if (!bounds.after && !bounds.before) return true;
+    var lexUtils = global && global.Lex && global.Lex.Utils;
+    var date = value && lexUtils && lexUtils.parseApiUtcDate ? lexUtils.parseApiUtcDate(value) : (value ? new Date(value) : null);
+    var time = date ? date.getTime() : NaN;
+    if (!Number.isFinite(time)) return false;
+    if (bounds.after && time < new Date(bounds.after).getTime()) return false;
+    if (bounds.before && time >= new Date(bounds.before).getTime()) return false;
+    return true;
+  }
+
+  /**
    * Filter options from /api/v1/storage/matters rows: value = matter_id (the
    * id files carry) or the given key, label = workspace name. Names shared by
    * several workspaces get their readable id appended so the choices stay
@@ -161,6 +182,7 @@
   var moduleApi = {
     EDITED_RANGE_OPTIONS: EDITED_RANGE_OPTIONS,
     editedRangeBounds: editedRangeBounds,
+    inEditedRange: inEditedRange,
     workspaceOptions: workspaceOptions,
     loadWorkspaces: loadWorkspaces,
     loadWorkspaceOptions: loadWorkspaceOptions

@@ -264,4 +264,20 @@ describe('lex-table page-supplied column filters', () => {
     expect(dropdown).toContain('data-col-check="Closed"');
     expect(dropdown).toContain('data-col-check="Open"');
   });
+
+  test('a client table filters by a supplied match predicate and keeps the choice checked', () => {
+    const window = loadLex();
+    const table = new window['lex-table']();
+    Object.assign(table, { limit: 20, columns: 'title,created_at', columnFilters: true });
+    table.setData([
+      { id: 1, title: 'New', created_at: '2026-10-19T12:00:00Z' },
+      { id: 2, title: 'Old', created_at: '2026-01-01T12:00:00Z' }
+    ]);
+    table.setColumnFilterOptions({
+      created_at: { single: true, options: [{ value: 'recent', label: 'Recent' }], match: (cell) => cell > '2026-06' }
+    });
+    table.dataSource.setFilter('created_at', 'match', { values: ['recent'], test: (cell) => cell > '2026-06' });
+    expect(table.dataSource.data.map((row) => row.title)).toEqual(['New']);
+    expect(table._renderColFilterDropdown('created_at')).toContain('data-col-check="recent" checked');
+  });
 });
