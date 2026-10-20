@@ -160,7 +160,15 @@ describe('lex-table sortable-columns', () => {
     expect(html).not.toContain('data-sort-col=');
   });
 
-  test('client-side tables still page and sort in memory', () => {
+  test('a blank label leaves its header blank instead of showing the column key', () => {
+    const window = loadLex();
+    const html = clientTable(window, { columns: 'name,actions', labels: 'Name,' }).render();
+    expect(html).not.toMatch(/>\s*actions\s*</);
+    const auto = clientTable(window, { columns: 'name,workspace', labels: 'Name' }).render();
+    expect(auto).toContain('workspace');
+  });
+
+    test('client-side tables still page and sort in memory', () => {
     const window = loadLex();
     const table = new window['lex-table']();
     Object.assign(table, { limit: 2, columns: 'name' });

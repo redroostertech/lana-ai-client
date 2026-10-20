@@ -299,41 +299,40 @@
       });
     }
 
-    // Matters list-view sortable column headers. Each clickable header drives the
-    // same sortBy/sortOrder state the #sortSelect / #sortOrderBtn use, then
-    // reloads matters so the server-side sort applies. Brainchild scope is unaffected.
-    var sortHeaders = document.querySelectorAll('.drive-sort-th[data-sort-field]');
-    Array.prototype.forEach.call(sortHeaders, function (header) {
-      var activate = function () {
-        handleHeaderSort(header.getAttribute('data-sort-field'));
-      };
-      header.addEventListener('click', activate);
-      header.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-          e.preventDefault();
-          activate();
-        }
+    // List view: one lex-table for every scope. Header sorts come back as
+    // lex-query-change and drive the same sortBy/sortOrder state the
+    // #sortSelect / #sortOrderBtn use; row clicks and row buttons are delegated.
+    var listTable = document.getElementById('listView');
+    if (listTable) {
+      listTable.addEventListener('lex-query-change', function (e) { handleListQuery(e.detail || {}); });
+      listTable.addEventListener('row-click', function (e) { handleListRowClick(e.detail && e.detail.row); });
+      listTable.addEventListener('click', handleListActionClick);
+    }
+
+    // Files (search matches) table: a row opens the file viewer.
+    var filesTable = document.getElementById('filesListView');
+    if (filesTable) {
+      filesTable.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row) openRecentFile(row.id, row.matterKey);
       });
-    });
+    }
   }
 
   /**
-   * Sort the matters list by a column header field. Toggles asc/desc when the
-   * same field is clicked again; defaults to asc when switching fields. Keeps
-   * #sortSelect, #sortOrderBtn, and the active-column caret in sync, then reloads
-   * matters so the server-side sort applies.
-   * @param {string} field - storage sort field (name | created_at | document_count)
+   * A list-view header sort. lex-table has already toggled the direction
+   * (asc when switching columns); mirror it into storageState, keep
+   * #sortSelect / #sortOrderBtn in sync, then reload the active scope so the
+   * server-side (matters) or scope comparator (notes) sort applies.
+   * @param {Object} query - lex-query-change detail ({ sortBy, sortDir })
    */
-  function handleHeaderSort(field) {
-    if (!field) return;
-
-    if (storageState.sortBy === field) {
-      storageState.sortOrder = storageState.sortOrder === 'asc' ? 'desc' : 'asc';
-    } else {
+  function handleListQuery(query) {
+    var field = SORT_FIELD_BY_COLUMN[query.sortBy];
+    if (field) {
       storageState.sortBy = field;
-      storageState.sortOrder = 'asc';
+      storageState.sortOrder = query.sortDir === 'desc' ? 'desc' : 'asc';
+      storageState.currentPage = 1;
     }
-    storageState.currentPage = 1;
 
     syncSortControls();
     if (isBrainchildScope()) { renderBrainchildScope(); return; }
@@ -370,22 +369,20 @@
   }
 
   /**
-   * Mark the active matters list-view column header and show its sort-direction
-   * caret. Only one header carries the active state at a time.
+   * Show the active sort on the list table's header. Fields with no column
+   * (Modified Date, Folder Count) leave every header unmarked.
    */
   function updateSortHeaderIndicators() {
-    var headers = document.querySelectorAll('.drive-sort-th[data-sort-field]');
-    Array.prototype.forEach.call(headers, function (header) {
-      var field = header.getAttribute('data-sort-field');
-      var active = field === storageState.sortBy;
-      var asc = storageState.sortOrder === 'asc';
-      header.classList.toggle('drive-sort-th--active', active);
-      header.classList.toggle('drive-sort-th--asc', active && asc);
-      header.classList.toggle('drive-sort-th--desc', active && !asc);
-      header.setAttribute('aria-sort', active
-        ? (asc ? 'ascending' : 'descending')
-        : 'none');
-    });
+    var table = document.getElementById('listView');
+    if (!table) return;
+    var column = COLUMN_BY_SORT_FIELD[storageState.sortBy] || '';
+    var direction = storageState.sortOrder === 'desc' ? 'desc' : 'asc';
+    table.sortBy = column;
+    table.sortDir = direction;
+    if (table.dataSource) {
+      table.dataSource._sortBy = column;
+      table.dataSource._sortDir = direction;
+    }
   }
 
   /**
@@ -550,6 +547,9 @@
     } catch (error) {
       console.error('[Drive] Failed to load matters:', error);
       Lex.Toast.error('Failed to load files. Please try again.');
+      if (listViewEl && typeof listViewEl.setServerError === 'function') {
+        listViewEl.setServerError('Workspaces could not be loaded. Try again.');
+      }
 
       loadingEl && loadingEl.classList.add('hidden');
       emptyEl && emptyEl.classList.remove('hidden');
@@ -692,49 +692,117 @@
     gridViewEl.innerHTML = cards;
   }
 
+  // ── List table (lex-table) ───────────────────────────────────────────
+  //
+  // #listView is one lex-table for every scope: workspaces, Knowledgebase
+  // folders and notes, and Shared Knowledge notes. This page keeps paging
+  // (#drivePagination, shared with the grid view) and hands each page to the
+  // table whole, so the table's own pager stays hidden.
+
+  // Table column <-> storage sort field.
+  var SORT_FIELD_BY_COLUMN = { name: 'name', created_at: 'created_at', size: 'document_count' };
+  var COLUMN_BY_SORT_FIELD = { name: 'name', created_at: 'created_at', document_count: 'size' };
+
+  var LIST_FOLDER_ICON = '<svg class="drive-list-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>';
+  var LIST_NOTE_ICON = '<svg class="drive-list-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
+  var MENU_DOTS_ICON = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>';
+
+  // Knowledgebase notes in the list, by row index, for promote / unpromote.
+  var listBrainchildNotes = [];
+
+  function listNameCell(icon, name, sub) {
+    return '<div class="drive-list-name-cell">' + icon +
+        '<div class="drive-list-name-text">' +
+          '<div class="drive-list-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</div>' +
+          (sub ? '<div class="drive-list-sub" title="' + escapeHtml(sub) + '">' + escapeHtml(sub) + '</div>' : '') +
+        '</div>' +
+      '</div>';
+  }
+
+  function listCellRenderers() {
+    return {
+      name: function (val, row) {
+        var icon = row.kind === 'matter' || row.kind === 'bc-folder' ? LIST_FOLDER_ICON : LIST_NOTE_ICON;
+        return listNameCell(icon, row.name, row.kind === 'matter' ? row.matterId : '');
+      },
+      created_by: function (val) {
+        return '<span class="drive-list-muted">' + escapeHtml(val || '\u2014') + '</span>';
+      },
+      created_at: function (val) {
+        return '<span class="drive-list-muted">' + (val ? formatRelativeDate(val) : '\u2014') + '</span>';
+      },
+      size: function (val) {
+        return '<span class="drive-list-muted">' + escapeHtml(val || '') + '</span>';
+      },
+      actions: function (val, row) {
+        if (row.kind === 'matter') {
+          var folder = row._matter;
+          return '<button type="button" class="drive-list-menu" aria-label="Workspace actions"' +
+            ' data-matter-id="' + escapeHtml(folder.matter_id) + '" data-matter-name="' + escapeHtml(folder.name) + '"' +
+            ' data-is-pinned="' + (folder.is_pinned || false) + '" data-source="' + escapeHtml(folder.source || 'lana') + '"' +
+            ' onclick="event.stopPropagation(); showMatterActionsModal(event)">' + MENU_DOTS_ICON + '</button>';
+        }
+        if (row.kind === 'bc-note') {
+          return brainchildPromoteControl(row._note, row.index, escapeHtml(row.path), brainchildScope && brainchildScope.canPromote());
+        }
+        return '';
+      }
+    };
+  }
+
+  /**
+   * Hand one page of rows to the list table. The page owns paging, so the
+   * table always holds exactly one page.
+   * @param {Array} rows - list row view models ({ key, kind, name, ... })
+   */
+  function setListRows(rows) {
+    var table = document.getElementById('listView');
+    if (!table) return;
+    if (typeof table.setServerData !== 'function') {
+      if (window.customElements) {
+        window.customElements.whenDefined('lex-table').then(function () { setListRows(rows); });
+      }
+      return;
+    }
+    table.setCellRenderers(listCellRenderers());
+    updateSortHeaderIndicators();
+    table.setServerData(rows, { page: 1, limit: Math.max(rows.length, 1), total: rows.length, totalPages: 1 });
+  }
+
   /**
    * Render the list/table view with matter rows only.
    * @param {Array} matters
    */
   function renderListView(matters) {
-    var listViewBodyEl = document.getElementById('listViewBody');
-    if (!listViewBodyEl) return;
+    setListRows(matters.map(function (folder) {
+      return {
+        key: 'matter:' + folder.matter_id,
+        kind: 'matter',
+        name: folder.name,
+        matterId: folder.matter_id,
+        created_by: '\u2014',
+        created_at: folder.created_at,
+        size: (folder.document_count || 0) + ' files \u2022 ' + (folder.child_folder_count || 0) + ' folders',
+        _matter: folder
+      };
+    }));
+  }
 
-    var rows = matters.map(function (folder) {
-      var dataAttrs = 'data-is-matter="true" data-matter-id="' + escapeHtml(folder.matter_id) + '" data-name="' + escapeHtml(folder.name) + '"';
+  function handleListRowClick(row) {
+    if (!row) return;
+    if (row.kind === 'matter') navigateToMatter(row.matterId, row.name);
+    else if (row.kind === 'bc-folder') openBrainchildFolder(row.name);
+    else if (row.kind === 'bc-note') openBrainchildNote(row.path);
+  }
 
-      var displayHtml = [
-        '<div class="flex items-center">',
-        '  <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-        '  </svg>',
-        '  <div class="min-w-0 flex-1">',
-        '    <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)">' + escapeHtml(folder.name) + '</div>',
-        '    <div class="text-xs font-mono truncate" style="color: var(--lex-text-secondary)" title="' + escapeHtml(folder.matter_id) + '">' + escapeHtml(folder.matter_id) + '</div>',
-        '  </div>',
-        '</div>'
-      ].join('');
-
-      var sizeDisplay = (folder.document_count || 0) + ' files \u2022 ' + (folder.child_folder_count || 0) + ' folders';
-
-      var menuButtonAttrs = 'data-matter-id="' + escapeHtml(folder.matter_id) + '" data-matter-name="' + escapeHtml(folder.name) + '" data-is-pinned="' + (folder.is_pinned || false) + '" data-source="' + escapeHtml(folder.source || 'lana') + '" onclick="event.stopPropagation(); showMatterActionsModal(event)"';
-
-      return [
-        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
-        '  <td class="px-6 py-4">' + displayHtml + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">\u2014</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatRelativeDate(folder.created_at) + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + sizeDisplay + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm">',
-        '    <button style="color: var(--lex-text-tertiary)" ' + menuButtonAttrs + '>',
-        '      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-        '    </button>',
-        '  </td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    listViewBodyEl.innerHTML = rows;
+  // lex-table's row-click skips buttons, so row buttons are delegated here.
+  function handleListActionClick(event) {
+    var target = event.target && event.target.closest ? event.target : null;
+    if (!target) return;
+    var unpromote = target.closest('.bc-unpromote-btn');
+    if (unpromote) { unpromoteBrainchildNote(unpromote, listBrainchildNotes, event); return; }
+    var promote = target.closest('.bc-promote-btn');
+    if (promote) promoteBrainchildNote(promote, listBrainchildNotes, event);
   }
 
   // ── Files load (search-only) ─────────────────────────────────────────
@@ -881,33 +949,28 @@
    * @param {Array} files
    */
   function renderFilesListView(files) {
-    var listBodyEl = document.getElementById('filesListViewBody');
-    if (!listBodyEl) return;
-
-    listBodyEl.innerHTML = (files || []).map(function (file) {
-      var fileName = escapeHtml(file.filename || file.original_filename || 'Untitled');
-      var matterName = escapeHtml(file.matter_name || file.client_matter || '');
-      var fileSize = formatFileSize(file.file_size || 0);
-      var created = file.created_at ? formatRelativeDate(file.created_at) : '-';
-      var fileIcon = getFileIconSVG(file.content_type);
-      var openArgs = escapeHtml(JSON.stringify(file.id)) + ', ' + escapeHtml(JSON.stringify(file.client_matter || ''));
-
-      return [
-        '<tr class="cursor-pointer" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" onclick="openRecentFile(' + openArgs + ')">',
-        '  <td class="px-6 py-4">',
-        '    <div class="flex items-center">',
-        '      <div class="w-5 h-5 mr-3 flex-shrink-0 flex items-center justify-center">' + fileIcon + '</div>',
-        '      <div class="min-w-0 flex-1">',
-        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + fileName + '">' + fileName + '</div>',
-        '      </div>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + (matterName || '-') + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + created + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + fileSize + '</td>',
-        '</tr>'
-      ].join('');
-    }).join('');
+    var table = document.getElementById('filesListView');
+    if (!table || typeof table.setData !== 'function') return;
+    table.setCellRenderers({
+      name: function (val, row) {
+        return '<div class="drive-list-name-cell"><span class="drive-list-file-icon">' + getFileIconSVG(row.contentType) + '</span>' +
+          '<div class="drive-list-name-text"><div class="drive-list-name" title="' + escapeHtml(val) + '">' + escapeHtml(val) + '</div></div></div>';
+      },
+      workspace: function (val) { return '<span class="drive-list-muted">' + escapeHtml(val || '\u2014') + '</span>'; },
+      created_at: function (val) { return '<span class="drive-list-muted">' + (val ? formatRelativeDate(val) : '\u2014') + '</span>'; },
+      size: function (val) { return '<span class="drive-list-muted">' + escapeHtml(val || '') + '</span>'; }
+    });
+    table.setData((files || []).map(function (file) {
+      return {
+        id: file.id,
+        name: file.filename || file.original_filename || 'Untitled',
+        workspace: file.matter_name || file.client_matter || '',
+        created_at: file.created_at || '',
+        size: formatFileSize(file.file_size || 0),
+        contentType: file.content_type,
+        matterKey: file.client_matter || ''
+      };
+    }));
   }
 
   // ── Brainchild scope (personal notes) ────────────────────────────────
@@ -1394,73 +1457,38 @@
   }
 
   /**
-   * Render Brainchild folder rows (clickable to drill in) followed by note rows,
-   * reusing the existing #listViewBody table body.
+   * Render Brainchild folder rows (clickable to drill in) followed by note rows
+   * into the shared list table.
    * @param {Array} folders - immediate child folders ({ name, path, count })
    * @param {Array} notes - normalized Brainchild row view models
    */
   function renderBrainchildList(folders, notes) {
-    var listViewBodyEl = document.getElementById('listViewBody');
-    if (!listViewBodyEl) return;
-
-    var canPromote = brainchildScope && brainchildScope.canPromote();
-
+    listBrainchildNotes = notes || [];
     var folderRows = (folders || []).map(function (folder) {
-      var folderName = escapeHtml(folder.name || '');
       var count = folder.count || 0;
-      var countLabel = count + ' note' + (count !== 1 ? 's' : '');
-
-      return [
-        '<tr class="cursor-pointer library-bc-folder-card" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" data-bc-folder-name="' + folderName + '">',
-        '  <td class="px-6 py-4">',
-        '    <div class="flex items-center">',
-        '      <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
-        '      </svg>',
-        '      <div class="min-w-0 flex-1">',
-        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + folderName + '">' + folderName + '</div>',
-        '      </div>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">You</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">-</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + countLabel + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm"></td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    var noteRows = (notes || []).map(function (row, index) {
-      var name = escapeHtml(row.filename || 'Untitled note');
-      var vaultPath = escapeHtml(row._vaultPath || '');
-      var updated = row.updated_at ? formatRelativeDate(row.updated_at) : '-';
-      var promoteCell = brainchildPromoteControl(row, index, vaultPath, canPromote);
-
-      return [
-        '<tr class="cursor-pointer library-bc-note-card" style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'" data-bc-note-path="' + vaultPath + '">',
-        '  <td class="px-6 py-4">',
-        '    <div class="flex items-center">',
-        '      <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>',
-        '      </svg>',
-        '      <div class="min-w-0 flex-1">',
-        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + name + '">' + name + '</div>',
-        '      </div>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">You</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + updated + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">Note</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm">' + promoteCell + '</td>',
-        '</tr>'
-      ].join('');
-    }).join('');
-
-    listViewBodyEl.innerHTML = folderRows + noteRows;
-    wireBrainchildFolderCards(listViewBodyEl);
-    wireBrainchildNoteCards(listViewBodyEl);
-    wireBrainchildPromoteButtons(listViewBodyEl, notes);
-    wireBrainchildUnpromoteButtons(listViewBodyEl, notes);
+      return {
+        key: 'bc-folder:' + (folder.path || folder.name || ''),
+        kind: 'bc-folder',
+        name: folder.name || '',
+        created_by: 'You',
+        created_at: '',
+        size: count + ' note' + (count !== 1 ? 's' : '')
+      };
+    });
+    var noteRows = listBrainchildNotes.map(function (row, index) {
+      return {
+        key: 'bc-note:' + (row._vaultPath || index),
+        kind: 'bc-note',
+        name: row.filename || 'Untitled note',
+        path: row._vaultPath || '',
+        index: index,
+        created_by: 'You',
+        created_at: row.updated_at || '',
+        size: 'Note',
+        _note: row
+      };
+    });
+    setListRows(folderRows.concat(noteRows));
   }
 
   /**
@@ -1473,17 +1501,20 @@
     var cards = container.querySelectorAll('.library-bc-folder-card');
     Array.prototype.forEach.call(cards, function (card) {
       card.addEventListener('click', function () {
-        var name = card.getAttribute('data-bc-folder-name') || '';
-        if (!name) return;
-        brainchildScope.enterFolder(name);
+        openBrainchildFolder(card.getAttribute('data-bc-folder-name') || '');
       });
     });
   }
 
+  /** Drill into a Brainchild folder; the controller's onChange re-renders. */
+  function openBrainchildFolder(name) {
+    if (!name || !brainchildScope) return;
+    brainchildScope.enterFolder(name);
+  }
+
   /**
-   * Wire each rendered Brainchild note card/row to open that note inside the
-   * Brainchild app via the frozen bridge (openNote(vaultPath)). Folder cards are
-   * handled separately by wireBrainchildFolderCards and keep enterFolder behavior.
+   * Wire each rendered Brainchild note card to open that note inside the
+   * Brainchild app. Folder cards keep enterFolder behavior.
    * @param {HTMLElement} container
    */
   function wireBrainchildNoteCards(container) {
@@ -1491,20 +1522,22 @@
     var cards = container.querySelectorAll('.library-bc-note-card');
     Array.prototype.forEach.call(cards, function (card) {
       card.addEventListener('click', function () {
-        var path = card.getAttribute('data-bc-note-path') || '';
-        if (!path) return;
-        if (window.electronAPI && window.electronAPI.brainchild &&
-            typeof window.electronAPI.brainchild.openNote === 'function') {
-          window.electronAPI.brainchild.openNote(path);
-        }
+        openBrainchildNote(card.getAttribute('data-bc-note-path') || '');
       });
     });
   }
 
+  /** Open a note in the Brainchild app via the frozen bridge (openNote(vaultPath)). */
+  function openBrainchildNote(path) {
+    if (!path) return;
+    if (window.electronAPI && window.electronAPI.brainchild &&
+        typeof window.electronAPI.brainchild.openNote === 'function') {
+      window.electronAPI.brainchild.openNote(path);
+    }
+  }
+
   /**
-   * Wire each rendered "Promote to Org" button to the controller's promote().
-   * The controller fetches the note body, builds the payload, and POSTs it.
-   * stopPropagation keeps a promote click from also opening the note in Brainchild.
+   * Wire each rendered "Promote to Org" button (grid cards) to promote().
    * @param {HTMLElement} container
    * @param {Array} rows
    */
@@ -1512,31 +1545,39 @@
     if (!container || !brainchildScope) return;
     var buttons = container.querySelectorAll('.bc-promote-btn');
     Array.prototype.forEach.call(buttons, function (button) {
-      button.addEventListener('click', async function (event) {
-        if (event && typeof event.stopPropagation === 'function') {
-          event.stopPropagation();
-        }
-        var index = parseInt(button.getAttribute('data-bc-index'), 10);
-        var row = rows[index];
-        if (!row) return;
-        var result = await brainchildScope.promote(row, null, button);
-        if (result && result.success) {
-          // Refresh the promoted map so the new promotion's org document id is
-          // known (needed for a later unpromote), then re-render so the action
-          // flips to the "Promoted" pill without a full reload.
-          await loadBrainchildPromotedIds();
-          renderBrainchildScope();
-        }
+      button.addEventListener('click', function (event) {
+        promoteBrainchildNote(button, rows, event);
       });
     });
   }
 
   /**
-   * Wire each rendered "Promoted" pill to unpromote the note: remove the org's
-   * shared copy. This does NOT touch the personal Brainchild note. Confirms
-   * first, then deletes via the Shared Knowledge scope controller, refreshes the
-   * promoted map, and re-renders so the pill flips back to "Promote to Org".
-   * stopPropagation keeps the click from also opening the note in Brainchild.
+   * Promote a note through the controller, which fetches the body, builds the
+   * payload, and POSTs it. stopPropagation keeps the click from also opening
+   * the note in Brainchild.
+   * @param {HTMLElement} button - carries data-bc-index
+   * @param {Array} rows
+   * @param {Event} event
+   */
+  async function promoteBrainchildNote(button, rows, event) {
+    if (event && typeof event.stopPropagation === 'function') {
+      event.stopPropagation();
+    }
+    if (!brainchildScope) return;
+    var row = rows[parseInt(button.getAttribute('data-bc-index'), 10)];
+    if (!row) return;
+    var result = await brainchildScope.promote(row, null, button);
+    if (result && result.success) {
+      // Refresh the promoted map so the new promotion's org document id is
+      // known (needed for a later unpromote), then re-render so the action
+      // flips to the "Promoted" pill without a full reload.
+      await loadBrainchildPromotedIds();
+      renderBrainchildScope();
+    }
+  }
+
+  /**
+   * Wire each rendered "Promoted" pill (grid cards) to unpromote the note.
    * @param {HTMLElement} container
    * @param {Array} rows
    */
@@ -1545,39 +1586,51 @@
     var buttons = container.querySelectorAll('.bc-unpromote-btn');
     Array.prototype.forEach.call(buttons, function (button) {
       button.addEventListener('click', function (event) {
-        if (event && typeof event.stopPropagation === 'function') {
-          event.stopPropagation();
-        }
-        var index = parseInt(button.getAttribute('data-bc-index'), 10);
-        var row = rows[index];
-        if (!row) return;
-
-        var run = async function () {
-          var docId = brainchildPromotedDocId(row);
-          if (!docId) return;
-          var oks = ensureOrgKnowledgeScope();
-          if (!oks) return;
-          var result = await oks.remove(docId);
-          if (result && result.success) {
-            await loadBrainchildPromotedIds();
-            renderBrainchildScope();
-          }
-        };
-
-        var title = 'Remove from Shared Knowledge';
-        var message = 'Remove this note from your organization\'s shared knowledge? Your personal Brainchild copy is not affected.';
-        if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-          Lex.Modal.confirm(title, message, run, {
-            confirmText: 'Remove',
-            cancelText: 'Cancel',
-            variant: 'default',
-            size: 'sm'
-          });
-        } else if (window.confirm(message)) {
-          run();
-        }
+        unpromoteBrainchildNote(button, rows, event);
       });
     });
+  }
+
+  /**
+   * Unpromote a note: remove the org's shared copy. This does NOT touch the
+   * personal Brainchild note. Confirms first, then deletes via the Shared
+   * Knowledge scope controller, refreshes the promoted map, and re-renders so
+   * the pill flips back to "Promote to Org".
+   * @param {HTMLElement} button - carries data-bc-index
+   * @param {Array} rows
+   * @param {Event} event
+   */
+  function unpromoteBrainchildNote(button, rows, event) {
+    if (event && typeof event.stopPropagation === 'function') {
+      event.stopPropagation();
+    }
+    var row = rows[parseInt(button.getAttribute('data-bc-index'), 10)];
+    if (!row) return;
+
+    var run = async function () {
+      var docId = brainchildPromotedDocId(row);
+      if (!docId) return;
+      var oks = ensureOrgKnowledgeScope();
+      if (!oks) return;
+      var result = await oks.remove(docId);
+      if (result && result.success) {
+        await loadBrainchildPromotedIds();
+        renderBrainchildScope();
+      }
+    };
+
+    var title = 'Remove from Shared Knowledge';
+    var message = 'Remove this note from your organization\'s shared knowledge? Your personal Brainchild copy is not affected.';
+    if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
+      Lex.Modal.confirm(title, message, run, {
+        confirmText: 'Remove',
+        cancelText: 'Cancel',
+        variant: 'default',
+        size: 'sm'
+      });
+    } else if (window.confirm(message)) {
+      run();
+    }
   }
 
   // ── Shared Knowledge scope (org promoted notes) ──────────────────────
@@ -1784,38 +1837,21 @@
   }
 
   /**
-   * Render promoted-knowledge note rows into the existing #listViewBody table.
+   * Render promoted-knowledge note rows into the shared list table.
    * Columns mirror the matters list: Name, Created By, Created On, Type, Action.
    * @param {Array} items
    */
   function renderOrgKnowledgeList(items) {
-    var listViewBodyEl = document.getElementById('listViewBody');
-    if (!listViewBodyEl) return;
-
-    listViewBodyEl.innerHTML = (items || []).map(function (item) {
-      var title = escapeHtml(item.title || 'Untitled note');
-      var byName = escapeHtml(item.created_by_name || 'a teammate');
-      var created = item.created_at ? formatRelativeDate(item.created_at) : '-';
-
-      return [
-        '<tr style="background: transparent" onmouseover="this.style.background=\'var(--lex-bg-secondary)\'" onmouseout="this.style.background=\'transparent\'">',
-        '  <td class="px-6 py-4">',
-        '    <div class="flex items-center">',
-        '      <svg class="w-5 h-5 mr-3 flex-shrink-0" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>',
-        '      </svg>',
-        '      <div class="min-w-0 flex-1">',
-        '        <div class="text-sm font-medium truncate" style="color: var(--lex-text-primary)" title="' + title + '">' + title + '</div>',
-        '      </div>',
-        '    </div>',
-        '  </td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + byName + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + created + '</td>',
-        '  <td class="px-6 py-4 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">Note</td>',
-        '  <td class="px-6 py-4"></td>',
-        '</tr>'
-      ].join('');
-    }).join('');
+    setListRows((items || []).map(function (item, index) {
+      return {
+        key: 'org-note:' + (item.id || item.document_id || index),
+        kind: 'org-note',
+        name: item.title || 'Untitled note',
+        created_by: item.created_by_name || 'a teammate',
+        created_at: item.created_at || '',
+        size: 'Note'
+      };
+    }));
   }
 
   // ── View toggle ──────────────────────────────────────────────────────

@@ -854,7 +854,7 @@
           ? ` cursor-pointer select-none" data-sort-col="${col}"`
           : '"';
         html += `<th scope="col" class="text-left ${cellPad} text-xs font-medium lex-text-secondary uppercase tracking-wider${sortAttrs}>
-          ${this.escapeHtml(labels[i] || col)}${sortIcon}${filterIcon}
+          ${this.escapeHtml(labels[i] !== undefined ? labels[i] : col)}${sortIcon}${filterIcon}
         </th>`;
       });
       html += `</tr></thead>`;
