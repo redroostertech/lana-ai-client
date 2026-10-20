@@ -60,10 +60,11 @@
    *
    * Only known query params are emitted, mirroring the backend validator
    * (document-studio.validators.js): kind, matter_id, document_type, category,
-   * q, include_org_wide, limit, offset, sort_by, sort_order.
+   * q, include_org_wide, limit, offset, sort_by, sort_order, workspaces,
+   * updated_after, updated_before.
    *
    * @param {Object} [filters]
-   * @param {string} [filters.kind]            - 'fill' | 'compose' | 'render'
+   * @param {string|Array} [filters.kind]      - 'fill' | 'compose' | 'render', or a list
    * @param {string} [filters.matterId]        - string matter key
    * @param {string} [filters.documentType]
    * @param {string} [filters.category]
@@ -73,15 +74,20 @@
    * @param {number} [filters.offset]
    * @param {string} [filters.sortBy]          - 'name' | 'updated_at' | 'workspace'
    * @param {string} [filters.sortOrder]       - 'asc' | 'desc'
+   * @param {Array}  [filters.workspaces]      - matter ids; 'organization' = org-wide
+   * @param {string} [filters.updatedAfter]    - ISO datetime (inclusive)
+   * @param {string} [filters.updatedBefore]   - ISO datetime (exclusive)
    * @returns {string}
    */
   function buildListQuery(filters) {
     var f = filters || {};
     var parts = [];
 
-    var kind = f.kind ? String(f.kind).toLowerCase() : '';
-    if (kind && VALID_KINDS.indexOf(kind) !== -1) {
-      _appendParam(parts, 'kind', kind);
+    var kinds = (Array.isArray(f.kind) ? f.kind : String(f.kind || '').split(','))
+      .map(function (k) { return String(k).trim().toLowerCase(); })
+      .filter(function (k, i, all) { return VALID_KINDS.indexOf(k) !== -1 && all.indexOf(k) === i; });
+    if (kinds.length) {
+      _appendParam(parts, 'kind', kinds.join(','));
     }
 
     _appendParam(parts, 'matter_id', f.matterId);
@@ -101,6 +107,13 @@
     if (typeof f.offset === 'number' && f.offset >= 0) {
       _appendParam(parts, 'offset', f.offset);
     }
+
+    var workspaces = (Array.isArray(f.workspaces) ? f.workspaces : [])
+      .map(function (w) { return String(w).trim(); })
+      .filter(Boolean);
+    if (workspaces.length) _appendParam(parts, 'workspaces', workspaces.join(','));
+    _appendParam(parts, 'updated_after', f.updatedAfter);
+    _appendParam(parts, 'updated_before', f.updatedBefore);
 
     var sortBy = f.sortBy ? String(f.sortBy).toLowerCase() : '';
     if (VALID_SORT_FIELDS.indexOf(sortBy) !== -1) {

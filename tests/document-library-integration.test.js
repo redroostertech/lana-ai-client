@@ -170,7 +170,10 @@ describe('Document Library integration', () => {
     expect(html).toContain('{"value":"pdf","label":"PDFs"}');
     expect(html).not.toContain('{"value":"image","label":"Images"}');
     expect(controller).toContain("if (searchTerm) params.set('search', searchTerm)");
-    expect(controller).toContain("params.set('file_family', fileFamilyParam(documentType))");
+    expect(controller).toContain("params.set('file_family', fileFamilyParam(filterValues(filters.name)))");
+    expect(controller).toContain("params.set('workspaces', workspaces.join(','))");
+    expect(controller).toContain("params.set('updated_after', range.after)");
+    expect(controller).toContain("target.addFilter('name', 'in', [value])");
     expect(controller).not.toContain("params.set('document_type'");
     expect(controller).toContain("event.target.id !== 'documentLibrarySearch'");
     expect(controller).toContain("id === 'documentLibraryTypeFilter'");
@@ -559,12 +562,12 @@ describe('Document Library file families', () => {
     return window.LanaDocumentLibrary;
   }
 
-  test('"All" asks for every library family except images; a tab asks for its own family', () => {
+  test('"All" asks for every library family except images; the File filter narrows it', () => {
     const library = loadController();
-    expect(library.fileFamilyParam('')).toBe('document,spreadsheet,presentation,pdf');
-    expect(library.fileFamilyParam('spreadsheet')).toBe('spreadsheet');
-    expect(library.fileFamilyParam('pdf')).toBe('pdf');
-    expect(library.fileFamilyParam('image')).toBe('document,spreadsheet,presentation,pdf');
+    expect(library.fileFamilyParam([])).toBe('document,spreadsheet,presentation,pdf');
+    expect(library.fileFamilyParam(['spreadsheet'])).toBe('spreadsheet');
+    expect(library.fileFamilyParam(['pdf', 'document'])).toBe('pdf,document');
+    expect(library.fileFamilyParam(['image'])).toBe('document,spreadsheet,presentation,pdf');
   });
 });
 

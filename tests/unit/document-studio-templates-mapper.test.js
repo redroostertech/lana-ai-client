@@ -39,6 +39,14 @@ describe('document-studio-templates-mapper', () => {
       expect(mapper.buildListQuery({ sortOrder: 'asc' })).toBe('');
     });
 
+    test('sends a kind list, workspaces and edited bounds', () => {
+      expect(mapper.buildListQuery({ kind: ['fill', 'render', 'bogus', 'fill'] })).toBe('kind=fill%2Crender');
+      expect(mapper.buildListQuery({ kind: 'compose,FILL' })).toBe('kind=compose%2Cfill');
+      expect(mapper.buildListQuery({ workspaces: ['MATT-1', ' organization ', ''] })).toBe('workspaces=MATT-1%2Corganization');
+      expect(mapper.buildListQuery({ updatedAfter: '2026-10-13T00:00:00.000Z' })).toBe('updated_after=2026-10-13T00%3A00%3A00.000Z');
+      expect(mapper.buildListQuery({ updatedBefore: '2026-09-20T00:00:00.000Z', workspaces: [] })).toBe('updated_before=2026-09-20T00%3A00%3A00.000Z');
+    });
+
     test('drops invalid kind values', () => {
       expect(mapper.buildListQuery({ kind: 'bogus' })).toBe('');
       expect(mapper.buildListQuery({ kind: 'FILL' })).toBe('kind=fill');
