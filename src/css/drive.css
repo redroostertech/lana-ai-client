@@ -137,3 +137,93 @@
   width: 1.25rem;
   height: 1.25rem;
 }
+
+/* List view (lex-table #listView / #filesListView): one table for every
+   scope; cells come from drive.js cell renderers. */
+.drive-list-table table {
+  table-layout: fixed;
+}
+
+.drive-list-table td {
+  overflow: hidden;
+}
+
+.drive-list-name-cell {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.drive-list-icon {
+  color: var(--lex-text-accent);
+  flex-shrink: 0;
+  height: 20px;
+  width: 20px;
+}
+
+.drive-list-file-icon {
+  align-items: center;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 20px;
+  justify-content: center;
+  width: 20px;
+}
+
+.drive-list-name-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.drive-list-name,
+.drive-list-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drive-list-name {
+  color: var(--lex-text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.drive-list-sub {
+  color: var(--lex-text-secondary);
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+}
+
+.drive-list-muted {
+  color: var(--lex-text-secondary);
+  white-space: nowrap;
+}
+
+.drive-list-menu {
+  background: none;
+  border: 0;
+  color: var(--lex-text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.drive-list-menu:hover {
+  color: var(--lex-text-primary);
+}
+
+/* Name gets the room; the actions column fits its widest control, the
+   Knowledgebase "Promote to Org" button. */
+#listView th:nth-child(1) { width: 40%; }
+#listView th:nth-child(2) { width: 14%; }
+#listView th:nth-child(3) { width: 14%; }
+#listView th:nth-child(4) { width: 16%; }
+#listView th:nth-child(5) { width: 9.5rem; }
+
+#listView td:nth-child(5) {
+  text-align: right;
+}
+#filesListView th:nth-child(1) { width: 46%; }
+#filesListView th:nth-child(2) { width: 24%; }
+#filesListView th:nth-child(3) { width: 15%; }
+#filesListView th:nth-child(4) { width: 15%; }

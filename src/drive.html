@@ -184,21 +184,21 @@
       <!-- Grid View -->
       <div id="gridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 
-      <!-- List View -->
-      <div id="listView" class="hidden bg-white rounded-lg shadow-sm border overflow-x-auto" style="border-color: var(--lex-border-default)">
-        <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
-          <thead style="background-color: var(--lex-bg-secondary)">
-            <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider drive-sort-th" style="color: var(--lex-text-secondary)" id="sortHeaderName" data-sort-field="name" role="button" tabindex="0">Name<span class="drive-sort-caret" aria-hidden="true"></span></th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created By</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider drive-sort-th" style="color: var(--lex-text-secondary)" id="sortHeaderCreated" data-sort-field="created_at" role="button" tabindex="0">Created On<span class="drive-sort-caret" aria-hidden="true"></span></th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider drive-sort-th" style="color: var(--lex-text-secondary)" id="sortHeaderSize" data-sort-field="document_count" role="button" tabindex="0">Size<span class="drive-sort-caret" aria-hidden="true"></span></th>
-              <th scope="col" class="w-20 px-6 py-3"></th>
-            </tr>
-          </thead>
-          <tbody id="listViewBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
-        </table>
-      </div>
+      <!-- List View: one table for every scope (workspaces, Knowledgebase,
+           Shared Knowledge). drive.js pages it and sorts it on the server. -->
+      <lex-table
+        id="listView"
+        class="hidden drive-list-table lex-table--card"
+        server-paging
+        columns="name,created_by,created_at,size,actions"
+        labels="Name,Created By,Created On,Size,"
+        sortable-columns="name,created_at,size"
+        sort-by="name"
+        sort-dir="asc"
+        limit="100"
+        id-key="key"
+        aria-label="All folders"
+      ></lex-table>
 
       <!-- Empty State — wrapped in a card so it matches the Workspaces empty state -->
       <div id="contentEmpty" class="hidden">
@@ -225,19 +225,16 @@
         <div id="filesGridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 
         <!-- List View -->
-        <div id="filesListView" class="hidden bg-white rounded-lg shadow-sm border overflow-hidden" style="border-color: var(--lex-border-default)">
-          <table class="min-w-full divide-y" style="border-color: var(--lex-border-default)">
-            <thead style="background-color: var(--lex-bg-secondary)">
-              <tr>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Name</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Workspace</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Created On</th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--lex-text-secondary)">Size</th>
-              </tr>
-            </thead>
-            <tbody id="filesListViewBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
-          </table>
-        </div>
+        <lex-table
+          id="filesListView"
+          class="hidden drive-list-table lex-table--card"
+          columns="name,workspace,created_at,size"
+          labels="Name,Workspace,Created On,Size"
+          sortable-columns=""
+          limit="50"
+          id-key="id"
+          aria-label="Matching files"
+        ></lex-table>
       </div>
 
       <!-- Pagination Controls -->
@@ -398,6 +395,7 @@
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>
