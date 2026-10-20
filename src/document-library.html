@@ -45,7 +45,7 @@
           id="documentLibraryTypeFilter"
           aria-labelledby="documentLibraryTypeFilterLabel"
           value=""
-          options='[{"value":"","label":"All"},{"value":"document","label":"Documents"},{"value":"spreadsheet","label":"Spreadsheets"},{"value":"presentation","label":"Presentations"},{"value":"pdf","label":"PDFs"},{"value":"image","label":"Images"}]'
+          options='[{"value":"","label":"All"},{"value":"document","label":"Documents"},{"value":"spreadsheet","label":"Spreadsheets"},{"value":"presentation","label":"Presentations"},{"value":"pdf","label":"PDFs"}]'
         ></lex-segmented>
         <div class="document-library-filters-spacer"></div>
         <label class="document-library-search-field" for="documentLibrarySearch">
@@ -59,7 +59,7 @@
         </label>
       </div>
 
-      <lex-card class="document-library-recents" padding="none" aria-labelledby="documentLibraryRecentHeading">
+      <section class="document-library-recents" aria-labelledby="documentLibraryRecentHeading">
         <div class="document-library-section-heading">
           <div>
             <h2 id="documentLibraryRecentHeading">Latest edited</h2>
@@ -68,22 +68,23 @@
           <span id="documentLibraryRecentCount" class="document-library-count" aria-live="polite"></span>
         </div>
 
-        <div id="documentLibraryFileColumns" class="document-library-columns" role="row" hidden>
-          <span aria-hidden="true"></span>
-          <span role="columnheader">File</span>
-          <span role="columnheader">Workspace</span>
-          <span role="columnheader">Last edited</span>
-          <span aria-hidden="true"></span>
-        </div>
-
-        <div id="documentLibraryRecentFiles" class="document-library-files" aria-live="polite" aria-busy="true">
-          <div class="document-library-skeleton" aria-hidden="true"></div>
-          <div class="document-library-skeleton" aria-hidden="true"></div>
-          <div class="document-library-skeleton" aria-hidden="true"></div>
-          <div class="document-library-skeleton" aria-hidden="true"></div>
-        </div>
-        <lex-pagination id="documentLibraryPagination" page="1" total-pages="1" total="0" limit="12" hidden></lex-pagination>
-      </lex-card>
+        <lex-table
+          id="documentLibraryTable"
+          class="document-library-table lex-table--card"
+          server-paging
+          columns="name,workspace,updated_at"
+          labels="File,Workspace,Last edited"
+          sortable-columns="name,updated_at"
+          sort-by="updated_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No documents found"
+          empty-action-label="New Document"
+          empty-action-icon="file-plus"
+          aria-label="Latest edited documents"
+        ></lex-table>
+      </section>
     </main>
   </template>
 
@@ -128,7 +129,8 @@
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
-  <script src="js/lex/components/data/lex-pagination.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/lex-page-init.js"></script>
   <script src="js/services/document-create-modal.js"></script>
   <script src="js/document-library.js"></script>
