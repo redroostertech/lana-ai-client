@@ -219,6 +219,7 @@ const MenuConfig = {
           { id: 'admin-organizations', label: 'Organizations', href: '/admin/organizations.html', icon: 'organizations' },
           { id: 'admin-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
           { id: 'admin-task-plans', label: 'Task Plans', href: '/admin/task-plans.html', icon: 'tasks' },
+          { id: 'admin-run-books', label: 'Run Books', href: '/admin/run-books.html', icon: 'document', requiredRoles: ADMIN_ROLES },
           {
             id: 'admin-communications',
             label: 'Communications',
