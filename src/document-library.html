@@ -39,33 +39,51 @@
         <lex-btn id="documentLibraryNewBtn" variant="primary" leading-icon="file-plus" data-action="new-document">New Document</lex-btn>
       </lex-banner>
 
-      <div class="document-library-filters" role="search" aria-label="Search and filter documents">
-        <span class="document-library-filter-label" id="documentLibraryTypeFilterLabel">Document type</span>
-        <lex-segmented
-          id="documentLibraryTypeFilter"
-          aria-labelledby="documentLibraryTypeFilterLabel"
-          value=""
-          options='[{"value":"","label":"All"},{"value":"document","label":"Documents"},{"value":"spreadsheet","label":"Spreadsheets"},{"value":"presentation","label":"Presentations"},{"value":"pdf","label":"PDFs"}]'
-        ></lex-segmented>
-        <div class="document-library-filters-spacer"></div>
-        <label class="document-library-search-field" for="documentLibrarySearch">
-          <span class="document-library-search-label">Search documents</span>
-          <input
-            id="documentLibrarySearch"
-            type="search"
-            autocomplete="off"
-            placeholder="Search documents..."
-          >
-        </label>
+      <!-- Search / Sort / Filter toolbar — Library-style, drives the table below -->
+      <div class="document-library-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" role="search" aria-label="Search and filter documents">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input
+              id="documentLibrarySearch"
+              placeholder="Search documents..."
+              clearable="true"
+              leading-icon="search"
+            ></lex-input>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label class="document-library-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+            <lex-select
+              id="documentLibrarySort"
+              options='[{"value":"updated_at","label":"Last Edited"},{"value":"name","label":"File Name"},{"value":"file_size","label":"Size"}]'
+              value="updated_at"
+            ></lex-select>
+          </div>
+
+          <lex-btn id="documentLibrarySortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="document-library-toolbar-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+
+          <div class="flex items-center gap-2">
+            <label class="document-library-toolbar-label text-sm whitespace-nowrap">Type:</label>
+            <lex-select
+              id="documentLibraryTypeFilter"
+              options='[{"value":"all","label":"All"},{"value":"document","label":"Documents"},{"value":"spreadsheet","label":"Spreadsheets"},{"value":"presentation","label":"Presentations"},{"value":"pdf","label":"PDFs"}]'
+              value="all"
+            ></lex-select>
+          </div>
+
+          <div id="documentLibraryCount" class="document-library-toolbar-label text-sm whitespace-nowrap"></div>
+        </div>
       </div>
 
       <section class="document-library-recents" aria-labelledby="documentLibraryRecentHeading">
-        <div class="document-library-section-heading">
-          <div>
-            <h2 id="documentLibraryRecentHeading">Latest edited</h2>
-            <p>Your most recently updated files across every workspace.</p>
-          </div>
-          <span id="documentLibraryRecentCount" class="document-library-count" aria-live="polite"></span>
+        <!-- Section header — title + count, Library-style -->
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="documentLibraryRecentHeading" class="document-library-section-title text-lg font-semibold">All Documents</h2>
+          <span id="documentLibraryRecentCount" class="document-library-toolbar-label text-sm" aria-live="polite"></span>
         </div>
 
         <lex-table
@@ -82,7 +100,7 @@
           empty-text="No documents found"
           empty-action-label="New Document"
           empty-action-icon="file-plus"
-          aria-label="Latest edited documents"
+          aria-label="Documents"
         ></lex-table>
       </section>
     </main>
@@ -128,7 +146,8 @@
   <script src="js/lex/components/foundation/lex-card.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>
-  <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/lex-page-init.js"></script>

@@ -161,9 +161,34 @@
     return el(TABLE_ID);
   }
 
+  // The count shows in the toolbar and the section header, as on the Library.
   function setCount(text) {
-    var count = el('documentLibraryRecentCount');
-    if (count) count.textContent = text;
+    ['documentLibraryCount', 'documentLibraryRecentCount'].forEach(function (id) {
+      var count = el(id);
+      if (count) count.textContent = text;
+    });
+  }
+
+  function sortOrder() {
+    var button = el('documentLibrarySortOrder');
+    return button && button.dataset.order === 'asc' ? 'asc' : 'desc';
+  }
+
+  // Toolbar sort drives the table, which asks the server for page 1.
+  function applySort(column, direction) {
+    var target = table();
+    if (!target || !target.dataSource) return;
+    target.sortBy = column;
+    target.sortDir = direction;
+    target.dataSource.setSort(column, direction);
+  }
+
+  // A header click sorted the table: mirror it in the toolbar.
+  function syncToolbarSort(column, direction) {
+    var select = el('documentLibrarySort');
+    var button = el('documentLibrarySortOrder');
+    if (select && select.value !== column) select.value = column;
+    if (button) button.dataset.order = direction === 'asc' ? 'asc' : 'desc';
   }
 
   function mapFileForTable(file) {
@@ -360,18 +385,39 @@
       if (!event.target || event.target.id !== TABLE_ID) return;
       openCreateDocument();
     });
-    root.addEventListener('lex-change', function (event) {
-      if (!event.target || event.target.id !== 'documentLibraryTypeFilter') return;
-      documentType = String((event.detail && event.detail.value) || '');
-      reloadFromFirstPage();
+    root.addEventListener('sort-change', function (event) {
+      if (!event.target || event.target.id !== TABLE_ID || !event.detail) return;
+      syncToolbarSort(event.detail.sortBy, event.detail.sortDir);
     });
-    root.addEventListener('input', function (event) {
-      if (!event.target || event.target.id !== 'documentLibrarySearch') return;
-      global.clearTimeout(searchDebounce);
-      searchDebounce = global.setTimeout(function () {
-        searchTerm = event.target.value.trim();
+    root.addEventListener('click', function (event) {
+      var button = event.target && event.target.closest ? event.target.closest('#documentLibrarySortOrder') : null;
+      if (!button) return;
+      button.dataset.order = sortOrder() === 'asc' ? 'desc' : 'asc';
+      var select = el('documentLibrarySort');
+      applySort(select ? select.value : 'updated_at', sortOrder());
+    });
+    root.addEventListener('lex-change', function (event) {
+      var id = event.target && event.target.id;
+      var value = String((event.detail && event.detail.value) || '');
+      if (id === 'documentLibraryTypeFilter') {
+        documentType = value === 'all' ? '' : value;
         reloadFromFirstPage();
-      }, 350);
+      } else if (id === 'documentLibrarySort') {
+        applySort(value || 'updated_at', sortOrder());
+      }
+    });
+    // lex-input emits lex-input while typing and lex-change on clear.
+    ['lex-input', 'lex-change'].forEach(function (name) {
+      root.addEventListener(name, function (event) {
+        if (!event.target || event.target.id !== 'documentLibrarySearch') return;
+        var value = String((event.detail && event.detail.value) || '').trim();
+        global.clearTimeout(searchDebounce);
+        searchDebounce = global.setTimeout(function () {
+          if (value === searchTerm) return;
+          searchTerm = value;
+          reloadFromFirstPage();
+        }, 350);
+      });
     });
   }
 
@@ -380,8 +426,8 @@
     if (!root) return;
     var search = el('documentLibrarySearch');
     var typeFilter = el('documentLibraryTypeFilter');
-    searchTerm = search ? search.value.trim() : '';
-    documentType = typeFilter ? String(typeFilter.value || '') : '';
+    searchTerm = search && search.value ? String(search.value).trim() : '';
+    documentType = typeFilter && typeFilter.value && typeFilter.value !== 'all' ? String(typeFilter.value) : '';
     bindEvents(root);
     var ready = global.customElements && typeof global.customElements.whenDefined === 'function'
       ? global.customElements.whenDefined('lex-table')

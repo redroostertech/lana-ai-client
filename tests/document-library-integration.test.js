@@ -62,7 +62,8 @@ describe('Document Library integration', () => {
       'js/lex/components/foundation/lex-banner.js',
       'js/lex/components/foundation/lex-card.js',
       'js/lex/components/foundation/lex-modal.js',
-      'js/lex/components/form/lex-segmented.js',
+      'js/lex/components/form/lex-input.js',
+      'js/lex/components/form/lex-select.js',
       'js/lex/components/foundation/lex-empty.js',
       'js/lex/components/data/lex-table.js',
       'js/services/document-create-modal.js',
@@ -88,7 +89,7 @@ describe('Document Library integration', () => {
     expect(html).toContain('href="css/document-create-modal.css"');
     expect(html).toContain('id="documentLibrary"');
     expect(html).toContain('id="documentLibraryTable"');
-    expect(html).toContain('Latest edited');
+    expect(html).toContain('All Documents');
     expect(html).toContain('class="document-library-table lex-table--card"');
     expect(html).toContain('server-paging');
     expect(html).toContain('labels="File,Workspace,Last edited"');
@@ -96,7 +97,11 @@ describe('Document Library integration', () => {
     expect(html).toContain('id="documentLibrarySearch"');
     expect(html).toContain('id="documentLibraryTypeFilter"');
     expect(html).toContain('Search and filter documents');
-    expect(html).toContain('src="js/lex/components/form/lex-segmented.js"');
+    expect(html).toContain('class="document-library-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4"');
+    expect(html).toContain('id="documentLibrarySort"');
+    expect(html).toContain('id="documentLibrarySortOrder"');
+    expect(html).toContain('src="js/lex/components/form/lex-select.js"');
+    expect(html).not.toContain('lex-segmented');
     expect(html).toContain('src="js/lex/components/data/lex-table.js"');
     expect(html).not.toContain('<lex-pagination');
     expect(html).toContain('<lex-banner');
@@ -158,6 +163,7 @@ describe('Document Library integration', () => {
     const html = fs.readFileSync(path.join(SRC, 'document-library.html'), 'utf8');
     const controller = fs.readFileSync(path.join(SRC, 'js', 'document-library.js'), 'utf8');
 
+    expect(html).toContain('{"value":"all","label":"All"}');
     expect(html).toContain('{"value":"document","label":"Documents"}');
     expect(html).toContain('{"value":"spreadsheet","label":"Spreadsheets"}');
     expect(html).toContain('{"value":"presentation","label":"Presentations"}');
@@ -167,7 +173,7 @@ describe('Document Library integration', () => {
     expect(controller).toContain("params.set('file_family', fileFamilyParam(documentType))");
     expect(controller).not.toContain("params.set('document_type'");
     expect(controller).toContain("event.target.id !== 'documentLibrarySearch'");
-    expect(controller).toContain("event.target.id !== 'documentLibraryTypeFilter'");
+    expect(controller).toContain("id === 'documentLibraryTypeFilter'");
     expect(controller).toContain('requestServerQuery({ resetPage: true })');
     expect(controller).toContain('No matching documents');
     expect(controller).toContain('currentFilters: function ()');
@@ -572,8 +578,9 @@ describe('Template Library table', () => {
     expect(html).toContain('class="document-library-table lex-table--card"');
     expect(html).toContain('server-paging');
     expect(html).toContain('labels="Template,Workspace,Last edited"');
-    // The templates API cannot sort, so no header claims to.
-    expect(html).toContain('sortable-columns=""');
+    expect(html).toContain('sortable-columns="name,workspace,updated_at"');
+    expect(html).toContain('id="dstSort"');
+    expect(html).toContain('All Templates');
     expect(html).toContain('src="js/lex/components/data/lex-table.js"');
     expect(html).not.toContain('<lex-pagination');
     expect(html).not.toContain('style=');
@@ -581,6 +588,7 @@ describe('Template Library table', () => {
     expect(descriptor.scripts).not.toContain('js/lex/components/data/lex-pagination.js');
     expect(controller).toContain("root.addEventListener('lex-query-change'");
     expect(controller).toContain('offset: ((query.page || 1) - 1) * limit');
+    expect(controller).toContain("sortBy: query.sortBy || 'updated_at'");
     expect(controller).toContain("root.addEventListener('row-click'");
   });
 });

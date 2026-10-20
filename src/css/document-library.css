@@ -14,93 +14,26 @@
   margin-bottom: 16px;
 }
 
-.document-library-filters {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 16px 0 12px;
+/* Search / sort / filter toolbar and section header: the Library-style
+   markup used by drive.html and my-tasks.html, with their inline colors
+   kept here instead. Shared by the Document and Template Library. */
+.document-library-toolbar {
+  border-color: var(--lex-border-default);
 }
 
-.document-library-filter-label,
-.document-library-search-label {
-  color: var(--lex-text-tertiary);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.document-library-toolbar-label,
+.document-library-toolbar-icon {
+  color: var(--lex-text-secondary);
 }
 
-.document-library-filters-spacer {
-  flex: 1;
-}
-
-.document-library-search-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.document-library-search-field input {
-  background: var(--lex-bg-primary);
-  border: 1px solid var(--lex-border-default);
-  border-radius: 6px;
+.document-library-section-title {
   color: var(--lex-text-primary);
-  font: inherit;
-  font-size: 13px;
-  min-height: 34px;
-  outline: none;
-  padding: 6px 12px;
-  width: 260px;
-}
-
-.document-library-search-field input:focus-visible {
-  border-color: var(--lex-border-accent);
-  box-shadow: var(--lex-focus-ring);
+  margin: 0;
 }
 
 .document-library-recents {
   display: block;
   margin: 0;
-}
-
-.document-library-section-heading {
-  align-items: center;
-  display: flex;
-  gap: 24px;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.document-library-section-heading h2 {
-  color: var(--lex-text-primary);
-  font-size: 16px;
-  font-weight: 650;
-  line-height: 1.35;
-  margin: 0;
-}
-
-.document-library-section-heading p {
-  color: var(--lex-text-tertiary);
-  font-size: 12px;
-  line-height: 1.5;
-  margin: 3px 0 0;
-}
-
-.document-library-count {
-  background: var(--lex-bg-secondary);
-  border-radius: 999px;
-  color: var(--lex-text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  min-width: 48px;
-  padding: 5px 9px;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.document-library-count:empty {
-  display: none;
 }
 
 .document-library-file-icon {
@@ -246,6 +179,23 @@
   width: 18%;
 }
 
+.document-library-table td {
+  overflow: hidden;
+}
+
+/* The workspace link is a button; keep it inside its cell and truncate. */
+.document-library-table .document-library-file-workspace {
+  display: block;
+  max-width: 100%;
+}
+
+.document-library-table .document-library-file-workspace > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .document-library-table .document-library-file-time {
   white-space: nowrap;
 }
@@ -253,25 +203,6 @@
 @media (max-width: 768px) {
   .document-library {
     padding: 1rem;
-  }
-}
-
-@media (max-width: 600px) {
-  .document-library-filters {
-    align-items: stretch;
-  }
-
-  .document-library-filters-spacer {
-    display: none;
-  }
-
-  .document-library-search-field,
-  .document-library-search-field input {
-    width: 100%;
-  }
-
-  .document-library-section-heading {
-    align-items: flex-start;
   }
 }
 

@@ -30,6 +30,15 @@ describe('document-studio-templates-mapper', () => {
       expect(q.startsWith('?')).toBe(false);
     });
 
+    test('sends sort_by / sort_order only with values the backend accepts', () => {
+      expect(mapper.buildListQuery({ sortBy: 'name', sortOrder: 'asc' })).toBe('sort_by=name&sort_order=asc');
+      expect(mapper.buildListQuery({ sortBy: 'WORKSPACE', sortOrder: 'DESC' })).toBe('sort_by=workspace&sort_order=desc');
+      expect(mapper.buildListQuery({ sortBy: 'updated_at' })).toBe('sort_by=updated_at');
+      expect(mapper.buildListQuery({ sortBy: 'size', sortOrder: 'asc' })).toBe('');
+      expect(mapper.buildListQuery({ sortBy: 'name', sortOrder: 'sideways' })).toBe('sort_by=name');
+      expect(mapper.buildListQuery({ sortOrder: 'asc' })).toBe('');
+    });
+
     test('drops invalid kind values', () => {
       expect(mapper.buildListQuery({ kind: 'bogus' })).toBe('');
       expect(mapper.buildListQuery({ kind: 'FILL' })).toBe('kind=fill');

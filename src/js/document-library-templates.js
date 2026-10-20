@@ -217,7 +217,9 @@
       q: _state.searchTerm,
       includeOrgWide: _state.includeOrgWide,
       limit: limit,
-      offset: ((query.page || 1) - 1) * limit
+      offset: ((query.page || 1) - 1) * limit,
+      sortBy: query.sortBy || 'updated_at',
+      sortOrder: query.sortDir || 'desc'
     };
   }
 
@@ -225,9 +227,34 @@
     return el(TABLE_ID);
   }
 
+  // The count shows in the toolbar and the section header, as on the Library.
   function _setCount(text) {
-    var count = el('dstTotalCount');
-    if (count) count.textContent = text;
+    ['dstToolbarCount', 'dstTotalCount'].forEach(function (id) {
+      var count = el(id);
+      if (count) count.textContent = text;
+    });
+  }
+
+  function _sortOrder() {
+    var button = el('dstSortOrder');
+    return button && button.dataset.order === 'asc' ? 'asc' : 'desc';
+  }
+
+  // Toolbar sort drives the table, which asks the server for page 1.
+  function _applySort(column, direction) {
+    var table = _table();
+    if (!table || !table.dataSource) return;
+    table.sortBy = column;
+    table.sortDir = direction;
+    table.dataSource.setSort(column, direction);
+  }
+
+  // A header click sorted the table: mirror it in the toolbar.
+  function _syncToolbarSort(column, direction) {
+    var select = el('dstSort');
+    var button = el('dstSortOrder');
+    if (select && select.value !== column) select.value = column;
+    if (button) button.dataset.order = direction === 'asc' ? 'asc' : 'desc';
   }
 
   // Empty copy depends on the filters outside the table: a filtered-empty
@@ -488,6 +515,10 @@
       if (!event.target || event.target.id !== TABLE_ID) return;
       _openNewTemplate();
     });
+    root.addEventListener('sort-change', function (event) {
+      if (!event.target || event.target.id !== TABLE_ID || !event.detail) return;
+      _syncToolbarSort(event.detail.sortBy, event.detail.sortDir);
+    });
   }
 
   function _bindEvents() {
@@ -496,8 +527,24 @@
     var kindFilter = el('dstKindFilter');
     if (kindFilter) {
       kindFilter.addEventListener('lex-change', function (e) {
-        _state.kindFilter = (e.detail && e.detail.value) || '';
+        var kind = (e.detail && e.detail.value) || '';
+        _state.kindFilter = kind === 'all' ? '' : kind;
         _reloadFromFirstPage();
+      });
+    }
+
+    var sortSelect = el('dstSort');
+    if (sortSelect) {
+      sortSelect.addEventListener('lex-change', function (e) {
+        _applySort((e.detail && e.detail.value) || 'updated_at', _sortOrder());
+      });
+    }
+
+    var sortOrderBtn = el('dstSortOrder');
+    if (sortOrderBtn) {
+      sortOrderBtn.addEventListener('click', function () {
+        sortOrderBtn.dataset.order = _sortOrder() === 'asc' ? 'desc' : 'asc';
+        _applySort(sortSelect ? sortSelect.value : 'updated_at', _sortOrder());
       });
     }
 
@@ -509,17 +556,21 @@
       });
     }
 
+    // lex-input emits lex-input while typing and lex-change on clear.
     var searchInput = el('dstSearch');
     if (searchInput) {
-      searchInput.addEventListener('input', function () {
+      var onSearch = function (e) {
+        var value = String((e.detail && e.detail.value) || '').trim();
         clearTimeout(_state.searchDebounce);
         _state.searchDebounce = setTimeout(function () {
-          _state.searchTerm = searchInput.value.trim();
+          if (value === _state.searchTerm) return;
+          _state.searchTerm = value;
           _reloadFromFirstPage();
         }, 350);
-      });
+      };
+      searchInput.addEventListener('lex-input', onSearch);
+      searchInput.addEventListener('lex-change', onSearch);
     }
-
   }
 
   // ===========================================================================
