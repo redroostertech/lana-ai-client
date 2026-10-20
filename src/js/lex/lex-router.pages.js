@@ -256,6 +256,7 @@
         'js/lex/components/form/lex-input.js',
         'js/lex/components/form/lex-select.js',
         'js/lex/components/data/lex-table.js',
+        'js/shared/library-column-filters.js',
         // Brainchild scope: shared mapper + promote builder + scope controller
         'js/shared/document-library-mapper.js',
         'js/shared/brainchild-promote-builder.js',

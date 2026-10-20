@@ -161,6 +161,12 @@
       /* ── "Card" modifier ─────────────────────────────────────
          Opt-in (class on the <lex-table> host) that wraps the table in a
          white, rounded, bordered card — matching the Library list table. */
+      /* An open column filter must not be clipped by a short table: the card
+         and its scroll area stop clipping while a dropdown is open. */
+      lex-table.lex-table--filter-open,
+      lex-table.lex-table--filter-open .lex-table-scroll-area {
+        overflow: visible !important;
+      }
       lex-table.lex-table--card {
         display: block;
         background: var(--lex-bg-primary, #fff);
@@ -988,6 +994,8 @@
     }
 
     updated() {
+      this.classList.toggle('lex-table--filter-open', !!this._colFilterOpen);
+
       // Restore search input focus after re-render
       if (this._searchHadFocus) {
         const input = this.$('[data-action="table-search"]');

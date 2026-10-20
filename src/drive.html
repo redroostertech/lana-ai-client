@@ -188,6 +188,7 @@
            Shared Knowledge). drive.js pages it and sorts it on the server. -->
       <lex-table
         id="listView"
+        column-filters
         class="hidden drive-list-table lex-table--card"
         server-paging
         columns="name,created_by,created_at,size,actions"
@@ -197,6 +198,7 @@
         sort-dir="asc"
         limit="100"
         id-key="key"
+        empty-text="Nothing matches these filters"
         aria-label="All folders"
       ></lex-table>
 
@@ -396,6 +398,7 @@
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>
