@@ -62,8 +62,10 @@ describe('Document Library integration', () => {
       'js/lex/components/foundation/lex-banner.js',
       'js/lex/components/foundation/lex-card.js',
       'js/lex/components/foundation/lex-modal.js',
-      'js/lex/components/form/lex-segmented.js',
-      'js/lex/components/data/lex-pagination.js',
+      'js/lex/components/form/lex-input.js',
+      'js/lex/components/form/lex-select.js',
+      'js/lex/components/foundation/lex-empty.js',
+      'js/lex/components/data/lex-table.js',
       'js/services/document-create-modal.js',
       'js/document-library.js',
       'js/lex/components/layout/lex-lana-dock.js'
@@ -86,16 +88,22 @@ describe('Document Library integration', () => {
     expect(html).toContain('href="css/document-library.css"');
     expect(html).toContain('href="css/document-create-modal.css"');
     expect(html).toContain('id="documentLibrary"');
-    expect(html).toContain('id="documentLibraryRecentFiles"');
-    expect(html).toContain('Latest edited');
-    expect(html).toContain('role="columnheader">File');
-    expect(html).toContain('role="columnheader">Workspace');
-    expect(html).toContain('role="columnheader">Last edited');
+    expect(html).toContain('id="documentLibraryTable"');
+    expect(html).toContain('All Documents');
+    expect(html).toContain('class="document-library-table lex-table--card"');
+    expect(html).toContain('server-paging');
+    expect(html).toContain('labels="File,Workspace,Last edited"');
+    expect(html).toContain('sortable-columns="name,updated_at"');
     expect(html).toContain('id="documentLibrarySearch"');
     expect(html).toContain('id="documentLibraryTypeFilter"');
     expect(html).toContain('Search and filter documents');
-    expect(html).toContain('src="js/lex/components/form/lex-segmented.js"');
-    expect(html).toContain('<lex-pagination id="documentLibraryPagination"');
+    expect(html).toContain('class="document-library-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4"');
+    expect(html).toContain('id="documentLibrarySort"');
+    expect(html).toContain('id="documentLibrarySortOrder"');
+    expect(html).toContain('src="js/lex/components/form/lex-select.js"');
+    expect(html).not.toContain('lex-segmented');
+    expect(html).toContain('src="js/lex/components/data/lex-table.js"');
+    expect(html).not.toContain('<lex-pagination');
     expect(html).toContain('<lex-banner');
     expect(html).toContain('data-action="new-document"');
     expect(html).toContain('src="js/time-utils.js"');
@@ -126,43 +134,47 @@ describe('Document Library integration', () => {
     expect(loader).toMatch(/#lex-loader-overlay\.lex-loader-visible\s*\{[^}]*pointer-events:\s*auto;/s);
   });
 
-  test('Document Library loads paginated latest-edited files and reuses shared document creation', () => {
+  test('Document Library answers the server-paged table with latest-edited files and reuses shared document creation', () => {
     const controller = fs.readFileSync(path.join(SRC, 'js', 'document-library.js'), 'utf8');
 
-    expect(controller).toContain("params.set('page', String(currentPage))");
-    expect(controller).toContain("params.set('page_size', String(FILE_LIMIT))");
-    expect(controller).toContain("params.set('sort_by', 'updated_at')");
-    expect(controller).toContain("params.set('sort_order', 'desc')");
+    expect(controller).toContain("params.set('page', String(query.page || 1))");
+    expect(controller).toContain("params.set('page_size', String(query.limit || 20))");
+    expect(controller).toContain("params.set('sort_by', query.sortBy || 'updated_at')");
+    expect(controller).toContain("params.set('sort_order', query.sortDir || 'desc')");
+    expect(controller).toContain("root.addEventListener('lex-query-change'");
+    expect(controller).toContain('target.setServerData(files.map(mapFileForTable), pagination)');
     expect(controller).toContain('LanaDocumentCreate.open');
     expect(controller).toContain("source: 'document_library'");
     expect(controller).toContain("Lex.Nav.go('file-viewer.html'");
     expect(controller).toContain("'/api/v1/storage/files/' + encodeURIComponent(fileId)");
     expect(controller).toContain("Lex.Modal.alert('Access denied', 'You do not have access to this file.'");
-    expect(controller).toContain('data-file-workspace-id=');
+    expect(controller).toContain("root.addEventListener('row-click'");
     expect(controller).toContain("return 'Organization';");
     expect(controller).toContain("Lex.Nav.go('workspace-details.html'");
     expect(controller).toContain('data-workspace-id=');
     expect(controller).toContain("workspaceName !== '—'");
     expect(controller).toContain("LexRouter.registerPageInit('document-library.html', init);");
-    expect(controller).toContain("root.addEventListener('page-change'");
+    expect(controller).not.toContain("root.addEventListener('page-change'");
     expect(controller).not.toContain('officeEditorInstance');
   });
 
   test('Document Library search and type filters reset paging and reach the paginated API', () => {
+    // Images are out of scope for the library.
     const html = fs.readFileSync(path.join(SRC, 'document-library.html'), 'utf8');
     const controller = fs.readFileSync(path.join(SRC, 'js', 'document-library.js'), 'utf8');
 
+    expect(html).toContain('{"value":"all","label":"All"}');
     expect(html).toContain('{"value":"document","label":"Documents"}');
     expect(html).toContain('{"value":"spreadsheet","label":"Spreadsheets"}');
     expect(html).toContain('{"value":"presentation","label":"Presentations"}');
     expect(html).toContain('{"value":"pdf","label":"PDFs"}');
-    expect(html).toContain('{"value":"image","label":"Images"}');
+    expect(html).not.toContain('{"value":"image","label":"Images"}');
     expect(controller).toContain("if (searchTerm) params.set('search', searchTerm)");
-    expect(controller).toContain("if (documentType) params.set('document_type', documentType)");
+    expect(controller).toContain("params.set('file_family', fileFamilyParam(documentType))");
+    expect(controller).not.toContain("params.set('document_type'");
     expect(controller).toContain("event.target.id !== 'documentLibrarySearch'");
-    expect(controller).toContain("event.target.id !== 'documentLibraryTypeFilter'");
-    expect(controller).toContain('currentPage = 1');
-    expect(controller).toContain("loadLatestFiles(1)");
+    expect(controller).toContain("id === 'documentLibraryTypeFilter'");
+    expect(controller).toContain('requestServerQuery({ resetPage: true })');
     expect(controller).toContain('No matching documents');
     expect(controller).toContain('currentFilters: function ()');
   });
@@ -534,5 +546,49 @@ describe('Document Library integration', () => {
     );
     expect(sidebar).toContain('const hasActiveChild = item.children.some');
     expect(sidebar).toContain("if (activeChild) group.dataset.expanded = 'true';");
+  });
+});
+
+describe('Document Library file families', () => {
+  function loadController() {
+    const code = fs.readFileSync(path.join(SRC, 'js', 'document-library.js'), 'utf8');
+    const window = { LexRouter: null };
+    const document = { getElementById: () => null };
+    // eslint-disable-next-line no-new-func
+    new Function('window', 'document', code)(window, document);
+    return window.LanaDocumentLibrary;
+  }
+
+  test('"All" asks for every library family except images; a tab asks for its own family', () => {
+    const library = loadController();
+    expect(library.fileFamilyParam('')).toBe('document,spreadsheet,presentation,pdf');
+    expect(library.fileFamilyParam('spreadsheet')).toBe('spreadsheet');
+    expect(library.fileFamilyParam('pdf')).toBe('pdf');
+    expect(library.fileFamilyParam('image')).toBe('document,spreadsheet,presentation,pdf');
+  });
+});
+
+describe('Template Library table', () => {
+  test('uses the same server-paged lex-table card as the Document Library', () => {
+    const html = fs.readFileSync(path.join(SRC, 'document-library-templates.html'), 'utf8');
+    const controller = fs.readFileSync(path.join(SRC, 'js', 'document-library-templates.js'), 'utf8');
+    const descriptor = loadPageDescriptors()['document-library-templates.html'];
+
+    expect(html).toContain('id="dstTable"');
+    expect(html).toContain('class="document-library-table lex-table--card"');
+    expect(html).toContain('server-paging');
+    expect(html).toContain('labels="Template,Workspace,Last edited"');
+    expect(html).toContain('sortable-columns="name,workspace,updated_at"');
+    expect(html).toContain('id="dstSort"');
+    expect(html).toContain('All Templates');
+    expect(html).toContain('src="js/lex/components/data/lex-table.js"');
+    expect(html).not.toContain('<lex-pagination');
+    expect(html).not.toContain('style=');
+    expect(descriptor.scripts).toContain('js/lex/components/data/lex-table.js');
+    expect(descriptor.scripts).not.toContain('js/lex/components/data/lex-pagination.js');
+    expect(controller).toContain("root.addEventListener('lex-query-change'");
+    expect(controller).toContain('offset: ((query.page || 1) - 1) * limit');
+    expect(controller).toContain("sortBy: query.sortBy || 'updated_at'");
+    expect(controller).toContain("root.addEventListener('row-click'");
   });
 });

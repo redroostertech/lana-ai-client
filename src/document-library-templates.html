@@ -45,52 +45,75 @@
         <lex-btn id="dstNewTemplate" variant="primary" leading-icon="file-plus" data-action="new-template">New Template</lex-btn>
       </lex-banner>
 
-      <!-- Kind filter, org-wide toggle, and search -->
-      <div class="dst-filters">
-        <span class="dst-filter-label" id="dstKindFilterLabel">Template type</span>
-        <lex-segmented
-          id="dstKindFilter"
-          aria-labelledby="dstKindFilterLabel"
-          value=""
-          options='[{"value":"","label":"All"},{"value":"fill","label":"Documents"},{"value":"compose","label":"Document sets"},{"value":"render","label":"Layouts"}]'
-        ></lex-segmented>
+      <!-- Search / Sort / Filter toolbar — Library-style, drives the table below -->
+      <div class="document-library-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" role="search" aria-label="Search and filter templates">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input
+              id="dstSearch"
+              placeholder="Search templates..."
+              clearable="true"
+              leading-icon="search"
+            ></lex-input>
+          </div>
 
-        <div class="dst-filters-spacer"></div>
+          <div class="flex items-center gap-2">
+            <label class="document-library-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+            <lex-select
+              id="dstSort"
+              options='[{"value":"updated_at","label":"Last Edited"},{"value":"name","label":"Template Name"},{"value":"workspace","label":"Workspace"}]'
+              value="updated_at"
+            ></lex-select>
+          </div>
 
-        <label class="dst-orgwide" title="Include organization-wide templates when a workspace is selected">
-          <input type="checkbox" id="dstOrgWideToggle" checked>
-          <span>Include organization-wide</span>
-        </label>
+          <lex-btn id="dstSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="document-library-toolbar-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
 
-        <input type="text" id="dstSearch" class="dst-search" placeholder="Search templates...">
+          <div class="flex items-center gap-2">
+            <label class="document-library-toolbar-label text-sm whitespace-nowrap">Type:</label>
+            <lex-select
+              id="dstKindFilter"
+              options='[{"value":"all","label":"All"},{"value":"fill","label":"Documents"},{"value":"compose","label":"Document Sets"},{"value":"render","label":"Layouts"}]'
+              value="all"
+            ></lex-select>
+          </div>
+
+          <label class="dst-orgwide" title="Include organization-wide templates when a workspace is selected">
+            <input type="checkbox" id="dstOrgWideToggle" checked>
+            <span>Include organization-wide</span>
+          </label>
+
+          <div id="dstToolbarCount" class="document-library-toolbar-label text-sm whitespace-nowrap"></div>
+        </div>
       </div>
 
-      <lex-card class="document-library-recents" padding="none" aria-labelledby="dstListHeading">
-        <div class="document-library-section-heading">
-          <div>
-            <h2 id="dstListHeading">All templates</h2>
-            <p>Organization-wide and workspace templates across every type.</p>
-          </div>
-          <span id="dstTotalCount" class="document-library-count" aria-live="polite"></span>
+      <section class="document-library-recents" aria-labelledby="dstListHeading">
+        <!-- Section header — title + count, Library-style -->
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="dstListHeading" class="document-library-section-title text-lg font-semibold">All Templates</h2>
+          <span id="dstTotalCount" class="document-library-toolbar-label text-sm" aria-live="polite"></span>
         </div>
 
-        <div id="dstColumns" class="document-library-columns" role="row" hidden>
-          <span aria-hidden="true"></span>
-          <span role="columnheader">Template</span>
-          <span role="columnheader">Workspace</span>
-          <span role="columnheader">Last edited</span>
-          <span aria-hidden="true"></span>
-        </div>
-
-        <div id="dstList" class="document-library-files" aria-live="polite" aria-busy="true">
-          <div class="document-library-skeleton" aria-hidden="true"></div>
-          <div class="document-library-skeleton" aria-hidden="true"></div>
-          <div class="document-library-skeleton" aria-hidden="true"></div>
-          <div class="document-library-skeleton" aria-hidden="true"></div>
-        </div>
-
-        <lex-pagination id="dstPagination" page="1" total-pages="1" total="0" limit="12" hidden></lex-pagination>
-      </lex-card>
+        <lex-table
+          id="dstTable"
+          class="document-library-table lex-table--card"
+          server-paging
+          columns="name,workspace,updated_at"
+          labels="Template,Workspace,Last edited"
+          sortable-columns="name,workspace,updated_at"
+          sort-by="updated_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="key"
+          empty-text="No templates yet"
+          empty-action-label="New Template"
+          empty-action-icon="file-plus"
+          aria-label="Templates"
+        ></lex-table>
+      </section>
 
       <!-- Detail drawer (read-only) -->
       <lex-drawer id="dstDetailDrawer" heading="Template" side="right" width="480">
@@ -102,9 +125,7 @@
   </template>
 
   <noscript>
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;color:#666;">
-      Please enable JavaScript to use LANA AI.
-    </div>
+    <div class="document-library-noscript">Please enable JavaScript to use LANA AI.</div>
   </noscript>
 
   <!-- Universal shell scripts -->
@@ -138,7 +159,8 @@
   <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/app-catalog.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
-  <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
   <script src="js/lex/components/layout/lex-conversation-item.js"></script>
@@ -152,7 +174,7 @@
   <script src="js/lex/components/foundation/lex-card.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>
   <script src="js/lex/components/foundation/lex-kv.js"></script>
-  <script src="js/lex/components/data/lex-pagination.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
 
   <!-- Inject page content -->
   <script src="js/lex/lex-page-init.js"></script>

@@ -654,13 +654,29 @@ Sortable, searchable, filterable, paginated data table with selection and bulk a
 | `sortBy` | String | — | Default sort column |
 | `sortDir` | String | `'asc'` | Default sort direction |
 | `compact` | Boolean | `false` | Reduced padding |
-| `columnFilters` | Boolean | `false` | Per-column filter dropdowns |
+| `columnFilters` | Boolean | `false` | Per-column filter dropdowns (off when `serverPaging`) |
+| `sortableColumns` | String | all | Comma-separated keys whose headers sort; empty = none |
 | `emptyText` | String | `'No data found'` | Empty state message |
 | `bulkActions` | Array | `[]` | `[{ label, action, variant?, icon? }]` |
 
-Plus `withDataSource` properties: `endpoint`, `limit`, `autoFetch`, `searchable`, `filterable`, `selectable`, `linkedTo`, `idKey`.
+Plus `withDataSource` properties: `endpoint`, `limit`, `autoFetch`, `searchable`, `filterable`, `selectable`, `linkedTo`, `idKey`, `serverPaging`.
 
-**Events:** `row-click`, `sort-change`, `selection-change`, `bulk-action`, `lex-filter-change`, `lex-data-loaded`
+**Events:** `row-click`, `sort-change`, `selection-change`, `bulk-action`, `lex-filter-change`, `lex-data-loaded`, `lex-query-change` (server paging)
+
+**Server paging:** use `server-paging` when the API pages and sorts itself and its parameter names differ from `endpoint` mode's (`page`/`limit`/`sortBy`/`sortOrder`/`q`). The page owns the request; the table owns paging and sort state.
+```javascript
+// <lex-table id="files" server-paging sortable-columns="name,updated_at" sort-by="updated_at" sort-dir="desc" limit="20">
+table.addEventListener('lex-query-change', async (e) => {
+  const { page, limit, sortBy, sortDir, search, filters } = e.detail;
+  try {
+    const res = await api.get(/* map the query to the API's params */);
+    table.setServerData(rows, res.pagination);   // { page, limit|page_size, total, totalPages|total_pages }
+  } catch (err) { table.setServerError(err.message); }
+});
+table.requestServerQuery();                      // first load
+table.requestServerQuery({ resetPage: true });   // after a filter outside the table changes
+```
+**RULE:** with `server-paging`, list in `sortable-columns` only what the API can sort, and keep filters outside the table (column filters would only see one page).
 
 **Selection API:**
 ```javascript

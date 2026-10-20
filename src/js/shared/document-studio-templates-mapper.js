@@ -24,6 +24,9 @@
   'use strict';
 
   var VALID_KINDS = ['fill', 'compose', 'render'];
+  // Mirrors the backend validator's sort_by / sort_order enums.
+  var VALID_SORT_FIELDS = ['name', 'updated_at', 'workspace'];
+  var VALID_SORT_ORDERS = ['asc', 'desc'];
 
   var KIND_LABELS = {
     fill: 'Document',
@@ -57,7 +60,7 @@
    *
    * Only known query params are emitted, mirroring the backend validator
    * (document-studio.validators.js): kind, matter_id, document_type, category,
-   * q, include_org_wide, limit, offset.
+   * q, include_org_wide, limit, offset, sort_by, sort_order.
    *
    * @param {Object} [filters]
    * @param {string} [filters.kind]            - 'fill' | 'compose' | 'render'
@@ -68,6 +71,8 @@
    * @param {boolean} [filters.includeOrgWide] - default omitted (backend defaults true)
    * @param {number} [filters.limit]
    * @param {number} [filters.offset]
+   * @param {string} [filters.sortBy]          - 'name' | 'updated_at' | 'workspace'
+   * @param {string} [filters.sortOrder]       - 'asc' | 'desc'
    * @returns {string}
    */
   function buildListQuery(filters) {
@@ -95,6 +100,13 @@
     }
     if (typeof f.offset === 'number' && f.offset >= 0) {
       _appendParam(parts, 'offset', f.offset);
+    }
+
+    var sortBy = f.sortBy ? String(f.sortBy).toLowerCase() : '';
+    if (VALID_SORT_FIELDS.indexOf(sortBy) !== -1) {
+      _appendParam(parts, 'sort_by', sortBy);
+      var sortOrder = f.sortOrder ? String(f.sortOrder).toLowerCase() : '';
+      if (VALID_SORT_ORDERS.indexOf(sortOrder) !== -1) _appendParam(parts, 'sort_order', sortOrder);
     }
 
     return parts.join('&');
