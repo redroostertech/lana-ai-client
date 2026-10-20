@@ -100,12 +100,6 @@
     return text === '-' ? '' : text;
   }
 
-  function shortDate(value) {
-    if (!value || !window.Lex || !Lex.Utils) return '';
-    var text = Lex.Utils.formatDateLong(value, { month: 'short' });
-    return text === 'Never' ? '' : text;
-  }
-
   function absoluteTime(value) {
     if (!value || !window.Lex || !Lex.Utils) return '';
     var text = Lex.Utils.formatDateTime(value);
@@ -188,7 +182,7 @@
       template_type: function (val) { return mutedCellHtml(val); },
       variables: function (val) { return mutedCellHtml(val); },
       workspace: function (val, tableRow) { return workspaceCellHtml(tableRow._row); },
-      created_at: function (val) { return timeCellHtml(val, shortDate(val)); },
+      created_at: function (val) { return timeCellHtml(val, absoluteTime(val)); },
       updated_at: function (val) { return timeCellHtml(val, relativeTime(val)); }
     };
   }

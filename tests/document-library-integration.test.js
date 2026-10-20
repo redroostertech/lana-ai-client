@@ -603,7 +603,7 @@ describe('Library dates use the shared date utils', () => {
     for (const file of ['document-library.js', 'document-library-templates.js']) {
       const controller = fs.readFileSync(path.join(SRC, 'js', file), 'utf8');
       expect(controller).toContain('Lex.Utils.timeAgo(value)');
-      expect(controller).toContain("Lex.Utils.formatDateLong(value, { month: 'short' })");
+      expect(controller).not.toContain('formatDateLong');
       expect(controller).toContain('Lex.Utils.formatDateTime(value)');
       expect(controller).not.toContain('toLocaleDateString');
       expect(controller).not.toContain('toLocaleString');
@@ -611,7 +611,25 @@ describe('Library dates use the shared date utils', () => {
     }
   });
 
-  test('the date column is called Created everywhere', () => {
+  test('every Created column shows date and time through Lex.Utils.formatDateTime', () => {
+    const read = (rel) => fs.readFileSync(path.join(SRC, rel), 'utf8');
+    expect(read('js/document-library.js')).toContain("esc(absoluteTime(created) || '\\u2014')");
+    expect(read('js/document-library-templates.js')).toContain('created_at: function (val) { return timeCellHtml(val, absoluteTime(val)); }');
+    const drive = read('js/drive.js');
+    expect((drive.match(/Lex\.Utils\.formatDateTime\(val\)/g) || []).length).toBe(2);
+    expect(drive).not.toContain('formatRelativeDate(val)');
+    expect(read('js/admin/admin-users.js')).toContain('Lex.Utils.formatDateTime(u.created_at)');
+    expect(read('js/pages/model-pricing.js')).toContain('formatDateTime(row.created_at)');
+    // Skills leaves created_at raw so lex-table formats it (formatDateTime) and sorts it as a date.
+    expect(read('js/skills.js')).not.toContain("out.created_at = formatDateLong");
+    for (const page of ['insights/dashboard.html', 'insights/module-execution.html']) {
+      const html = read(page);
+      expect(html).not.toContain('${new Date(lead.source_created_at).toLocaleDateString()}');
+      expect(html).toContain('Lex.Utils.formatDateTime(opp.source_created_at)');
+    }
+  });
+
+    test('the date column is called Created everywhere', () => {
     for (const file of ['document-library.html', 'document-library-templates.html', 'drive.html']) {
       const html = fs.readFileSync(path.join(SRC, file), 'utf8');
       expect(html).not.toContain('Created On');

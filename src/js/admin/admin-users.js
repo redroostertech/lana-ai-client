@@ -23,7 +23,6 @@
   // =========================================================================
 
   var escHtml    = Lex.Utils.escapeHtml;
-  var fmtDate    = Lex.Utils.formatDate;
 
   // =========================================================================
   // Module-level state
@@ -255,7 +254,7 @@
             username:    String(u.username || ''),
             role_name:   userRoleName(u) || 'No role',
             status:      String(u.status || (u.is_active ? 'active' : 'inactive')),
-            created_at:  u.created_at ? fmtDate(u.created_at) : '—',
+            created_at:  u.created_at ? Lex.Utils.formatDateTime(u.created_at) : '—',
             _raw:        u
           };
         });

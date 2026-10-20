@@ -1014,7 +1014,7 @@
                       ${lead.data?.company || 'N/A'}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ${new Date(lead.source_created_at).toLocaleDateString()}
+                      ${window.Lex && Lex.Utils ? Lex.Utils.formatDateTime(lead.source_created_at) : new Date(lead.source_created_at).toLocaleString()}
                     </td>
                   </tr>
                 `).join('')}
@@ -1352,7 +1352,7 @@
                       <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${lead.data?.email || 'N/A'}</td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${lead.data?.phone || 'N/A'}</td>
                       <td class="px-4 py-3 whitespace-nowrap text-sm">${statusBadge}</td>
-                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${new Date(lead.source_created_at).toLocaleDateString()}</td>
+                      <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${window.Lex && Lex.Utils ? Lex.Utils.formatDateTime(lead.source_created_at) : new Date(lead.source_created_at).toLocaleString()}</td>
                     </tr>
                   `;
                 }).join('')}
@@ -1560,7 +1560,7 @@
                         'bg-yellow-100 text-yellow-800'
                       }">${opp.data?.status || 'N/A'}</span>
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${new Date(opp.source_created_at).toLocaleDateString()}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${window.Lex && Lex.Utils ? Lex.Utils.formatDateTime(opp.source_created_at) : new Date(opp.source_created_at).toLocaleString()}</td>
                   </tr>
                 `).join('')}
               </tbody>
