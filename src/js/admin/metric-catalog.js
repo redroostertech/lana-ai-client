@@ -842,6 +842,10 @@
           key: metric.key,
           current: current.value,
           format: current.format,
+          unit: current.unit,
+          aggregation: current.aggregation,
+          status: current.status,
+          metadata: current.metadata,
           goal: lastData.goal || null,
           comparison: lastData.comparison || null,
         });
@@ -851,6 +855,10 @@
           key: metric.key,
           value: current.value,
           format: current.format,
+          unit: current.unit,
+          aggregation: current.aggregation,
+          status: current.status,
+          metadata: current.metadata,
           goal: lastData.goal || null,
           comparison: lastData.comparison || null,
         });
@@ -885,7 +893,7 @@
       var start = (el('metricPlaygroundStart') || {}).value || '';
       var end = (el('metricPlaygroundEnd') || {}).value || '';
       var grain = (el('metricPlaygroundGrain') || {}).value || 'monthly';
-      if (!start || !end) return;
+      if ((!start || !end) && !window.CurrentPipelinePresentation?.isCurrentPipeline(metric)) return;
 
       if (card) card.innerHTML = '<div class="metric-catalog-muted">Loading...</div>';
 
@@ -894,13 +902,15 @@
         : (isPreset ? 'previous_calendar' : 'previous_period');
 
       try {
-        var response = await api.getMetricDetail(metric.key, {
+        var legacyOptions = window.CurrentPipelinePresentation?.isCurrentPipeline(metric) ? {} : {
           periodStart: playgroundISO(start, false),
           periodEnd: playgroundISO(end, true),
           periodType: grain,
           compareToPrevious: true,
           compareMode: compareMode,
-        });
+        };
+        var response = await api.getMetricDetail(metric.key, window.CurrentPipelinePresentation
+          ? window.CurrentPipelinePresentation.detailOptions(metric, legacyOptions) : legacyOptions);
         var data = response && response.data ? response.data : response;
         lastData = data || {};
         lastGoalForPeriod = lastData.goal || null;

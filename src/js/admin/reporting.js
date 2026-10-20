@@ -556,6 +556,9 @@
   // ==========================================================================
 
   function renderMetricChart(metric, canvasId) {
+    if (window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.isAcquisitionSource(metric)) return;
+    if (window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.isOpportunityIntake(metric)) return;
+    if (window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.isCurrentPipeline(metric)) return;
     if (!Array.isArray(metric.current)) {
       renderEmptyState(canvasId, 'No distribution data available');
       return;
@@ -1224,6 +1227,12 @@
   }
 
   function createMetricCard(metric) {
+    var intake = window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.renderCard(metric);
+    if (intake) return intake;
+    var acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.renderCard(metric);
+    if (acquisition) return acquisition;
+    var pipeline = window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.renderCard(metric);
+    if (pipeline) return pipeline;
     if (Array.isArray(metric.current)) {
       return createDistributionMetricCard(metric);
     }
@@ -1423,6 +1432,9 @@
     var grid = document.getElementById('metricsGrid');
     if (!grid) return;
     grid.innerHTML = metrics.map(function (metric) { return createMetricCard(metric); }).join('');
+    if (window.CurrentPipelinePresentation) window.CurrentPipelinePresentation.bindDetails(grid, openGenericDrilldown);
+    if (window.AcquisitionSourcePresentation) window.AcquisitionSourcePresentation.bindDetails(grid, openGenericDrilldown);
+    if (window.OpportunityIntakePresentation) window.OpportunityIntakePresentation.bindDetails(grid, openGenericDrilldown);
 
     requestAnimationFrame(function () { fitAllMetricCardText(grid); });
 
@@ -1785,6 +1797,15 @@
   }
 
   function renderVisualization(viz, data, uniqueId) {
+    var intake = window.OpportunityIntakePresentation && window.OpportunityIntakePresentation.visualization(viz, data,
+      function (sibling) { return renderVisualization(sibling, data, uniqueId); }, openGenericDrilldown);
+    if (intake) return intake;
+    var acquisition = window.AcquisitionSourcePresentation && window.AcquisitionSourcePresentation.visualization(viz, data,
+      function (sibling) { return renderVisualization(sibling, data, uniqueId); }, openGenericDrilldown);
+    if (acquisition) return acquisition;
+    var pipeline = window.CurrentPipelinePresentation && window.CurrentPipelinePresentation.visualization(viz, data,
+      function (sibling) { return renderVisualization(sibling, data, uniqueId); }, openGenericDrilldown);
+    if (pipeline) return pipeline;
     switch (viz.type) {
       case 'metric_grid': return renderMetricGrid(viz, uniqueId);
       case 'time_series':
@@ -1826,6 +1847,9 @@
     grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(260px, 1fr))';
     grid.id = 'grid-' + uniqueId;
     grid.innerHTML = viz.metrics.map(function (metric) { return createMetricCard(metric); }).join('');
+    if (window.CurrentPipelinePresentation) window.CurrentPipelinePresentation.bindDetails(grid, openGenericDrilldown);
+    if (window.AcquisitionSourcePresentation) window.AcquisitionSourcePresentation.bindDetails(grid, openGenericDrilldown);
+    if (window.OpportunityIntakePresentation) window.OpportunityIntakePresentation.bindDetails(grid, openGenericDrilldown);
     div.appendChild(grid);
 
     requestAnimationFrame(function () { fitAllMetricCardText(grid); });

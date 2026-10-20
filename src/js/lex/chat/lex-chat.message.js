@@ -19,6 +19,17 @@
     return global.Lex && global.Lex.Chat && global.Lex.Chat.ContextPromotion;
   }
 
+  // Presentation only: original upload labels never replace document routing identity.
+  function documentCitationDisplayName(citation) {
+    const source = String(citation.source || '').toLowerCase();
+    const type = String(citation.sourceType || citation.source_type || '').toLowerCase();
+    if (source === 'domain_pack' || type === 'domain_pack' || type === 'legal_authority'
+      || citation.authority_id || citation.authorityId) return null;
+    const isDocument = type === 'document' || type === 'chunk' || citation.document_id || citation.documentId || citation.doc_id;
+    return isDocument && typeof citation.display_filename === 'string' && citation.display_filename.trim()
+      ? citation.display_filename : null;
+  }
+
   // ---------------------------------------------------------------------------
   // Timestamp formatting — smart relative dates
   // ---------------------------------------------------------------------------
@@ -933,7 +944,8 @@
       const items = visibleCitations.map((c, i) => {
         const absoluteIndex = this._expandedCitations ? i : i;
         const label = c.label || c.filename || c.citation || c.title || c.name || 'Unknown';
-        const fn = ChatFormat.escapeHtml(label);
+        const fn = ChatFormat.escapeHtml(documentCitationDisplayName(c) || label);
+        const routingFilename = ChatFormat.escapeHtml(label);
         const pg = c.page_number || c.page || (c.locator && c.locator.page) || '?';
         const docId = ChatFormat.escapeHtml(c.document_id || c.documentId || c.doc_id || c.sourceRef || '');
         const excerpt = c.chunk_text || c.excerpt || c.snippet || c.content || c.text || '';
@@ -948,7 +960,7 @@
           <div class="lex-chat-citation-item">
             <span>${absoluteIndex + 1}.</span>
             <div>
-              <button class="lex-chat-citation-link" data-citation-index="${absoluteIndex}" data-document-id="${docId}" data-filename="${fn}" data-page="${ChatFormat.escapeHtml(String(pg))}" data-source-type="${sourceType}" data-source="${source}">${fn}</button>
+              <button class="lex-chat-citation-link" data-citation-index="${absoluteIndex}" data-document-id="${docId}" data-filename="${routingFilename}" data-page="${ChatFormat.escapeHtml(String(pg))}" data-source-type="${sourceType}" data-source="${source}">${fn}</button>
               <div>${sourceKind}</div>
               ${relation ? `<div style="opacity:0.8">${ChatFormat.escapeHtml(String(relation))}</div>` : ''}
               ${pg !== '?' ? `<div>page ${pg}</div>` : ''}
@@ -1280,5 +1292,6 @@
   global.Lex.Chat = global.Lex.Chat || {};
   global.Lex.Chat.LexChatMessage = LexChatMessage;
   global.Lex.Chat.formatTimestamp = formatTimestamp;
+  global.Lex.Chat.documentCitationDisplayName = documentCitationDisplayName;
 
 })(typeof window !== 'undefined' ? window : globalThis);

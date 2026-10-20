@@ -73,6 +73,18 @@
     );
   }
 
+  // The server records this on a document created with no text. There is
+  // nothing to process until the document is written and released, so it is a
+  // draft, not a file waiting in a queue. Any processing that does start
+  // (status leaves pending) takes over the label.
+  function isEmptyDraft(doc, metadata) {
+    var status = toLower(doc && doc.status);
+    var processingStatus = toLower(doc && doc.processing_status);
+    return metadata.processing_skipped_reason === 'empty_document' &&
+      (status === '' || status === 'pending') &&
+      (processingStatus === '' || processingStatus === 'pending');
+  }
+
   function hasSummary(doc) {
     return Boolean(trimText(doc && doc.summary) || (doc && doc.summary_generated_at));
   }
@@ -94,6 +106,7 @@
     if (ingestionStage === 'ready' || status === 'completed' || processingStatus === 'completed') return 'ready';
     if (hasIndexedSignals(doc, metadata)) return 'indexed';
     if (hasParsedSignals(doc, metadata)) return 'parsed';
+    if (isEmptyDraft(doc, metadata)) return 'draft';
     if (status === 'queued' || status === 'pending' || status === 'uploaded' || processingStatus === 'queued' || processingStatus === 'processing' || status === 'processing') {
       return 'uploaded';
     }
@@ -154,6 +167,16 @@
       display.isTerminal = false;
       display.isInProgress = true;
       display.isActionableInChat = false;
+      return display;
+    }
+
+    if (lifecycle === 'draft') {
+      display.label = 'Draft';
+      display.badgeClass = 'bg-gray-100 text-gray-700';
+      display.progressLabel = 'Draft, no text yet';
+      display.secondaryLabel = 'Release it to make it searchable';
+      display.isTerminal = true;
+      display.isInProgress = false;
       return display;
     }
 

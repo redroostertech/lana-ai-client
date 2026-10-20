@@ -428,6 +428,9 @@
       title: 'Analytics',
       activeNav: 'reports',
       scripts: [
+        'js/shared/current-pipeline-presentation.js',
+        'js/shared/acquisition-source-presentation.js',
+        'js/shared/opportunity-intake-presentation.js',
         'js/vendor/chart.js',
         'js/vendor/jspdf.umd.min.js',
         'js/vendor/jspdf.plugin.autotable.min.js',
@@ -469,6 +472,9 @@
       title: 'Dashboard',
       activeNav: 'insights-dashboard',
       scripts: [
+        'js/shared/current-pipeline-presentation.js',
+        'js/shared/acquisition-source-presentation.js',
+        'js/shared/opportunity-intake-presentation.js',
         'js/dashboard/metric-goal-comparison.js',
         'js/admin/dashboard-detail.js'
       ],
@@ -546,6 +552,9 @@
       title: 'Analytics',
       activeNav: 'reports',
       scripts: [
+        'js/shared/current-pipeline-presentation.js',
+        'js/shared/acquisition-source-presentation.js',
+        'js/shared/opportunity-intake-presentation.js',
         'js/vendor/chart.js',
         'js/vendor/jspdf.umd.min.js',
         'js/vendor/jspdf.plugin.autotable.min.js',
