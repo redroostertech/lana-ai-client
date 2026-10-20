@@ -325,6 +325,11 @@
   color: var(--lex-text-secondary);
 }
 
+.mdv-badge--draft {
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-secondary);
+}
+
 .mdv-file-meta {
   align-items: center;
   color: var(--lex-text-secondary);

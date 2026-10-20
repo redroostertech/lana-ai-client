@@ -154,6 +154,11 @@
     if (status === 'cancelled' || status === 'deleted') {
       return 'inactive';
     }
+    // Created with no text: nothing to process until it is written and released.
+    if (parseDocumentMetadata(doc).processing_skipped_reason === 'empty_document' &&
+        (status === '' || status === 'pending') && (processingStatus === '' || processingStatus === 'pending')) {
+      return 'draft';
+    }
     if (status === 'queued' || status === 'pending' || status === 'ready') {
       return 'uploaded';
     }
@@ -181,6 +186,11 @@
         label: 'Uploaded',
         badgeClass: 'mdv-badge--uploaded',
         progressLabel: 'Uploaded, awaiting processing'
+      },
+      'draft': {
+        label: 'Draft',
+        badgeClass: 'mdv-badge--draft',
+        progressLabel: 'Draft, no text yet'
       },
       'needs_attention': {
         label: 'Needs Attention',
