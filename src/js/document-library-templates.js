@@ -190,9 +190,15 @@
   // ===========================================================================
 
   var TABLE_ID = 'dstTable';
+  // Template column filter values (the server's template kinds).
+  var KIND_OPTIONS = [
+    { value: 'fill', label: 'Documents' },
+    { value: 'compose', label: 'Document Sets' },
+    { value: 'render', label: 'Layouts' }
+  ];
+  var ORGANIZATION_OPTION = { value: 'organization', label: 'Organization' };
 
   var _state = {
-    kindFilter: '',
     includeOrgWide: true,
     matterId: '',
     searchTerm: '',
@@ -209,10 +215,23 @@
   // Data access (thin — delegates query building + mapping)
   // ===========================================================================
 
+  // Values a column filter selected: lex-table sends { operator: 'in', value: [...] }.
+  function _filterValues(filter) {
+    if (!filter) return [];
+    var value = filter.value !== undefined ? filter.value : filter;
+    return (Array.isArray(value) ? value : [value]).map(String).filter(Boolean);
+  }
+
   function _currentFilters(query) {
     var limit = query.limit || 20;
+    var filters = query.filters || {};
+    var shared = window.LanaLibraryColumnFilters;
+    var range = shared ? shared.editedRangeBounds(_filterValues(filters.updated_at)[0]) : { after: '', before: '' };
     return {
-      kind: _state.kindFilter,
+      kind: _filterValues(filters.name),
+      workspaces: _filterValues(filters.workspace),
+      updatedAfter: range.after,
+      updatedBefore: range.before,
       matterId: _state.matterId,
       q: _state.searchTerm,
       includeOrgWide: _state.includeOrgWide,
@@ -259,8 +278,8 @@
 
   // Empty copy depends on the filters outside the table: a filtered-empty
   // state offers no create button.
-  function _syncEmptyState(table) {
-    var filtered = Boolean(_state.searchTerm || _state.kindFilter);
+  function _syncEmptyState(table, filters) {
+    var filtered = Boolean(_state.searchTerm || Object.keys(filters || {}).length);
     table.emptyText = filtered
       ? 'No matching templates. Try a different search or template type.'
       : 'No templates yet. Create an organization template to reuse it from every workspace.';
@@ -286,7 +305,7 @@
         return { key: key, name: row.name, workspace: row.matterName || '', updated_at: row.updatedAt || row.createdAt || '', _row: row };
       });
 
-      _syncEmptyState(table);
+      _syncEmptyState(table, query.filters);
       _setCount(view.total + (view.total === 1 ? ' template' : ' templates'));
       table.setServerData(tableRows, {
         page: query.page || 1,
@@ -527,9 +546,12 @@
     var kindFilter = el('dstKindFilter');
     if (kindFilter) {
       kindFilter.addEventListener('lex-change', function (e) {
+        // Same state as the Template column filter, as My Tasks' Status select does.
         var kind = (e.detail && e.detail.value) || '';
-        _state.kindFilter = kind === 'all' ? '' : kind;
-        _reloadFromFirstPage();
+        var table = _table();
+        if (!table) return;
+        if (kind && kind !== 'all') table.addFilter('name', 'in', [kind]);
+        else table.removeFilter('name');
       });
     }
 
@@ -589,8 +611,25 @@
       if (!table) return;
       // Renderers must be registered before the first page lands.
       table.setCellRenderers(cellRenderers());
+      _applyColumnFilterOptions(table, []);
       _reloadFromFirstPage();
+      if (window.LanaLibraryColumnFilters) {
+        window.LanaLibraryColumnFilters.loadWorkspaceOptions(window.api).then(function (options) {
+          if (_table() === table) _applyColumnFilterOptions(table, options);
+        });
+      }
     });
+  }
+
+  function _applyColumnFilterOptions(table, workspaceOptions) {
+    var shared = window.LanaLibraryColumnFilters;
+    var map = {
+      name: { options: KIND_OPTIONS },
+      // Org-wide templates have no workspace; "Organization" selects them.
+      workspace: { options: [ORGANIZATION_OPTION].concat(workspaceOptions || []) }
+    };
+    if (shared) map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    table.setColumnFilterOptions(map);
   }
 
   if (window.LexRouter && typeof LexRouter.registerPageInit === 'function') {

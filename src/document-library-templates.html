@@ -99,6 +99,7 @@
 
         <lex-table
           id="dstTable"
+          column-filters
           class="document-library-table lex-table--card"
           server-paging
           columns="name,workspace,updated_at"
@@ -185,6 +186,7 @@
   <script src="js/services/document-create-modal.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/shared/library-column-filters.js"></script>
   <script src="js/document-library-templates.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

@@ -180,3 +180,88 @@ describe('lex-table sortable-columns', () => {
     expect(table.events.some((e) => e.name === 'lex-query-change')).toBe(false);
   });
 });
+
+describe('lex-table page-supplied column filters', () => {
+  const OPTIONS = {
+    name: { options: [{ value: 'pdf', label: 'PDFs' }, { value: 'spreadsheet', label: 'Spreadsheets' }] },
+    updated_at: { single: true, options: [{ value: '7d', label: 'Last 7 days' }, { value: '30d', label: 'Last 30 days' }] }
+  };
+
+  function filteredServerTable(window) {
+    const table = serverTable(window, { columnFilters: true });
+    table.setColumnFilterOptions(OPTIONS);
+    table.setServerData([{ id: 'a', name: 'A.pdf', workspace: 'W', updated_at: '' }], { page: 1, limit: 20, total: 1 });
+    return table;
+  }
+
+  test('server mode shows a filter only on columns the page supplied values for', () => {
+    const window = loadLex();
+    const html = filteredServerTable(window).render();
+    expect(html).toContain('data-col-filter="name"');
+    expect(html).toContain('data-col-filter="updated_at"');
+    expect(html).not.toContain('data-col-filter="workspace"');
+  });
+
+  test('the dropdown lists the supplied labels, with radios for single-choice columns', () => {
+    const window = loadLex();
+    const table = filteredServerTable(window);
+    expect(table._renderColFilterDropdown('name')).toContain('type="checkbox" name="lex-col-filter-name" data-col-check="pdf"');
+    expect(table._renderColFilterDropdown('name')).toContain('PDFs');
+    expect(table._renderColFilterDropdown('updated_at')).toContain('type="radio"');
+    expect(table._renderColFilterDropdown('updated_at', true)).toContain('lex-th-filter-dropdown--end');
+  });
+
+  test('a long list gets a search box', () => {
+    const window = loadLex();
+    const table = filteredServerTable(window);
+    const many = Array.from({ length: 13 }, (_, i) => ({ value: 'w' + i, label: 'Workspace ' + i }));
+    table.setColumnFilterOptions({ workspace: { options: many } });
+    expect(table._renderColFilterDropdown('workspace')).toContain('data-col-filter-search');
+    expect(table._renderColFilterDropdown('name')).not.toContain('data-col-filter-search');
+  });
+
+  test('applying a filter asks the page for page 1 with the selection', () => {
+    const window = loadLex();
+    const table = filteredServerTable(window);
+    table.dataSource.setFilter('name', 'in', ['pdf', 'spreadsheet']);
+    const query = lastEvent(table, 'lex-query-change').detail;
+    expect(query.page).toBe(1);
+    expect(query.filters.name).toEqual({ operator: 'in', value: ['pdf', 'spreadsheet'] });
+    expect(table._renderColFilterDropdown('name')).toContain('data-col-check="pdf" checked');
+  });
+
+  test('a filtered empty table offers Clear filters instead of the create button', () => {
+    const window = loadLex();
+    const table = filteredServerTable(window);
+    table.emptyActionLabel = 'New Document';
+    table.dataSource.setFilter('name', 'in', ['pdf']);
+    table.setServerData([], { page: 1, limit: 20, total: 0 });
+    const html = table.render();
+    expect(html).toContain('action-label="Clear filters"');
+    expect(html).toContain('data-empty-mode="clear-filters"');
+    expect(html).not.toContain('New Document');
+  });
+
+  test('a server error while filtered offers Clear filters; unfiltered errors do not', () => {
+    const window = loadLex();
+    const table = filteredServerTable(window);
+    table.setServerError('Validation failed');
+    expect(table.render()).not.toContain('clear-col-filters');
+    table.dataSource.setFilter('name', 'in', ['pdf', 'spreadsheet']);
+    table.setServerError('Validation failed');
+    expect(table.render()).toContain('data-action="clear-col-filters"');
+    table.dataSource.clearFilters();
+    expect(lastEvent(table, 'lex-query-change').detail.filters).toEqual({});
+  });
+
+    test('client tables keep deriving filter values from their rows', () => {
+    const window = loadLex();
+    const table = new window['lex-table']();
+    Object.assign(table, { limit: 20, columns: 'status', columnFilters: true });
+    table.setData([{ id: 1, status: 'Open' }, { id: 2, status: 'Closed' }]);
+    expect(table.render()).toContain('data-col-filter="status"');
+    const dropdown = table._renderColFilterDropdown('status');
+    expect(dropdown).toContain('data-col-check="Closed"');
+    expect(dropdown).toContain('data-col-check="Open"');
+  });
+});

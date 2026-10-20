@@ -9,9 +9,15 @@
   // File families the library lists. Images are out of scope, so "All" asks
   // for these four instead of sending no filter.
   var LIBRARY_FAMILIES = ['document', 'spreadsheet', 'presentation', 'pdf'];
+  // File column filter values (the server's file_family names).
+  var FAMILY_OPTIONS = [
+    { value: 'document', label: 'Documents' },
+    { value: 'spreadsheet', label: 'Spreadsheets' },
+    { value: 'presentation', label: 'Presentations' },
+    { value: 'pdf', label: 'PDFs' }
+  ];
   var loadSequence = 0;
   var searchTerm = '';
-  var documentType = '';
   var searchDebounce = null;
   var openingFileIds = {};
 
@@ -59,8 +65,17 @@
     };
   }
 
-  function fileFamilyParam(type) {
-    return type && LIBRARY_FAMILIES.indexOf(type) !== -1 ? type : LIBRARY_FAMILIES.join(',');
+  // Values a column filter selected: lex-table sends { operator: 'in', value: [...] }.
+  function filterValues(filter) {
+    if (!filter) return [];
+    var value = filter.value !== undefined ? filter.value : filter;
+    return (Array.isArray(value) ? value : [value]).map(String).filter(Boolean);
+  }
+
+  // The File filter's families, or every library family (never images).
+  function fileFamilyParam(families) {
+    var picked = (families || []).filter(function (family) { return LIBRARY_FAMILIES.indexOf(family) !== -1; });
+    return (picked.length ? picked : LIBRARY_FAMILIES).join(',');
   }
 
   function fileName(file) {
@@ -235,8 +250,8 @@
 
   // Empty copy depends on the filters outside the table: a filtered-empty
   // state offers no create button.
-  function syncEmptyState(target) {
-    var filtered = Boolean(searchTerm || documentType);
+  function syncEmptyState(target, filters) {
+    var filtered = Boolean(searchTerm || Object.keys(filters || {}).length);
     target.emptyText = filtered ? 'No matching documents. Try a different search or document type.' : 'No edited files yet';
     target.emptyActionLabel = filtered ? '' : 'New Document';
   }
@@ -260,13 +275,21 @@
       params.set('page_size', String(query.limit || 20));
       params.set('sort_by', query.sortBy || 'updated_at');
       params.set('sort_order', query.sortDir || 'desc');
-      params.set('file_family', fileFamilyParam(documentType));
+      var filters = query.filters || {};
+      params.set('file_family', fileFamilyParam(filterValues(filters.name)));
+      var workspaces = filterValues(filters.workspace);
+      if (workspaces.length) params.set('workspaces', workspaces.join(','));
+      var range = global.LanaLibraryColumnFilters
+        ? global.LanaLibraryColumnFilters.editedRangeBounds(filterValues(filters.updated_at)[0])
+        : { after: '', before: '' };
+      if (range.after) params.set('updated_after', range.after);
+      if (range.before) params.set('updated_before', range.before);
       if (searchTerm) params.set('search', searchTerm);
       var response = await client.get('/api/v1/storage/library/files?' + params.toString());
       if (sequence !== loadSequence || !el('documentLibrary')) return;
       var files = filesFromResponse(response);
       var pagination = paginationFromResponse(response, files.length);
-      syncEmptyState(target);
+      syncEmptyState(target, filters);
       setCount(pagination.total + (pagination.total === 1 ? ' file' : ' files'));
       target.setServerData(files.map(mapFileForTable), pagination);
     } catch (error) {
@@ -400,8 +423,11 @@
       var id = event.target && event.target.id;
       var value = String((event.detail && event.detail.value) || '');
       if (id === 'documentLibraryTypeFilter') {
-        documentType = value === 'all' ? '' : value;
-        reloadFromFirstPage();
+        // Same state as the File column filter, as My Tasks' Status select does.
+        var target = table();
+        if (!target) return;
+        if (value && value !== 'all') target.addFilter('name', 'in', [value]);
+        else target.removeFilter('name');
       } else if (id === 'documentLibrarySort') {
         applySort(value || 'updated_at', sortOrder());
       }
@@ -425,9 +451,7 @@
     var root = el('documentLibrary');
     if (!root) return;
     var search = el('documentLibrarySearch');
-    var typeFilter = el('documentLibraryTypeFilter');
     searchTerm = search && search.value ? String(search.value).trim() : '';
-    documentType = typeFilter && typeFilter.value && typeFilter.value !== 'all' ? String(typeFilter.value) : '';
     bindEvents(root);
     var ready = global.customElements && typeof global.customElements.whenDefined === 'function'
       ? global.customElements.whenDefined('lex-table')
@@ -437,8 +461,22 @@
       if (!target) return;
       // Renderers must be registered before the first page lands.
       target.setCellRenderers(cellRenderers());
+      applyColumnFilterOptions(target, []);
       reloadFromFirstPage();
+      if (global.LanaLibraryColumnFilters) {
+        global.LanaLibraryColumnFilters.loadWorkspaceOptions(global.api).then(function (options) {
+          if (table() === target) applyColumnFilterOptions(target, options);
+        });
+      }
     });
+  }
+
+  function applyColumnFilterOptions(target, workspaceOptions) {
+    var shared = global.LanaLibraryColumnFilters;
+    var map = { name: { options: FAMILY_OPTIONS } };
+    if (workspaceOptions && workspaceOptions.length) map.workspace = { options: workspaceOptions };
+    if (shared) map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    target.setColumnFilterOptions(map);
   }
 
   global.LanaDocumentLibrary = {
@@ -449,7 +487,7 @@
     currentFilters: function () {
       var target = table();
       var query = target && target.dataSource ? target.dataSource.query : {};
-      return { search: searchTerm, documentType: documentType, page: query.page || 1, pageSize: query.limit || 20 };
+      return { search: searchTerm, filters: query.filters || {}, page: query.page || 1, pageSize: query.limit || 20 };
     }
   };
 
