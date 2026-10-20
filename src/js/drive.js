@@ -79,6 +79,7 @@
       sortBy: 'name',
       sortOrder: 'asc',
       sourceFilter: 'all',
+      columnFilters: {},
       totalResults: 0,
       currentPage: 1,
       totalPages: 0
@@ -243,6 +244,8 @@
       sourceFilter.addEventListener('lex-change', function (e) {
         storageState.sourceFilter = e.detail.value || 'all';
         storageState.currentPage = 1;
+        // Each scope has its own filterable columns.
+        resetListColumnFilters();
         if (isBrainchildScope()) {
           // Clear any matters query and load the personal notes vault.
           storageState.searchQuery = '';
@@ -331,8 +334,9 @@
     if (field) {
       storageState.sortBy = field;
       storageState.sortOrder = query.sortDir === 'desc' ? 'desc' : 'asc';
-      storageState.currentPage = 1;
     }
+    storageState.columnFilters = query.filters || {};
+    storageState.currentPage = 1;
 
     syncSortControls();
     if (isBrainchildScope()) { renderBrainchildScope(); return; }
@@ -511,6 +515,8 @@
         params.append('source', storageState.sourceFilter);
       }
 
+      appendMatterColumnFilters(params);
+
       var response = await api.get('/api/v1/storage/matters?' + params.toString());
 
       if (response.success && response.matters) {
@@ -623,6 +629,18 @@
 
     var matters = storageState.folders.filter(function (f) { return f.isMatter; });
 
+    // Filtered to nothing in list view: keep the table (and its header filters)
+    // up so its empty state can offer Clear filters.
+    if (matters.length === 0 && storageState.viewMode !== 'grid' &&
+        Object.keys(storageState.columnFilters || {}).length) {
+      emptyEl && emptyEl.classList.add('hidden');
+      gridViewEl && gridViewEl.classList.add('hidden');
+      renderListView([]);
+      listViewEl && listViewEl.classList.remove('hidden');
+      updatePaginationUI();
+      return;
+    }
+
     if (matters.length === 0) {
       applyRootEmptyState();
       emptyEl && emptyEl.classList.remove('hidden');
@@ -710,6 +728,100 @@
   // Knowledgebase notes in the list, by row index, for promote / unpromote.
   var listBrainchildNotes = [];
 
+  // ── List column filters ──────────────────────────────────────────────
+  //
+  // Workspaces filter on the server (matter_ids, created_after/before,
+  // min/max_documents); the notes scopes hold their whole list and filter it
+  // here. Created By has no workspace data, so only Shared Knowledge offers it.
+
+  var SIZE_BUCKETS = [
+    { value: 'empty', label: 'Empty', min: 0, max: 0 },
+    { value: '1-10', label: '1\u201310 files', min: 1, max: 10 },
+    { value: '11+', label: 'More than 10 files', min: 11, max: null }
+  ];
+  var workspaceFilterOptions = [];
+
+  function filterValues(filter) {
+    if (!filter) return [];
+    var value = filter.value !== undefined ? filter.value : filter;
+    return (Array.isArray(value) ? value : [value]).map(String).filter(Boolean);
+  }
+
+  function createdRange() {
+    var shared = window.LanaLibraryColumnFilters;
+    var value = filterValues(storageState.columnFilters.created_at)[0];
+    return shared && value ? shared.editedRangeBounds(value) : { after: '', before: '' };
+  }
+
+  function appendMatterColumnFilters(params) {
+    var filters = storageState.columnFilters || {};
+    var ids = filterValues(filters.name);
+    if (ids.length) params.append('matter_ids', ids.join(','));
+    var range = createdRange();
+    if (range.after) params.append('created_after', range.after);
+    if (range.before) params.append('created_before', range.before);
+    // Size is single-choice: the server takes one min/max range.
+    var bucket = SIZE_BUCKETS.filter(function (b) { return b.value === filterValues(filters.size)[0]; })[0];
+    if (bucket) {
+      params.append('min_documents', String(bucket.min));
+      if (bucket.max !== null) params.append('max_documents', String(bucket.max));
+    }
+  }
+
+  // Notes scopes: keep rows matching Created On / Created By. Folders always
+  // stay so the vault can still be browsed.
+  function filterNoteRows(rows) {
+    var filters = storageState.columnFilters || {};
+    var range = createdRange();
+    var creators = filterValues(filters.created_by);
+    if (!range.after && !range.before && !creators.length) return rows;
+    return rows.filter(function (row) {
+      if (row.kind === 'bc-folder') return true;
+      if (creators.length && creators.indexOf(row.created_by) === -1) return false;
+      if (range.after || range.before) {
+        var time = row.created_at ? new Date(row.created_at).getTime() : NaN;
+        if (!Number.isFinite(time)) return false;
+        if (range.after && time < new Date(range.after).getTime()) return false;
+        if (range.before && time >= new Date(range.before).getTime()) return false;
+      }
+      return true;
+    });
+  }
+
+  function listFilterOptions(rows) {
+    var shared = window.LanaLibraryColumnFilters;
+    var map = {};
+    if (shared) map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    if (isBrainchildScope()) return map;
+    if (isOrgKnowledgeScope()) {
+      var names = [];
+      rows.forEach(function (row) { if (row.created_by && names.indexOf(row.created_by) === -1) names.push(row.created_by); });
+      if (names.length) map.created_by = { options: names.sort().map(function (n) { return { value: n, label: n }; }) };
+      return map;
+    }
+    if (workspaceFilterOptions.length) map.name = { options: workspaceFilterOptions };
+    map.size = { single: true, options: SIZE_BUCKETS.map(function (b) { return { value: b.value, label: b.label }; }) };
+    return map;
+  }
+
+  // Drop every column filter without a reload; callers reload the scope.
+  function resetListColumnFilters() {
+    storageState.columnFilters = {};
+    var table = document.getElementById('listView');
+    if (table && table.dataSource && table.dataSource._filters) table.dataSource._filters.clear();
+  }
+
+  function loadWorkspaceFilterOptions() {
+    if (!window.LanaLibraryColumnFilters) return;
+    window.LanaLibraryColumnFilters.loadWorkspaceOptions(window.api).then(function (options) {
+      workspaceFilterOptions = options;
+      var table = document.getElementById('listView');
+      if (table && typeof table.setColumnFilterOptions === 'function' && !isBrainchildScope() && !isOrgKnowledgeScope()) {
+        table.setColumnFilterOptions(listFilterOptions([]));
+      }
+    });
+  }
+
   function listNameCell(icon, name, sub) {
     return '<div class="drive-list-name-cell">' + icon +
         '<div class="drive-list-name-text">' +
@@ -765,7 +877,9 @@
       return;
     }
     table.setCellRenderers(listCellRenderers());
+    table.setColumnFilterOptions(listFilterOptions(rows));
     updateSortHeaderIndicators();
+    if (isBrainchildScope() || isOrgKnowledgeScope()) rows = filterNoteRows(rows);
     table.setServerData(rows, { page: 1, limit: Math.max(rows.length, 1), total: rows.length, totalPages: 1 });
   }
 
@@ -1861,19 +1975,19 @@
    * @param {string} mode - 'grid' or 'list'
    */
   function switchView(mode) {
+    // Column filters live in the list header; grid view would hide them.
+    if (mode === 'grid' && Object.keys(storageState.columnFilters || {}).length) {
+      resetListColumnFilters();
+      storageState.viewMode = mode;
+      if (isBrainchildScope()) renderBrainchildScope();
+      else if (isOrgKnowledgeScope()) renderOrgKnowledgeScope();
+      else loadMatters({ silent: true });
+      syncViewButtons(mode);
+      return;
+    }
     storageState.viewMode = mode;
 
-    var gridBtn = document.getElementById('gridViewBtn');
-    var listBtn = document.getElementById('listViewBtn');
-
-    // lex-btn: switch variant to indicate active view (primary = active, ghost = inactive)
-    if (mode === 'grid') {
-      gridBtn && (gridBtn.variant = 'primary');
-      listBtn && (listBtn.variant = 'ghost');
-    } else {
-      listBtn && (listBtn.variant = 'primary');
-      gridBtn && (gridBtn.variant = 'ghost');
-    }
+    syncViewButtons(mode);
 
     if (isBrainchildScope()) {
       renderBrainchildScope();
@@ -1882,6 +1996,19 @@
     } else {
       renderMatters();
       renderFilesSection();
+    }
+  }
+
+  // lex-btn: switch variant to indicate active view (primary = active, ghost = inactive)
+  function syncViewButtons(mode) {
+    var gridBtn = document.getElementById('gridViewBtn');
+    var listBtn = document.getElementById('listViewBtn');
+    if (mode === 'grid') {
+      gridBtn && (gridBtn.variant = 'primary');
+      listBtn && (listBtn.variant = 'ghost');
+    } else {
+      listBtn && (listBtn.variant = 'primary');
+      gridBtn && (gridBtn.variant = 'ghost');
     }
   }
 
@@ -2456,6 +2583,7 @@
     exposeGlobal('refreshPage', refreshPage);
 
     setupEventListeners();
+    loadWorkspaceFilterOptions();
     updateViewButtons();
     updateSortHeaderIndicators();
     loadMatters();
