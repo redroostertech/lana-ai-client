@@ -260,6 +260,7 @@
       this._sortBy = '';
       this._sortDir = 'asc';
       this._clientSideMode = false;   // True when data injected via setData()
+      this._serverMode = false;       // True when the page fetches each page (setServerData())
     }
 
     // -----------------------------------------------------------------------
@@ -353,6 +354,16 @@
           sortBy: this._sortBy,
           sortDir: this._sortDir
         });
+      } else if (this._serverMode) {
+        // Server mode: the page re-fetches page 1 with the new query
+        this._pagination.page = 1;
+        this.requestServerQuery();
+        this.element.emit('lex-filter-change', {
+          filters: Object.fromEntries(this._filters),
+          searchQuery: this._searchQuery,
+          sortBy: this._sortBy,
+          sortDir: this._sortDir
+        });
       } else if (this.endpoint) {
         // Endpoint mode: re-fetch with updated params
         this._pagination.page = 1;
@@ -364,6 +375,59 @@
           sortDir: this._sortDir
         });
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // Server mode — the page owns the request. The source keeps the paging,
+    // sort, search and filter state, emits 'lex-query-change' with it, and
+    // the page answers with setServerData(rows, pagination). Use it when the
+    // API pages, sorts or filters itself and its parameter names differ from
+    // the endpoint mode's (page/limit/sortBy/sortOrder/q).
+    // -----------------------------------------------------------------------
+
+    get query() {
+      return {
+        page: this._pagination.page,
+        limit: this._pagination.limit,
+        sortBy: this._sortBy,
+        sortDir: this._sortDir,
+        search: this._searchQuery,
+        filters: Object.fromEntries(this._filters)
+      };
+    }
+
+    requestServerQuery() {
+      this._loading = true;
+      this._error = null;
+      this.element._scheduleUpdate();
+      this.element.emit('lex-query-change', this.query);
+    }
+
+    setServerData(rows, pagination = {}) {
+      const list = Array.isArray(rows) ? rows : [];
+      const limit = Number(pagination.limit || pagination.page_size || pagination.pageSize) || this._pagination.limit;
+      const total = Number(pagination.total);
+      const totalPages = Number(pagination.totalPages || pagination.total_pages);
+      this._serverMode = true;
+      this._clientSideMode = false;
+      this._data = list;
+      this._pagination.page = Number(pagination.page) || this._pagination.page || 1;
+      this._pagination.limit = limit;
+      this._pagination.total = Number.isFinite(total) ? total : list.length;
+      this._pagination.totalPages = Number.isFinite(totalPages) && totalPages > 0
+        ? totalPages
+        : Math.max(1, Math.ceil(this._pagination.total / limit));
+      this._loading = false;
+      this._error = null;
+      this.element._scheduleUpdate();
+      this.element.emit('lex-data-loaded', { data: this._data, pagination: { ...this._pagination } });
+    }
+
+    setServerError(message) {
+      this._loading = false;
+      this._error = message || 'Failed to load data';
+      this.element._scheduleUpdate();
+      this.element.emit('lex-data-error', { error: this._error });
     }
 
     // -----------------------------------------------------------------------
@@ -487,6 +551,7 @@
         this.element._scheduleUpdate();
         return;
       }
+      if (this._serverMode) return this.requestServerQuery();
       return this.fetch();
     }
 
@@ -512,6 +577,7 @@
         this.element._scheduleUpdate();
         return;
       }
+      if (this._serverMode) return this.requestServerQuery();
       return this.fetch();
     }
 
@@ -522,6 +588,7 @@
         this.element._scheduleUpdate();
         return;
       }
+      if (this._serverMode) return this.requestServerQuery();
       return this.fetch();
     }
 
@@ -561,13 +628,16 @@
           filterable:   { type: Boolean, default: false },
           selectable:   { type: Boolean, default: false },
           linkedTo:     { type: String },
-          idKey:        { type: String, default: 'id' }
+          idKey:        { type: String, default: 'id' },
+          serverPaging: { type: Boolean, default: false }  // Page fetches each page; see LexDataSource server mode
         };
       }
 
       connected() {
         super.connected();
-        if (this.endpoint) {
+        if (this.serverPaging && !this.endpoint) {
+          this._ensureServerSource();
+        } else if (this.endpoint) {
           this.dataSource = new LexDataSource(this, {
             endpoint: this.endpoint,
             params: this._buildParams(),
@@ -620,6 +690,47 @@
         this.dataSource._error = null;
         this.dataSource._reprocess();
         this._scheduleUpdate();
+      }
+
+      // -----------------------------------------------------------------------
+      // Server mode convenience methods (server-paging attribute)
+      // -----------------------------------------------------------------------
+
+      _ensureServerSource() {
+        if (!this.dataSource) {
+          this.dataSource = new LexDataSource(this, { autoFetch: false });
+          this.dataSource._pagination.limit = this.limit || 20;
+          if (this.sortBy) {
+            this.dataSource._sortBy = this.sortBy;
+            this.dataSource._sortDir = this.sortDir || 'asc';
+          }
+        }
+        this.dataSource._serverMode = true;
+        this.dataSource._clientSideMode = false;
+        return this.dataSource;
+      }
+
+      // Current { page, limit, sortBy, sortDir, search, filters }.
+      get serverQuery() {
+        return this._ensureServerSource().query;
+      }
+
+      // Ask the page for data: shows the loading state and emits
+      // 'lex-query-change'. Pass { resetPage: true } after an outside filter changes.
+      requestServerQuery(options = {}) {
+        const source = this._ensureServerSource();
+        if (options.resetPage) source._pagination.page = 1;
+        source.requestServerQuery();
+      }
+
+      // Hand one page of rows back: pagination accepts { page, limit|page_size,
+      // total, totalPages|total_pages }.
+      setServerData(rows, pagination) {
+        this._ensureServerSource().setServerData(rows, pagination);
+      }
+
+      setServerError(message) {
+        this._ensureServerSource().setServerError(message);
       }
 
       // -----------------------------------------------------------------------

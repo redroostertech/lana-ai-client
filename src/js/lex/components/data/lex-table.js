@@ -18,7 +18,18 @@
    Column filters (per-column dropdown filters in header):
      <lex-table column-filters columns="status,type" ...></lex-table>
 
-   Events: row-click, sort-change, selection-change, bulk-action, lex-filter-change
+   Server paging (the API pages and sorts; the page owns the request):
+     <lex-table server-paging sortable-columns="name,updated_at" sort-by="updated_at" sort-dir="desc" limit="20"></lex-table>
+     table.addEventListener('lex-query-change', async (e) => {
+       const { page, limit, sortBy, sortDir } = e.detail;
+       const res = await api.get(...);              // map the query to the API's own params
+       table.setServerData(res.rows, res.pagination); // { page, limit|page_size, total, totalPages|total_pages }
+     });
+     table.requestServerQuery();                     // first load; { resetPage: true } after an outside filter changes
+     Column filters are off in this mode (one page cannot list a column's values).
+
+   Events: row-click, sort-change, selection-change, bulk-action, lex-filter-change,
+           lex-query-change (server paging)
 */
 
 (function () {
@@ -418,8 +429,16 @@
         // page wires to its create flow. emptyActionIcon defaults to a plus glyph.
         emptyActionLabel: { type: String },
         emptyActionIcon:  { type: String, default: 'plus' },
+        // Comma-separated column keys whose headers sort. Absent = every column;
+        // empty = none. Server-paged tables list only what the API can sort.
+        sortableColumns: { type: String },
         bulkActions:   { type: Array, default: [] }   // [{label, action, variant, icon}]
       };
+    }
+
+    _isSortable(col) {
+      if (this.sortableColumns === undefined || this.sortableColumns === null) return true;
+      return String(this.sortableColumns).split(',').map(c => c.trim()).filter(Boolean).includes(col);
     }
 
     constructor() {
@@ -740,8 +759,8 @@
         this._searchHadFocus = true;
       }
 
-      // Loading state
-      if (this.dataSource?.loading) {
+      // Loading state (a server-paged table is loading until the page answers)
+      if (this.dataSource?.loading || (this.serverPaging && !this.dataSource)) {
         return `
           <div class="animate-pulse space-y-3 p-4">
             <div class="h-8 lex-bg-tertiary rounded w-full"></div>
@@ -815,13 +834,15 @@
       }
 
       columns.forEach((col, i) => {
-        const sortIcon = this.sortBy === col
+        const sortable = this._isSortable(col);
+        const sortIcon = sortable && this.sortBy === col
           ? (this.sortDir === 'asc' ? ' &#9650;' : ' &#9660;')
           : '';
 
-        // Column header filter icon
+        // Column header filter icon. Server-paged tables hold one page, so
+        // value lists built from it would be wrong; filter outside the table.
         let filterIcon = '';
-        if (this.columnFilters) {
+        if (this.columnFilters && !this.serverPaging) {
           const hasFilter = this.dataSource?._filters?.has(col);
           filterIcon = `<span class="lex-th-filter ${hasFilter ? 'lex-th-filter--active' : ''}" data-col-filter="${col}" style="position:relative">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
@@ -829,7 +850,10 @@
           </span>`;
         }
 
-        html += `<th scope="col" class="text-left ${cellPad} text-xs font-medium lex-text-secondary uppercase tracking-wider cursor-pointer select-none" data-sort-col="${col}">
+        const sortAttrs = sortable
+          ? ` cursor-pointer select-none" data-sort-col="${col}"`
+          : '"';
+        html += `<th scope="col" class="text-left ${cellPad} text-xs font-medium lex-text-secondary uppercase tracking-wider${sortAttrs}>
           ${this.escapeHtml(labels[i] || col)}${sortIcon}${filterIcon}
         </th>`;
       });
