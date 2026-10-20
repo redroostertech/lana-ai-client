@@ -293,7 +293,7 @@
 .my-task-table__title {
   color: var(--lex-text-primary);
   font-weight: var(--lex-weight-semibold, 600);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .my-task-workspace-link,
@@ -1607,4 +1607,16 @@
 
 .my-task-table__created {
   white-space: nowrap;
+}
+
+/* Task, Workspace | Matter, Status, Priority, Due, Created */
+#myTasksTable th:nth-child(1) { width: 32%; }
+#myTasksTable th:nth-child(2) { width: 22%; }
+#myTasksTable th:nth-child(3) { width: 11%; }
+#myTasksTable th:nth-child(4) { width: 10%; }
+#myTasksTable th:nth-child(5) { width: 9%; }
+#myTasksTable th:nth-child(6) { width: 16%; }
+
+#myTasksTable td:nth-child(2) {
+  max-width: 0;
 }
