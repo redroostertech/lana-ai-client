@@ -70,7 +70,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
             <lex-select
               id="sortSelect"
-              options='[{"value":"name","label":"Name"},{"value":"created_at","label":"Created Date"},{"value":"updated_at","label":"Modified Date"},{"value":"document_count","label":"File Count"},{"value":"folder_count","label":"Folder Count"}]'
+              options='[{"value":"name","label":"Name"},{"value":"created_at","label":"Created"},{"value":"updated_at","label":"Modified Date"},{"value":"document_count","label":"File Count"},{"value":"folder_count","label":"Folder Count"}]'
               value="name"
             ></lex-select>
           </div>
@@ -192,7 +192,7 @@
         class="hidden drive-list-table lex-table--card"
         server-paging
         columns="name,created_by,created_at,size,actions"
-        labels="Name,Created By,Created On,Size,"
+        labels="Name,Created By,Created,Size,"
         sortable-columns="name,created_at,size"
         sort-by="name"
         sort-dir="asc"
@@ -231,7 +231,7 @@
           id="filesListView"
           class="hidden drive-list-table lex-table--card"
           columns="name,workspace,created_at,size"
-          labels="Name,Workspace,Created On,Size"
+          labels="Name,Workspace,Created,Size"
           sortable-columns=""
           limit="50"
           id-key="id"

@@ -25,7 +25,7 @@
 
   var VALID_KINDS = ['fill', 'compose', 'render'];
   // Mirrors the backend validator's sort_by / sort_order enums.
-  var VALID_SORT_FIELDS = ['name', 'updated_at', 'workspace'];
+  var VALID_SORT_FIELDS = ['name', 'updated_at', 'created_at', 'workspace', 'kind', 'document_type', 'variables'];
   var VALID_SORT_ORDERS = ['asc', 'desc'];
 
   var KIND_LABELS = {
@@ -61,7 +61,7 @@
    * Only known query params are emitted, mirroring the backend validator
    * (document-studio.validators.js): kind, matter_id, document_type, category,
    * q, include_org_wide, limit, offset, sort_by, sort_order, workspaces,
-   * updated_after, updated_before.
+   * updated_after, updated_before, created_after, created_before.
    *
    * @param {Object} [filters]
    * @param {string|Array} [filters.kind]      - 'fill' | 'compose' | 'render', or a list
@@ -72,11 +72,13 @@
    * @param {boolean} [filters.includeOrgWide] - default omitted (backend defaults true)
    * @param {number} [filters.limit]
    * @param {number} [filters.offset]
-   * @param {string} [filters.sortBy]          - 'name' | 'updated_at' | 'workspace'
+   * @param {string} [filters.sortBy]          - name | updated_at | created_at | workspace | kind | document_type | variables
    * @param {string} [filters.sortOrder]       - 'asc' | 'desc'
    * @param {Array}  [filters.workspaces]      - matter ids; 'organization' = org-wide
    * @param {string} [filters.updatedAfter]    - ISO datetime (inclusive)
    * @param {string} [filters.updatedBefore]   - ISO datetime (exclusive)
+   * @param {string} [filters.createdAfter]    - ISO datetime (inclusive)
+   * @param {string} [filters.createdBefore]   - ISO datetime (exclusive)
    * @returns {string}
    */
   function buildListQuery(filters) {
@@ -114,6 +116,8 @@
     if (workspaces.length) _appendParam(parts, 'workspaces', workspaces.join(','));
     _appendParam(parts, 'updated_after', f.updatedAfter);
     _appendParam(parts, 'updated_before', f.updatedBefore);
+    _appendParam(parts, 'created_after', f.createdAfter);
+    _appendParam(parts, 'created_before', f.createdBefore);
 
     var sortBy = f.sortBy ? String(f.sortBy).toLowerCase() : '';
     if (VALID_SORT_FIELDS.indexOf(sortBy) !== -1) {

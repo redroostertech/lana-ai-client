@@ -9,7 +9,7 @@
   // File families the library lists. Images are out of scope, so "All" asks
   // for these four instead of sending no filter.
   var LIBRARY_FAMILIES = ['document', 'spreadsheet', 'presentation', 'pdf'];
-  // File column filter values (the server's file_family names).
+  // Type column filter values (the server's file_family names).
   var FAMILY_OPTIONS = [
     { value: 'document', label: 'Documents' },
     { value: 'spreadsheet', label: 'Spreadsheets' },
@@ -72,7 +72,7 @@
     return (Array.isArray(value) ? value : [value]).map(String).filter(Boolean);
   }
 
-  // The File filter's families, or every library family (never images).
+  // The Type filter's families, or every library family (never images).
   function fileFamilyParam(families) {
     var picked = (families || []).filter(function (family) { return LIBRARY_FAMILIES.indexOf(family) !== -1; });
     return (picked.length ? picked : LIBRARY_FAMILIES).join(',');
@@ -149,28 +149,26 @@
     return (index === 0 ? Math.round(amount) : Number(amount.toFixed(1))) + ' ' + units[index];
   }
 
+  // Dates go through Lex.Utils: API timestamps are system time (UTC) and
+  // display in the user's timezone (profile, then org, then browser).
   function relativeTime(value) {
-    if (!value) return '';
-    if (global.LanaTime && typeof LanaTime.timeAgo === 'function') {
-      return LanaTime.timeAgo(value, { style: 'words' });
-    }
-    var date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!value || !global.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.timeAgo(value);
+    return text === '-' ? '' : text;
+  }
+
+  function shortDate(value) {
+    if (!value || !global.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.formatDateLong(value, { month: 'short' });
+    return text === 'Never' ? '' : text;
   }
 
   function absoluteTime(value) {
-    if (!value) return '';
-    var date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    });
+    if (!value || !global.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.formatDateTime(value);
+    return text === 'Never' ? '' : text;
   }
+
 
   function table() {
     return el(TABLE_ID);
@@ -206,11 +204,17 @@
     if (button) button.dataset.order = direction === 'asc' ? 'asc' : 'desc';
   }
 
+  // Table column -> library API sort_by.
+  var SORT_BY_COLUMN = { name: 'name', size: 'file_size', created_at: 'created_at', updated_at: 'updated_at' };
+
   function mapFileForTable(file) {
     return {
       id: file.id || file.document_id || file.file_id || '',
       name: fileName(file),
+      type: filePresentation(file).label,
+      size: formatFileSize(file.file_size || file.size),
       workspace: fileWorkspace(file),
+      created_at: file.created_at || '',
       updated_at: editedAt(file),
       _raw: file
     };
@@ -220,29 +224,34 @@
     return {
       name: function (val, row) {
         var presentation = filePresentation(row._raw);
-        var size = formatFileSize(row._raw.file_size || row._raw.size);
-        var meta = [presentation.label, size].filter(Boolean).join(' · ');
         return '<span class="document-library-file-cell">' +
             '<span class="document-library-file-icon document-library-file-icon--' + esc(presentation.tone) + '" aria-hidden="true">' + icon(presentation.icon) + '</span>' +
-            '<span class="document-library-file-primary">' +
-              '<span class="document-library-file-name" title="' + esc(val) + '">' + esc(val) + '</span>' +
-              '<span class="document-library-file-type">' + esc(meta) + '</span>' +
-            '</span>' +
+            '<span class="document-library-file-name" title="' + esc(val) + '">' + esc(val) + '</span>' +
           '</span>';
+      },
+      type: function (val) {
+        return '<span class="document-library-cell-muted">' + esc(val || '\u2014') + '</span>';
+      },
+      size: function (val) {
+        return '<span class="document-library-cell-muted">' + esc(val || '\u2014') + '</span>';
       },
       workspace: function (workspaceName, row) {
         var workspaceId = fileWorkspaceId(row._raw);
         if (workspaceId && workspaceName !== '—') {
-          return '<button class="document-library-file-workspace document-library-workspace-link" type="button" data-workspace-id="' + esc(workspaceId) + '" title="Open ' + esc(workspaceName) + ' workspace">' +
+          return '<button class="document-library-workspace-link" type="button" data-workspace-id="' + esc(workspaceId) + '" title="Open ' + esc(workspaceName) + ' workspace">' +
               '<span>' + esc(workspaceName) + '</span>' +
             '</button>';
         }
-        return '<span class="document-library-file-workspace"><span>' + esc(workspaceName) + '</span></span>';
+        return '<span class="document-library-cell-muted">' + esc(workspaceName) + '</span>';
+      },
+      created_at: function (created) {
+        return '<time class="document-library-file-time" datetime="' + esc(created) + '" title="' + esc(absoluteTime(created)) + '">' +
+            esc(shortDate(created) || '\u2014') +
+          '</time>';
       },
       updated_at: function (edited) {
-        var editedLabel = relativeTime(edited);
         return '<time class="document-library-file-time" datetime="' + esc(edited) + '" title="' + esc(absoluteTime(edited)) + '">' +
-            esc(editedLabel ? 'Edited ' + editedLabel : 'Edit time unavailable') +
+            esc(relativeTime(edited) || '\u2014') +
           '</time>';
       }
     };
@@ -273,17 +282,19 @@
       var params = new URLSearchParams();
       params.set('page', String(query.page || 1));
       params.set('page_size', String(query.limit || 20));
-      params.set('sort_by', query.sortBy || 'updated_at');
+      params.set('sort_by', SORT_BY_COLUMN[query.sortBy] || 'updated_at');
       params.set('sort_order', query.sortDir || 'desc');
       var filters = query.filters || {};
-      params.set('file_family', fileFamilyParam(filterValues(filters.name)));
+      params.set('file_family', fileFamilyParam(filterValues(filters.type)));
       var workspaces = filterValues(filters.workspace);
       if (workspaces.length) params.set('workspaces', workspaces.join(','));
-      var range = global.LanaLibraryColumnFilters
-        ? global.LanaLibraryColumnFilters.editedRangeBounds(filterValues(filters.updated_at)[0])
-        : { after: '', before: '' };
-      if (range.after) params.set('updated_after', range.after);
-      if (range.before) params.set('updated_before', range.before);
+      var ranges = global.LanaLibraryColumnFilters;
+      var edited = ranges ? ranges.editedRangeBounds(filterValues(filters.updated_at)[0]) : { after: '', before: '' };
+      if (edited.after) params.set('updated_after', edited.after);
+      if (edited.before) params.set('updated_before', edited.before);
+      var created = ranges ? ranges.editedRangeBounds(filterValues(filters.created_at)[0]) : { after: '', before: '' };
+      if (created.after) params.set('created_after', created.after);
+      if (created.before) params.set('created_before', created.before);
       if (searchTerm) params.set('search', searchTerm);
       var response = await client.get('/api/v1/storage/library/files?' + params.toString());
       if (sequence !== loadSequence || !el('documentLibrary')) return;
@@ -423,11 +434,11 @@
       var id = event.target && event.target.id;
       var value = String((event.detail && event.detail.value) || '');
       if (id === 'documentLibraryTypeFilter') {
-        // Same state as the File column filter, as My Tasks' Status select does.
+        // Same state as the Type column filter, as My Tasks' Status select does.
         var target = table();
         if (!target) return;
-        if (value && value !== 'all') target.addFilter('name', 'in', [value]);
-        else target.removeFilter('name');
+        if (value && value !== 'all') target.addFilter('type', 'in', [value]);
+        else target.removeFilter('type');
       } else if (id === 'documentLibrarySort') {
         applySort(value || 'updated_at', sortOrder());
       }
@@ -473,9 +484,12 @@
 
   function applyColumnFilterOptions(target, workspaceOptions) {
     var shared = global.LanaLibraryColumnFilters;
-    var map = { name: { options: FAMILY_OPTIONS } };
+    var map = { type: { options: FAMILY_OPTIONS } };
     if (workspaceOptions && workspaceOptions.length) map.workspace = { options: workspaceOptions };
-    if (shared) map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    if (shared) {
+      map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+      map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    }
     target.setColumnFilterOptions(map);
   }
 

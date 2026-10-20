@@ -45,6 +45,9 @@ describe('document-studio-templates-mapper', () => {
       expect(mapper.buildListQuery({ workspaces: ['MATT-1', ' organization ', ''] })).toBe('workspaces=MATT-1%2Corganization');
       expect(mapper.buildListQuery({ updatedAfter: '2026-10-13T00:00:00.000Z' })).toBe('updated_after=2026-10-13T00%3A00%3A00.000Z');
       expect(mapper.buildListQuery({ updatedBefore: '2026-09-20T00:00:00.000Z', workspaces: [] })).toBe('updated_before=2026-09-20T00%3A00%3A00.000Z');
+      expect(mapper.buildListQuery({ createdAfter: '2026-10-13T00:00:00.000Z' })).toBe('created_after=2026-10-13T00%3A00%3A00.000Z');
+      expect(mapper.buildListQuery({ sortBy: 'variables', sortOrder: 'asc' })).toBe('sort_by=variables&sort_order=asc');
+      expect(mapper.buildListQuery({ sortBy: 'document_type' })).toBe('sort_by=document_type');
     });
 
     test('drops invalid kind values', () => {
