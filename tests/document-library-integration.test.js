@@ -92,8 +92,8 @@ describe('Document Library integration', () => {
     expect(html).toContain('All Documents');
     expect(html).toContain('class="document-library-table lex-table--card"');
     expect(html).toContain('server-paging');
-    expect(html).toContain('labels="File,Workspace,Last edited"');
-    expect(html).toContain('sortable-columns="name,updated_at"');
+    expect(html).toContain('labels="File,Type,Size,Workspace,Created,Last edited"');
+    expect(html).toContain('sortable-columns="name,size,created_at,updated_at"');
     expect(html).toContain('id="documentLibrarySearch"');
     expect(html).toContain('id="documentLibraryTypeFilter"');
     expect(html).toContain('Search and filter documents');
@@ -139,7 +139,8 @@ describe('Document Library integration', () => {
 
     expect(controller).toContain("params.set('page', String(query.page || 1))");
     expect(controller).toContain("params.set('page_size', String(query.limit || 20))");
-    expect(controller).toContain("params.set('sort_by', query.sortBy || 'updated_at')");
+    expect(controller).toContain("params.set('sort_by', SORT_BY_COLUMN[query.sortBy] || 'updated_at')");
+    expect(controller).toContain("size: 'file_size'");
     expect(controller).toContain("params.set('sort_order', query.sortDir || 'desc')");
     expect(controller).toContain("root.addEventListener('lex-query-change'");
     expect(controller).toContain('target.setServerData(files.map(mapFileForTable), pagination)');
@@ -170,10 +171,11 @@ describe('Document Library integration', () => {
     expect(html).toContain('{"value":"pdf","label":"PDFs"}');
     expect(html).not.toContain('{"value":"image","label":"Images"}');
     expect(controller).toContain("if (searchTerm) params.set('search', searchTerm)");
-    expect(controller).toContain("params.set('file_family', fileFamilyParam(filterValues(filters.name)))");
+    expect(controller).toContain("params.set('file_family', fileFamilyParam(filterValues(filters.type)))");
+    expect(controller).toContain("params.set('created_after', created.after)");
     expect(controller).toContain("params.set('workspaces', workspaces.join(','))");
-    expect(controller).toContain("params.set('updated_after', range.after)");
-    expect(controller).toContain("target.addFilter('name', 'in', [value])");
+    expect(controller).toContain("params.set('updated_after', edited.after)");
+    expect(controller).toContain("target.addFilter('type', 'in', [value])");
     expect(controller).not.toContain("params.set('document_type'");
     expect(controller).toContain("event.target.id !== 'documentLibrarySearch'");
     expect(controller).toContain("id === 'documentLibraryTypeFilter'");
@@ -580,8 +582,8 @@ describe('Template Library table', () => {
     expect(html).toContain('id="dstTable"');
     expect(html).toContain('class="document-library-table lex-table--card"');
     expect(html).toContain('server-paging');
-    expect(html).toContain('labels="Template,Workspace,Last edited"');
-    expect(html).toContain('sortable-columns="name,workspace,updated_at"');
+    expect(html).toContain('labels="Template,Type,Template Type,Variables,Workspace,Created,Last edited"');
+    expect(html).toContain('sortable-columns="name,kind,template_type,variables,workspace,created_at,updated_at"');
     expect(html).toContain('id="dstSort"');
     expect(html).toContain('All Templates');
     expect(html).toContain('src="js/lex/components/data/lex-table.js"');
@@ -591,7 +593,28 @@ describe('Template Library table', () => {
     expect(descriptor.scripts).not.toContain('js/lex/components/data/lex-pagination.js');
     expect(controller).toContain("root.addEventListener('lex-query-change'");
     expect(controller).toContain('offset: ((query.page || 1) - 1) * limit');
-    expect(controller).toContain("sortBy: query.sortBy || 'updated_at'");
+    expect(controller).toContain("sortBy: SORT_BY_COLUMN[query.sortBy] || 'updated_at'");
     expect(controller).toContain("root.addEventListener('row-click'");
+  });
+});
+
+describe('Library dates use the shared date utils', () => {
+  test('Created and Last edited go through Lex.Utils, never browser-local formatting', () => {
+    for (const file of ['document-library.js', 'document-library-templates.js']) {
+      const controller = fs.readFileSync(path.join(SRC, 'js', file), 'utf8');
+      expect(controller).toContain('Lex.Utils.timeAgo(value)');
+      expect(controller).toContain("Lex.Utils.formatDateLong(value, { month: 'short' })");
+      expect(controller).toContain('Lex.Utils.formatDateTime(value)');
+      expect(controller).not.toContain('toLocaleDateString');
+      expect(controller).not.toContain('toLocaleString');
+      expect(controller).not.toContain('LanaTime.timeAgo');
+    }
+  });
+
+  test('the date column is called Created everywhere', () => {
+    for (const file of ['document-library.html', 'document-library-templates.html', 'drive.html']) {
+      const html = fs.readFileSync(path.join(SRC, file), 'utf8');
+      expect(html).not.toContain('Created On');
+    }
   });
 });

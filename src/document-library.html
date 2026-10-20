@@ -55,7 +55,7 @@
             <label class="document-library-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
             <lex-select
               id="documentLibrarySort"
-              options='[{"value":"updated_at","label":"Last Edited"},{"value":"name","label":"File Name"},{"value":"file_size","label":"Size"}]'
+              options='[{"value":"updated_at","label":"Last Edited"},{"value":"created_at","label":"Created"},{"value":"name","label":"File Name"},{"value":"size","label":"Size"}]'
               value="updated_at"
             ></lex-select>
           </div>
@@ -91,9 +91,9 @@
           column-filters
           class="document-library-table lex-table--card"
           server-paging
-          columns="name,workspace,updated_at"
-          labels="File,Workspace,Last edited"
-          sortable-columns="name,updated_at"
+          columns="name,type,size,workspace,created_at,updated_at"
+          labels="File,Type,Size,Workspace,Created,Last edited"
+          sortable-columns="name,size,created_at,updated_at"
           sort-by="updated_at"
           sort-dir="desc"
           limit="20"

@@ -77,7 +77,7 @@
   color: var(--lex-status-info-text, #175cd3);
 }
 
-/* File cell: icon tile beside the name and type line */
+/* Name cell: icon tile beside the name */
 .document-library-file-cell {
   align-items: center;
   display: flex;
@@ -89,60 +89,56 @@
   flex-shrink: 0;
 }
 
-.document-library-file-primary,
-.document-library-file-workspace,
-.document-library-file-time {
-  min-width: 0;
-}
-
-.document-library-file-primary {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.document-library-file-name,
-.document-library-file-workspace > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .document-library-file-name {
   color: var(--lex-text-primary);
   font-size: 13px;
   font-weight: 620;
   line-height: 1.4;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.document-library-file-type,
-.document-library-file-workspace,
+/* Plain value cells (type, size, counts, workspaces without a link) */
+.document-library-cell-muted,
 .document-library-file-time {
-  color: var(--lex-text-tertiary);
+  color: var(--lex-text-secondary);
+  display: block;
   font-size: 12px;
   line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.document-library-file-workspace {
-  appearance: none;
-  background: transparent;
-  border: 0;
-  color: var(--lex-text-secondary);
-  display: flex;
-  flex-direction: column;
-  font: inherit;
-  padding: 4px 0;
-  text-align: left;
-}
-
+/* Workspace link: same treatment as My Tasks' workspace links */
 .document-library-workspace-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--lex-accent, #3b5bdb);
   cursor: pointer;
+  display: block;
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.document-library-workspace-link > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .document-library-workspace-link:hover {
-  color: var(--lex-text-accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  color: var(--lex-accent-strong, var(--lex-accent, #2f47b3));
 }
 
 .document-library-workspace-link:focus-visible {
@@ -151,54 +147,40 @@
   outline: none;
 }
 
-.document-library-file-time {
-  white-space: nowrap;
-}
-
 .document-library-noscript {
   color: var(--lex-text-secondary, #5f6368);
   padding: 24px;
   text-align: center;
 }
 
-/* Library tables (Document and Template Library): fixed column widths so
-   long names and workspaces truncate instead of widening the table. */
+/* Library tables (Document and Template Library): fixed layout so long
+   names and workspaces truncate instead of widening the table. Column
+   widths are per table, below. */
 .document-library-table table {
   table-layout: fixed;
-}
-
-.document-library-table th:nth-child(1) {
-  width: 56%;
-}
-
-.document-library-table th:nth-child(2) {
-  width: 26%;
-}
-
-.document-library-table th:nth-child(3) {
-  width: 18%;
 }
 
 .document-library-table td {
   overflow: hidden;
 }
 
-/* The workspace link is a button; keep it inside its cell and truncate. */
-.document-library-table .document-library-file-workspace {
-  display: block;
-  max-width: 100%;
-}
+/* Document Library: File, Type, Size, Workspace, Created, Last edited */
+#documentLibraryTable th:nth-child(1) { width: 32%; }
+#documentLibraryTable th:nth-child(2) { width: 8%; }
+#documentLibraryTable th:nth-child(3) { width: 9%; }
+#documentLibraryTable th:nth-child(4) { width: 21%; }
+#documentLibraryTable th:nth-child(5) { width: 14%; }
+#documentLibraryTable th:nth-child(6) { width: 16%; }
 
-.document-library-table .document-library-file-workspace > span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.document-library-table .document-library-file-time {
-  white-space: nowrap;
-}
+/* Template Library: Template, Type, Template Type, Variables, Workspace,
+   Created, Last edited */
+#dstTable th:nth-child(1) { width: 26%; }
+#dstTable th:nth-child(2) { width: 11%; }
+#dstTable th:nth-child(3) { width: 12%; }
+#dstTable th:nth-child(4) { width: 9%; }
+#dstTable th:nth-child(5) { width: 16%; }
+#dstTable th:nth-child(6) { width: 12%; }
+#dstTable th:nth-child(7) { width: 14%; }
 
 @media (max-width: 768px) {
   .document-library {

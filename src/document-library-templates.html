@@ -61,7 +61,7 @@
             <label class="document-library-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
             <lex-select
               id="dstSort"
-              options='[{"value":"updated_at","label":"Last Edited"},{"value":"name","label":"Template Name"},{"value":"workspace","label":"Workspace"}]'
+              options='[{"value":"updated_at","label":"Last Edited"},{"value":"created_at","label":"Created"},{"value":"name","label":"Template Name"},{"value":"kind","label":"Type"},{"value":"template_type","label":"Template Type"},{"value":"variables","label":"Variables"},{"value":"workspace","label":"Workspace"}]'
               value="updated_at"
             ></lex-select>
           </div>
@@ -102,9 +102,9 @@
           column-filters
           class="document-library-table lex-table--card"
           server-paging
-          columns="name,workspace,updated_at"
-          labels="Template,Workspace,Last edited"
-          sortable-columns="name,workspace,updated_at"
+          columns="name,kind,template_type,variables,workspace,created_at,updated_at"
+          labels="Template,Type,Template Type,Variables,Workspace,Created,Last edited"
+          sortable-columns="name,kind,template_type,variables,workspace,created_at,updated_at"
           sort-by="updated_at"
           sort-dir="desc"
           limit="20"

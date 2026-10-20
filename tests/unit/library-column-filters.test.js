@@ -13,10 +13,23 @@ describe('library-column-filters', () => {
     expect(filters.editedRangeBounds('bogus', now)).toEqual({ after: '', before: '' });
   });
 
-  test('"Today" starts at local midnight', () => {
+  test('"Today" starts at midnight in the user\'s timezone', () => {
+    // 15:30Z on Oct 20 is 11:30 in New York (EDT, UTC-4) and 00:30 Oct 21 in Tokyo.
+    expect(filters.editedRangeBounds('today', now, 'America/New_York').after).toBe('2026-10-20T04:00:00.000Z');
+    expect(filters.editedRangeBounds('today', now, 'Asia/Tokyo').after).toBe('2026-10-20T15:00:00.000Z');
+    expect(filters.editedRangeBounds('today', now, 'UTC').after).toBe('2026-10-20T00:00:00.000Z');
+  });
+
+  test('"Today" crosses a DST change correctly', () => {
+    // US clocks fall back on Nov 1 2026; midnight that day is still EDT (UTC-4).
+    const afternoon = new Date('2026-11-01T18:00:00.000Z');
+    expect(filters.editedRangeBounds('today', afternoon, 'America/New_York').after).toBe('2026-11-01T04:00:00.000Z');
+  });
+
+  test('"Today" falls back to local midnight without a usable zone', () => {
     const local = new Date(now.getTime());
     local.setHours(0, 0, 0, 0);
-    expect(filters.editedRangeBounds('today', now)).toEqual({ after: local.toISOString(), before: '' });
+    expect(filters.editedRangeBounds('today', now, 'Not/AZone').after).toBe(local.toISOString());
   });
 
   test('every range option has bounds', () => {
@@ -48,7 +61,19 @@ describe('library-column-filters', () => {
     ]).map((o) => o.label)).toEqual(['Acme Executive Separation · 10399', 'Acme Executive Separation · 10539', 'Solo']);
   });
 
-  test('loadWorkspaceOptions pages through every workspace', async () => {
+  test("key 'id' gives internal ids (templates) and still names duplicates by readable id", () => {
+    expect(filters.workspaceOptions([
+      { id: 'uuid-1', matter_id: '10399', name: 'Acme' },
+      { id: 'uuid-2', matter_id: '10539', name: 'Acme' },
+      { id: 'uuid-3', matter_id: 'MATT-3', name: 'Solo' }
+    ], 'id')).toEqual([
+      { value: 'uuid-1', label: 'Acme · 10399' },
+      { value: 'uuid-2', label: 'Acme · 10539' },
+      { value: 'uuid-3', label: 'Solo' }
+    ]);
+  });
+
+    test('loadWorkspaceOptions pages through every workspace', async () => {
     const pages = { 1: ['A', 'B'], 2: ['C'] };
     const api = { get: async (url) => {
       const page = Number(new URL('http://x' + url).searchParams.get('page'));

@@ -768,7 +768,7 @@
     }
   }
 
-  // Notes scopes: keep rows matching Created On / Created By. Folders always
+  // Notes scopes: keep rows matching Created / Created By. Folders always
   // stay so the vault can still be browsed.
   function filterNoteRows(rows) {
     var filters = storageState.columnFilters || {};
@@ -1058,7 +1058,7 @@
 
   /**
    * Render file rows into the Files list view, mirroring the matters list row
-   * structure/classes. Columns: Name, Matter, Created On, Size. Clicking a row
+   * structure/classes. Columns: Name, Workspace, Created, Size. Clicking a row
    * opens the file viewer via openRecentFile.
    * @param {Array} files
    */
@@ -1952,7 +1952,7 @@
 
   /**
    * Render promoted-knowledge note rows into the shared list table.
-   * Columns mirror the matters list: Name, Created By, Created On, Type, Action.
+   * Columns mirror the matters list: Name, Created By, Created, Type, Action.
    * @param {Array} items
    */
   function renderOrgKnowledgeList(items) {

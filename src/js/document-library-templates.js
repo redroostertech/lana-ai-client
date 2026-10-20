@@ -92,24 +92,26 @@
     return '';
   }
 
+  // Dates go through Lex.Utils: API timestamps are system time (UTC) and
+  // display in the user's timezone (profile, then org, then browser).
   function relativeTime(value) {
-    if (!value) return '';
-    if (window.LanaTime && typeof LanaTime.timeAgo === 'function') {
-      return LanaTime.timeAgo(value, { style: 'words' });
-    }
-    var date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!value || !window.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.timeAgo(value);
+    return text === '-' ? '' : text;
+  }
+
+  function shortDate(value) {
+    if (!value || !window.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.formatDateLong(value, { month: 'short' });
+    return text === 'Never' ? '' : text;
   }
 
   function absoluteTime(value) {
-    if (!value) return '';
-    var date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return date.toLocaleString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-    });
+    if (!value || !window.Lex || !Lex.Utils) return '';
+    var text = Lex.Utils.formatDateTime(value);
+    return text === 'Never' ? '' : text;
   }
+
 
   function extensionFromName(name) {
     var value = String(name || '');
@@ -135,44 +137,46 @@
 
   function workspaceCellHtml(row) {
     if (row.scope === 'org') {
-      return '<span class="document-library-file-workspace">' +
-          '<span>Organization</span>' +
-        '</span>';
+      return '<span class="document-library-cell-muted">Organization</span>';
     }
     var label = row.matterName || '—';
-    if (row.matterId && row.matterName) {
-      return '<button class="document-library-file-workspace document-library-workspace-link" type="button" data-workspace-id="' + escHtml(row.matterId) + '" title="Open ' + escHtml(label) + ' workspace">' +
+    // Templates carry the workspace's internal id; workspace-details opens
+    // its readable matter_id, known once the workspace list loads.
+    var workspaceKey = row.matterId ? _state.matterKeyById[row.matterId] : '';
+    if (workspaceKey && row.matterName) {
+      return '<button class="document-library-workspace-link" type="button" data-workspace-id="' + escHtml(workspaceKey) + '" title="Open ' + escHtml(label) + ' workspace">' +
           '<span>' + escHtml(label) + '</span>' +
         '</button>';
     }
-    return '<span class="document-library-file-workspace">' +
-        '<span>' + escHtml(label) + '</span>' +
-      '</span>';
+    return '<span class="document-library-cell-muted">' + escHtml(label) + '</span>';
   }
 
   function nameCellHtml(row) {
     var presentation = templatePresentation(row);
-    var metaParts = [
-      row.kindLabel,
-      row.documentTypeLabel || row.documentType || row.category,
-      row.variableCount !== null ? row.variableCount + ' variables' : '',
-      row.documentCount !== null ? row.documentCount + ' docs' : ''
-    ];
-    var meta = metaParts.filter(Boolean).join(' · ');
     return '<span class="document-library-file-cell">' +
         '<span class="document-library-file-icon document-library-file-icon--' + escHtml(presentation.tone) + '" aria-hidden="true">' + icon(presentation.icon) + '</span>' +
-        '<span class="document-library-file-primary">' +
-          '<span class="document-library-file-name" title="' + escHtml(row.name) + '">' + escHtml(row.name) + '</span>' +
-          '<span class="document-library-file-type">' + escHtml(meta) + '</span>' +
-        '</span>' +
+        '<span class="document-library-file-name" title="' + escHtml(row.name) + '">' + escHtml(row.name) + '</span>' +
       '</span>';
   }
 
-  function timeCellHtml(row) {
-    var edited = row.updatedAt || row.createdAt || '';
-    var editedLabel = relativeTime(edited);
-    return '<time class="document-library-file-time" datetime="' + escHtml(edited) + '" title="' + escHtml(absoluteTime(edited)) + '">' +
-        escHtml(editedLabel ? 'Edited ' + editedLabel : 'Edit time unavailable') +
+  function mutedCellHtml(value) {
+    return '<span class="document-library-cell-muted" title="' + escHtml(value || '') + '">' + escHtml(value || '\u2014') + '</span>';
+  }
+
+  function templateTypeLabel(row) {
+    return row.documentTypeLabel || row.documentType || row.category || '';
+  }
+
+  // Variables for fill templates; a document set shows how many documents it holds.
+  function variablesLabel(row) {
+    if (row.variableCount !== null) return String(row.variableCount);
+    if (row.documentCount !== null) return row.documentCount + (row.documentCount === 1 ? ' doc' : ' docs');
+    return '';
+  }
+
+  function timeCellHtml(value, text) {
+    return '<time class="document-library-file-time" datetime="' + escHtml(value || '') + '" title="' + escHtml(absoluteTime(value)) + '">' +
+        escHtml(text || '\u2014') +
       '</time>';
   }
 
@@ -180,8 +184,12 @@
   function cellRenderers() {
     return {
       name: function (val, tableRow) { return nameCellHtml(tableRow._row); },
+      kind: function (val) { return mutedCellHtml(val); },
+      template_type: function (val) { return mutedCellHtml(val); },
+      variables: function (val) { return mutedCellHtml(val); },
       workspace: function (val, tableRow) { return workspaceCellHtml(tableRow._row); },
-      updated_at: function (val, tableRow) { return timeCellHtml(tableRow._row); }
+      created_at: function (val) { return timeCellHtml(val, shortDate(val)); },
+      updated_at: function (val) { return timeCellHtml(val, relativeTime(val)); }
     };
   }
 
@@ -190,7 +198,12 @@
   // ===========================================================================
 
   var TABLE_ID = 'dstTable';
-  // Template column filter values (the server's template kinds).
+  // Table column -> templates API sort_by.
+  var SORT_BY_COLUMN = {
+    name: 'name', kind: 'kind', template_type: 'document_type', variables: 'variables',
+    workspace: 'workspace', created_at: 'created_at', updated_at: 'updated_at'
+  };
+  // Type column filter values (the server's template kinds).
   var KIND_OPTIONS = [
     { value: 'fill', label: 'Documents' },
     { value: 'compose', label: 'Document Sets' },
@@ -204,7 +217,8 @@
     searchTerm: '',
     searchDebounce: null,
     loadSequence: 0,
-    rowsByKey: {}
+    rowsByKey: {},
+    matterKeyById: {}
   };
 
   function _rowKey(kind, id) {
@@ -226,18 +240,22 @@
     var limit = query.limit || 20;
     var filters = query.filters || {};
     var shared = window.LanaLibraryColumnFilters;
-    var range = shared ? shared.editedRangeBounds(_filterValues(filters.updated_at)[0]) : { after: '', before: '' };
+    var none = { after: '', before: '' };
+    var edited = shared ? shared.editedRangeBounds(_filterValues(filters.updated_at)[0]) : none;
+    var created = shared ? shared.editedRangeBounds(_filterValues(filters.created_at)[0]) : none;
     return {
-      kind: _filterValues(filters.name),
+      kind: _filterValues(filters.kind),
       workspaces: _filterValues(filters.workspace),
-      updatedAfter: range.after,
-      updatedBefore: range.before,
+      updatedAfter: edited.after,
+      updatedBefore: edited.before,
+      createdAfter: created.after,
+      createdBefore: created.before,
       matterId: _state.matterId,
       q: _state.searchTerm,
       includeOrgWide: _state.includeOrgWide,
       limit: limit,
       offset: ((query.page || 1) - 1) * limit,
-      sortBy: query.sortBy || 'updated_at',
+      sortBy: SORT_BY_COLUMN[query.sortBy] || 'updated_at',
       sortOrder: query.sortDir || 'desc'
     };
   }
@@ -302,7 +320,17 @@
       var tableRows = view.rows.map(function (row) {
         var key = _rowKey(row.kind, row.id);
         _state.rowsByKey[key] = row;
-        return { key: key, name: row.name, workspace: row.matterName || '', updated_at: row.updatedAt || row.createdAt || '', _row: row };
+        return {
+          key: key,
+          name: row.name,
+          kind: row.kindLabel,
+          template_type: templateTypeLabel(row),
+          variables: variablesLabel(row),
+          workspace: row.matterName || '',
+          created_at: row.createdAt || '',
+          updated_at: row.updatedAt || row.createdAt || '',
+          _row: row
+        };
       });
 
       _syncEmptyState(table, query.filters);
@@ -546,12 +574,12 @@
     var kindFilter = el('dstKindFilter');
     if (kindFilter) {
       kindFilter.addEventListener('lex-change', function (e) {
-        // Same state as the Template column filter, as My Tasks' Status select does.
+        // Same state as the Type column filter, as My Tasks' Status select does.
         var kind = (e.detail && e.detail.value) || '';
         var table = _table();
         if (!table) return;
-        if (kind && kind !== 'all') table.addFilter('name', 'in', [kind]);
-        else table.removeFilter('name');
+        if (kind && kind !== 'all') table.addFilter('kind', 'in', [kind]);
+        else table.removeFilter('kind');
       });
     }
 
@@ -613,9 +641,14 @@
       table.setCellRenderers(cellRenderers());
       _applyColumnFilterOptions(table, []);
       _reloadFromFirstPage();
-      if (window.LanaLibraryColumnFilters) {
-        window.LanaLibraryColumnFilters.loadWorkspaceOptions(window.api).then(function (options) {
-          if (_table() === table) _applyColumnFilterOptions(table, options);
+      var shared = window.LanaLibraryColumnFilters;
+      if (shared) {
+        shared.loadWorkspaces(window.api).then(function (matters) {
+          if (_table() !== table) return;
+          _state.matterKeyById = {};
+          matters.forEach(function (m) { if (m && m.id && m.matter_id) _state.matterKeyById[m.id] = m.matter_id; });
+          // Filter values are internal ids: the templates API matches on those.
+          _applyColumnFilterOptions(table, shared.workspaceOptions(matters, 'id'));
         });
       }
     });
@@ -624,11 +657,14 @@
   function _applyColumnFilterOptions(table, workspaceOptions) {
     var shared = window.LanaLibraryColumnFilters;
     var map = {
-      name: { options: KIND_OPTIONS },
+      kind: { options: KIND_OPTIONS },
       // Org-wide templates have no workspace; "Organization" selects them.
       workspace: { options: [ORGANIZATION_OPTION].concat(workspaceOptions || []) }
     };
-    if (shared) map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    if (shared) {
+      map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+      map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    }
     table.setColumnFilterOptions(map);
   }
 
