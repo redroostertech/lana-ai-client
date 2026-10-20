@@ -47,7 +47,7 @@ function loadLexSelect() {
 }
 
 describe('lex-select dropdown layout contract', () => {
-  test('dropdown is constrained to the trigger width and wraps long option text', () => {
+  test('dropdown fits its options, is at least the trigger width, and wraps long text at a cap', () => {
     const { Select, appendedStyles } = loadLexSelect();
     const select = new Select();
     select._open = true;
@@ -67,12 +67,15 @@ describe('lex-select dropdown layout contract', () => {
 
     expect(html).toContain('lex-select-dropdown--open');
     expect(html).toContain('A very long template description');
-    expect(dropdownRule).toContain('width: 100%;');
+    expect(dropdownRule).toContain('min-width: 100%;');
+    expect(dropdownRule).toContain('width: max-content;');
+    expect(dropdownRule).toContain('max-width: max(100%, 20rem);');
     expect(dropdownRule).toContain('box-sizing: border-box;');
     expect(dropdownRule).toContain('overflow-x: hidden;');
-    expect(dropdownRule).not.toContain('width: max-content;');
     expect(optionRule).toContain('white-space: normal;');
     expect(optionRule).not.toContain('white-space: nowrap;');
-    expect(labelRule).toContain('overflow-wrap: anywhere;');
+    // Short labels like "Name" must never split mid-word.
+    expect(labelRule).toContain('overflow-wrap: break-word;');
+    expect(labelRule).not.toContain('overflow-wrap: anywhere;');
   });
 });

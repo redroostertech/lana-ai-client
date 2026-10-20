@@ -168,8 +168,11 @@
         position: absolute;
         top: calc(100% + 4px);
         left: 0;
+        /* Fit the options, never narrower than the trigger. The cap keeps
+           long descriptions wrapping instead of widening the page. */
         min-width: 100%;
-        width: 100%;
+        width: max-content;
+        max-width: max(100%, 20rem);
         box-sizing: border-box;
         max-height: 240px;
         overflow-y: auto;
@@ -250,7 +253,7 @@
       .lex-select-option-label {
         flex: 1;
         min-width: 0;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
       }
 
       .lex-select-option-desc {
