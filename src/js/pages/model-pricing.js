@@ -168,7 +168,7 @@
     var notesTitle = escHtml(notesRaw);
     var inputCost = escHtml(formatMicroAsPer1k(row && row.input_token_microdollars, row && row.currency));
     var outputCost = escHtml(formatMicroAsPer1k(row && row.output_token_microdollars, row && row.currency));
-    var created = escHtml(row && row.created_at ? formatDate(row.created_at) : '');
+    var created = escHtml(row && row.created_at ? formatDateTime(row.created_at) : '');
 
     return ''
       + '<tr data-row-id="' + id + '">'

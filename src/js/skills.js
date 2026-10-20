@@ -1771,15 +1771,8 @@
           }).join(' ');
         }
 
-        // Format created_at to readable date
-        if (out.created_at) {
-          try {
-            var d = new Date(out.created_at);
-            if (!isNaN(d.getTime())) {
-              out.created_at = formatDateLong(out.created_at, { month: 'short' });
-            }
-          } catch (e) { /* keep raw value */ }
-        }
+        // created_at stays raw: lex-table shows it with Lex.Utils.formatDateTime
+        // and sorts it as a date.
 
         return out;
       });

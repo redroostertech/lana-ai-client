@@ -841,7 +841,7 @@
         return '<span class="drive-list-muted">' + escapeHtml(val || '\u2014') + '</span>';
       },
       created_at: function (val) {
-        return '<span class="drive-list-muted">' + (val ? formatRelativeDate(val) : '\u2014') + '</span>';
+        return '<span class="drive-list-muted">' + escapeHtml(val ? Lex.Utils.formatDateTime(val) : '\u2014') + '</span>';
       },
       size: function (val) {
         return '<span class="drive-list-muted">' + escapeHtml(val || '') + '</span>';
@@ -1071,7 +1071,7 @@
           '<div class="drive-list-name-text"><div class="drive-list-name" title="' + escapeHtml(val) + '">' + escapeHtml(val) + '</div></div></div>';
       },
       workspace: function (val) { return '<span class="drive-list-muted">' + escapeHtml(val || '\u2014') + '</span>'; },
-      created_at: function (val) { return '<span class="drive-list-muted">' + (val ? formatRelativeDate(val) : '\u2014') + '</span>'; },
+      created_at: function (val) { return '<span class="drive-list-muted">' + escapeHtml(val ? Lex.Utils.formatDateTime(val) : '\u2014') + '</span>'; },
       size: function (val) { return '<span class="drive-list-muted">' + escapeHtml(val || '') + '</span>'; }
     });
     table.setData((files || []).map(function (file) {

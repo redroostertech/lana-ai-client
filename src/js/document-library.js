@@ -157,12 +157,6 @@
     return text === '-' ? '' : text;
   }
 
-  function shortDate(value) {
-    if (!value || !global.Lex || !Lex.Utils) return '';
-    var text = Lex.Utils.formatDateLong(value, { month: 'short' });
-    return text === 'Never' ? '' : text;
-  }
-
   function absoluteTime(value) {
     if (!value || !global.Lex || !Lex.Utils) return '';
     var text = Lex.Utils.formatDateTime(value);
@@ -246,7 +240,7 @@
       },
       created_at: function (created) {
         return '<time class="document-library-file-time" datetime="' + esc(created) + '" title="' + esc(absoluteTime(created)) + '">' +
-            esc(shortDate(created) || '\u2014') +
+            esc(absoluteTime(created) || '\u2014') +
           '</time>';
       },
       updated_at: function (edited) {
