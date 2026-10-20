@@ -1,0 +1,496 @@
+/* Run Books admin page styles. Product UI uses Lex components and tokens. */
+
+.run-books-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  justify-content: flex-end;
+}
+
+.run-books-intro {
+  margin: var(--lex-spacing-md, 0.75rem) 0 0 0;
+  max-width: 62ch;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.6;
+}
+
+/* ── Step strip ─────────────────────────────────────────────── */
+
+.run-books-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  margin: var(--lex-spacing-lg, 1.5rem) 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-books-step {
+  display: flex;
+  align-items: center;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  padding: var(--lex-spacing-sm, 0.5rem) var(--lex-spacing-md, 0.75rem);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-full, 9999px);
+  background: var(--lex-bg-primary);
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.run-books-step.is-current {
+  border-color: var(--lex-border-accent);
+  background: var(--lex-bg-accent-soft);
+  color: var(--lex-text-primary);
+  font-weight: var(--lex-weight-semibold, 600);
+}
+
+.run-books-step.is-done {
+  color: var(--lex-text-primary);
+}
+
+.run-books-step__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--lex-radius-full, 9999px);
+  background: var(--lex-bg-tertiary);
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+  font-weight: var(--lex-weight-semibold, 600);
+}
+
+.run-books-step.is-current .run-books-step__index {
+  background: var(--lex-bg-accent);
+  color: var(--lex-text-on-accent);
+}
+
+/* ── Sections and shared layout ─────────────────────────────── */
+
+.run-books-section {
+  display: grid;
+  gap: var(--lex-spacing-lg, 1.5rem);
+  margin-top: var(--lex-spacing-lg, 1.5rem);
+  align-items: start;
+}
+
+/* The step sections are toggled with the `hidden` class. Tailwind's .hidden is
+   the same specificity as the rule above, so which one wins would otherwise
+   depend on stylesheet order, and on tailwind-output.css having been built. */
+.run-books-section.hidden {
+  display: none;
+}
+
+.run-books-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--lex-spacing-md, 0.75rem);
+}
+
+.run-books-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  justify-content: flex-end;
+  margin-top: var(--lex-spacing-lg, 1.5rem);
+}
+
+.run-books-field-label {
+  display: block;
+  margin: 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  font-weight: var(--lex-weight-semibold, 600);
+}
+
+.run-books-field-help {
+  margin: var(--lex-spacing-xs, 0.25rem) 0 var(--lex-spacing-sm, 0.5rem) 0;
+  max-width: 62ch;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.5;
+}
+
+/* ── Scope values ───────────────────────────────────────────── */
+
+.run-books-scope-values {
+  margin-top: var(--lex-spacing-lg, 1.5rem);
+}
+
+.run-books-scope-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--lex-spacing-sm, 0.5rem);
+}
+
+.run-books-scope-entry lex-input {
+  flex: 1 1 16rem;
+}
+
+.run-books-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  margin-top: var(--lex-spacing-md, 0.75rem);
+}
+
+.run-books-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  padding: var(--lex-spacing-xs, 0.25rem) var(--lex-spacing-sm, 0.5rem);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-full, 9999px);
+  background: var(--lex-bg-secondary);
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.run-books-chip__remove {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-base-size, 1rem);
+  line-height: 1;
+}
+
+.run-books-chip__remove:hover,
+.run-books-chip__remove:focus-visible {
+  color: var(--lex-color-danger-600);
+  outline: none;
+}
+
+/* ── Formats explainer ──────────────────────────────────────── */
+
+.run-books-formats {
+  display: grid;
+  gap: var(--lex-spacing-lg, 1.5rem);
+}
+
+.run-books-format-list {
+  display: grid;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-books-format {
+  padding: var(--lex-spacing-md, 0.75rem);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md, 0.5rem);
+  background: var(--lex-bg-primary);
+}
+
+.run-books-format--refused {
+  background: var(--lex-bg-secondary);
+}
+
+.run-books-format__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lex-spacing-sm, 0.5rem);
+}
+
+.run-books-format__label {
+  margin: 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-base-size, 1rem);
+  font-weight: var(--lex-weight-semibold, 600);
+}
+
+.run-books-format__extensions {
+  color: var(--lex-text-secondary);
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.run-books-format__note {
+  margin: var(--lex-spacing-xs, 0.25rem) 0 0 0;
+  max-width: 72ch;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.5;
+}
+
+.run-books-subheading {
+  margin: 0 0 var(--lex-spacing-sm, 0.5rem) 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-base-size, 1rem);
+  font-weight: var(--lex-weight-semibold, 600);
+}
+
+/* ── Drop zone and file list ────────────────────────────────── */
+
+.run-books-dropzone {
+  display: grid;
+  justify-items: center;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  padding: var(--lex-spacing-2xl, 2rem);
+  border: 2px dashed var(--lex-border-strong);
+  border-radius: var(--lex-radius-lg, 0.5rem);
+  background: var(--lex-bg-secondary);
+  text-align: center;
+}
+
+.run-books-dropzone.is-dragging {
+  border-color: var(--lex-border-accent);
+  background: var(--lex-bg-accent-soft);
+}
+
+.run-books-dropzone__hint {
+  margin: 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+.run-books-file-input {
+  display: none;
+}
+
+.run-books-file-list {
+  display: grid;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  margin-top: var(--lex-spacing-lg, 1.5rem);
+}
+
+.run-books-file {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  align-items: start;
+  padding: var(--lex-spacing-md, 0.75rem);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md, 0.5rem);
+  background: var(--lex-bg-primary);
+}
+
+.run-books-file--refused {
+  border-color: var(--lex-color-danger-100);
+  background: var(--lex-color-danger-50);
+}
+
+.run-books-file__name {
+  margin: 0;
+  color: var(--lex-text-primary);
+  font-weight: var(--lex-weight-semibold, 600);
+  overflow-wrap: anywhere;
+}
+
+.run-books-file__meta,
+.run-books-file__reason {
+  margin: var(--lex-spacing-xs, 0.25rem) 0 0 0;
+  max-width: 72ch;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.5;
+}
+
+.run-books-file__reason {
+  color: var(--lex-color-danger-700);
+}
+
+/* ── Readiness checklist ────────────────────────────────────── */
+
+.run-books-readiness-list {
+  display: grid;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-books-readiness-item {
+  display: flex;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  padding: var(--lex-spacing-sm, 0.5rem) var(--lex-spacing-md, 0.75rem);
+  border-left: 3px solid var(--lex-color-warning-500);
+  background: var(--lex-color-warning-50);
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.run-books-readiness-ok {
+  margin: 0;
+  padding: var(--lex-spacing-sm, 0.5rem) var(--lex-spacing-md, 0.75rem);
+  border-left: 3px solid var(--lex-color-success-500);
+  background: var(--lex-color-success-50);
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.5;
+}
+
+.run-books-readiness-count {
+  margin: 0 0 var(--lex-spacing-sm, 0.5rem) 0;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+}
+
+/* ── Proposal groups ────────────────────────────────────────── */
+
+.run-books-proposals {
+  display: grid;
+  gap: var(--lex-spacing-lg, 1.5rem);
+}
+
+.run-books-source {
+  padding: var(--lex-spacing-lg, 1.5rem);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-lg, 0.5rem);
+  background: var(--lex-bg-primary);
+}
+
+.run-books-source__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lex-spacing-sm, 0.5rem);
+}
+
+.run-books-source__name {
+  margin: 0;
+  color: var(--lex-text-primary);
+  font-size: var(--lex-h4-size, 1.125rem);
+  font-weight: var(--lex-weight-semibold, 600);
+  overflow-wrap: anywhere;
+}
+
+.run-books-source__structure,
+.run-books-source__note {
+  margin: var(--lex-spacing-xs, 0.25rem) 0 0 0;
+  max-width: 72ch;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.5;
+}
+
+.run-books-source__review-note {
+  margin: var(--lex-spacing-sm, 0.5rem) 0 0 0;
+  max-width: 72ch;
+  padding: var(--lex-spacing-sm, 0.5rem) var(--lex-spacing-md, 0.75rem);
+  border-left: 3px solid var(--lex-color-warning-500);
+  background: var(--lex-color-warning-50);
+  color: var(--lex-text-primary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.5;
+}
+
+.run-books-entries {
+  display: grid;
+  gap: var(--lex-spacing-md, 0.75rem);
+  margin-top: var(--lex-spacing-lg, 1.5rem);
+}
+
+.run-books-entry {
+  padding: var(--lex-spacing-md, 0.75rem);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-md, 0.5rem);
+  background: var(--lex-bg-secondary);
+}
+
+.run-books-entry.has-issues {
+  border-color: var(--lex-color-warning-500);
+}
+
+.run-books-entry__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--lex-spacing-md, 0.75rem);
+}
+
+.run-books-entry__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lex-spacing-md, 0.75rem);
+  margin-top: var(--lex-spacing-sm, 0.5rem);
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-xs-size, 0.75rem);
+}
+
+.run-books-entry__issues {
+  display: grid;
+  gap: var(--lex-spacing-xs, 0.25rem);
+  margin: var(--lex-spacing-sm, 0.5rem) 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-books-entry__issue {
+  color: var(--lex-color-warning-700);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.5;
+}
+
+.run-books-entry__excerpt {
+  margin: var(--lex-spacing-sm, 0.5rem) 0 0 0;
+  max-width: 88ch;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* ── Dropped sections ───────────────────────────────────────── */
+
+.run-books-dropped {
+  margin-top: var(--lex-spacing-lg, 1.5rem);
+  padding-top: var(--lex-spacing-lg, 1.5rem);
+  border-top: 1px solid var(--lex-border-default);
+}
+
+.run-books-dropped__list {
+  display: grid;
+  gap: var(--lex-spacing-sm, 0.5rem);
+  margin: var(--lex-spacing-sm, 0.5rem) 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-books-dropped__item {
+  padding: var(--lex-spacing-md, 0.75rem);
+  border: 1px dashed var(--lex-border-strong);
+  border-radius: var(--lex-radius-md, 0.5rem);
+  background: var(--lex-bg-secondary);
+}
+
+.run-books-dropped__title {
+  margin: 0;
+  color: var(--lex-text-primary);
+  font-weight: var(--lex-weight-semibold, 600);
+  overflow-wrap: anywhere;
+}
+
+.run-books-dropped__reason,
+.run-books-dropped__detail,
+.run-books-dropped__excerpt {
+  margin: var(--lex-spacing-xs, 0.25rem) 0 0 0;
+  max-width: 72ch;
+  color: var(--lex-text-secondary);
+  font-size: var(--lex-body-sm-size, 0.875rem);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* ── Utility ────────────────────────────────────────────────── */
+
+.run-books-noscript {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  color: var(--lex-text-secondary);
+}
+
+@media (max-width: 48rem) {
+  .run-books-file {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

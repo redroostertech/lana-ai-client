@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Run Books - LANA AI</title>
+
+  <!-- CSS in head; behavioral scripts at end of body. -->
+  <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/admin/run-books.css">
+  <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
+  <script src="../js/tailwind-loader.js"></script>
+
+  <link rel="stylesheet" href="../css/lex-chat.css">
+</head>
+<body>
+
+  <lex-loader theme="light"></lex-loader>
+
+  <lex-app
+    logo-src="../img/logo-light.png"
+    logo-alt="LANA AI"
+    logo-href="../dashboard.html"
+    active-nav-id="admin-run-books"
+    page-title="Run Books"
+  ></lex-app>
+
+  <template id="page-content">
+    <main>
+      <lex-banner
+        variant="light"
+        heading="Run Books"
+        subtitle="Package how your organization works so LANA can use it as evidence"
+        lana
+        lana-context-type="full_chat"
+      >
+        <div class="run-books-banner-actions">
+          <lex-btn id="runBookStartOverBtn" variant="secondary" icon="refresh-cw">Start over</lex-btn>
+        </div>
+      </lex-banner>
+
+      <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Run Books"}]'></lex-breadcrumb>
+
+      <p class="run-books-intro">
+        A run book is your organization's own processes and documentation, packaged so LANA can retrieve it
+        across every matter. It is not a file share: the matter document store already holds whatever someone
+        uploaded. A run book is org-wide, curated, and an assertion that this is how you operate. Entries set
+        authority, which means an answer can rest on one, so keeping them accurate and current is the
+        organization's responsibility.
+      </p>
+
+      <ol class="run-books-steps" id="runBookSteps">
+        <li class="run-books-step" data-step="declare">
+          <span class="run-books-step__index">1</span><span>Declare</span>
+        </li>
+        <li class="run-books-step" data-step="upload">
+          <span class="run-books-step__index">2</span><span>Upload</span>
+        </li>
+        <li class="run-books-step" data-step="review">
+          <span class="run-books-step__index">3</span><span>Review</span>
+        </li>
+      </ol>
+
+      <!-- ── Step 1: declare ─────────────────────────────────────── -->
+      <section id="runBookDeclareStep" class="run-books-section">
+        <lex-card heading="Declare the run book" subtitle="Name it, and say who it applies to">
+          <lex-form id="runBookDeclareForm">
+            <div class="run-books-form-grid">
+              <lex-input
+                id="runBookName"
+                name="name"
+                label="Name"
+                placeholder="Client intake"
+                required
+              ></lex-input>
+              <lex-input
+                id="runBookDomain"
+                name="domain"
+                label="Domain"
+                placeholder="internal_process"
+                help="One lowercase word for the kind of knowledge this holds."
+                required
+              ></lex-input>
+              <lex-input
+                id="runBookScopeType"
+                name="scope_type"
+                label="Scope type"
+                placeholder="department"
+                help="How you divide the organization. For example department, practice_area or role."
+                required
+              ></lex-input>
+            </div>
+
+            <div class="run-books-scope-values">
+              <p class="run-books-field-label">Scope values</p>
+              <p class="run-books-field-help">
+                The scope decides who a run book applies to. Every entry has to name at least one of these
+                values before the draft is complete.
+              </p>
+              <div class="run-books-scope-entry">
+                <lex-input
+                  id="runBookScopeValueInput"
+                  label="Add a value"
+                  placeholder="intake"
+                ></lex-input>
+                <lex-btn id="runBookScopeValueAddBtn" variant="secondary" icon="plus">Add value</lex-btn>
+              </div>
+              <div id="runBookScopeValues" class="run-books-chips" aria-live="polite"></div>
+            </div>
+
+            <div class="run-books-step-actions">
+              <lex-btn id="runBookDeclareNextBtn" variant="primary" type="submit">Continue to upload</lex-btn>
+            </div>
+          </lex-form>
+        </lex-card>
+      </section>
+
+      <!-- ── Step 2: upload ──────────────────────────────────────── -->
+      <section id="runBookUploadStep" class="run-books-section hidden">
+        <lex-card
+          heading="What can go in a run book"
+          subtitle="A format has to answer whether a reader can trust that this is what your organization said"
+        >
+          <div id="runBookFormats" class="run-books-formats"></div>
+        </lex-card>
+
+        <lex-card heading="Add documents" subtitle="Files are read in your browser; nothing is stored yet">
+          <div id="runBookDropZone" class="run-books-dropzone">
+            <p class="run-books-dropzone__hint">Drop files here, or choose them.</p>
+            <lex-btn id="runBookChooseBtn" variant="secondary" icon="upload">Choose files</lex-btn>
+            <input type="file" id="runBookFileInput" class="run-books-file-input" multiple>
+          </div>
+
+          <div id="runBookFileList" class="run-books-file-list" aria-live="polite"></div>
+
+          <div class="run-books-step-actions">
+            <lex-btn id="runBookUploadBackBtn" variant="secondary">Back</lex-btn>
+            <lex-btn id="runBookProposeBtn" variant="primary" disabled>Propose entries</lex-btn>
+          </div>
+        </lex-card>
+      </section>
+
+      <!-- ── Step 3: review ──────────────────────────────────────── -->
+      <section id="runBookReviewStep" class="run-books-section hidden">
+        <lex-card
+          heading="What is left to do"
+          subtitle="Checked against the backend as you edit, so nothing waits until the end"
+        >
+          <div id="runBookReadiness" aria-live="polite"></div>
+        </lex-card>
+
+        <p class="run-books-intro" id="runBookReviewSummary"></p>
+
+        <div id="runBookRefused"></div>
+
+        <div id="runBookProposals" class="run-books-proposals"></div>
+
+        <div class="run-books-step-actions">
+          <lex-btn id="runBookReviewBackBtn" variant="secondary">Back to upload</lex-btn>
+        </div>
+      </section>
+    </main>
+  </template>
+
+  <noscript>
+    <div class="run-books-noscript">Please enable JavaScript to use LANA AI.</div>
+  </noscript>
+
+  <script src="../js/error-reporter.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-data.js"></script>
+  <script src="../js/time-utils.js"></script>
+  <script src="../js/shared/request-retry.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components.js"></script>
+  <script src="../js/version.js"></script>
+  <script src="../js/menu.js"></script>
+  <script src="../js/navigation-helpers.js"></script>
+  <script src="../js/conversation-search-modal.js"></script>
+  <script src="../js/contact-search-modal.js"></script>
+  <script src="../js/notifications.js"></script>
+
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.state.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/lex.auth.js"></script>
+  <script src="../js/lex/lex-nav.js"></script>
+
+  <script src="../js/lex/components/foundation/lex-loader.js"></script>
+  <script src="../js/lex/components/foundation/lex-toast.js"></script>
+  <script src="../js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/layout/lex-sidebar.js"></script>
+  <script src="../js/lex/components/layout/lex-topbar.js"></script>
+  <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
+  <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-app.js"></script>
+
+  <!-- Page components, loaded BEFORE the template is injected -->
+  <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-banner.js"></script>
+  <script src="../js/lex/components/foundation/lex-card.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/form/lex-form.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+
+  <!-- Text extraction runs in the renderer: /drafts/propose takes extracted
+       text, and a run book is not a matter document, so the files are never
+       uploaded to the document store just to be read. -->
+  <script src="../js/vendor/mammoth.min.js"></script>
+  <script src="../js/vendor/pdf.min.js"></script>
+
+  <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/admin/admin-switcher.js"></script>
+  <script src="../js/admin/run-books-draft.js"></script>
+  <script src="../js/admin/run-books.js"></script>
+
+  <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
+  <!-- LANA dock (IDE-style docked chat panel) -->
+  <script src="../js/lex/chat/lex-chat.format.js"></script>
+  <script src="../js/lex/chat/lex-chat.conversations-api.js"></script>
+  <script src="../js/lex/chat/lex-chat.source.js"></script>
+  <script src="../js/lex/chat/lex-chat.message.js"></script>
+  <script src="../js/lex/chat/lex-chat-progress-events.js"></script>
+  <script src="../js/lex/chat/lex-chat.activity.js"></script>
+  <script src="../js/lex/chat/lex-chat.documents.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-mentions.js"></script>
+  <script src="../js/services/slash-commands.service.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer-slash.js"></script>
+  <script src="../js/lex/chat/lex-chat.composer.js"></script>
+  <script src="../js/lex/chat/lex-chat.thread.js"></script>
+  <script src="../js/lex/chat/lex-chat.threads.js"></script>
+  <script src="../js/lex/chat/lex-chat.js"></script>
+  <script src="../js/lex/chat/lex-dynamic-card.renderer.js"></script>
+  <script src="../js/lex/chat/lex-agentic-plan-card.js"></script>
+  <script src="../js/lex/chat/lex-chat.index.js"></script>
+  <script src="../js/lex/components/chat/lex-lana-panel.js"></script>
+  <script src="../js/lex/components/layout/lex-lana-dock.js"></script>
+
+  <script src="../js/auth-guard.js"></script>
+</body>
+</html>

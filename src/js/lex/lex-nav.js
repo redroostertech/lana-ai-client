@@ -65,6 +65,7 @@
     'admin/reporting.html':                   { id: 'string', report: 'string' },
     'admin/roles.html':                       { id: 'string' },
     'admin/roles_manager.html':               { id: 'string' },
+    'admin/run-books.html':                   { id: 'string' },
     'admin/search-analytics.html':            { q: 'string' },
     'admin/session-details.html':             { sessionId: 'string' },
     'admin/sessions.html':                    { sessionId: 'string', userId: 'string' },

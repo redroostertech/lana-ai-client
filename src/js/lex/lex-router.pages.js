@@ -403,6 +403,7 @@
     // admin/health.html — standalone page (not routed)
     // admin/organizations.html — standalone page (not routed)
     // admin/roles.html — standalone page (not routed)
+    // admin/run-books.html — standalone page (not routed)
 
     'admin/roles_manager.html': {
       title: 'Role Manager',
