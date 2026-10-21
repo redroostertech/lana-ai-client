@@ -423,6 +423,12 @@ function bindGlobalEvents() {
 }
 
 function onAppLexClose(event) {
+  // The publish dialog's header close, backdrop and Escape: same as Cancel.
+  if (event.target?.matches?.('[data-builder-publish-modal]')) {
+    state.builder.publishModalOpen = false;
+    return;
+  }
+
   if (event.target?.matches?.('[data-run-detail-drawer]')) {
     state.selectedRunId = null;
     state.selectedRunDetail = null;
@@ -1351,6 +1357,8 @@ async function onAppClick(event) {
 
   if (event.target.closest('#create-automation-btn')) {
     state.builder.publishModalOpen = false;
+    const publishModal = document.getElementById('builder-publish-modal');
+    if (publishModal) publishModal.open = false;
     await createAutomation(createContext());
     return;
   }

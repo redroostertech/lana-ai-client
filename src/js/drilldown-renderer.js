@@ -217,18 +217,11 @@ createModalStructure() {
           if (row) this.showRawData(row);
           return;
         }
-        const tip = target.closest('.cell-tooltip-trigger');
-        if (tip) {
-          e.stopPropagation();
-          this.showTooltip(tip);
-        }
+        // Column help is the trigger's native tooltip (title); a click must
+        // not open the row's details.
+        if (target.closest('.cell-tooltip-trigger')) e.stopPropagation();
       });
     }
-
-    // Close a cell tooltip when clicking anywhere else.
-    document.addEventListener('click', () => {
-      document.getElementById('cell-tooltip-popover')?.remove();
-    });
   }
 
   /**
@@ -422,8 +415,6 @@ createModalStructure() {
     if (this.modal && this.modal.open) {
       this.modal.open = false;
     }
-    const tooltip = document.getElementById('cell-tooltip-popover');
-    if (tooltip && typeof tooltip.remove === 'function') tooltip.remove();
     this._tableContext = null;
     this.currentConfig = null;
     this.currentData = null;
@@ -1594,7 +1585,7 @@ createModalStructure() {
           ? this.renderBadgeColumn(value, col)
           : this.formatValue(value, col.format || { type: col.type });
         const tip = col.tooltip
-          ? `<svg class="inline-block ml-1 h-4 w-4 text-gray-400 cursor-pointer hover:text-gray-600 cell-tooltip-trigger" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-tooltip="${this.escapeHtml(col.tooltip)}"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+          ? `<button type="button" class="cell-tooltip-trigger inline-block ml-1 align-middle text-gray-400 hover:text-gray-600" title="${this.escapeHtml(col.tooltip)}" aria-label="${this.escapeHtml(col.tooltip)}"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></button>`
           : '';
         return `<span class="drilldown-cell drilldown-cell--${this.escapeHtml(col.align || 'left')}">${formatted}${tip}</span>`;
       };
@@ -1688,49 +1679,6 @@ createModalStructure() {
     }
     this.renderSortOptions();
     this.renderActiveFilters();
-  }
-
-
-
-  /**
-   * Show tooltip popover near the clicked help icon
-   */
-  showTooltip(trigger) {
-    // Remove any existing tooltip
-    const existingTooltip = document.getElementById('cell-tooltip-popover');
-    if (existingTooltip) {
-      existingTooltip.remove();
-      return; // Toggle behavior - click again to close
-    }
-
-    const tooltipText = trigger.getAttribute('data-tooltip');
-    if (!tooltipText) return;
-
-    // Create tooltip element
-    const tooltip = document.createElement('div');
-    tooltip.id = 'cell-tooltip-popover';
-    tooltip.className = 'absolute z-50 bg-gray-900 text-white text-sm rounded-lg shadow-lg p-3 max-w-xs';
-    tooltip.innerHTML = tooltipText;
-    tooltip.style.pointerEvents = 'none'; // Don't interfere with clicks
-
-    // Position tooltip near the trigger
-    const rect = trigger.getBoundingClientRect();
-    tooltip.style.left = `${rect.left + window.scrollX}px`;
-    tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
-
-    // Add to DOM
-    document.body.appendChild(tooltip);
-
-    // Adjust position if it goes off-screen
-    setTimeout(() => {
-      const tooltipRect = tooltip.getBoundingClientRect();
-      if (tooltipRect.right > window.innerWidth) {
-        tooltip.style.left = `${window.innerWidth - tooltipRect.width - 10}px`;
-      }
-      if (tooltipRect.bottom > window.innerHeight) {
-        tooltip.style.top = `${rect.top + window.scrollY - tooltipRect.height - 5}px`;
-      }
-    }, 0);
   }
 
 
@@ -1945,8 +1893,8 @@ createModalStructure() {
     const lex = typeof window !== 'undefined' ? window.Lex : null;
     if (lex && lex.Toast && typeof lex.Toast.error === 'function') {
       lex.Toast.error(message);
-    } else if (lex && lex.Modal && typeof lex.Modal.alert === 'function') {
-      lex.Modal.alert(title, this.escapeHtml(message));
+    } else if (lex && lex.Modal && typeof lex.Modal.alertAsync === 'function') {
+      lex.Modal.alertAsync(title, message);
     } else {
       console.error('[DrilldownRenderer]', title, message);
     }
@@ -2106,7 +2054,7 @@ createModalStructure() {
     const lex = typeof window !== 'undefined' ? window.Lex : null;
 
     if (!helpText) {
-      if (lex && lex.Modal) lex.Modal.alert('Help', 'No help documentation available for this drilldown.');
+      if (lex && lex.Modal) lex.Modal.alertAsync('Help', 'No help documentation available for this drilldown.');
       return;
     }
 

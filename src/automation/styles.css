@@ -1675,53 +1675,9 @@ button:disabled {
   align-items: center;
 }
 
-.builder-publish-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 140;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-}
-
-.builder-publish-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(17, 17, 17, 0.44);
-}
-
-.builder-publish-panel {
-  position: relative;
-  width: min(760px, 100%);
-  max-height: calc(100vh - 64px);
-  overflow: auto;
-  border: 1px solid var(--lex-border-default);
-  border-radius: var(--lex-radius-xl, 16px);
-  background: var(--lex-bg-elevated, var(--paper));
-  box-shadow: var(--lex-shadow-xl);
-  display: flex;
-  flex-direction: column;
-}
-
-.builder-publish-header,
-.builder-publish-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
-}
-
-.builder-publish-header {
-  border-bottom: 1px solid var(--lex-border-subtle);
-}
-
-.builder-publish-header h3 {
-  margin: 0;
-}
-
+/* Publish dialog is a lex-modal (#builder-publish-modal); the modal owns
+   the header, close, footer and body padding. */
 .builder-publish-body {
-  padding: 14px;
   display: grid;
   gap: 12px;
 }
@@ -1743,11 +1699,6 @@ button:disabled {
 
 .builder-publish-blockers li + li {
   margin-top: 4px;
-}
-
-.builder-publish-footer {
-  border-top: 1px solid var(--lex-border-subtle);
-  justify-content: flex-end;
 }
 
 .automations-footer-meta {
