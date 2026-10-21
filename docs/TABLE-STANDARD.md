@@ -1,6 +1,6 @@
 # LANA Table Standard
 
-Every list of records in the client is one `lex-table` laid out the same way, with the same search, sort, filter, pagination and formatting rules. This document is the spec. The reference pages are My Tasks (`src/my-tasks.html`, `src/js/pages/my-tasks.js`), Document Library (`src/document-library.html`, `src/js/document-library.js`) and Template Library (`src/document-library-templates.html`, `src/js/document-library-templates.js`).
+This standard covers every page and app in lana-client. Every list of records is one `lex-table` laid out the same way, with the same search, sort, filter, pagination and formatting rules. This document is the spec. The reference pages are My Tasks (`src/my-tasks.html`, `src/js/pages/my-tasks.js`), Document Library (`src/document-library.html`, `src/js/document-library.js`) and Template Library (`src/document-library-templates.html`, `src/js/document-library-templates.js`).
 
 Component API details live in `src/js/lex/LEX-COMPONENT-RULES.md` (the `lex-table` section) and in the header comment of `src/js/lex/components/data/lex-table.js`.
 
@@ -131,6 +131,7 @@ table.requestServerQuery();                          // first load
 
 - **All dates go through `Lex.Utils`.** It reads API timestamps as UTC and shows them in the user's timezone: their profile setting, then the organization's, then the browser's.
   - Don't format dates with `toLocaleString`, a page-local helper, or an app-specific timezone lookup. The automation app currently has its own, which checks the organization before the user and falls back to UTC.
+- **Every table has a "Created" column** showing the record's `created_at`. It is sortable, has the date-range filter, and is never truncated. For event logs (audit, traces), the event timestamp is the Created column.
 - **"Created"** column: `Lex.Utils.formatDateTime`, which gives `1/20/2026 3:16 PM`. This is the default format for any date column holding a timestamp.
 - **"Last edited" or "Updated"** column: relative time (`Lex.Utils.timeAgo`), with the full `formatDateTime` value in `title`.
 - **Due dates and other date-only values:** `Lex.Utils.formatDate`.
@@ -184,7 +185,27 @@ A list API behind a server table must support:
 - **Facet endpoints** that list the values of open-ended columns, such as `GET /library/files/extensions` and `GET /document-studio/templates/document-types`. Each returns `{ <name>: [{ value, count }] }`.
 - **400 errors with a readable message** for invalid parameters.
 
-## 11. Checklist for a page
+## 11. Dropdowns and overlays (all pages)
+
+- **Dropdowns:** use only `lex-select`, in toolbars, forms, drawers and modals.
+  - No native `<select>`, whether in HTML or built in JS.
+  - No hand-built dropdown or popover menus.
+  - Option labels follow the capital-first-letter rule.
+- **Dialogs:** use `lex-modal`, with its own title, close button and footer slot.
+- **Side panels:** use `lex-drawer`, with its own header, close button and footer.
+- **No hand-built overlays.** That means no custom backdrop divs, `fixed inset-0` modals, or slide-overs. Never use `window.alert`, `confirm` or `prompt`; use `lex-modal` or a toast instead.
+- **A lex-table row click** opens the record's `lex-drawer` or detail page. It never opens a hand-built panel.
+
+## 12. API architecture (chef endpoints behind these tables)
+
+- **Layers:** routes → controllers → services → repositories.
+  - No SQL, and no database reads or writes, outside repositories.
+  - A route or service that runs a query gets that query moved into the owning repository.
+- **One repository method per table and criteria.** The list query, its count query and its facet queries share one WHERE builder, including the access or visibility predicate.
+  - Duplicate queries found while working on an endpoint are merged onto that method, and callers are updated. Near-duplicates that can't be merged safely are flagged.
+- **Validation:** zod at the route, with readable 400 messages, parameterized SQL and allow-listed sort fields.
+
+## 13. Checklist for a page
 
 - [ ] Banner, toolbar card, section heading with count, and `lex-table.lex-table--card`
 - [ ] No `searchable` / `filterable` / `compact`; search in the toolbar
@@ -192,14 +213,15 @@ A list API behind a server table must support:
 - [ ] Correct data mode: no capped client-side lists, no outside pager
 - [ ] Rows hold raw values; all formatting in renderers
 - [ ] Name column first and semibold; workspace links; status/priority badges; muted "—" for empty cells
-- [ ] Dates through `Lex.Utils`; "Created" label; full date-time never truncated
+- [ ] A Created column; dates through `Lex.Utils`; "Created" label; full date-time never truncated
+- [ ] Only `lex-select` dropdowns; only `lex-modal` / `lex-drawer` overlays; no native select, custom menus or `alert` / `confirm`
 - [ ] Every column has a filter; Clear filters works; empty text reflects filtering
 - [ ] Column widths set; narrow window scrolls sideways
 - [ ] Unit tests for the query mapping; checked live: sort, each filter, search, paging, and the empty and error states
 
 ---
 
-## 12. Inventory and migration order (2026-10-21)
+## 14. Inventory and migration order (2026-10-21)
 
 Status: ✓ meets the standard. ~ close. ✗ needs migration.
 
@@ -236,3 +258,8 @@ Status: ✓ meets the standard. ~ close. ✗ needs migration.
 - Admin: reporting, search-analytics, settings, dashboard and integrations.
 
 Report-card tables inside generated documents and chat blocks are exempt.
+
+### Also in scope
+
+- **Card or div lists of records** (for example the dashboards catalog on `admin/analytics.html`). They become the standard table, unless they're a visual launcher or gallery. A separate inventory of these is in progress.
+- **Native `<select>` elements, hand-built menus and hand-built overlays** across all pages. A separate inventory of these is in progress.
