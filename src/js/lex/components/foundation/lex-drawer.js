@@ -424,6 +424,13 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
           footerContainer.appendChild(child);
         }
       }
+      // Declarative header actions: children marked data-slot="header-actions".
+      const headerActions = this.querySelector('.lex-drawer-header-actions');
+      if (slotContent && headerActions) {
+        for (const child of slotContent.querySelectorAll('[data-slot="header-actions"]')) {
+          headerActions.appendChild(child);
+        }
+      }
 
       if (!this.open) {
         // Deactivate focus trap and restore previously focused element.
@@ -545,6 +552,17 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
     }
 
     // --- Instance API ---
+
+    // Show or hide the footer without touching its markup.
+    setFooterVisible(visible) {
+      const footer = this.querySelector('.lex-drawer-footer');
+      if (footer) footer.classList.toggle('hidden', !visible);
+    }
+
+    // The element page content lives in (inside the drawer body).
+    get contentRoot() {
+      return this.querySelector('.lex-drawer-body slot-content') || this.querySelector('.lex-drawer-body');
+    }
 
     /**
      * Set action buttons in the drawer header (between title and close button).

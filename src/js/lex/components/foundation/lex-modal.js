@@ -18,6 +18,9 @@
    Sizes: sm | md | lg | xl | full
    Variants: default | danger | info | success
    Events: lex-confirm, lex-cancel, lex-close
+   Footer: footer-content="<html>" (first render), children with data-slot="footer"
+   (moved into the footer), or modal.setFooterContent(html) later.
+   modal.setHeaderActions(html); hide-close removes the header close button.
 */
 
 (function () {
@@ -212,7 +215,11 @@
         padding: 24px;
       }
 
+      .lex-modal-close[hidden] {
+        display: none !important;
+      }
       .lex-modal-body-text {
+        white-space: pre-line;
         font-size: var(--lex-body-sm-size, 0.875rem);
         color: var(--lex-text-secondary);
         line-height: 1.6;
@@ -389,7 +396,8 @@
         backButton:  { type: Boolean, default: false },
         backLabel:   { type: String, default: 'Back' },
         headerActions: { type: String, default: '' },
-        footerContent: { type: String, default: '' }
+        footerContent: { type: String, default: '' },
+        hideClose:   { type: Boolean, default: false }   // no header close button (pickers with their own Done/Cancel)
       };
     }
 
@@ -454,7 +462,7 @@
         if (this.headerActions) {
           html += `<div class="lex-modal-header-actions">${this.headerActions}</div>`;
         }
-        html += `<button type="button" class="lex-modal-close" data-action="close" aria-label="Close dialog">${CLOSE_SVG}</button>`;
+        html += `<button type="button" class="lex-modal-close" data-action="close" aria-label="Close dialog"${this.hideClose ? ' hidden' : ''}>${CLOSE_SVG}</button>`;
         html += `</div>`;
       }
 
@@ -504,6 +512,20 @@
             panel.removeAttribute('aria-labelledby');
           }
         }
+      }
+
+      if (changedProps && changedProps.has('hideClose')) {
+        const closeBtn = this.querySelector('.lex-modal-close');
+        if (closeBtn) closeBtn.hidden = !!this.hideClose;
+      }
+
+      // Declarative footer: children marked data-slot="footer" move into the
+      // footer (replacing the built-in confirm/cancel buttons).
+      const slotContent = this.querySelector('.lex-modal-body slot-content');
+      const slotted = slotContent ? slotContent.querySelectorAll('[data-slot="footer"]') : [];
+      if (slotted.length) {
+        const footer = this._ensureFooter(true);
+        for (const child of slotted) footer.appendChild(child);
       }
 
       if (changedProps && (changedProps.has('backButton') || changedProps.has('backLabel'))) {
@@ -640,6 +662,44 @@
           this._scrollLocked = false;
         }
       });
+    }
+
+    // The footer element, created if needed. replaceBuiltIns drops the built-in
+    // confirm/cancel buttons the first time custom content arrives.
+    _ensureFooter(replaceBuiltIns) {
+      const panel = this.querySelector('.lex-modal-panel');
+      if (!panel) return null;
+      let footer = panel.querySelector(':scope > .lex-modal-footer');
+      if (!footer) {
+        footer = document.createElement('div');
+        footer.className = 'lex-modal-footer';
+        panel.appendChild(footer);
+      } else if (replaceBuiltIns && !footer.dataset.lexCustom) {
+        footer.querySelectorAll('[data-action="confirm"], [data-action="cancel"]').forEach((btn) => btn.remove());
+      }
+      if (replaceBuiltIns) footer.dataset.lexCustom = 'true';
+      return footer;
+    }
+
+    // Replace the footer after first render (footer-content only applies to
+    // the first render). html is trusted markup.
+    setFooterContent(html) {
+      const footer = this._ensureFooter(true);
+      if (footer) footer.innerHTML = html || '';
+    }
+
+    // Replace the header actions after first render. html is trusted markup.
+    setHeaderActions(html) {
+      const header = this.querySelector('.lex-modal-header');
+      if (!header) return;
+      let actions = header.querySelector('.lex-modal-header-actions');
+      if (!actions) {
+        actions = document.createElement('div');
+        actions.className = 'lex-modal-header-actions';
+        const close = header.querySelector('.lex-modal-close');
+        header.insertBefore(actions, close || null);
+      }
+      actions.innerHTML = html || '';
     }
 
     // Call from a lex-confirm listener to keep the modal open this time.
