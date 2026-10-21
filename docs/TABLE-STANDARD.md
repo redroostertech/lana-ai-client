@@ -189,7 +189,7 @@ A list API behind a server table must support:
 
 - **Dropdowns:** use only `lex-select`, in toolbars, forms, drawers and modals.
   - No native `<select>`, whether in HTML or built in JS.
-  - No hand-built dropdown or popover menus.
+  - No hand-built dropdown or popover menus. Action menus are `lex-dropdown-btn`; add `floating` when the menu sits inside a card, table, drawer or modal that clips. A menu anchored at a text caret or other rect uses `Lex.Menu.openAt`.
   - Option labels follow the capital-first-letter rule.
 - **Dialogs:** use `lex-modal`, with its own title, close button and footer slot.
   - Instead of `window.confirm`, use `await Lex.Modal.confirmAsync(title, text, opts)`, which returns true or false.
@@ -252,16 +252,21 @@ A list API behind a server table must support:
 - fix/tasks-matters-list-filters is still in progress.
 - Until chef 3.0.0 is live, new client filters send parameters that the running server ignores, or fall back to built-in option lists.
 
+**Leftovers closed (2026-10-21, feat/ui-standard-leftovers):**
+- lex-dropdown-btn `floating`: the open menu renders in a body-level layer, flips above when needed and follows scroll. Set on the drive, folder, workspaces and matters card/row kebabs, the matter drawer menu, the matter-documents-view row menu, the dashboard task status and drawer Actions menus, and the My Tasks modal Actions menu. The drive.css clipping workaround is gone.
+- connector-viewer's topbar connector switcher is a floating lex-dropdown-btn.
+- The file editor's caret-anchored variable autocomplete runs on the new `Lex.Menu.openAt(rect, items, opts)` (LEX-COMPONENT-RULES.md).
+
 **Known leftovers:**
-- lex-dropdown-btn has no free-floating option (drive.css works around clipping).
-- connector-viewer's topbar connector switcher.
-- The file editor's caret-anchored variable autocomplete: no component positions at a text caret.
 - The admin/settings notification panel.
 - `bindFooterSubmit` in js/pages/my-tasks.js.
-- On matters.html the LANA dock covers the header user menu at about 1400px wide. This existed before this work.
 - Errors that existed before this work: onboarding.html (`api` declared twice) and admin/dashboard.html (`isSystemAdmin` declared twice).
 - workflows/active and insights/predictions have stubbed data sources.
-- Skills calls `/api/v1/skills`, which chef no longer mounts. Chef says to use `GET /automations`.
+
+**3.0.1:**
+- Matters: the LANA dock covers the header user menu at about 1400px wide. This existed before this work.
+- Skills: switch from `/api/v1/skills` (chef no longer mounts it) to `GET /automations`.
+- Deck Studio: org-scoped library (chef commit 825ca5c83), with a backfill of existing decks, which stay hidden until it runs.
 
 ## 15. Inventory and migration order (2026-10-21)
 

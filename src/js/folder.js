@@ -1021,7 +1021,7 @@
    */
   function folderMenuHtml(folder, className) {
     return '<lex-dropdown-btn class="' + className + '" data-folder-menu data-folder-id="' + escapeHtml(folder.id) + '"' +
-      ' icon="more-vertical" icon-only variant="ghost" align="end" aria-label="Folder actions"' +
+      ' icon="more-vertical" icon-only variant="ghost" align="end" floating aria-label="Folder actions"' +
       ' options="' + jsonAttr(FOLDER_ITEM_MENU) + '" onclick="event.stopPropagation()"></lex-dropdown-btn>';
   }
 

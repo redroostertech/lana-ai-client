@@ -2206,7 +2206,7 @@
     return '<lex-dropdown-btn class="' + className + '" data-matter-menu' +
       ' data-matter-id="' + escapeHtml(matterId) + '" data-matter-name="' + escapeHtml(matterName) + '"' +
       ' data-is-pinned="' + (isPinned ? 'true' : 'false') + '" data-source="' + escapeHtml(source || 'lana') + '"' +
-      ' icon="more-vertical" icon-only variant="ghost" align="end" aria-label="Folder actions"' +
+      ' icon="more-vertical" icon-only variant="ghost" align="end" floating aria-label="Folder actions"' +
       ' options="' + json + '" onclick="event.stopPropagation()"></lex-dropdown-btn>';
   }
 

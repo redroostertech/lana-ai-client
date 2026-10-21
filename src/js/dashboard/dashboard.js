@@ -1102,7 +1102,7 @@
 
     return '<lex-dropdown-btn class="cc-task-status-pill" data-task-status-pill="1"' +
       ' data-task-id="' + escHtml(taskId) + '" data-current-status="' + escHtml(status) + '"' +
-      ' data-status-color="' + taskStatusColor(status) + '" variant="ghost" align="end"' +
+      ' data-status-color="' + taskStatusColor(status) + '" variant="ghost" align="end" floating' +
       ' button-label="' + escHtml(label) + '" aria-label="' + escHtml('Change status: ' + label) + '"' +
       ' options="' + jsonAttr(items) + '"></lex-dropdown-btn>';
   }
@@ -1536,7 +1536,7 @@
     ];
 
     drawerEl.setHeaderActions([{ html:
-      '<lex-dropdown-btn class="cc-task-header-actions" data-task-actions-menu button-label="Actions" align="end"' +
+      '<lex-dropdown-btn class="cc-task-header-actions" data-task-actions-menu button-label="Actions" align="end" floating' +
       ' options="' + jsonAttr(items) + '"></lex-dropdown-btn>'
     }]);
   }

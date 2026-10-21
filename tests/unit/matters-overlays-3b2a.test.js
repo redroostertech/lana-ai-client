@@ -231,9 +231,15 @@ describe('converted matters.html markup with the real lex components', () => {
     expect(menu).not.toBeNull();
     const seen = [];
     menu.addEventListener('lex-select', (e) => seen.push(e.detail.value));
-    menu.querySelector('[data-action="toggle"]').click();
+    const trigger = menu.querySelector('[data-action="toggle"]');
+    trigger.click();
     await tick(window);
-    const items = menu.querySelectorAll('.lex-ddbtn-item');
+    // floating: the open menu sits in a body-level layer (found by aria-controls),
+    // so the drawer's overflow cannot clip it.
+    expect(menu.hasAttribute('floating')).toBe(true);
+    const list = window.document.getElementById(trigger.getAttribute('aria-controls'));
+    expect(drawer.contains(list)).toBe(false);
+    const items = list.querySelectorAll('.lex-ddbtn-item');
     expect(items.length).toBe(2);
     items[1].click();
     expect(seen).toEqual(['delete']);

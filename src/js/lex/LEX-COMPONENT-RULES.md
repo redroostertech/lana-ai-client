@@ -618,6 +618,7 @@ Button that opens a dropdown action menu (not a value selector).
 | `icon` | String | `''` | Lex.Icons name shown on the trigger |
 | `iconOnly` | Boolean | `false` | Icon-only trigger (`icon-only`): no text, no chevron. Give the element an `aria-label`. |
 | `align` | String | `'start'` | `end` lines the menu up with the trigger's right edge (header menus at the right edge) |
+| `floating` | Boolean | `false` | Render the open menu in a body-level layer (`position: fixed`) so a card, table row, drawer or modal with `overflow: hidden/auto` cannot clip it. Set it on every menu inside such a container (row/card kebabs, drawer and modal header menus). |
 | `searchable` | Boolean | `false` | Search box in the menu |
 | `disabled` | Boolean | `false` | Disabled trigger |
 
@@ -626,6 +627,32 @@ Button that opens a dropdown action menu (not a value selector).
 **Events:** `lex-select { value, label, item }` (`value` is the string form)
 
 **Keyboard and ARIA:** ArrowDown/Enter/Space on the trigger opens and focuses the first item; ArrowUp/ArrowDown/Home/End move (skipping separators and disabled items); Enter/Space activates; Escape closes and returns focus to the trigger (without closing an enclosing modal); Tab closes. Roles `menu` / `menuitem` / `separator`; trigger carries `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`.
+
+**`floating`:** the menu opens below the trigger and flips above when there is less room below (capping its height when neither side fits), honours `align="end"`, clamps to the viewport, and re-positions on scroll (capture phase, so any scrolling ancestor counts) and resize. It stacks at `--lex-z-floating` (2000), above lex-modal/lex-drawer (`--lex-z-modal`) and page topbars. Outside click, Escape (an enclosing modal stays open), keyboard navigation and `lex-select` (still emitted on the element, so `closest()` lookups from the event work) behave as without it. `aria-controls` names the floating menu; while it is open the menu is not inside the element, so tests and code find it with `document.getElementById(trigger.getAttribute('aria-controls'))`, never `el.querySelector('.lex-ddbtn-item')`. The layer is removed on close and when the element disconnects. Not the default, because existing code reads the open menu from inside the element (the header user menu does).
+
+### `Lex.Menu.openAt(anchor, items, opts)`
+
+A floating menu at any rect, for menus with no trigger of their own: autocomplete at a text caret (`range.getBoundingClientRect()`), a picker under a toolbar button. Defined in `lex-dropdown-btn.js` (load that script). The host keeps DOM focus (a contenteditable keeps its caret) and forwards keys.
+
+```javascript
+const menu = Lex.Menu.openAt(() => range.getBoundingClientRect(), items, {
+  heading: 'Template variables', hint: '#{{entity:property_key}}',
+  search: { value: '', placeholder: 'Search...', onInput: (q) => menu.update(filter(q)) },
+  onBack: () => { /* back one level */ },
+  tabSelects: true, owner: editorEl, align: 'center', gap: 8,
+  onSelect: (item, index) => { insert(item); menu.close(); },
+  onClose: (reason) => { /* 'escape' | 'outside' | 'host' */ }
+});
+editorEl.addEventListener('keydown', (e) => { if (menu.open && menu.handleKey(e)) e.preventDefault(); });
+menu.update(nextItems);   // filtering as the user types; opts merge, highlight kept unless opts.activeIndex
+```
+
+- **anchor:** a DOMRect-like box, or a function returning one (re-read on scroll/resize, so the menu follows a caret in a scrolling page).
+- **items:** `{ value, label, description?, meta?, icon?, avatar?, disabled?, data? }` or `{ divider: true }`. `meta` is a monospace second line, `avatar` short text (initials) in a circle, `data` anything the host wants back in `onSelect`.
+- **opts:** `align` start/center/end, `placement` bottom/top, `gap`, `margin`, `width`, `id`, `className`, `ariaLabel`, `heading`, `hint`, `onBack`, `search`, `emptyText`, `activeIndex`, `tabSelects`, `owner` (gets `aria-expanded`, `aria-controls`, `aria-activedescendant`), `ignoreOutside(target)`, `onSelect`, `onActiveChange`, `onClose`.
+- **Controller:** `element`, `open`, `activeIndex`, `items`, `update(items, opts)`, `reposition()`, `setActive(i)`, `move(delta)`, `select(i?)`, `handleKey(event)` (true when used: ArrowUp/ArrowDown/Home/End move and wrap past dividers and disabled items, Enter (and Tab with `tabSelects`) selects, Escape closes; with no selectable items only Escape is used, so Enter falls through to the editor), `focusSearch()`, `close()`.
+- **Behaviour:** placement as `floating` above. Selecting does not close the menu: the host closes it or drills into another level with `update()`. A mousedown inside the menu (except its search box) is prevented so focus stays in the host. Escape is caught in the capture phase (an enclosing modal stays open); a mousedown outside closes it. Because `update()` replaces the rows, a document-level click handler that runs after a pick should test `event.composedPath()` rather than `closest()` on the detached row.
+- **Positioning helper:** `Lex.Floating.compute(anchorRect, { width, height }, { width, height }, { align, placement, gap, margin })` returns `{ top, left, placement, maxHeight }` (pure, for tests); `Lex.Floating.place(el, rect, opts)` and `Lex.Floating.track(el, getRect, opts)` (in `lex.core.js`) position a fixed element and follow scroll/resize.
 
 ```html
 <lex-dropdown-btn icon="settings" icon-only aria-label="Account menu" align="end" variant="ghost"

@@ -514,7 +514,7 @@
     }
 
     function kebabMenu(items, label, dataAttrs) {
-      return '<lex-dropdown-btn class="mdv-kebab-menu" icon="more-vertical" icon-only variant="ghost" align="end"' +
+      return '<lex-dropdown-btn class="mdv-kebab-menu" icon="more-vertical" icon-only variant="ghost" align="end" floating' +
         ' aria-label="' + esc(label) + '"' + dataAttrs +
         ' options="' + escAttrJson(items) + '"></lex-dropdown-btn>';
     }

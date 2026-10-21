@@ -601,7 +601,7 @@
   <!-- Matter Details Drawer (lex-drawer: title, close, backdrop, Escape, focus trap) -->
   <lex-drawer id="matterDrawer" heading="Matter Details" width="full" flush>
     <div data-slot="header-actions" class="flex items-center gap-2">
-      <lex-dropdown-btn id="drawerOptionsMenu" icon="more-vertical" icon-only aria-label="More options" align="end" variant="ghost"
+      <lex-dropdown-btn id="drawerOptionsMenu" icon="more-vertical" icon-only aria-label="More options" align="end" variant="ghost" floating
         options='[{"value":"edit","label":"Edit","icon":"edit"},{"value":"delete","label":"Delete","icon":"trash-2","variant":"danger"}]'></lex-dropdown-btn>
       <button id="refreshMatterBtn" onclick="refreshCurrentMatter()" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Refresh matter details" aria-label="Refresh matter details">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1281,7 +1281,7 @@
             <div class="flex items-center justify-between text-xs text-gray-400">
               <span>Created ${formatDate(matter.created_at)}</span>
               <lex-dropdown-btn id="matter-card-options-${escapedMatterId}" class="matter-card-options" data-matter-id="${escapedMatterId}"
-                icon="more-vertical" icon-only aria-label="More options" align="end" variant="ghost" onclick="event.stopPropagation()"
+                icon="more-vertical" icon-only aria-label="More options" align="end" variant="ghost" floating onclick="event.stopPropagation()"
                 options='[{"value":"edit","label":"Edit","icon":"edit"},{"value":"delete","label":"Delete","icon":"trash-2","variant":"danger"}]'></lex-dropdown-btn>
             </div>
           </div>
