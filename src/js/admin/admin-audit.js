@@ -1,16 +1,19 @@
 /**
  * Admin Audit Logs — standalone page controller.
  *
- * Handles audit log listing, statistics, category filtering,
- * event info modal, and log detail drawer for admin/audit.html.
+ * One server-paged lex-table (docs/TABLE-STANDARD.md) with statistics
+ * cards, a Category toolbar filter, header filters on every column, the
+ * event info modal and the log detail drawer for admin/audit.html.
  *
  * @requires api.js                - window.api — getAuditEventTypes, getAuditStatistics,
- *                                    getAuditLogs, queryAuditLogs
+ *                                    queryAuditLogs
  * @requires event-display-names.js - window.EventDisplayNames.getEventDisplayName
  * @requires lex.utils.js          - Lex.Utils.escapeHtml, Lex.Utils.formatDateTime
  * @requires lex-modal.js          - Lex.Modal (event info modal)
  * @requires lex-toast.js          - Lex.Toast.error
- * @requires lex-table.js          - table.setData()
+ * @requires lex-table.js          - server paging (setServerData)
+ * @requires admin-table-kit.js    - AdminTableKit toolbar + cell helpers
+ * @requires library-column-filters.js - date-range filter bounds
  */
 
 (function () {
@@ -119,12 +122,22 @@
   // Module-level state
   // =========================================================================
 
-  var _currentPage     = 1;
-  var _pageSize        = 10;
-  var _logs            = [];
-  var _eventTypes      = [];
-  var _categoryFilter  = null;   // null | 'all' | 'security' | 'user' | 'system' | 'other'
+  var TABLE_ID         = 'auditTable';
+  var _eventTypes      = [];     // from /audit/event-types
   var _otherEventTypes = [];     // populated by loadStatistics
+  var _statsRange      = null;   // created_at range the statistics were loaded for
+  var _statsPromise    = null;
+  var _searchTerm      = '';
+  var _toolbar         = null;
+  var _gen             = 0;
+
+  var CATEGORY_CARDS = {
+    all:      'statCardAll',
+    security: 'statCardSecurity',
+    user:     'statCardUser',
+    system:   'statCardSystem',
+    other:    'statCardOther'
+  };
 
   // =========================================================================
   // Entry point
@@ -133,20 +146,46 @@
   function init() {
     _wireStatCards();
     _wireInfoButtons();
-    _wireFilters();
-    _wireDrawer();
-    _setDefaultDates();
+
+    var table = el(TABLE_ID);
+    if (!table) return;
 
     // Topbar refresh button
     document.addEventListener('lex-refresh', function (e) {
       e.preventDefault();
-      loadStatistics();
-      loadLogs();
+      _statsRange = null;
+      table.requestServerQuery();
+    });
+
+    window.AdminTableKit.whenTableReady().then(function () {
+      if (el(TABLE_ID) !== table) return;
+      table.setCellRenderers(cellRenderers());
+      table.setColumnFilterOptions(filterOptions(_eventTypes));
+      _toolbar = window.AdminTableKit.bindToolbar({
+        table: table,
+        searchId: 'auditSearch',
+        sortId: 'auditSort',
+        orderId: 'auditSortOrder',
+        filterId: 'auditCategoryFilter',
+        filterKey: 'category',
+        countIds: ['auditCount', 'auditSectionCount'],
+        noun: ['event', 'events'],
+        onSearch: function (term) {
+          _searchTerm = term;
+          table.requestServerQuery({ resetPage: true });
+        }
+      });
+      table.addEventListener('lex-query-change', function (e) {
+        if (e.target === table) loadLogs(e.detail);
+      });
+      table.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row) _viewLogDetails(row._raw || row);
+      });
+      table.requestServerQuery({ resetPage: true });
     });
 
     loadEventTypes();
-    loadStatistics();
-    loadLogs();
   }
 
   // =========================================================================
@@ -170,35 +209,130 @@
   }
 
   /**
-   * Build the event types array for a given category (for query API).
+   * The event types of a category (for the query API); null = no category.
+   * "Other" uses the uncategorised types the statistics found.
    * @param {string} category
-   * @returns {string[]}
+   * @param {string[]} [otherTypes]
+   * @returns {string[]|null}
    */
-  function getCategoryEventTypes(category) {
+  function getCategoryEventTypes(category, otherTypes) {
     if (category === 'security') return SECURITY_PATTERNS.slice();
     if (category === 'user')     return USER_ACTION_PATTERNS.slice();
     if (category === 'system')   return SYSTEM_EVENT_PATTERNS.slice();
-    if (category === 'other')    return _otherEventTypes.map(function (e) { return e.event_type; });
-    return [];
+    if (category === 'other')    return (otherTypes || []).slice();
+    return null;
+  }
+
+  function eventLabel(eventType) {
+    var names = typeof EventDisplayNames !== 'undefined' ? EventDisplayNames : window.EventDisplayNames;
+    var name = names && typeof names.getEventDisplayName === 'function'
+      ? names.getEventDisplayName(eventType)
+      : Lex.Utils.humanizeLabel(String(eventType || '').split('.').join(' '));
+    return Lex.Utils.capitalizeFirst(name || eventType);
+  }
+
+  var CATEGORY_COLORS = { security: 'red', user: 'blue', system: 'green', other: 'gray' };
+
+  // =========================================================================
+  // Query mapping
+  // =========================================================================
+
+  /**
+   * The audit query body for a lex-table server query. Returns null when the
+   * filters cannot match anything (a category with no types, or event types
+   * outside the chosen category), so the page shows an empty result without
+   * a request. search, user_email and sort_* are sent for the API to read
+   * once it supports them; today it ignores unknown keys.
+   * @param {Object} query - { page, limit, sortDir, filters }
+   * @param {string} search
+   * @param {string[]} otherTypes
+   * @param {Date} [now]
+   * @returns {Object|null}
+   */
+  function toQueryBody(query, search, otherTypes, now) {
+    var kit = window.AdminTableKit;
+    var q = query || {};
+    var filters = q.filters || {};
+    var paging = kit.pageOffset(q);
+    var body = { limit: paging.limit, offset: paging.offset, sort_by: 'created_at', sort_order: q.sortDir === 'asc' ? 'asc' : 'desc' };
+
+    var category = kit.firstFilterValue(filters, 'category');
+    var categoryTypes = getCategoryEventTypes(category, otherTypes);
+    var picked = kit.filterValues(filters.event_type);
+    var types = categoryTypes;
+    if (picked.length) {
+      types = categoryTypes ? picked.filter(function (t) { return categoryTypes.indexOf(t) !== -1; }) : picked;
+    }
+    if (types && !types.length) return null;
+    if (types) body.event_types = types;
+
+    var ip = kit.firstFilterValue(filters, 'ip_address');
+    if (ip) body.ip_addresses = [ip];
+    var email = kit.firstFilterValue(filters, 'user_email');
+    if (email) body.user_email = email;
+    if (search) body.search = search;
+    var range = kit.setRange(null, filters, 'created_at', '', '', now);
+    if (range.after) body.start_date = range.after;
+    if (range.before) body.end_date = range.before;
+    return body;
+  }
+
+  function mapLog(log) {
+    return {
+      id:         String(log.id || ''),
+      event_type: String(log.event_type || ''),
+      user_email: String(log.user_email || ''),
+      ip_address: String(log.ip_address || ''),
+      created_at: log.timestamp || log.created_at || '',
+      _raw:       log
+    };
+  }
+
+  function cellRenderers() {
+    var kit = window.AdminTableKit;
+    return {
+      event_type: function (val) {
+        if (!val) return kit.muted('');
+        return '<span class="admin-table-name" title="' + kit.esc(val) + '">' + kit.esc(eventLabel(val)) + '</span>' +
+          '<span class="admin-table-sub">' + kit.esc(Lex.Utils.capitalizeFirst(categoryLabel(classifyEvent(val)))) + '</span>';
+      },
+      user_email: function (val) {
+        return val ? '<span class="admin-table-text" title="' + kit.esc(val) + '">' + kit.esc(val) + '</span>' : kit.muted('');
+      },
+      ip_address: function (val) {
+        return val ? '<span class="admin-table-text">' + kit.esc(val) + '</span>' : kit.muted('');
+      },
+      created_at: function (val) { return kit.timeCell(val); }
+    };
+  }
+
+  function categoryLabel(category) {
+    return { security: 'Security event', user: 'User action', system: 'System event', other: 'Other event' }[category] || '';
   }
 
   /**
-   * Build an HTML pill badge for an event type.
-   * @param {string} eventType
-   * @returns {string}
+   * Header filters for every column. Event types come from the server; the
+   * known categorised types stand in until it answers.
+   * @param {Array} eventTypes
    */
-  function eventTypePill(eventType) {
-    var displayName = escHtml(EventDisplayNames.getEventDisplayName(eventType));
-    return (
-      '<span style="' +
-        'display:inline-flex;align-items:center;' +
-        'padding:2px 8px;border-radius:9999px;' +
-        'font-size:var(--lex-body-xs-size,0.75rem);' +
-        'font-weight:500;' +
-        'background:var(--lex-status-neutral-bg,#F2F4F7);' +
-        'color:var(--lex-text-secondary);' +
-      '">' + displayName + '</span>'
-    );
+  function filterOptions(eventTypes) {
+    var kit = window.AdminTableKit;
+    var values = (eventTypes && eventTypes.length)
+      ? eventTypes.map(function (et) { return typeof et === 'string' ? et : et.event_type; })
+      : SECURITY_PATTERNS.concat(USER_ACTION_PATTERNS, SYSTEM_EVENT_PATTERNS);
+    var seen = {};
+    var options = values.filter(function (v) {
+      if (!v || seen[v]) return false;
+      seen[v] = true;
+      return true;
+    }).map(function (v) { return { value: v, label: eventLabel(v) }; })
+      .sort(function (a, b) { return a.label.localeCompare(b.label); });
+    return {
+      event_type: { options: options },
+      user_email: { text: true, placeholder: 'Email contains...' },
+      ip_address: { text: true, placeholder: 'IP address is...' },
+      created_at: kit.dateRangeFilter()
+    };
   }
 
   // =========================================================================
@@ -206,26 +340,16 @@
   // =========================================================================
 
   function _wireStatCards() {
-    var cards = [
-      { id: 'statCardAll',      category: 'all' },
-      { id: 'statCardSecurity', category: 'security' },
-      { id: 'statCardUser',     category: 'user' },
-      { id: 'statCardSystem',   category: 'system' },
-      { id: 'statCardOther',    category: 'other' }
-    ];
-
-    for (var i = 0; i < cards.length; i++) {
-      (function (cfg) {
-        var card = el(cfg.id);
-        if (!card || card._auditWired) return;
-        card._auditWired = true;
-        card.addEventListener('click', function (e) {
-          // Don't trigger card click if info button was clicked
-          if (e.target.closest('button')) return;
-          _selectCategory(cfg.category);
-        });
-      })(cards[i]);
-    }
+    Object.keys(CATEGORY_CARDS).forEach(function (category) {
+      var card = el(CATEGORY_CARDS[category]);
+      if (!card || card._auditWired) return;
+      card._auditWired = true;
+      card.addEventListener('click', function (e) {
+        // Don't trigger card click if info button was clicked
+        if (e.target.closest('button')) return;
+        _selectCategory(category);
+      });
+    });
   }
 
   function _wireInfoButtons() {
@@ -249,133 +373,36 @@
     }
   }
 
-  function _wireFilters() {
-    var applyBtn = el('applyFiltersBtn');
-    var clearBtn = el('clearFiltersBtn');
-
-    if (applyBtn && !applyBtn._auditWired) {
-      applyBtn._auditWired = true;
-      applyBtn.addEventListener('click', function () {
-        _categoryFilter = null;
-        _clearCardHighlights();
-        _currentPage = 1;
-        loadStatistics();
-        loadLogs();
-      });
-    }
-
-    if (clearBtn && !clearBtn._auditWired) {
-      clearBtn._auditWired = true;
-      clearBtn.addEventListener('click', function () {
-        var eventSelect = el('eventTypeFilter');
-        var fromDate    = el('fromDate');
-        var toDate      = el('toDate');
-        if (eventSelect) eventSelect.value = '';
-        if (fromDate)    fromDate.value    = '';
-        if (toDate)      toDate.value      = '';
-        _categoryFilter = null;
-        _clearCardHighlights();
-        _currentPage = 1;
-        loadStatistics();
-        loadLogs();
-      });
-    }
-  }
-
-  function _wireDrawer() {
-    var drawer = el('auditDrawer');
-    if (!drawer || drawer._auditCloseWired) return;
-    drawer._auditCloseWired = true;
-    // No additional wiring needed — drawer just displays data
-  }
-
-  function _setDefaultDates() {
-    var toDate = el('toDate');
-    if (toDate) {
-      toDate.value = LanaTime.toLocalDateInputValue(LanaTime.nowDate());
-    }
-  }
-
-  function _getDateFilters() {
-    var fromDateEl = el('fromDate');
-    var toDateEl   = el('toDate');
-    return {
-      fromDate: fromDateEl ? (fromDateEl.value || '') : '',
-      toDate:   toDateEl   ? (toDateEl.value   || '') : ''
-    };
-  }
-
-  function _dateStartIso(dateValue) {
-    return dateValue ? LanaTime.toIsoInstant(dateValue + 'T00:00:00.000') : '';
-  }
-
-  function _dateEndIso(dateValue) {
-    return dateValue ? LanaTime.toIsoInstant(dateValue + 'T23:59:59.999') : '';
-  }
-
-  // =========================================================================
-  // Category selection + card highlighting
-  // =========================================================================
-
+  // A card click is the Category filter, held in the table's filter state.
   function _selectCategory(category) {
-    _categoryFilter = category;
-    _currentPage = 1;
-
-    // Highlight selected card
-    _clearCardHighlights();
-    var cardMap = {
-      all:      'statCardAll',
-      security: 'statCardSecurity',
-      user:     'statCardUser',
-      system:   'statCardSystem',
-      other:    'statCardOther'
-    };
-    var cardId = cardMap[category];
-    if (cardId) {
-      var card = el(cardId);
-      if (card) {
-        card.style.outline = '2px solid var(--lex-bg-accent,#8B7355)';
-        card.style.outlineOffset = '-2px';
-      }
-    }
-
-    // Clear the event type filter select since we're using category
-    var eventSelect = el('eventTypeFilter');
-    if (eventSelect) eventSelect.value = '';
-
-    loadLogs();
+    var table = el(TABLE_ID);
+    if (!table || typeof table.addFilter !== 'function') return;
+    if (category && category !== 'all') table.addFilter('category', 'in', [category]);
+    else table.removeFilter('category');
   }
 
-  function _clearCardHighlights() {
-    var ids = ['statCardAll', 'statCardSecurity', 'statCardUser', 'statCardSystem', 'statCardOther'];
-    for (var i = 0; i < ids.length; i++) {
-      var card = el(ids[i]);
-      if (card) {
-        card.style.outline = '';
-        card.style.outlineOffset = '';
-      }
-    }
+  function _highlightCard(category) {
+    Object.keys(CATEGORY_CARDS).forEach(function (key) {
+      var card = el(CATEGORY_CARDS[key]);
+      if (!card) return;
+      var on = key === (category || 'all');
+      card.style.outline = on ? '2px solid var(--lex-bg-accent,#8B7355)' : '';
+      card.style.outlineOffset = on ? '-2px' : '';
+    });
   }
 
   // =========================================================================
-  // Load Event Types (for filter dropdown)
+  // Load Event Types (column filter values)
   // =========================================================================
 
   function loadEventTypes() {
     api.getAuditEventTypes()
       .then(function (result) {
-        _eventTypes = result.event_types || [];
-        var selectEl = el('eventTypeFilter');
-        if (!selectEl) return;
-
-        var opts = [{ value: '', label: 'All Event Types' }];
-        for (var i = 0; i < _eventTypes.length; i++) {
-          var et = _eventTypes[i];
-          var eventType = typeof et === 'string' ? et : et.event_type;
-          var count = (typeof et === 'object' && et.count) ? ' (' + et.count + ')' : '';
-          opts.push({ value: eventType, label: eventType + count });
+        _eventTypes = (result && result.event_types) || [];
+        var table = el(TABLE_ID);
+        if (table && typeof table.setColumnFilterOptions === 'function') {
+          table.setColumnFilterOptions(filterOptions(_eventTypes));
         }
-        selectEl.options = opts;
       })
       .catch(function (err) {
         console.error('[admin-audit] loadEventTypes error:', err);
@@ -407,15 +434,15 @@
   }
 
   // =========================================================================
-  // Load Statistics
+  // Load Statistics (for the Created range the table shows)
   // =========================================================================
 
-  function loadStatistics() {
-    var dates = _getDateFilters();
-    var startDate = _dateStartIso(dates.fromDate);
-    var endDate   = _dateEndIso(dates.toDate);
+  function loadStatistics(range) {
+    var key = (range.after || '') + '|' + (range.before || '');
+    if (_statsRange === key && _statsPromise) return _statsPromise;
+    _statsRange = key;
 
-    api.getAuditStatistics(startDate, endDate)
+    _statsPromise = api.getAuditStatistics(range.after, range.before)
       .then(function (result) {
         setStatNumber('statTotal', result.total_events || 0);
 
@@ -451,224 +478,53 @@
       .catch(function (err) {
         console.error('[admin-audit] loadStatistics error:', err);
       });
+    return _statsPromise;
   }
 
   // =========================================================================
-  // Load Logs (server-side pagination, category filtering)
+  // Load Logs (answers the table's lex-query-change)
   // =========================================================================
 
-  function loadLogs() {
-    var table = el('auditTable');
-    if (table) Lex.Redact.on(table);
+  function loadLogs(query) {
+    var gen = ++_gen;
+    var table = el(TABLE_ID);
+    if (!table) return;
+    query = query || table.serverQuery;
+    var filters = query.filters || {};
+    var kit = window.AdminTableKit;
+    var filtered = Boolean(_searchTerm || Object.keys(filters).length);
+    var category = kit.firstFilterValue(filters, 'category');
+    if (_toolbar) _toolbar.syncFilter(filters);
+    _highlightCard(category);
 
-    var eventSelect = el('eventTypeFilter');
-    var dates       = _getDateFilters();
-    var eventType   = eventSelect ? (eventSelect.value || '') : '';
-    var fromDate    = dates.fromDate;
-    var toDate      = dates.toDate;
-
-    var promise;
-
-    // Path 1: Category filter active and no manual event type override
-    if (_categoryFilter && _categoryFilter !== 'all' && !eventType) {
-      if (_categoryFilter === 'other') {
-        // For "other", fetch a large batch and filter client-side
-        var filters = {};
-        if (fromDate) filters.start_date = fromDate;
-        if (toDate)   filters.end_date   = toDate;
-
-        promise = api.getAuditLogs(1, 1000, filters).then(function (result) {
-          var allLogs = result.logs || [];
-
-          // Build set of all known event types for fast lookup
-          var knownSet = {};
-          var allKnown = SECURITY_PATTERNS.concat(USER_ACTION_PATTERNS).concat(SYSTEM_EVENT_PATTERNS);
-          for (var k = 0; k < allKnown.length; k++) {
-            knownSet[allKnown[k]] = true;
-          }
-
-          // Filter to only "other" events
-          var otherLogs = [];
-          for (var m = 0; m < allLogs.length; m++) {
-            if (!knownSet[allLogs[m].event_type]) {
-              otherLogs.push(allLogs[m]);
-            }
-          }
-
-          // Client-side pagination
-          var startIdx = (_currentPage - 1) * _pageSize;
-          _logs = otherLogs.slice(startIdx, startIdx + _pageSize);
-          var total = otherLogs.length;
-
-          return { logs: _logs, total: total };
+    // "Other" needs the uncategorised types, which come with the statistics.
+    var range = kit.setRange(null, filters, 'created_at', '', '');
+    loadStatistics(range)
+      .then(function () {
+        if (gen !== _gen) return null;
+        var otherTypes = _otherEventTypes.map(function (e) { return e.event_type; });
+        var body = toQueryBody(query, _searchTerm, otherTypes);
+        if (!body) return { logs: [], pagination: { total: 0 } };
+        return api.queryAuditLogs(body);
+      })
+      .then(function (result) {
+        if (gen !== _gen || !result) return;
+        var logs = result.logs || [];
+        var pagination = result.pagination || {};
+        var total = Number(pagination.total !== undefined ? pagination.total : result.total);
+        table.emptyText = kit.emptyText(filtered, 'audit events');
+        table.setServerData(logs.map(mapLog), {
+          page: query.page,
+          limit: query.limit,
+          total: Number.isFinite(total) ? total : logs.length
         });
-      } else {
-        // Use query API for category filtering
-        var queryBody = {
-          limit:  _pageSize,
-          offset: (_currentPage - 1) * _pageSize,
-          event_types: getCategoryEventTypes(_categoryFilter)
-        };
-        if (fromDate) queryBody.start_date = _dateStartIso(fromDate);
-        if (toDate)   queryBody.end_date   = _dateEndIso(toDate);
-
-        promise = api.queryAuditLogs(queryBody).then(function (result) {
-          _logs = result.logs || [];
-          var total = (result.pagination && result.pagination.total) || result.total || _logs.length;
-          return { logs: _logs, total: total };
-        });
-      }
-    }
-    // Path 2: Default — use simple GET endpoint
-    else {
-      var simpleFilters = {};
-      if (eventType) simpleFilters.event_type = eventType;
-      if (fromDate)  simpleFilters.start_date = fromDate;
-      if (toDate)    simpleFilters.end_date   = toDate;
-
-      promise = api.getAuditLogs(_currentPage, _pageSize, simpleFilters).then(function (result) {
-        _logs = result.logs || [];
-        var total = (result.pagination && result.pagination.total) || result.total || _logs.length;
-        return { logs: _logs, total: total };
-      });
-    }
-
-    promise
-      .then(function (data) {
-        if (table) {
-          Lex.Redact.off(table);
-          _ensureTableObserver(table);
-          table.setData(data.logs);
-        }
-        _renderPagination(data.total);
       })
       .catch(function (err) {
-        if (table) Lex.Redact.off(table);
+        if (gen !== _gen) return;
         console.error('[admin-audit] loadLogs error:', err);
-        Lex.Toast.error('Failed to load audit logs');
+        if (_toolbar) _toolbar.setCount(null);
+        table.setServerError('Audit logs could not be loaded. Check your connection and try again.');
       });
-  }
-
-  // =========================================================================
-  // Table Renderers (MutationObserver pattern)
-  // =========================================================================
-
-  function _ensureTableObserver(table) {
-    if (table._auditRendererAttached) return;
-    table._auditRendererAttached = true;
-
-    table.addEventListener('row-click', function (e) {
-      var row = e.detail && e.detail.row;
-      if (row) _viewLogDetails(row);
-    });
-
-    new MutationObserver(function () {
-      requestAnimationFrame(function () { _applyTableRenderers(table); });
-    }).observe(table, { childList: true });
-  }
-
-  function _applyTableRenderers(table) {
-    var rows = (table.dataSource && table.dataSource.data) || [];
-
-    var tbody = table.querySelector('tbody');
-    if (!tbody) return;
-
-    var trs = tbody.querySelectorAll('tr');
-    for (var i = 0; i < trs.length; i++) {
-      var tr  = trs[i];
-      var row = rows[i];
-      if (!row) continue;
-
-      var tds = tr.querySelectorAll('td');
-      if (tds.length === 0) continue;
-
-      // Column order: timestamp(0), event_type(1), user_email(2), ip_address(3)
-
-      // Timestamp cell (index 0): formatted datetime
-      if (tds[0] && row.timestamp) {
-        tds[0].innerHTML =
-          '<span style="font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-secondary);white-space:nowrap;">' +
-            escHtml(fmtDateTime(row.timestamp)) +
-          '</span>';
-      }
-
-      // Event type cell (index 1): pill badge
-      if (tds[1] && row.event_type) {
-        tds[1].innerHTML = eventTypePill(row.event_type);
-      }
-
-      // User email cell (index 2): break long emails
-      if (tds[2]) {
-        tds[2].innerHTML =
-          '<div style="max-width:16rem;word-break:break-all;font-size:var(--lex-body-sm-size,0.875rem);">' +
-            escHtml(row.user_email || '-') +
-          '</div>';
-      }
-
-    }
-  }
-
-  // =========================================================================
-  // Pagination (server-side — manual prev/next)
-  // =========================================================================
-
-  function _renderPagination(total) {
-    var infoEl = el('paginationInfo');
-    var ctrlEl = el('paginationControls');
-
-    if (!total || total === 0) {
-      if (infoEl) infoEl.textContent = '';
-      if (ctrlEl) ctrlEl.innerHTML   = '';
-      return;
-    }
-
-    var totalPages = Math.ceil(total / _pageSize);
-    var start      = ((_currentPage - 1) * _pageSize) + 1;
-    var end        = Math.min(_currentPage * _pageSize, total);
-
-    if (infoEl) {
-      infoEl.textContent = 'Showing ' + start + '-' + end + ' of ' + total + ' logs';
-    }
-
-    if (!ctrlEl) return;
-
-    if (totalPages <= 1) {
-      ctrlEl.innerHTML = '';
-      return;
-    }
-
-    var prevDisabled = _currentPage <= 1;
-    var nextDisabled = _currentPage >= totalPages;
-
-    var btnStyle = 'padding:6px 12px;border-radius:var(--lex-radius-md,6px);' +
-      'border:1px solid var(--lex-border-default);font-size:var(--lex-body-sm-size,0.875rem);cursor:pointer;';
-    var disabledStyle = 'opacity:0.4;cursor:not-allowed;';
-
-    ctrlEl.innerHTML =
-      '<button id="paginationPrev" style="' + btnStyle + (prevDisabled ? disabledStyle : 'background:var(--lex-bg-primary);color:var(--lex-text-primary);') + '"' +
-        (prevDisabled ? ' disabled' : '') + '>Previous</button>' +
-      '<span style="padding:6px 12px;font-size:var(--lex-body-sm-size,0.875rem);color:var(--lex-text-secondary);">' +
-        'Page ' + _currentPage + ' of ' + totalPages +
-      '</span>' +
-      '<button id="paginationNext" style="' + btnStyle + (nextDisabled ? disabledStyle : 'background:var(--lex-bg-primary);color:var(--lex-text-primary);') + '"' +
-        (nextDisabled ? ' disabled' : '') + '>Next</button>';
-
-    // Wire buttons
-    var prevBtn = el('paginationPrev');
-    var nextBtn = el('paginationNext');
-
-    if (prevBtn && !prevDisabled) {
-      prevBtn.addEventListener('click', function () {
-        _currentPage--;
-        loadLogs();
-      });
-    }
-    if (nextBtn && !nextDisabled) {
-      nextBtn.addEventListener('click', function () {
-        _currentPage++;
-        loadLogs();
-      });
-    }
   }
 
   // =========================================================================
@@ -791,8 +647,8 @@
     var kvIP       = el('auditKvIP');
     var detailsPre = el('auditKvDetails');
 
-    if (kvEventType) kvEventType.value = EventDisplayNames.getEventDisplayName(log.event_type);
-    if (kvTimestamp) kvTimestamp.value = log.timestamp ? fmtDateTime(log.timestamp) : '\u2014';
+    if (kvEventType) kvEventType.value = eventLabel(log.event_type);
+    if (kvTimestamp) kvTimestamp.value = (log.timestamp || log.created_at) ? fmtDateTime(log.timestamp || log.created_at) : '\u2014';
     if (kvUser)      kvUser.value     = String(log.user_email || '\u2014');
     if (kvIP)        kvIP.value       = String(log.ip_address || '\u2014');
 
@@ -806,6 +662,16 @@
 
     drawer.open = true;
   }
+
+  // Pure table logic, exposed for unit tests.
+  window.AdminAuditTable = {
+    toQueryBody: toQueryBody,
+    mapLog: mapLog,
+    cellRenderers: cellRenderers,
+    filterOptions: filterOptions,
+    getCategoryEventTypes: getCategoryEventTypes,
+    classifyEvent: classifyEvent
+  };
 
   // =========================================================================
   // Bootstrap

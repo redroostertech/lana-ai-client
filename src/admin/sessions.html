@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -45,19 +46,51 @@
 
       <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Active Sessions"}]'></lex-breadcrumb>
 
-      <!-- Sessions Table -->
-      <lex-card padding="none">
+      <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+      <div class="bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter sessions">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="sessionsSearch" placeholder="Search sessions..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+            <lex-select id="sessionsSort" options='[{"value":"created_at","label":"Created"},{"value":"expires_at","label":"Expires"}]' value="created_at"></lex-select>
+          </div>
+          <lex-btn id="sessionsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Device:</label>
+            <lex-select id="sessionsDeviceFilter" options='[{"value":"all","label":"All"},{"value":"Desktop","label":"Desktop"},{"value":"Mobile","label":"Mobile"},{"value":"Tablet","label":"Tablet"}]' value="all"></lex-select>
+          </div>
+          <div id="sessionsCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+        </div>
+      </div>
+
+      <section aria-labelledby="sessionsHeading">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="sessionsHeading" class="admin-table-section-title text-lg font-semibold">All Sessions</h2>
+          <span id="sessionsSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+        </div>
+
         <lex-table
           id="sessionsTable"
-          columns="user_display,device,ip_location,started,last_activity,status"
-          labels="User,Device,IP / Location,Started,Last Activity,Status"
-          searchable
-          empty-text="No active sessions found"
-          sort-by="started"
+          class="admin-table lex-table--card"
+          column-filters
+          server-paging
+          columns="user,device,ip_address,created_at,last_activity,expires_at,status"
+          labels="User,Device,IP address,Created,Last activity,Expires,Status"
+          sortable-columns="created_at,expires_at"
+          sort-by="created_at"
           sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No active sessions"
+          aria-label="Active sessions"
         ></lex-table>
-        <lex-pagination id="sessionsPagination" style="padding:0 1rem;"></lex-pagination>
-      </lex-card>
+      </section>
 
     </main>
 
@@ -118,7 +151,8 @@
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
-  <script src="../js/lex/components/data/lex-pagination.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
 
   <!-- Inject page content + hoist modals -->
@@ -126,6 +160,8 @@
   <script src="../js/admin/admin-switcher.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/admin-sessions.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

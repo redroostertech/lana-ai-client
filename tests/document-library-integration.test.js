@@ -621,7 +621,9 @@ describe('Library dates use the shared date utils', () => {
     const drive = read('js/drive.js');
     expect((drive.match(/Lex\.Utils\.formatDateTime\(val\)/g) || []).length).toBe(2);
     expect(drive).not.toContain('formatRelativeDate(val)');
-    expect(read('js/admin/admin-users.js')).toContain('Lex.Utils.formatDateTime(u.created_at)');
+    // Admin Users keeps created_at raw; the Created renderer formats it (AdminTableKit.timeCell).
+    expect(read('js/admin/admin-users.js')).toContain('created_at: function (val) { return kit.timeCell(val); }');
+    expect(read('js/admin/admin-table-kit.js')).toContain("formatted('formatDateTime', value, 'Never')");
     expect(read('js/pages/model-pricing.js')).toContain('formatDateTime(row.created_at)');
     // Skills leaves created_at raw so lex-table formats it (formatDateTime) and sorts it as a date.
     expect(read('js/skills.js')).not.toContain("out.created_at = formatDateLong");
