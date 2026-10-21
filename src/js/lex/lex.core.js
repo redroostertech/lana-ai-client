@@ -150,6 +150,7 @@
         }
         this._initialized = true;
         this._performUpdate();
+        this._adoptChildrenParsedLater();
       } else {
         // Re-run update to re-attach event listeners that were removed in
         // disconnectedCallback (e.g., after a DOM hoist moves this element
@@ -157,6 +158,44 @@
         this._performUpdate();
       }
       this.connected();
+    }
+
+    // A component in the page HTML upgrades as soon as the parser reaches its
+    // opening tag when its script loaded earlier (e.g. in <head>), so it
+    // renders before its children exist and they get parsed after its
+    // rendered markup. Once parsing finishes, move those children into its
+    // <slot-content> and update (so footer/header slots get placed).
+    _adoptChildrenParsedLater() {
+      if (typeof document === 'undefined' || document.readyState !== 'loading') return;
+      const rendered = Array.from(this.childNodes);
+      // Only this component's own slot (inside its rendered markup), never
+      // one belonging to a nested component.
+      const ownSlot = () => {
+        for (const node of rendered) {
+          if (node.nodeType !== 1) continue;
+          if (node.tagName === 'SLOT-CONTENT') return node;
+          const found = node.querySelector('slot-content');
+          if (found) return found;
+        }
+        return null;
+      };
+      if (!ownSlot()) return;
+      const renderedSet = new Set(rendered);
+      document.addEventListener('DOMContentLoaded', () => {
+        const slot = ownSlot();
+        if (!slot || !this.contains(slot)) return;
+        const late = Array.from(this.childNodes).filter((node) => !renderedSet.has(node) && !node.contains(slot));
+        if (!late.length) return;
+        for (const node of late) slot.appendChild(node);
+        // Components that re-render restore their slot from the captured
+        // children on every update, so those become the captured children.
+        // Render-once components (modal, drawer: _rendered) keep live nodes.
+        if (!this._rendered) {
+          this._originalChildren = late.map((node) => LexElement.cloneContent(node));
+          this._pristineChildren = this._originalChildren.slice();
+        }
+        this._scheduleUpdate();
+      }, { once: true });
     }
 
     disconnectedCallback() {
