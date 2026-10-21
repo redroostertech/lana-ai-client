@@ -259,7 +259,64 @@ Status: ✓ meets the standard. ~ close. ✗ needs migration.
 
 Report-card tables inside generated documents and chat blocks are exempt.
 
-### Also in scope
+### Wave 2b: card or div record lists to convert to lex-table (inventory 2026-10-21)
 
-- **Card or div lists of records** (for example the dashboards catalog on `admin/analytics.html`). They become the standard table, unless they're a visual launcher or gallery. A separate inventory of these is in progress.
-- **Native `<select>` elements, hand-built menus and hand-built overlays** across all pages. A separate inventory of these is in progress.
+| Page | Renders in | Records |
+|---|---|---|
+| admin/billable-hours.html | js/admin/billable-hours-reporting.js:209, ~255, 341 | By attorney, by matter, approval queue (each fetched with a `limit=50` cap) |
+| admin/communications.html | js/admin/admin-communications.js:448, 500 | Providers, routes |
+| admin/roles.html | js/admin/roles.js:147 | Roles (no paging) |
+| admin/management-boards.html | js/pages/management-boards-main.js:158, 274 | Boards, submissions (no paging) |
+| admin/plugins.html (Installed) | inline :236 | Installed plugins |
+| admin/task-plans.html | js/admin/task-plans.js:291 | Task plans (`limit=50`) |
+| approvals.html | js/approvals.js:542 | Approvals inbox |
+| recordings.html | js/recordings.js:277 | Recordings |
+| matters.html | inline :1411 | Matters (copy the grid/table switch from workspaces) |
+| workflows/active.html | inline :288 | Workflows (the API call in js/workflows.js:227 is commented out) |
+| workspace-details billable drafts | js/workspace-billable-hours.js:220 | Billable drafts |
+
+Kept as cards, because they're launchers or galleries:
+- admin/analytics.html shortcuts (most used, recent, shared). The full catalog is the Dashboard Library table. Michael to confirm.
+- Dashboard builder metric picker
+- Health service tiles
+- Plugin marketplace
+- Connectors catalog
+- Skills marketplace
+- Automation starter templates
+
+### Wave 3: dropdowns and overlays (inventory 2026-10-21)
+
+**Size:**
+- About 204 native `<select>` in 57 files.
+- 12 hand-built menus, plus the `#userMenu` header dropdown copied into 11 pages (`js/menu.js:977`).
+- About 110 hand-built overlays in about 50 files.
+- About 63 `alert`/`confirm`/`prompt` calls in 33 files.
+
+**Component notes:**
+- `lex-select` takes `options` JSON and fires `lex-change`, not `<option>` children and `change`.
+- `lex-modal` has no `subtitle` and no footer slot. Use `footer-content`, or `Lex.Modal.confirm/alert/open`.
+- `lex-drawer` supports `subtitle` and `[data-slot="footer"]`.
+
+**Order:**
+1. Replace `alert`/`confirm`/`prompt` with `Lex.Modal`. Route the legacy `js/components.js` confirm and alert through `Lex.Modal`.
+2. Fix misuse of lex-modal:
+   - About 70 `hide-actions` modals that put their footers in the body (21 in workspace-details.html).
+   - `subtitle` on lex-modal (workspace-details.html:421/471/607, workspaces.html:301).
+   - `*Drawer` lex-modals that should be lex-drawer (workspace-details.html:550-594).
+   - Header and close CSS hacks in the user and matter pickers, my-tasks.js:1067, data_connectors.js:1012.
+   - Global `.lex-drawer-body` queries (metric-catalog.js, data-visualization.js).
+3. Shared JS:
+   - The notifications, activity and data-override slide-overs become lex-drawer.
+   - The `#userMenu` header.
+   - The help, contact, conversation and note modals.
+   - The widget-config modal.
+4. Workflows, admin and integrations connector pages: simple modals and selects.
+5. Doc Studio (including `prompt` for rename and share), voice, agents and BrainChild (which writes into `.lex-modal-body`).
+6. Automation: `template-modal` x5, library-detail modals, and the builder's 16 selects plus its publish modal.
+7. Hardest, last:
+   - matters.html: 18 selects and about 17 modals.
+   - insights/module-execution.html and insights/dashboard.html: duplicated code, to convert together.
+   - connector-viewer, actionstep and leadly.
+   - drilldown-renderer.
+   - The kebab and status menus: matter-documents-view, dashboard, folder and drive.
+   - First check whether a lex menu component exists, or add one.
