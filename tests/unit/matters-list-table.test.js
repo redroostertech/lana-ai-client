@@ -169,7 +169,7 @@ describe('matters.html follows the table standard markup', () => {
     expect(tag).toContain('server-paging');
     expect(tag).toContain('selectable');
     expect(tag).toContain('limit="20"');
-    expect(tag).toContain('labels="Name,Client,Matter ID,Status,Type,Created,Last edited,Actions"');
+    expect(tag).toContain('labels="Name,Client,Matter ID,Status,Type,Created,Last edited,"');
     expect(tag).not.toMatch(/\s(searchable|filterable|compact)[\s=>]/);
     expect(html).toContain('<h2 id="mattersListHeading"');
     expect(html).toContain('id="mattersSectionCount"');

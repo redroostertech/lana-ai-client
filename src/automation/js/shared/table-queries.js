@@ -205,10 +205,7 @@
     matter: 'matter',
     trigger_event_type: 'trigger',
     scope: 'scope',
-    // The API's created_at sort is COALESCE(started_at, created_at): it
-    // serves both date columns (a run's start and creation are the same
-    // moment unless it waited in a queue).
-    started_at: 'created_at',
+    started_at: 'started_at',
     created_at: 'created_at',
     status: 'status',
     duration: 'duration'
@@ -237,7 +234,7 @@
     var limit = pageLimit(query, 100);
     params.set('limit', String(limit));
     params.set('offset', String((pageNumber(query) - 1) * limit));
-    params.set('sort_by', RUNS_SORT_BY[query.sortBy] || 'created_at');
+    params.set('sort_by', RUNS_SORT_BY[query.sortBy] || 'started_at');
     params.set('sort_dir', sortDir(query));
     if (search) params.set('query', String(search));
     setText(params, 'automation_name', filters.automation_name);
