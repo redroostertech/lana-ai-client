@@ -44,6 +44,14 @@ function assert(condition, testName) {
   }
 }
 
+// lex-select has no native <option>s: set the value and fire lex-change.
+async function chooseLexSelect(page, selector, value) {
+  await page.$eval(selector, function (el, v) {
+    el.value = v;
+    el.dispatchEvent(new CustomEvent('lex-change', { detail: { name: el.name, value: v }, bubbles: true }));
+  }, value);
+}
+
 async function waitForSelector(page, selector, timeout) {
   try {
     await page.waitForSelector(selector, { timeout: timeout || 5000 });
@@ -137,14 +145,9 @@ async function run() {
       await page.waitForTimeout(500);
 
       const panelVisible = await page.$eval('#customizePanel', function (el) {
-        return el.style.transform === 'translateX(0px)' || el.style.transform === 'translateX(0)';
+        return el.open === true;
       }).catch(function () { return false; });
-      assert(panelVisible, 'Customization panel slides open');
-
-      const overlayVisible = await page.$eval('#customizeOverlay', function (el) {
-        return !el.classList.contains('hidden');
-      }).catch(function () { return false; });
-      assert(overlayVisible, 'Overlay becomes visible');
+      assert(panelVisible, 'Customization drawer opens');
     }
 
     // ── Step 6: Verify Panel Form Elements ────────────────────────
@@ -170,7 +173,7 @@ async function run() {
     console.log('\nStep 7: Mode Selector Toggles');
 
     // Select "Replace" for metric mode — should show metrics list
-    await page.select('#custMetricMode', 'replace');
+    await chooseLexSelect(page, '#custMetricMode', 'replace');
     await page.waitForTimeout(300);
 
     const metricsListVisible = await page.$eval('#custMetricsList', function (el) {
@@ -190,7 +193,7 @@ async function run() {
     // ── Step 8: Test Dimension Selector ────────────────────────
     console.log('\nStep 8: Dimension Selector');
 
-    await page.select('#custDimensionMode', 'replace');
+    await chooseLexSelect(page, '#custDimensionMode', 'replace');
     await page.waitForTimeout(300);
 
     const dimListVisible = await page.$eval('#custDimensionsList', function (el) {
@@ -209,7 +212,7 @@ async function run() {
     // ── Step 9: Test Filter Section ────────────────────────
     console.log('\nStep 9: Filter Section');
 
-    await page.select('#custFilterMode', 'extend');
+    await chooseLexSelect(page, '#custFilterMode', 'extend');
     await page.waitForTimeout(300);
 
     const filterListVisible = await page.$eval('#custFiltersList', function (el) {
@@ -228,20 +231,15 @@ async function run() {
     // ── Step 10: Close Panel ────────────────────────
     console.log('\nStep 10: Close Panel');
 
-    const closeBtn = await page.$('#closeCustomizePanel');
+    const closeBtn = await page.$('#customizePanel [data-action="close"]');
     if (closeBtn) {
       await closeBtn.click();
       await page.waitForTimeout(500);
 
       const panelClosed = await page.$eval('#customizePanel', function (el) {
-        return el.style.transform.indexOf('100%') !== -1;
+        return el.open === false;
       }).catch(function () { return false; });
-      assert(panelClosed, 'Panel closes when X button clicked');
-
-      const overlayClosed = await page.$eval('#customizeOverlay', function (el) {
-        return el.classList.contains('hidden');
-      }).catch(function () { return false; });
-      assert(overlayClosed, 'Overlay hides when panel closes');
+      assert(panelClosed, 'Drawer closes when X button clicked');
     }
 
     // ── Step 11: Verify Customization Badge ────────────────────────

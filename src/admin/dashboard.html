@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Lana AI</title>
-    <link rel="stylesheet" href="../css/tailwind-output.css">
+    <link rel="stylesheet" href="../css/lex-tokens.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
+  <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
     <script src="../js/error-reporter.js"></script>
     <script src="../js/config.js"></script>
@@ -281,45 +283,45 @@
                     <!-- Recent Users (Admin Only) -->
                     <div id="recentUsersSection" class="bg-white rounded-lg shadow-sm p-6 hidden">
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900">Recent Users</h3>
+                            <div class="flex items-center gap-3"><h3 class="text-lg font-semibold text-gray-900">Recent Users</h3><span id="recentUsersCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span></div>
                             <a href="/admin/users.html" class="text-blue-600 hover:underline text-sm">View All</a>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead class="text-left text-sm text-gray-500 border-b">
-                                    <tr>
-                                        <th class="pb-2">User</th>
-                                        <th class="pb-2">Status</th>
-                                        <th class="pb-2">Joined</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recentUsers" class="text-sm">
-                                    <tr><td colspan="3" class="py-4 text-gray-500">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <lex-table
+                            id="recentUsersTable"
+                            class="admin-table lex-table--card"
+                            column-filters
+                            columns="name,email,status,created_at"
+                            labels="Name,Email,Status,Created"
+                            sortable-columns="name,email,status,created_at"
+                            sort-by="created_at"
+                            sort-dir="desc"
+                            limit="20"
+                            id-key="id"
+                            empty-text="No users yet"
+                            aria-label="Recent users"
+                        ></lex-table>
                     </div>
 
                     <!-- Recent Matters -->
                     <div class="bg-white rounded-lg shadow-sm p-6">
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900">Recent Matters</h3>
+                            <div class="flex items-center gap-3"><h3 class="text-lg font-semibold text-gray-900">Recent Matters</h3><span id="recentMattersCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span></div>
                             <a href="/matters.html" class="text-blue-600 hover:underline text-sm">View All</a>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead class="text-left text-sm text-gray-500 border-b">
-                                    <tr>
-                                        <th class="pb-2">Matter</th>
-                                        <th class="pb-2">Status</th>
-                                        <th class="pb-2">Created</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recentMatters" class="text-sm">
-                                    <tr><td colspan="3" class="py-4 text-gray-500">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <lex-table
+                            id="recentMattersTable"
+                            class="admin-table lex-table--card"
+                            column-filters
+                            columns="name,organization_name,status,created_at"
+                            labels="Matter,Organization,Status,Created"
+                            sortable-columns="name,organization_name,status,created_at"
+                            sort-by="created_at"
+                            sort-dir="desc"
+                            limit="20"
+                            id-key="id"
+                            empty-text="No matters yet"
+                            aria-label="Recent matters"
+                        ></lex-table>
                     </div>
                 </div>
 
@@ -417,9 +419,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Organization</label>
-                    <select name="organization_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" id="matterOrgSelect">
-                        <option value="">Select organization...</option>
-                    </select>
+                    <lex-select name="organization_id" id="matterOrgSelect" placeholder="Select organization..." searchable="true" options='[]' aria-label="Organization"></lex-select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -433,6 +433,22 @@
         </div>
     </div>
 
+    <!-- Lex UI core + the components this page uses -->
+    <script src="../js/lex/lex.core.js"></script>
+    <script src="../js/lex/lex.icons.js"></script>
+    <script src="../js/lex/lex.data.js"></script>
+    <script src="../js/lex/lex.forms.js"></script>
+    <script src="../js/lex/lex.state.js"></script>
+    <script src="../js/lex/lex.utils.js"></script>
+    <script src="../js/lex/lex-nav.js"></script>
+    <script src="../js/lex/components/foundation/lex-empty.js"></script>
+    <script src="../js/lex/components/foundation/lex-badge.js"></script>
+    <script src="../js/lex/components/form/lex-select.js"></script>
+    <script src="../js/lex/components/data/lex-table.js"></script>
+    <script src="../js/shared/library-column-filters.js"></script>
+    <script src="../js/admin/admin-table-kit.js"></script>
+    <script src="../js/admin/admin-client-tables.js"></script>
+    <script src="../js/admin/admin-dashboard-tables.js"></script>
     <script>
 
         document.addEventListener('DOMContentLoaded', async function() {
@@ -726,74 +742,61 @@
             return actionFormatted;
         }
 
+        /**
+         * Recent Users / Recent Matters: client-side lex-tables with the newest
+         * few records (js/admin/admin-dashboard-tables.js). Rows keep raw
+         * values; the renderers format them.
+         */
+        var recentTables = {};
+        function recentTable(key, renderers) {
+            if (recentTables[key]) return recentTables[key];
+            var table = document.getElementById(key + 'Table');
+            table.setCellRenderers(renderers);
+            table.addEventListener('click', function (e) {
+                var link = e.target.closest ? e.target.closest('[data-matter-id]') : null;
+                if (!link) return;
+                e.stopPropagation();
+                AdminTableKit.openWorkspace(link.getAttribute('data-matter-id'));
+            });
+            recentTables[key] = {
+                table: table,
+                count: AdminClientTables.bindCount(table, [key + 'Count'], key === 'recentUsers' ? ['user', 'users'] : ['matter', 'matters'])
+            };
+            return recentTables[key];
+        }
+
+        function fillRecent(key, rows, renderers, filters) {
+            var entry = recentTable(key, renderers);
+            entry.table.setColumnFilterOptions(filters(rows));
+            entry.table.setData(rows);
+            entry.count.update();
+        }
+
         async function loadRecentUsers() {
+            await AdminTableKit.whenTableReady();
+            var T = AdminDashboardTables;
             try {
-                const res = await api.getUsers({ limit: 5, sort: 'created_at', order: 'desc' });
-                const container = document.getElementById('recentUsers');
-
-                if (!res.users || res.users.length === 0) {
-                    container.innerHTML = '<tr><td colspan="3" class="py-4 text-gray-500">No users yet</td></tr>';
-                    return;
-                }
-
-                container.innerHTML = res.users.map(user => `
-                    <tr class="border-b border-gray-100">
-                        <td class="py-3">
-                            <div class="flex items-center">
-                                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center mr-3">
-                                    <span class="text-gray-600 text-xs font-medium">${(user.first_name?.[0] || user.username?.[0] || 'U').toUpperCase()}</span>
-                                </div>
-                                <div>
-                                    <p class="font-medium text-gray-900">${user.first_name || ''} ${user.last_name || user.username || ''}</p>
-                                    <p class="text-xs text-gray-500">${user.email}</p>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="py-3">
-                            <span class="px-2 py-1 text-xs rounded-full ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                                ${user.is_active ? 'Active' : 'Inactive'}
-                            </span>
-                        </td>
-                        <td class="py-3 text-gray-500">${formatDate(user.created_at)}</td>
-                    </tr>
-                `).join('');
+                const res = await api.getUsers({ limit: T.RECENT_LIMIT, sort: 'created_at', order: 'desc' });
+                fillRecent('recentUsers', (res.users || []).map(T.mapUser), T.userRenderers(), T.userFilters);
             } catch (error) {
                 // Hide the section if we don't have permission
                 if (error.status === 403) {
                     document.getElementById('recentUsersSection').classList.add('hidden');
                 } else {
-                    document.getElementById('recentUsers').innerHTML = '<tr><td colspan="3" class="py-4 text-gray-500">Unable to load users</td></tr>';
+                    recentTable('recentUsers', T.userRenderers()).table.setError('Users could not be loaded.');
                 }
             }
         }
 
         async function loadRecentMatters() {
+            await AdminTableKit.whenTableReady();
+            var T = AdminDashboardTables;
             try {
-                const res = await api.getMatters({ limit: 5 });
-                const container = document.getElementById('recentMatters');
-                const matters = res.matters || res;
-
-                if (!matters || matters.length === 0) {
-                    container.innerHTML = '<tr><td colspan="3" class="py-4 text-gray-500">No matters yet</td></tr>';
-                    return;
-                }
-
-                container.innerHTML = matters.map(matter => `
-                    <tr class="border-b border-gray-100">
-                        <td class="py-3">
-                            <p class="font-medium text-gray-900">${matter.name}</p>
-                            <p class="text-xs text-gray-500">${matter.organization_name || ''}</p>
-                        </td>
-                        <td class="py-3">
-                            <span class="px-2 py-1 text-xs rounded-full ${getStatusClass(matter.status)}">
-                                ${matter.status || 'active'}
-                            </span>
-                        </td>
-                        <td class="py-3 text-gray-500">${formatDate(matter.created_at)}</td>
-                    </tr>
-                `).join('');
+                const res = await api.getMatters({ limit: T.RECENT_LIMIT });
+                const matters = res.matters || res || [];
+                fillRecent('recentMatters', (Array.isArray(matters) ? matters : []).map(T.mapMatter), T.matterRenderers(), T.matterFilters);
             } catch (error) {
-                document.getElementById('recentMatters').innerHTML = '<tr><td colspan="3" class="py-4 text-red-500">Failed to load</td></tr>';
+                recentTable('recentMatters', T.matterRenderers()).table.setError('Matters could not be loaded.');
             }
         }
 
@@ -803,12 +806,7 @@
                 const select = document.getElementById('matterOrgSelect');
                 const orgList = orgs.organizations || orgs;
 
-                orgList.forEach(org => {
-                    const option = document.createElement('option');
-                    option.value = org.id;
-                    option.textContent = org.name;
-                    select.appendChild(option);
-                });
+                select.setAttribute('options', JSON.stringify((orgList || []).map(org => ({ value: String(org.id), label: org.name || String(org.id) }))));
             } catch (error) {
                 console.error('Failed to load organizations:', error);
             }
@@ -861,10 +859,17 @@
             e.preventDefault();
             try {
                 const data = Object.fromEntries(new FormData(this));
+                // lex-select is not a form control: read the organization from it.
+                data.organization_id = String(document.getElementById('matterOrgSelect').value || '');
+                if (!data.organization_id) {
+                    Toast.error('Select an organization');
+                    return;
+                }
                 await api.createMatter(data);
                 Toast.success('Matter created successfully');
                 closeModal('createMatterModal');
                 this.reset();
+                document.getElementById('matterOrgSelect').value = '';
                 loadRecentMatters();
                 loadStats();
             } catch (error) {

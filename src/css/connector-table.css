@@ -1,0 +1,110 @@
+/* Connector catalog table (js/shared/connector-table.js), shared by
+   data-connectors.html and the automation app's Connectors view.
+   Columns: Pin, Name, Category, Auth, Scope, Status, Version, Created, Actions */
+
+.connector-table table { min-width: 1080px; table-layout: fixed; }
+.connector-table th { white-space: nowrap; }
+.connector-table td { overflow: hidden; }
+.connector-table th:nth-child(1) { width: 44px; }
+.connector-table th:nth-child(3) { width: 150px; }
+.connector-table th:nth-child(4) { width: 140px; }
+.connector-table th:nth-child(5) { width: 104px; }
+.connector-table th:nth-child(6) { width: 132px; }
+.connector-table th:nth-child(7) { width: 96px; }
+.connector-table th:nth-child(8) { width: 176px; }
+.connector-table th:nth-child(9) { width: 150px; }
+/* Name (column 2) takes the rest. */
+
+.connector-table-name-cell {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.connector-table-logo {
+  align-items: center;
+  background: var(--lex-bg-accent-muted, var(--lex-bg-tertiary));
+  border-radius: var(--lex-radius-md, 8px);
+  color: var(--lex-text-accent, var(--lex-text-secondary));
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  height: 32px;
+  justify-content: center;
+  overflow: hidden;
+  width: 32px;
+}
+
+.connector-table-logo img {
+  height: 26px;
+  object-fit: contain;
+  width: 26px;
+}
+
+.connector-table-name-text {
+  display: block;
+  min-width: 0;
+}
+
+.connector-table-name {
+  color: var(--lex-text-primary);
+  display: block;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+.connector-table-sub,
+.connector-table-muted,
+.connector-table-time,
+.connector-table-text {
+  color: var(--lex-text-secondary);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connector-table-text {
+  color: var(--lex-text-primary);
+  font-size: 13px;
+}
+
+.connector-table-time { font-variant-numeric: tabular-nums; }
+
+.connector-table-pin {
+  align-items: center;
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: var(--lex-radius-sm, 4px);
+  color: var(--lex-text-tertiary);
+  cursor: pointer;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  padding: 0;
+  width: 28px;
+}
+
+.connector-table-pin:hover,
+.connector-table-pin.is-pinned {
+  color: var(--lex-text-accent, #b8860b);
+}
+
+.connector-table-pin:focus-visible {
+  box-shadow: var(--lex-focus-ring);
+  outline: none;
+}
+
+.connector-table-actions {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}

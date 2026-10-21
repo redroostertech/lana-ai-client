@@ -96,7 +96,7 @@
     els.timeline            = document.getElementById('timelineContainer');
     els.llmCalls            = document.getElementById('llmCallsContainer');
     els.ragRetrievals       = document.getElementById('ragRetrievalsContainer');
-    els.sseEvents           = document.getElementById('sseEventsContainer');
+    els.sseTable            = document.getElementById('sseEventsTable');
 
     initTable();
   }
@@ -592,41 +592,91 @@
   // SSE Events
   // =========================================================================
 
-  function renderSSEEvents(sseEvents) {
-    if (!sseEvents || sseEvents.length === 0) {
-      els.sseEvents.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-sm lex-text-tertiary text-center">No SSE events recorded</td></tr>';
-      return;
+  // The trace's SSE events arrive in one response: a client-side lex-table
+  // (docs/TABLE-STANDARD.md); a row opens the event's full data in a drawer.
+
+  var SSE_OFFSET_RANGES = [
+    { value: 'lt1s', label: 'Under 1 s', max: 1000 },
+    { value: '1-10s', label: '1–10 s', min: 1000, max: 10000 },
+    { value: 'gte10s', label: '10 s or more', min: 10000 }
+  ];
+
+  function parseEventData(value) {
+    if (value === null || value === undefined || value === '') return { compact: '', pretty: '' };
+    if (typeof value !== 'string') return { compact: JSON.stringify(value), pretty: JSON.stringify(value, null, 2) };
+    try {
+      var parsed = JSON.parse(value);
+      return { compact: JSON.stringify(parsed), pretty: JSON.stringify(parsed, null, 2) };
+    } catch (e) {
+      return { compact: value, pretty: value };
     }
+  }
 
-    els.sseEvents.innerHTML = sseEvents.map(function (evt) {
-      var dataStr = '';
-      var prettyStr = '';
-      if (evt.event_data) {
-        if (typeof evt.event_data === 'string') {
-          try {
-            var parsed = JSON.parse(evt.event_data);
-            dataStr = JSON.stringify(parsed);
-            prettyStr = JSON.stringify(parsed, null, 2);
-          } catch (e) {
-            dataStr = evt.event_data;
-            prettyStr = evt.event_data;
-          }
-        } else {
-          dataStr = JSON.stringify(evt.event_data);
-          prettyStr = JSON.stringify(evt.event_data, null, 2);
-        }
+  function mapSseEvent(evt, index) {
+    var e = evt || {};
+    var offset = Number(e.time_since_request_ms);
+    return {
+      _key: String(e.event_id || e.event_sequence || 'sse-' + index),
+      event_type: e.event_type || '',
+      event_data: parseEventData(e.event_data).compact,
+      time_since_request_ms: e.time_since_request_ms === null || e.time_since_request_ms === undefined || !Number.isFinite(offset) ? null : offset,
+      created_at: e.event_timestamp || e.created_at || '',
+      _raw: e
+    };
+  }
+
+  function sseRenderers() {
+    var kit = window.AdminTableKit;
+    return {
+      event_type: function (val) { return val ? kit.badge(Lex.Utils.humanizeLabel(val), 'gray') : kit.muted(''); },
+      event_data: function (val) {
+        if (!val) return kit.muted('');
+        return '<span class="admin-table-text" style="font-family:var(--lex-font-mono,monospace)" title="' + kit.esc(val.length > 500 ? val.slice(0, 500) + '…' : val) + '">' + kit.esc(val.length > 160 ? val.slice(0, 160) + '…' : val) + '</span>';
+      },
+      time_since_request_ms: function (val) {
+        return val === null ? kit.muted('') : '<span class="admin-table-text">+' + kit.esc(formatDuration(val)) + '</span>';
+      },
+      created_at: function (val) { return kit.timeCell(val); }
+    };
+  }
+
+  function sseFilterOptions(rows) {
+    var client = window.AdminClientTables;
+    return {
+      event_type: { options: client.valueOptions(rows, 'event_type') },
+      event_data: { text: true, placeholder: 'Data contains...' },
+      time_since_request_ms: client.rangeFilter(SSE_OFFSET_RANGES),
+      created_at: client.dateFilter()
+    };
+  }
+
+  var _sseCount = null;
+
+  function renderSSEEvents(sseEvents) {
+    var table = els.sseTable;
+    if (!table) return;
+    window.AdminTableKit.whenTableReady().then(function () {
+      if (!_sseCount) {
+        table.setCellRenderers(sseRenderers());
+        _sseCount = window.AdminClientTables.bindCount(table, ['sseEventsCount'], ['event', 'events']);
+        table.addEventListener('row-click', function (e) {
+          var row = e.detail && e.detail.row;
+          if (!row || !row._raw || !Lex.Drawer) return;
+          Lex.Drawer.open({
+            heading: Lex.Utils.humanizeLabel(row.event_type || 'SSE event'),
+            subtitle: row.time_since_request_ms === null ? '' : '+' + formatDuration(row.time_since_request_ms),
+            content: '<pre class="text-xs" style="background:var(--lex-bg-secondary);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-md,6px);padding:0.75rem;white-space:pre-wrap;word-break:break-word;">' +
+              escHtml(parseEventData(row._raw.event_data).pretty || 'No data') + '</pre>',
+            width: 'md'
+          });
+        });
       }
-
-      return '<tr style="border-bottom:1px solid var(--lex-border-default);">' +
-        '<td class="px-4 py-3 text-sm"><lex-badge variant="neutral">' + escHtml(evt.event_type || 'N/A') + '</lex-badge></td>' +
-        '<td class="px-4 py-3 text-sm lex-text-tertiary">+' + formatDuration(evt.time_since_request_ms) + '</td>' +
-        '<td class="px-4 py-3 text-sm lex-text-secondary font-mono">' +
-          (dataStr
-            ? '<details><summary class="cursor-pointer" style="color:var(--lex-color-primary-600);">' + escHtml(dataStr.substring(0, 80)) + (dataStr.length > 80 ? '...' : '') + '</summary>' +
-              '<pre class="mt-1 text-xs" style="background:var(--lex-bg-secondary);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-md,6px);padding:0.5rem;overflow-x:auto;max-height:12rem;overflow-y:auto;">' + escHtml(prettyStr) + '</pre></details>'
-            : 'N/A') +
-        '</td></tr>';
-    }).join('');
+      var rows = (sseEvents || []).map(mapSseEvent);
+      table.resetQuery();
+      table.setColumnFilterOptions(sseFilterOptions(rows));
+      table.setData(rows);
+      _sseCount.update();
+    });
   }
 
   // =========================================================================
@@ -704,7 +754,10 @@
     cellRenderers: cellRenderers,
     filterOptions: filterOptions,
     formatTraceRoute: formatTraceRoute,
-    SORT_BY_COLUMN: SORT_BY_COLUMN
+    SORT_BY_COLUMN: SORT_BY_COLUMN,
+    mapSseEvent: mapSseEvent,
+    sseRenderers: sseRenderers,
+    sseFilterOptions: sseFilterOptions
   };
 
 })();

@@ -1012,11 +1012,7 @@
       html += '<div style="margin-top:1.5rem;border-top:2px solid var(--lex-border-default,#e5e7eb);padding-top:1rem;">';
       html += '<div style="font-size:0.8rem;font-weight:700;color:var(--lex-text-primary,#111827);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">Connected Data</div>';
       for (var ci = 0; ci < connections.length; ci++) {
-        var conn = connections[ci];
-        html += '<div id="connected-' + conn.view + '" style="margin-bottom:1rem;">';
-        html += '<div style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted,#6b7280);margin-bottom:0.25rem;">' + Lex.Utils.escapeHtml(conn.label) + '</div>';
-        html += '<div style="font-size:0.8rem;color:var(--lex-text-muted,#9ca3af);">Loading...</div>';
-        html += '</div>';
+        html += connectedSectionHtml(connections[ci]);
       }
       html += '</div>';
     }
@@ -1035,9 +1031,9 @@
     // Wire navigation links via delegation on the drawer content
     _wireDrawerNavLinks();
 
-    // Fetch connected data async
+    // Each connected section is a server-paged lex-table filtered to this record.
     for (var fi = 0; fi < connections.length; fi++) {
-      _fetchConnectedData(connections[fi], row);
+      _wireConnectedTable(connections[fi], row);
     }
   }
 
@@ -1062,83 +1058,111 @@
     return html;
   }
 
-  function _fetchConnectedData(conn, parentRow) {
-    var filterValue = parentRow[conn.filterSource];
-    if (!filterValue) {
-      _renderConnectedSection(conn.view, []);
-      return;
+  // ─── Connected data tables (docs/TABLE-STANDARD.md) ───────────────
+  // Tables inside the record drawer: no toolbar, a heading with the count,
+  // and the same paging, sort, filters and renderers as the main table.
+
+  /**
+   * The VIEW_CONFIG-shaped config of a connected section: its columns, plus
+   * the view's Created column when the view has one, and the view's formats
+   * (timestamps found by name when the view has no config).
+   */
+  function connectedConfig(conn) {
+    var base = VIEW_CONFIG[conn.view] || {};
+    var columns = _columnsOf(conn);
+    var labels = _labelsOf(conn);
+    if (columns.indexOf('created_at') === -1 && _columnsOf(base).indexOf('created_at') !== -1) {
+      columns.push('created_at');
+      labels.push('Created');
     }
-
-    var url = '/api/v1/mcp-data/' + conn.view +
-      '?filter_' + conn.filterField + '=' + encodeURIComponent(filterValue) +
-      '&limit=20&sort_dir=desc';
-
-    api.get(url)
-      .then(function (result) {
-        var rows = (result && result.data) || [];
-        _connectedRows[conn.view] = rows;
-        _renderConnectedSection(conn.view, rows, conn);
-      })
-      .catch(function () {
-        _connectedRows[conn.view] = [];
-        _renderConnectedSection(conn.view, []);
-      });
+    var format = {};
+    var baseFormat = base.format || {};
+    columns.forEach(function (col) {
+      if (baseFormat[col]) format[col] = baseFormat[col];
+      else if (col.slice(-3) === '_at' || col === 'last_activity' || col.slice(-5) === '_time') format[col] = 'datetime';
+      else if (col.slice(-5) === '_date') format[col] = 'date';
+      else if (col === 'status' || col.slice(-7) === '_status' || col === 'priority') format[col] = 'pill';
+    });
+    var sortBy = columns.indexOf('created_at') !== -1 ? 'created_at'
+      : (columns.indexOf(base.sortBy) !== -1 ? base.sortBy
+        : (columns.filter(function (c) { return format[c] === 'datetime'; })[0] || columns[0]));
+    return { columns: columns.join(','), labels: labels.join(','), sortBy: sortBy, format: format };
   }
 
-  function _renderConnectedSection(viewName, rows, conn) {
-    var container = document.getElementById('connected-' + viewName);
-    if (!container) return;
+  /** mcp-data params for a connected table: the table's query plus the parent filter. */
+  function connectedParams(query, conn, parentRow, now) {
+    var params = toApiParams(query, connectedConfig(conn), '', now);
+    params.set('filter_' + conn.filterField, String(parentRow[conn.filterSource]));
+    return params;
+  }
 
-    if (!rows || rows.length === 0) {
-      container.innerHTML = '<div style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted,#6b7280);margin-bottom:0.25rem;">' +
-        Lex.Utils.escapeHtml((conn && conn.label) || viewName) + '</div>' +
-        '<div style="font-size:0.8rem;color:var(--lex-text-muted,#9ca3af);font-style:italic;">None found</div>';
-      return;
-    }
+  function connectedSectionHtml(conn) {
+    var config = connectedConfig(conn);
+    var esc = Lex.Utils.escapeHtml;
+    return '<section id="connected-' + esc(conn.view) + '" class="dataviz-connected" aria-label="' + esc(conn.label) + '">' +
+      '<div class="dataviz-connected-head"><h4 class="dataviz-connected-title">' + esc(conn.label) + '</h4>' +
+      '<span class="dataviz-connected-count" id="connected-' + esc(conn.view) + '-count" aria-live="polite"></span></div>' +
+      '<lex-table id="connected-' + esc(conn.view) + '-table" class="admin-table lex-table--card dataviz-connected-table"' +
+      ' column-filters server-paging columns="' + esc(config.columns) + '" labels="' + esc(config.labels) + '"' +
+      ' sortable-columns="' + esc(config.columns) + '" sort-by="' + esc(config.sortBy) + '" sort-dir="desc"' +
+      ' limit="20" id-key="_key" empty-text="None found" aria-label="' + esc(conn.label) + '"></lex-table>' +
+      '</section>';
+  }
 
-    var cols = conn ? conn.columns.split(',') : [];
-    var labels = conn ? conn.labels.split(',') : [];
-
-    // Build a compact table
-    var html = '<div style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted,#6b7280);margin-bottom:0.5rem;">' +
-      Lex.Utils.escapeHtml(conn.label) + ' (' + rows.length + ')' + '</div>';
-    html += '<div style="overflow-x:auto;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;">';
-    html += '<table style="width:100%;font-size:0.75rem;border-collapse:collapse;">';
-
-    // Header
-    html += '<thead><tr style="background:var(--lex-bg-muted,#f9fafb);">';
-    for (var hi = 0; hi < labels.length; hi++) {
-      html += '<th style="padding:0.375rem 0.5rem;text-align:left;font-weight:600;color:var(--lex-text-muted,#6b7280);white-space:nowrap;">' + Lex.Utils.escapeHtml(labels[hi]) + '</th>';
-    }
-    html += '</tr></thead>';
-
-    // Body
-    html += '<tbody>';
-    for (var ri = 0; ri < rows.length; ri++) {
-      var bgStyle = ri % 2 === 1 ? 'background:var(--lex-bg-muted,#f9fafb);' : '';
-      // Make entire row clickable — opens the full record detail
-      html += '<tr data-nav-view="' + Lex.Utils.escapeHtml(conn.view) + '" data-nav-row="' + ri + '" class="drawer-nav-row" style="' + bgStyle + 'border-top:1px solid var(--lex-border-default,#e5e7eb);cursor:pointer;" onmouseover="this.style.background=\'var(--lex-bg-accent-subtle,#eff6ff)\'" onmouseout="this.style.background=\'' + (ri % 2 === 1 ? 'var(--lex-bg-muted,#f9fafb)' : '') + '\'">';
-      for (var ci2 = 0; ci2 < cols.length; ci2++) {
-        var colName = cols[ci2];
-        var cellVal = rows[ri][colName];
-        var cellStr = cellVal == null ? '-' : String(cellVal);
-        if (cellStr.length > 80) cellStr = cellStr.substring(0, 77) + '...';
-        // Format dates inline
-        if (colName.indexOf('_at') !== -1 || colName.indexOf('date') !== -1) {
-          var fmtd = fmtDateTime(cellVal);
-          if (fmtd) cellStr = fmtd;
-        }
-        // First column gets a subtle link color to hint clickability
-        var cellStyle = ci2 === 0
-          ? 'padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;color:var(--lex-color-blue-600,#2563eb);'
-          : 'padding:0.375rem 0.5rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;';
-        html += '<td style="' + cellStyle + '">' + Lex.Utils.escapeHtml(cellStr) + '</td>';
+  function _wireConnectedTable(conn, parentRow) {
+    // The drawer renders its content on open; wait a tick for it.
+    setTimeout(function () {
+      var table = document.getElementById('connected-' + conn.view + '-table');
+      var countEl = document.getElementById('connected-' + conn.view + '-count');
+      if (!table) return;
+      var config = connectedConfig(conn);
+      var gen = 0;
+      if (!parentRow[conn.filterSource]) {
+        window.AdminTableKit.whenTableReady().then(function () {
+          table.setCellRenderers(cellRenderers(config));
+          table.setServerData([], { page: 1, limit: 20, total: 0 });
+        });
+        return;
       }
-      html += '</tr>';
-    }
-    html += '</tbody></table></div>';
-
-    container.innerHTML = html;
+      window.AdminTableKit.whenTableReady().then(function () {
+        table.setCellRenderers(cellRenderers(config));
+        table.setColumnFilterOptions(filterOptions(config));
+        table.addEventListener('lex-query-change', function (e) {
+          if (e.target !== table) return;
+          var query = e.detail;
+          var seq = ++gen;
+          var filtered = Object.keys(query.filters || {}).length > 0;
+          api.get('/api/v1/mcp-data/' + conn.view + '?' + connectedParams(query, conn, parentRow).toString())
+            .then(function (result) {
+              if (seq !== gen) return;
+              var rows = (result && result.data) || [];
+              var pagination = (result && result.pagination) || {};
+              var total = pagination.total !== undefined ? Number(pagination.total) : rows.length;
+              _connectedRows[conn.view] = rows;
+              table.emptyText = filtered ? 'No matching records. Clear the filters to see all.' : 'None found';
+              table.setServerData(rows.map(mapRow), { page: query.page, limit: query.limit, total: total });
+              if (countEl) countEl.textContent = window.AdminTableKit.countText(total, 'record', 'records');
+            })
+            .catch(function () {
+              if (seq !== gen) return;
+              if (countEl) countEl.textContent = '';
+              table.setServerError(conn.label + ' could not be loaded.');
+            });
+        });
+        // A row opens that record's own drawer; workspace links open the workspace.
+        table.addEventListener('row-click', function (e) {
+          var row = e.detail && e.detail.row;
+          if (row && row._raw) _navigateToRecord(conn.view, row._raw);
+        });
+        table.addEventListener('click', function (e) {
+          var link = e.target && e.target.closest ? e.target.closest('[data-matter-id]') : null;
+          if (!link) return;
+          e.stopPropagation();
+          window.AdminTableKit.openWorkspace(link.getAttribute('data-matter-id'));
+        });
+        table.requestServerQuery({ resetPage: true });
+      });
+    }, 0);
   }
 
   function _formatDetailValue(key, val) {
@@ -1240,19 +1264,6 @@
         return;
       }
 
-      // Check for clickable connected data rows
-      var row = e.target.closest('.drawer-nav-row');
-      if (row) {
-        e.preventDefault();
-        var navView = row.getAttribute('data-nav-view');
-        var navRowIdx = row.getAttribute('data-nav-row');
-        if (navView && navRowIdx != null) {
-          var rows = _connectedRows[navView];
-          if (rows && rows[parseInt(navRowIdx, 10)]) {
-            _navigateToRecord(navView, rows[parseInt(navRowIdx, 10)]);
-          }
-        }
-      }
     });
   }
 
@@ -1299,7 +1310,10 @@
     cellRenderers: cellRenderers,
     filterOptions: filterOptions,
     rangeBase: rangeBase,
-    getRecordActions: _getRecordActions
+    getRecordActions: _getRecordActions,
+    CONNECTED_DATA_MAP: CONNECTED_DATA_MAP,
+    connectedConfig: connectedConfig,
+    connectedParams: connectedParams
   };
 
   init();

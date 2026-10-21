@@ -7,6 +7,7 @@
 
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
   <script src="../js/tailwind-loader.js"></script>
@@ -45,16 +46,49 @@
         </div>
       </div>
 
-      <!-- Rules table -->
-      <lex-card>
-        <div id="bbRulesLoading" style="padding:2rem;text-align:center;">
-          <div class="animate-pulse"><div class="cc-skeleton" style="height:2rem;width:100%;margin-bottom:0.5rem;"></div><div class="cc-skeleton" style="height:2rem;width:100%;"></div></div>
+      <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+      <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter block billing rules">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="bbSearch" placeholder="Search rules..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+            <lex-select id="bbSort" options='[{"value":"priority","label":"Priority"},{"value":"name","label":"Name"},{"value":"composite_activity_type","label":"Composite type"},{"value":"max_gap_minutes","label":"Max gap"},{"value":"created_at","label":"Created"}]' value="priority"></lex-select>
+          </div>
+          <lex-btn id="bbSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="asc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Status:</label>
+            <lex-select id="bbStatusFilter" options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"}]' value="all"></lex-select>
+          </div>
+          <div id="bbCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
         </div>
-        <div id="bbRulesTable" class="hidden"></div>
-        <div id="bbRulesEmpty" class="hidden" style="padding:3rem;text-align:center;">
-          <lex-empty heading="No block billing rules" description="Click 'Initialize Defaults' to load recommended rules for legal work, or create custom rules."></lex-empty>
+      </div>
+
+      <section aria-labelledby="bbHeading">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="bbHeading" class="admin-table-section-title text-lg font-semibold">All Rules</h2>
+          <span id="bbSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
         </div>
-      </lex-card>
+
+        <lex-table
+          id="bbRulesTable"
+          class="admin-table lex-table--card"
+          column-filters
+          columns="name,required_activity_types,composite_activity_type,billing_code,priority,max_gap_minutes,status,created_at,actions"
+          labels="Name,Required types,Composite type,Code,Priority,Max gap,Status,Created, "
+          sortable-columns="name,composite_activity_type,billing_code,priority,max_gap_minutes,status,created_at"
+          sort-by="priority"
+          sort-dir="asc"
+          limit="20"
+          id-key="id"
+          empty-text="No block billing rules yet. Initialize the defaults or create a rule."
+          empty-action-label="Create Rule"
+          aria-label="Block billing rules"
+        ></lex-table>
+      </section>
 
     </div>
   </template>
@@ -81,7 +115,11 @@
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
 
   <!-- Lex Layout -->
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
@@ -98,6 +136,9 @@
   <script src="../js/api.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
+  <script src="../js/admin/admin-client-tables.js"></script>
   <script src="../js/admin/block-billing-rules.js"></script>
 
   <!-- Auth guard (MUST be last) -->
