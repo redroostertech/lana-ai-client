@@ -98,23 +98,8 @@
 
       .unified-search-entity-filter {
         flex: 0 0 auto;
-        height: 2.125rem;
         min-width: 10rem;
         max-width: 13rem;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        background: #ffffff;
-        color: #374151;
-        font-size: 0.8125rem;
-        line-height: 1;
-        padding: 0 0.625rem;
-        cursor: pointer;
-      }
-
-      .unified-search-entity-filter:focus {
-        outline: 2px solid rgba(79, 70, 229, 0.22);
-        outline-offset: 1px;
-        border-color: #4f46e5;
       }
 
       .unified-search-close {
@@ -505,9 +490,7 @@
             <div class="unified-search-input-row">
               ${searchIcon()}
               <input id="unifiedSearchInput" class="unified-search-input" type="search" placeholder="Search Lana — matters, contacts, documents, conversations, messages, tasks…" autocomplete="off">
-              <select id="unifiedSearchEntityFilter" class="unified-search-entity-filter" aria-label="Filter search by entity type">
-                ${entityFilterOptionsHtml()}
-              </select>
+              <lex-select id="unifiedSearchEntityFilter" class="unified-search-entity-filter" size="sm" aria-label="Filter search by entity type" options="${escapeHtml(JSON.stringify(ENTITY_FILTER_OPTIONS))}" value="all"></lex-select>
               <button id="unifiedSearchClose" class="unified-search-close" type="button" aria-label="Close search">
                 <span class="unified-search-close-x" aria-hidden="true">&times;</span>
                 <span class="unified-search-close-key" aria-hidden="true">Esc</span>
@@ -533,7 +516,8 @@
     });
     document.getElementById('unifiedSearchClose').addEventListener('click', close);
     document.getElementById('unifiedSearchInput').addEventListener('input', onInput);
-    document.getElementById('unifiedSearchEntityFilter').addEventListener('change', onEntityFilterChange);
+    document.getElementById('unifiedSearchEntityFilter').addEventListener('lex-change', onEntityFilterChange);
+    ensureLexSelect();
     renderStartState();
     bindShortcut();
     state.mounted = true;
@@ -575,7 +559,8 @@
   }
 
   function onEntityFilterChange(event) {
-    state.activeType = event.target.value === 'all' ? null : event.target.value;
+    const value = (event.detail && event.detail.value) || event.target.value || 'all';
+    state.activeType = value === 'all' ? null : value;
     if (state.query && state.query.length >= 2) {
       search(state.query);
       return;
@@ -692,15 +677,46 @@
     matter: 'Open workspace'
   };
 
-  function entityFilterOptionsHtml() {
-    return ENTITY_FILTER_OPTIONS.map((option) => (
-      `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`
-    )).join('');
+  // The modal is injected on every page by lex-app, including pages that do
+  // not load lex-select (or the form mixin it needs). Load them next to this
+  // script so the entity filter upgrades.
+  const SCRIPT_BASE = (function () {
+    const current = document.currentScript && document.currentScript.src;
+    return current ? current.replace(/unified-search-modal\.js(\?.*)?$/, '') : 'js/';
+  }());
+
+  function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[src="${src}"]`);
+      if (existing) {
+        if (existing.dataset.loaded === 'true') { resolve(); return; }
+        existing.addEventListener('load', () => resolve());
+        existing.addEventListener('error', () => reject(new Error('Failed to load ' + src)));
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = src;
+      script.addEventListener('load', () => { script.dataset.loaded = 'true'; resolve(); });
+      script.addEventListener('error', () => reject(new Error('Failed to load ' + src)));
+      document.head.appendChild(script);
+    });
+  }
+
+  function ensureLexSelect() {
+    if (!window.customElements || window.customElements.get('lex-select')) return;
+    const formsReady = window.Lex && window.Lex.withFormField
+      ? Promise.resolve()
+      : loadScriptOnce(SCRIPT_BASE + 'lex/lex.forms.js');
+    formsReady
+      .then(() => loadScriptOnce(SCRIPT_BASE + 'lex/components/form/lex-select.js'))
+      .catch((error) => console.warn('[UnifiedSearch] lex-select unavailable:', error));
   }
 
   function syncEntityFilterSelect() {
     const select = document.getElementById('unifiedSearchEntityFilter');
     if (!select) return;
+    // Attribute as well as property: the element may not be upgraded yet.
+    select.setAttribute('value', state.activeType || 'all');
     select.value = state.activeType || 'all';
   }
 

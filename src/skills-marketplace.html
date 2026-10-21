@@ -13,6 +13,9 @@
   <script src="js/api.js"></script>
   <script src="js/utils/rename-conversation.js"></script>
   <script src="js/components.js"></script>
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/lex.forms.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/version.js"></script>
   <script src="js/menu.js"></script>
   <script src="js/notifications.js"></script>
@@ -73,14 +76,7 @@
 
           <!-- Category Filter -->
           <div class="w-full md:w-64">
-            <select id="category-filter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option value="all">All Categories</option>
-              <option value="document-intelligence">Document Intelligence</option>
-              <option value="ai-assistance">AI Assistance</option>
-              <option value="automation">Automation</option>
-              <option value="workflow">Workflow</option>
-              <option value="integration">Integration</option>
-            </select>
+            <lex-select id="category-filter" options='[{"value": "all", "label": "All categories"}, {"value": "document-intelligence", "label": "Document Intelligence"}, {"value": "ai-assistance", "label": "AI Assistance"}, {"value": "automation", "label": "Automation"}, {"value": "workflow", "label": "Workflow"}, {"value": "integration", "label": "Integration"}]' value="all"></lex-select>
           </div>
 
           <!-- View Toggle -->

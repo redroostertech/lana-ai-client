@@ -437,6 +437,25 @@ function setInputValue(input, value) {
   }
 }
 
+// lex-select options are { value, label } with string values; the value is
+// set after the options so the selection always has a matching label.
+function setSelectOptions(select, options, value) {
+  if (!select) {
+    return;
+  }
+  select.options = options.map(option => ({ value: String(option.value), label: option.label }));
+  select.value = value === null || value === undefined ? '' : String(value);
+}
+
+function capitalizeLabel(value) {
+  const text = String(value ?? '');
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
+function selectOptionsAttr(options) {
+  return escapeHtml(JSON.stringify(options.map(option => ({ value: String(option.value), label: option.label }))));
+}
+
 function sourceFileNames() {
   return Array.from(elements.sourceFiles?.files || []).map(file => file.name).join(', ');
 }
@@ -1656,16 +1675,24 @@ function renderEditorTools() {
   elements.toggleTemplatesBtn.classList.toggle('active', state.templateGalleryOpen);
   elements.toggleTemplatesBtn.textContent = state.templateGalleryOpen ? 'Hide templates' : 'Templates';
   elements.saveMetadataBtn.disabled = !cards.length && !state.presentationId;
-  elements.slidePicker.innerHTML = cards.length
-    ? cards.map((card, index) => `<option value="${index}" ${index === state.selectedSlideIndex ? 'selected' : ''}>${index + 1}. ${escapeHtml(card.title || 'Untitled slide')}</option>`).join('')
-    : '<option>No slides</option>';
+  elements.slidePicker.placeholder = 'No slides';
+  setSelectOptions(
+    elements.slidePicker,
+    cards.map((card, index) => ({ value: index, label: `${index + 1}. ${card.title || 'Untitled slide'}` })),
+    cards.length ? state.selectedSlideIndex : ''
+  );
+  elements.slidePicker.disabled = !cards.length;
   const selectedLayout = selectedCard?.design?.template?.layoutFamily || selectedCard?.design?.layout;
-  elements.slideLayout.innerHTML = layoutOptions.map(layout => `<option value="${escapeHtml(layout)}" ${selectedLayout === layout ? 'selected' : ''}>${escapeHtml(layout.replace(/-/g, ' '))}</option>`).join('');
-  elements.slideStyle.innerHTML = ['deck'].concat(styleOptions).map(style => {
-    const active = style === 'deck' ? !selectedCard?.design?.style : selectedCard?.design?.style === style;
-    const label = style === 'deck' ? `Deck (${activeDeckStyle()})` : style;
-    return `<option value="${escapeHtml(style)}" ${active ? 'selected' : ''}>${escapeHtml(label)}</option>`;
-  }).join('');
+  setSelectOptions(
+    elements.slideLayout,
+    layoutOptions.map(layout => ({ value: layout, label: capitalizeLabel(layout.replace(/-/g, ' ')) })),
+    layoutOptions.includes(selectedLayout) ? selectedLayout : (layoutOptions[0] || '')
+  );
+  setSelectOptions(
+    elements.slideStyle,
+    ['deck'].concat(styleOptions).map(style => ({ value: style, label: style === 'deck' ? `Deck (${activeDeckStyle()})` : capitalizeLabel(style) })),
+    selectedCard?.design?.style && styleOptions.includes(selectedCard.design.style) ? selectedCard.design.style : 'deck'
+  );
   elements.slideLayout.disabled = !selectedCard;
   elements.slideStyle.disabled = !selectedCard;
 
@@ -1695,12 +1722,10 @@ function renderEditorTools() {
       <span>Visual label</span>
       <input id="visualLabelInput" value="${escapeHtml(visualLabel(selectedCard.visual, design.layout || 'statement'))}">
     </label>
-    <label class="mini-field">
+    <div class="mini-field">
       <span>Image style</span>
-      <select id="slideImageStyleInput">
-        ${imageStyleOptions.map(style => `<option value="${escapeHtml(style)}" ${activeSlideImageStyle(selectedCard) === style ? 'selected' : ''}>${escapeHtml(style.replace(/-/g, ' '))}</option>`).join('')}
-      </select>
-    </label>
+      <lex-select id="slideImageStyleInput" options="${selectOptionsAttr(imageStyleOptions.map(style => ({ value: style, label: capitalizeLabel(style.replace(/-/g, ' ')) })))}" value="${escapeHtml(activeSlideImageStyle(selectedCard))}"></lex-select>
+    </div>
     <label class="mini-field image-prompt-field">
       <span>Image prompt</span>
       <textarea id="imagePromptInput" rows="3">${escapeHtml(selectedCard.image_prompt || '')}</textarea>
@@ -1708,13 +1733,11 @@ function renderEditorTools() {
     ${state.libraryCapabilities.imageAvailable ? '' : '<span class="image-unavailable">Image provider unavailable. Configure OPENAI_API_KEY to generate images.</span>'}
     <div class="bullet-icon-editor" aria-label="Bullet icons">
       ${points.map((point, pointIndex) => `
-        <label class="bullet-icon-row">
+        <div class="bullet-icon-row">
           <span>${escapeHtml(String(pointIndex + 1))}</span>
-          <select data-bullet-icon="${pointIndex}">
-            ${iconNames.map(name => `<option value="${escapeHtml(name)}" ${(bulletIcons[pointIndex]?.icon || icons[pointIndex % icons.length]) === name ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}
-          </select>
+          <lex-select data-bullet-icon="${pointIndex}" size="sm" searchable="true" options="${selectOptionsAttr(iconNames.map(name => ({ value: name, label: name })))}" value="${escapeHtml(bulletIcons[pointIndex]?.icon || icons[pointIndex % icons.length])}"></lex-select>
           <small>${escapeHtml(point)}</small>
-        </label>
+        </div>
       `).join('')}
     </div>
   `;
@@ -1726,10 +1749,14 @@ function renderBrandKitControls() {
     return;
   }
 
-  const options = ['<option value="">Select saved kit</option>'].concat(
-    state.brandKits.map(kit => `<option value="${escapeHtml(kit.id)}">${escapeHtml(kit.name)} · ${escapeHtml(kit.style || 'editorial')}</option>`)
+  elements.brandKitSelect.placeholder = 'Select saved kit';
+  setSelectOptions(
+    elements.brandKitSelect,
+    [{ value: '', label: 'Select saved kit' }].concat(
+      state.brandKits.map(kit => ({ value: kit.id, label: `${kit.name} · ${kit.style || 'editorial'}` }))
+    ),
+    ''
   );
-  elements.brandKitSelect.innerHTML = options.join('');
 }
 
 function renderCriticPanel() {
@@ -3495,14 +3522,14 @@ elements.themeForeground.addEventListener('input', () => {
   elements.brandDensity,
   elements.brandComposition
 ].filter(Boolean).forEach(input => {
-  input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', () => {
+  input.addEventListener(input.tagName === 'LEX-SELECT' ? 'lex-change' : 'input', () => {
     applyBrandControlsToDeck();
     render();
   });
 });
 elements.saveBrandKitBtn.addEventListener('click', saveBrandKit);
-elements.brandKitSelect.addEventListener('change', () => applyBrandKit(elements.brandKitSelect.value));
-elements.style.addEventListener('change', () => applyDeckStyle(elements.style.value));
+elements.brandKitSelect.addEventListener('lex-change', event => applyBrandKit(event.detail.value));
+elements.style.addEventListener('lex-change', event => applyDeckStyle(event.detail.value));
 elements.slidesView.addEventListener('input', syncEdits);
 elements.slidesView.addEventListener('click', event => {
   const cardNode = event.target.closest('.slide-card');
@@ -3533,8 +3560,8 @@ elements.presentView.addEventListener('click', event => {
     movePresentation(1);
   }
 });
-elements.slidePicker.addEventListener('change', () => {
-  state.selectedSlideIndex = Number(elements.slidePicker.value) || 0;
+elements.slidePicker.addEventListener('lex-change', event => {
+  state.selectedSlideIndex = Number(event.detail.value) || 0;
   render();
   document.querySelector(`[data-index="${state.selectedSlideIndex}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
@@ -3546,17 +3573,17 @@ elements.nextSlideBtn.addEventListener('click', () => {
   state.selectedSlideIndex = Math.min(Math.max(0, state.deck.cards.length - 1), state.selectedSlideIndex + 1);
   render();
 });
-elements.slideLayout.addEventListener('change', () => {
+elements.slideLayout.addEventListener('lex-change', event => {
   const card = selectedCard();
   if (!card) {
     return;
   }
-  card.design = { ...(card.design || {}), layout: elements.slideLayout.value };
+  card.design = { ...(card.design || {}), layout: event.detail.value };
   delete card.design.template;
   delete card.design.templateId;
   render();
 });
-elements.slideStyle.addEventListener('change', () => {
+elements.slideStyle.addEventListener('lex-change', () => {
   const card = selectedCard();
   if (!card) {
     return;
@@ -3626,13 +3653,13 @@ elements.visualEditor.addEventListener('input', event => {
     card.image_prompt = event.target.value.trim();
   }
 });
-elements.visualEditor.addEventListener('change', event => {
+elements.visualEditor.addEventListener('lex-change', event => {
   if (event.target.id === 'slideImageStyleInput') {
     const card = state.deck.cards[state.selectedSlideIndex];
     if (!card) {
       return;
     }
-    card.design = { ...(card.design || {}), imageStyle: enumOption(event.target.value, imageStyleOptions, activeBrandKitModel().preferences.imageStyle) };
+    card.design = { ...(card.design || {}), imageStyle: enumOption(event.detail.value, imageStyleOptions, activeBrandKitModel().preferences.imageStyle) };
     return;
   }
 
@@ -3644,7 +3671,7 @@ elements.visualEditor.addEventListener('change', event => {
 
   const bulletIcons = ensureBulletIconModel(card);
   const pointIndex = Number(select.dataset.bulletIcon);
-  bulletIcons[pointIndex].icon = select.value;
+  bulletIcons[pointIndex].icon = event.detail.value;
   render();
 });
 elements.templateGallery.addEventListener('click', event => {

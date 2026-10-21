@@ -8150,12 +8150,32 @@
   }
 
   /**
+   * The type and dropdown-value controls are lex-selects, which fire
+   * lex-change rather than change; one delegated listener per container.
+   */
+  function bindCustomFieldSelects(container) {
+    if (container.dataset.customFieldSelectsBound === 'true') return;
+    container.dataset.customFieldSelectsBound = 'true';
+    container.addEventListener('lex-change', function (e) {
+      var target = e.target;
+      if (!target || !target.dataset) return;
+      var value = e.detail ? e.detail.value : target.value;
+      if (target.dataset.fieldDefIndex !== undefined) {
+        updateFieldDefinition(Number(target.dataset.fieldDefIndex), target.dataset.fieldDefProp, value);
+      } else if (target.dataset.fieldValueKey !== undefined) {
+        updateFieldValue(target.dataset.fieldValueKey, value);
+      }
+    });
+  }
+
+  /**
    * Render the custom fields modal content.
    * Builds HTML for each field definition and its current value input.
    */
   function renderCustomFieldsModal() {
     var container = document.getElementById('customFieldsContainer');
     if (!container) return;
+    bindCustomFieldSelects(container);
 
     if (customFieldDefinitions.length === 0) {
       container.innerHTML =
@@ -8178,15 +8198,16 @@
       }
       var currentValue = valueObj ? valueObj.value : (def.default_value || '');
 
-      var selectTypeHtml =
-        '<option value="text"' + (def.type === 'text' ? ' selected' : '') + '>Text</option>' +
-        '<option value="textarea"' + (def.type === 'textarea' ? ' selected' : '') + '>Long Text</option>' +
-        '<option value="number"' + (def.type === 'number' ? ' selected' : '') + '>Number</option>' +
-        '<option value="currency"' + (def.type === 'currency' ? ' selected' : '') + '>Currency</option>' +
-        '<option value="date"' + (def.type === 'date' ? ' selected' : '') + '>Date</option>' +
-        '<option value="datetime"' + (def.type === 'datetime' ? ' selected' : '') + '>Date+Time</option>' +
-        '<option value="boolean"' + (def.type === 'boolean' ? ' selected' : '') + '>Yes/No</option>' +
-        '<option value="select"' + (def.type === 'select' ? ' selected' : '') + '>Dropdown</option>';
+      var selectTypeOptions = [
+        { value: 'text', label: 'Text' },
+        { value: 'textarea', label: 'Long text' },
+        { value: 'number', label: 'Number' },
+        { value: 'currency', label: 'Currency' },
+        { value: 'date', label: 'Date' },
+        { value: 'datetime', label: 'Date and time' },
+        { value: 'boolean', label: 'Yes/No' },
+        { value: 'select', label: 'Dropdown' }
+      ];
 
       var optionsRowHtml = '';
       if (def.type === 'select') {
@@ -8220,10 +8241,9 @@
             '</div>' +
             '<div class="col-span-2">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Type</label>' +
-              '<select onchange="updateFieldDefinition(' + i + ', \'type\', this.value)"' +
-                ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus">' +
-                selectTypeHtml +
-              '</select>' +
+              '<lex-select size="sm" data-field-def-index="' + i + '" data-field-def-prop="type"' +
+                ' options="' + escapeHtml(JSON.stringify(selectTypeOptions)) + '"' +
+                ' value="' + escapeHtml(def.type || 'text') + '"></lex-select>' +
             '</div>' +
             '<div class="col-span-2">' +
               '<label class="block text-xs font-medium text-gray-700 mb-1">Required</label>' +
@@ -8309,15 +8329,16 @@
         '</label>';
 
       case 'select':
-        var optionsHtml = '<option value="">-- Select ' + displayName + ' --</option>';
+        var emptyLabel = 'Select ' + (def.display_name || def.key || '');
+        var selectOptions = [{ value: '', label: emptyLabel }];
         var opts = def.options || [];
         for (var o = 0; o < opts.length; o++) {
-          var optVal = escapeHtml(opts[o]);
-          optionsHtml += '<option value="' + optVal + '"' + (currentValue === opts[o] ? ' selected' : '') + '>' + optVal + '</option>';
+          selectOptions.push({ value: String(opts[o]), label: String(opts[o]) });
         }
-        return '<select onchange="updateFieldValue(\'' + key + '\', this.value)"' +
-          ' class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus">' +
-          optionsHtml + '</select>';
+        return '<lex-select size="sm" data-field-value-key="' + key + '"' +
+          ' placeholder="' + escapeHtml(emptyLabel) + '"' +
+          ' options="' + escapeHtml(JSON.stringify(selectOptions)) + '"' +
+          ' value="' + escapeHtml(currentValue == null ? '' : String(currentValue)) + '"></lex-select>';
 
       case 'text':
       default:
@@ -10133,42 +10154,33 @@
 
   function buildGenerateFormContent(matter) {
     // Merge document types from learned + template sets for the select options
-    var options = '<option value="">-- Select Document Type --</option>';
-
-    if (docGenState.documentTypes.length > 0) {
-      options += '<optgroup label="Learned Types">';
-      for (var i = 0; i < docGenState.documentTypes.length; i++) {
-        var dt = docGenState.documentTypes[i];
-        options += '<option value="' + escapeHtml(dt.document_type) + '">' + escapeHtml(dt.document_type_label || dt.document_type) + '</option>';
-      }
-      options += '</optgroup>';
+    var docTypeOptions = [{ value: '', label: 'Select document type' }];
+    for (var i = 0; i < docGenState.documentTypes.length; i++) {
+      var dt = docGenState.documentTypes[i];
+      docTypeOptions.push({ value: String(dt.document_type || ''), label: String(dt.document_type_label || dt.document_type || ''), group: 'Learned types' });
     }
-
-    if (docGenState.templateSets.length > 0) {
-      options += '<optgroup label="Template Sets">';
-      for (var j = 0; j < docGenState.templateSets.length; j++) {
-        var ts = docGenState.templateSets[j];
-        options += '<option value="' + escapeHtml(ts.document_type) + '" data-set-id="' + escapeHtml(ts.id) + '">' + escapeHtml(ts.name) + '</option>';
-      }
-      options += '</optgroup>';
+    for (var j = 0; j < docGenState.templateSets.length; j++) {
+      var ts = docGenState.templateSets[j];
+      // Template sets carry their id in the value ("set:<id>") so the
+      // submit can send template_set_id; a learned type may share the
+      // same document_type.
+      docTypeOptions.push({ value: 'set:' + String(ts.id || ''), label: String(ts.name || ts.document_type || ''), group: 'Template sets' });
     }
 
     // Contact options
-    var contactOptions = '<option value="">-- No Target Contact --</option>';
+    var contactOptions = [{ value: '', label: 'No target contact' }];
     for (var k = 0; k < docGenState.contacts.length; k++) {
       var c = docGenState.contacts[k];
       var cName = c.display_name || ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
       if (cName) {
-        contactOptions += '<option value="' + escapeHtml(cName) + '">' + escapeHtml(cName) + '</option>';
+        contactOptions.push({ value: cName, label: cName });
       }
     }
 
     return '<form id="docGenForm" onsubmit="submitDocGeneration(event)" class="space-y-4">' +
       '<div>' +
         '<label class="block text-sm font-medium text-gray-700 mb-1">Document Type</label>' +
-        '<select id="dgDocType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>' +
-          options +
-        '</select>' +
+        '<lex-select id="dgDocType" searchable required placeholder="Select document type" options="' + escapeHtml(JSON.stringify(docTypeOptions)) + '" value=""></lex-select>' +
       '</div>' +
       '<div>' +
         '<label class="block text-sm font-medium text-gray-700 mb-1">Instructions</label>' +
@@ -10176,9 +10188,7 @@
       '</div>' +
       '<div>' +
         '<label class="block text-sm font-medium text-gray-700 mb-1">Target Contact</label>' +
-        '<select id="dgContact" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">' +
-          contactOptions +
-        '</select>' +
+        '<lex-select id="dgContact" searchable placeholder="No target contact" options="' + escapeHtml(JSON.stringify(contactOptions)) + '" value=""></lex-select>' +
         '<p class="text-xs text-gray-400 mt-1">Participant data will be injected into the generated document</p>' +
       '</div>' +
       '<div>' +
@@ -10413,9 +10423,7 @@
       addSection.style.cssText = 'border-top:1px solid #e5e7eb;padding:12px 20px;';
       addSection.innerHTML = '<p style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;">Add Document from Matter</p>' +
         '<div style="display:flex;gap:8px;">' +
-          '<select id="tsDocSelect" style="flex:1;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">' +
-            '<option value="">Loading documents...</option>' +
-          '</select>' +
+          '<lex-select id="tsDocSelect" size="sm" searchable style="flex:1;" placeholder="Loading documents..." options="[]" value=""></lex-select>' +
           '<button id="tsDocAddBtn" onclick="addDocToSet(\'' + setId + '\')" style="padding:6px 14px;border-radius:6px;border:none;background:#7c3aed;color:white;font-size:13px;font-weight:500;cursor:pointer;">Add</button>' +
         '</div>';
       panel.appendChild(addSection);
@@ -10437,13 +10445,14 @@
         var matterDocs = (docsResp && docsResp.data) ? docsResp.data : (Array.isArray(docsResp) ? docsResp : []);
         var select = document.getElementById('tsDocSelect');
         if (select) {
-          var optHtml = '<option value="">-- Select a document --</option>';
+          var docOptions = [];
           for (var di = 0; di < matterDocs.length; di++) {
             var md = matterDocs[di];
             if (existingIds[md.id]) continue; // Already in set
-            optHtml += '<option value="' + escapeHtml(md.id) + '">' + escapeHtml(md.filename || 'Document') + '</option>';
+            docOptions.push({ value: String(md.id), label: String(md.filename || 'Document') });
           }
-          select.innerHTML = optHtml;
+          select.placeholder = docOptions.length ? 'Select a document' : 'No documents to add';
+          select.options = docOptions;
         }
       }
     } catch (err) {
@@ -10511,7 +10520,14 @@
     if (!currentMatterData || docGenState.isGenerating) return;
 
     var matter = currentMatterData.matter;
-    var docType = (document.getElementById('dgDocType') || {}).value;
+    var docTypeValue = String((document.getElementById('dgDocType') || {}).value || '');
+    var docType = docTypeValue;
+    var templateSetId = null;
+    if (docTypeValue.indexOf('set:') === 0) {
+      templateSetId = docTypeValue.slice(4);
+      var selectedSet = docGenState.templateSets.find(function (set) { return String(set.id) === templateSetId; });
+      docType = selectedSet ? selectedSet.document_type : '';
+    }
     var instructions = (document.getElementById('dgInstructions') || {}).value;
     var contactName = (document.getElementById('dgContact') || {}).value;
     var useStream = document.getElementById('dgStream') ? document.getElementById('dgStream').checked : true;
@@ -10532,16 +10548,6 @@
         if (k && valInputs[i]) {
           customVars[k] = valInputs[i].value;
         }
-      }
-    }
-
-    // Check if a template set was selected
-    var templateSetId = null;
-    var selectEl = document.getElementById('dgDocType');
-    if (selectEl && selectEl.selectedIndex >= 0) {
-      var opt = selectEl.options[selectEl.selectedIndex];
-      if (opt && opt.getAttribute('data-set-id')) {
-        templateSetId = opt.getAttribute('data-set-id');
       }
     }
 

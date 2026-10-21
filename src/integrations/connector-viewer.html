@@ -348,12 +348,7 @@
                     <div class="mt-4 space-y-4">
                       <div>
                         <label for="syncFrequency" class="mb-2 block text-sm font-medium text-gray-700">Sync Frequency</label>
-                        <select id="syncFrequency" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                          <option value="manual">Manual</option>
-                          <option value="hourly">Hourly</option>
-                          <option value="daily">Daily</option>
-                          <option value="weekly">Weekly</option>
-                        </select>
+                        <lex-select id="syncFrequency" options='[{"value":"manual","label":"Manual"},{"value":"hourly","label":"Hourly"},{"value":"daily","label":"Daily"},{"value":"weekly","label":"Weekly"}]' value="manual"></lex-select>
                       </div>
                       <div id="scheduledTimeGroup" class="hidden">
                         <label for="scheduledSyncTime" class="mb-2 block text-sm font-medium text-gray-700">Scheduled Time</label>
@@ -421,13 +416,11 @@
                     <div class="mt-2 text-sm text-gray-500">Route the current selection to a matter. Leave the picker on <span class="font-medium text-gray-700">Unassigned</span> to create a new matter when you assign.</div>
 
                     <div class="mt-5 space-y-5">
-                      <label class="block">
+                      <div class="block">
                         <div class="mb-2 text-sm font-medium text-gray-900">Target Matter</div>
-                        <select id="dataMatterSelect" onchange="onMatterDropdownChange()" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                          <option value="">Unassigned (create new matter)</option>
-                        </select>
+                        <lex-select id="dataMatterSelect" searchable placeholder="Unassigned (create new matter)" options='[{"value":"","label":"Unassigned (create new matter)"}]' value=""></lex-select>
                         <div id="matterDropdownHint" class="mt-2 text-xs text-blue-700"></div>
-                      </label>
+                      </div>
 
                       <div id="cascadePanel" class="hidden space-y-3"></div>
 
@@ -617,6 +610,30 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    // lex-select helpers. Options are { value, label } with string values;
+    // the attribute form is for HTML strings built before the element exists.
+    function lexSelectOptionsAttr(options) {
+      return escapeHtml(JSON.stringify(options.map((option) => ({
+        value: String(option?.value ?? ''),
+        label: String(option?.label ?? option?.value ?? ''),
+      }))));
+    }
+
+    function readLexSelectValues(element) {
+      if (!element) return [];
+      const value = element.value;
+      if (Array.isArray(value)) return value.map((item) => String(item));
+      if (typeof value === 'string' && value) {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
+        } catch (_error) {
+          return [];
+        }
+      }
+      return [];
     }
 
     function formatNumber(value) {
@@ -2047,8 +2064,9 @@
         }
 
         if (element.multiple) {
-          draft[name] = Array.from(element.selectedOptions || [])
-            .map((option) => option.value)
+          draft[name] = (element.tagName === 'LEX-SELECT'
+            ? readLexSelectValues(element)
+            : Array.from(element.selectedOptions || []).map((option) => option.value))
             .filter(Boolean);
           return;
         }
@@ -2993,20 +3011,16 @@
               </div>
             ` : ''}
             ${authModes.length > 1 ? `
-              <label class="block">
+              <div class="block">
                 <div class="mb-2 text-sm font-medium text-gray-900">Authentication Method</div>
-                <select
+                <lex-select
                   id="authModeSelect"
                   name="auth_type"
-                  onchange="handleAuthModeChange()"
-                  class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                >
-                  ${authModes.map((mode) => `
-                    <option value="${escapeHtml(mode.type)}" ${mode.type === selectedAuthType ? 'selected' : ''}>${escapeHtml(getAuthModeDisplayLabel(mode))}</option>
-                  `).join('')}
-                </select>
+                  options="${lexSelectOptionsAttr(authModes.map((mode) => ({ value: mode.type, label: getAuthModeDisplayLabel(mode) })))}"
+                  value="${escapeHtml(authModes.some((mode) => mode.type === selectedAuthType) ? selectedAuthType : (authModes[0]?.type || ''))}"
+                ></lex-select>
                 <p class="mt-2 text-xs text-gray-500">The shared viewer renders the selected auth path from the connector package. Save before testing or connecting.</p>
-              </label>
+              </div>
             ` : ''}
             ${authFields.map((field) => renderField(field, currentConfig[field.name])).join('')}
           ` : ''}
@@ -3052,7 +3066,10 @@
       const syncValue = currentConfig.sync_frequency || 'manual';
       syncFrequency.value = ['manual', 'hourly', 'daily', 'weekly'].includes(syncValue) ? syncValue : 'manual';
       scheduledSyncTime.value = currentConfig.scheduled_sync_time || '';
-      syncFrequency.onchange = updateSyncSettingsVisibility;
+      if (!syncFrequency.dataset.lexChangeBound) {
+        syncFrequency.dataset.lexChangeBound = '1';
+        syncFrequency.addEventListener('lex-change', updateSyncSettingsVisibility);
+      }
       updateSyncSettingsVisibility();
 
       const configStatusSummary = document.getElementById('configStatusSummary');
@@ -3330,16 +3347,10 @@
                   </div>
 
                   <div class="space-y-7">
-                    <label class="block">
+                    <div class="block">
                       <div class="mb-3 text-sm font-medium text-gray-900">Method</div>
-                      <select id="customRequestMethod" ${disabledAttr} class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200${inputDisabledClass}">
-                        <option value="GET">GET</option>
-                        <option value="POST">POST</option>
-                        <option value="PUT">PUT</option>
-                        <option value="PATCH">PATCH</option>
-                        <option value="DELETE">DELETE</option>
-                      </select>
-                    </label>
+                      <lex-select id="customRequestMethod" ${disabledAttr} options='[{"value":"GET","label":"GET"},{"value":"POST","label":"POST"},{"value":"PUT","label":"PUT"},{"value":"PATCH","label":"PATCH"},{"value":"DELETE","label":"DELETE"}]' value="GET"></lex-select>
+                    </div>
 
                     <label class="block">
                       <div class="mb-3 text-sm font-medium text-gray-900">Endpoint Path</div>
@@ -3437,17 +3448,8 @@
         .filter((f) => f.value !== '__data_path__')
         .map((f) => f.value);
 
-      const fieldOptions = (selectedField, isDataPathMode) => DATA_RULE_FIELDS
-        .map((f) => {
-          const isSelected = (f.value === '__data_path__' && isDataPathMode)
-            || (f.value === selectedField && !isDataPathMode);
-          return `<option value="${f.value}" ${isSelected ? 'selected' : ''}>${f.label}</option>`;
-        })
-        .join('');
-
-      const operatorOptions = (selected) => DATA_RULE_OPERATORS
-        .map((o) => `<option value="${o.value}" ${selected === o.value ? 'selected' : ''}>${o.label}</option>`)
-        .join('');
+      const fieldOptionsAttr = lexSelectOptionsAttr([{ value: '', label: 'Pick a field…' }].concat(DATA_RULE_FIELDS));
+      const operatorOptionsAttr = lexSelectOptionsAttr(DATA_RULE_OPERATORS);
 
       container.innerHTML = state.dataRules.map((rule, index) => {
         const valueless = isValuelessOperator(rule.operator);
@@ -3462,10 +3464,7 @@
         return `
           <div class="data-rule-row space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3" data-index="${index}" data-mode="${treatAsDataPath ? 'data' : 'indexed'}">
             <div class="flex items-start gap-2">
-              <select data-role="field" onchange="onDataRuleFieldChange(${index}, this.value)" class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                <option value="" ${!fieldRaw ? 'selected' : ''}>Pick a field…</option>
-                ${fieldOptions(fieldSelectValue, treatAsDataPath)}
-              </select>
+              <lex-select data-role="field" data-rule-index="${index}" class="flex-1 min-w-0" size="sm" searchable placeholder="Pick a field…" options="${fieldOptionsAttr}" value="${escapeHtml(fieldSelectValue)}"></lex-select>
               <button type="button" onclick="removeDataRule(${index})" aria-label="Remove rule" class="shrink-0 rounded-lg border border-gray-200 bg-white p-2 text-gray-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
                   <path d="M18 6 6 18" /><path d="m6 6 12 12" />
@@ -3477,9 +3476,7 @@
               <input data-role="data-path" type="text" value="${escapeHtml(dataPathValue)}" placeholder="e.g. matter_id" class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
             </div>
             <div class="flex items-start gap-2">
-              <select data-role="operator" onchange="onDataRuleOperatorChange(${index}, this.value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" style="flex: 0 0 auto; max-width: 50%;">
-                ${operatorOptions(rule.operator || 'contains')}
-              </select>
+              <lex-select data-role="operator" data-rule-index="${index}" size="sm" options="${operatorOptionsAttr}" value="${escapeHtml(rule.operator || 'contains')}" style="flex: 0 0 auto; max-width: 50%;"></lex-select>
               <input data-role="value" type="text" value="${escapeHtml(rule.value || '')}" placeholder="Value" class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 ${valueless ? 'hidden' : ''}">
             </div>
           </div>
@@ -3598,23 +3595,21 @@
 
       if (field.type === 'select') {
         const currentValue = value == null ? '' : String(value);
+        const optionValues = fieldOptions.map((option) => String(option?.value ?? ''));
+        // A native select shows its first option when the value is not offered.
+        const selectedValue = optionValues.includes(currentValue) ? currentValue : (optionValues[0] || '');
         return `
-          <label class="block">
+          <div class="block">
             <div class="mb-2 text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
-            <select
+            <lex-select
               name="${safeName}"
               data-required="${field.required ? 'true' : 'false'}"
               ${field.required ? 'required' : ''}
-              class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            >
-              ${fieldOptions.map((option) => {
-                const optionValue = String(option?.value ?? '');
-                const optionLabel = String(option?.label ?? optionValue);
-                return `<option value="${escapeHtml(optionValue)}" ${optionValue === currentValue ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
-              }).join('')}
-            </select>
+              options="${lexSelectOptionsAttr(fieldOptions)}"
+              value="${escapeHtml(selectedValue)}"
+            ></lex-select>
             ${safeHelp}
-          </label>
+          </div>
         `;
       }
 
@@ -3625,23 +3620,19 @@
             ? value.split(',').map((item) => item.trim()).filter(Boolean)
             : []);
         return `
-          <label class="block">
+          <div class="block">
             <div class="mb-2 text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
-            <select
+            <lex-select
               name="${safeName}"
               multiple
+              searchable
               data-required="${field.required ? 'true' : 'false'}"
               ${field.required ? 'required' : ''}
-              class="min-h-[140px] w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            >
-              ${fieldOptions.map((option) => {
-                const optionValue = String(option?.value ?? '');
-                const optionLabel = String(option?.label ?? optionValue);
-                return `<option value="${escapeHtml(optionValue)}" ${selectedValues.includes(optionValue) ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
-              }).join('')}
-            </select>
+              options="${lexSelectOptionsAttr(fieldOptions)}"
+              value="${escapeHtml(JSON.stringify(selectedValues))}"
+            ></lex-select>
             ${safeHelp}
-          </label>
+          </div>
         `;
       }
 
@@ -3655,7 +3646,7 @@
         const errorMessage = state.dynamicFieldErrors[field.name];
         const buttonLabel = getDynamicDiscoveryButtonLabel(field);
         return `
-          <label class="block">
+          <div class="block">
             <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
               <div class="text-sm font-medium text-gray-900">${safeLabel} ${requiredMark}</div>
               <button
@@ -3667,23 +3658,19 @@
                 ${escapeHtml(isLoading ? 'Loading…' : buttonLabel)}
               </button>
             </div>
-            <select
+            <lex-select
               name="${safeName}"
               multiple
+              searchable
               data-required="${field.required ? 'true' : 'false'}"
               ${field.required ? 'required' : ''}
-              class="min-h-[140px] w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            >
-              ${fieldOptions.map((option) => {
-                const optionValue = String(option?.value ?? '');
-                const optionLabel = String(option?.label ?? optionValue);
-                return `<option value="${escapeHtml(optionValue)}" ${selectedValues.includes(optionValue) ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
-              }).join('')}
-            </select>
+              options="${lexSelectOptionsAttr(fieldOptions)}"
+              value="${escapeHtml(JSON.stringify(selectedValues))}"
+            ></lex-select>
             ${safeHelp}
             <p class="mt-2 text-xs text-gray-500">${fieldOptions.length ? `${fieldOptions.length} option${fieldOptions.length === 1 ? '' : 's'} available.` : 'No options loaded yet. Discover options after entering the required configuration above.'}</p>
             ${errorMessage ? `<p class="mt-2 text-xs text-red-600">${escapeHtml(errorMessage)}</p>` : ''}
-          </label>
+          </div>
         `;
       }
 
@@ -4412,7 +4399,7 @@
       if (response && response.created_matter && response.created_matter.id) {
         await loadMatterOptions();
         const select = document.getElementById('dataMatterSelect');
-        if (select) select.value = response.created_matter.id;
+        if (select) select.value = String(response.created_matter.id);
         renderMatterDropdownHint();
         updateAssignSelectedButton();
       }
@@ -4617,18 +4604,16 @@
           </div>`
         : '<div class="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-500">No rows in the current selection are already assigned to a matter.</div>';
 
-      const matterOptionsHtml = ['<option value="">Select a matter…</option>']
-        .concat(state.matterOptions.map((matter) => {
-          const label = matter.name || matter.matter_id || matter.client_name || 'Matter';
-          const selected = matter.id === dialog.targetMatterId ? ' selected' : '';
-          return `<option value="${escapeHtml(matter.id)}"${selected}>${escapeHtml(label)}</option>`;
-        }))
-        .join('');
+      const matterOptionsAttr = lexSelectOptionsAttr([{ value: '', label: 'Select a matter…' }]
+        .concat(state.matterOptions.map((matter) => ({
+          value: String(matter.id),
+          label: matter.name || matter.matter_id || matter.client_name || 'Matter',
+        }))));
 
       const existingPanelHtml = dialog.mode === 'existing' ? `
         <div class="mt-3 space-y-2">
           <label class="block text-xs font-medium text-gray-700">Matter</label>
-          <select id="assignDialogMatterSelect" onchange="setAssignDialogMatter(this.value)" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">${matterOptionsHtml}</select>
+          <lex-select id="assignDialogMatterSelect" searchable placeholder="Select a matter…" options="${matterOptionsAttr}" value="${escapeHtml(dialog.targetMatterId == null ? '' : String(dialog.targetMatterId))}"></lex-select>
         </div>` : '';
 
       const form = dialog.createForm || {};
@@ -4691,18 +4676,14 @@
         ${perRowPreviewHtml}
         <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           ${singleCreateFieldsHtml}
-          <label class="block">
+          <div class="block">
             <div class="text-xs font-medium text-gray-700">Status</div>
-            <select onchange="updateAssignDialogField('status', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-              ${['active', 'pending', 'archived', 'closed'].map((s) => `<option value="${s}"${(form.status || 'active') === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}
-            </select>
-          </label>
-          <label class="block">
+            <lex-select data-assign-dialog-field="status" class="mt-1" options="${lexSelectOptionsAttr(['active', 'pending', 'archived', 'closed'].map((s) => ({ value: s, label: titleCase(s) })))}" value="${escapeHtml(form.status || 'active')}"></lex-select>
+          </div>
+          <div class="block">
             <div class="text-xs font-medium text-gray-700">Matter Type</div>
-            <select onchange="updateAssignDialogField('matter_type', this.value)" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-              ${['workspace', 'matter'].map((s) => `<option value="${s}"${(form.matter_type || 'workspace') === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}
-            </select>
-          </label>
+            <lex-select data-assign-dialog-field="matter_type" class="mt-1" options="${lexSelectOptionsAttr(['workspace', 'matter'].map((s) => ({ value: s, label: titleCase(s) })))}" value="${escapeHtml(form.matter_type || 'workspace')}"></lex-select>
+          </div>
         </div>` : '';
 
       const cascadeHtml = dialog.cascadeAvailable
@@ -5285,10 +5266,9 @@
       const paths = [];
       collectFieldPaths(data, '', paths);
       paths.sort();
-      const options = ['<option value="">Select a field…</option>']
-        .concat(paths.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`))
-        .concat(['<option value="__custom__">Custom path…</option>']);
-      return options.join('');
+      return [{ value: '', label: 'Select a field…' }]
+        .concat(paths.map((p) => ({ value: p, label: p })))
+        .concat([{ value: '__custom__', label: 'Custom path…' }]);
     }
 
     function renderInteractivePayload(record) {
@@ -5389,7 +5369,7 @@
       const proposedInput = document.getElementById('recordCorrectionValue');
       if (!select) return;
 
-      const hasOption = [...select.options].some((opt) => opt.value === path);
+      const hasOption = (select.options || []).some((opt) => opt.value === path);
       if (hasOption) {
         select.value = path;
         if (custom) custom.classList.add('hidden');
@@ -5545,13 +5525,11 @@
               <div class="text-sm font-semibold text-gray-900">Propose A Correction</div>
               <div class="mt-2 text-sm text-gray-500">Suggest an edit without overwriting the source record. LANA stores the suggestion as a correction annotation.</div>
               <div class="mt-4 space-y-3">
-                <label class="block">
+                <div class="block">
                   <div class="mb-2 text-sm font-medium text-gray-900">Field</div>
-                  <select id="recordCorrectionFieldSelect" onchange="onCorrectionFieldSelectChange()" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                    ${renderCorrectionFieldOptions(record)}
-                  </select>
+                  <lex-select id="recordCorrectionFieldSelect" searchable placeholder="Select a field…" options="${lexSelectOptionsAttr(renderCorrectionFieldOptions(record))}" value=""></lex-select>
                   <input id="recordCorrectionFieldCustom" type="text" placeholder="Custom path, e.g. address.city" oninput="updateCurrentValueDisplay()" class="mt-2 hidden w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                </label>
+                </div>
                 <div id="recordCorrectionCurrentValueWrap" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Current Value</div>
                   <div id="recordCorrectionCurrentValue" class="mt-2 break-words connector-mono text-xs text-gray-800"></div>
@@ -6500,8 +6478,10 @@
       }
 
       fields.forEach((field) => {
+        // lex-select is not form-associated, so it is not in form.elements.
         const element = forms
-          .map((form) => form.elements[field.name])
+          .map((form) => form.elements[field.name]
+            || form.querySelector(`lex-select[name="${CSS.escape(field.name)}"]`))
           .find(Boolean);
         if (!element) return;
 
@@ -6521,8 +6501,9 @@
         }
 
         if (field.type === 'multiselect' || field.type === 'multiselect_dynamic') {
-          const selectedValues = Array.from(element.selectedOptions || [])
-            .map((option) => option.value)
+          const selectedValues = (element.tagName === 'LEX-SELECT'
+            ? readLexSelectValues(element)
+            : Array.from(element.selectedOptions || []).map((option) => option.value))
             .filter(Boolean);
           if (!selectedValues.length && !field.required) {
             return;
@@ -6609,15 +6590,13 @@
       const select = document.getElementById('dataMatterSelect');
       if (select) {
         const currentValue = select.value;
-        select.innerHTML = ['<option value="">Unassigned (create new matter)</option>']
-          .concat(state.matterOptions.map((matter) => (
-            `<option value="${escapeHtml(matter.id)}">${escapeHtml(matter.name || matter.matter_id || matter.client_name || 'Matter')}</option>`
-          )))
-          .join('');
-
-        if ([...select.options].some((option) => option.value === currentValue)) {
-          select.value = currentValue;
-        }
+        const options = [{ value: '', label: 'Unassigned (create new matter)' }]
+          .concat(state.matterOptions.map((matter) => ({
+            value: String(matter.id),
+            label: String(matter.name || matter.matter_id || matter.client_name || 'Matter'),
+          })));
+        select.options = options;
+        select.value = options.some((option) => option.value === currentValue) ? currentValue : '';
       }
       renderMatterDropdownHint();
       updateAssignSelectedButton();
@@ -6670,7 +6649,11 @@
       try {
         const forms = [document.getElementById('configForm'), document.getElementById('webhooksForm')].filter(Boolean);
         const invalidForm = forms.find((form) => typeof form.reportValidity === 'function' && !form.reportValidity());
-        if (invalidForm) {
+        // lex-select is not form-associated, so reportValidity skips it.
+        const invalidSelect = forms
+          .flatMap((form) => Array.from(form.querySelectorAll('lex-select[required]')))
+          .find((select) => typeof select.validate === 'function' && !select.validate().valid);
+        if (invalidForm || invalidSelect) {
           throw new Error('Fill in the required configuration fields before saving.');
         }
 
@@ -7944,6 +7927,29 @@
     window.selectAllFiltered = selectAllFiltered;
     window.clearAssignSelection = clearAssignSelection;
     window.onMatterDropdownChange = onMatterDropdownChange;
+
+    // lex-select fires lex-change (not change); one delegated listener routes
+    // the page's dropdowns to the handlers the native selects called inline.
+    document.addEventListener('lex-change', (event) => {
+      const target = event.target;
+      if (!target || target.tagName !== 'LEX-SELECT') return;
+      const value = event.detail ? event.detail.value : target.value;
+      if (target.id === 'dataMatterSelect') {
+        onMatterDropdownChange();
+      } else if (target.id === 'authModeSelect') {
+        handleAuthModeChange();
+      } else if (target.id === 'assignDialogMatterSelect') {
+        setAssignDialogMatter(value);
+      } else if (target.id === 'recordCorrectionFieldSelect') {
+        onCorrectionFieldSelectChange();
+      } else if (target.dataset.assignDialogField) {
+        updateAssignDialogField(target.dataset.assignDialogField, value);
+      } else if (target.dataset.role === 'field' && target.dataset.ruleIndex != null) {
+        onDataRuleFieldChange(Number(target.dataset.ruleIndex), value);
+      } else if (target.dataset.role === 'operator' && target.dataset.ruleIndex != null) {
+        onDataRuleOperatorChange(Number(target.dataset.ruleIndex), value);
+      }
+    });
     window.openRecordDetail = openRecordDetail;
     window.openParentRecord = openParentRecord;
     window.refreshParentRecordsForOpenRecord = refreshParentRecordsForOpenRecord;

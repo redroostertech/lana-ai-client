@@ -2803,8 +2803,37 @@
     }
 
     // Render custom fields modal content
+    const CUSTOM_FIELD_TYPE_OPTIONS = [
+      { value: 'text', label: 'Text' },
+      { value: 'textarea', label: 'Long text' },
+      { value: 'number', label: 'Number' },
+      { value: 'currency', label: 'Currency' },
+      { value: 'date', label: 'Date' },
+      { value: 'datetime', label: 'Date and time' },
+      { value: 'boolean', label: 'Yes/No' },
+      { value: 'select', label: 'Dropdown' }
+    ];
+
+    // The type and dropdown-value controls are lex-selects (lex-change, not
+    // change): one delegated listener on the container.
+    function bindCustomFieldSelects(container) {
+      if (!container || container.dataset.customFieldSelectsBound === 'true') return;
+      container.dataset.customFieldSelectsBound = 'true';
+      container.addEventListener('lex-change', (e) => {
+        const target = e.target;
+        if (!target || !target.dataset) return;
+        const value = e.detail ? e.detail.value : target.value;
+        if (target.dataset.fieldDefIndex !== undefined) {
+          updateFieldDefinition(Number(target.dataset.fieldDefIndex), target.dataset.fieldDefProp, value);
+        } else if (target.dataset.fieldValueKey !== undefined) {
+          updateFieldValue(target.dataset.fieldValueKey, value);
+        }
+      });
+    }
+
     function renderCustomFieldsModal() {
       const container = document.getElementById('customFieldsContainer');
+      bindCustomFieldSelects(container);
 
       if (customFieldDefinitions.length === 0) {
         container.innerHTML = `
@@ -2855,19 +2884,13 @@
                   <!-- Type -->
                   <div class="col-span-2">
                     <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
-                    <select
-                      onchange="updateFieldDefinition(${index}, 'type', this.value)"
-                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
-                    >
-                      <option value="text" ${def.type === 'text' ? 'selected' : ''}>Text</option>
-                      <option value="textarea" ${def.type === 'textarea' ? 'selected' : ''}>Long Text</option>
-                      <option value="number" ${def.type === 'number' ? 'selected' : ''}>Number</option>
-                      <option value="currency" ${def.type === 'currency' ? 'selected' : ''}>Currency</option>
-                      <option value="date" ${def.type === 'date' ? 'selected' : ''}>Date</option>
-                      <option value="datetime" ${def.type === 'datetime' ? 'selected' : ''}>Date+Time</option>
-                      <option value="boolean" ${def.type === 'boolean' ? 'selected' : ''}>Yes/No</option>
-                      <option value="select" ${def.type === 'select' ? 'selected' : ''}>Dropdown</option>
-                    </select>
+                    <lex-select
+                      size="sm"
+                      data-field-def-index="${index}"
+                      data-field-def-prop="type"
+                      options="${escapeHtml(JSON.stringify(CUSTOM_FIELD_TYPE_OPTIONS))}"
+                      value="${escapeHtml(def.type || 'text')}"
+                    ></lex-select>
                   </div>
 
                   <!-- Required -->
@@ -3002,17 +3025,13 @@
 
         case 'select':
           return `
-            <select
-              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 lex-ring-focus lex-border-focus"
-            >
-              <option value="">-- Select ${escapeHtml(def.display_name || def.key)} --</option>
-              ${(def.options || []).map(option => `
-                <option value="${escapeHtml(option)}" ${currentValue === option ? 'selected' : ''}>
-                  ${escapeHtml(option)}
-                </option>
-              `).join('')}
-            </select>
+            <lex-select
+              size="sm"
+              data-field-value-key="${escapeHtml(key)}"
+              placeholder="${escapeHtml('Select ' + (def.display_name || def.key))}"
+              options="${escapeHtml(JSON.stringify([{ value: '', label: 'Select ' + (def.display_name || def.key) }].concat((def.options || []).map(option => ({ value: String(option), label: String(option) })))))}"
+              value="${escapeHtml(currentValue == null ? '' : String(currentValue))}"
+            ></lex-select>
           `;
 
         case 'text':

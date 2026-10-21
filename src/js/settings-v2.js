@@ -1825,22 +1825,16 @@
     if (!row || row.status !== 'connected' || !row.source_id || row.supports_sync === false) return '';
     var value = currentSyncFrequency(row);
     var options = [
-      ['manual', 'Manual'],
-      ['hourly', 'Hourly'],
-      ['daily', 'Daily'],
-      ['weekly', 'Weekly']
+      { value: 'manual', label: 'Manual' },
+      { value: 'hourly', label: 'Hourly' },
+      { value: 'daily', label: 'Daily' },
+      { value: 'weekly', label: 'Weekly' }
     ];
-    var html =
-      '<label class="sv2-connection-sync-control">' +
+    return '<span class="sv2-connection-sync-control">' +
         '<span>Sync</span>' +
-        '<select class="sv2-connection-sync-select" data-source-id="' + esc(row.source_id || '') + '" data-current-value="' + esc(value) + '">';
-    for (var i = 0; i < options.length; i++) {
-      html += '<option value="' + options[i][0] + '"' + (value === options[i][0] ? ' selected' : '') + '>' +
-        options[i][1] +
-      '</option>';
-    }
-    html += '</select></label>';
-    return html;
+        '<lex-select size="sm" class="sv2-connection-sync-select" aria-label="Sync frequency" data-source-id="' + esc(row.source_id || '') + '" data-current-value="' + esc(value) + '"' +
+          ' options="' + esc(JSON.stringify(options)) + '" value="' + esc(value) + '"></lex-select>' +
+      '</span>';
   }
 
   function renderUserConnectionsRows(rows) {
@@ -1911,7 +1905,7 @@
     }
     var selects = dom.userConnectionsContent.querySelectorAll('.sv2-connection-sync-select');
     for (var j = 0; j < selects.length; j++) {
-      selects[j].addEventListener('change', handleUserConnectionSyncFrequencyChange);
+      selects[j].addEventListener('lex-change', handleUserConnectionSyncFrequencyChange);
     }
   }
 
@@ -2061,17 +2055,15 @@
     return formatted.relative || value;
   }
 
-  function renderEntityFilterOptions(counts, selected) {
-    var html = '<option value="">All entities</option>';
+  function entityFilterOptions(counts) {
+    var options = [{ value: '', label: 'All entities' }];
     for (var i = 0; i < (counts || []).length; i++) {
       var count = counts[i] || {};
       var entity = count.entity_type || '';
       if (!entity) continue;
-      html += '<option value="' + esc(entity) + '"' + (selected === entity ? ' selected' : '') + '>' +
-        esc(entity) + ' (' + esc(String(count.count || 0)) + ')' +
-      '</option>';
+      options.push({ value: String(entity), label: entity + ' (' + String(count.count || 0) + ')' });
     }
-    return html;
+    return options;
   }
 
   function renderConnectionDataRecords(payload) {
@@ -2131,9 +2123,9 @@
 
     body.innerHTML =
       '<div class="sv2-connection-data-toolbar">' +
-        '<select class="sv2-connection-data-entity" aria-label="Entity type">' +
-          renderEntityFilterOptions(payload.entity_counts || [], state.entityType || '') +
-        '</select>' +
+        '<lex-select size="sm" class="sv2-connection-data-entity" aria-label="Entity type" placeholder="All entities"' +
+          ' options="' + esc(JSON.stringify(entityFilterOptions(payload.entity_counts || []))) + '"' +
+          ' value="' + esc(state.entityType || '') + '"></lex-select>' +
         '<input class="sv2-connection-data-search" type="search" placeholder="Search records" value="' + esc(state.query || '') + '">' +
         '<lex-btn size="sm" variant="secondary" icon="search" data-action="filter-data">Search</lex-btn>' +
         '<lex-btn size="sm" variant="danger" icon="trash-2" data-action="delete-data">Delete data</lex-btn>' +

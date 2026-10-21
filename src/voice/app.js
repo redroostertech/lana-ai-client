@@ -620,33 +620,32 @@ function fieldWithInfo(label, name, value, settingKey, attrs = '') {
   `;
 }
 
+// lex-select for a named setting. lex-select is not form-associated, so
+// updateSelectedFromForm() reads every lex-select[name] in the form itself.
+// A value that is not offered falls back to the first option, as a native
+// select did.
+function lexSelectControl(name, value, options) {
+  const values = options.map(([optionValue]) => String(optionValue));
+  const current = values.includes(String(value ?? '')) ? String(value) : (values[0] || '');
+  const optionsJson = JSON.stringify(options.map(([optionValue, optionLabel]) => ({ value: String(optionValue), label: optionLabel })));
+  return `<lex-select name="${escapeHtml(name)}" options="${escapeHtml(optionsJson)}" value="${escapeHtml(current)}"></lex-select>`;
+}
+
 function selectField(label, name, value, options) {
   return `
-    <label class="field">
+    <div class="field">
       <span>${escapeHtml(label)}</span>
-      <select name="${escapeHtml(name)}">
-        ${options.map(([optionValue, optionLabel]) => `
-          <option value="${escapeHtml(optionValue)}" ${String(value) === String(optionValue) ? 'selected' : ''}>
-            ${escapeHtml(optionLabel)}
-          </option>
-        `).join('')}
-      </select>
-    </label>
+      ${lexSelectControl(name, value, options)}
+    </div>
   `;
 }
 
 function selectFieldWithInfo(label, name, value, options, settingKey) {
   return `
-    <label class="field">
+    <div class="field">
       ${settingLabel(label, settingKey)}
-      <select name="${escapeHtml(name)}">
-        ${options.map(([optionValue, optionLabel]) => `
-          <option value="${escapeHtml(optionValue)}" ${String(value) === String(optionValue) ? 'selected' : ''}>
-            ${escapeHtml(optionLabel)}
-          </option>
-        `).join('')}
-      </select>
-    </label>
+      ${lexSelectControl(name, value, options)}
+    </div>
   `;
 }
 
@@ -1104,6 +1103,9 @@ function updateSelectedFromForm() {
   const agent = selectedAgent();
   if (!agent) return null;
   const formData = new FormData(els.form);
+  for (const control of els.form.querySelectorAll('lex-select[name]')) {
+    formData.append(control.getAttribute('name'), String(control.value ?? ''));
+  }
   for (const [name, value] of formData.entries()) {
     if (name === 'voice.speed') {
       writePath(agent, name, Number(value));
@@ -2339,6 +2341,10 @@ function bind() {
     els.selectedName.textContent = selectedAgent()?.name || 'Receptionist';
   });
   els.form.addEventListener('change', () => {
+    updateSelectedFromForm();
+    setDirty(true);
+  });
+  els.form.addEventListener('lex-change', () => {
     updateSelectedFromForm();
     setDirty(true);
   });

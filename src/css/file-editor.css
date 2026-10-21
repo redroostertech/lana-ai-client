@@ -299,7 +299,7 @@
 .office-file-item:focus-visible,
 .office-doc-toolbar button:focus-visible,
 .office-selection-toolbar button:focus-visible,
-.office-format-select:focus-visible,
+.office-format-select .lex-select-trigger:focus-visible,
 .office-color-control:focus-within,
 .office-ruler-actions button:focus-visible,
 .office-title-input:focus-visible,
@@ -918,7 +918,7 @@
 }
 
 .office-doc-toolbar button,
-.office-format-select,
+.office-format-select .lex-select-trigger,
 .office-color-control {
   align-items: center;
   background: var(--office-panel-bg);
@@ -936,7 +936,7 @@
 }
 
 .office-doc-toolbar button:hover,
-.office-format-select:hover,
+.office-format-select .lex-select-trigger:hover:not(:disabled),
 .office-color-control:hover {
   background: var(--office-hover);
   border-color: var(--office-line-strong);
@@ -950,12 +950,19 @@
   color: var(--lex-text-accent);
 }
 
+/* Toolbar lex-selects: the host sizes the control, the trigger carries the
+   same box as the toolbar buttons. */
 .office-format-select {
+  display: inline-block;
+  min-width: 116px;
+}
+
+.office-format-select .lex-select-trigger {
   font: inherit;
   font-size: var(--lex-label-sm-size);
   font-weight: 650;
-  min-width: 116px;
-  padding: 0 28px 0 8px;
+  justify-content: space-between;
+  padding: 0 8px;
 }
 
 .office-format-select-narrow {
@@ -1542,7 +1549,6 @@
   gap: 6px;
 }
 
-.office-file-info-edit select,
 .office-file-info-edit input,
 .office-file-info-edit textarea {
   background: var(--office-rail-bg);

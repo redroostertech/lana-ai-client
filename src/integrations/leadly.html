@@ -39,18 +39,11 @@
         <!-- Pipeline Category Filter -->
         <div id="pipelineCategoryFilter" class="mb-6 flex items-center gap-4 bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <label class="text-sm font-medium text-gray-700 flex-shrink-0">View:</label>
-          <select id="pipelineCategorySelect" onchange="onPipelineCategoryChange(this.value)"
-                  class="block w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-            <option value="new_lead" selected>New Leads Only</option>
-            <option value="all">All Pipelines</option>
-            <option value="maintenance">Maintenance Only</option>
-            <option value="event_attendee">Event Attendees Only</option>
-            <option value="funding">Funding Only</option>
-          </select>
-          <select id="pipelineSelect" onchange="onPipelineChange(this.value)"
-                  class="block w-64 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-            <option value="">All pipelines in category</option>
-          </select>
+          <lex-select id="pipelineCategorySelect" class="block w-48" size="sm"
+                  options='[{"value":"new_lead","label":"New leads only"},{"value":"all","label":"All pipelines"},{"value":"maintenance","label":"Maintenance only"},{"value":"event_attendee","label":"Event attendees only"},{"value":"funding","label":"Funding only"}]'
+                  value="new_lead"></lex-select>
+          <lex-select id="pipelineSelect" class="block w-64" size="sm" searchable placeholder="All pipelines in category"
+                  options='[{"value":"","label":"All pipelines in category"}]' value=""></lex-select>
           <span id="pipelineFilterInfo" class="text-xs text-gray-400 ml-auto"></span>
         </div>
 
@@ -180,9 +173,7 @@
         <!-- Volume Selector -->
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">Storage Volume</label>
-          <select id="volumeSelector" onchange="onVolumeChange()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-            <option value="">Loading volumes...</option>
-          </select>
+          <lex-select id="volumeSelector" placeholder="Loading volumes..." options='[]' value=""></lex-select>
         </div>
 
         <!-- Manual Path Entry (optional) -->
@@ -526,7 +517,8 @@
      */
     async function loadPipelineOptions(category) {
       const select = document.getElementById('pipelineSelect');
-      select.innerHTML = '<option value="">All pipelines in category</option>';
+      const baseOptions = [{ value: '', label: 'All pipelines in category' }];
+      select.options = baseOptions;
 
       try {
         const params = new URLSearchParams({ limit: '50' });
@@ -536,12 +528,10 @@
         const result = await api.get(`/api/v1/pipelines?${params.toString()}`);
         const pipelines = result?.data || [];
 
-        for (const p of pipelines) {
-          const opt = document.createElement('option');
-          opt.value = p.pipeline_id || p.external_id || p.id;
-          opt.textContent = p.name || p.pipeline_id;
-          select.appendChild(opt);
-        }
+        select.options = baseOptions.concat(pipelines.map((p) => ({
+          value: String(p.pipeline_id || p.external_id || p.id),
+          label: String(p.name || p.pipeline_id),
+        })));
 
         const infoEl = document.getElementById('pipelineFilterInfo');
         if (pipelines.length === 0 && category !== 'all') {
@@ -576,6 +566,12 @@
     // Load pipeline options on dashboard init
     document.addEventListener('DOMContentLoaded', () => {
       loadPipelineOptions('new_lead');
+      document.getElementById('pipelineCategorySelect')
+        ?.addEventListener('lex-change', (e) => onPipelineCategoryChange(e.detail.value));
+      document.getElementById('pipelineSelect')
+        ?.addEventListener('lex-change', (e) => onPipelineChange(e.detail.value));
+      document.getElementById('volumeSelector')
+        ?.addEventListener('lex-change', () => onVolumeChange());
     });
     // ---- End Pipeline Category Filter ----
 
@@ -1012,13 +1008,7 @@
                 <div class="grid grid-cols-12 gap-4">
                   <div class="col-span-3">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Method</label>
-                    <select id="customApiMethod" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                      <option value="GET">GET</option>
-                      <option value="POST">POST</option>
-                      <option value="PUT">PUT</option>
-                      <option value="PATCH">PATCH</option>
-                      <option value="DELETE">DELETE</option>
-                    </select>
+                    <lex-select id="customApiMethod" options='[{"value":"GET","label":"GET"},{"value":"POST","label":"POST"},{"value":"PUT","label":"PUT"},{"value":"PATCH","label":"PATCH"},{"value":"DELETE","label":"DELETE"}]' value="GET"></lex-select>
                   </div>
                   <div class="col-span-9">
                     <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -1883,8 +1873,8 @@
       const bodySection = document.getElementById('customApiBodySection');
 
       if (methodSelect && bodySection) {
-        methodSelect.addEventListener('change', (e) => {
-          if (['POST', 'PUT', 'PATCH'].includes(e.target.value)) {
+        methodSelect.addEventListener('lex-change', (e) => {
+          if (['POST', 'PUT', 'PATCH'].includes(e.detail.value)) {
             bodySection.classList.remove('hidden');
           } else {
             bodySection.classList.add('hidden');
@@ -2409,16 +2399,12 @@
                 <label for="sync_frequency" class="block text-sm font-medium text-gray-700 mb-2">
                   Sync Frequency
                 </label>
-                <select
+                <lex-select
                   id="sync_frequency"
                   name="sync_frequency"
-                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                >
-                  <option value="manual" ${currentConfig.sync_frequency === 'manual' ? 'selected' : ''}>Manual Only</option>
-                  <option value="hourly" ${currentConfig.sync_frequency === 'hourly' ? 'selected' : ''}>Hourly</option>
-                  <option value="daily" ${currentConfig.sync_frequency === 'daily' || !currentConfig.sync_frequency ? 'selected' : ''}>Daily</option>
-                  <option value="realtime" ${currentConfig.sync_frequency === 'realtime' ? 'selected' : ''}>Real-time (Advanced)</option>
-                </select>
+                  options='[{"value":"manual","label":"Manual only"},{"value":"hourly","label":"Hourly"},{"value":"daily","label":"Daily"},{"value":"realtime","label":"Real-time (advanced)"}]'
+                  value="${['manual', 'hourly', 'daily', 'realtime'].includes(currentConfig.sync_frequency) ? currentConfig.sync_frequency : (currentConfig.sync_frequency ? 'manual' : 'daily')}"
+                ></lex-select>
                 <p class="mt-1 text-xs text-gray-500">Automatic syncs run in the background at the selected interval</p>
               </div>
 
@@ -3806,11 +3792,11 @@
         const volumeSelector = document.getElementById('volumeSelector');
 
         // Build volume options
-        const volumeOptions = availableVolumes.map(v =>
-          `<option value="${v.path}">${v.name}${v.is_default ? ' (Default)' : ''}</option>`
-        ).join('');
-
-        volumeSelector.innerHTML = volumeOptions;
+        volumeSelector.options = availableVolumes.map(v => ({
+          value: String(v.path),
+          label: `${v.name}${v.is_default ? ' (default)' : ''}`,
+        }));
+        volumeSelector.placeholder = 'Select a volume';
 
         // Select first volume or chef-primary if available
         const defaultVolume = availableVolumes.find(v => v.is_default) || availableVolumes[0];

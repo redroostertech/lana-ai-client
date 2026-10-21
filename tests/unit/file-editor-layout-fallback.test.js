@@ -24,7 +24,8 @@ describe('File Editor layout fallback wiring', () => {
   });
 
   test('the toolbar offers six heading levels and maps them to the embed styles', () => {
-    expect(editor).toContain('<option value="h5">Heading 5</option><option value="h6">Heading 6</option>');
+    expect(editor).toContain("{ value: 'h4', label: 'Heading 4' }, { value: 'h5', label: 'Heading 5' },");
+    expect(editor).toContain("{ value: 'h6', label: 'Heading 6' }");
     expect(editor).toContain("h5: 'Heading5'");
     expect(editor).toContain("h6: 'Heading6'");
     expect(editor).toContain("Heading5: 'h5', Heading6: 'h6'");

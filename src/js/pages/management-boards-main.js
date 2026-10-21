@@ -524,7 +524,7 @@ function setupEventListeners() {
   if (cancelTeamMemberBtn) {
     cancelTeamMemberBtn.addEventListener('click', () => {
       document.getElementById('addTeamMemberForm').classList.add('hidden');
-      document.getElementById('teamAssignmentForm').reset();
+      resetTeamAssignmentForm();
       clearUserSearch();
     });
   }
@@ -874,6 +874,24 @@ function closeModal(modalId) {
 }
 
 /**
+ * Set a lex-select back to a value; form.reset() leaves lex-select alone.
+ * @param {string} id - Element id
+ * @param {string} value - Value to restore
+ */
+function resetLexSelect(id, value) {
+  const select = document.getElementById(id);
+  if (select) select.value = value;
+}
+
+/**
+ * Reset the team assignment form, including its access level lex-select
+ */
+function resetTeamAssignmentForm() {
+  document.getElementById('teamAssignmentForm').reset();
+  resetLexSelect('teamAccessLevel', 'admin');
+}
+
+/**
  * Handle create board form submission
  * @param {Event} e - Form submit event
  */
@@ -905,8 +923,10 @@ async function handleCreateBoard(e) {
     // Close modal
     closeModal('newBoardModal');
 
-    // Reset form
+    // Reset form. form.reset() does not reach lex-select, so clear those too.
     e.target.reset();
+    resetLexSelect('boardType', '');
+    resetLexSelect('reviewFrequency', '');
 
     // Reload boards
     await loadBoards();
@@ -1368,7 +1388,7 @@ async function handleTeamAssignmentSubmit(e) {
     showToast('User assigned successfully', 'success');
 
     // Reset form and hide it
-    document.getElementById('teamAssignmentForm').reset();
+    resetTeamAssignmentForm();
     document.getElementById('addTeamMemberForm').classList.add('hidden');
 
     // Reload assignments (users already cached by autocomplete)

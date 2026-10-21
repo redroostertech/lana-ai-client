@@ -1375,17 +1375,15 @@
     var current = (_importWizard.mapping && (_importWizard.mapping.entityType || _importWizard.mapping.entity_type)) ||
       (_importWizard.job && (_importWizard.job.target_entity_type || _importWizard.job.targetEntityType)) ||
       'lead';
-    var html = '';
-    for (var i = 0; i < _importEntityOptions.length; i++) {
-      var opt = _importEntityOptions[i];
-      html += '<option value="' + _escAttr(opt.value) + '"' + (opt.value === current ? ' selected' : '') + '>' + _escHtml(opt.label) + '</option>';
-    }
-    select.innerHTML = html;
+    select.options = _importEntityOptions.map(function (opt) {
+      return { value: String(opt.value), label: String(opt.label) };
+    });
+    select.value = String(current);
     if (!select._wired) {
       select._wired = true;
-      select.addEventListener('change', function () {
+      select.addEventListener('lex-change', function (event) {
         if (!_importWizard.mapping) return;
-        _importWizard.mapping.entityType = select.value;
+        _importWizard.mapping.entityType = (event.detail && event.detail.value) || select.value;
         _importWizard.customFieldApproved = false;
         _importWizard.spotCheckConfirmed = false;
         _importWizard.importPlanConfirmation = '';
@@ -1453,15 +1451,16 @@
       ? '<div class="ws-import-mapping-guidance" data-testid="workspace-csv-mapping-guidance">' + _escHtml(guidance) + '</div>'
       : '';
 
-    var selectHtml =
-      '<select class="ws-import-map-mode" data-map-index="' + index + '" data-testid="workspace-csv-mapping-target">' +
-        '<option value="unmapped"' + (mode === 'unmapped' ? ' selected' : '') + '>Do not import</option>' +
-        '<option value="custom"' + (mode === 'custom' ? ' selected' : '') + '>Custom field</option>';
+    var modeOptions = [
+      { value: 'unmapped', label: 'Do not import' },
+      { value: 'custom', label: 'Custom field' }
+    ];
     for (var i = 0; i < fieldOptions.length; i++) {
-      var value = fieldOptions[i];
-      selectHtml += '<option value="field:' + _escAttr(value) + '"' + (mode === 'field:' + value ? ' selected' : '') + '>' + _escHtml(_formatFieldLabel(value)) + '</option>';
+      modeOptions.push({ value: 'field:' + fieldOptions[i], label: _formatFieldLabel(fieldOptions[i]) });
     }
-    selectHtml += '</select>';
+    var selectHtml =
+      '<lex-select size="sm" class="ws-import-map-mode" data-map-index="' + index + '" data-testid="workspace-csv-mapping-target"' +
+        ' options="' + _escAttr(JSON.stringify(modeOptions)) + '" value="' + _escAttr(mode) + '"></lex-select>';
 
     return '<tr class="ws-import-map-row' + (mode === 'custom' ? ' is-custom-field' : '') + '" data-source-column="' + _escAttr(row.sourceColumn) + '">' +
       '<td><div class="ws-import-column-name">' + _escHtml(row.sourceColumn) + '</div></td>' +
@@ -1484,11 +1483,11 @@
     for (var i = 0; i < controls.length; i++) {
       if (controls[i]._wired) continue;
       controls[i]._wired = true;
-      controls[i].addEventListener('change', function () {
+      controls[i].addEventListener('lex-change', function (event) {
         var row = this.closest('.ws-import-map-row');
         var customInput = row ? row.querySelector('.ws-import-custom-key') : null;
         var customPreview = row ? row.querySelector('[data-custom-preview]') : null;
-        var isCustom = this.value === 'custom';
+        var isCustom = ((event.detail && event.detail.value) || this.value) === 'custom';
         if (customInput) customInput.hidden = !isCustom;
         if (customPreview) customPreview.hidden = !isCustom;
         if (row) row.classList.toggle('is-custom-field', isCustom);

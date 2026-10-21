@@ -782,6 +782,39 @@ function renderMatterEventSummaryHtml(selectedEvent) {
 }
 
 /**
+ * lex-select markup for the step builder. Option values stay strings; the
+ * value defaults to the first option, as a native select did.
+ */
+function matterSkillSelectHtml(attrs, options, value) {
+  const escapeAttr = (text) => String(text == null ? '' : text)
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const selected = value !== undefined ? value : (options.length ? options[0].value : '');
+  return `<lex-select ${attrs} size="sm" options="${escapeAttr(JSON.stringify(options))}" value="${escapeAttr(selected)}"></lex-select>`;
+}
+
+/**
+ * Grouped event type options ({ value, label, group }) for the trigger select.
+ */
+function buildMatterEventOptions() {
+  const catalog = window.LanaEventCatalog;
+  if (catalog && Array.isArray(catalog.categories) && typeof catalog.getEventMeta === 'function') {
+    const options = [];
+    catalog.categories.forEach((group) => {
+      (group.events || []).forEach((eventType) => {
+        const meta = catalog.getEventMeta(eventType) || {};
+        options.push({ value: eventType, label: meta.friendly_name || eventType, group: group.label });
+      });
+    });
+    return options;
+  }
+  return ['document.created', 'document.updated', 'document.deleted', 'document.uploaded', 'document.parsed',
+    'document.indexed', 'document.ready', 'document.summarized', 'document.processed', 'document.shared',
+    'document.downloaded', 'document_version.created', 'document_version.restored']
+    .map((eventType) => ({ value: eventType, label: eventType, group: 'Document Events' }));
+}
+
+/**
  * Add a new skill step
  */
 function addWorkflowStep() {
@@ -819,13 +852,7 @@ function addWorkflowStep() {
               </svg>
             </div>
             <div class="flex-1">
-              <select class="step-type-selector bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-gray-900 text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-purple-500" onchange="updateStepType('${stepId}', this.value)">
-                <option value="trigger">Trigger</option>
-                <option value="condition">Condition</option>
-                <option value="ai-action">AI Action</option>
-                <option value="integration">Integration</option>
-                <option value="transform">Transform</option>
-              </select>
+              ${matterSkillSelectHtml(`class="step-type-selector" data-step-id="${stepId}" aria-label="Step type"`, [{ value: 'trigger', label: 'Trigger' }, { value: 'condition', label: 'Condition' }, { value: 'ai-action', label: 'AI Action' }, { value: 'integration', label: 'Integration' }, { value: 'transform', label: 'Transform' }])}
               <code class="block mt-1 text-xs font-mono text-gray-500">step_${stepIndex + 1}.*</code>
             </div>
           </div>
@@ -863,6 +890,11 @@ function addWorkflowStep() {
   `;
 
   container.insertAdjacentHTML('beforeend', stepHtml);
+
+  const typeSelect = container.querySelector(`[data-step-id="${stepId}"] .step-type-selector`);
+  if (typeSelect) {
+    typeSelect.addEventListener('lex-change', (e) => updateStepType(stepId, e.detail.value));
+  }
 
   // Initialize step configuration UI
   updateStepConfigUI(stepId, 'trigger');
@@ -911,27 +943,7 @@ function updateStepConfigUI(stepId, type) {
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1.5">Event Type</label>
             <div class="flex flex-wrap items-center gap-2">
-              <select id="event-type-select-${stepId}" onchange="updateEventDescription('${stepId}')" class="flex-1 min-w-[220px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                ${window.LanaEventCatalog && typeof window.LanaEventCatalog.buildSelectOptions === 'function'
-                  ? window.LanaEventCatalog.buildSelectOptions()
-                  : `
-                    <optgroup label="Document Events">
-                      <option value="document.created">document.created</option>
-                      <option value="document.updated">document.updated</option>
-                      <option value="document.deleted">document.deleted</option>
-                      <option value="document.uploaded">document.uploaded</option>
-                      <option value="document.parsed">document.parsed</option>
-                      <option value="document.indexed">document.indexed</option>
-                      <option value="document.ready">document.ready</option>
-                      <option value="document.summarized">document.summarized</option>
-                      <option value="document.processed">document.processed</option>
-                      <option value="document.shared">document.shared</option>
-                      <option value="document.downloaded">document.downloaded</option>
-                      <option value="document_version.created">document_version.created</option>
-                      <option value="document_version.restored">document_version.restored</option>
-                    </optgroup>
-                  `}
-              </select>
+              ${matterSkillSelectHtml(`id="event-type-select-${stepId}" class="flex-1 min-w-[220px]" searchable aria-label="Event type"`, buildMatterEventOptions())}
               <button type="button" class="px-3 py-2 text-xs font-semibold rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100" data-event-browser-open-step="${stepId}">Browse Events</button>
             </div>
             <div id="event-description-${stepId}" class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -953,12 +965,7 @@ function updateStepConfigUI(stepId, type) {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1.5">Operator</label>
-              <select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                <option value="equals">equals</option>
-                <option value="contains">contains</option>
-                <option value="greater_than">greater than</option>
-                <option value="less_than">less than</option>
-              </select>
+              ${matterSkillSelectHtml('class="condition-operator-select w-full" aria-label="Operator"', [{ value: 'equals', label: 'Equals' }, { value: 'contains', label: 'Contains' }, { value: 'greater_than', label: 'Greater than' }, { value: 'less_than', label: 'Less than' }])}
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1.5">Value</label>
@@ -975,19 +982,11 @@ function updateStepConfigUI(stepId, type) {
         <div class="space-y-3">
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1.5">AI Task</label>
-            <select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-              <option value="summarize">Summarize Document</option>
-              <option value="extract">Extract Key Information</option>
-              <option value="classify">Classify Content</option>
-              <option value="generate">Generate Text</option>
-            </select>
+            ${matterSkillSelectHtml('class="ai-task-select w-full" aria-label="AI task"', [{ value: 'summarize', label: 'Summarize Document' }, { value: 'extract', label: 'Extract Key Information' }, { value: 'classify', label: 'Classify Content' }, { value: 'generate', label: 'Generate Text' }])}
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1.5">AI Instructions Mode</label>
-            <select class="ai-prompt-mode-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-              <option value="default">Use Default AI Instructions</option>
-              <option value="custom">Use Custom System Prompt</option>
-            </select>
+            ${matterSkillSelectHtml('class="ai-prompt-mode-select w-full" aria-label="AI instructions mode"', [{ value: 'default', label: 'Use Default AI Instructions' }, { value: 'custom', label: 'Use Custom System Prompt' }])}
           </div>
           <div class="ai-system-prompt-field hidden">
             <label class="block text-xs font-medium text-gray-700 mb-1.5">System Prompt</label>
@@ -1008,12 +1007,7 @@ function updateStepConfigUI(stepId, type) {
         <div class="space-y-3">
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1.5">Action Type</label>
-            <select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-              <option value="send_email">Send Email</option>
-              <option value="create_task">Create Task</option>
-              <option value="update_crm">Update CRM</option>
-              <option value="post_slack">Post to Slack</option>
-            </select>
+            ${matterSkillSelectHtml('class="integration-action-select w-full" aria-label="Action type"', [{ value: 'send_email', label: 'Send Email' }, { value: 'create_task', label: 'Create Task' }, { value: 'update_crm', label: 'Update CRM' }, { value: 'post_slack', label: 'Post to Slack' }])}
           </div>
         </div>
       `;
@@ -1024,12 +1018,7 @@ function updateStepConfigUI(stepId, type) {
         <div class="space-y-3">
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1.5">Operation</label>
-            <select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-              <option value="map">Map Fields</option>
-              <option value="filter">Filter Data</option>
-              <option value="merge">Merge Objects</option>
-              <option value="split">Split String</option>
-            </select>
+            ${matterSkillSelectHtml('class="transform-operation-select w-full" aria-label="Operation"', [{ value: 'map', label: 'Map Fields' }, { value: 'filter', label: 'Filter Data' }, { value: 'merge', label: 'Merge Objects' }, { value: 'split', label: 'Split String' }])}
           </div>
         </div>
       `;
@@ -1039,6 +1028,10 @@ function updateStepConfigUI(stepId, type) {
   configContainer.innerHTML = configHtml;
 
   if (type === 'trigger') {
+    const eventSelect = document.getElementById(`event-type-select-${stepId}`);
+    if (eventSelect) {
+      eventSelect.addEventListener('lex-change', () => updateEventDescription(stepId));
+    }
     const browseButton = configContainer.querySelector('[data-event-browser-open-step]');
     if (browseButton) {
       browseButton.addEventListener('click', function() {
@@ -1052,14 +1045,14 @@ function updateStepConfigUI(stepId, type) {
     if (!step) return;
 
     if (type === 'trigger') {
-      var eventSelect = configContainer.querySelector('select');
+      var eventSelect = configContainer.querySelector('lex-select');
       step.config = { event_type: eventSelect ? eventSelect.value : 'manual' };
       return;
     }
 
     if (type === 'condition') {
       var conditionInputs = configContainer.querySelectorAll('input');
-      var conditionSelect = configContainer.querySelector('select');
+      var conditionSelect = configContainer.querySelector('lex-select');
       step.config = {
         field: conditionInputs[0] ? conditionInputs[0].value : '',
         operator: conditionSelect ? conditionSelect.value : 'equals',
@@ -1069,7 +1062,7 @@ function updateStepConfigUI(stepId, type) {
     }
 
     if (type === 'ai-action') {
-      var aiSelects = configContainer.querySelectorAll('select');
+      var aiSelects = configContainer.querySelectorAll('lex-select');
       var aiTextareas = configContainer.querySelectorAll('textarea');
       step.config = {
         task: aiSelects[0] ? aiSelects[0].value : 'summarize',
@@ -1081,13 +1074,13 @@ function updateStepConfigUI(stepId, type) {
     }
 
     if (type === 'integration') {
-      var integrationSelect = configContainer.querySelector('select');
+      var integrationSelect = configContainer.querySelector('lex-select');
       step.config = { action_type: integrationSelect ? integrationSelect.value : 'send_email' };
       return;
     }
 
     if (type === 'transform') {
-      var transformSelect = configContainer.querySelector('select');
+      var transformSelect = configContainer.querySelector('lex-select');
       step.config = { operation: transformSelect ? transformSelect.value : 'map' };
     }
   };
@@ -1099,10 +1092,16 @@ function updateStepConfigUI(stepId, type) {
       systemPromptField.classList.toggle('hidden', promptModeSelect.value !== 'custom');
     };
     updateAiPromptModeVisibility();
-    promptModeSelect.addEventListener('change', updateAiPromptModeVisibility);
+    promptModeSelect.addEventListener('lex-change', updateAiPromptModeVisibility);
   }
 
-  var formFields = configContainer.querySelectorAll('select, input, textarea');
+  configContainer.querySelectorAll('lex-select').forEach(function(field) {
+    field.addEventListener('lex-change', syncStepConfig);
+  });
+  // The lex-select search box is an <input> too; leave it out.
+  var formFields = Array.prototype.filter.call(configContainer.querySelectorAll('input, textarea'), function(field) {
+    return !field.closest('lex-select');
+  });
   formFields.forEach(function(field) {
     field.addEventListener('change', syncStepConfig);
     field.addEventListener('input', syncStepConfig);
@@ -1146,7 +1145,7 @@ function openMatterEventBrowserForStep(stepId) {
       if (descEl) {
         descEl.innerHTML = renderMatterEventSummaryHtml(eventType);
       }
-      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+      selectEl.dispatchEvent(new CustomEvent('lex-change', { bubbles: true, detail: { name: selectEl.name || '', value: eventType } }));
     }
   });
 }

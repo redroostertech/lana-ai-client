@@ -199,30 +199,7 @@
 }
 
 .cc-task-status-select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding: 0.3125rem 1.75rem 0.3125rem 0.625rem;
-  border: 1px solid var(--lex-border-default);
-  border-radius: var(--lex-radius-md, 8px);
-  background-color: var(--lex-bg-primary);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  color: var(--lex-text-primary);
-  font: inherit;
-  font-size: var(--lex-body-sm-size, 0.875rem);
-  font-weight: var(--lex-weight-medium, 500);
-  cursor: pointer;
-}
-
-.cc-task-status-select:hover {
-  border-color: var(--lex-border-strong, var(--lex-border-default));
-}
-
-.cc-task-status-select:focus-visible {
-  outline: none;
-  border-color: var(--lex-accent, var(--lex-border-strong));
-  box-shadow: 0 0 0 3px var(--lex-accent-subtle, rgba(99, 102, 241, 0.18));
+  min-width: 9rem;
 }
 
 .cc-task-matter-link {

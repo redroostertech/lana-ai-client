@@ -621,7 +621,8 @@
         var select = document.getElementById(prefix + 'BlankMap_' + blankId);
         if (select) {
           select.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          select.focus();
+          var trigger = select.querySelector('button') || select;
+          if (trigger.focus) trigger.focus();
           select.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.3)';
           setTimeout(function () { select.style.boxShadow = ''; }, 2000);
         }
@@ -1065,22 +1066,20 @@
     // Sort blanks by position (document order)
     var sorted = st.blanks.slice().sort(function (a, b) { return a.position - b.position; });
 
-    // Build the select options HTML once (reused for every blank)
-    var optionsHtml = '<option value="">Select...</option>' +
-      '<option value="__custom__">Custom value...</option>';
-    var lastPfx = '';
+    // Build the lex-select options once (reused for every blank)
+    var blankOptions = [
+      { value: '', label: 'Select...' },
+      { value: '__custom__', label: 'Custom value...' }
+    ];
     for (var k = 0; k < nsKeys.length; k++) {
       var key = nsKeys[k];
       var entry = ns[key];
       var pfx = key.indexOf('.') !== -1 ? key.substring(0, key.indexOf('.')) : '';
-      if (pfx !== lastPfx && pfx) {
-        if (lastPfx) optionsHtml += '</optgroup>';
-        optionsHtml += '<optgroup label="' + pfx.charAt(0).toUpperCase() + pfx.substring(1) + '">';
-        lastPfx = pfx;
-      }
-      optionsHtml += '<option value="' + _escapeHtml(key) + '">' + _escapeHtml(entry.label || key) + '</option>';
+      var option = { value: String(key), label: String(entry.label || key) };
+      if (pfx) option.group = pfx.charAt(0).toUpperCase() + pfx.substring(1);
+      blankOptions.push(option);
     }
-    if (lastPfx) optionsHtml += '</optgroup>';
+    var optionsAttr = _escapeHtml(JSON.stringify(blankOptions));
 
     // Render compact field list (shown in right panel next to PDF preview)
     var html = '';
@@ -1096,9 +1095,7 @@
           '<span class="text-[9px] text-gray-400 uppercase tracking-wide flex-shrink-0">' + _escapeHtml(blank.category || '') + '</span>' +
         '</div>' +
         '<div class="flex items-center gap-1 pl-7">' +
-          '<select id="' + prefix + 'BlankMap_' + blank.id + '" class="dtm-blank-select flex-1 px-1.5 py-1 border border-gray-200 rounded text-[11px] bg-white focus:ring-1 focus:ring-purple-500 focus:border-purple-500" data-blank-id="' + blank.id + '" data-prefix="' + prefix + '">' +
-            optionsHtml +
-          '</select>' +
+          '<lex-select id="' + prefix + 'BlankMap_' + blank.id + '" size="sm" searchable class="dtm-blank-select flex-1" data-blank-id="' + blank.id + '" data-prefix="' + prefix + '" placeholder="Select..." options="' + optionsAttr + '" value=""></lex-select>' +
           '<input type="text" id="' + prefix + 'BlankCustom_' + blank.id + '" class="hidden flex-1 px-1.5 py-1 border border-gray-200 rounded text-[11px] bg-white focus:ring-1 focus:ring-purple-500" placeholder="Type value...">' +
         '</div>' +
       '</div>';
@@ -1111,7 +1108,7 @@
     self._loadPdfPreview();
 
     // Event delegation for blank select changes
-    blanksList.addEventListener('change', function (e) {
+    blanksList.addEventListener('lex-change', function (e) {
       var select = e.target.closest('.dtm-blank-select');
       if (!select) return;
       var blankId = select.getAttribute('data-blank-id');

@@ -1107,13 +1107,12 @@
   function renderTaskStatusSelect(task) {
     var current = task.status || 'pending';
     var options = TASK_STATUSES.map(function (status) {
-      return '<option value="' + escHtml(status) + '"' + (status === current ? ' selected' : '') + '>' + escHtml(taskStatusLabel(status)) + '</option>';
-    }).join('');
+      return { value: status, label: taskStatusLabel(status) };
+    });
     return [
       '<span class="cc-task-status-control">',
-      '  <select class="cc-task-status-select" data-task-status-select aria-label="Update status">',
-      options,
-      '  </select>',
+      '  <lex-select class="cc-task-status-select" data-task-status-select size="sm" aria-label="Update status"',
+      '    options="' + escHtml(JSON.stringify(options)) + '" value="' + escHtml(current) + '"></lex-select>',
       '</span>'
     ].join('');
   }
@@ -1668,8 +1667,8 @@
 
     var statusSelect = drawerEl.querySelector('[data-task-status-select]');
     if (statusSelect) {
-      statusSelect.addEventListener('change', async function () {
-        await updateTaskStatusFromDrawer(drawerEl, taskId, statusSelect.value);
+      statusSelect.addEventListener('lex-change', async function (event) {
+        await updateTaskStatusFromDrawer(drawerEl, taskId, event.detail.value);
       });
     }
 
@@ -3292,12 +3291,12 @@
     var modalContent =
       '<div style="margin-bottom:12px;">' +
         '<label style="display:block;font-size:var(--lex-form-font-size,0.8125rem);font-weight:var(--lex-weight-medium,500);color:var(--lex-text-primary);margin-bottom:6px;">Task Priority</label>' +
-        '<select id="dashAssignPriority" style="width:100%;padding:8px 12px;font-family:inherit;font-size:var(--lex-form-font-size,0.8125rem);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.12));border-radius:var(--lex-input-radius,6px);background:var(--lex-bg-primary);color:var(--lex-text-primary);outline:none;">' +
-          '<option value="urgent"' + (defaultPriority === 'urgent' ? ' selected' : '') + '>Urgent</option>' +
-          '<option value="high"' + (defaultPriority === 'high' ? ' selected' : '') + '>High</option>' +
-          '<option value="medium"' + (defaultPriority === 'medium' ? ' selected' : '') + '>Medium</option>' +
-          '<option value="low"' + (defaultPriority === 'low' ? ' selected' : '') + '>Low</option>' +
-        '</select>' +
+        '<lex-select id="dashAssignPriority" options="' + escHtml(JSON.stringify([
+          { value: 'urgent', label: 'Urgent' },
+          { value: 'high', label: 'High' },
+          { value: 'medium', label: 'Medium' },
+          { value: 'low', label: 'Low' }
+        ])) + '" value="' + escHtml(['urgent', 'high', 'medium', 'low'].indexOf(defaultPriority) !== -1 ? defaultPriority : 'urgent') + '"></lex-select>' +
         '<p style="font-size:0.6875rem;color:var(--lex-text-tertiary);margin-top:6px;">Higher priority tasks are executed sooner. Urgent and High start immediately.</p>' +
       '</div>';
 
@@ -3358,10 +3357,10 @@
       '</div>' +
       '<div>' +
         '<label style="display:block;font-size:var(--lex-form-font-size,0.8125rem);font-weight:var(--lex-weight-medium,500);color:var(--lex-text-primary);margin-bottom:6px;">Suppress for</label>' +
-        '<select id="dashRejectDays" style="padding:8px 12px;font-family:inherit;font-size:var(--lex-form-font-size,0.8125rem);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.12));border-radius:var(--lex-input-radius,6px);background:var(--lex-bg-primary);color:var(--lex-text-primary);outline:none;">' +
-          '<option value="45">45 days</option>' +
-          '<option value="60">60 days</option>' +
-        '</select>' +
+        '<lex-select id="dashRejectDays" options="' + escHtml(JSON.stringify([
+          { value: '45', label: '45 days' },
+          { value: '60', label: '60 days' }
+        ])) + '" value="45"></lex-select>' +
       '</div>';
 
     Lex.Modal.open({

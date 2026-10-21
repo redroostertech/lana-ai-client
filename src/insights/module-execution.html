@@ -409,9 +409,7 @@
         </div>
 
         <!-- Module Selection - Now handled by sidebar menu, keeping select hidden for backward compatibility -->
-        <select id="moduleSelect" class="hidden">
-          <option value="">Loading modules...</option>
-        </select>
+        <lex-select id="moduleSelect" class="hidden" placeholder="Loading modules..." options='[{"value":"","label":"Loading modules..."}]' value=""></lex-select>
 
         <!-- Date Range Inputs -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -430,13 +428,7 @@
           <!-- Period Type (for comparison calculation) -->
           <div>
             <label for="periodType" class="block text-sm font-medium text-gray-700 mb-2">Compare By</label>
-            <select id="periodType" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="yearly">Yearly</option>
-            </select>
+            <lex-select id="periodType" class="w-full" options='[{"value":"daily","label":"Daily"},{"value":"weekly","label":"Weekly"},{"value":"monthly","label":"Monthly"},{"value":"quarterly","label":"Quarterly"},{"value":"yearly","label":"Yearly"}]' value="daily"></lex-select>
           </div>
         </div>
 
@@ -653,10 +645,31 @@
       showInfo(`Period set to: ${formatDate(startDate)} to ${formatDate(endDate)}`);
     }
 
+    // lex-select helpers. Options and value go on the attributes as well as
+    // the properties: this script can run before lex-select.js has upgraded
+    // the element, and an attribute survives the upgrade.
+    function setLexSelectValue(select, value) {
+      const next = value === null || value === undefined ? '' : String(value);
+      select.setAttribute('value', next);
+      select.value = next;
+    }
+
+    function setLexSelectOptions(select, options, value) {
+      const normalized = options.map(option => ({ value: String(option.value), label: option.label }));
+      select.setAttribute('options', JSON.stringify(normalized));
+      select.options = normalized;
+      if (value !== undefined) setLexSelectValue(select, value);
+    }
+
+    function lexSelectValue(select) {
+      const value = select.value;
+      return value === undefined ? (select.getAttribute('value') || '') : String(value || '');
+    }
+
     // Update "Compare By" dropdown based on selected date range
     function updateCompareByOptions(startDate, endDate, preset) {
       const periodTypeSelect = document.getElementById('periodType');
-      const currentValue = periodTypeSelect.value;
+      const currentValue = lexSelectValue(periodTypeSelect);
 
       // Calculate the duration in days
       const durationMs = endDate - startDate;
@@ -664,23 +677,18 @@
 
       // For "Last Year" preset or full year periods (365-366 days), only show monthly
       if (preset === 'lastYear' || (durationDays >= 365 && durationDays <= 366)) {
-        periodTypeSelect.innerHTML = `
-          <option value="monthly">Monthly</option>
-        `;
-        periodTypeSelect.value = 'monthly';
+        setLexSelectOptions(periodTypeSelect, [{ value: 'monthly', label: 'Monthly' }], 'monthly');
       } else {
-        // For other periods, show all options
-        periodTypeSelect.innerHTML = `
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          <option value="quarterly">Quarterly</option>
-          <option value="yearly">Yearly</option>
-        `;
-        // Restore previous value if it's still valid
-        if (['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].includes(currentValue)) {
-          periodTypeSelect.value = currentValue;
-        }
+        // For other periods, show all options, restoring the previous value
+        // if it's still valid (otherwise the first option, as before)
+        const periodValues = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+        setLexSelectOptions(periodTypeSelect, [
+          { value: 'daily', label: 'Daily' },
+          { value: 'weekly', label: 'Weekly' },
+          { value: 'monthly', label: 'Monthly' },
+          { value: 'quarterly', label: 'Quarterly' },
+          { value: 'yearly', label: 'Yearly' }
+        ], periodValues.includes(currentValue) ? currentValue : 'daily');
       }
     }
 
@@ -765,15 +773,9 @@
           }))
         });
 
-        // Clear loading option
-        moduleSelect.innerHTML = '';
-
         if (!response.modules || response.modules.length === 0) {
-          const option = document.createElement('option');
-          option.value = '';
-          option.textContent = 'No modules available';
-          option.disabled = true;
-          moduleSelect.appendChild(option);
+          moduleSelect.setAttribute('placeholder', 'No modules available');
+          setLexSelectOptions(moduleSelect, [], '');
 
           // Update module menu
           const moduleMenu = document.getElementById('moduleMenu');
@@ -791,22 +793,18 @@
           modulesByCategory[category].push(module);
         });
 
-        // Populate hidden select dropdown (for backward compatibility)
+        // Populate hidden select dropdown (for backward compatibility).
+        // lex-select has no disabled options, so modules that need more
+        // connectors are left out; the side menu still lists them.
+        const moduleOptions = [];
         Object.keys(modulesByCategory).sort().forEach(category => {
-          const modules = modulesByCategory[category];
-
-          modules.forEach(module => {
-            const option = document.createElement('option');
-            option.value = module.moduleKey;
-            option.dataset.category = category;
-            option.textContent = module.name;
-            if (!module.available) {
-              option.disabled = true;
-              option.textContent += ' (Requires additional connectors)';
+          modulesByCategory[category].forEach(module => {
+            if (module.available) {
+              moduleOptions.push({ value: module.moduleKey, label: module.name });
             }
-            moduleSelect.appendChild(option);
           });
         });
+        setLexSelectOptions(moduleSelect, moduleOptions, '');
 
         // Populate module side menu with collapsible sections
         const moduleMenu = document.getElementById('moduleMenu');
@@ -880,7 +878,7 @@
               // Add click handler for available modules
               moduleItem.addEventListener('click', () => {
                 // Update hidden select
-                moduleSelect.value = module.moduleKey;
+                setLexSelectValue(moduleSelect, module.moduleKey);
 
                 // Update visual selection
                 document.querySelectorAll('#moduleMenu button[data-module-key]').forEach(btn => {
@@ -921,7 +919,7 @@
         // Auto-select first available module
         const firstAvailable = response.modules.find(m => m.available);
         if (firstAvailable) {
-          moduleSelect.value = firstAvailable.moduleKey;
+          setLexSelectValue(moduleSelect, firstAvailable.moduleKey);
 
           // Highlight in side menu
           const firstModuleBtn = moduleMenu.querySelector(`button[data-module-key="${firstAvailable.moduleKey}"]`);
@@ -935,20 +933,16 @@
         }
 
         // Add change event listener to hidden select (for backward compatibility)
-        moduleSelect.addEventListener('change', (e) => {
-          updateMissingEntitiesForModule(e.target.value);
+        moduleSelect.addEventListener('lex-change', (e) => {
+          updateMissingEntitiesForModule(e.detail.value);
         });
 
       } catch (error) {
         console.error('Failed to load modules:', error);
 
         // Update hidden select
-        moduleSelect.innerHTML = '';
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'Failed to load modules';
-        option.disabled = true;
-        moduleSelect.appendChild(option);
+        moduleSelect.setAttribute('placeholder', 'Failed to load modules');
+        setLexSelectOptions(moduleSelect, [], '');
 
         // Update module menu
         const moduleMenu = document.getElementById('moduleMenu');
@@ -4355,7 +4349,7 @@
     // Execute module
     async function executeModule() {
       const moduleKey = document.getElementById('moduleSelect').value;
-      const periodType = document.getElementById('periodType').value;
+      const periodType = lexSelectValue(document.getElementById('periodType'));
       const periodStart = document.getElementById('periodStart').value;
       const periodEnd = document.getElementById('periodEnd').value;
       const useCache = false; // Caching disabled - always fetch fresh data
@@ -4797,7 +4791,7 @@
     // Open data override panel
     function openDataOverridePanel(metricKey, metricName, metricDescription, currentValue, overrideType = 'target') {
       const moduleKey = document.getElementById('moduleSelect').value;
-      const periodType = document.getElementById('periodType').value;
+      const periodType = lexSelectValue(document.getElementById('periodType'));
       const periodStart = document.getElementById('periodStart').value;
       const periodEnd = document.getElementById('periodEnd').value;
 

@@ -743,7 +743,7 @@
   margin-top: 0.875rem;
 }
 
-.dash-builder__field span {
+.dash-builder__field > span {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--lex-text-secondary, #6b7280);

@@ -462,6 +462,10 @@ const HelpSystem = (function() {
     const contactForm = document.getElementById('contactSupportForm');
     if (contactForm) {
       contactForm.addEventListener('submit', handleContactFormSubmit);
+      const categorySelect = document.getElementById('contactCategory');
+      if (categorySelect) {
+        categorySelect.addEventListener('lex-change', () => { categorySelect.error = ''; });
+      }
     }
   }
 
@@ -549,6 +553,13 @@ const HelpSystem = (function() {
     successMsg.classList.add('hidden');
     errorMsg.classList.add('hidden');
 
+    // lex-select is not form-associated, so the browser's required check
+    // does not cover it: validate the category explicitly.
+    const categorySelect = document.getElementById('contactCategory');
+    if (categorySelect && typeof categorySelect.validate === 'function' && !categorySelect.validate().valid) {
+      return;
+    }
+
     // Disable submit button
     submitBtn.disabled = true;
     submitBtn.innerHTML = `
@@ -613,8 +624,10 @@ const HelpSystem = (function() {
         document.getElementById('ticketId').textContent = result.ticket_id || result.ticketId || 'N/A';
         successMsg.classList.remove('hidden');
 
-        // Reset form
+        // Reset form (lex-selects are not form-associated, so reset them too)
         form.reset();
+        document.getElementById('contactCategory').value = '';
+        document.getElementById('contactPriority').value = 'normal';
 
         // Re-fill user data
         prefillContactForm();
