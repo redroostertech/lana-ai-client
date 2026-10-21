@@ -164,23 +164,34 @@
   overflow: hidden;
 }
 
+/* Column widths. The name column takes the remaining width; short and date
+   columns get fixed widths so a full "10/20/2026 11:40 PM" never truncates
+   and headers (label + sort arrow + filter icon) stay on one line. */
+#documentLibraryTable th,
+#dstTable th {
+  white-space: nowrap;
+}
+
+/* Below these widths the table scrolls sideways instead of squeezing the
+   name column to nothing. */
+#documentLibraryTable table { min-width: 920px; }
+#dstTable table { min-width: 1120px; }
+
 /* Document Library: File, Type, Size, Workspace, Created, Last edited */
-#documentLibraryTable th:nth-child(1) { width: 32%; }
-#documentLibraryTable th:nth-child(2) { width: 8%; }
-#documentLibraryTable th:nth-child(3) { width: 9%; }
-#documentLibraryTable th:nth-child(4) { width: 21%; }
-#documentLibraryTable th:nth-child(5) { width: 14%; }
-#documentLibraryTable th:nth-child(6) { width: 16%; }
+#documentLibraryTable th:nth-child(2) { width: 96px; }
+#documentLibraryTable th:nth-child(3) { width: 96px; }
+#documentLibraryTable th:nth-child(4) { width: 22%; }
+#documentLibraryTable th:nth-child(5) { width: 176px; }
+#documentLibraryTable th:nth-child(6) { width: 150px; }
 
 /* Template Library: Template, Type, Template Type, Variables, Workspace,
    Created, Last edited */
-#dstTable th:nth-child(1) { width: 26%; }
-#dstTable th:nth-child(2) { width: 11%; }
-#dstTable th:nth-child(3) { width: 12%; }
-#dstTable th:nth-child(4) { width: 9%; }
-#dstTable th:nth-child(5) { width: 16%; }
-#dstTable th:nth-child(6) { width: 12%; }
-#dstTable th:nth-child(7) { width: 14%; }
+#dstTable th:nth-child(2) { width: 112px; }
+#dstTable th:nth-child(3) { width: 156px; }
+#dstTable th:nth-child(4) { width: 116px; }
+#dstTable th:nth-child(5) { width: 18%; }
+#dstTable th:nth-child(6) { width: 176px; }
+#dstTable th:nth-child(7) { width: 150px; }
 
 @media (max-width: 768px) {
   .document-library {
