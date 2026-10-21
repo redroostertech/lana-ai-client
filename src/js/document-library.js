@@ -9,13 +9,17 @@
   // File families the library lists. Images are out of scope, so "All" asks
   // for these four instead of sending no filter.
   var LIBRARY_FAMILIES = ['document', 'spreadsheet', 'presentation', 'pdf'];
-  // Type column filter values (the server's file_family names).
-  var FAMILY_OPTIONS = [
-    { value: 'document', label: 'Documents' },
-    { value: 'spreadsheet', label: 'Spreadsheets' },
-    { value: 'presentation', label: 'Presentations' },
-    { value: 'pdf', label: 'PDFs' }
-  ];
+  // Type column filter values: file extensions. The server lists the ones in
+  // use (GET /library/files/extensions); these stand in until it answers or
+  // when it predates that endpoint.
+  var DEFAULT_EXTENSIONS = ['docx', 'doc', 'pdf', 'txt', 'md', 'rtf', 'xlsx', 'xls', 'csv', 'pptx', 'ppt'];
+  // Size column filter: byte ranges, min inclusive, max exclusive.
+  var SIZE_RANGES = {
+    under_100kb: { label: 'Under 100 KB', min: null, max: 100 * 1024 },
+    '100kb_1mb': { label: '100 KB – 1 MB', min: 100 * 1024, max: 1024 * 1024 },
+    '1mb_10mb': { label: '1 MB – 10 MB', min: 1024 * 1024, max: 10 * 1024 * 1024 },
+    over_10mb: { label: 'Over 10 MB', min: 10 * 1024 * 1024, max: null }
+  };
   var loadSequence = 0;
   var searchTerm = '';
   var searchDebounce = null;
@@ -279,7 +283,18 @@
       params.set('sort_by', SORT_BY_COLUMN[query.sortBy] || 'updated_at');
       params.set('sort_order', query.sortDir || 'desc');
       var filters = query.filters || {};
-      params.set('file_family', fileFamilyParam(filterValues(filters.type)));
+      // Toolbar Type select: a file family. Type column: extensions.
+      params.set('file_family', fileFamilyParam(filterValues(filters.file_family)));
+      var typeSelect = el('documentLibraryTypeFilter');
+      var family = filterValues(filters.file_family)[0] || 'all';
+      if (typeSelect && typeSelect.value !== family) typeSelect.value = family;
+      var extensions = filterValues(filters.type);
+      if (extensions.length) params.set('extensions', extensions.join(','));
+      var name = filterValues(filters.name)[0];
+      if (name) params.set('name', name);
+      var size = SIZE_RANGES[filterValues(filters.size)[0]];
+      if (size && size.min !== null) params.set('min_size', String(size.min));
+      if (size && size.max !== null) params.set('max_size', String(size.max));
       var workspaces = filterValues(filters.workspace);
       if (workspaces.length) params.set('workspaces', workspaces.join(','));
       var ranges = global.LanaLibraryColumnFilters;
@@ -428,11 +443,12 @@
       var id = event.target && event.target.id;
       var value = String((event.detail && event.detail.value) || '');
       if (id === 'documentLibraryTypeFilter') {
-        // Same state as the Type column filter, as My Tasks' Status select does.
+        // A family filter held in the table's state (not a column), so the
+        // table's Clear filters resets it too.
         var target = table();
         if (!target) return;
-        if (value && value !== 'all') target.addFilter('type', 'in', [value]);
-        else target.removeFilter('type');
+        if (value && value !== 'all') target.addFilter('file_family', 'in', [value]);
+        else target.removeFilter('file_family');
       } else if (id === 'documentLibrarySort') {
         applySort(value || 'updated_at', sortOrder());
       }
@@ -466,20 +482,53 @@
       if (!target) return;
       // Renderers must be registered before the first page lands.
       target.setCellRenderers(cellRenderers());
-      applyColumnFilterOptions(target, []);
+      applyColumnFilterOptions(target);
       reloadFromFirstPage();
       if (global.LanaLibraryColumnFilters) {
         global.LanaLibraryColumnFilters.loadWorkspaceOptions(global.api).then(function (options) {
-          if (table() === target) applyColumnFilterOptions(target, options);
+          if (table() !== target) return;
+          filterState.workspaces = options;
+          applyColumnFilterOptions(target);
         });
       }
+      loadExtensionOptions().then(function (extensions) {
+        if (table() !== target || !extensions.length) return;
+        filterState.extensions = extensions;
+        applyColumnFilterOptions(target);
+      });
     });
   }
 
-  function applyColumnFilterOptions(target, workspaceOptions) {
+  var filterState = { workspaces: [], extensions: DEFAULT_EXTENSIONS };
+
+  // Extensions in use, most common first; [] when the server can't say.
+  async function loadExtensionOptions() {
+    var client = global.api;
+    if (!client || typeof client.get !== 'function') return [];
+    try {
+      var response = await client.get('/api/v1/storage/library/files/extensions');
+      var rows = (response && (response.extensions || (response.data && response.data.extensions))) || [];
+      return rows.map(function (row) { return String(row && row.value !== undefined ? row.value : row).toLowerCase(); })
+        .filter(Boolean);
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  // Every column filters (the table standard): name by text, the rest by values.
+  function applyColumnFilterOptions(target) {
     var shared = global.LanaLibraryColumnFilters;
-    var map = { type: { options: FAMILY_OPTIONS } };
-    if (workspaceOptions && workspaceOptions.length) map.workspace = { options: workspaceOptions };
+    var map = {
+      name: { text: true, placeholder: 'File name contains...' },
+      type: {
+        options: filterState.extensions.map(function (ext) { return { value: ext, label: ext.toUpperCase() }; })
+      },
+      size: {
+        single: true,
+        options: Object.keys(SIZE_RANGES).map(function (key) { return { value: key, label: SIZE_RANGES[key].label }; })
+      }
+    };
+    if (filterState.workspaces.length) map.workspace = { options: filterState.workspaces };
     if (shared) {
       map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
       map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };

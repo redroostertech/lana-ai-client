@@ -171,11 +171,14 @@ describe('Document Library integration', () => {
     expect(html).toContain('{"value":"pdf","label":"PDFs"}');
     expect(html).not.toContain('{"value":"image","label":"Images"}');
     expect(controller).toContain("if (searchTerm) params.set('search', searchTerm)");
-    expect(controller).toContain("params.set('file_family', fileFamilyParam(filterValues(filters.type)))");
+    expect(controller).toContain("params.set('file_family', fileFamilyParam(filterValues(filters.file_family)))");
+    expect(controller).toContain("params.set('extensions', extensions.join(','))");
+    expect(controller).toContain("params.set('name', name)");
+    expect(controller).toContain("params.set('min_size', String(size.min))");
     expect(controller).toContain("params.set('created_after', created.after)");
     expect(controller).toContain("params.set('workspaces', workspaces.join(','))");
     expect(controller).toContain("params.set('updated_after', edited.after)");
-    expect(controller).toContain("target.addFilter('type', 'in', [value])");
+    expect(controller).toContain("target.addFilter('file_family', 'in', [value])");
     expect(controller).not.toContain("params.set('document_type'");
     expect(controller).toContain("event.target.id !== 'documentLibrarySearch'");
     expect(controller).toContain("id === 'documentLibraryTypeFilter'");

@@ -237,8 +237,13 @@
     var none = { after: '', before: '' };
     var edited = shared ? shared.editedRangeBounds(_filterValues(filters.updated_at)[0]) : none;
     var created = shared ? shared.editedRangeBounds(_filterValues(filters.created_at)[0]) : none;
+    var variables = VARIABLE_RANGES[_filterValues(filters.variables)[0]] || {};
     return {
       kind: _filterValues(filters.kind),
+      name: _filterValues(filters.name)[0] || '',
+      documentType: _filterValues(filters.template_type),
+      minVariables: variables.min,
+      maxVariables: variables.max,
       workspaces: _filterValues(filters.workspace),
       updatedAfter: edited.after,
       updatedBefore: edited.before,
@@ -327,6 +332,7 @@
         };
       });
 
+      _rememberDocumentTypes(table, view.rows);
       _syncEmptyState(table, query.filters);
       _setCount(view.total + (view.total === 1 ? ' template' : ' templates'));
       table.setServerData(tableRows, {
@@ -645,16 +651,72 @@
           _applyColumnFilterOptions(table, shared.workspaceOptions(matters, 'id'));
         });
       }
+      _loadDocumentTypeOptions().then(function (options) {
+        if (_table() !== table || !options.length) return;
+        _state.documentTypesFromServer = true;
+        _state.documentTypeOptions = options;
+        _applyColumnFilterOptions(table);
+      });
     });
   }
 
+  // Variables column filter: counts, min inclusive, max exclusive.
+  var VARIABLE_RANGES = {
+    none: { label: 'None', min: 0, max: 1 },
+    '1_5': { label: '1 – 5', min: 1, max: 6 },
+    '6_10': { label: '6 – 10', min: 6, max: 11 },
+    over_10: { label: 'More than 10', min: 11 }
+  };
+
+  // Until the server lists Template Types, offer the ones seen on loaded pages.
+  function _rememberDocumentTypes(table, rows) {
+    if (_state.documentTypesFromServer) return;
+    var known = _state.documentTypeOptions || [];
+    var added = false;
+    rows.forEach(function (row) {
+      var value = row.documentType || '';
+      if (!value || known.some(function (o) { return o.value === value; })) return;
+      known = known.concat([{ value: value, label: templateTypeLabel(row) || value }]);
+      added = true;
+    });
+    if (!added) return;
+    _state.documentTypeOptions = known;
+    _applyColumnFilterOptions(table);
+  }
+
+  // Template Type values in use, from the server; [] when it can't say.
+  async function _loadDocumentTypeOptions() {
+    var client = window.api;
+    if (!client || typeof client.get !== 'function') return [];
+    try {
+      var response = await client.get('/api/v1/document-studio/templates/document-types');
+      var rows = (response && (response.document_types || (response.data && response.data.document_types))) || [];
+      return rows.map(function (row) {
+        var value = String(row && row.value !== undefined ? row.value : row);
+        return { value: value, label: value ? value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ') : value };
+      }).filter(function (o) { return o.value; });
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  // Every column filters (the table standard): name by text, the rest by values.
   function _applyColumnFilterOptions(table, workspaceOptions) {
+    if (workspaceOptions) _state.workspaceFilterOptions = workspaceOptions;
     var shared = window.LanaLibraryColumnFilters;
     var map = {
+      name: { text: true, placeholder: 'Template name contains...' },
+      variables: {
+        single: true,
+        options: Object.keys(VARIABLE_RANGES).map(function (key) { return { value: key, label: VARIABLE_RANGES[key].label }; })
+      },
       kind: { options: KIND_OPTIONS },
       // Org-wide templates have no workspace; "Organization" selects them.
-      workspace: { options: [ORGANIZATION_OPTION].concat(workspaceOptions || []) }
+      workspace: { options: [ORGANIZATION_OPTION].concat(_state.workspaceFilterOptions || []) }
     };
+    if (_state.documentTypeOptions && _state.documentTypeOptions.length) {
+      map.template_type = { options: _state.documentTypeOptions };
+    }
     if (shared) {
       map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
       map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };

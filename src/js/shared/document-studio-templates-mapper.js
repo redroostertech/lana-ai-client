@@ -93,7 +93,14 @@
     }
 
     _appendParam(parts, 'matter_id', f.matterId);
-    _appendParam(parts, 'document_type', f.documentType);
+    // One document type or a list (the Template Type column filter).
+    var documentTypes = (Array.isArray(f.documentType) ? f.documentType : [f.documentType])
+      .map(function (t) { return t === undefined || t === null ? '' : String(t).trim(); })
+      .filter(Boolean);
+    if (documentTypes.length) _appendParam(parts, 'document_type', documentTypes.join(','));
+    _appendParam(parts, 'name', f.name);
+    if (typeof f.minVariables === 'number' && f.minVariables >= 0) _appendParam(parts, 'min_variables', f.minVariables);
+    if (typeof f.maxVariables === 'number' && f.maxVariables > 0) _appendParam(parts, 'max_variables', f.maxVariables);
     _appendParam(parts, 'category', f.category);
     _appendParam(parts, 'q', f.q);
 

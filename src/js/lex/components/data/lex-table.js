@@ -30,6 +30,8 @@
        table.setColumnFilterOptions({ type: { options: [{ value: 'pdf', label: 'PDFs' }] },
                                       updated_at: { single: true, options: [...] } });
      Selections arrive in lex-query-change as filters[col] = { operator: 'in', value: [...] }.
+   A name-like column can take a text box instead of options: name: { text: true, placeholder }
+   (filters[col] = { operator: 'contains', value }).
    Client-side tables can give supplied options a predicate instead of exact matching
    (e.g. date ranges): created_at: { single: true, options: [...], match: (cell, values) => bool }.
 
@@ -260,7 +262,8 @@
         vertical-align: middle;
       }
       .lex-th-filter:hover,
-      .lex-th-filter--active {
+      .lex-th-filter--active,
+      .lex-th-filter--open {
         opacity: 1;
         color: var(--lex-text-accent, #8B7355);
       }
@@ -279,6 +282,22 @@
         padding: 6px;
         display: flex;
         flex-direction: column;
+        color: var(--lex-text-primary);
+        cursor: default;
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: normal;
+      }
+      .lex-th-filter-text {
+        margin: 2px 2px 6px;
+        padding: 6px 8px;
+        font: inherit;
+        font-size: 13px;
+        color: var(--lex-text-primary);
+        background: var(--lex-bg-primary);
+        border: 1px solid var(--lex-border-default);
+        border-radius: 6px;
+        min-width: 200px;
       }
       .lex-th-filter-dropdown--end {
         left: auto;
@@ -511,10 +530,23 @@
       this._scheduleUpdate();
     }
 
+    // A text column filter: non-empty text filters by "contains", empty clears.
+    _applyTextFilter(raw) {
+      const col = this._colFilterOpen;
+      const value = String(raw || '').trim();
+      if (col && this.dataSource) {
+        if (value) this.dataSource.setFilter(col, 'contains', value);
+        else this.dataSource.removeFilter(col);
+      }
+      this._colFilterOpen = null;
+      this._scheduleUpdate();
+    }
+
     _hasColumnFilter(col) {
       if (!this.columnFilters) return false;
       if (!this.serverPaging) return true;
       const config = this._columnFilterOptions[col];
+      if (config && config.text) return true;
       return !!(config && Array.isArray(config.options) && config.options.length);
     }
 
@@ -790,6 +822,17 @@
 
     _renderColFilterDropdown(col, alignEnd) {
       const config = this._columnFilterOptions[col];
+      if (config && config.text) {
+        const current = this.dataSource?._filters?.get(col);
+        const value = current && current.operator === 'contains' ? String(current.value) : '';
+        return `<div class="lex-th-filter-dropdown${alignEnd ? ' lex-th-filter-dropdown--end' : ''}" data-col-filter-dropdown>
+          <input type="search" class="lex-th-filter-text" data-col-filter-text value="${this.escapeHtml(value)}" placeholder="${this.escapeHtml(config.placeholder || 'Contains...')}" aria-label="Filter ${this.escapeHtml(col)}" />
+          <div class="lex-col-filter-actions">
+            <button class="lex-col-filter-clear" data-action="col-filter-clear">Clear</button>
+            <button class="lex-col-filter-apply" data-action="col-filter-apply">Apply</button>
+          </div>
+        </div>`;
+      }
       const supplied = config && Array.isArray(config.options) ? config.options : null;
       const options = supplied
         ? supplied.map(o => ({ value: String(o.value), label: String(o.label !== undefined ? o.label : o.value) }))
@@ -923,7 +966,8 @@
         let filterIcon = '';
         if (this._hasColumnFilter(col)) {
           const hasFilter = this.dataSource?._filters?.has(col);
-          filterIcon = `<span class="lex-th-filter ${hasFilter ? 'lex-th-filter--active' : ''}" data-col-filter="${col}" style="position:relative">
+          const isOpen = this._colFilterOpen === col;
+          filterIcon = `<span class="lex-th-filter${hasFilter ? ' lex-th-filter--active' : ''}${isOpen ? ' lex-th-filter--open' : ''}" data-col-filter="${col}" style="position:relative">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
             ${this._colFilterOpen === col ? this._renderColFilterDropdown(col, i >= columns.length / 2) : ''}
           </span>`;
@@ -1139,6 +1183,11 @@
       // Column filter apply
       this.delegate('click', '[data-action="col-filter-apply"]', (e) => {
         e.stopPropagation();
+        const textInput = this.$('[data-col-filter-text]');
+        if (textInput) {
+          this._applyTextFilter(textInput.value);
+          return;
+        }
         const checks = this.$$('[data-col-check]:checked');
         const values = checks.map(c => c.dataset.colCheck);
         if (values.length > 0 && this.dataSource && this._colFilterOpen) {
@@ -1164,17 +1213,34 @@
       });
 
       // Close column filter dropdown on outside click
+      // (attached after the opening click has finished, so the next press
+      // anywhere outside closes it)
       if (this._colFilterOpen) {
-        let skipFirst = true;
         const closeColFilter = (ev) => {
-          if (skipFirst) { skipFirst = false; return; }
           if (!ev.target.closest('[data-col-filter-dropdown]') && !ev.target.closest('[data-col-filter]')) {
             this._colFilterOpen = null;
             this._scheduleUpdate();
           }
         };
+        const escapeColFilter = (ev) => {
+          if (ev.key !== 'Escape') return;
+          this._colFilterOpen = null;
+          this._scheduleUpdate();
+        };
         document.addEventListener('mousedown', closeColFilter);
-        this._eventCleanups.push(() => document.removeEventListener('mousedown', closeColFilter));
+        document.addEventListener('keydown', escapeColFilter);
+        this._eventCleanups.push(() => {
+          document.removeEventListener('mousedown', closeColFilter);
+          document.removeEventListener('keydown', escapeColFilter);
+        });
+        const textInput = this.$('[data-col-filter-text]');
+        if (textInput) {
+          this.listen(textInput, 'click', (ev) => ev.stopPropagation());
+          this.listen(textInput, 'keydown', (ev) => {
+            if (ev.key === 'Enter') { ev.preventDefault(); this._applyTextFilter(textInput.value); }
+          });
+          if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => textInput.focus());
+        }
       }
 
       // Selection: row checkbox — use targeted DOM updates to avoid full re-render.

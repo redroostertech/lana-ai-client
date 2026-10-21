@@ -265,6 +265,31 @@ describe('lex-table page-supplied column filters', () => {
     expect(dropdown).toContain('data-col-check="Open"');
   });
 
+  test('a text column filter shows a box in server mode and sends "contains"', () => {
+    const window = loadLex();
+    const table = serverTable(window, { columnFilters: true });
+    table.setColumnFilterOptions({ name: { text: true, placeholder: 'File name contains...' } });
+    table.setServerData([{ id: 'a', name: 'A.pdf', workspace: 'W', updated_at: '' }], { page: 1, limit: 20, total: 1 });
+    expect(table.render()).toContain('data-col-filter="name"');
+    expect(table._renderColFilterDropdown('name')).toContain('data-col-filter-text');
+    table._colFilterOpen = 'name';
+    table._applyTextFilter('  motion ');
+    expect(lastEvent(table, 'lex-query-change').detail.filters.name).toEqual({ operator: 'contains', value: 'motion' });
+    expect(table._renderColFilterDropdown('name')).toContain('value="motion"');
+    table._colFilterOpen = 'name';
+    table._applyTextFilter('');
+    expect(lastEvent(table, 'lex-query-change').detail.filters).toEqual({});
+  });
+
+  test('an open filter menu keeps its icon fully opaque', () => {
+    const window = loadLex();
+    const table = serverTable(window, { columnFilters: true });
+    table.setColumnFilterOptions({ name: { text: true } });
+    table.setServerData([{ id: 'a', name: 'A.pdf', workspace: 'W', updated_at: '' }], { page: 1, limit: 20, total: 1 });
+    table._colFilterOpen = 'name';
+    expect(table.render()).toContain('lex-th-filter lex-th-filter--open');
+  });
+
   test('a client table filters by a supplied match predicate and keeps the choice checked', () => {
     const window = loadLex();
     const table = new window['lex-table']();
