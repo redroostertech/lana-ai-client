@@ -2235,43 +2235,54 @@
       onClose: function () { _activityDrawerEl = null; }
     });
 
-    var activities = currentMatterData.activities || [];
-    try {
-      var result = await api.getMatterActivity(matterId, 200, 0);
-      if (result && result.activities) {
-        activities = result.activities;
-        currentMatterData.activities = activities;
-        currentMatterData.activityPagination = result.pagination || {};
-      }
-    } catch (error) {
-      console.warn('[openActivityDrawer] Falling back to cached activity:', error.message);
-    }
-
     var body = document.getElementById('activityDrawerBody');
-    if (!body) return; // drawer was closed while loading
+    if (!body) return;
+    var tables = window.LanaWorkspaceDetailsTables;
 
-    if (!activities.length) {
-      body.innerHTML = '<lex-empty icon="inbox" message="No activity yet" description="Activity in this workspace will appear here"></lex-empty>';
-      return;
-    }
-
-    body.innerHTML = '<lex-table id="activityDrawerTable" columns="message,when" limit="25"></lex-table>';
+    // Server-paged: the activity API pages by limit/offset, newest first. It
+    // has no sort, search or filter parameters yet, so the table offers none.
+    body.innerHTML = '<lex-table id="activityDrawerTable" class="wd-activity-table lex-table--card" server-paging column-filters' +
+      ' columns="message,type,created_at" labels="Activity,Type,Created" sortable-columns=""' +
+      ' sort-by="created_at" sort-dir="desc" limit="20" id-key="id" aria-label="Workspace activity"' +
+      ' empty-text="No activity yet. Activity in this workspace will appear here."></lex-table>';
     var table = document.getElementById('activityDrawerTable');
-    if (!table || typeof table.setData !== 'function') return;
+    if (!table) return;
+    var loadSequence = 0;
 
-    var rows = activities.map(function (act, idx) {
-      return {
-        id: act.id != null ? String(act.id) : 'idx-' + idx,
-        message: getActivityText(act),
-        when: timeAgo(act.created_at),
-        _activity: act
-      };
+    table.addEventListener('lex-query-change', async function (e) {
+      var seq = ++loadSequence;
+      var request = tables ? tables.activityRequest(e.detail) : { limit: 20, offset: 0 };
+      try {
+        var result = await api.getMatterActivity(matterId, request.limit, request.offset);
+        if (seq !== loadSequence || !document.getElementById('activityDrawerTable')) return;
+        var activities = (result && result.activities) || [];
+        if (request.offset === 0) {
+          currentMatterData.activities = activities;
+          currentMatterData.activityPagination = (result && result.pagination) || {};
+        }
+        var rows = activities.map(tables ? tables.activityRow : function (act, idx) {
+          return { id: act.id != null ? String(act.id) : 'idx-' + idx, message: getActivityText(act), type: '', created_at: act.created_at, _raw: act, _activity: act };
+        });
+        table.setServerData(rows, tables ? tables.activityPagination(result, e.detail, rows.length) : { page: 1, total: rows.length });
+      } catch (error) {
+        if (seq !== loadSequence) return;
+        console.warn('[openActivityDrawer] Activity could not be loaded:', error && error.message);
+        table.setServerError('Activity could not be loaded. Check your connection and try again.');
+      }
     });
-    table.setData(rows);
     table.addEventListener('row-click', function (e) {
       var row = e.detail && e.detail.row;
       if (row && row._activity) openActivityArtifact(row._activity);
     });
+
+    var ready = window.customElements && typeof window.customElements.whenDefined === 'function'
+      ? window.customElements.whenDefined('lex-table')
+      : Promise.resolve();
+    await ready;
+    if (typeof table.requestServerQuery !== 'function') return;
+    // Renderers must be registered before the first page lands.
+    if (tables) table.setCellRenderers(tables.activityRenderers({ describe: getActivityDescription }));
+    table.requestServerQuery();
   }
 
   // Navigate to the artifact behind an activity record. Closes the drawer
@@ -7830,14 +7841,14 @@
 
       if (action === 'link') {
         // Only link available connector data (skip contacts and already-linked)
-        if (item.status === 'Linked' || item._linkType === 'contact' || id.indexOf('contact_') === 0) {
+        if (item.status === 'linked' || item._linkType === 'contact' || id.indexOf('contact_') === 0) {
           skipped++;
           continue;
         }
         promises.push(api.linkConnectorDataToMatter(matterId, id));
       } else if (action === 'unlink') {
         // Only unlink linked connector data (skip contacts and available)
-        if (item.status === 'Available' || item._linkType === 'contact' || id.indexOf('contact_') === 0) {
+        if (item.status === 'available' || item._linkType === 'contact' || id.indexOf('contact_') === 0) {
           skipped++;
           continue;
         }
@@ -7899,9 +7910,14 @@
 
       // Set table columns and bulk actions
       if (table) {
-        table.setAttribute('columns', 'source,type,name,detail,status');
-        table.setAttribute('labels', 'Source,Type,Name,Detail,Status');
-        table.setAttribute('empty-text', 'No data available. Connect an integration to sync data.');
+        // Rows and formatting: js/shared/workspace-details-tables.js.
+        if (window.LanaWorkspaceDetailsTables && typeof table.setCellRenderers === 'function') {
+          table.setCellRenderers(window.LanaWorkspaceDetailsTables.connectedDataRenderers());
+        }
+        if (table.dataSource && typeof table.dataSource.clearFilters === 'function' &&
+            table.dataSource._filters && table.dataSource._filters.size > 0) {
+          table.dataSource.clearFilters();
+        }
         table.bulkActions = [
           { label: 'Link Selected', action: 'link', variant: 'primary', icon: 'link' },
           { label: 'Unlink Selected', action: 'unlink', variant: 'danger', icon: 'unlink' }
@@ -7946,6 +7962,11 @@
           connectorSelect.addEventListener('lex-change', function () { _cdModalSearch(); });
         }
 
+        // Column filters changed: the empty copy says whether they hid everything.
+        if (table) {
+          table.addEventListener('lex-filter-change', function () { _cdModalSyncEmptyText(table); });
+        }
+
         // Bulk link/unlink actions
         if (table) {
           table.addEventListener('bulk-action', function (e) {
@@ -7963,6 +7984,46 @@
     }); });
   }
 
+  var _cdModalLoadSequence = 0;
+
+  // Every available record the toolbar's search, type and connector match,
+  // page by page (the endpoint serves at most 50 per page), up to 500 rows.
+  function _cdModalFetchAvailable(matterId, params) {
+    var tables = window.LanaWorkspaceDetailsTables;
+    var pageSize = tables ? tables.CD_SEARCH_PAGE_SIZE : 50;
+    var maxPages = tables ? tables.CD_SEARCH_MAX_PAGES : 10;
+    var collected = [];
+    function fetchPage(page) {
+      return api.searchConnectorDataForLinking(matterId, {
+        search: params.search, entity_type: params.entity_type, connector_id: params.connector_id,
+        page: page, limit: pageSize
+      }).then(function (response) {
+        var results = (response && response.results) || [];
+        collected = collected.concat(results);
+        var totalPages = Number(response && response.pagination && response.pagination.total_pages) || 1;
+        if (!results.length || page >= totalPages || page >= maxPages) return collected;
+        return fetchPage(page + 1);
+      });
+    }
+    return fetchPage(1).catch(function () { return collected; });
+  }
+
+  // Empty copy follows the toolbar and the column filters.
+  function _cdModalSyncEmptyText(table) {
+    var tables = window.LanaWorkspaceDetailsTables;
+    if (!table || !tables) return;
+    var searchInput = document.getElementById('cdModalSearch');
+    var entityTypeSelect = document.getElementById('cdModalEntityType');
+    var connectorSelect = document.getElementById('cdModalConnector');
+    var columnFiltered = !!(table.dataSource && table.dataSource._filters && table.dataSource._filters.size > 0);
+    var filtered = columnFiltered ||
+      !!(searchInput && String(searchInput.value || '').trim()) ||
+      !!(entityTypeSelect && entityTypeSelect.value) ||
+      !!(connectorSelect && connectorSelect.value);
+    var text = tables.connectedDataEmptyText(filtered);
+    if (table.emptyText !== text) table.emptyText = text;
+  }
+
   function _cdModalSearch() {
     var table = document.getElementById('cdModalTable');
     if (!table) return;
@@ -7971,6 +8032,9 @@
       return;
     }
     if (!_cdModalMatter) return;
+    var tables = window.LanaWorkspaceDetailsTables;
+    if (!tables) return;
+    var seq = ++_cdModalLoadSequence;
 
     var searchInput = document.getElementById('cdModalSearch');
     var entityTypeSelect = document.getElementById('cdModalEntityType');
@@ -7979,101 +8043,31 @@
     var search = searchInput ? (searchInput.value || '').trim() : '';
     var entityType = entityTypeSelect ? (entityTypeSelect.value || '') : '';
     var connectorId = connectorSelect ? (connectorSelect.value || '') : '';
-    var searchLower = search.toLowerCase();
 
     // Fetch both linked and available data in parallel
     var linkedPromise = api.getMatterConnectorData(_cdModalMatter.matter_id).catch(function () { return { data: {} }; });
-    var availablePromise = api.searchConnectorDataForLinking(_cdModalMatter.matter_id, {
-      search: search, entity_type: entityType, connector_id: connectorId, limit: 100
-    }).catch(function () { return { results: [] }; });
+    var availablePromise = _cdModalFetchAvailable(_cdModalMatter.matter_id, {
+      search: search, entity_type: entityType, connector_id: connectorId
+    });
 
     Promise.all([linkedPromise, availablePromise]).then(function (responses) {
-      var linkedResponse = responses[0];
-      var availableResponse = responses[1];
-      var rows = [];
-
-      // 1) Add contacts (already linked to matter)
-      var contacts = (currentMatterData && currentMatterData.contacts) || _cdModalMatter.contacts || [];
-      if (!entityType || entityType === 'contact') {
-        for (var ci = 0; ci < contacts.length; ci++) {
-          var c = contacts[ci];
-          var fullName = ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || c.display_name || 'Unknown';
-          if (searchLower) {
-            var haystack = (fullName + ' ' + (c.email || '') + ' ' + (c.phone || '')).toLowerCase();
-            if (haystack.indexOf(searchLower) === -1) continue;
-          }
-          rows.push({
-            id: 'contact_' + (c.id || ci),
-            source: 'LANA',
-            type: 'Contact',
-            name: fullName,
-            detail: c.email || c.phone || '--',
-            status: 'Linked',
-            _linkType: 'contact'
-          });
-        }
-      }
-
-      // 2) Add linked connector data records
-      var linkedGroups = linkedResponse.data || {};
-      var linkedIds = {};
-      var groupKeys = Object.keys(linkedGroups);
-      for (var gi = 0; gi < groupKeys.length; gi++) {
-        var records = linkedGroups[groupKeys[gi]];
-        if (!Array.isArray(records)) continue;
-        for (var li = 0; li < records.length; li++) {
-          var lr = records[li];
-          var lrEntityLabel = lr.entity_type ? lr.entity_type.split('_').join(' ') : 'Unknown';
-          var lrData = lr.data || {};
-          var lrName = lrData.name || lrData.title || lr.external_id || '';
-          var lrDetail = lrData.description || lrData.email || lrData.status || lr.external_id || '';
-
-          // Apply client-side filters for linked records
-          if (entityType && lr.entity_type !== entityType) continue;
-          if (connectorId && lr.connector_id !== connectorId) continue;
-          if (searchLower) {
-            var lrHaystack = (lrName + ' ' + lrDetail + ' ' + (lr.connector_name || '')).toLowerCase();
-            if (lrHaystack.indexOf(searchLower) === -1) continue;
-          }
-
-          linkedIds[lr.id] = true;
-          rows.push({
-            id: lr.id || '',
-            source: lr.connector_name || lr.connector_id || '',
-            type: lrEntityLabel,
-            name: lrName,
-            detail: lrDetail,
-            status: 'Linked',
-            _linkType: 'connector'
-          });
-        }
-      }
-
-      // 3) Add available (unlinked) connector data records
-      var availableResults = availableResponse.results || [];
-      for (var ri = 0; ri < availableResults.length; ri++) {
-        var r = availableResults[ri];
-        if (linkedIds[r.id]) continue; // skip duplicates
-        var entityLabel = r.entity_type ? r.entity_type.split('_').join(' ') : 'Unknown';
-        var data = r.data || {};
-        var recordName = data.name || data.title || r.external_id || '';
-        var detail = data.description || data.email || data.status || r.external_id || '';
-
-        rows.push({
-          id: r.id || '',
-          source: r.connector_name || r.connector_id || '',
-          type: entityLabel,
-          name: recordName,
-          detail: detail,
-          status: 'Available',
-          _linkType: 'connector'
-        });
-      }
-
+      if (seq !== _cdModalLoadSequence) return;
+      var rows = tables.buildConnectedDataRows({
+        contacts: (currentMatterData && currentMatterData.contacts) || _cdModalMatter.contacts || [],
+        linkedGroups: (responses[0] && responses[0].data) || {},
+        available: responses[1] || [],
+        search: search,
+        entityType: entityType,
+        connectorId: connectorId
+      });
+      table.setColumnFilterOptions(tables.connectedDataFilterOptions(rows, window.LanaLibraryColumnFilters));
       table.setData(rows);
+      _cdModalSyncEmptyText(table);
     }).catch(function (err) {
+      if (seq !== _cdModalLoadSequence) return;
       console.error('[ConnectedDataModal] Search error:', err);
       table.setData([]);
+      _cdModalSyncEmptyText(table);
     });
   }
 

@@ -49,12 +49,69 @@
         </div>
 
         <section id="bcOrgPanel" class="bc-panel" aria-label="Organization documents">
+          <div class="bc-table-toolbar" role="search" aria-label="Search and filter organization documents">
+            <div class="bc-table-toolbar-row">
+              <div class="bc-table-toolbar-search">
+                <lex-input id="bcOrgSearch" placeholder="Search documents..." clearable="true" leading-icon="search"></lex-input>
+              </div>
+              <div class="bc-table-toolbar-group">
+                <label class="bc-table-toolbar-label">Sort by:</label>
+                <lex-select
+                  id="bcOrgSort"
+                  options='[{"value":"updated_at","label":"Last edited"},{"value":"created_at","label":"Created"},{"value":"name","label":"File"}]'
+                  value="updated_at"
+                ></lex-select>
+              </div>
+              <lex-btn id="bcOrgSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+              </svg>
+              </lex-btn>
+              <div class="bc-table-toolbar-group">
+                <label class="bc-table-toolbar-label">Source:</label>
+                <lex-select
+                  id="bcOrgSource"
+                  options='[{"value":"stored","label":"Documents"},{"value":"studio","label":"Doc Studio files"}]'
+                  value="stored"
+                ></lex-select>
+              </div>
+              <div id="bcOrgCount" class="bc-table-toolbar-label"></div>
+            </div>
+          </div>
+
+          <div class="bc-section-heading">
+            <h2 id="bcOrgSectionTitle" class="bc-section-title">Documents</h2>
+            <span id="bcOrgSectionCount" class="bc-table-toolbar-label" aria-live="polite"></span>
+          </div>
+
           <lex-table
             id="bcOrgTable"
-            columns="filename,file_type,matter,is_template,updated_at"
-            labels="Name,Type,Matter,Template,Updated"
-            empty-text="No organization documents found."
-            searchable
+            class="lex-table--card"
+            column-filters
+            server-paging
+            columns="name,type,workspace,is_template,created_at,updated_at"
+            labels="File,Type,Matter,Template,Created,Last edited"
+            sortable-columns="name,created_at,updated_at"
+            sort-by="updated_at"
+            sort-dir="desc"
+            limit="20"
+            id-key="id"
+            empty-text="No organization documents yet."
+            aria-label="Organization documents"
+          ></lex-table>
+          <lex-table
+            id="bcOrgStudioTable"
+            class="lex-table--card"
+            column-filters
+            columns="name,style,cards,created_at"
+            labels="File,Style,Sections,Created"
+            sort-by="created_at"
+            sort-dir="desc"
+            limit="20"
+            id-key="id"
+            empty-text="No saved Doc Studio files yet."
+            aria-label="Doc Studio files"
+            style="display: none"
           ></lex-table>
         </section>
 
@@ -75,14 +132,48 @@
             description="Your personal notes live in the Brainchild app on this device. Launch and connect Brainchild to read your vault here."
             action-label="Launch Brainchild"
           ></lex-empty>
-          <lex-table
-            id="bcMyTable"
-            class="bc-hidden"
-            columns="filename,file_type,matter,updated_at"
-            labels="Name,Type,Source,Updated"
-            empty-text="No personal notes found."
-            searchable
-          ></lex-table>
+          <div id="bcMyList" class="bc-list bc-hidden">
+            <div class="bc-table-toolbar" role="search" aria-label="Search and filter personal notes">
+              <div class="bc-table-toolbar-row">
+                <div class="bc-table-toolbar-search">
+                  <lex-input id="bcMySearch" placeholder="Search notes..." clearable="true" leading-icon="search"></lex-input>
+                </div>
+                <div class="bc-table-toolbar-group">
+                  <label class="bc-table-toolbar-label">Sort by:</label>
+                  <lex-select
+                    id="bcMySort"
+                    options='[{"value":"updated_at","label":"Last edited"},{"value":"created_at","label":"Created"},{"value":"name","label":"Name"},{"value":"folder","label":"Folder"}]'
+                    value="updated_at"
+                  ></lex-select>
+                </div>
+                <lex-btn id="bcMySortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+              </svg>
+                </lex-btn>
+                <div id="bcMyCount" class="bc-table-toolbar-label"></div>
+              </div>
+            </div>
+
+            <div class="bc-section-heading">
+              <h2 class="bc-section-title">My notes</h2>
+              <span id="bcMySectionCount" class="bc-table-toolbar-label" aria-live="polite"></span>
+            </div>
+
+            <lex-table
+              id="bcMyTable"
+              class="lex-table--card"
+              column-filters
+              columns="name,folder,created_at,updated_at"
+              labels="Name,Folder,Created,Last edited"
+              sort-by="updated_at"
+              sort-dir="desc"
+              limit="20"
+              id-key="id"
+              empty-text="No personal notes found."
+              aria-label="Personal notes"
+            ></lex-table>
+          </div>
         </section>
 
         <p id="bcStatus" class="bc-status" role="status"></p>
@@ -105,6 +196,8 @@
     <script src="../js/lex/components/foundation/lex-modal.js"></script>
     <script src="../js/lex/components/foundation/lex-toast.js"></script>
     <script src="../js/lex/components/form/lex-segmented.js"></script>
+    <script src="../js/lex/components/form/lex-input.js"></script>
+    <script src="../js/lex/components/form/lex-select.js"></script>
     <script src="../js/lex/components/data/lex-table.js"></script>
     <script src="../js/lex/components/data/lex-pagination.js"></script>
     <script src="../js/lex/components/layout/lex-sidebar.js"></script>
@@ -115,6 +208,9 @@
     <script src="../js/sidebar-footer-hydrate.js"></script>
     <script src="../js/shared/document-library-mapper.js"></script>
     <script src="../js/shared/brainchild-promote-builder.js"></script>
+    <script src="../js/shared/library-column-filters.js"></script>
+    <script src="../js/shared/doc-studio-library-table.js"></script>
+    <script src="../js/shared/brainchild-table.js"></script>
     <script>
       (function () {
         function mountBrainchild() {

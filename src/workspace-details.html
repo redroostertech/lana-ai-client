@@ -648,7 +648,20 @@
       </div>
       <!-- Table area -->
       <div style="flex:1;overflow:auto;">
-        <lex-table id="cdModalTable" selectable empty-text="No connected data"></lex-table>
+        <lex-table
+          id="cdModalTable"
+          class="wd-connected-data-table lex-table--card"
+          selectable
+          column-filters
+          columns="name,type,source,detail,status,created_at"
+          labels="Name,Type,Source,Detail,Status,Created"
+          sort-by="created_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No data available. Connect an integration to sync data."
+          aria-label="Connected data"
+        ></lex-table>
       </div>
     </div>
   </lex-modal>
@@ -1236,6 +1249,8 @@
   <!-- Page controller (MUST be last before auth-guard) -->
   <script src="js/workspace-switcher.js"></script>
   <script src="js/workspace-billable-hours.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/workspace-details-tables.js"></script>
   <script src="js/workspace-details.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->
