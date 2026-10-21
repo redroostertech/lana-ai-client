@@ -51,9 +51,7 @@
 
         <div style="margin-bottom:1.5rem;">
           <label for="workspaceMatterPicker" style="display:block;font-size:0.875rem;font-weight:500;color:#374151;margin-bottom:0.375rem;">Select Matter</label>
-          <select id="workspaceMatterPicker" style="width:100%;max-width:400px;padding:0.5rem;border:1px solid #d1d5db;border-radius:0.375rem;font-size:0.875rem;">
-            <option value="">Choose a matter...</option>
-          </select>
+          <lex-select id="workspaceMatterPicker" style="max-width:400px;" searchable="true" placeholder="Choose a matter..." options='[{"value":"","label":"Choose a matter..."}]' value=""></lex-select>
         </div>
 
         <!-- Analytics Cards Grid -->
@@ -123,6 +121,7 @@
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/form/lex-segmented.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
   <script src="../js/lex/components/layout/lex-conversation-item.js"></script>

@@ -213,6 +213,25 @@ const EventTypes = [
   { value: 'followup.missed', label: 'Follow-up Missed' }
 ];
 
+// Dropdowns are lex-select (UI standard section 11). Values are strings. An
+// unknown value falls back to the first option, as a native select would,
+// unless the list starts with an empty "Select ..." option.
+function workflowEscapeAttr(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function workflowConfigSelect(id, options, value) {
+  const opts = options.map((option) => ({ value: String(option.value), label: String(option.label) }));
+  const current = value === undefined || value === null ? '' : String(value);
+  const emptyOption = opts.find((option) => option.value === '');
+  let selected = current;
+  if (!opts.some((option) => option.value === current)) {
+    selected = emptyOption ? '' : (opts[0] ? opts[0].value : '');
+  }
+  const placeholder = emptyOption ? emptyOption.label : 'Select...';
+  return `<lex-select id="${workflowEscapeAttr(id)}" options="${workflowEscapeAttr(JSON.stringify(opts))}" value="${workflowEscapeAttr(selected)}" placeholder="${workflowEscapeAttr(placeholder)}"></lex-select>`;
+}
+
 function getWorkflowEventSummaryHtml(eventType) {
   if (window.LanaEventBrowser && typeof window.LanaEventBrowser.renderSummaryHtml === 'function') {
     return window.LanaEventBrowser.renderSummaryHtml(eventType);
@@ -238,7 +257,7 @@ function openWorkflowEventBrowser() {
       if (descEl) {
         descEl.innerHTML = getWorkflowEventSummaryHtml(eventType);
       }
-      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+      selectEl.dispatchEvent(new CustomEvent('lex-change', { bubbles: true, detail: { name: selectEl.name || '', value: eventType } }));
     }
   });
 }
@@ -426,6 +445,14 @@ class WorkflowBuilder {
 
     configPanel.innerHTML = this.renderConfigForm(nodeDef, config, nodeId);
     configPanel.classList.remove('hidden');
+
+    const eventSelect = document.getElementById('config-event');
+    if (eventSelect) {
+      eventSelect.addEventListener('lex-change', (event) => {
+        const descEl = document.getElementById('workflow-event-description');
+        if (descEl) descEl.innerHTML = getWorkflowEventSummaryHtml(event.detail.value);
+      });
+    }
   }
 
   hideNodeConfig() {
@@ -452,12 +479,7 @@ class WorkflowBuilder {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
-              <select id="config-timezone" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="America/New_York" ${config.timezone === 'America/New_York' ? 'selected' : ''}>Eastern Time</option>
-                <option value="America/Chicago" ${config.timezone === 'America/Chicago' ? 'selected' : ''}>Central Time</option>
-                <option value="America/Denver" ${config.timezone === 'America/Denver' ? 'selected' : ''}>Mountain Time</option>
-                <option value="America/Los_Angeles" ${config.timezone === 'America/Los_Angeles' ? 'selected' : ''}>Pacific Time</option>
-              </select>
+              ${workflowConfigSelect('config-timezone', [{ value: 'America/New_York', label: 'Eastern Time' }, { value: 'America/Chicago', label: 'Central Time' }, { value: 'America/Denver', label: 'Mountain Time' }, { value: 'America/Los_Angeles', label: 'Pacific Time' }], config.timezone)}
             </div>
           </div>
         `;
@@ -468,9 +490,7 @@ class WorkflowBuilder {
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
             <div class="flex flex-wrap items-center gap-2">
-              <select id="config-event" class="flex-1 min-w-[220px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                ${EventTypes.map(e => `<option value="${e.value}" ${config.event === e.value ? 'selected' : ''}>${e.label}</option>`).join('')}
-              </select>
+              <div class="flex-1 min-w-[220px]">${workflowConfigSelect('config-event', EventTypes, config.event)}</div>
               <button type="button" class="px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100" onclick="openWorkflowEventBrowser()">Browse Events</button>
             </div>
             <div id="workflow-event-description" class="mt-2">
@@ -485,11 +505,7 @@ class WorkflowBuilder {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Operator</label>
-              <select id="config-operator" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="greater_than" ${config.operator === 'greater_than' ? 'selected' : ''}>Greater than</option>
-                <option value="less_than" ${config.operator === 'less_than' ? 'selected' : ''}>Less than</option>
-                <option value="equals" ${config.operator === 'equals' ? 'selected' : ''}>Equals</option>
-              </select>
+              ${workflowConfigSelect('config-operator', [{ value: 'greater_than', label: 'Greater than' }, { value: 'less_than', label: 'Less than' }, { value: 'equals', label: 'Equals' }], config.operator)}
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Days</label>
@@ -512,11 +528,7 @@ class WorkflowBuilder {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Operator</label>
-              <select id="config-operator" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="equals" ${config.operator === 'equals' ? 'selected' : ''}>Equals</option>
-                <option value="not_equals" ${config.operator === 'not_equals' ? 'selected' : ''}>Not Equals</option>
-                <option value="contains" ${config.operator === 'contains' ? 'selected' : ''}>Contains</option>
-              </select>
+              ${workflowConfigSelect('config-operator', [{ value: 'equals', label: 'Equals' }, { value: 'not_equals', label: 'Not Equals' }, { value: 'contains', label: 'Contains' }], config.operator)}
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Value</label>
@@ -542,13 +554,7 @@ class WorkflowBuilder {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Template</label>
-              <select id="config-template" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="">Select template...</option>
-                <option value="initial_followup" ${config.template === 'initial_followup' ? 'selected' : ''}>Initial Follow-up</option>
-                <option value="second_followup" ${config.template === 'second_followup' ? 'selected' : ''}>Second Follow-up</option>
-                <option value="urgent_followup" ${config.template === 'urgent_followup' ? 'selected' : ''}>Urgent Follow-up</option>
-                <option value="welcome" ${config.template === 'welcome' ? 'selected' : ''}>Welcome Email</option>
-              </select>
+              ${workflowConfigSelect('config-template', [{ value: '', label: 'Select template...' }, { value: 'initial_followup', label: 'Initial Follow-up' }, { value: 'second_followup', label: 'Second Follow-up' }, { value: 'urgent_followup', label: 'Urgent Follow-up' }, { value: 'welcome', label: 'Welcome Email' }], config.template)}
             </div>
           </div>
         `;
@@ -582,11 +588,7 @@ class WorkflowBuilder {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
-              <select id="config-assignee" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="assigned_rep" ${config.assignee === 'assigned_rep' ? 'selected' : ''}>Assigned Rep</option>
-                <option value="manager" ${config.assignee === 'manager' ? 'selected' : ''}>Manager</option>
-                <option value="intake" ${config.assignee === 'intake' ? 'selected' : ''}>Intake Team</option>
-              </select>
+              ${workflowConfigSelect('config-assignee', [{ value: 'assigned_rep', label: 'Assigned Rep' }, { value: 'manager', label: 'Manager' }, { value: 'intake', label: 'Intake Team' }], config.assignee)}
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Due In (Days)</label>
@@ -595,11 +597,7 @@ class WorkflowBuilder {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-              <select id="config-priority" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="low" ${config.priority === 'low' ? 'selected' : ''}>Low</option>
-                <option value="normal" ${config.priority === 'normal' ? 'selected' : ''}>Normal</option>
-                <option value="high" ${config.priority === 'high' ? 'selected' : ''}>High</option>
-              </select>
+              ${workflowConfigSelect('config-priority', [{ value: 'low', label: 'Low' }, { value: 'normal', label: 'Normal' }, { value: 'high', label: 'High' }], config.priority)}
             </div>
           </div>
         `;
@@ -610,11 +608,7 @@ class WorkflowBuilder {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Notify</label>
-              <select id="config-recipient" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="assigned_rep" ${config.recipient === 'assigned_rep' ? 'selected' : ''}>Assigned Rep</option>
-                <option value="manager" ${config.recipient === 'manager' ? 'selected' : ''}>Manager</option>
-                <option value="all" ${config.recipient === 'all' ? 'selected' : ''}>All Team</option>
-              </select>
+              ${workflowConfigSelect('config-recipient', [{ value: 'assigned_rep', label: 'Assigned Rep' }, { value: 'manager', label: 'Manager' }, { value: 'all', label: 'All Team' }], config.recipient)}
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
@@ -630,11 +624,7 @@ class WorkflowBuilder {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Escalate To</label>
-              <select id="config-escalateTo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="manager" ${config.escalateTo === 'manager' ? 'selected' : ''}>Manager</option>
-                <option value="senior_partner" ${config.escalateTo === 'senior_partner' ? 'selected' : ''}>Senior Partner</option>
-                <option value="admin" ${config.escalateTo === 'admin' ? 'selected' : ''}>Admin</option>
-              </select>
+              ${workflowConfigSelect('config-escalateTo', [{ value: 'manager', label: 'Manager' }, { value: 'senior_partner', label: 'Senior Partner' }, { value: 'admin', label: 'Admin' }], config.escalateTo)}
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Reason</label>
@@ -650,12 +640,7 @@ class WorkflowBuilder {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Document Template</label>
-              <select id="config-templateId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="">Select template...</option>
-                <option value="engagement_letter" ${config.templateId === 'engagement_letter' ? 'selected' : ''}>Engagement Letter</option>
-                <option value="fee_agreement" ${config.templateId === 'fee_agreement' ? 'selected' : ''}>Fee Agreement</option>
-                <option value="retainer" ${config.templateId === 'retainer' ? 'selected' : ''}>Retainer Agreement</option>
-              </select>
+              ${workflowConfigSelect('config-templateId', [{ value: '', label: 'Select template...' }, { value: 'engagement_letter', label: 'Engagement Letter' }, { value: 'fee_agreement', label: 'Fee Agreement' }, { value: 'retainer', label: 'Retainer Agreement' }], config.templateId)}
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Save Path</label>
@@ -671,19 +656,11 @@ class WorkflowBuilder {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Audience</label>
-              <select id="config-audienceId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="">Select audience...</option>
-                <option value="no_shows" ${config.audienceId === 'no_shows' ? 'selected' : ''}>No-Shows</option>
-                <option value="stale_leads" ${config.audienceId === 'stale_leads' ? 'selected' : ''}>Stale Leads</option>
-                <option value="lost_opportunities" ${config.audienceId === 'lost_opportunities' ? 'selected' : ''}>Lost Opportunities</option>
-              </select>
+              ${workflowConfigSelect('config-audienceId', [{ value: '', label: 'Select audience...' }, { value: 'no_shows', label: 'No-Shows' }, { value: 'stale_leads', label: 'Stale Leads' }, { value: 'lost_opportunities', label: 'Lost Opportunities' }], config.audienceId)}
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Platform</label>
-              <select id="config-platform" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
-                <option value="facebook" ${config.platform === 'facebook' ? 'selected' : ''}>Facebook</option>
-                <option value="google" ${config.platform === 'google' ? 'selected' : ''}>Google Ads</option>
-              </select>
+              ${workflowConfigSelect('config-platform', [{ value: 'facebook', label: 'Facebook' }, { value: 'google', label: 'Google Ads' }], config.platform)}
             </div>
           </div>
         `;

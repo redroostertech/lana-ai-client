@@ -14,6 +14,9 @@
   <script src="../js/shared/request-retry.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/components.js"></script>
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-900 text-white transform -translate-x-full lg:translate-x-0 transition-transform z-30">
@@ -57,9 +60,7 @@
           <p class="text-sm text-gray-500">Unified view of all matter activities</p>
         </div>
         <div class="flex items-center gap-3">
-          <select id="matterSelect" onchange="loadTimeline()" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">Select a Matter</option>
-          </select>
+          <lex-select id="matterSelect" size="sm" style="min-width:16rem" placeholder="Select a matter" options='[{"value":"","label":"Select a matter"}]' value=""></lex-select>
         </div>
       </div>
     </header>
@@ -279,8 +280,10 @@
 
     function populateMatterSelect() {
       const select = document.getElementById('matterSelect');
-      select.innerHTML = '<option value="">Select a Matter</option>' +
-        mockMatters.map(m => `<option value="${m.id}">${m.name} - ${m.client}</option>`).join('');
+      select.options = [{ value: '', label: 'Select a matter' }].concat(
+        mockMatters.map(m => ({ value: String(m.id), label: `${m.name} - ${m.client}` }))
+      );
+      select.addEventListener('lex-change', loadTimeline);
     }
 
     function loadTimeline() {

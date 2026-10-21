@@ -94,7 +94,9 @@
     'matters/timeline.html': {
       title: 'Matter Timeline',
       activeNav: 'workspaces',
-      scripts: [],
+      scripts: [
+        'js/lex/components/form/lex-select.js'
+      ],
       stylesheets: []
     },
 
@@ -102,6 +104,7 @@
       title: 'Matter Skills',
       activeNav: 'workspaces',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/matter-skills.js'
       ],
       stylesheets: [
@@ -209,6 +212,7 @@
       title: 'File Editor',
       activeNav: 'document-library',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/time-utils.js',
         'js/app-catalog.js',
         'js/lex/components/foundation/lex-drawer.js',
@@ -330,6 +334,7 @@
       title: 'Help & Support',
       activeNav: 'help',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/help.js'
       ],
       stylesheets: []
@@ -505,6 +510,7 @@
       title: 'Dashboard Builder',
       activeNav: 'insights-library',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/admin/dashboard-builder.js'
       ],
       stylesheets: [
@@ -576,7 +582,9 @@
     'admin/onboarding_management.html': {
       title: 'Onboarding Management',
       activeNav: 'admin',
-      scripts: [],
+      scripts: [
+        'js/lex/components/form/lex-select.js'
+      ],
       stylesheets: [
         'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
       ]
@@ -587,6 +595,7 @@
       title: 'Analytics',
       activeNav: 'reports',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/shared/current-pipeline-presentation.js',
         'js/shared/acquisition-source-presentation.js',
         'js/shared/opportunity-intake-presentation.js',
@@ -606,6 +615,7 @@
       title: 'Module Execution Dashboard',
       activeNav: 'reports',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/vendor/chart.js',
         'js/vendor/jspdf.umd.min.js',
         'js/vendor/jspdf.plugin.autotable.min.js'
@@ -629,6 +639,7 @@
       title: 'Connector',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/utils/event-display-names.js',
         'js/services/feature-tracker.js',
         'js/activity-heatmap.js',
@@ -643,6 +654,7 @@
       title: 'CRM Connectors',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/connectors.js'
       ],
       stylesheets: []
@@ -659,6 +671,7 @@
       title: 'Communications Connectors',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/connectors.js'
       ],
       stylesheets: []
@@ -675,6 +688,7 @@
       title: 'Case Management Connectors',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/connectors.js'
       ],
       stylesheets: []
@@ -693,6 +707,7 @@
       title: 'ActionStep Dashboard',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/chunked-uploader.js'
       ],
       stylesheets: []
@@ -702,6 +717,7 @@
       title: 'Leadly CRM Dashboard',
       activeNav: 'connectors',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/chunked-uploader.js'
       ],
       stylesheets: []
@@ -721,6 +737,7 @@
       title: 'Workflow Builder',
       activeNav: 'workflows',
       scripts: [
+        'js/lex/components/form/lex-select.js',
         'js/services/feature-tracker.js',
         'js/workflows.js',
         'js/workflow-builder.js',

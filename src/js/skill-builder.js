@@ -505,9 +505,13 @@ SkillBuilder.prototype.renderConfigForm = function (nodeDef, config, nodeId) {
   // Build config form based on node type
   if (nodeDef.type === 'condition-field') {
     var operatorOptions = ConditionOperators.map(function (op) {
-      var sel = config.operator === op.value ? ' selected' : '';
-      return '<option value="' + op.value + '"' + sel + '>' + op.label + '</option>';
-    }).join('');
+      return { value: String(op.value), label: op.label };
+    });
+    // Native selects default to the first option; lex-select shows a
+    // placeholder for an unknown value, so fall back the same way.
+    var operatorValue = operatorOptions.some(function (op) { return op.value === config.operator; })
+      ? config.operator
+      : operatorOptions[0].value;
 
     formFields = '<div class="space-y-4">'
       + '<div>'
@@ -518,9 +522,8 @@ SkillBuilder.prototype.renderConfigForm = function (nodeDef, config, nodeId) {
       + '</div>'
       + '<div>'
       + '<label class="block text-sm font-medium text-gray-700 mb-1">Operator</label>'
-      + '<select id="config-operator" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">'
-      + operatorOptions
-      + '</select>'
+      + '<lex-select id="config-operator" options="' + escapeAttr(JSON.stringify(operatorOptions)) + '"'
+      + ' value="' + escapeAttr(operatorValue) + '"></lex-select>'
       + '</div>'
       + '<div>'
       + '<label class="block text-sm font-medium text-gray-700 mb-1">Value</label>'

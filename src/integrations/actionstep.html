@@ -197,9 +197,7 @@
         <!-- Volume Selector -->
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">Storage Volume</label>
-          <select id="volumeSelector" onchange="onVolumeChange()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-            <option value="">Loading volumes...</option>
-          </select>
+          <lex-select id="volumeSelector" placeholder="Loading volumes..." options='[]' value=""></lex-select>
         </div>
 
         <!-- Manual Path Entry (optional) -->
@@ -1900,16 +1898,12 @@
 
               <div>
                 <label for="sync_frequency" class="block text-sm font-medium text-gray-700 mb-2">How often should we check for new files?</label>
-                <select
+                <lex-select
                   id="sync_frequency"
                   name="sync_frequency"
-                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                >
-                  <option value="realtime" ${currentConfig.sync_frequency === 'realtime' ? 'selected' : ''}>Right away (when files change)</option>
-                  <option value="hourly" ${currentConfig.sync_frequency === 'hourly' ? 'selected' : ''}>Every hour</option>
-                  <option value="daily" ${currentConfig.sync_frequency === 'daily' || !currentConfig.sync_frequency ? 'selected' : ''}>Once a day</option>
-                  <option value="manual" ${currentConfig.sync_frequency === 'manual' ? 'selected' : ''}>Only when I click Upload</option>
-                </select>
+                  options='[{"value":"realtime","label":"Right away (when files change)"},{"value":"hourly","label":"Every hour"},{"value":"daily","label":"Once a day"},{"value":"manual","label":"Only when I click Upload"}]'
+                  value="${['realtime', 'hourly', 'daily', 'manual'].includes(currentConfig.sync_frequency) ? currentConfig.sync_frequency : (currentConfig.sync_frequency ? 'realtime' : 'daily')}"
+                ></lex-select>
               </div>
 
               <div class="bg-gray-50 rounded-lg p-4">
@@ -3202,11 +3196,11 @@
         const volumeSelector = document.getElementById('volumeSelector');
 
         // Build volume options
-        const volumeOptions = availableVolumes.map(v =>
-          `<option value="${v.path}">${v.name}${v.is_default ? ' (Default)' : ''}</option>`
-        ).join('');
-
-        volumeSelector.innerHTML = volumeOptions;
+        volumeSelector.options = availableVolumes.map(v => ({
+          value: String(v.path),
+          label: `${v.name}${v.is_default ? ' (default)' : ''}`,
+        }));
+        volumeSelector.placeholder = 'Select a volume';
 
         // Select first volume or chef-primary if available
         const defaultVolume = availableVolumes.find(v => v.is_default) || availableVolumes[0];
@@ -3241,6 +3235,10 @@
     }
 
     // Volume changed
+    document.addEventListener('lex-change', (event) => {
+      if (event.target && event.target.id === 'volumeSelector') onVolumeChange();
+    });
+
     async function onVolumeChange() {
       const volumeSelector = document.getElementById('volumeSelector');
       selectedVolume = volumeSelector.value;

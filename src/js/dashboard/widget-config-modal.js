@@ -9,7 +9,7 @@
  *   WidgetConfigModal.open()   - Opens the modal
  *   WidgetConfigModal.close()  - Closes the modal
  *
- * Depends on: api (global ApiClient), WidgetRenderer (global)
+ * Depends on: api (global ApiClient), WidgetRenderer (global), lex-select
  */
 const WidgetConfigModal = (function() {
   /** Cached modal DOM element */
@@ -30,6 +30,18 @@ const WidgetConfigModal = (function() {
     { type: 'matter_summary', label: 'Matter Summary', description: 'Matter count and status statistics' },
     { type: 'connector_status', label: 'Connector Status', description: 'Integration sync health at a glance' }
   ];
+
+  /**
+   * Markup for a lex-select with static { value, label } options.
+   * @param {string} id
+   * @param {Array<{value: string, label: string}>} options
+   * @param {string} value
+   * @returns {string}
+   */
+  function lexSelectHtml(id, options, value) {
+    var json = JSON.stringify(options).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    return '<lex-select id="' + id + '" options="' + json + '" value="' + value + '"></lex-select>';
+  }
 
   /**
    * Create the modal DOM element and attach it to the body.
@@ -66,9 +78,7 @@ const WidgetConfigModal = (function() {
       // Widget type selector
       + '<div class="mb-4">'
       + '<label class="block text-sm font-medium text-gray-700 mb-1">Widget Type</label>'
-      + '<select id="widgetTypeSelect" class="w-full rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">'
-      + '<option value="">Select widget type...</option>'
-      + '</select>'
+      + '<lex-select id="widgetTypeSelect" placeholder="Select widget type..." options="[]" value=""></lex-select>'
       + '</div>'
 
       // Widget title input
@@ -96,7 +106,7 @@ const WidgetConfigModal = (function() {
     modal.querySelector('#closeWidgetModal').addEventListener('click', close);
     modal.querySelector('#cancelWidgetBtn').addEventListener('click', close);
     modal.querySelector('#saveWidgetBtn').addEventListener('click', save);
-    modal.querySelector('#widgetTypeSelect').addEventListener('change', onTypeChange);
+    modal.querySelector('#widgetTypeSelect').addEventListener('lex-change', onTypeChange);
   }
 
   /**
@@ -119,13 +129,10 @@ const WidgetConfigModal = (function() {
 
     // Populate type select
     var select = modalElement.querySelector('#widgetTypeSelect');
-    select.innerHTML = '<option value="">Select widget type...</option>';
-    widgetTypes.forEach(function(wt) {
-      var opt = document.createElement('option');
-      opt.value = wt.type;
-      opt.textContent = wt.label || wt.type;
-      select.appendChild(opt);
-    });
+    select.options = [{ value: '', label: 'Select widget type...' }].concat(widgetTypes.map(function(wt) {
+      return { value: String(wt.type), label: wt.label || wt.type };
+    }));
+    select.value = '';
 
     // Reset form state
     modalElement.querySelector('#widgetTitleInput').value = '';
@@ -177,30 +184,30 @@ const WidgetConfigModal = (function() {
       if (selectedType === 'metric_card') {
         configContainer.innerHTML += '<div class="mb-3">'
           + '<label class="block text-sm font-medium text-gray-700 mb-1">Metric</label>'
-          + '<select id="widgetMetric" class="w-full rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">'
-          + '<option value="count">Count</option>'
-          + '<option value="sum">Sum</option>'
-          + '<option value="avg">Average</option>'
-          + '</select>'
+          + lexSelectHtml('widgetMetric', [
+            { value: 'count', label: 'Count' },
+            { value: 'sum', label: 'Sum' },
+            { value: 'avg', label: 'Average' }
+          ], 'count')
           + '</div>';
       }
 
       if (selectedType === 'chart') {
         configContainer.innerHTML += '<div class="mb-3">'
           + '<label class="block text-sm font-medium text-gray-700 mb-1">Chart Type</label>'
-          + '<select id="widgetChartType" class="w-full rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">'
-          + '<option value="bar">Bar</option>'
-          + '<option value="pie">Pie</option>'
-          + '<option value="doughnut">Doughnut</option>'
-          + '<option value="line">Line</option>'
-          + '</select>'
+          + lexSelectHtml('widgetChartType', [
+            { value: 'bar', label: 'Bar' },
+            { value: 'pie', label: 'Pie' },
+            { value: 'doughnut', label: 'Doughnut' },
+            { value: 'line', label: 'Line' }
+          ], 'bar')
           + '</div>'
           + '<div class="mb-3">'
           + '<label class="block text-sm font-medium text-gray-700 mb-1">Group By</label>'
-          + '<select id="widgetGroupBy" class="w-full rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">'
-          + '<option value="connector_id">Connector</option>'
-          + '<option value="entity_type">Entity Type</option>'
-          + '</select>'
+          + lexSelectHtml('widgetGroupBy', [
+            { value: 'connector_id', label: 'Connector' },
+            { value: 'entity_type', label: 'Entity Type' }
+          ], 'connector_id')
           + '</div>';
       }
     }

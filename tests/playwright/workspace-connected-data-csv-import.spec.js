@@ -747,6 +747,12 @@ async function setMapping(page, sourceColumn, targetField) {
     await control.selectOption(values.includes(targetField) ? targetField : `field:${targetField}`);
     return;
   }
+  if (tagName === 'lex-select') {
+    // Field targets carry a `field:` prefix; `custom` and `unmapped` do not.
+    const values = await control.evaluate((node) => (node.options || []).map((option) => option.value));
+    await setControlValue(control, values.includes(targetField) ? targetField : `field:${targetField}`);
+    return;
+  }
   await setControlValue(control, targetField);
 }
 
@@ -789,7 +795,7 @@ async function runCsvImportToValidation(page, calls, options = {}) {
   await firstVisible(page, ['#wsImportMappingRows', '.ws-import-map-table'], 'CSV mapping step');
 
   if (options.entityType) {
-    await page.locator('#wsImportEntityType').selectOption(options.entityType);
+    await setControlValue(page.locator('#wsImportEntityType'), options.entityType);
   }
 
   const mappings = options.mappings || {

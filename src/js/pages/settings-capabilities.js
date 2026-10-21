@@ -85,19 +85,22 @@
   }
 
   function createVoiceField(labelText, field, value, options) {
-    var label = element('label', 'sv2-capability-field');
+    // A lex-select inside a <label> reopens when an option is picked (the
+    // label re-clicks its trigger), so select fields use a div wrapper.
+    var label = element(Array.isArray(options) ? 'div' : 'label', 'sv2-capability-field');
     label.appendChild(element('span', 'sv2-capability-select-label', labelText));
     var control;
     if (Array.isArray(options)) {
-      control = element('select', 'sv2-capability-select');
-      options.forEach(function (option) { control.appendChild(new Option(option.label, option.value)); });
+      control = element('lex-select', 'sv2-capability-select');
+      control.setAttribute('aria-label', labelText);
+      control.options = options.map(function (option) { return { value: String(option.value), label: option.label }; });
     } else {
       control = document.createElement('input');
       control.className = 'sv2-capability-input';
       control.type = 'text';
       control.autocomplete = 'off';
     }
-    control.name = field;
+    control.setAttribute('name', field);
     control.value = value || '';
     label.appendChild(control);
     return label;
@@ -164,7 +167,7 @@
       { label: 'Risk based', value: 'risk_based' }, { label: 'Always preview', value: 'always' },
       { label: 'Skip for safe inserts', value: 'never_safe_only' }
     ]));
-    Array.prototype.forEach.call(fields.querySelectorAll('input, select'), function (control) { control.disabled = disabled; });
+    Array.prototype.forEach.call(fields.querySelectorAll('input, lex-select'), function (control) { control.disabled = disabled; });
     dictationShortcut.querySelector('input').disabled = true;
     captureShortcut.querySelector('input').disabled = true;
     form.appendChild(fields);
@@ -203,7 +206,8 @@
         defaultMode: 'agent',
         screenContextEnabled: form.elements.screenContextEnabled.checked,
         voiceOutputEnabled: form.elements.voiceOutputEnabled.checked,
-        confirmationPolicy: form.elements.confirmationPolicy.value,
+        // lex-select is not form-associated, so form.elements cannot see it.
+        confirmationPolicy: form.querySelector('lex-select[name="confirmationPolicy"]').value,
         language: settings.language || 'en'
       }, save);
     }
@@ -240,19 +244,20 @@
 
     var selectWrap = element('div', 'sv2-capability-select-wrap');
     var selectId = 'sv2-capability-' + String(capability.id).replace(/[^a-zA-Z0-9_-]/g, '-');
-    var label = element('label', 'sv2-capability-select-label', 'Activation');
-    label.setAttribute('for', selectId);
-    var select = element('select', 'sv2-capability-select');
+    var label = element('span', 'sv2-capability-select-label', 'Activation');
+    label.id = selectId + '-label';
+    var select = element('lex-select', 'sv2-capability-select');
     select.id = selectId;
+    select.setAttribute('aria-labelledby', label.id);
+    select.setAttribute('size', 'sm');
     select.dataset.capabilityId = capability.id;
-    select.appendChild(new Option('Activated', 'active'));
-    select.appendChild(new Option('Off', 'off'));
+    select.options = [{ value: 'active', label: 'Activated' }, { value: 'off', label: 'Off' }];
     select.value = capability.active ? 'active' : 'off';
     select.disabled = capability.required || !capability.available || capability.runtimeUnavailable === 'microphone';
     if (capability.required) select.title = 'Required by your organization';
     if (!capability.available) select.title = 'Unavailable on this platform';
     if (capability.runtimeUnavailable === 'microphone') select.title = 'Connect a microphone to use this capability';
-    select.addEventListener('change', function () { onChange(capability, select); });
+    select.addEventListener('lex-change', function () { onChange(capability, select); });
     selectWrap.appendChild(label);
     selectWrap.appendChild(select);
     heading.appendChild(expand);

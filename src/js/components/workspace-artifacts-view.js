@@ -136,14 +136,14 @@
   WorkspaceArtifactsView.prototype._bind = function () {
     this.container.addEventListener('click', this._onClick);
     this.container.addEventListener('input', this._onInput);
-    this.container.addEventListener('change', this._onChange);
+    this.container.addEventListener('lex-change', this._onChange);
   };
 
   WorkspaceArtifactsView.prototype.destroy = function () {
     if (this.container) {
       this.container.removeEventListener('click', this._onClick);
       this.container.removeEventListener('input', this._onInput);
-      this.container.removeEventListener('change', this._onChange);
+      this.container.removeEventListener('lex-change', this._onChange);
     }
     clearTimeout(this._searchTimer);
     if (this._drawerEl) this._drawerEl.removeEventListener('click', this._onClick);
@@ -170,9 +170,7 @@
           '</div>' +
           '<div class="flex flex-wrap gap-2">' +
             '<input type="search" class="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Search artifacts" data-artifacts-search value="' + this.escapeHtml(this.search) + '">' +
-            '<select class="px-3 py-2 border border-gray-200 rounded-lg text-sm" data-artifacts-sort>' +
-              this._renderSortOptions() +
-            '</select>' +
+            '<lex-select size="sm" data-artifacts-sort aria-label="Sort artifacts" options="' + this.escapeHtml(JSON.stringify(this._sortOptions())) + '" value="' + this.escapeHtml(this.sortBy) + '"></lex-select>' +
           '</div>' +
         '</div>' +
         '<div id="matterArtifactsList">' +
@@ -215,20 +213,15 @@
     }
   };
 
-  WorkspaceArtifactsView.prototype._renderSortOptions = function () {
-    var options = [
-      ['updated_at', 'Updated'],
-      ['created_at', 'Created'],
-      ['artifact_name', 'Name'],
-      ['artifact_type', 'Type'],
-      ['promotion_status', 'Status'],
-      ['version', 'Version']
+  WorkspaceArtifactsView.prototype._sortOptions = function () {
+    return [
+      { value: 'updated_at', label: 'Updated' },
+      { value: 'created_at', label: 'Created' },
+      { value: 'artifact_name', label: 'Name' },
+      { value: 'artifact_type', label: 'Type' },
+      { value: 'promotion_status', label: 'Status' },
+      { value: 'version', label: 'Version' }
     ];
-    var html = '';
-    for (var i = 0; i < options.length; i++) {
-      html += '<option value="' + options[i][0] + '"' + (this.sortBy === options[i][0] ? ' selected' : '') + '>' + options[i][1] + '</option>';
-    }
-    return html;
   };
 
   WorkspaceArtifactsView.prototype._renderList = function () {
@@ -330,7 +323,7 @@
 
   WorkspaceArtifactsView.prototype._handleChange = function (event) {
     if (!event.target || !event.target.matches('[data-artifacts-sort]')) return;
-    this.sortBy = event.target.value || 'updated_at';
+    this.sortBy = (event.detail && event.detail.value) || event.target.value || 'updated_at';
     this.offset = 0;
     this.refresh().catch(this._showError.bind(this));
   };

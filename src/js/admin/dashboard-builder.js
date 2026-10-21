@@ -523,12 +523,12 @@
     el('dashboardBuilderMetricSearch').addEventListener('input', renderMetrics);
     el('dashboardBuilderName').addEventListener('input', updateWizardState);
     el('dashboardBuilderDescription').addEventListener('input', updateWizardState);
-    el('dashboardBuilderType').addEventListener('change', function () {
+    el('dashboardBuilderType').addEventListener('lex-change', function () {
       activeType = 'all';
       loadMetrics();
       updateWizardState();
     });
-    el('dashboardBuilderVisibility').addEventListener('change', function () {
+    el('dashboardBuilderVisibility').addEventListener('lex-change', function () {
       updateVisibilityMode();
       updateWizardState();
     });

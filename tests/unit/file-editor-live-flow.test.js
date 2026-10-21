@@ -544,7 +544,10 @@ describe('File Editor live document boundary', () => {
     expect(sharingSource).toContain('async function loadShareWorkspaceOptions(file)');
     expect(sharingSource).toContain('window.api.getMatters(1, 250');
     expect(sharingSource).toContain('id="officeShareTargetType"');
-    expect(sharingSource).toContain('<option value="user">Person</option><option value="workspace">Workspace</option>');
+    expect(sharingSource).toContain("{ value: 'user', label: 'Person' }, { value: 'workspace', label: 'Workspace' }");
+    expect(sharingSource).toContain('<lex-select id="officeShareWorkspace" label="Workspace" searchable disabled');
+    expect(sharingSource).toContain("type.addEventListener('lex-change', syncShareTargetFields)");
+    expect(sharingSource).not.toContain('<select');
     expect(sharingSource).toContain('id="officeShareWorkspace"');
     expect(sharingSource).toContain('function confirmRemoveCollaborator(file, collaboratorId)');
     expect(sharingSource).toContain("heading: 'Remove Document Access'");

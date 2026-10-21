@@ -522,10 +522,7 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">
             Link to Workspace <span class="text-gray-400">(Optional)</span>
           </label>
-          <select id="workspaceSelector" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="">No workspace (standalone matter)</option>
-            <!-- Workspaces populated by JavaScript -->
-          </select>
+          <lex-select id="workspaceSelector" placeholder="No workspace (standalone matter)" options='[{"value": "", "label": "No workspace (standalone matter)"}]' value=""></lex-select>
           <p class="text-xs text-gray-500 mt-1">
             Linking to a workspace allows this matter to access documents from the workspace and other linked matters (read-only).
           </p>
@@ -538,19 +535,12 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
-          <select id="matterVisibility" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="private">Private - Only shared users can access</option>
-            <option value="organization">Organization - All org members can view</option>
-          </select>
+          <lex-select id="matterVisibility" options='[{"value": "private", "label": "Private - Only shared users can access"}, {"value": "organization", "label": "Organization - All org members can view"}]' value="private"></lex-select>
         </div>
 
         <div class="mt-4">
           <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select id="matterStatus" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-            <option value="archived">Archived</option>
-          </select>
+          <lex-select id="matterStatus" options='[{"value": "active", "label": "Active"}, {"value": "closed", "label": "Closed"}, {"value": "archived", "label": "Archived"}]' value="active"></lex-select>
         </div>
 
         <!-- Share with Users Section -->
@@ -625,19 +615,12 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
-          <select id="workspaceMatterVisibility" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="private">Private - Only shared users can access</option>
-            <option value="organization">Organization - All org members can view</option>
-          </select>
+          <lex-select id="workspaceMatterVisibility" options='[{"value": "private", "label": "Private - Only shared users can access"}, {"value": "organization", "label": "Organization - All org members can view"}]' value="private"></lex-select>
         </div>
 
         <div class="mt-4">
           <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select id="workspaceMatterStatus" class="select-standard w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-            <option value="archived">Archived</option>
-          </select>
+          <lex-select id="workspaceMatterStatus" options='[{"value": "active", "label": "Active"}, {"value": "closed", "label": "Closed"}, {"value": "archived", "label": "Archived"}]' value="active"></lex-select>
         </div>
 
         <!-- Share with Users Section -->
@@ -801,21 +784,11 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select id="taskStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-              <option value="pending">Pending</option>
-              <option value="in_progress">In Progress</option>
-              <option value="in_review">In Review</option>
-              <option value="complete">Complete</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <lex-select id="taskStatus" options='[{"value": "pending", "label": "Pending"}, {"value": "in_progress", "label": "In Progress"}, {"value": "in_review", "label": "In Review"}, {"value": "complete", "label": "Complete"}, {"value": "cancelled", "label": "Cancelled"}]' value="pending"></lex-select>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-            <select id="taskPriority" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-              <option value="low">Low</option>
-              <option value="normal" selected>Normal</option>
-              <option value="high">High</option>
-            </select>
+            <lex-select id="taskPriority" options='[{"value": "low", "label": "Low"}, {"value": "normal", "label": "Normal"}, {"value": "high", "label": "High"}]' value="normal"></lex-select>
           </div>
         </div>
 
@@ -826,10 +799,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
-            <select id="taskAssignedTo" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-              <option value="">Unassigned</option>
-              <!-- Users populated dynamically -->
-            </select>
+            <lex-select id="taskAssignedTo" placeholder="Unassigned" options='[{"value": "", "label": "Unassigned"}]' value=""></lex-select>
           </div>
         </div>
 
@@ -902,12 +872,7 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Contact Type</label>
-          <select id="contactType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="contact:participant">Participant</option>
-            <option value="contact:opportunity">Opportunity</option>
-            <option value="contact:lead">Lead</option>
-            <option value="contact:other">Other</option>
-          </select>
+          <lex-select id="contactType" options='[{"value": "contact:participant", "label": "Participant"}, {"value": "contact:opportunity", "label": "Opportunity"}, {"value": "contact:lead", "label": "Lead"}, {"value": "contact:other", "label": "Other"}]' value="contact:participant"></lex-select>
         </div>
 
         <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
@@ -995,12 +960,7 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Contact Type</label>
-          <select id="editContactType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="contact:participant">Participant</option>
-            <option value="contact:opportunity">Opportunity</option>
-            <option value="contact:lead">Lead</option>
-            <option value="contact:other">Other</option>
-          </select>
+          <lex-select id="editContactType" options='[{"value": "contact:participant", "label": "Participant"}, {"value": "contact:opportunity", "label": "Opportunity"}, {"value": "contact:lead", "label": "Lead"}, {"value": "contact:other", "label": "Other"}]' value="contact:participant"></lex-select>
         </div>
 
         <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
@@ -1080,11 +1040,7 @@
         <!-- Link Type -->
         <div id="linkTypeContainer">
           <label class="block text-sm font-medium text-gray-700 mb-1">Link Type</label>
-          <select id="linkType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-            <option value="related_to">Related To (bidirectional)</option>
-            <option value="parent_of">Parent Of (this matter is parent)</option>
-            <option value="child_of">Child Of (this matter is child)</option>
-          </select>
+          <lex-select id="linkType" options='[{"value": "related_to", "label": "Related To (bidirectional)"}, {"value": "parent_of", "label": "Parent Of (this matter is parent)"}, {"value": "child_of", "label": "Child Of (this matter is child)"}]' value="related_to"></lex-select>
           <p class="mt-1 text-xs text-gray-500">
             Choose how these matters are related to each other
           </p>
@@ -1137,19 +1093,7 @@
         <!-- Document Type -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
-          <select id="metadataDocType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">Auto-detect (recommended)</option>
-            <option value="contract">Contract</option>
-            <option value="pleading">Pleading</option>
-            <option value="deposition">Deposition</option>
-            <option value="medical_record">Medical Record</option>
-            <option value="police_report">Police Report</option>
-            <option value="email">Email</option>
-            <option value="expert_report">Expert Report</option>
-            <option value="correspondence">Correspondence</option>
-            <option value="presentation">Presentation</option>
-            <option value="document">Other Document</option>
-          </select>
+          <lex-select id="metadataDocType" placeholder="Auto-detect (recommended)" options='[{"value": "", "label": "Auto-detect (recommended)"}, {"value": "contract", "label": "Contract"}, {"value": "pleading", "label": "Pleading"}, {"value": "deposition", "label": "Deposition"}, {"value": "medical_record", "label": "Medical Record"}, {"value": "police_report", "label": "Police Report"}, {"value": "email", "label": "Email"}, {"value": "expert_report", "label": "Expert Report"}, {"value": "correspondence", "label": "Correspondence"}, {"value": "presentation", "label": "Presentation"}, {"value": "document", "label": "Other Document"}]' value=""></lex-select>
           <p class="text-xs text-gray-500 mt-1">Leave as "Auto-detect" to let AI classify the document</p>
         </div>
 
@@ -2041,25 +1985,48 @@
       }
     }
 
+    // lex-select is not form-associated, so form.reset() does not touch it.
+    // Restore each one to the value it was declared with when its form resets.
+    document.addEventListener('reset', (event) => {
+      const resetForm = event.target;
+      if (!resetForm || !resetForm.querySelectorAll) return;
+      resetForm.querySelectorAll('lex-select').forEach((select) => {
+        select.value = select.getAttribute('value') || '';
+      });
+    }, true);
+
+    // Text for a double-quoted HTML attribute. Escapes quotes itself: the
+    // page's later escapeHtml (div-based) does not.
+    function lexSelectAttr(text) {
+      return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    // lex-select options JSON for a double-quoted HTML attribute.
+    function lexSelectOptionsAttr(options) {
+      return lexSelectAttr(JSON.stringify(options));
+    }
+
     // Populate workspace selector dropdown
     function populateWorkspaceSelector() {
       const workspaceSelector = document.getElementById('workspaceSelector');
       if (!workspaceSelector) return;
 
-      // Keep the default "No workspace" option
-      const defaultOption = workspaceSelector.querySelector('option[value=""]');
-      workspaceSelector.innerHTML = '';
-      if (defaultOption) {
-        workspaceSelector.appendChild(defaultOption);
-      }
-
-      // Add workspace options
+      // Keep the default "No workspace" option, then add workspace options
+      const options = [{ value: '', label: 'No workspace (standalone matter)' }];
       allWorkspaces.forEach(workspace => {
-        const option = document.createElement('option');
-        option.value = workspace.matter_id;
-        option.textContent = workspace.matter_name || workspace.matter_id;
-        workspaceSelector.appendChild(option);
+        options.push({
+          value: String(workspace.matter_id),
+          label: workspace.matter_name || String(workspace.matter_id)
+        });
       });
+      const current = workspaceSelector.value;
+      workspaceSelector.options = options;
+      if (!options.some(o => o.value === current)) workspaceSelector.value = '';
 
       console.log('[populateWorkspaceSelector] Added workspace options:', allWorkspaces.length);
     }
@@ -2167,7 +2134,7 @@
 
     // Handle visibility change
     const visibilitySelect = document.getElementById('matterVisibility');
-    visibilitySelect.addEventListener('change', () => {
+    visibilitySelect.addEventListener('lex-change', () => {
       if (visibilitySelect.value === 'organization') {
         // Clear selected users when switching to organization visibility
         selectedUsers = [];
@@ -2430,7 +2397,7 @@
               if (workspaceLink) {
                 // Set the workspace selector to the linked workspace
                 // For incoming links (matter linked to workspace), workspace ID is in linked_entity_id
-                document.getElementById('workspaceSelector').value = workspaceLink.linked_entity_id;
+                document.getElementById('workspaceSelector').value = String(workspaceLink.linked_entity_id);
                 console.log('[Edit Matter] Loaded existing workspace link:', workspaceLink.linked_entity_id);
               }
             }
@@ -6861,36 +6828,38 @@
               <!-- Filter by Type -->
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Filter by Type</label>
-                <select
+                <lex-select
                   id="contactsFilterSelect"
-                  onchange="updateContactsFilter(this.value)"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-                >
-                  <option value="all" ${contactsFilterType === 'all' ? 'selected' : ''}>All Types</option>
-                  <option value="contact:participant" ${contactsFilterType === 'contact:participant' ? 'selected' : ''}>Participants</option>
-                  <option value="contact:opportunity" ${contactsFilterType === 'contact:opportunity' ? 'selected' : ''}>Opportunities</option>
-                  <option value="contact:lead" ${contactsFilterType === 'contact:lead' ? 'selected' : ''}>Leads</option>
-                  <option value="contact:other" ${contactsFilterType === 'contact:other' ? 'selected' : ''}>Other</option>
-                </select>
+                  size="sm"
+                  options="${lexSelectOptionsAttr([
+                    { value: 'all', label: 'All types' },
+                    { value: 'contact:participant', label: 'Participants' },
+                    { value: 'contact:opportunity', label: 'Opportunities' },
+                    { value: 'contact:lead', label: 'Leads' },
+                    { value: 'contact:other', label: 'Other' }
+                  ])}"
+                  value="${lexSelectAttr(contactsFilterType)}"
+                ></lex-select>
               </div>
 
               <!-- Sort By -->
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Sort By</label>
-                <select
+                <lex-select
                   id="contactsSortSelect"
-                  onchange="updateContactsSort(this.value)"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-                >
-                  <option value="name" ${contactsSortBy === 'name' ? 'selected' : ''}>Name (A-Z)</option>
-                  <option value="name-desc" ${contactsSortBy === 'name-desc' ? 'selected' : ''}>Name (Z-A)</option>
-                  <option value="company" ${contactsSortBy === 'company' ? 'selected' : ''}>Company (A-Z)</option>
-                  <option value="company-desc" ${contactsSortBy === 'company-desc' ? 'selected' : ''}>Company (Z-A)</option>
-                  <option value="type" ${contactsSortBy === 'type' ? 'selected' : ''}>Type (A-Z)</option>
-                  <option value="type-desc" ${contactsSortBy === 'type-desc' ? 'selected' : ''}>Type (Z-A)</option>
-                  <option value="date" ${contactsSortBy === 'date' ? 'selected' : ''}>Date Added (Oldest)</option>
-                  <option value="date-desc" ${contactsSortBy === 'date-desc' ? 'selected' : ''}>Date Added (Newest)</option>
-                </select>
+                  size="sm"
+                  options="${lexSelectOptionsAttr([
+                    { value: 'name', label: 'Name (A-Z)' },
+                    { value: 'name-desc', label: 'Name (Z-A)' },
+                    { value: 'company', label: 'Company (A-Z)' },
+                    { value: 'company-desc', label: 'Company (Z-A)' },
+                    { value: 'type', label: 'Type (A-Z)' },
+                    { value: 'type-desc', label: 'Type (Z-A)' },
+                    { value: 'date', label: 'Date added (oldest)' },
+                    { value: 'date-desc', label: 'Date added (newest)' }
+                  ])}"
+                  value="${lexSelectAttr(contactsSortBy)}"
+                ></lex-select>
               </div>
             </div>
 
@@ -6976,6 +6945,13 @@
         renderContactsTab(currentMatterData.matter, currentMatterData.contacts || []);
       }
     };
+
+    // Contacts toolbar selects are re-rendered with the tab, so listen once at the document.
+    document.addEventListener('lex-change', (event) => {
+      const id = event.target && event.target.id;
+      if (id === 'contactsFilterSelect') updateContactsFilter(event.detail.value);
+      else if (id === 'contactsSortSelect') updateContactsSort(event.detail.value);
+    });
 
     // Update contacts filter
     window.updateContactsFilter = function(filterType) {
@@ -8652,13 +8628,13 @@
         const currentUserId = api.user?.id;
 
         // Build dropdown options
-        let options = '<option value="">Unassigned</option>';
+        const options = [{ value: '', label: 'Unassigned' }];
 
         // Add "Me" option for current user
         if (currentUserId) {
           const currentUser = users.find(u => u.id === currentUserId);
           if (currentUser) {
-            options += `<option value="${currentUserId}">Me (${currentUser.first_name} ${currentUser.last_name})</option>`;
+            options.push({ value: String(currentUserId), label: `Me (${currentUser.first_name} ${currentUser.last_name})` });
           }
         }
 
@@ -8666,13 +8642,13 @@
         users
           .filter(u => u.id !== currentUserId)
           .forEach(user => {
-            options += `<option value="${user.id}">${user.first_name} ${user.last_name}</option>`;
+            options.push({ value: String(user.id), label: `${user.first_name} ${user.last_name}` });
           });
 
-        dropdown.innerHTML = options;
+        dropdown.options = options;
 
         // Set selected value (default to current user if no selection provided)
-        dropdown.value = selectedUserId || currentUserId || '';
+        dropdown.value = String(selectedUserId || currentUserId || '');
       } catch (error) {
         console.error('Failed to load users for task assignment:', error);
         Toast.error('Failed to load users');
@@ -9187,10 +9163,11 @@
 
       const content = document.createElement('div');
       content.innerHTML = `
-        <select id="shareUserId" class="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4">
-          <option value="">Select a user</option>
-          ${users.map(u => `<option value="${u.id}">${u.email} (${u.first_name || ''} ${u.last_name || ''})</option>`).join('')}
-        </select>
+        <lex-select id="shareUserId" class="mb-4" searchable placeholder="Select a user" value=""
+          options="${lexSelectOptionsAttr([{ value: '', label: 'Select a user' }].concat(users.map(u => ({
+            value: String(u.id),
+            label: `${u.email} (${u.first_name || ''} ${u.last_name || ''})`
+          }))))}"></lex-select>
         <div class="flex gap-2">
           <label class="flex items-center gap-2">
             <input type="checkbox" name="perm" value="read" checked class="w-4 h-4"> Read
@@ -9385,7 +9362,7 @@
         const visibilitySelect = document.getElementById('modalMatterVisibility');
         const shareSection = document.getElementById('modalShareSection');
 
-        visibilitySelect.addEventListener('change', function() {
+        visibilitySelect.addEventListener('lex-change', function() {
           if (this.value === 'organization') {
             shareSection.style.opacity = '0.5';
             shareSection.style.pointerEvents = 'none';
@@ -10107,10 +10084,7 @@
         <!-- Visibility Setting -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Visibility</label>
-          <select id="modalMatterVisibility" class="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-            <option value="private">Private - Only shared users can access</option>
-            <option value="organization">Organization - All members can access</option>
-          </select>
+          <lex-select id="modalMatterVisibility" options='[{"value": "private", "label": "Private - Only shared users can access"}, {"value": "organization", "label": "Organization - All members can access"}]' value="private"></lex-select>
           <p class="text-xs text-gray-500 mt-2">Organization visibility allows all team members to view this matter</p>
         </div>
 
@@ -10189,19 +10163,8 @@
           </svg>
         </div>
         <div class="mt-3 flex gap-2">
-          <select id="manualConnectEntityType" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
-            <option value="">All Types</option>
-            <option value="matter">Matters</option>
-            <option value="contact">Contacts</option>
-            <option value="document">Documents</option>
-            <option value="task">Tasks</option>
-            <option value="time_entry">Time Entries</option>
-            <option value="expense">Expenses</option>
-            <option value="invoice">Invoices</option>
-          </select>
-          <select id="manualConnectConnector" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
-            <option value="">All Connectors</option>
-          </select>
+          <lex-select id="manualConnectEntityType" size="sm" style="min-width:10rem" placeholder="All types" options='[{"value": "", "label": "All types"}, {"value": "matter", "label": "Matters"}, {"value": "contact", "label": "Contacts"}, {"value": "document", "label": "Documents"}, {"value": "task", "label": "Tasks"}, {"value": "time_entry", "label": "Time Entries"}, {"value": "expense", "label": "Expenses"}, {"value": "invoice", "label": "Invoices"}]' value=""></lex-select>
+          <lex-select id="manualConnectConnector" size="sm" style="min-width:10rem" placeholder="All connectors" options='[{"value": "", "label": "All connectors"}]' value=""></lex-select>
         </div>
       </div>
 
@@ -10249,8 +10212,8 @@
         manualConnectSearchTimeout = setTimeout(() => performManualConnectSearch(), 300);
       });
 
-      entityTypeSelect.addEventListener('change', performManualConnectSearch);
-      connectorSelect.addEventListener('change', performManualConnectSearch);
+      entityTypeSelect.addEventListener('lex-change', performManualConnectSearch);
+      connectorSelect.addEventListener('lex-change', performManualConnectSearch);
 
       // Clear previous search
       searchInput.value = '';
@@ -10273,14 +10236,10 @@
         const connectors = response.sources || [];
 
         const select = document.getElementById('manualConnectConnector');
-        select.innerHTML = '<option value="">All Connectors</option>';
-
-        connectors.forEach(conn => {
-          const option = document.createElement('option');
-          option.value = conn.connector_id;
-          option.textContent = conn.connector_name || conn.connector_id;
-          select.appendChild(option);
-        });
+        select.options = [{ value: '', label: 'All connectors' }].concat(connectors.map(conn => ({
+          value: String(conn.connector_id),
+          label: conn.connector_name || String(conn.connector_id)
+        })));
       } catch (error) {
         console.error('[loadAvailableConnectors] Error:', error);
       }
@@ -10549,19 +10508,21 @@
                   <!-- Type -->
                   <div class="col-span-2">
                     <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
-                    <select
-                      onchange="updateFieldDefinition(${index}, 'type', this.value)"
-                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="text" ${def.type === 'text' ? 'selected' : ''}>Text</option>
-                      <option value="textarea" ${def.type === 'textarea' ? 'selected' : ''}>Long Text</option>
-                      <option value="number" ${def.type === 'number' ? 'selected' : ''}>Number</option>
-                      <option value="currency" ${def.type === 'currency' ? 'selected' : ''}>Currency</option>
-                      <option value="date" ${def.type === 'date' ? 'selected' : ''}>Date</option>
-                      <option value="datetime" ${def.type === 'datetime' ? 'selected' : ''}>Date+Time</option>
-                      <option value="boolean" ${def.type === 'boolean' ? 'selected' : ''}>Yes/No</option>
-                      <option value="select" ${def.type === 'select' ? 'selected' : ''}>Dropdown</option>
-                    </select>
+                    <lex-select
+                      data-field-definition-index="${index}"
+                      size="sm"
+                      options="${lexSelectOptionsAttr([
+                        { value: 'text', label: 'Text' },
+                        { value: 'textarea', label: 'Long text' },
+                        { value: 'number', label: 'Number' },
+                        { value: 'currency', label: 'Currency' },
+                        { value: 'date', label: 'Date' },
+                        { value: 'datetime', label: 'Date+Time' },
+                        { value: 'boolean', label: 'Yes/No' },
+                        { value: 'select', label: 'Dropdown' }
+                      ])}"
+                      value="${lexSelectAttr(def.type || '')}"
+                    ></lex-select>
                   </div>
 
                   <!-- Required -->
@@ -10696,17 +10657,14 @@
 
         case 'select':
           return `
-            <select
-              onchange="updateFieldValue('${escapeHtml(key)}', this.value)"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="">-- Select ${escapeHtml(def.display_name || def.key)} --</option>
-              ${(def.options || []).map(option => `
-                <option value="${escapeHtml(option)}" ${currentValue === option ? 'selected' : ''}>
-                  ${escapeHtml(option)}
-                </option>
-              `).join('')}
-            </select>
+            <lex-select
+              data-field-value-key="${lexSelectAttr(key)}"
+              size="sm"
+              placeholder="${lexSelectAttr(`Select ${def.display_name || def.key}`)}"
+              options="${lexSelectOptionsAttr([{ value: '', label: `Select ${def.display_name || def.key}` }]
+                .concat((def.options || []).map(option => ({ value: String(option), label: String(option) }))))}"
+              value="${lexSelectAttr(currentValue)}"
+            ></lex-select>
           `;
 
         case 'text':
@@ -10742,6 +10700,17 @@
     }
 
     // Update field definition (metadata)
+    // Custom-field selects are rendered as HTML strings; route their changes here.
+    document.addEventListener('lex-change', (event) => {
+      const target = event.target;
+      if (!target || target.tagName !== 'LEX-SELECT') return;
+      if (target.dataset.fieldDefinitionIndex !== undefined) {
+        updateFieldDefinition(Number(target.dataset.fieldDefinitionIndex), 'type', event.detail.value);
+      } else if (target.dataset.fieldValueKey !== undefined) {
+        updateFieldValue(target.dataset.fieldValueKey, event.detail.value);
+      }
+    });
+
     function updateFieldDefinition(index, property, value) {
       if (customFieldDefinitions[index]) {
         const oldKey = customFieldDefinitions[index].key;

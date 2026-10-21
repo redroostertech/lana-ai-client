@@ -437,10 +437,7 @@
             </div>
             <!-- User Filter Dropdown (Admins Only) -->
             <div id="activityUserFilterContainer" class="hidden">
-              <select id="activityUserFilter" class="block w-64 rounded-lg border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="me">My Activity</option>
-                <option value="all">All Users</option>
-              </select>
+              <lex-select id="activityUserFilter" size="sm" searchable style="width:16rem" options='[{"value":"me","label":"My activity"},{"value":"all","label":"All users"}]' value="me"></lex-select>
             </div>
           </div>
         </div>
@@ -1152,28 +1149,21 @@
         const result = await api.getOrganizationUsers();
         const users = result.users || [];
 
-        // Clear existing options except "My Activity" and "All Users"
-        while (filterSelect.options.length > 2) {
-          filterSelect.remove(2);
-        }
-
-        // Add divider
-        const divider = document.createElement('option');
-        divider.disabled = true;
-        divider.textContent = '────────────────';
-        filterSelect.add(divider);
-
-        // Add each user
-        users.forEach(user => {
-          const option = document.createElement('option');
-          option.value = user.id;
-          option.textContent = `${user.full_name} (${user.email})`;
-          filterSelect.add(option);
-        });
+        // "My activity" and "All users", then each user under a group header
+        // (the group header replaces the old disabled divider option)
+        const options = [
+          { value: 'me', label: 'My activity' },
+          { value: 'all', label: 'All users' }
+        ].concat(users.map(user => ({
+          value: String(user.id),
+          label: `${user.full_name} (${user.email})`,
+          group: 'Users'
+        })));
+        filterSelect.setAttribute('options', JSON.stringify(options));
 
         // Handle filter change
-        filterSelect.addEventListener('change', async (e) => {
-          const selectedValue = e.target.value;
+        filterSelect.addEventListener('lex-change', async (e) => {
+          const selectedValue = e.detail.value;
 
           if (selectedValue === 'me') {
             // Load current user's productivity and activity
@@ -1504,6 +1494,7 @@
   <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
 

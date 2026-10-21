@@ -371,6 +371,7 @@ function bindGlobalEvents() {
   document.body.addEventListener('click', onAppClick);
   document.body.addEventListener('input', onAppInput);
   document.body.addEventListener('change', onAppInput);
+  document.body.addEventListener('lex-change', onAppInput);
   document.body.addEventListener('lex-composer-send', onHomeComposerSend);
   document.body.addEventListener('lex-close', onAppLexClose);
   document.body.addEventListener('breadcrumb-navigate', onBreadcrumbNavigate);
@@ -1283,7 +1284,10 @@ async function onAppClick(event) {
       onSelect: (eventType) => {
         if (triggerSelect) {
           triggerSelect.value = eventType;
-          triggerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          triggerSelect.dispatchEvent(new CustomEvent('lex-change', {
+            bubbles: true,
+            detail: { name: triggerSelect.name || '', value: eventType }
+          }));
         }
       }
     });
@@ -1657,6 +1661,17 @@ async function loadLibraryData() {
 }
 
 async function onAppInput(event) {
+  // Builder dropdowns are lex-select: their committed value arrives as
+  // lex-change (handled like a native change). The input/change events of
+  // the search box inside a lex-select are not field edits, and other lex
+  // form controls emit lex-change alongside their own native events.
+  if (event.type === 'lex-change') {
+    if (event.target.tagName !== 'LEX-SELECT') return;
+  } else if (event.target.closest && event.target.closest('lex-select')) {
+    return;
+  }
+  const isCommit = event.type === 'change' || event.type === 'lex-change';
+
   // "Build with Lana" description — store without re-rendering so the textarea
   // keeps focus while typing (re-render wipes and rebuilds the DOM).
   const designPromptField = event.target.closest('[data-design-prompt]');
@@ -1675,7 +1690,7 @@ async function onAppInput(event) {
 
   // Inline visibility selector in the builder edit page — PATCH immediately
   const builderVisibilityField = event.target.closest('[data-builder-visibility]');
-  if (builderVisibilityField && event.type === 'change') {
+  if (builderVisibilityField && isCommit) {
     const automationId = builderVisibilityField.dataset.editAutomationId;
     const nextVisibility = builderVisibilityField.value;
     if (!automationId) return;
@@ -1734,7 +1749,7 @@ async function onAppInput(event) {
       }
     }
 
-    if (fieldName === 'scopeType' || fieldName === 'matterId' || fieldName === 'matterSearch' || event.type === 'change') {
+    if (fieldName === 'scopeType' || fieldName === 'matterId' || fieldName === 'matterSearch' || isCommit) {
       renderCurrentView();
     }
 
