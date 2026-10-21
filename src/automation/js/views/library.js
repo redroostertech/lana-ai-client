@@ -117,6 +117,9 @@ function filterOptions(context, store) {
   const types = store.facets?.automation_types?.length
     ? store.facets.automation_types
     : [...known.map((item) => item.automation_type), ...store.seen.automation_type];
+  // Every column filters: until the server lists types, offer the one the
+  // builder creates.
+  if (!types.filter(Boolean).length) types.push('automation');
   const map = {
     name: { text: true, placeholder: 'Name contains...' },
     category: { options: Q.optionsFromValues(categories) },
