@@ -16,6 +16,9 @@
    Sizes: sm | md | lg
    icon="true" for icon-only buttons (square padding)
    badge="N" shows a red notification bubble (0 or empty hides it, >99 shows "99+")
+   label="Save" is the button text when the element has no children
+     (<lex-btn label="Save"></lex-btn>, or btn.label = 'Save'); children win.
+   type="submit" form="id" submits <form id> or <lex-form id> from outside it.
 */
 
 (function () {
@@ -181,7 +184,9 @@
         icon:         { type: Boolean, default: false },
         badge:        { type: Number, default: 0 },
         leadingIcon:  { type: String, default: '' },
-        trailingIcon: { type: String, default: '' }
+        trailingIcon: { type: String, default: '' },
+        // Button text used when the element has no children of its own.
+        label:        { type: String, default: '' }
       };
     }
 
@@ -279,6 +284,7 @@
 
       const leadSvg = this.leadingIcon ? getIcon(this.leadingIcon, this.size) : '';
       const trailSvg = this.trailingIcon ? getIcon(this.trailingIcon, this.size) : '';
+      const labelText = (this.label && !this._hasOwnContent()) ? this.escapeHtml(this.label) : '';
 
       return `${badgeHtml}<button
           type="${this.type}"
@@ -286,7 +292,25 @@
           class="lex-btn-inner"
           style="${cssVars}${sizeStyle}"
           ${this.disabled || this.loading ? 'disabled' : ''}
-        >${spinner}${leadSvg}<slot-content></slot-content>${trailSvg}</button>`;
+        >${spinner}${leadSvg}<slot-content>${labelText}</slot-content>${trailSvg}</button>`;
+    }
+
+    // True when the element was authored with children (or setLexButtonText
+    // seeded some); whitespace-only text does not count.
+    _hasOwnContent() {
+      const nodes = this._originalChildren;
+      if (!nodes || !nodes.length) return false;
+      for (const node of nodes) {
+        if (node.nodeType === 1) return true;
+        if (node.nodeType === 3 && node.textContent.trim() !== '') return true;
+      }
+      return false;
+    }
+
+    // Whitespace-only children would otherwise overwrite the label text.
+    _restoreContent() {
+      if (!this._hasOwnContent()) return;
+      super._restoreContent();
     }
 
     updated() {
