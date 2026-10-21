@@ -473,9 +473,8 @@
                   </div>
                 </div>
               </div>
-              <div id="recordDetailBackdrop" class="hidden fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]" onclick="closeRecordDetail()"></div>
-              <div id="recordDetailPanel" class="hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl"></div>
-              <div id="assignMatterModal" class="hidden"></div>
+              <lex-drawer id="recordDetailPanel" heading="Record detail" subtitle="Inspect the source payload, review annotations, and shortlist corrections without overwriting the synced snapshot." width="xl" flush></lex-drawer>
+              <lex-modal id="assignMatterModal" heading="Assign to matter" size="lg" width="672px"></lex-modal>
             </section>
 
             <section id="tab-logs" class="connector-tabpane space-y-6">
@@ -488,8 +487,7 @@
               <div id="logsMeta" class="hidden text-sm text-gray-500"></div>
               <div id="logsTable"></div>
 
-              <div id="logDetailBackdrop" class="hidden fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]" onclick="closeLogDetail()"></div>
-              <div id="logDetailPanel" class="hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl"></div>
+              <lex-drawer id="logDetailPanel" heading="Sync log detail" width="xl" flush></lex-drawer>
             </section>
 
             <section id="tab-docs" class="connector-tabpane space-y-6">
@@ -529,6 +527,7 @@
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
@@ -2186,69 +2185,42 @@
     function renderDeleteConfigModal() {
       const existing = document.getElementById('deleteConfigModal');
       if (!state.deleteConfigModalOpen) {
-        if (existing) existing.remove();
+        if (existing) {
+          existing.open = false;
+          existing.remove();
+        }
         return;
       }
       if (existing) return;
 
-      const modal = document.createElement('div');
+      // lex-modal supplies the backdrop, close button, Escape and focus trap.
+      const modal = document.createElement('lex-modal');
       modal.id = 'deleteConfigModal';
-      modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4';
+      modal.setAttribute('heading', 'Delete configuration?');
+      modal.setAttribute('size', 'sm');
       modal.innerHTML = `
-        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-          <div class="flex items-start gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-                <path d="M12 9v4" />
-                <path d="M12 17h.01" />
-                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-              </svg>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-base font-semibold text-gray-900">Delete configuration?</h3>
-              <p class="mt-2 text-sm text-gray-600">
-                This will clear saved credentials and settings for <span class="font-semibold">${escapeHtml(state.connectorName || 'this connector')}</span>.
-                Any running sync schedule will stop. You&rsquo;ll need to re-enter credentials and re-authorize to use this connector again.
-                This action cannot be undone.
-              </p>
-            </div>
-          </div>
-          <div class="mt-6 flex flex-wrap justify-end gap-3">
-            <button type="button" onclick="closeDeleteConfigModal()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              Cancel
-            </button>
-            <button type="button" id="confirmDeleteConfigBtn" onclick="confirmDeleteConfig()" class="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
-              Delete Configuration
-            </button>
-          </div>
-        </div>
+        <p class="text-sm text-gray-600">
+          This will clear saved credentials and settings for <span class="font-semibold">${escapeHtml(state.connectorName || 'this connector')}</span>.
+          Any running sync schedule will stop. You&rsquo;ll need to re-enter credentials and re-authorize to use this connector again.
+          This action cannot be undone.
+        </p>
+        <lex-btn data-slot="footer" variant="secondary" onclick="closeDeleteConfigModal()">Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="confirmDeleteConfigBtn" variant="danger" onclick="confirmDeleteConfig()">Delete Configuration</lex-btn>
       `;
+      modal.addEventListener('lex-close', () => closeDeleteConfigModal());
       document.body.appendChild(modal);
-
-      // Dismiss on backdrop click (but not on card click).
-      modal.addEventListener('click', function (event) {
-        if (event.target === modal) {
-          closeDeleteConfigModal();
-        }
-      });
+      modal.open = true;
     }
 
     async function confirmDeleteConfig() {
       const button = document.getElementById('confirmDeleteConfigBtn');
-      const originalLabel = button ? button.textContent : '';
       try {
-        if (button) {
-          button.disabled = true;
-          button.textContent = 'Deleting...';
-        }
+        if (button) button.loading = true;
         await disconnectConnector();
         state.editingConfig = false;
         closeDeleteConfigModal();
       } catch (error) {
-        if (button) {
-          button.disabled = false;
-          button.textContent = originalLabel || 'Delete Configuration';
-        }
+        if (button) button.loading = false;
         // disconnectConnector already surfaces the error via showPageAlert.
       }
     }
@@ -4574,11 +4546,18 @@
     }
 
     function renderAssignDialog() {
-      const node = document.getElementById('assignMatterModal');
-      if (!node) return;
+      const modal = document.getElementById('assignMatterModal');
+      if (!modal) return;
+      // lex-modal supplies the header, close button, backdrop, Escape and
+      // focus trap; closing it any of those ways cancels the dialog.
+      if (!modal.__assignCloseBound) {
+        modal.__assignCloseBound = true;
+        modal.addEventListener('lex-close', () => closeAssignDialog());
+      }
+      const node = modal.contentRoot || modal;
       const dialog = state.assignDialog;
       if (!dialog || !dialog.open) {
-        node.classList.add('hidden');
+        modal.open = false;
         node.innerHTML = '';
         return;
       }
@@ -4723,17 +4702,10 @@
 
       const description = ctx.parentDescription || `${formatNumber(totals.rowCount)} row${totals.rowCount === 1 ? '' : 's'}`;
 
-      node.classList.remove('hidden');
       node.innerHTML = `
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="connector-label">Assign to matter</div>
-                <div class="mt-1 text-sm text-gray-600">${escapeHtml(description)} from this connector.</div>
-              </div>
-              <button type="button" onclick="closeAssignDialog()" class="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50">Close</button>
-            </div>
+        <div>
+          <div>
+            <div class="text-sm text-gray-600">${escapeHtml(description)} from this connector.</div>
 
             <div class="mt-4">${skippedHtml}</div>
 
@@ -4758,14 +4730,14 @@
             <div class="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
               <span id="assignDialogTotalsText">${renderAssignDialogTotalsText(totals, targetLabel, skippedCount, { oneMatterPerRow: oneMatterPerRow && dialog.mode === 'create', matterCount: ctxParentRows.length })}</span>
             </div>
-
-            <div class="mt-6 flex justify-end gap-3">
-              <button type="button" onclick="closeAssignDialog()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button type="button" onclick="confirmAssignDialog()" ${canConfirm ? '' : 'disabled'} class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 ${canConfirm ? '' : 'opacity-60 cursor-not-allowed'}">${escapeHtml(confirmLabel)}</button>
-            </div>
           </div>
         </div>
       `;
+      modal.setFooterContent(`
+        <lex-btn variant="secondary" onclick="closeAssignDialog()">Cancel</lex-btn>
+        <lex-btn variant="primary" id="assignDialogConfirmBtn" onclick="confirmAssignDialog()" label="${escapeHtml(confirmLabel)}" ${canConfirm ? '' : 'disabled'}></lex-btn>
+      `);
+      modal.open = true;
     }
 
     function renderAssignDialogTotalsText(totals, targetLabel, skippedCount, options) {
@@ -5461,38 +5433,22 @@
     }
 
     function renderRecordDetail() {
-      const node = document.getElementById('recordDetailPanel');
-      const backdrop = document.getElementById('recordDetailBackdrop');
-      if (!node) return;
+      const drawer = document.getElementById('recordDetailPanel');
+      if (!drawer) return;
+      bindDetailDrawerClose(drawer, closeRecordDetail);
+      const node = drawer.contentRoot || drawer;
 
       if (!state.selectedRecord) {
-        node.className = 'hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl';
+        drawer.open = false;
         node.innerHTML = '';
-        if (backdrop) {
-          backdrop.classList.add('hidden');
-        }
         return;
       }
 
       const record = state.selectedRecord;
       const annotations = Array.isArray(state.recordAnnotations) ? state.recordAnnotations : [];
-      node.className = 'fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl';
-      if (backdrop) {
-        backdrop.classList.remove('hidden');
-      }
 
       node.innerHTML = `
-        <div class="min-h-full bg-white">
-          <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-200 bg-white px-6 py-5">
-            <div>
-              <div class="connector-label">Record Detail</div>
-              <div class="mt-2 text-sm text-gray-500">Inspect the source payload, review annotations, and shortlist corrections without overwriting the synced snapshot.</div>
-            </div>
-            <button type="button" onclick="closeRecordDetail()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              Close
-            </button>
-          </div>
-
+        <div class="bg-white">
           <div class="space-y-6 p-6">
             <div class="grid gap-6 md:grid-cols-2">
               <div class="rounded-xl border border-gray-200 bg-white p-4">
@@ -5576,6 +5532,7 @@
           </div>
         </div>
       `;
+      drawer.open = true;
     }
 
     function renderSourceAttributionSection(record) {
@@ -5870,6 +5827,26 @@
       `;
     }
 
+    // The record and log detail panels are lex-drawers: the drawer supplies
+    // the header, close button, backdrop, Escape and focus trap. Closing it
+    // any of those ways clears the selection the same as the page's close
+    // functions. Bound lazily because the drawers live in the page template.
+    function bindDetailDrawerClose(drawer, onClose) {
+      if (!drawer || drawer.__detailCloseBound) return;
+      drawer.__detailCloseBound = true;
+      drawer.addEventListener('lex-close', () => {
+        // Escape reaches every open overlay. When a dialog is stacked on
+        // this drawer (assign, delete annotation), Escape is meant for the
+        // dialog only, so reopen the drawer (it closes itself right after
+        // emitting lex-close).
+        if (document.querySelector('lex-modal[open]')) {
+          queueMicrotask(() => { drawer.open = true; });
+          return;
+        }
+        onClose();
+      });
+    }
+
     function closeRecordDetail() {
       state.selectedRecordId = '';
       state.selectedRecord = null;
@@ -6154,33 +6131,26 @@
         clearInterval(state.logDetailPollTimer);
         state.logDetailPollTimer = null;
       }
-      const panel = document.getElementById('logDetailPanel');
-      const backdrop = document.getElementById('logDetailBackdrop');
-      if (panel) {
-        panel.classList.add('hidden');
-        panel.innerHTML = '';
-      }
-      if (backdrop) {
-        backdrop.classList.add('hidden');
+      const drawer = document.getElementById('logDetailPanel');
+      if (drawer) {
+        drawer.open = false;
+        (drawer.contentRoot || drawer).innerHTML = '';
       }
       renderLogs();
     }
 
     function renderLogDetail() {
-      const panel = document.getElementById('logDetailPanel');
-      const backdrop = document.getElementById('logDetailBackdrop');
-      if (!panel) return;
+      const drawer = document.getElementById('logDetailPanel');
+      if (!drawer) return;
+      bindDetailDrawerClose(drawer, closeLogDetail);
+      const panel = drawer.contentRoot || drawer;
 
       const log = findSelectedLog();
       if (!log) {
-        panel.classList.add('hidden');
+        drawer.open = false;
         panel.innerHTML = '';
-        if (backdrop) backdrop.classList.add('hidden');
         return;
       }
-
-      panel.classList.remove('hidden');
-      if (backdrop) backdrop.classList.remove('hidden');
 
       const records = log.records || {};
       const changes = log.changes || {};
@@ -6202,18 +6172,10 @@
       const consoleOutputHtml = renderConsoleOutput(metadata);
 
       panel.innerHTML = `
-        <div class="min-h-full bg-white">
-          <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-200 bg-white px-6 py-5">
-            <div>
-              <div class="flex items-center gap-3">
-                ${renderLogStatus(log.status)}
-                <div class="connector-label">Sync Log Detail</div>
-              </div>
-              <div class="mt-2 connector-mono text-xs text-gray-500">${escapeHtml(log.id || '')}</div>
-            </div>
-            <button type="button" onclick="closeLogDetail()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              Close
-            </button>
+        <div class="bg-white">
+          <div class="flex items-center gap-3 border-b border-gray-200 px-6 py-4">
+            ${renderLogStatus(log.status)}
+            <div class="connector-mono text-xs text-gray-500">${escapeHtml(log.id || '')}</div>
           </div>
 
           <div class="space-y-6 p-6">
@@ -6310,6 +6272,7 @@
           </div>
         </div>
       `;
+      drawer.open = true;
     }
 
     function renderConsoleOutput(metadata) {
@@ -7486,66 +7449,43 @@
     function renderDeleteAnnotationModal() {
       const existing = document.getElementById('deleteAnnotationModal');
       if (!state.deleteAnnotationModal) {
-        if (existing) existing.remove();
+        if (existing) {
+          existing.open = false;
+          existing.remove();
+        }
         return;
       }
       if (existing) return;
 
+      // lex-modal supplies the backdrop, close button, Escape and focus trap.
       const dialog = state.deleteAnnotationModal;
-      const modal = document.createElement('div');
+      const modal = document.createElement('lex-modal');
       modal.id = 'deleteAnnotationModal';
-      modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4';
+      modal.setAttribute('heading', 'Delete annotation?');
+      modal.setAttribute('size', 'sm');
       modal.innerHTML = `
-        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-          <div class="flex items-start gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-                <path d="M12 9v4" />
-                <path d="M12 17h.01" />
-                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-              </svg>
-            </div>
-            <div class="flex-1">
-              <h3 class="text-base font-semibold text-gray-900">Delete annotation?</h3>
-              <p class="mt-2 text-sm text-gray-600">
-                This will permanently remove the
-                <span class="font-semibold">${escapeHtml(dialog.annotationType)}</span>
-                annotation${dialog.summary ? ` (<span class="font-semibold">${escapeHtml(dialog.summary)}</span>)` : ''}
-                from this record. The synced source data is not modified.
-              </p>
-              ${dialog.createdAt ? `<p class="mt-2 text-xs text-gray-500">Created ${escapeHtml(formatDateTime(dialog.createdAt))}</p>` : ''}
-              <p class="mt-2 text-sm text-gray-600">This action cannot be undone.</p>
-            </div>
-          </div>
-          <div class="mt-6 flex flex-wrap justify-end gap-3">
-            <button type="button" onclick="closeDeleteAnnotationModal()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              Cancel
-            </button>
-            <button type="button" id="confirmDeleteAnnotationBtn" onclick="confirmDeleteAnnotation()" class="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
-              Delete Annotation
-            </button>
-          </div>
-        </div>
+        <p class="text-sm text-gray-600">
+          This will permanently remove the
+          <span class="font-semibold">${escapeHtml(dialog.annotationType)}</span>
+          annotation${dialog.summary ? ` (<span class="font-semibold">${escapeHtml(dialog.summary)}</span>)` : ''}
+          from this record. The synced source data is not modified.
+        </p>
+        ${dialog.createdAt ? `<p class="mt-2 text-xs text-gray-500">Created ${escapeHtml(formatDateTime(dialog.createdAt))}</p>` : ''}
+        <p class="mt-2 text-sm text-gray-600">This action cannot be undone.</p>
+        <lex-btn data-slot="footer" variant="secondary" onclick="closeDeleteAnnotationModal()">Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="confirmDeleteAnnotationBtn" variant="danger" onclick="confirmDeleteAnnotation()">Delete Annotation</lex-btn>
       `;
+      modal.addEventListener('lex-close', () => closeDeleteAnnotationModal());
       document.body.appendChild(modal);
-
-      modal.addEventListener('click', function (event) {
-        if (event.target === modal) {
-          closeDeleteAnnotationModal();
-        }
-      });
+      modal.open = true;
     }
 
     async function confirmDeleteAnnotation() {
       const dialog = state.deleteAnnotationModal;
       if (!dialog || !state.sourceId || !state.selectedRecordId) return;
       const button = document.getElementById('confirmDeleteAnnotationBtn');
-      const originalLabel = button ? button.textContent : '';
       try {
-        if (button) {
-          button.disabled = true;
-          button.textContent = 'Deleting...';
-        }
+        if (button) button.loading = true;
         await api.delete(connectorApi(`/data-records/${state.selectedRecordId}/annotations/${dialog.annotationId}`));
         showPageAlert('Annotation deleted.', 'success');
         closeDeleteAnnotationModal();
@@ -7553,10 +7493,7 @@
       } catch (error) {
         console.error('[Connector Viewer] Failed to delete annotation', error);
         showPageAlert(error.message || 'Failed to delete annotation.', 'error');
-        if (button) {
-          button.disabled = false;
-          button.textContent = originalLabel || 'Delete Annotation';
-        }
+        if (button) button.loading = false;
       }
     }
 

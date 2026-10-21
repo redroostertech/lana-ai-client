@@ -180,129 +180,95 @@
   </div>
 
   <!-- Directory Browser Modal -->
-  <div id="directoryBrowserModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-900">Select Import Directory</h3>
-        <button onclick="closeDirectoryBrowser()" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
+  <lex-modal id="directoryBrowserModal" heading="Select Import Directory" size="xl">
+    <!-- Volume Selector -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Storage Volume</label>
+      <lex-select id="volumeSelector" placeholder="Loading volumes..." options='[]' value=""></lex-select>
+    </div>
 
-      <!-- Modal Body -->
-      <div class="flex-1 overflow-hidden flex flex-col p-6">
-        <!-- Volume Selector -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Storage Volume</label>
-          <lex-select id="volumeSelector" placeholder="Loading volumes..." options='[]' value=""></lex-select>
-        </div>
+    <!-- Manual Path Entry (optional) -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">
+        Or Enter Path Manually
+        <span class="text-xs font-normal text-gray-500">(Optional)</span>
+      </label>
+      <input
+        type="text"
+        id="manualPathInput"
+        placeholder="e.g., /Volumes/chef-primary/my-folder"
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+        onchange="updateSelectedPathFromManual()"
+      />
+      <p class="mt-1 text-xs text-gray-500">Type a full path if you know it, or use the volume selector and browser above</p>
+    </div>
 
-        <!-- Manual Path Entry (optional) -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Or Enter Path Manually
-            <span class="text-xs font-normal text-gray-500">(Optional)</span>
-          </label>
+    <!-- Browse Section -->
+    <div id="browseSection">
+      <!-- Current Path Display -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Current Path</label>
+        <div class="flex items-center gap-2">
           <input
             type="text"
-            id="manualPathInput"
-            placeholder="e.g., /Volumes/chef-primary/my-folder"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
-            onchange="updateSelectedPathFromManual()"
+            id="currentPath"
+            readonly
+            class="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-600"
+            value="/"
           />
-          <p class="mt-1 text-xs text-gray-500">Type a full path if you know it, or use the volume selector and browser above</p>
-        </div>
-
-        <!-- Browse Section -->
-        <div id="browseSection">
-          <!-- Current Path Display -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Current Path</label>
-            <div class="flex items-center gap-2">
-              <input
-                type="text"
-                id="currentPath"
-                readonly
-                class="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-600"
-                value="/"
-              />
-              <button onclick="createNewFolder()" id="createFolderBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                New Folder
-              </button>
-            </div>
-          </div>
-
-          <!-- Directory Browser -->
-          <div class="flex-1 border border-gray-200 rounded-lg overflow-hidden flex flex-col">
-            <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 text-sm font-medium text-gray-700">
-              Directories
-            </div>
-            <div id="directoryList" class="flex-1 overflow-y-auto p-2">
-              <!-- Directory items will be loaded here -->
-              <div class="flex items-center justify-center py-8 text-gray-500">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-              </div>
-            </div>
-          </div>
+          <button onclick="createNewFolder()" id="createFolderBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            New Folder
+          </button>
         </div>
       </div>
 
-      <!-- Modal Footer -->
-      <div class="flex items-center justify-between p-6 border-t border-gray-200">
-        <p class="text-sm text-gray-500">
-          Selected: <span id="selectedPath" class="font-medium text-gray-900">/</span>
-        </p>
-        <div class="flex gap-3">
-          <button onclick="closeDirectoryBrowser()" class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
-          <button onclick="selectDirectory()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
-            Select This Directory
-          </button>
+      <!-- Directory Browser -->
+      <div class="flex-1 border border-gray-200 rounded-lg overflow-hidden flex flex-col">
+        <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 text-sm font-medium text-gray-700">
+          Directories
+        </div>
+        <div id="directoryList" class="flex-1 overflow-y-auto p-2">
+          <!-- Directory items will be loaded here -->
+          <div class="flex items-center justify-center py-8 text-gray-500">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+
+    <div data-slot="footer" class="flex items-center justify-between gap-3 w-full">
+      <p class="text-sm text-gray-500">
+        Selected: <span id="selectedPath" class="font-medium text-gray-900">/</span>
+      </p>
+      <div class="flex gap-3">
+        <lex-btn variant="secondary" onclick="closeDirectoryBrowser()">Cancel</lex-btn>
+        <lex-btn variant="primary" onclick="selectDirectory()">Select This Directory</lex-btn>
+      </div>
+    </div>
+  </lex-modal>
 
   <!-- Settings Modal -->
-  <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
-    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-      <div class="p-6 border-b border-gray-200">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-gray-900">ActionStep Configuration</h3>
-          <button onclick="hideSettings()" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
+  <lex-modal id="settingsModal" heading="ActionStep Configuration" size="md">
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Import Directory</label>
+        <div id="settingsImportDir" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700 font-mono text-sm">-</div>
+        <p class="text-xs text-gray-500 mt-1">Configured via ACTIONSTEP_IMPORT_DIR in .env</p>
       </div>
-      <div class="p-6 space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Import Directory</label>
-          <div id="settingsImportDir" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700 font-mono text-sm">-</div>
-          <p class="text-xs text-gray-500 mt-1">Configured via ACTIONSTEP_IMPORT_DIR in .env</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Sync Frequency</label>
-          <div id="settingsSyncFreq" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700">-</div>
-          <p class="text-xs text-gray-500 mt-1">Configured via ACTIONSTEP_SYNC_FREQUENCY in .env</p>
-        </div>
-        <div class="pt-4 border-t">
-          <p class="text-sm text-gray-500">To change these settings, update your <code class="bg-gray-200 px-1 rounded">.env</code> file and restart the server.</p>
-        </div>
-        <div class="flex justify-end pt-2">
-          <button onclick="hideSettings()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">
-            Close
-          </button>
-        </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Sync Frequency</label>
+        <div id="settingsSyncFreq" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700">-</div>
+        <p class="text-xs text-gray-500 mt-1">Configured via ACTIONSTEP_SYNC_FREQUENCY in .env</p>
+      </div>
+      <div class="pt-4 border-t">
+        <p class="text-sm text-gray-500">To change these settings, update your <code class="bg-gray-200 px-1 rounded">.env</code> file and restart the server.</p>
       </div>
     </div>
-  </div>
+    <lex-btn data-slot="footer" variant="secondary" onclick="hideSettings()">Close</lex-btn>
+  </lex-modal>
 
   </template>
 
@@ -342,10 +308,12 @@
   <script src="../js/lex/components/foundation/lex-loader.js"></script>
   <script src="../js/lex/components/foundation/lex-toast.js"></script>
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
-  <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <!-- lex-btn after lex-modal/lex-drawer: their footers hold declarative lex-btns -->
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
@@ -361,6 +329,7 @@
   <script src="../js/shared/library-column-filters.js"></script>
   <script src="../insights/js/record-table-kit.js"></script>
   <script src="js/integration-tables.js"></script>
+  <script src="js/connector-import-dialogs.js"></script>
   <script src="js/actionstep-tables.js"></script>
 
   <!-- Page dependencies -->
@@ -1108,44 +1077,9 @@
       }
     }
 
-    // Show upload error modal
+    // Show upload error modal (plain-text title and message)
     function showUploadErrorModal(title, message, isWarning = false) {
-      const iconColor = isWarning ? 'text-yellow-600' : 'text-red-600';
-      const bgColor = isWarning ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200';
-      const icon = isWarning
-        ? `<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>`
-        : `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>`;
-
-      const modal = document.createElement('div');
-      modal.className = 'fixed inset-0 z-50 overflow-y-auto';
-      modal.innerHTML = `
-        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-          <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onclick="this.parentElement.parentElement.remove()"></div>
-          <div class="inline-block overflow-hidden text-left align-bottom bg-white rounded-lg shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-              <div class="sm:flex sm:items-start">
-                <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${bgColor} sm:mx-0 sm:h-10 sm:w-10">
-                  <svg class="h-6 w-6 ${iconColor}" fill="currentColor" viewBox="0 0 20 20">
-                    ${icon}
-                  </svg>
-                </div>
-                <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                  <h3 class="text-lg leading-6 font-medium text-gray-900">${title}</h3>
-                  <div class="mt-2">
-                    <p class="text-sm text-gray-500">${message}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-              <button type="button" onclick="this.closest('.fixed').remove()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:ml-3 sm:w-auto sm:text-sm">
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
+      return Lex.Modal.alertAsync(title, message, { variant: isWarning ? 'default' : 'danger' });
     }
 
     // Handle file upload
@@ -2496,76 +2430,17 @@
     }
 
     // Show cancel job confirmation modal
-    function showCancelJobModal(jobId, isUpload = false) {
-      const dialogHtml = `
-        <div id="cancelJobModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
-          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 transform transition-all scale-100 animate-fade-in">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900">Cancel Job</h3>
-                <p class="text-sm text-gray-500">This action cannot be undone</p>
-              </div>
-            </div>
-
-            <div class="mb-6">
-              <p class="text-sm text-gray-700 mb-2">
-                Are you sure you want to cancel this ${isUpload ? 'upload' : 'processing job'}?
-              </p>
-              <p class="text-sm text-gray-600">
-                The job will be stopped immediately and marked as cancelled.
-              </p>
-            </div>
-
-            <div class="flex gap-3 justify-end">
-              <button
-                onclick="closeCancelJobModal()"
-                class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Keep Job
-              </button>
-              <button
-                onclick="confirmCancelJob('${jobId}', ${isUpload})"
-                class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
-              >
-                Cancel Job
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-
-      document.body.insertAdjacentHTML('beforeend', dialogHtml);
-
-      // Add animation class
-      setTimeout(() => {
-        const modal = document.getElementById('cancelJobModal');
-        if (modal) {
-          modal.querySelector('.transform').classList.remove('scale-100');
-          modal.querySelector('.transform').classList.add('scale-105');
-          setTimeout(() => {
-            modal.querySelector('.transform').classList.remove('scale-105');
-            modal.querySelector('.transform').classList.add('scale-100');
-          }, 150);
-        }
-      }, 10);
-    }
-
-    // Close cancel job modal
-    function closeCancelJobModal() {
-      const modal = document.getElementById('cancelJobModal');
-      if (modal) {
-        modal.remove();
-      }
+    async function showCancelJobModal(jobId, isUpload = false) {
+      const confirmed = await Lex.Modal.confirmAsync(
+        'Cancel job',
+        `Are you sure you want to cancel this ${isUpload ? 'upload' : 'processing job'}? The job will be stopped immediately and marked as cancelled. This action cannot be undone.`,
+        { confirmText: 'Cancel job', cancelText: 'Keep job', variant: 'danger' }
+      );
+      if (confirmed) await confirmCancelJob(jobId, isUpload);
     }
 
     // Confirm cancel job
     async function confirmCancelJob(jobId, isUpload = false) {
-      closeCancelJobModal();
 
       try {
         if (isUpload) {
@@ -3152,7 +3027,7 @@
 
     // Show settings modal
     function showSettings() {
-      document.getElementById('settingsModal').classList.remove('hidden');
+      document.getElementById('settingsModal').open = true;
       if (dashboardData?.config) {
         document.getElementById('settingsImportDir').textContent = dashboardData.config.import_directory || 'Not set';
         document.getElementById('settingsSyncFreq').textContent = (dashboardData.config.sync_frequency || 'daily').charAt(0).toUpperCase() + (dashboardData.config.sync_frequency || 'daily').slice(1);
@@ -3161,7 +3036,7 @@
 
     // Hide settings modal
     function hideSettings() {
-      document.getElementById('settingsModal').classList.add('hidden');
+      document.getElementById('settingsModal').open = false;
     }
 
     // Directory Browser State
@@ -3186,7 +3061,7 @@
     // Open directory browser modal
     async function openDirectoryBrowser() {
       const modal = document.getElementById('directoryBrowserModal');
-      modal.classList.remove('hidden');
+      modal.open = true;
 
       // Load available volumes
       try {
@@ -3217,7 +3092,16 @@
 
     // Close directory browser modal
     function closeDirectoryBrowser() {
-      document.getElementById('directoryBrowserModal').classList.add('hidden');
+      document.getElementById('directoryBrowserModal').open = false;
+      resetDirectoryBrowser();
+    }
+
+    // The modal's own close button, backdrop click and Escape emit lex-close.
+    document.addEventListener('lex-close', (event) => {
+      if (event.target && event.target.id === 'directoryBrowserModal') resetDirectoryBrowser();
+    });
+
+    function resetDirectoryBrowser() {
       currentBrowsePath = '/';
 
       // Reset manual path input
@@ -3374,64 +3258,8 @@
 
     // Create new folder
     async function createNewFolder() {
-      // Show inline input dialog
-      const dialogHtml = `
-        <div id="folderNameDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
-          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Create New Folder</h3>
-            <input
-              type="text"
-              id="folderNameInput"
-              placeholder="Enter folder name"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 mb-2"
-              autofocus
-            />
-            <p class="text-xs text-gray-500 mb-4">Only letters, numbers, hyphens, and underscores allowed</p>
-            <div class="flex gap-3 justify-end">
-              <button onclick="cancelFolderCreation()" class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">
-                Cancel
-              </button>
-              <button onclick="confirmFolderCreation()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg">
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-
-      document.body.insertAdjacentHTML('beforeend', dialogHtml);
-
-      // Focus input and handle Enter key
-      const input = document.getElementById('folderNameInput');
-      input.focus();
-      input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          confirmFolderCreation();
-        }
-      });
-    }
-
-    function cancelFolderCreation() {
-      const dialog = document.getElementById('folderNameDialog');
-      if (dialog) dialog.remove();
-    }
-
-    async function confirmFolderCreation() {
-      const folderName = document.getElementById('folderNameInput').value.trim();
-
-      if (!folderName) {
-        Toast.error('Please enter a folder name');
-        return;
-      }
-
-      // Validate folder name
-      if (!/^[a-zA-Z0-9_-]+$/.test(folderName)) {
-        Toast.error('Folder name can only contain letters, numbers, hyphens, and underscores');
-        return;
-      }
-
-      // Remove dialog
-      cancelFolderCreation();
+      const folderName = await ConnectorImportDialogs.promptFolderName();
+      if (!folderName) return;
 
       try {
         const newPath = `${currentBrowsePath}/${folderName}`.replace(/\/+/g, '/');
@@ -3483,128 +3311,42 @@
     // Setup Required modal
     function showSetupRequiredModal(event) {
       event?.stopPropagation(); // Prevent event bubbling
-
-      const modalHtml = `
-        <div id="setupRequiredModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;" onclick="closeSetupRequiredModal()">
-          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900">Setup Required</h3>
-              </div>
-            </div>
-
-            <div class="mb-6">
-              <p class="text-sm text-gray-700">Set up the folder where your ActionStep files will be stored and processed. This only takes a minute.</p>
-            </div>
-
-            <div class="flex justify-end">
-              <button onclick="closeSetupRequiredModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg">
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      ConnectorImportDialogs.showSetupRequired('ActionStep');
     }
 
-    function closeSetupRequiredModal() {
-      const modal = document.getElementById('setupRequiredModal');
-      if (modal) modal.remove();
-    }
-
-    // Delete configuration dialog
+    // Delete configuration dialog (type DELETE to confirm)
     function showDeleteConfigDialog() {
-      const dialogHtml = `
-        <div id="deleteConfigDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
-          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900">Delete Configuration</h3>
-                <p class="text-sm text-gray-600 mt-1">This action cannot be undone</p>
-              </div>
-            </div>
-
-            <div class="mb-4">
-              <p class="text-sm text-gray-700 mb-3">This will delete your ActionStep configuration settings. Your synced data (matters, participants, etc.) will <strong>NOT</strong> be deleted.</p>
-              <p class="text-sm text-gray-700 mb-3">To confirm, type <strong>DELETE</strong> in the box below:</p>
-              <input
-                type="text"
-                id="deleteConfirmInput"
-                placeholder="Type DELETE"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                autofocus
-              />
-            </div>
-
-            <div class="flex gap-3 justify-end">
-              <button onclick="closeDeleteConfigDialog()" class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">
-                Cancel
-              </button>
-              <button onclick="confirmDeleteConfig()" id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                Delete Configuration
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-
-      document.body.insertAdjacentHTML('beforeend', dialogHtml);
-
-      // Focus input and enable button when DELETE is typed
-      const input = document.getElementById('deleteConfirmInput');
-      const confirmBtn = document.getElementById('confirmDeleteBtn');
-
-      input.addEventListener('input', (e) => {
-        confirmBtn.disabled = e.target.value !== 'DELETE';
-      });
-
-      input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && e.target.value === 'DELETE') {
-          confirmDeleteConfig();
-        }
+      ConnectorImportDialogs.confirmTypedDelete({
+        connectorLabel: 'ActionStep',
+        onConfirm: deleteConfiguration
       });
     }
 
     function closeDeleteConfigDialog() {
-      const dialog = document.getElementById('deleteConfigDialog');
-      if (dialog) {
-        dialog.remove();
-      }
+      const dialog = ConnectorImportDialogs.activeDelete();
+      if (dialog) dialog.close();
     }
 
     async function confirmDeleteConfig() {
-      const confirmBtn = document.getElementById('confirmDeleteBtn');
+      const dialog = ConnectorImportDialogs.activeDelete();
+      if (dialog) await dialog.confirm();
+    }
 
+    // Throws on failure so the dialog stays open for a retry.
+    async function deleteConfiguration() {
       try {
-        confirmBtn.disabled = true;
-        confirmBtn.textContent = 'Deleting...';
-
         await api.delete(connectorApi(''));
-
-        closeDeleteConfigDialog();
-        Toast.success('Configuration deleted successfully');
-
-        // Reload the dashboard to show "Needs Setup" state
-        setTimeout(() => {
-          loadDashboard();
-        }, 500);
       } catch (error) {
         Toast.error(error.message || 'Failed to delete configuration');
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = 'Delete Configuration';
+        throw error;
       }
+
+      Toast.success('Configuration deleted successfully');
+
+      // Reload the dashboard to show "Needs Setup" state
+      setTimeout(() => {
+        loadDashboard();
+      }, 500);
     }
 
     // ========================================
@@ -3774,15 +3516,7 @@
 
     // Open matter detail panel and fetch data
     async function openMatterDetail(matterId) {
-      const panel = document.getElementById('matterDetailPanel');
-      const overlay = document.getElementById('matterDetailOverlay');
-      const content = document.getElementById('matterDetailContent');
-
-      // Show panel and overlay with slide-in animation
-      overlay.classList.remove('hidden');
-      setTimeout(() => {
-        panel.classList.remove('translate-x-full');
-      }, 10);
+      const content = openDetailDrawer('Matter Details');
 
       // Show loading state
       content.innerHTML = `
@@ -3818,15 +3552,19 @@
       }
     }
 
+    // Matter, participant, task and file-note details share one lex-drawer.
+    // Returns the element the detail content renders into.
+    function openDetailDrawer(title) {
+      const drawer = document.getElementById('matterDetailPanel');
+      drawer.heading = title;
+      drawer.open = true;
+      return document.getElementById('matterDetailContent');
+    }
+
     // Close matter detail panel
     function closeMatterDetail() {
-      const panel = document.getElementById('matterDetailPanel');
-      const overlay = document.getElementById('matterDetailOverlay');
-
-      panel.classList.add('translate-x-full');
-      setTimeout(() => {
-        overlay.classList.add('hidden');
-      }, 300);
+      const drawer = document.getElementById('matterDetailPanel');
+      if (drawer) drawer.open = false;
     }
 
     // Render matter detail content
@@ -4082,17 +3820,7 @@
     // Participant Detail Functions
     // ========================================
     async function openParticipantDetail(participantId) {
-      const panel = document.getElementById('matterDetailPanel');
-      const overlay = document.getElementById('matterDetailOverlay');
-      const content = document.getElementById('matterDetailContent');
-      const panelTitle = panel.querySelector('h2');
-
-      // Update panel title
-      panelTitle.textContent = 'Participant Details';
-
-      // Show panel and overlay
-      overlay.classList.remove('hidden');
-      setTimeout(() => panel.classList.remove('translate-x-full'), 10);
+      const content = openDetailDrawer('Participant Details');
 
       // Show loading state
       content.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
@@ -4201,14 +3929,7 @@
     // Task Detail Functions
     // ========================================
     async function openTaskDetail(taskId) {
-      const panel = document.getElementById('matterDetailPanel');
-      const overlay = document.getElementById('matterDetailOverlay');
-      const content = document.getElementById('matterDetailContent');
-      const panelTitle = panel.querySelector('h2');
-
-      panelTitle.textContent = 'Task Details';
-      overlay.classList.remove('hidden');
-      setTimeout(() => panel.classList.remove('translate-x-full'), 10);
+      const content = openDetailDrawer('Task Details');
 
       content.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
 
@@ -4288,14 +4009,7 @@
     // File Note Detail Functions
     // ========================================
     async function openFileNoteDetail(noteId) {
-      const panel = document.getElementById('matterDetailPanel');
-      const overlay = document.getElementById('matterDetailOverlay');
-      const content = document.getElementById('matterDetailContent');
-      const panelTitle = panel.querySelector('h2');
-
-      panelTitle.textContent = 'File Note Details';
-      overlay.classList.remove('hidden');
-      setTimeout(() => panel.classList.remove('translate-x-full'), 10);
+      const content = openDetailDrawer('File Note Details');
 
       content.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
 
@@ -4350,32 +4064,14 @@
       content.innerHTML = html;
     }
 
-    // Add ESC key listener to close panel
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        closeMatterDetail();
-      }
-    });
-
     // Initialize
     loadDashboard();
 
   </script>
 
-  <!-- Matter Detail Side Panel -->
-  <div id="matterDetailPanel" class="fixed inset-y-0 right-0 w-full lg:w-2/3 xl:w-1/2 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50 overflow-y-auto">
-    <!-- Panel Header -->
-    <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-      <h2 class="text-xl font-semibold text-gray-900">Matter Details</h2>
-      <button onclick="closeMatterDetail()" class="text-gray-400 hover:text-gray-600 transition-colors">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-    </div>
-
-    <!-- Panel Content -->
-    <div id="matterDetailContent" class="p-6">
+  <!-- Matter Detail Side Panel (matter, participant, task and file-note details) -->
+  <lex-drawer id="matterDetailPanel" heading="Matter Details" width="xl">
+    <div id="matterDetailContent">
       <!-- Loading state -->
       <div class="flex items-center justify-center py-12">
         <svg class="animate-spin h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24">
@@ -4384,10 +4080,7 @@
         </svg>
       </div>
     </div>
-  </div>
-
-  <!-- Overlay (click to close panel) -->
-  <div id="matterDetailOverlay" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40" onclick="closeMatterDetail()"></div>
+  </lex-drawer>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
   <!-- LANA dock (IDE-style docked chat panel) -->

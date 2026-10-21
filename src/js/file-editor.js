@@ -2453,7 +2453,10 @@
       }
     };
     var message = 'Release the saved draft for "' + (file.filename || file.title || 'this document') + '" as a new version?';
-    Lex.Modal.confirm('Release Version', message, run, { confirmText: 'Release Version' });
+    // confirmAsync escapes the text; the filename is user data.
+    Lex.Modal.confirmAsync('Release Version', message, { confirmText: 'Release Version' }).then(function (confirmed) {
+      if (confirmed) run();
+    });
   }
 
   async function retryReleaseApproval(file) {
@@ -4019,7 +4022,7 @@
   function refreshFileInfoDrawer(file) {
     var drawer = activeFileInfoDrawer();
     if (!drawer || !file) return false;
-    var slot = drawer.querySelector('.lex-drawer-body slot-content');
+    var slot = drawer.contentRoot;
     if (!slot) return false;
     slot.innerHTML = renderDocFileInfoRail(file, { drawer: true });
     hydrateIcons(slot);
