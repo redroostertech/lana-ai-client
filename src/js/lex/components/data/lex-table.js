@@ -37,7 +37,9 @@
 
    State without private fields (both modes):
      table.setError(message)          // error state, client-side tables too
+     table.setSearch(term)            // toolbar search: client filters, server asks for page 1
      table.searchText                 // current search text
+     table.pagination                 // { page, limit, total, totalPages }
      table.filteredRows               // client: every matching row (all pages); server: this page
      table.restoreQuery({ search, sortBy, sortDir, filters, page, limit })  // set without fetching
      table.resetQuery()               // default sort, no search/filters, page 1, without fetching

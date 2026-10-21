@@ -683,8 +683,10 @@
       setData(data) {
         if (!this.dataSource) {
           this.dataSource = new LexDataSource(this, { autoFetch: false });
+          this.dataSource._pagination.limit = this.limit || 20;
         }
-        this.dataSource._pagination.limit = this.limit || 20;
+        // A refresh keeps the page size the user picked.
+        if (!this.dataSource._pagination.limit) this.dataSource._pagination.limit = this.limit || 20;
         this.dataSource._clientSideMode = true;
         this.dataSource._rawData = Array.isArray(data) ? [...data] : data;
         this.dataSource._data = data;
@@ -743,6 +745,20 @@
         this.dataSource._error = message || 'Failed to load data';
         this._scheduleUpdate();
         this.emit('lex-data-error', { error: this.dataSource._error });
+      }
+
+      // Search from a page toolbar: client tables filter, server tables ask
+      // the page for page 1 with the new term.
+      setSearch(term) {
+        if (!this.dataSource) this.dataSource = new LexDataSource(this, { autoFetch: false });
+        this.dataSource.setSearch(term || '');
+      }
+
+      // { page, limit, total, totalPages } for what the table shows.
+      get pagination() {
+        const source = this.dataSource;
+        if (!source) return { page: 1, limit: this.limit || 20, total: 0, totalPages: 0 };
+        return { ...source.pagination };
       }
 
       // Current search text (toolbar or built-in).
