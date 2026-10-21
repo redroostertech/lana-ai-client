@@ -212,18 +212,42 @@
   color: var(--lex-text-primary);
 }
 
-/* Name gets the room; the actions column fits its widest control, the
-   Knowledgebase "Promote to Org" button. */
-#listView th:nth-child(1) { width: 40%; }
-#listView th:nth-child(2) { width: 14%; }
-#listView th:nth-child(3) { width: 14%; }
-#listView th:nth-child(4) { width: 16%; }
+/* Column widths (docs/TABLE-STANDARD.md, section 8). Headers stay on one
+   line, dates never truncate, and below the min-width the table scrolls
+   sideways. Name takes the remaining width.
+   #listView: Name, Created By, Created, Size, actions (fits the
+   Knowledgebase "Promote to Org" button). */
+#listView th,
+#filesListView th { white-space: nowrap; }
+#listView table { min-width: 860px; }
+#listView th:nth-child(2) { width: 16%; }
+#listView th:nth-child(3) { width: 176px; }
+#listView th:nth-child(4) { width: 180px; }
 #listView th:nth-child(5) { width: 9.5rem; }
 
 #listView td:nth-child(5) {
   text-align: right;
 }
-#filesListView th:nth-child(1) { width: 46%; }
+
+/* #filesListView: Name, Workspace, Created, Size */
+#filesListView table { min-width: 760px; }
 #filesListView th:nth-child(2) { width: 24%; }
-#filesListView th:nth-child(3) { width: 15%; }
-#filesListView th:nth-child(4) { width: 15%; }
+#filesListView th:nth-child(3) { width: 176px; }
+#filesListView th:nth-child(4) { width: 112px; }
+
+.drive-list-workspace-link {
+  background: none;
+  border: none;
+  color: var(--lex-accent, #3b5bdb);
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--lex-weight-semibold, 600);
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-overflow: ellipsis;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}

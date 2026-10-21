@@ -67,7 +67,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
             <lex-select
               id="myTasksSort"
-              options='[{"value":"updated_at","label":"Last Updated"},{"value":"due_date","label":"Due Date"},{"value":"created_at","label":"Created"},{"value":"title","label":"Task"},{"value":"status","label":"Status"},{"value":"priority","label":"Priority"}]'
+              options='[{"value":"updated_at","label":"Last edited"},{"value":"due_date","label":"Due"},{"value":"created_at","label":"Created"},{"value":"title","label":"Task"},{"value":"status","label":"Status"},{"value":"priority","label":"Priority"}]'
               value="updated_at"
             ></lex-select>
           </div>
@@ -82,7 +82,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
             <lex-select
               id="myTasksStatusFilter"
-              options='[{"value":"all","label":"All"},{"value":"Pending","label":"Pending"},{"value":"In Progress","label":"In Progress"},{"value":"In Review","label":"In Review"},{"value":"Complete","label":"Complete"},{"value":"Cancelled","label":"Cancelled"}]'
+              options='[{"value":"all","label":"All"},{"value":"pending","label":"Pending"},{"value":"in_progress","label":"In progress"},{"value":"in_review","label":"In review"},{"value":"complete","label":"Complete"},{"value":"cancelled","label":"Cancelled"}]'
               value="all"
             ></lex-select>
           </div>
@@ -103,6 +103,8 @@
         columns="title,workspace_matter,status,priority,due_date,created_at"
         labels="Task,Workspace | Matter,Status,Priority,Due,Created"
         column-filters
+        server-paging
+        sortable-columns="title,status,priority,due_date,created_at"
         sort-by="updated_at"
         sort-dir="desc"
         limit="20"
@@ -347,6 +349,7 @@
   <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/list-query-params.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
   <script src="js/lex/components/layout/lex-conversation-item.js"></script>

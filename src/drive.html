@@ -70,7 +70,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
             <lex-select
               id="sortSelect"
-              options='[{"value":"name","label":"Name"},{"value":"created_at","label":"Created"},{"value":"updated_at","label":"Modified Date"},{"value":"document_count","label":"File Count"},{"value":"folder_count","label":"Folder Count"}]'
+              options='[{"value":"name","label":"Name"},{"value":"created_at","label":"Created"},{"value":"updated_at","label":"Last edited"},{"value":"document_count","label":"Size"},{"value":"folder_count","label":"Folder count"}]'
               value="name"
             ></lex-select>
           </div>
@@ -185,7 +185,8 @@
       <div id="gridView" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 
       <!-- List View: one table for every scope (workspaces, Knowledgebase,
-           Shared Knowledge). drive.js pages it and sorts it on the server. -->
+           Shared Knowledge). Its own pager is the only list pager: workspaces
+           page and sort on the server; the notes scopes are sliced in drive.js. -->
       <lex-table
         id="listView"
         column-filters
@@ -196,9 +197,9 @@
         sortable-columns="name,created_at,size"
         sort-by="name"
         sort-dir="asc"
-        limit="100"
+        limit="20"
         id-key="key"
-        empty-text="Nothing matches these filters"
+        empty-text="Nothing here yet"
         aria-label="All folders"
       ></lex-table>
 
@@ -230,17 +231,23 @@
         <lex-table
           id="filesListView"
           class="hidden drive-list-table lex-table--card"
+          server-paging
+          column-filters
           columns="name,workspace,created_at,size"
           labels="Name,Workspace,Created,Size"
-          sortable-columns=""
-          limit="50"
+          sortable-columns="name,created_at,size"
+          sort-by="created_at"
+          sort-dir="desc"
+          limit="20"
           id-key="id"
+          empty-text="No matching files"
           aria-label="Matching files"
         ></lex-table>
       </div>
 
-      <!-- Pagination Controls -->
-      <lex-pagination id="drivePagination" class="mt-6"></lex-pagination>
+      <!-- Grid view pager (workspaces). Hidden in list view, where each
+           table's own pager is the only pager. -->
+      <lex-pagination id="drivePagination" class="hidden mt-6"></lex-pagination>
     </main>
 
     <!-- ══════════════════════════════════════════════════════════════════
@@ -399,6 +406,7 @@
   <script src="js/lex/components/data/lex-pagination.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/list-query-params.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>

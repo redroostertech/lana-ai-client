@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/components/document-metadata.css">
   <link rel="stylesheet" href="css/matter-notes.css">
+  <link rel="stylesheet" href="css/workspaces-list.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
@@ -89,7 +90,7 @@
       </div>
 
       <!-- Search / Sort / Filter toolbar — Library-style, drives grid + list -->
-      <div class="matters-toolbar bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)">
+      <div class="matters-toolbar bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter workspaces">
         <div class="flex items-center gap-4 flex-wrap">
           <div class="flex-1 min-w-[200px]">
             <lex-input
@@ -104,7 +105,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
             <lex-select
               id="mattersSort"
-              options='[{"value":"created_at","label":"Created Date"},{"value":"updated_at","label":"Modified Date"},{"value":"name","label":"Name"},{"value":"status","label":"Status"}]'
+              options='[{"value":"created_at","label":"Created"},{"value":"updated_at","label":"Last edited"},{"value":"name","label":"Name"},{"value":"status","label":"Status"},{"value":"matter_type","label":"Type"}]'
               value="created_at"
             ></lex-select>
           </div>
@@ -119,7 +120,7 @@
             <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
             <lex-select
               id="statusFilter"
-              options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'
+              options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'
               value="all"
             ></lex-select>
           </div>
@@ -171,25 +172,30 @@
         <!-- Matters Grid View -->
         <div id="mattersGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
 
-        <!-- Matters List View -->
+        <!-- Matters List View: server-paged; the table owns paging, sort and
+             column filters, and js/workspace.js answers its lex-query-change. -->
         <lex-table
           id="mattersListView"
-          class="hidden lex-table--card"
-          columns="matter_id,name,status,matter_type,created_at"
-          labels="Matter ID,Name,Status,Type,Created"
+          class="hidden matters-list-table lex-table--card"
+          server-paging
           column-filters
           selectable
-          compact
+          columns="name,matter_id,status,matter_type,created_at,updated_at"
+          labels="Name,Matter ID,Status,Type,Created,Last edited"
+          sortable-columns="name,status,matter_type,created_at,updated_at"
           sort-by="created_at"
           sort-dir="desc"
-          empty-text="No matters found"
-          empty-action-label="Create your first matter"
+          limit="20"
           id-key="matter_id"
+          empty-text="No matters yet"
+          empty-action-label="Create your first matter"
+          aria-label="Workspaces"
           bulk-actions='[{"label":"Delete","action":"delete","variant":"danger"}]'
         ></lex-table>
 
-        <!-- Pagination -->
-        <lex-pagination id="pagination"></lex-pagination>
+        <!-- Grid view pager: the grid shows the table's current page. Hidden in
+             list view, where the table's own pager is the only pager. -->
+        <lex-pagination id="mattersGridPagination" class="hidden mt-6"></lex-pagination>
       </div>
     </main>
 
@@ -417,6 +423,8 @@
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/lex/components/data/lex-filter-bar.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/list-query-params.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="js/lex/lex-page-init.js"></script>
