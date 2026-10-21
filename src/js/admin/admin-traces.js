@@ -1,13 +1,16 @@
 /**
  * Admin Chat Traces — standalone page controller.
  *
- * Handles trace listing, filtering by conversation/status/mode/date,
- * trace detail view with timeline, LLM calls, RAG retrievals, SSE events.
+ * One server-paged lex-table of traces (docs/TABLE-STANDARD.md): toolbar
+ * search (text, or a conversation/session/trace id), Sort by, a Status
+ * filter and header filters on every column; plus the trace detail view with timeline, LLM calls, RAG retrievals, SSE events.
  *
  * @requires api.js       - window.api — getTraceById, getTraces
  * @requires lex.utils.js - Lex.Utils.escapeHtml, Lex.Utils.formatDateTime
  * @requires lex-toast.js - Lex.Toast.error
- * @requires lex-table.js - table.setData()
+ * @requires lex-table.js - server paging (setServerData)
+ * @requires admin-table-kit.js - AdminTableKit toolbar + cell helpers
+ * @requires library-column-filters.js - date-range filter bounds
  */
 
 (function () {
@@ -25,21 +28,38 @@
   // =========================================================================
 
   var state = {
-    traces: [],
     currentTrace: null,
-    filters: {
-      conversationId: '',
-      status: '',
-      mode: '',
-      date: ''
-    },
-    pagination: {
-      limit: 50,
-      offset: 0,
-      total: 0,
-      hasMore: false
-    }
+    search: ''
   };
+
+  var TABLE_ID = 'tracesTable';
+  var _gen = 0;
+  var _toolbar = null;
+
+  // Table column -> traces API sortBy.
+  var SORT_BY_COLUMN = { created_at: 'created_at', status: 'status', chat_mode: 'chat_mode', duration: 'total_duration_ms' };
+
+  var TRACE_STATUSES = ['completed', 'failed', 'pending', 'aborted'];
+  var STATUS_COLORS = { completed: 'green', failed: 'red', pending: 'yellow', aborted: 'gray' };
+  var ROUTES = ['unified', 'workspace', 'document', 'agentic', 'rag', 'general', 'data', 'insights', 'automations', 'text_transform', 'pending_detection'];
+
+  // Duration column filter: milliseconds, min inclusive, max exclusive.
+  var DURATION_RANGES = {
+    under_5s:  { label: 'Under 5 s',   min: null,   max: 5000 },
+    '5s_30s':  { label: '5 s – 30 s',  min: 5000,   max: 30000 },
+    '30s_2m':  { label: '30 s – 2 min', min: 30000, max: 120000 },
+    over_2m:   { label: 'Over 2 min',  min: 120000, max: null }
+  };
+
+  // LLM calls column filter: counts, min inclusive, max exclusive.
+  var LLM_CALL_RANGES = {
+    none:     { label: 'None',    min: null, max: 1 },
+    '1_3':    { label: '1 – 3',   min: 1,    max: 4 },
+    '4_10':   { label: '4 – 10',  min: 4,    max: 11 },
+    over_10:  { label: 'Over 10', min: 11,   max: null }
+  };
+
+  var UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   // =========================================================================
   // DOM references (resolved after DOMContentLoaded)
@@ -57,16 +77,7 @@
     els.listView            = document.getElementById('traceListView');
     els.detailView          = document.getElementById('traceDetailView');
     els.breadcrumb          = document.getElementById('traceBreadcrumb');
-    els.tracesTable         = document.getElementById('tracesTable');
-    els.filterConversation  = document.getElementById('filterConversation');
-    els.filterStatus        = document.getElementById('filterStatus');
-    els.filterMode          = document.getElementById('filterMode');
-    els.filterDate          = document.getElementById('filterDate');
-    els.applyBtn            = document.getElementById('applyFiltersBtn');
-    els.clearBtn            = document.getElementById('clearFiltersBtn');
-    els.prevBtn             = document.getElementById('prevPageBtn');
-    els.nextBtn             = document.getElementById('nextPageBtn');
-    els.paginationInfo      = document.getElementById('paginationInfo');
+    els.tracesTable         = document.getElementById(TABLE_ID);
 
     // Detail view elements
     els.traceId             = document.getElementById('traceIdDisplay');
@@ -87,119 +98,173 @@
     els.ragRetrievals       = document.getElementById('ragRetrievalsContainer');
     els.sseEvents           = document.getElementById('sseEventsContainer');
 
-    // Bind events
-    if (els.applyBtn) els.applyBtn.addEventListener('click', applyFilters);
-    if (els.clearBtn) els.clearBtn.addEventListener('click', clearFilters);
-    if (els.prevBtn)  els.prevBtn.addEventListener('click', previousPage);
-    if (els.nextBtn)  els.nextBtn.addEventListener('click', nextPage);
-    loadTraces();
+    initTable();
   }
 
   // =========================================================================
-  // Filters
+  // Query mapping (pure; exposed for unit tests)
   // =========================================================================
 
-  function applyFilters() {
-    state.filters.conversationId = getValue(els.filterConversation);
-    state.filters.status         = getValue(els.filterStatus);
-    state.filters.mode           = getValue(els.filterMode);
-    state.filters.date           = getValue(els.filterDate);
-    state.pagination.offset      = 0;
-
-    loadTraces();
+  function rangeOf(map, filters, col) {
+    var kit = window.AdminTableKit;
+    return map[kit.firstFilterValue(filters, col)] || null;
   }
 
-  function clearFilters() {
-    setValue(els.filterConversation, '');
-    setValue(els.filterStatus, '');
-    setValue(els.filterMode, '');
-    setValue(els.filterDate, '');
+  /**
+   * The traces API options for a lex-table server query. The search box
+   * takes free text or a conversation/session/trace id (a UUID). Filters the
+   * API does not read yet go under the names listed in the report.
+   * @param {Object} query - { page, limit, sortBy, sortDir, filters }
+   * @param {string} search
+   * @param {Date} [now]
+   * @returns {Object} options for api.getTraces
+   */
+  function toApiOptions(query, search, now) {
+    var kit = window.AdminTableKit;
+    var q = query || {};
+    var filters = q.filters || {};
+    var paging = kit.pageOffset(q);
+    var options = {
+      limit: paging.limit,
+      offset: paging.offset,
+      sortBy: SORT_BY_COLUMN[q.sortBy] || 'created_at',
+      sortOrder: q.sortDir === 'asc' ? 'asc' : 'desc'
+    };
+    var term = String(search || '').trim();
+    if (term && UUID_PATTERN.test(term)) options.conversationId = term;
+    else if (term) options.search = term;
+    var message = kit.firstFilterValue(filters, 'user_message');
+    if (message) options.message = message;
+    var statuses = kit.filterValues(filters.status);
+    if (statuses.length) options.status = statuses.join(',');
+    var routes = kit.filterValues(filters.chat_mode);
+    if (routes.length) options.chatMode = routes.join(',');
+    var duration = rangeOf(DURATION_RANGES, filters, 'duration');
+    if (duration && duration.min !== null) options.minDurationMs = duration.min;
+    if (duration && duration.max !== null) options.maxDurationMs = duration.max;
+    var calls = rangeOf(LLM_CALL_RANGES, filters, 'llm_calls');
+    if (calls && calls.min !== null) options.minLlmCalls = calls.min;
+    if (calls && calls.max !== null) options.maxLlmCalls = calls.max;
+    var created = kit.setRange(null, filters, 'created_at', '', '', now);
+    if (created.after) options.createdAfter = created.after;
+    if (created.before) options.createdBefore = created.before;
+    return options;
+  }
 
-    state.filters = { conversationId: '', status: '', mode: '', date: '' };
-    state.pagination.offset = 0;
+  function mapTrace(t) {
+    return {
+      id:           String(t.trace_id || ''),
+      user_message: String(t.user_message || ''),
+      chat_mode:    String(t.chat_mode || ''),
+      status:       String(t.status || ''),
+      duration:     t.total_duration_ms == null ? null : Number(t.total_duration_ms),
+      llm_calls:    Number(t.llm_call_count || 0),
+      created_at:   t.created_at || t.request_timestamp || '',
+      _raw:         t
+    };
+  }
 
-    loadTraces();
+  function cellRenderers() {
+    var kit = window.AdminTableKit;
+    return {
+      user_message: function (val) {
+        if (!val) return kit.muted('No message');
+        return '<span class="admin-table-name" title="' + kit.esc(val) + '">' + kit.esc(truncate(val, 160)) + '</span>';
+      },
+      chat_mode: function (val) { return val ? kit.badge(formatTraceRoute(val), 'blue') : kit.muted(''); },
+      status: function (val) {
+        var key = String(val || '').toLowerCase();
+        return kit.badge(Lex.Utils.humanizeLabel(key || 'unknown'), STATUS_COLORS[key] || 'gray');
+      },
+      duration: function (val) {
+        return val === null || val === undefined ? kit.muted('') : '<span class="admin-table-text">' + kit.esc(formatDuration(val)) + '</span>';
+      },
+      llm_calls: function (val) { return '<span class="admin-table-text">' + kit.esc(String(val || 0)) + '</span>'; },
+      created_at: function (val) { return kit.timeCell(val); }
+    };
+  }
+
+  function rangeOptions(map) {
+    return Object.keys(map).map(function (key) { return { value: key, label: map[key].label }; });
+  }
+
+  function filterOptions() {
+    var kit = window.AdminTableKit;
+    var routeLabels = {};
+    ROUTES.forEach(function (r) { routeLabels[r] = formatTraceRoute(r); });
+    return {
+      user_message: { text: true, placeholder: 'Message contains...' },
+      chat_mode:    { options: kit.labelOptions(ROUTES, routeLabels) },
+      status:       { options: kit.labelOptions(TRACE_STATUSES) },
+      duration:     { single: true, options: rangeOptions(DURATION_RANGES) },
+      llm_calls:    { single: true, options: rangeOptions(LLM_CALL_RANGES) },
+      created_at:   kit.dateRangeFilter()
+    };
   }
 
   // =========================================================================
-  // Data Loading
+  // Table
   // =========================================================================
 
-  async function loadTraces() {
-    try {
-      setTableLoading(true);
-
-      var resp = await window.api.getTraces({
-        limit: state.pagination.limit,
-        offset: state.pagination.offset,
-        conversationId: state.filters.conversationId,
-        status: state.filters.status,
-        chatMode: state.filters.mode,
-        requestDate: state.filters.date
+  function initTable() {
+    var table = els.tracesTable;
+    if (!table) return;
+    window.AdminTableKit.whenTableReady().then(function () {
+      table.setCellRenderers(cellRenderers());
+      table.setColumnFilterOptions(filterOptions());
+      _toolbar = window.AdminTableKit.bindToolbar({
+        table: table,
+        searchId: 'tracesSearch',
+        sortId: 'tracesSort',
+        orderId: 'tracesSortOrder',
+        filterId: 'tracesStatusFilter',
+        filterKey: 'status',
+        countIds: ['tracesCount', 'tracesSectionCount'],
+        noun: ['trace', 'traces'],
+        onSearch: function (term) {
+          state.search = term;
+          table.requestServerQuery({ resetPage: true });
+        }
       });
-
-      var data = resp.data || resp;
-      state.traces = data.traces || [];
-      state.pagination.total   = data.total || 0;
-      state.pagination.hasMore = (state.pagination.offset + state.pagination.limit) < state.pagination.total;
-
-      renderTraceList(state.traces);
-      setTableLoading(false);
-      updatePagination();
-
-    } catch (err) {
-      console.error('[Traces] Failed to load traces:', err);
-      Lex.Toast.error('Failed to load traces: ' + (err.message || err));
-      setTableLoading(false);
-    }
-  }
-
-  async function loadConversationTraces(conversationId) {
-    state.filters.conversationId = conversationId || '';
-    return loadTraces();
-  }
-
-  // =========================================================================
-  // List Rendering
-  // =========================================================================
-
-  function showEmptyState() {
-    if (els.tracesTable && els.tracesTable.setData) {
-      els.tracesTable.setData([]);
-    }
-    if (els.paginationInfo) els.paginationInfo.textContent = '';
-    setPageBtn(els.prevBtn, true);
-    setPageBtn(els.nextBtn, true);
-  }
-
-  function setTableLoading(loading) {
-    if (!els.tracesTable) return;
-    if (loading) { Lex.Redact.on(els.tracesTable); }
-    else { Lex.Redact.off(els.tracesTable); }
-  }
-
-  function renderTraceList(traces) {
-    if (!els.tracesTable) return;
-
-    // Pass plain text data — HTML rendering happens in MutationObserver
-    var rows = traces.map(function (t) {
-      return {
-        _traceId: t.trace_id,
-        _status: t.status,
-        _chatMode: t.chat_mode,
-        timestamp: fmtDateTime ? fmtDateTime(t.request_timestamp) : formatDateTime(t.request_timestamp),
-        user_message: truncate(t.user_message || 'N/A', 80),
-        chat_mode: formatTraceRoute(t.chat_mode),
-        status: (t.status || 'unknown').toUpperCase(),
-        duration: formatDuration(t.total_duration_ms),
-        llm_calls: String(t.llm_call_count || 0)
-      };
+      table.addEventListener('lex-query-change', function (e) {
+        if (e.target === table) loadTraces(e.detail);
+      });
+      table.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row && row.id) viewTraceDetail(row.id);
+      });
+      document.addEventListener('lex-refresh', function (e) {
+        e.preventDefault();
+        table.requestServerQuery();
+      });
+      table.requestServerQuery({ resetPage: true });
     });
+  }
 
-    _ensureTableObserver(els.tracesTable);
-
-    if (els.tracesTable.setData) {
-      els.tracesTable.setData(rows);
+  async function loadTraces(query) {
+    var gen = ++_gen;
+    var table = els.tracesTable;
+    if (!table) return;
+    query = query || table.serverQuery;
+    var filters = query.filters || {};
+    var filtered = Boolean(state.search || Object.keys(filters).length);
+    if (_toolbar) _toolbar.syncFilter(filters);
+    try {
+      var resp = await window.api.getTraces(toApiOptions(query, state.search));
+      if (gen !== _gen) return;
+      var data = (resp && resp.data) || resp || {};
+      var traces = data.traces || [];
+      table.emptyText = window.AdminTableKit.emptyText(filtered, 'traces');
+      table.setServerData(traces.map(mapTrace), {
+        page: query.page,
+        limit: query.limit,
+        total: Number(data.total) || 0
+      });
+    } catch (err) {
+      if (gen !== _gen) return;
+      console.error('[Traces] Failed to load traces:', err);
+      if (_toolbar) _toolbar.setCount(null);
+      table.setServerError('Traces could not be loaded. Check your connection and try again.');
     }
   }
 
@@ -228,64 +293,7 @@
       general: 'General'
     };
 
-    return labels[value] || value.replace(/_/g, ' ');
-  }
-
-  /**
-   * Attach MutationObserver + row-click to lex-table (once).
-   * Mirrors the proven pattern from admin-audit.js.
-   */
-  function _ensureTableObserver(table) {
-    if (table._tracesRendererAttached) return;
-    table._tracesRendererAttached = true;
-
-    // Row-click event for drill-down (no timing issues)
-    table.addEventListener('row-click', function (e) {
-      var row = e.detail && e.detail.row;
-      if (row && row._traceId) {
-        viewTraceDetail(row._traceId);
-      }
-    });
-
-    // MutationObserver to post-process cells with HTML badges
-    new MutationObserver(function () {
-      requestAnimationFrame(function () { _applyTableRenderers(table); });
-    }).observe(table, { childList: true });
-  }
-
-  /**
-   * Post-render: inject badge HTML into status + chat_mode cells.
-   * Column order: timestamp(0), user_message(1), chat_mode(2), status(3), duration(4), llm_calls(5)
-   */
-  function _applyTableRenderers(table) {
-    var rows = (table.dataSource && table.dataSource.data) || [];
-    var tbody = table.querySelector('tbody');
-    if (!tbody) return;
-
-    var trs = tbody.querySelectorAll('tr');
-    for (var i = 0; i < trs.length; i++) {
-      var tr  = trs[i];
-      var row = rows[i];
-      if (!row) continue;
-
-      var tds = tr.querySelectorAll('td');
-      if (tds.length < 6) continue;
-
-      // chat_mode cell (index 2): info badge
-      if (tds[2]) {
-        tds[2].innerHTML = '<lex-badge variant="info">' + escHtml(formatTraceRoute(row._chatMode || row.chat_mode)) + '</lex-badge>';
-      }
-
-      // status cell (index 3): colored badge
-      if (tds[3]) {
-        var statusVariants = { completed: 'success', failed: 'danger', pending: 'warning', aborted: 'neutral' };
-        var variant = statusVariants[row._status] || 'neutral';
-        tds[3].innerHTML = '<lex-badge variant="' + variant + '">' + escHtml((row._status || 'unknown').toUpperCase()) + '</lex-badge>';
-      }
-
-      // Make rows look clickable
-      tr.style.cursor = 'pointer';
-    }
+    return labels[value] || Lex.Utils.humanizeLabel(value);
   }
 
   // =========================================================================
@@ -322,10 +330,9 @@
     els.userMessage.textContent = trace.user_message || 'N/A';
 
     // Status badge
-    var badgeVariant = { completed: 'success', failed: 'danger', pending: 'warning', aborted: 'neutral' };
     if (els.statusBadge) {
-      els.statusBadge.setAttribute('variant', badgeVariant[trace.status] || 'neutral');
-      els.statusBadge.textContent = (trace.status || 'unknown').toUpperCase();
+      els.statusBadge.setAttribute('color', STATUS_COLORS[trace.status] || 'gray');
+      els.statusBadge.setAttribute('label', Lex.Utils.humanizeLabel(trace.status || 'unknown'));
     }
 
     // Response text
@@ -623,34 +630,6 @@
   }
 
   // =========================================================================
-  // Pagination
-  // =========================================================================
-
-  function updatePagination() {
-    var from = state.pagination.total > 0 ? state.pagination.offset + 1 : 0;
-    var to   = Math.min(state.pagination.offset + state.pagination.limit, state.pagination.total);
-
-    if (els.paginationInfo) {
-      els.paginationInfo.textContent = 'Showing ' + from + ' to ' + to + ' of ' + state.pagination.total + ' traces';
-    }
-
-    setPageBtn(els.prevBtn, state.pagination.offset === 0);
-    setPageBtn(els.nextBtn, !state.pagination.hasMore);
-  }
-
-  function previousPage() {
-    if (state.pagination.offset > 0) {
-      state.pagination.offset -= state.pagination.limit;
-      loadTraces();
-    }
-  }
-
-  function nextPage() {
-    state.pagination.offset += state.pagination.limit;
-    loadTraces();
-  }
-
-  // =========================================================================
   // View switching
   // =========================================================================
 
@@ -713,30 +692,19 @@
     }
   }
 
-  function setPageBtn(btn, disabled) {
-    if (!btn) return;
-    btn.disabled = disabled;
-    if (disabled) {
-      btn.setAttribute('disabled', '');
-    } else {
-      btn.removeAttribute('disabled');
-    }
-  }
-
-  function getValue(el) {
-    if (!el) return '';
-    var v = el.value;
-    return (v != null ? String(v) : '').trim();
-  }
-
-  function setValue(el, val) {
-    if (!el) return;
-    el.value = val;
-  }
-
   function setBreadcrumbItems(items) {
     if (!els.breadcrumb) return;
     els.breadcrumb.items = items;
   }
+
+  // Pure table logic, exposed for unit tests.
+  window.AdminTracesTable = {
+    toApiOptions: toApiOptions,
+    mapTrace: mapTrace,
+    cellRenderers: cellRenderers,
+    filterOptions: filterOptions,
+    formatTraceRoute: formatTraceRoute,
+    SORT_BY_COLUMN: SORT_BY_COLUMN
+  };
 
 })();

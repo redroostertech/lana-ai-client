@@ -1,15 +1,16 @@
 /**
  * Data Visualization — Admin page controller.
  *
- * Displays MCP view data in tabbed lex-tables with an embedded
- * insights_chat panel for natural language querying.
+ * Displays MCP view data in one server-paged lex-table
+ * (docs/TABLE-STANDARD.md): a View select, toolbar search and Sort by,
+ * header filters on every column and a record drawer with connected data.
  *
  * @requires api.js          - window.api
  * @requires lex.utils.js    - Lex.Utils.escapeHtml, Lex.Utils.formatDateTime
  * @requires lex-toast.js    - Lex.Toast.error
- * @requires lex-table.js    - table.setData()
- * @requires lex-tabs.js     - lex-tabs component
- * @requires lex-chat.js     - lex-chat component
+ * @requires lex-table.js    - server paging (setServerData)
+ * @requires admin-table-kit.js - AdminTableKit toolbar + cell helpers
+ * @requires library-column-filters.js - date-range filter bounds
  */
 
 (function () {
@@ -397,10 +398,10 @@
   var _gen         = 0;
   var _currentTab  = 'matters';
   var _subViewMode = 'primary'; // 'primary' or 'detail'
-  var _currentPage = 1;
-  var _pageSize    = 50;
   var _availableViews = [];     // populated from /api/v1/mcp-data/views
-  var _rawRows     = [];        // unformatted rows for detail drawer
+  var _searchTerm  = '';
+  var _toolbar     = null;
+  var _tabLabels   = {};        // tab id -> label, for the section heading
   var _connectedRows = {};      // connected data rows keyed by view name
   // _chatEl / _threadsEl removed — managed by the global LANA dock.
 
@@ -448,10 +449,9 @@
       .then(function (result) {
         _availableViews = (result && result.data) || [];
         _setupTabs();
-        _wirePagination();
+        _wireTable();
         _wireRefresh();
-        _wireRowClick();
-        _loadData();
+        _applyView();
       })
       .catch(function (err) {
         console.error('[DataViz] Failed to fetch views:', err);
@@ -525,6 +525,7 @@
       var def = viewDefs[i];
       var viewName = TAB_VIEW_MAP[def.id];
       if (_isViewAvailable(viewName)) {
+        _tabLabels[def.id] = def.label;
         options.push({ value: def.id, label: def.label, group: def.group });
       }
     }
@@ -547,9 +548,8 @@
       if (val && val !== _currentTab) {
         _currentTab = val;
         _subViewMode = 'primary';
-        _currentPage = 1;
         _updateSubViewToggle();
-        _loadData();
+        _applyView();
       }
     });
 
@@ -602,38 +602,229 @@
         var val = e.detail && (e.detail.value || e.detail);
         if (typeof val === 'string' && val !== _subViewMode) {
           _subViewMode = val;
-          _currentPage = 1;
-          _loadData();
+          _applyView();
         }
       });
     }
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Pagination
+  // Table (server-paged; the view decides the columns)
   // ═══════════════════════════════════════════════════════════════
 
-  function _wirePagination() {
-    var pager = el('dataVizPagination');
-    if (!pager || pager._dataVizWired) return;
-    pager._dataVizWired = true;
-    pager.addEventListener('page-change', function (e) {
-      var page = e.detail && e.detail.page;
-      if (page && page !== _currentPage) {
-        _currentPage = page;
-        _loadData();
+  var PILL_COLORS = {
+    active: 'green', completed: 'green', success: 'green', paid: 'green', open: 'green', resolved: 'green', synced: 'green', connected: 'green', won: 'green', accepted: 'green',
+    failed: 'red', error: 'red', overdue: 'red', critical: 'red', high: 'red', urgent: 'red', expired: 'red', lost: 'red',
+    pending: 'yellow', in_progress: 'yellow', running: 'yellow', medium: 'yellow', warning: 'yellow', queued: 'yellow', syncing: 'yellow', draft: 'yellow',
+    low: 'blue', info: 'blue'
+  };
+
+  function _columnsOf(config) {
+    return String(config.columns || '').split(',').map(function (c) { return c.trim(); }).filter(Boolean);
+  }
+
+  function _labelsOf(config) {
+    return String(config.labels || '').split(',').map(function (c) { return c.trim(); });
+  }
+
+  /** Date-range parameter base: created_at -> created, due_date -> due_date. */
+  function rangeBase(col) {
+    return col.length > 3 && col.slice(-3) === '_at' ? col.slice(0, -3) : col;
+  }
+
+  /**
+   * The mcp-data query for a lex-table server query. Value filters use the
+   * API's exact filter_<column>; date ranges go as <base>_after/_before for
+   * the API to read once it supports them.
+   * @param {Object} query - { page, limit, sortBy, sortDir, filters }
+   * @param {Object} config - VIEW_CONFIG entry
+   * @param {string} search
+   * @param {Date} [now]
+   * @returns {URLSearchParams}
+   */
+  function toApiParams(query, config, search, now) {
+    var kit = window.AdminTableKit;
+    var q = query || {};
+    var filters = q.filters || {};
+    var formats = config.format || {};
+    var columns = _columnsOf(config);
+    var params = new URLSearchParams();
+    params.set('page', String(q.page || 1));
+    params.set('limit', String(q.limit || 20));
+    params.set('sort_by', columns.indexOf(q.sortBy) !== -1 ? q.sortBy : config.sortBy);
+    params.set('sort_dir', q.sortDir === 'asc' ? 'asc' : 'desc');
+    if (search) params.set('search', search);
+    Object.keys(filters).forEach(function (col) {
+      if (columns.indexOf(col) === -1) return;
+      var fmt = formats[col];
+      if (fmt === 'datetime' || fmt === 'date') {
+        var base = rangeBase(col);
+        kit.setRange(params, filters, col, base + '_after', base + '_before', now);
+        return;
       }
+      var value = kit.firstFilterValue(filters, col);
+      if (value) params.set('filter_' + col, value);
+    });
+    return params;
+  }
+
+  function mapRow(row, index) {
+    var out = { _key: String(row.id != null ? row.id : 'row-' + index), _raw: row };
+    Object.keys(row).forEach(function (key) {
+      if (key !== '_key' && key !== '_raw') out[key] = row[key];
+    });
+    return out;
+  }
+
+  function _isTrue(val) {
+    return val === true || val === 't' || val === 'true';
+  }
+
+  function _textCell(val) {
+    var kit = window.AdminTableKit;
+    if (val === null || val === undefined || val === '') return kit.muted('');
+    var str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+    return '<span class="admin-table-text" title="' + kit.esc(str.length > 500 ? str.slice(0, 500) + '…' : str) + '">' + kit.esc(str.length > 160 ? str.slice(0, 160) + '…' : str) + '</span>';
+  }
+
+  /**
+   * Renderers for a view's columns: dates through Lex.Utils, booleans as
+   * Yes/No, enums as badges, workspaces as links, the first column as the
+   * name. Rows keep raw values.
+   */
+  function cellRenderers(config) {
+    var kit = window.AdminTableKit;
+    var formats = config.format || {};
+    var columns = _columnsOf(config);
+    var renderers = {};
+    columns.forEach(function (col, idx) {
+      var fmt = formats[col];
+      if (col === 'matter_name') {
+        renderers[col] = function (val, row) { return row.matter_id ? kit.matterLink(row.matter_id, val) : kit.nameCell(val); };
+      } else if (col === 'matter_id') {
+        renderers[col] = function (val) { return val ? kit.matterLink(val, val) : kit.muted(''); };
+      } else if (fmt === 'datetime') {
+        renderers[col] = function (val) { return kit.timeCell(val); };
+      } else if (fmt === 'date') {
+        renderers[col] = function (val) { return kit.dateCell(val); };
+      } else if (fmt === 'bool') {
+        renderers[col] = function (val) {
+          if (val === null || val === undefined) return kit.muted('');
+          return '<span class="admin-table-text">' + (_isTrue(val) ? 'Yes' : 'No') + '</span>';
+        };
+      } else if (fmt === 'pill') {
+        renderers[col] = function (val) {
+          if (val === null || val === undefined || val === '') return kit.muted('');
+          var key = String(val).toLowerCase();
+          return kit.badge(Lex.Utils.humanizeLabel(val), PILL_COLORS[key] || 'gray');
+        };
+      } else if (idx === 0) {
+        renderers[col] = function (val) {
+          return val === null || val === undefined || val === '' ? kit.muted('') : kit.nameCell(String(val).length > 200 ? String(val).slice(0, 200) + '…' : String(val));
+        };
+      } else {
+        renderers[col] = _textCell;
+      }
+    });
+    return renderers;
+  }
+
+  /**
+   * A header filter for every column: date ranges, Yes/No for booleans and a
+   * value box (exact match, the API's filter_<column>) for the rest.
+   */
+  function filterOptions(config) {
+    var kit = window.AdminTableKit;
+    var formats = config.format || {};
+    var labels = _labelsOf(config);
+    var map = {};
+    _columnsOf(config).forEach(function (col, idx) {
+      var fmt = formats[col];
+      if (fmt === 'datetime' || fmt === 'date') {
+        map[col] = kit.dateRangeFilter();
+      } else if (fmt === 'bool') {
+        map[col] = { single: true, options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] };
+      } else {
+        map[col] = { text: true, placeholder: (labels[idx] || Lex.Utils.humanizeLabel(col)) + ' is...' };
+      }
+    });
+    return map;
+  }
+
+  function _sortOptions(config) {
+    var labels = _labelsOf(config);
+    return _columnsOf(config).map(function (col, idx) {
+      return { value: col, label: labels[idx] || Lex.Utils.humanizeLabel(col) };
     });
   }
 
-  function _updatePagination(total) {
-    var pager = el('dataVizPagination');
-    if (!pager) return;
-    var totalPages = Math.max(1, Math.ceil(total / _pageSize));
-    pager.page       = _currentPage;
-    pager.totalPages = totalPages;
-    pager.total      = total;
-    pager.limit      = _pageSize;
+  function _wireTable() {
+    var table = el('dataVizTable');
+    if (!table || table._dataVizWired) return;
+    table._dataVizWired = true;
+    _toolbar = window.AdminTableKit.bindToolbar({
+      table: table,
+      searchId: 'dataVizSearch',
+      sortId: 'dataVizSort',
+      orderId: 'dataVizSortOrder',
+      countIds: ['dataVizCount', 'dataVizSectionCount'],
+      noun: ['record', 'records'],
+      onSearch: function (term) {
+        _searchTerm = term;
+        table.requestServerQuery({ resetPage: true });
+      }
+    });
+    table.addEventListener('lex-query-change', function (e) {
+      if (e.target === table) _loadData(e.detail);
+    });
+    table.addEventListener('row-click', function (e) {
+      var row = e.detail && e.detail.row;
+      if (row && row._raw) _openDetailDrawer(row._raw, _getEffectiveView());
+    });
+  }
+
+  /**
+   * Point the table at the current view: columns, labels, sort, renderers
+   * and filters, then load page 1 with no filters.
+   */
+  function _applyView() {
+    var table = el('dataVizTable');
+    if (!table) return;
+    var config = VIEW_CONFIG[_getEffectiveView()];
+    if (!config) return;
+    window.AdminTableKit.whenTableReady().then(function () {
+      table.setAttribute('columns', config.columns);
+      table.setAttribute('labels', config.labels);
+      table.setAttribute('sortable-columns', config.columns);
+      table.setAttribute('sort-by', config.sortBy);
+      table.setAttribute('sort-dir', 'desc');
+      table.sortBy = config.sortBy;
+      table.sortDir = 'desc';
+      // A new view starts unfiltered and sorted by its default column.
+      var source = table.dataSource;
+      if (source) {
+        source._sortBy = config.sortBy;
+        source._sortDir = 'desc';
+        if (source._filters && typeof source._filters.clear === 'function') source._filters.clear();
+      }
+      table.setCellRenderers(cellRenderers(config));
+      table.setColumnFilterOptions(filterOptions(config));
+
+      var sort = el('dataVizSort');
+      if (sort) {
+        sort.setAttribute('options', JSON.stringify(_sortOptions(config)));
+        sort.setAttribute('value', config.sortBy);
+        sort.value = config.sortBy;
+      }
+      var order = el('dataVizSortOrder');
+      if (order) order.dataset.order = 'desc';
+      var heading = el('dataVizHeading');
+      if (heading) {
+        var sub = SUB_VIEW_MAP[_currentTab];
+        heading.textContent = sub && _subViewMode === 'detail' ? sub.detailLabel : (sub ? sub.primaryLabel : (_tabLabels[_currentTab] || 'Records'));
+      }
+      table.requestServerQuery({ resetPage: true });
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -643,16 +834,16 @@
   function _wireRefresh() {
     document.addEventListener('lex-refresh', function (e) {
       e.preventDefault();
-      _currentPage = 1;
-      _loadData();
+      var table = el('dataVizTable');
+      if (table && typeof table.requestServerQuery === 'function') table.requestServerQuery();
     });
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Data loading
+  // Data loading (answers the table's lex-query-change)
   // ═══════════════════════════════════════════════════════════════
 
-  function _loadData() {
+  function _loadData(query) {
     var gen = ++_gen;
     var table = el('dataVizTable');
     if (!table) return;
@@ -660,87 +851,28 @@
     var viewName = _getEffectiveView();
     var config = VIEW_CONFIG[viewName];
     if (!config) return;
+    query = query || table.serverQuery;
+    var filtered = Boolean(_searchTerm || Object.keys(query.filters || {}).length);
 
-    // Reconfigure table columns/labels for this view
-    table.setAttribute('columns', config.columns);
-    table.setAttribute('labels', config.labels);
-    table.setAttribute('sort-by', config.sortBy);
-
-    // Shimmer loading
-    Lex.Redact.on(table);
-
-    var url = '/api/v1/mcp-data/' + viewName +
-      '?page=' + _currentPage +
-      '&limit=' + _pageSize +
-      '&sort_by=' + encodeURIComponent(config.sortBy) +
-      '&sort_dir=desc';
-
-    api.get(url)
+    api.get('/api/v1/mcp-data/' + viewName + '?' + toApiParams(query, config, _searchTerm).toString())
       .then(function (result) {
         if (gen !== _gen) return; // stale response guard
-
         var rows = (result && result.data) || [];
         var pagination = (result && result.pagination) || {};
-        var total = pagination.total || rows.length;
-
-        // Store raw rows for detail drawer
-        _rawRows = rows;
-
-        // Format rows for display
-        var formatted = rows.map(function (row) {
-          return _formatRow(row, config);
+        table.emptyText = window.AdminTableKit.emptyText(filtered, 'records');
+        table.setServerData(rows.map(mapRow), {
+          page: pagination.page || query.page,
+          limit: pagination.limit || query.limit,
+          total: pagination.total !== undefined ? pagination.total : rows.length,
+          totalPages: pagination.totalPages
         });
-
-        Lex.Redact.off(table);
-        table.setData(formatted);
-        _updatePagination(total);
       })
       .catch(function (err) {
         if (gen !== _gen) return;
-        Lex.Redact.off(table);
         console.error('[DataViz] Load failed:', err);
-        if (typeof Lex !== 'undefined' && Lex.Toast) {
-          Lex.Toast.error('Failed to load data');
-        }
+        if (_toolbar) _toolbar.setCount(null);
+        table.setServerError('This view could not be loaded. Check your connection and try again.');
       });
-  }
-
-  /**
-   * Format a row for display — plain text values only.
-   * lex-table escapes all HTML, so we must NOT return HTML strings.
-   * lex-table auto-detects status badges for: active, inactive, pending,
-   * completed, failed, error, success, open, closed, draft, archived.
-   */
-  function _formatRow(row, config) {
-    var out = {};
-    var formatMap = config.format || {};
-
-    for (var key in row) {
-      if (!row.hasOwnProperty(key)) continue;
-      var val = row[key];
-      var fmt = formatMap[key];
-
-      if (val == null) {
-        out[key] = '-';
-      } else if (fmt === 'datetime') {
-        out[key] = fmtDateTime(val) || String(val);
-      } else if (fmt === 'date') {
-        out[key] = fmtDateTime(val, { dateOnly: true }) || String(val);
-      } else if (fmt === 'bool') {
-        out[key] = (val === true || val === 't' || val === 'true') ? 'Yes' : 'No';
-      } else if (fmt === 'pill') {
-        // Pass raw string — lex-table auto-styles known status values
-        out[key] = String(val);
-      } else {
-        var str = String(val);
-        if (str.length > 120) {
-          str = str.substring(0, 117) + '...';
-        }
-        out[key] = str;
-      }
-    }
-
-    return out;
   }
 
   // _setupChat() removed — managed by the global LANA dock.
@@ -748,36 +880,6 @@
   // ═══════════════════════════════════════════════════════════════
   // Row detail drawer
   // ═══════════════════════════════════════════════════════════════
-
-  function _wireRowClick() {
-    var table = el('dataVizTable');
-    if (!table || table._dataVizRowWired) return;
-    table._dataVizRowWired = true;
-
-    table.addEventListener('row-click', function (e) {
-      var detail = e.detail || {};
-      var rowId = detail.id;
-      var clickedRow = detail.row || {};
-
-      // Find the raw (unformatted) row by matching id field
-      var rawRow = null;
-      if (rowId && _rawRows.length > 0) {
-        for (var i = 0; i < _rawRows.length; i++) {
-          var raw = _rawRows[i];
-          if (String(raw.id) === String(rowId)) {
-            rawRow = raw;
-            break;
-          }
-        }
-      }
-
-      // Fall back to the formatted row if raw not found
-      var displayRow = rawRow || clickedRow;
-      if (!displayRow || Object.keys(displayRow).length === 0) return;
-
-      _openDetailDrawer(displayRow, _getEffectiveView());
-    });
-  }
 
   // Defines what connected data to fetch per entity type.
   // Each entry: { view, filterField, label, columns, labels }
@@ -860,7 +962,7 @@
     if (viewName === 'mcp_client_matters' && row.matter_id) {
       actions.push({
         label: 'View Workspace',
-        href: '../workspace-details.html?matter_id=' + encodeURIComponent(row.matter_id)
+        href: '../workspace-details.html?id=' + encodeURIComponent(row.matter_id)
       });
     }
 
@@ -904,8 +1006,7 @@
 
     html += _buildRecordFields(row);
 
-    // Connected data sections (load async)
-    var viewName = _getEffectiveView();
+    // Connected data sections (load async) for the record's own view
     var connections = CONNECTED_DATA_MAP[viewName] || [];
     if (connections.length > 0) {
       html += '<div style="margin-top:1.5rem;border-top:2px solid var(--lex-border-default,#e5e7eb);padding-top:1rem;">';
@@ -1189,6 +1290,17 @@
   // ═══════════════════════════════════════════════════════════════
   // Start
   // ═══════════════════════════════════════════════════════════════
+
+  // Pure table logic, exposed for unit tests.
+  window.DataVizTable = {
+    VIEW_CONFIG: VIEW_CONFIG,
+    toApiParams: toApiParams,
+    mapRow: mapRow,
+    cellRenderers: cellRenderers,
+    filterOptions: filterOptions,
+    rangeBase: rangeBase,
+    getRecordActions: _getRecordActions
+  };
 
   init();
 

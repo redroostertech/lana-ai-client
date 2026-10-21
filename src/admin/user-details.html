@@ -8,6 +8,7 @@
   <!-- ── CSS + Tailwind in head — behavioral scripts at end of body ── -->
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -89,16 +90,38 @@
           <lex-btn id="revokeAllBtn" variant="danger" size="sm" icon="log-out">Revoke All Sessions</lex-btn>
         </div>
 
+        <!-- Search / Sort toolbar (docs/TABLE-STANDARD.md) -->
+        <div class="flex items-center gap-4 flex-wrap mb-3" role="search" aria-label="Search and sort sessions">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="userSessionsSearch" placeholder="Search sessions..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+            <lex-select id="userSessionsSort" options='[{"value":"created_at","label":"Created"},{"value":"last_activity","label":"Last activity"},{"value":"expires_at","label":"Expires"}]' value="created_at"></lex-select>
+          </div>
+          <lex-btn id="userSessionsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div id="userSessionsCount" class="admin-table-toolbar-label text-sm whitespace-nowrap" aria-live="polite"></div>
+        </div>
+
         <lex-table
           id="userSessionsTable"
-          columns="device,ip_address,created_at,expires_at"
-          labels="Device,IP Address,Created,Expires"
-          empty-text="No active sessions"
+          class="admin-table lex-table--card"
+          column-filters
+          server-paging
+          columns="device,ip_address,created_at,last_activity,expires_at"
+          labels="Device,IP address,Created,Last activity,Expires"
+          sortable-columns="created_at,last_activity,expires_at"
           sort-by="created_at"
           sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No active sessions"
+          aria-label="Active sessions"
         ></lex-table>
-
-        <lex-pagination id="sessionsPagination" style="margin-top:1rem;"></lex-pagination>
 
       </lex-card>
 
@@ -277,7 +300,6 @@
   <script src="../js/lex/components/foundation/lex-kv.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
-  <script src="../js/lex/components/data/lex-pagination.js"></script>
   <script src="../js/lex/components/form/lex-form.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
@@ -287,6 +309,8 @@
   <script src="../js/lex/lex-page-init.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/admin-user-details.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
