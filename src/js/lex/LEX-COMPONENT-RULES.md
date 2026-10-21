@@ -663,6 +663,8 @@ Plus `withDataSource` properties: `endpoint`, `limit`, `autoFetch`, `searchable`
 
 **Events:** `row-click`, `sort-change`, `selection-change`, `bulk-action`, `lex-filter-change`, `lex-data-loaded`, `lex-query-change` (server paging)
 
+**Page-level table standard** (layout, toolbar, data mode, dates, filters, widths, pagination, and the migration inventory): `docs/TABLE-STANDARD.md`. Every list page follows it.
+
 **Server paging:** use `server-paging` when the API pages and sorts itself and its parameter names differ from `endpoint` mode's (`page`/`limit`/`sortBy`/`sortOrder`/`q`). The page owns the request; the table owns paging and sort state.
 ```javascript
 // <lex-table id="files" server-paging sortable-columns="name,updated_at" sort-by="updated_at" sort-dir="desc" limit="20">
