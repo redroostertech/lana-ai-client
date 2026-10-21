@@ -47,11 +47,8 @@
         lana
         lana-context-type="full_chat"
       >
-        <button id="folderMoreBtn" class="folder-banner-more" type="button" title="More actions" aria-label="More actions" onclick="showFolderActionsMenu(event)">
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
-          </svg>
-        </button>
+        <lex-dropdown-btn id="folderMoreBtn" class="folder-banner-more" data-folder-actions-menu icon="more-vertical" icon-only variant="ghost" align="end" aria-label="More actions"
+          options="[{&quot;value&quot;:&quot;upload&quot;,&quot;label&quot;:&quot;Upload new file&quot;,&quot;icon&quot;:&quot;upload&quot;},{&quot;value&quot;:&quot;doc-studio&quot;,&quot;label&quot;:&quot;Create with Doc Studio&quot;,&quot;icon&quot;:&quot;plus&quot;},{&quot;divider&quot;:true},{&quot;value&quot;:&quot;new-folder&quot;,&quot;label&quot;:&quot;Create folder&quot;,&quot;icon&quot;:&quot;folder-plus&quot;}]"></lex-dropdown-btn>
       </lex-banner>
       <input type="file" id="fileUploadInput" class="hidden" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.pptx,.ppt">
 
@@ -109,7 +106,8 @@
       </div>
 
       <div id="folderActionsBar" class="folder-actions-bar hidden">
-        <lex-btn id="folderActionsBtn" variant="primary" leading-icon="plus">Actions</lex-btn>
+        <lex-dropdown-btn id="folderActionsBtn" data-folder-actions-menu variant="primary" icon="plus" button-label="Actions" align="end"
+          options="[{&quot;value&quot;:&quot;upload&quot;,&quot;label&quot;:&quot;Upload new file&quot;,&quot;icon&quot;:&quot;upload&quot;},{&quot;value&quot;:&quot;doc-studio&quot;,&quot;label&quot;:&quot;Create with Doc Studio&quot;,&quot;icon&quot;:&quot;plus&quot;},{&quot;divider&quot;:true},{&quot;value&quot;:&quot;new-folder&quot;,&quot;label&quot;:&quot;Create folder&quot;,&quot;icon&quot;:&quot;folder-plus&quot;}]"></lex-dropdown-btn>
       </div>
 
       <!-- Loading State -->
@@ -141,7 +139,8 @@
           id="contentEmptyWidget"
         ></lex-empty>
         <div id="folderEmptyState" class="folder-empty-actions">
-          <lex-btn id="emptyCreateBtn" variant="primary" leading-icon="plus">Create</lex-btn>
+          <lex-dropdown-btn id="emptyCreateBtn" data-folder-actions-menu variant="primary" icon="plus" button-label="Create"
+            options="[{&quot;value&quot;:&quot;upload&quot;,&quot;label&quot;:&quot;Upload new file&quot;,&quot;icon&quot;:&quot;upload&quot;},{&quot;value&quot;:&quot;doc-studio&quot;,&quot;label&quot;:&quot;Create with Doc Studio&quot;,&quot;icon&quot;:&quot;plus&quot;},{&quot;divider&quot;:true},{&quot;value&quot;:&quot;new-folder&quot;,&quot;label&quot;:&quot;Create folder&quot;,&quot;icon&quot;:&quot;folder-plus&quot;}]"></lex-dropdown-btn>
         </div>
       </div>
     </main>
@@ -326,9 +325,6 @@
          component, which injects its own Lex rename modal and confirm dialogs.
          No per-file rename/delete modal markup lives here. -->
 
-    <!-- Context Menu Container -->
-    <div id="contextMenu" class="hidden fixed bg-white rounded-lg shadow-xl border py-1 z-50 min-w-[180px]" style="border-color: var(--lex-border-default)"></div>
-
   </template>
 
   <noscript>
@@ -388,6 +384,7 @@
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>

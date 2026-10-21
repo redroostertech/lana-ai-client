@@ -40,16 +40,21 @@ describe('lex-modal footers use footer-content', () => {
     }
   });
 
-  test('footer Save buttons re-emit lex-submit on the form', () => {
-    for (const [file, ids] of [
-      ['js/admin/admin-users.js', ['userModalSaveBtn']],
-      ['js/admin/task-plans.js', ['taskPlanSaveBtn', 'taskPlanItemSaveBtn']],
-      ['js/admin/roles.js', ['saveRoleBtn']],
+  test('footer Save buttons submit their lex-form through the form attribute', () => {
+    for (const [page, script, pairs] of [
+      ['admin/users.html', 'js/admin/admin-users.js', [['userModalSaveBtn', 'userForm']]],
+      ['admin/task-plans.html', 'js/admin/task-plans.js', [['taskPlanSaveBtn', 'taskPlanForm'], ['taskPlanItemSaveBtn', 'taskPlanItemForm']]],
+      ['admin/roles.html', 'js/admin/roles.js', [['saveRoleBtn', 'roleForm']]],
     ]) {
-      const js = read(file);
-      expect(js).toContain("new CustomEvent('lex-submit'");
-      for (const id of ids) expect(js).toContain(id);
-      expect(js).toMatch(/_requestFormSubmit\((form|itemForm)\)/);
+      const html = read(page);
+      for (const [btn, form] of pairs) {
+        expect(html).toMatch(new RegExp(`<lex-btn id="${btn}"[^>]*type="submit"[^>]*form="${form}"`));
+        expect(html).toContain(`<lex-form id="${form}"`);
+      }
+      const js = read(script);
+      expect(js).not.toContain('_requestFormSubmit');
+      expect(js).not.toContain("new CustomEvent('lex-submit'");
+      expect(js).toContain("addEventListener('lex-submit'");
     }
   });
 
@@ -59,5 +64,33 @@ describe('lex-modal footers use footer-content', () => {
     expect(js).toContain("footer-content='");
     expect(js).toContain('form.requestSubmit()');
     expect(js).not.toContain('dscm-actions');
+  });
+});
+
+describe('footer-content submit button reaches its lex-form (jsdom)', () => {
+  const { JSDOM } = require('jsdom');
+  const lex = ['js/lex/lex.core.js', 'js/lex/lex.forms.js', 'js/lex/components/foundation/lex-modal.js',
+    'js/lex/components/form/lex-form.js', 'js/lex/components/form/lex-input.js',
+    'js/lex/components/foundation/lex-btn.js'].map(read);
+
+  test('roles.html roleModal: clicking Save emits lex-submit on #roleForm', async () => {
+    const html = read('admin/roles.html');
+    const end = html.indexOf('</lex-modal>', html.indexOf('id="roleModal"')) + '</lex-modal>'.length;
+    const markup = html.slice(html.lastIndexOf('<lex-modal', html.indexOf('id="roleModal"')), end);
+    const dom = new JSDOM(`<!doctype html><body>${markup}</body>`, { runScripts: 'outside-only', pretendToBeVisual: true });
+    const { window } = dom;
+    lex.forEach((code) => window.eval(code));
+    const modal = window.document.getElementById('roleModal');
+    modal.open = true;
+    await new Promise((r) => window.setTimeout(r, 0));
+    const events = [];
+    window.document.getElementById('roleForm').addEventListener('lex-submit', (e) => events.push(e.detail));
+    const save = window.document.getElementById('saveRoleBtn');
+    expect(save).not.toBeNull();
+    (save.querySelector('button') || save).dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(events.length).toBe(1);
+    expect(events[0]).toHaveProperty('values');
+    await new Promise((r) => window.setTimeout(r, 0));
+    window.close();
   });
 });

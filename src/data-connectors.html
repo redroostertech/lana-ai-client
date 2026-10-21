@@ -13,46 +13,11 @@
   <link rel="stylesheet" href="css/connector-table.css">
   <script src="js/tailwind-loader.js"></script>
   <style>
-    .dc-fullscreen-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 10000;
-      display: flex;
-      flex-direction: column;
-      background: var(--lex-bg-primary);
-    }
-    .dc-fullscreen-modal.hidden {
-      display: none;
-    }
-    .dc-fullscreen-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      min-height: 4rem;
-      padding: 0.75rem 1.25rem;
-      border-bottom: 1px solid var(--lex-border-default);
-      background: var(--lex-card-bg);
-      box-shadow: var(--lex-shadow-sm, 0 1px 3px rgba(0,0,0,0.08));
-    }
-    .dc-fullscreen-title {
-      min-width: 0;
-      font-size: 1rem;
-      font-weight: 800;
-      color: var(--lex-text-primary);
-    }
-    .dc-fullscreen-subtitle {
-      margin-top: 0.125rem;
-      font-size: 0.75rem;
-      color: var(--lex-text-secondary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: min(56rem, 70vw);
-    }
+    /* Fills the full-size, flush lex-modal body under its header. */
     .dc-fullscreen-frame {
-      flex: 1;
+      display: block;
       width: 100%;
+      height: 100%;
       border: 0;
       background: var(--lex-bg-primary);
     }
@@ -190,9 +155,9 @@
     </main>
 
     <!-- Full-screen Connector Dashboard Modal -->
-    <div id="connectorDashboardModal" class="dc-fullscreen-modal hidden" role="dialog" aria-modal="true" aria-label="Connector dashboard">
+    <lex-modal id="connectorDashboardModal" heading="Connector dashboard" size="full" flush hide-actions style="--lex-z-modal: 10000">
       <iframe id="connectorDashboardFrame" class="dc-fullscreen-frame" title="Connector dashboard"></iframe>
-    </div>
+    </lex-modal>
 
     <!-- ══════════════════════════════════════════════════════════════════ -->
     <!-- Connector-specific Modals                                        -->

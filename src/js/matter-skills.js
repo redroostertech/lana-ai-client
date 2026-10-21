@@ -203,10 +203,34 @@ window.executeMatterSkill = async function(matterId, skillId) {
 // CREATE SKILL MODAL
 // =============================================================================
 
-function closeCreateSkillModal() {
-  const modal = document.getElementById('createSkillModal');
+// Hide a skill modal: a lex-modal closes through `open`; a page that still
+// carries the legacy fixed-overlay markup is hidden by class.
+function hideSkillModal(modal) {
+  if (!modal) return;
+  if (modal.tagName === 'LEX-MODAL') {
+    modal.open = false;
+    return;
+  }
   modal.classList.add('hidden');
   modal.classList.remove('flex');
+}
+
+// The lex-modal header close (lex-close) runs the same cleanup as Cancel.
+// skills.html has its own #createSkillModal (handled by skills.js); this
+// builder is the one carrying #simple-workflow-mode.
+document.addEventListener('lex-close', function(e) {
+  var target = e.target;
+  if (!target || target.tagName !== 'LEX-MODAL') return;
+  if (target.id === 'createSkillModal' && target.querySelector('#simple-workflow-mode')) {
+    closeCreateSkillModal();
+  } else if (target.id === 'importSkillModal') {
+    closeImportSkillModal();
+  }
+});
+
+function closeCreateSkillModal() {
+  const modal = document.getElementById('createSkillModal');
+  hideSkillModal(modal);
   // Clear individual inputs (no form element exists)
   var nameEl = document.getElementById('skill_name');
   var descEl = document.getElementById('skill_description');
@@ -216,7 +240,7 @@ function closeCreateSkillModal() {
   skillSteps = [];
   var stepsContainer = document.getElementById('workflow-steps-container');
   if (stepsContainer) {
-    var steps = stepsContainer.querySelectorAll('.workflow-step-card');
+    var steps = stepsContainer.querySelectorAll('.workflow-step, .workflow-step-card');
     steps.forEach(function(s) { s.remove(); });
   }
 }
@@ -230,8 +254,7 @@ let importSkillData = null;
 
 function closeImportSkillModal() {
   const modal = document.getElementById('importSkillModal');
-  modal.classList.add('hidden');
-  modal.classList.remove('flex');
+  hideSkillModal(modal);
   clearSkillFile();
 }
 

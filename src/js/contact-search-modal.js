@@ -1,8 +1,8 @@
 /**
  * Contact Search Modal
  * Search for existing contacts across the organization and link them to a matter.
- * Supports role selection when linking via a custom styled dropdown.
- * Rendered in a lex-modal (requires lex-modal.js on the page).
+ * Supports role selection when linking via a lex-select per result.
+ * Rendered in a lex-modal (requires lex-modal.js and lex-select.js on the page).
  */
 
 const ContactSearchModal = {
@@ -95,11 +95,11 @@ const ContactSearchModal = {
     // The modal's close button, backdrop and Escape close it; reset state.
     this.modal.addEventListener('lex-close', () => this.close());
 
-    // Close role dropdowns when clicking outside
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('[id^="role-wrapper-"]')) {
-        this.closeAllDropdowns();
-      }
+    // Role pickers are lex-selects; remember each contact's choice.
+    this.resultsContainer.addEventListener('lex-change', (e) => {
+      const select = e.target.closest ? e.target.closest('[data-role-select]') : null;
+      if (!select || !e.detail) return;
+      this.selectRole(select.getAttribute('data-contact-id'), e.detail.value);
     });
   },
 
@@ -255,22 +255,11 @@ const ContactSearchModal = {
     const currentRole = this.selectedRoles[contact.id];
     const currentRoleLabel = this.getRoleLabel(currentRole);
 
-    // Build custom role dropdown options
-    const roleOptions = this.roles.map(r => {
-      const isSelected = r.role_key === currentRole;
-      return `
-        <button
-          data-role-key="${this.escapeAttr(r.role_key)}"
-          onclick="event.stopPropagation(); ContactSearchModal.selectRole('${escapedContactId}', '${this.escapeAttr(r.role_key)}', '${this.escapeAttr(r.role_label)}')"
-          class="w-full text-left px-3 py-2 text-xs flex items-center justify-between transition-colors hover:bg-indigo-50 hover:text-indigo-700 ${isSelected ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'}"
-        >
-          <span>${this.escapeHtml(r.role_label)}</span>
-          <svg class="w-3.5 h-3.5 role-check ${isSelected ? 'text-indigo-600' : 'hidden'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-        </button>
-      `;
-    }).join('');
+    // Role picker options (lex-select)
+    const roleOptions = this.roles.map(r => ({ value: r.role_key, label: r.role_label }));
+    if (!roleOptions.some(o => o.value === currentRole)) {
+      roleOptions.unshift({ value: currentRole, label: currentRoleLabel });
+    }
 
     return `
       <div class="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 transition-colors" data-contact-id="${escapedContactId}">
@@ -297,28 +286,17 @@ const ContactSearchModal = {
             ` : ''}
           </div>
           <div class="flex flex-col items-end gap-2 flex-shrink-0">
-            <!-- Custom styled role dropdown -->
-            <div class="relative" id="role-wrapper-${escapedContactId}">
-              <button
-                onclick="event.stopPropagation(); ContactSearchModal.toggleRoleDropdown('${escapedContactId}')"
-                class="flex items-center gap-1.5 text-xs font-medium border border-gray-200 rounded-lg px-3 py-1.5 bg-gray-50 hover:bg-white hover:border-indigo-300 text-gray-700 transition-all min-w-[140px] justify-between shadow-sm"
-                id="role-trigger-${escapedContactId}"
-              >
-                <span class="flex items-center gap-1.5">
-                  <svg class="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                  </svg>
-                  <span id="role-label-${escapedContactId}" class="truncate">${this.escapeHtml(currentRoleLabel)}</span>
-                </span>
-                <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </button>
-              <div id="role-dropdown-${escapedContactId}" class="hidden absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-56 overflow-y-auto">
-                <div class="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">Select Role</div>
-                ${roleOptions}
-              </div>
-            </div>
+            <lex-select
+              class="contact-role-select"
+              style="min-width: 10rem"
+              data-role-select
+              data-contact-id="${escapedContactId}"
+              id="role-select-${escapedContactId}"
+              size="sm"
+              aria-label="Role"
+              value="${this.escapeAttr(currentRole)}"
+              options="${this.escapeAttr(JSON.stringify(roleOptions))}"
+            ></lex-select>
             <button
               onclick="ContactSearchModal.linkContact('${escapedContactId}')"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-medium transition-colors shadow-sm"
@@ -335,69 +313,13 @@ const ContactSearchModal = {
   },
 
   /**
-   * Toggle a role dropdown open/closed
-   * @param {string} contactId - Contact UUID
-   */
-  toggleRoleDropdown(contactId) {
-    const dropdown = document.getElementById('role-dropdown-' + contactId);
-    if (!dropdown) return;
-
-    // Close all other dropdowns first
-    this.closeAllDropdowns(contactId);
-
-    if (dropdown.classList.contains('hidden')) {
-      dropdown.classList.remove('hidden');
-    } else {
-      dropdown.classList.add('hidden');
-    }
-  },
-
-  /**
-   * Select a role for a contact
+   * Remember the role chosen for a contact (its lex-select fires lex-change)
    * @param {string} contactId - Contact UUID
    * @param {string} roleKey - Role key
-   * @param {string} roleLabel - Role display label
    */
-  selectRole(contactId, roleKey, roleLabel) {
+  selectRole(contactId, roleKey) {
+    if (!contactId || !roleKey) return;
     this.selectedRoles[contactId] = roleKey;
-
-    // Update trigger label
-    const label = document.getElementById('role-label-' + contactId);
-    if (label) label.textContent = roleLabel;
-
-    // Update visual state in dropdown
-    const dropdown = document.getElementById('role-dropdown-' + contactId);
-    if (dropdown) {
-      const options = dropdown.querySelectorAll('[data-role-key]');
-      for (let i = 0; i < options.length; i++) {
-        const opt = options[i];
-        const optKey = opt.getAttribute('data-role-key');
-        const check = opt.querySelector('.role-check');
-        if (optKey === roleKey) {
-          opt.classList.add('bg-indigo-50', 'text-indigo-700', 'font-medium');
-          opt.classList.remove('text-gray-700');
-          if (check) { check.classList.remove('hidden'); check.classList.add('text-indigo-600'); }
-        } else {
-          opt.classList.remove('bg-indigo-50', 'text-indigo-700', 'font-medium');
-          opt.classList.add('text-gray-700');
-          if (check) { check.classList.add('hidden'); }
-        }
-      }
-
-      dropdown.classList.add('hidden');
-    }
-  },
-
-  /**
-   * Close all role dropdowns
-   * @param {string} exceptId - Contact ID to keep open (optional)
-   */
-  closeAllDropdowns(exceptId) {
-    const dropdowns = document.querySelectorAll('[id^="role-dropdown-"]');
-    for (let i = 0; i < dropdowns.length; i++) {
-      if (exceptId && dropdowns[i].id === 'role-dropdown-' + exceptId) continue;
-      dropdowns[i].classList.add('hidden');
-    }
   },
 
   /**

@@ -140,6 +140,9 @@
     var newFolderForm = document.getElementById('newFolderForm');
     newFolderForm && newFolderForm.addEventListener('submit', handleCreateFolder);
 
+    // Workspace folder menus (lex-dropdown-btn) on cards and list rows.
+    trackDocListener('lex-select', handleMatterMenuSelect);
+
     // Refresh Recently Opened / Pinned when returning to the Library (e.g. back
     // from the file viewer). Opening a file logs a file_activity row server-side;
     // a back/forward restore reuses the cached page without re-running onEnter,
@@ -698,13 +701,9 @@
 
       var dataAttrs = 'data-is-matter="true" data-matter-id="' + escapeHtml(folder.matter_id) + '" data-name="' + escapeHtml(folder.name) + '"';
 
-      var menuButtonAttrs = 'data-matter-id="' + escapeHtml(folder.matter_id) + '" data-matter-name="' + escapeHtml(folder.name) + '" data-is-pinned="' + (folder.is_pinned || false) + '" data-source="' + escapeHtml(folder.source || 'lana') + '" onclick="event.stopPropagation(); showMatterActionsModal(event)"';
-
       return [
         '<div class="grid-item rounded-lg border p-4 cursor-pointer hover:shadow-md transition-shadow relative group" style="background: var(--lex-bg-primary); border-color: var(--lex-border-default)" ' + dataAttrs + ' onclick="handleFolderClick(this)">',
-        '  <button class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-tertiary); opacity: 1" ' + menuButtonAttrs + '>',
-        '    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>',
-        '  </button>',
+        '  ' + matterMenuHtml(folder.matter_id, folder.name, folder.is_pinned, folder.source, 'absolute top-2 right-2'),
         '  <div class="flex flex-col items-center">',
         '    <svg class="w-16 h-16 mb-2" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
         '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>',
@@ -733,7 +732,6 @@
 
   var LIST_FOLDER_ICON = '<svg class="drive-list-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>';
   var LIST_NOTE_ICON = '<svg class="drive-list-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
-  var MENU_DOTS_ICON = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>';
 
   // Knowledgebase notes in the list, by row index, for promote / unpromote.
   var listBrainchildNotes = [];
@@ -864,10 +862,7 @@
       actions: function (val, row) {
         if (row.kind === 'matter') {
           var folder = row._matter;
-          return '<button type="button" class="drive-list-menu" aria-label="Workspace actions"' +
-            ' data-matter-id="' + escapeHtml(folder.matter_id) + '" data-matter-name="' + escapeHtml(folder.name) + '"' +
-            ' data-is-pinned="' + (folder.is_pinned || false) + '" data-source="' + escapeHtml(folder.source || 'lana') + '"' +
-            ' onclick="event.stopPropagation(); showMatterActionsModal(event)">' + MENU_DOTS_ICON + '</button>';
+          return matterMenuHtml(folder.matter_id, folder.name, folder.is_pinned, folder.source, 'drive-list-menu');
         }
         if (row.kind === 'bc-note') {
           return brainchildPromoteControl(row._note, row.index, escapeHtml(row.path), brainchildScope && brainchildScope.canPromote());
@@ -2188,88 +2183,85 @@
   // ── Matter actions modal ─────────────────────────────────────────────
 
   /**
-   * Show the matter actions modal (open, pin, delete) for a matter card.
-   * Reads matter data from the triggering button's dataset attributes.
-   * @param {Event} event
+   * Workspace folder menu (Open / Pin or Unpin / Delete) on grid cards, list
+   * rows and pinned/recent cards: a lex-dropdown-btn whose data attributes
+   * carry the folder. The click is stopped at the host so it does not open
+   * the folder underneath; handleMatterMenuSelect runs the item.
+   * @param {string} matterId
+   * @param {string} matterName
+   * @param {boolean} isPinned
+   * @param {string} source
+   * @param {string} className
+   * @returns {string} HTML
    */
-  function showMatterActionsModal(event) {
-    console.log('[Drive] Show matter actions modal');
+  function matterMenuHtml(matterId, matterName, isPinned, source, className) {
+    var items = [
+      { value: 'open', label: 'Open Folder', icon: 'folder-open' },
+      { value: 'pin', label: isPinned ? 'Unpin Folder' : 'Pin Folder', icon: 'pin' },
+      { divider: true },
+      { value: 'delete', label: 'Delete Folder', icon: 'trash-2', danger: true }
+    ];
+    var json = JSON.stringify(items).split('&').join('&amp;').split('"').join('&quot;')
+      .split('<').join('&lt;').split('>').join('&gt;');
+    return '<lex-dropdown-btn class="' + className + '" data-matter-menu' +
+      ' data-matter-id="' + escapeHtml(matterId) + '" data-matter-name="' + escapeHtml(matterName) + '"' +
+      ' data-is-pinned="' + (isPinned ? 'true' : 'false') + '" data-source="' + escapeHtml(source || 'lana') + '"' +
+      ' icon="more-vertical" icon-only variant="ghost" align="end" aria-label="Folder actions"' +
+      ' options="' + json + '" onclick="event.stopPropagation()"></lex-dropdown-btn>';
+  }
 
-    var button = event.currentTarget;
-    var matterId = button.dataset.matterId;
-    var matterName = button.dataset.matterName;
-    var isPinned = button.dataset.isPinned === 'true';
-    var source = button.dataset.source || 'lana';
-
-    console.log('[Drive] Matter data:', { matterId: matterId, matterName: matterName, isPinned: isPinned, source: source });
-
+  /**
+   * A folder menu item was chosen: read the folder from the menu host and
+   * run the action.
+   * @param {CustomEvent} event - lex-select
+   */
+  function handleMatterMenuSelect(event) {
+    var host = event.target && event.target.closest ? event.target.closest('lex-dropdown-btn[data-matter-menu]') : null;
+    if (!host || !event.detail) return;
     selectedMatter = {
-      matterId: matterId,
-      matterName: matterName,
-      isPinned: isPinned,
-      source: source
+      matterId: host.getAttribute('data-matter-id'),
+      matterName: host.getAttribute('data-matter-name'),
+      isPinned: host.getAttribute('data-is-pinned') === 'true',
+      source: host.getAttribute('data-source') || 'lana'
     };
-
-    var nameEl = document.getElementById('modalMatterName');
-    var idEl = document.getElementById('modalMatterId');
-    if (nameEl) nameEl.textContent = matterName;
-    if (idEl) idEl.textContent = matterId;
-
-    var pinLabel = document.getElementById('pinBtnLabel');
-    var pinDesc = document.getElementById('pinBtnDesc');
-    if (isPinned) {
-      if (pinLabel) pinLabel.textContent = 'Unpin Folder';
-      if (pinDesc) pinDesc.textContent = 'Remove from pinned folders';
-    } else {
-      if (pinLabel) pinLabel.textContent = 'Pin Folder';
-      if (pinDesc) pinDesc.textContent = 'Add to pinned folders';
-    }
-
-    var modal = document.getElementById('matterActionsModal');
-    if (modal) modal.open = true;
+    var action = event.detail.value;
+    if (action === 'open') openSelectedMatter();
+    else if (action === 'pin') togglePinSelectedMatter();
+    else if (action === 'delete') deleteSelectedMatter();
   }
 
   /**
-   * Close the matter actions modal and clear selectedMatter.
+   * Open the selected matter (navigate into it).
    */
-  function closeMatterActionsModal() {
-    var modal = document.getElementById('matterActionsModal');
-    if (modal) modal.open = false;
-    selectedMatter = null;
-  }
-
-  /**
-   * Open the selected matter (navigate into it) from the actions modal.
-   */
-  function openMatterFromModal() {
+  function openSelectedMatter() {
     if (!selectedMatter) return;
 
     var matterId = selectedMatter.matterId;
     var matterName = selectedMatter.matterName;
 
-    closeMatterActionsModal();
+    selectedMatter = null;
     navigateToMatter(matterId, matterName);
   }
 
   /**
-   * Toggle the pin state of the selected matter from the actions modal.
+   * Toggle the pin state of the selected matter.
    */
-  async function togglePinFromModal() {
+  async function togglePinSelectedMatter() {
     if (!selectedMatter) return;
 
     var matterId = selectedMatter.matterId;
     var source = selectedMatter.source;
     var isPinned = selectedMatter.isPinned;
 
-    closeMatterActionsModal();
+    selectedMatter = null;
     await togglePin(matterId, source, isPinned);
   }
 
   /**
-   * Initiate matter deletion from the actions modal.
-   * Transitions to a separate delete confirmation modal.
+   * Initiate deletion of the selected matter: opens the delete confirmation
+   * modal.
    */
-  function deleteMatterFromModal() {
+  function deleteSelectedMatter() {
     if (!selectedMatter) return;
 
     var nameEl = document.getElementById('deleteConfirmMatterName');
@@ -2281,9 +2273,6 @@
       btn.textContent = 'Delete Folder';
       btn.classList.remove('opacity-50', 'cursor-not-allowed');
     }
-
-    var optionsModal = document.getElementById('matterActionsModal');
-    if (optionsModal) optionsModal.open = false;
 
     var confirmModal = document.getElementById('deleteMatterConfirmModal');
     if (confirmModal) confirmModal.open = true;
@@ -2559,17 +2548,7 @@
       isPinned
         ? '<div class="absolute top-2 right-8 p-1 rounded-full" style="background: var(--lex-status-warning-bg); border: 1px solid var(--lex-status-warning-border)" title="Pinned"><svg class="w-3 h-3" style="color: var(--lex-status-warning-text)" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg></div>'
         : '',
-      '<button class="matter-menu-btn absolute top-2 right-2 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--lex-text-secondary)"',
-      '        data-matter-id="' + matterNumber + '"',
-      '        data-matter-name="' + matterName + '"',
-      '        data-is-pinned="' + (matter.is_pinned || isPinned) + '"',
-      '        data-source="' + escapeHtml(matter.source || 'lana') + '"',
-      '        onclick="event.stopPropagation(); showMatterActionsModal(event)"',
-      '        title="More options">',
-      '  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-      '    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>',
-      '  </svg>',
-      '</button>',
+      matterMenuHtml(matter.matter_id || '', matter.name || matter.matter_id, matter.is_pinned || isPinned, matter.source, 'matter-menu-btn absolute top-2 right-2'),
       '<div class="flex flex-col items-center text-center">',
       '  <div class="w-12 h-12 mb-3 flex items-center justify-center">',
       '    <svg class="w-12 h-12" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
@@ -2678,11 +2657,6 @@
     exposeGlobal('handleFolderClick', handleFolderClick);
     exposeGlobal('navigateToMatter', navigateToMatter);
     exposeGlobal('navigateToRoot', navigateToRoot);
-    exposeGlobal('showMatterActionsModal', showMatterActionsModal);
-    exposeGlobal('closeMatterActionsModal', closeMatterActionsModal);
-    exposeGlobal('openMatterFromModal', openMatterFromModal);
-    exposeGlobal('togglePinFromModal', togglePinFromModal);
-    exposeGlobal('deleteMatterFromModal', deleteMatterFromModal);
     exposeGlobal('closeDeleteMatterConfirmModal', closeDeleteMatterConfirmModal);
     exposeGlobal('confirmDeleteMatter', confirmDeleteMatter);
     exposeGlobal('togglePin', togglePin);

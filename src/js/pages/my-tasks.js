@@ -3,7 +3,6 @@
 
   var state = {
     tasks: [],
-    newMenuOpen: false,
     // Create/Edit Task modal selections
     editingTaskId: null,           // null when creating, set when editing
     viewingTask: null,             // currently open in the details modal
@@ -1072,46 +1071,15 @@
     if (!wrap) return;
 
     var isComplete = normalizeStatus(task.status) === 'complete';
-    var completeLabel = isComplete ? 'Reopen' : 'Mark Complete';
-    var completeAction = isComplete ? 'reopen' : 'complete';
-
-    var chevron = '<svg class="my-task-actions-btn__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
-    wrap.innerHTML = [
-      '<button type="button" class="my-task-actions-btn" data-task-actions-toggle aria-haspopup="true" aria-expanded="false">',
-      '  <span>Actions</span>' + chevron,
-      '</button>',
-      '<div class="my-task-actions-menu hidden" role="menu">',
-      '  <button type="button" role="menuitem" data-task-action="edit">Edit</button>',
-      '  <button type="button" role="menuitem" data-task-action="' + completeAction + '">' + completeLabel + '</button>',
-      '  <button type="button" role="menuitem" class="my-task-actions-menu__danger" data-task-action="delete">Delete</button>',
-      '</div>'
-    ].join('');
-  }
-
-  function taskActionsEls() {
-    var modal = el('myTaskDetailsModal');
-    if (!modal) return {};
-    return {
-      menu: modal.querySelector('.my-task-actions-menu'),
-      toggle: modal.querySelector('[data-task-actions-toggle]')
-    };
-  }
-
-  function toggleTaskActionsMenu() {
-    var refs = taskActionsEls();
-    if (!refs.menu) return;
-    if (refs.menu.classList.contains('hidden')) {
-      refs.menu.classList.remove('hidden');
-      if (refs.toggle) refs.toggle.setAttribute('aria-expanded', 'true');
-    } else {
-      closeTaskActionsMenu();
-    }
-  }
-
-  function closeTaskActionsMenu() {
-    var refs = taskActionsEls();
-    if (refs.menu) refs.menu.classList.add('hidden');
-    if (refs.toggle) refs.toggle.setAttribute('aria-expanded', 'false');
+    var items = [
+      { value: 'edit', label: 'Edit', icon: 'edit' },
+      { value: isComplete ? 'reopen' : 'complete', label: isComplete ? 'Reopen' : 'Mark Complete', icon: isComplete ? 'rotate-ccw' : 'check' },
+      { divider: true },
+      { value: 'delete', label: 'Delete', icon: 'trash-2', danger: true }
+    ];
+    var json = JSON.stringify(items).split('&').join('&amp;').split('"').join('&quot;')
+      .split('<').join('&lt;').split('>').join('&gt;');
+    wrap.innerHTML = '<lex-dropdown-btn data-task-actions-menu button-label="Actions" align="end" options="' + json + '"></lex-dropdown-btn>';
   }
 
   function closeoutValue(id) {
@@ -1440,42 +1408,19 @@
     return false;
   }
 
-  function syncNewMenuVisibility() {
-    var menu = el('myTasksNewMenu');
-    var btn = el('myTasksNewBtn');
-    if (!menu) return;
-    if (state.newMenuOpen) {
-      menu.classList.remove('hidden');
-      if (btn) btn.setAttribute('aria-expanded', 'true');
-    } else {
-      menu.classList.add('hidden');
-      if (btn) btn.setAttribute('aria-expanded', 'false');
-    }
-  }
-
-  function toggleNewMenu(force) {
-    state.newMenuOpen = typeof force === 'boolean' ? force : !state.newMenuOpen;
-    syncNewMenuVisibility();
-  }
-
-  function hideNewMenu() {
-    if (!state.newMenuOpen) return;
-    state.newMenuOpen = false;
-    syncNewMenuVisibility();
-  }
-
+  // Items of the "New Task" menu (#myTasksNewBtn, a lex-dropdown-btn). New
+  // Task Plan is listed only for roles that may create plans. Set as an
+  // attribute so a re-render of the lex-banner around it keeps the items.
   function applyTaskPlanRoleGate() {
-    var menu = el('myTasksNewMenu');
+    var menu = el('myTasksNewBtn');
     if (!menu) return;
-    var canPlans = canCreateTaskPlans();
-    var planItem = menu.querySelector('[data-new-action="task-plan"]');
-    if (planItem) {
-      if (canPlans) {
-        planItem.classList.remove('hidden');
-      } else {
-        planItem.classList.add('hidden');
-      }
+    var items = [
+      { value: 'task', label: 'New Task', description: 'Create a single task on a matter' }
+    ];
+    if (canCreateTaskPlans()) {
+      items.push({ value: 'task-plan', label: 'New Task Plan', description: 'Draft a checklist that publishes to tasks' });
     }
+    menu.setAttribute('options', JSON.stringify(items));
   }
 
   // --- Matter picker (Create Task modal) ----------------------------------
@@ -2675,7 +2620,6 @@
   }
 
   function handleNewMenuClick(action) {
-    hideNewMenu();
     if (action === 'task') {
       openNewTaskModal();
       return;
@@ -2982,52 +2926,25 @@
       });
     }
 
-    // Header "Actions" dropdown (Edit / Mark Complete / Delete). The toggle
-    // and menu live in the modal header, outside #myTaskDetailsContent.
+    // Header "Actions" menu (lex-dropdown-btn: Edit / Mark Complete or
+    // Reopen / Delete). It lives in the modal header, outside
+    // #myTaskDetailsContent.
     var detailsModal = el('myTaskDetailsModal');
     if (detailsModal) {
-      detailsModal.addEventListener('click', function (event) {
-        if (event.target.closest('[data-task-actions-toggle]')) {
-          event.stopPropagation();
-          toggleTaskActionsMenu();
-          return;
-        }
-        var menuItem = event.target.closest('.my-task-actions-menu [data-task-action]');
-        if (menuItem) {
-          event.stopPropagation();
-          closeTaskActionsMenu();
-          handleTaskAction(menuItem.getAttribute('data-task-action'));
-        }
+      detailsModal.addEventListener('lex-select', function (event) {
+        if (!event.target.closest || !event.target.closest('[data-task-actions-menu]')) return;
+        handleTaskAction(event.detail && event.detail.value);
       });
     }
-    // Dismiss the actions menu on any outside click.
-    document.addEventListener('click', function (event) {
-      if (!event.target.closest('.my-task-header-actions')) closeTaskActionsMenu();
-    });
 
+    // "New Task" menu (lex-dropdown-btn): New Task / New Task Plan.
     var newBtn = el('myTasksNewBtn');
-    var newMenu = el('myTasksNewMenu');
     if (newBtn) {
-      newBtn.addEventListener('click', function (event) {
-        event.stopPropagation();
-        toggleNewMenu();
+      newBtn.addEventListener('lex-select', function (event) {
+        handleNewMenuClick(event.detail && event.detail.value);
       });
     }
-    if (newMenu) {
-      newMenu.addEventListener('click', function (event) {
-        var item = event.target.closest('[data-new-action]');
-        if (!item) return;
-        event.stopPropagation();
-        handleNewMenuClick(item.getAttribute('data-new-action'));
-      });
-    }
-    document.addEventListener('click', function (event) {
-      if (!state.newMenuOpen) return;
-      var wrapper = event.target.closest('.my-tasks-new-wrapper');
-      if (!wrapper) hideNewMenu();
-    });
     document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape') hideNewMenu();
       if (event.key && event.key.toLowerCase() === 'm' && state.viewingTask) {
         var tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';
         var editable = event.target && event.target.isContentEditable;

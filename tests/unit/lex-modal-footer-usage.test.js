@@ -52,9 +52,13 @@ describe('lex-modal footers are in footer-content, not the body', () => {
       expect(footer.querySelector('#' + buttonId)).toBeTruthy();
       expect(modal.querySelector('#' + buttonId)).toBeNull();
     });
-    // Moved out of the lex-form, a footer button must not rely on the form's
-    // submit-button delegation.
-    expect(footer.querySelector('[type="submit"]')).toBeNull();
+    // Moved out of the lex-form, a footer submit button must name its form
+    // (lex-form handles <lex-btn type="submit" form="id"> from outside).
+    footer.querySelectorAll('[type="submit"]').forEach((btn) => {
+      const formId = btn.getAttribute('form');
+      expect(formId).toBeTruthy();
+      expect(modal.querySelector('lex-form#' + formId)).toBeTruthy();
+    });
   });
 
   test('connector actions/accounts modals close from the footer', () => {
@@ -78,8 +82,11 @@ describe('lex-modal footers are in footer-content, not the body', () => {
     expect(tasks).toContain("bindFooterSubmit(el('myTaskSaveBtn'), createForm, submitNewTask)");
     expect(tasks).toContain("bindFooterSubmit(el('myTaskPlanSaveBtn'), planForm, submitNewTaskPlan)");
     const users = read('js/admin/admin-user-details.js');
-    expect(users).toContain("_bindFooterSubmit(el('userModalSaveBtn'), form, onSubmit)");
-    expect(users).toContain("_bindFooterSubmit(el('resetPasswordSubmitBtn'), form, onSubmit)");
+    expect(users).not.toContain('_bindFooterSubmit');
+    const page = read('admin/user-details.html');
+    expect(footerOf(modalFrom('admin/user-details.html', 'userModal')).querySelector('#userModalSaveBtn[type="submit"][form="userForm"]')).toBeTruthy();
+    expect(footerOf(modalFrom('admin/user-details.html', 'resetPasswordModal')).querySelector('#resetPasswordSubmitBtn[type="submit"][form="resetPasswordForm"]')).toBeTruthy();
+    expect(page).toContain('<lex-form id="resetPasswordForm">');
   });
 });
 

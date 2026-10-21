@@ -42,6 +42,7 @@
         'js/lex/components/foundation/lex-tabs.js',
         'js/lex/components/foundation/lex-accordion.js',
         'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-dropdown-btn.js',
         'js/lex/components/form/lex-checkbox.js',
         'js/lex/components/form/lex-textarea.js',
         'js/lex/components/data/lex-table.js',
@@ -262,6 +263,7 @@
         'js/lex/components/foundation/lex-modal.js',
         'js/lex/components/form/lex-input.js',
         'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-dropdown-btn.js',
         'js/lex/components/data/lex-table.js',
         'js/shared/library-column-filters.js',
         'js/shared/list-query-params.js',
@@ -288,6 +290,7 @@
         'js/lex/components/foundation/lex-modal.js',
         'js/lex/components/form/lex-input.js',
         'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-dropdown-btn.js',
         'js/lex/components/form/lex-checkbox.js',
         'js/lex/components/form/lex-textarea.js',
         // Page controller
