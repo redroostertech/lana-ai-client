@@ -1579,3 +1579,38 @@
 #activityDrawerTable .wd-table-name strong { font-weight: 600; }
 .wd-table-muted { color: var(--lex-text-secondary); }
 .wd-table-time { white-space: nowrap; }
+
+/* ── Learned Document Types (Document Generation tab) ──
+   Type, Source, Documents, Confidence, Structure, Created
+   (rows and renderers in js/shared/document-types-table.js) */
+.wd-doc-types-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.wd-doc-types-search { flex: 1; min-width: 200px; }
+#docTypesTable table { min-width: 760px; table-layout: fixed; }
+#docTypesTable th { white-space: nowrap; }
+#docTypesTable th:nth-child(2) { width: 130px; }
+#docTypesTable th:nth-child(3) { width: 110px; }
+#docTypesTable th:nth-child(4) { width: 120px; }
+#docTypesTable th:nth-child(5) { width: 120px; }
+#docTypesTable th:nth-child(6) { width: 176px; }
+#docTypesTable td { overflow: hidden; }
+#docTypesTable .wd-table-name {
+  color: var(--lex-text-primary);
+  display: block;
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+#docTypesTable .wd-table-sub {
+  color: var(--lex-text-tertiary);
+  display: block;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#docTypesTable .wd-table-num { font-variant-numeric: tabular-nums; }

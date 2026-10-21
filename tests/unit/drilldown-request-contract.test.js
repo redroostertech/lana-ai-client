@@ -27,6 +27,7 @@ describe('drilldown metadata request contract', () => {
       createElement: jest.fn(() => element())
     };
     global.window = { api: { get: jest.fn(), post: jest.fn().mockResolvedValue({ data: { rows: [], values: [] } }) },
+      Lex: { Toast: { error: jest.fn() } },
       URL: { createObjectURL: jest.fn(() => 'blob:mock'), revokeObjectURL: jest.fn() } };
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ data: { rows: [], values: [] } }), blob: async () => ({}) });
     global.alert = jest.fn();
@@ -95,7 +96,7 @@ describe('drilldown metadata request contract', () => {
   test('legacy browser execute and distinct preserve date shape', async () => {
     configure(undefined); window.api = null;
     await renderer.fetchData();
-    expect(fetchBody()).toMatchObject({ ...PERIOD, page: 3, pageSize: 25 });
+    expect(fetchBody()).toMatchObject({ ...PERIOD, page: 3, pageSize: 20 });
     fetch.mockClear();
     await renderer.fetchDistinctValues('status');
     expect(fetchBody()).toMatchObject({ ...PERIOD, search: 'Needle', filters: { source: ['source-qualified-key'] } });
@@ -163,7 +164,7 @@ describe('drilldown metadata request contract', () => {
     const body = transport === 'api' ? window.api.post.mock.calls[0][1] : fetchBody();
     expect(body).not.toHaveProperty('periodStart');
     expect(body).not.toHaveProperty('periodEnd');
-    expect(body).toMatchObject({ page: 3, pageSize: 25, filters: renderer.filters, search: 'Needle', sortBy: 'value', sortDirection: 'desc' });
+    expect(body).toMatchObject({ page: 3, pageSize: 20, filters: renderer.filters, search: 'Needle', sortBy: 'value', sortDirection: 'desc' });
   });
   test.each(['api', 'fetch'])('current distinct via %s omits dates and only its own filter', async transport => {
     configure('current_snapshot');
@@ -196,7 +197,7 @@ describe('drilldown metadata request contract', () => {
     expect(window.api.post).not.toHaveBeenCalled();
     await renderer.exportData('csv');
     expect(fetch).not.toHaveBeenCalled();
-    expect(alert).toHaveBeenCalled();
+    expect(window.Lex.Toast.error).toHaveBeenCalled();
   });
   test('reserved browser-transport override refuses without dropping into another request', async () => {
     configure('current_snapshot'); window.api = null;
@@ -217,7 +218,7 @@ describe('drilldown metadata request contract', () => {
     first.resolve({ drilldown: { temporal_mode: 'current_snapshot', title: 'Old', columns: [] } });
     await oldOpen;
     expect(renderer.currentConfig.metricKey).toBe('new-metric');
-    expect(nodes.get('drilldown-title').textContent).toBe('New');
+    expect(renderer.modal.heading).toBe('New');
     expect(window.api.post).toHaveBeenCalledTimes(1);
     expect(window.api.post.mock.calls[0][0]).toContain('/second-module/metrics/new-metric/');
   });
@@ -305,121 +306,92 @@ describe('drilldown metadata request contract', () => {
     expect(alert).not.toHaveBeenCalled();
   });
 
-  function popoverFixture() {
-    const attached = new Set();
-    const subnodes = new Map();
-    function interactive() {
-      const node = element(); node.handlers = {};
-      node.addEventListener = jest.fn((event, handler) => { node.handlers[event] = handler; });
-      node.querySelectorAll = () => [];
-      node.querySelector = () => null;
-      return node;
-    }
-    const pop = interactive();
-    pop.remove = jest.fn(() => attached.delete(pop));
-    pop.contains = target => target === pop;
-    pop.querySelector = selector => {
-      if (!subnodes.has(selector)) subnodes.set(selector, interactive());
-      return subnodes.get(selector);
+  function fakeTable() {
+    return {
+      attrs: {},
+      setAttribute: jest.fn(function (name, value) { this.attrs[name] = value; }),
+      setCellRenderers: jest.fn(),
+      setColumnFilterOptions: jest.fn(),
+      restoreQuery: jest.fn(),
+      setServerData: jest.fn(),
+      hidden: true
     };
-    const baseLookup = document.getElementById;
-    document.getElementById = jest.fn(id => id.startsWith('drilldown-col-') ? (attached.has(pop) && pop.id === id ? pop : null) : baseLookup(id));
-    document.createElement.mockReturnValue(pop);
-    document.body.appendChild.mockImplementation(node => attached.add(node));
-    document.body.contains = node => attached.has(node);
-    document.addEventListener = jest.fn(); document.removeEventListener = jest.fn();
-    renderer._positionPopover = jest.fn();
-    renderer.escapeHtml = value => String(value); // Synthetic labels only; not an escaping proof.
-    renderer.renderActiveFilters = jest.fn();
-    jest.spyOn(global, 'setTimeout').mockImplementation(callback => { callback(); return 0; });
-    return { pop, subnodes, attached, anchor: { getBoundingClientRect: () => ({}) } };
   }
-  test.each([false, true, undefined])('column filterable %s controls both affordance and direct fetch', async filterable => {
+  async function flush() { for (let i = 0; i < 5; i += 1) await Promise.resolve(); }
+
+  test.each([false, true, undefined])('column filterable %s controls both the header filter and direct fetch', async filterable => {
     configure('current_snapshot');
     renderer.currentConfig.columns = [{ field: 'value', header: 'Amount', type: 'text', filterable }];
-    renderer.currentData = { rows: [{ value: '-9007199254740993.0123456789' }] };
-    const filter = { dataset: { colFilter: 'value' }, addEventListener: jest.fn() };
-    document.querySelectorAll = selector => selector === '[data-col-filter]' && filterable !== false ? [filter] : [];
-    renderer.openColumnFilterPopover = jest.fn();
-    renderer.renderActiveFilters = jest.fn(); renderer.attachTooltipHandlers = jest.fn();
-    renderer.renderTable();
-    const html = nodes.get('drilldown-table-header').innerHTML;
-    expect(html.includes('data-col-filter="value"')).toBe(filterable !== false);
-    if (filterable !== false) {
-      const event = { stopPropagation: jest.fn() };
-      filter.addEventListener.mock.calls[0][1](event);
-      expect(event.stopPropagation).toHaveBeenCalledTimes(1);
-      expect(renderer.openColumnFilterPopover).toHaveBeenCalledWith(filter, renderer.currentConfig.columns[0]);
-      expect(html).toContain('cursor-pointer');
-    }
-    expect(nodes.get('drilldown-table-body').innerHTML).toContain('-9007199254740993.0123456789');
-    await renderer.fetchDistinctValues('value');
+    window.api.post.mockResolvedValue({ data: { values: [{ value: '-9007199254740993.0123456789', count: 1 }] } });
+    const table = fakeTable();
+    renderer.configureTable(table);
+    await flush();
+    expect(table.attrs.columns).toBe('value,_actions');
+    expect(table.attrs.labels).toBe('Amount,');
     expect(window.api.post).toHaveBeenCalledTimes(filterable === false ? 0 : 1);
+    const last = table.setColumnFilterOptions.mock.calls.at(-1)[0];
+    if (filterable === false) expect(last).not.toHaveProperty('value');
+    else expect(last.value.options).toEqual([{ value: '-9007199254740993.0123456789', label: '-9007199254740993.0123456789' }]);
+    const renderers = table.setCellRenderers.mock.calls[0][0];
+    expect(renderers.value('-9007199254740993.0123456789')).toContain('-9007199254740993.0123456789');
+    expect((await renderer.fetchDistinctValues('value')).error).toBe(filterable === false ? 'Filtering is not supported for this column' : undefined);
   });
   test('facet labels are presentation only: duplicate source labels retain distinct qualified values and null sentinel', async () => {
     configure('current_snapshot');
-    const fixture = popoverFixture();
+    renderer.currentConfig.columns = [{ field: 'source', header: 'Source' }];
+    renderer.renderActiveFilters = jest.fn();
     const keys = ['["connector","org","a","crm"]', '["connector","org","b","crm"]', 'null'];
-    renderer.filters = { source: keys };
-    window.api.post.mockResolvedValueOnce({ data: { values: keys.map((value, index) => ({ value,
-      label: index === 2 ? 'Unknown provenance' : 'Same source', count: 1 })) } });
-    const loading = jest.spyOn(renderer, 'fetchDistinctValues');
-    renderer.openColumnFilterPopover(fixture.anchor, { field: 'source', header: 'Source' });
-    await loading.mock.results[0].value;
-    const html = fixture.subnodes.get('[data-role="body"]').innerHTML;
-    expect(html).toContain('Same source'); expect(html).toContain('Unknown provenance');
-    fixture.subnodes.get('[data-action="apply"]').handlers.click();
+    const options = DrilldownRenderer.filterOptionsFor({ field: 'source' }, keys.map((value, index) => ({ value,
+      label: index === 2 ? 'Unknown provenance' : 'Same source', count: 1 })));
+    expect(options.map(o => o.value)).toEqual(keys);
+    expect(options.map(o => o.label)).toEqual(['Same source', 'Same source', 'Unknown provenance']);
+    renderer.applyTableQuery({ page: 1, limit: 20, filters: { source: { operator: 'in', value: keys } } });
+    await flush();
     expect(renderer.filters.source).toEqual(keys);
-    expect(window.api.post.mock.calls[1][1].filters.source).toEqual(keys);
+    expect(window.api.post.mock.calls[0][1].filters.source).toEqual(keys);
   });
-  test.each(['unchanged', 'close', 'new-open'])('distinct popover completion is owned by original context: %s', async change => {
+  test.each(['unchanged', 'close', 'new-open'])('distinct filter options are owned by the original context: %s', async change => {
     configure('current_snapshot');
-    const fixture = popoverFixture();
+    renderer.currentConfig.columns = [{ field: 'status', header: 'Status' }];
     const pending = deferred();
     window.api.post.mockReturnValueOnce(pending.promise);
-    const loading = jest.spyOn(renderer, 'fetchDistinctValues');
-    renderer.openColumnFilterPopover(fixture.anchor, { field: 'status', header: 'Status' });
+    const table = fakeTable();
+    renderer.configureTable(table);
     if (change === 'close') renderer.close();
     if (change === 'new-open') { metadata('current_snapshot'); await renderer.open('example', 'new', {}); }
     pending.resolve({ data: { values: [{ value: 'old-status', count: 1 }] } });
-    await loading.mock.results[0].value;
-    if (change === 'unchanged') {
-      expect(fixture.subnodes.get('[data-role="body"]').innerHTML).toContain('old-status');
-      expect(fixture.attached.has(fixture.pop)).toBe(true);
-    } else {
-      expect(fixture.attached.has(fixture.pop)).toBe(false);
-      expect(fixture.subnodes.get('[data-role="body"]').innerHTML || '').not.toContain('old-status');
-    }
+    await flush();
+    const applied = table.setColumnFilterOptions.mock.calls.slice(1).map(call => call[0]);
+    if (change === 'unchanged') expect(applied).toEqual([{ status: { options: [{ value: 'old-status', label: 'old-status' }] } }]);
+    else expect(applied).toEqual([]);
   });
-  test.each(['apply', 'clear'])('stale popover %s cannot modify newer context while distinct is pending', async action => {
+  test('a table query maps page, size, sort and column filters, keeping report selectors', async () => {
     configure('current_snapshot');
-    const fixture = popoverFixture(); const pending = deferred();
-    window.api.post.mockReturnValueOnce(pending.promise);
-    const loading = jest.spyOn(renderer, 'fetchDistinctValues');
-    renderer.openColumnFilterPopover(fixture.anchor, { field: 'status', header: 'Status' });
-    metadata('current_snapshot');
-    await renderer.open('example', 'new', { filters: { status: ['new-status'] } });
-    const calls = window.api.post.mock.calls.length;
-    fixture.subnodes.get(`[data-action="${action}"]`).handlers.click();
-    expect(renderer.filters).toEqual({ status: ['new-status'] });
-    expect(window.api.post).toHaveBeenCalledTimes(calls);
-    pending.resolve({ data: { values: [] } });
-    await loading.mock.results[0].value;
+    renderer.currentConfig.columns = [{ field: 'status', header: 'Status' }, { field: 'value', header: 'Value' }];
+    renderer.renderActiveFilters = jest.fn();
+    renderer.filters = { status: ['old'], source: ['source-qualified-key'] };
+    renderer.applyTableQuery({ page: 2, limit: 50, sortBy: 'value', sortDir: 'desc', filters: { status: { operator: 'in', value: ['open', 'won'] } } });
+    await flush();
+    expect(window.api.post.mock.calls[0][1]).toMatchObject({ page: 2, pageSize: 50, sortBy: 'value', sortDirection: 'desc',
+      filters: { status: ['open', 'won'], source: ['source-qualified-key'] } });
+    renderer.applyTableQuery({ page: 1, limit: 50, filters: {} });
+    await flush();
+    expect(window.api.post.mock.calls[1][1].filters).toEqual({ source: ['source-qualified-key'] });
+    expect(window.api.post.mock.calls[1][1].page).toBe(1);
   });
-  test.each(['apply', 'clear'])('active popover %s still updates filters and fetches its own context', async action => {
-    configure('current_snapshot');
-    const fixture = popoverFixture();
-    window.api.post.mockResolvedValueOnce({ data: { values: [{ value: 'open', count: 1 }] } });
-    const loading = jest.spyOn(renderer, 'fetchDistinctValues');
-    renderer.openColumnFilterPopover(fixture.anchor, { field: 'status', header: 'Status' });
-    await loading.mock.results[0].value;
-    fixture.subnodes.get(`[data-action="${action}"]`).handlers.click();
-    expect(window.api.post).toHaveBeenCalledTimes(2);
-    expect(window.api.post.mock.calls[1][0]).toContain('/example/metrics/stock/');
-    expect(renderer.currentPage).toBe(1);
-    if (action === 'apply') expect(renderer.filters.status).toEqual(['open']);
-    else expect(renderer.filters).not.toHaveProperty('status');
-    expect(fixture.attached.has(fixture.pop)).toBe(false);
+  test('table helpers: attributes, rows with raw values, filter state and badge colours', () => {
+    const attrs = DrilldownRenderer.tableAttributes([{ field: 'a', header: 'A, b' }, { field: 'b', header: 'B', sortable: false }, {}]);
+    expect(attrs).toEqual({ columns: 'a,b,_actions', labels: 'A  b,B,', sortableColumns: 'a' });
+    const rows = DrilldownRenderer.tableRows([{ a: '2026-10-01T00:00:00Z' }], 3, 20);
+    expect(rows[0]).toMatchObject({ a: '2026-10-01T00:00:00Z', _row_id: '40', _row_index: 0 });
+    expect(rows[0]._raw).toEqual({ a: '2026-10-01T00:00:00Z' });
+    expect(DrilldownRenderer.tableFilterState({ a: 'x', b: ['y'], hidden: ['z'] }, ['a', 'b']))
+      .toEqual({ a: { operator: 'in', value: ['x'] }, b: { operator: 'in', value: ['y'] } });
+    expect(DrilldownRenderer.badgeColor('bg-orange-100 text-orange-800')).toBe('yellow');
+    expect(DrilldownRenderer.badgeColor('bg-purple-100')).toBe('indigo');
+    expect(DrilldownRenderer.badgeColor('')).toBe('gray');
+    expect(DrilldownRenderer.filterOptionsFor({ type: 'badge' }, [{ value: 'in_pipeline', count: 2 }, { value: '', count: 1 }]))
+      .toEqual([{ value: 'in_pipeline', label: 'In pipeline' }]);
   });
   test('close invalidates pending metadata without a subsequent data request', async () => {
     const pending = deferred();

@@ -1,0 +1,86 @@
+/* Workflows pages: lex-table row actions and column widths
+   (docs/TABLE-STANDARD.md section 8). Cell styles come from
+   css/admin/admin-tables.css. */
+
+.workflow-table-actions {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+}
+
+.workflow-table-action {
+  background: none;
+  border: 0;
+  border-radius: var(--lex-radius-sm, 4px);
+  color: var(--lex-text-tertiary);
+  cursor: pointer;
+  padding: 6px;
+}
+
+.workflow-table-action:hover {
+  background: var(--lex-bg-secondary);
+  color: var(--lex-accent, #3b5bdb);
+}
+
+.workflow-table-action:focus-visible,
+.workflow-table-link:focus-visible {
+  box-shadow: var(--lex-focus-ring);
+  outline: none;
+}
+
+.workflow-table-link {
+  background: none;
+  border: 0;
+  color: var(--lex-accent, #3b5bdb);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  padding: 0;
+  white-space: nowrap;
+}
+
+#wfTable th,
+#execTable th,
+#logsTable th,
+#audTable th { white-space: nowrap; }
+
+#wfTable td:nth-child(4),
+#wfTable td:nth-child(5),
+#execTable td:nth-child(6),
+#logsTable td:nth-child(6),
+#audTable td:nth-child(5),
+#audTable td:nth-child(6) { white-space: nowrap; }
+
+/* Workflows: Workflow, Status, Trigger, Updated, Created, actions */
+#wfTable table { min-width: 860px; }
+#wfTable th:nth-child(2) { width: 120px; }
+#wfTable th:nth-child(3) { width: 120px; }
+#wfTable th:nth-child(4) { width: 150px; }
+#wfTable th:nth-child(5) { width: 176px; }
+#wfTable th:nth-child(6) { width: 96px; }
+
+/* Recent executions: Workflow, Status, Trigger, Records, Duration, Created */
+#execTable table { min-width: 860px; }
+#execTable th:nth-child(2) { width: 120px; }
+#execTable th:nth-child(3) { width: 120px; }
+#execTable th:nth-child(4) { width: 110px; }
+#execTable th:nth-child(5) { width: 120px; }
+#execTable th:nth-child(6) { width: 176px; }
+
+/* Execution logs: as above plus the details action */
+#logsTable table { min-width: 980px; }
+#logsTable th:nth-child(2) { width: 120px; }
+#logsTable th:nth-child(3) { width: 120px; }
+#logsTable th:nth-child(4) { width: 110px; }
+#logsTable th:nth-child(5) { width: 120px; }
+#logsTable th:nth-child(6) { width: 176px; }
+#logsTable th:nth-child(7) { width: 120px; }
+
+/* Audiences: Audience, Platform, Size, Sync status, Last sync, Created, actions */
+#audTable table { min-width: 1000px; }
+#audTable th:nth-child(2) { width: 120px; }
+#audTable th:nth-child(3) { width: 110px; }
+#audTable th:nth-child(4) { width: 140px; }
+#audTable th:nth-child(5) { width: 150px; }
+#audTable th:nth-child(6) { width: 176px; }
+#audTable th:nth-child(7) { width: 96px; }

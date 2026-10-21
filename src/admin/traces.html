@@ -215,25 +215,26 @@
           </div>
         </lex-card>
 
-        <!-- SSE Events -->
+        <!-- SSE Events (docs/TABLE-STANDARD.md; inside the detail view, so no toolbar) -->
         <lex-card>
-          <h3 class="text-base font-semibold lex-text-primary mb-4">SSE Events</h3>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr style="border-bottom:1px solid var(--lex-border-default);">
-                  <th class="px-4 py-2 text-left text-xs font-medium lex-text-tertiary uppercase">Event Type</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium lex-text-tertiary uppercase">Timestamp</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium lex-text-tertiary uppercase">Data</th>
-                </tr>
-              </thead>
-              <tbody id="sseEventsContainer">
-                <tr>
-                  <td colspan="3" class="px-4 py-4 text-sm lex-text-tertiary text-center">No SSE events recorded</td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-semibold lex-text-primary">SSE Events</h3>
+            <span id="sseEventsCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
           </div>
+          <lex-table
+            id="sseEventsTable"
+            class="admin-table lex-table--card"
+            column-filters
+            columns="event_type,event_data,time_since_request_ms,created_at"
+            labels="Event,Data,Offset,Created"
+            sortable-columns="event_type,time_since_request_ms,created_at"
+            sort-by="time_since_request_ms"
+            sort-dir="asc"
+            limit="20"
+            id-key="_key"
+            empty-text="No SSE events recorded"
+            aria-label="SSE events"
+          ></lex-table>
         </lex-card>
 
       </div>
@@ -296,6 +297,7 @@
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
@@ -307,6 +309,7 @@
   <!-- Page controller -->
   <script src="../js/shared/library-column-filters.js"></script>
   <script src="../js/admin/admin-table-kit.js"></script>
+  <script src="../js/admin/admin-client-tables.js"></script>
   <script src="../js/admin/admin-traces.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
