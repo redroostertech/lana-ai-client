@@ -23,6 +23,12 @@ if (typeof marked !== 'undefined' && marked) {
   console.warn('[DrilldownRenderer] Marked library not available, markdown will not be rendered');
 }
 
+// Where this script was loaded from, so missing Lex components load from
+// the same js/ folder (see ensureComponents).
+const DRILLDOWN_SCRIPT_BASE = (typeof document !== 'undefined' && document.currentScript && document.currentScript.src)
+  ? document.currentScript.src.replace(/drilldown-renderer\.js.*$/, '')
+  : '';
+
 class DrilldownRenderer {
   constructor() {
     this.modal = null;
@@ -31,7 +37,7 @@ class DrilldownRenderer {
     this.allRows = []; // Store all fetched rows for client-side filtering
     this.filteredRows = []; // Filtered rows after search/filter
     this.currentPage = 1;
-    this.pageSize = 25;
+    this.pageSize = 20;
     this.sortBy = null;
     this.sortDirection = 'asc';
     this.filters = {};
@@ -40,7 +46,6 @@ class DrilldownRenderer {
     this.currentTableView = null; // Stores current table view filter state
     this.contextGeneration = 0;
     this.dataGeneration = 0;
-    this.filterPopoverCleanup = null;
     this.facetLabels = new Map();
 
     // Active breakdown card filter: { column: string, value: string, key: string } or null.
@@ -69,203 +74,75 @@ class DrilldownRenderer {
     this.modal = document.getElementById('drilldown-modal');
     this.attachEventListeners();
     this.initialized = true;
+    this.ensureComponents();
   }
 
   /**
    * Create the modal HTML structure
    */
-  createModalStructure() {
+createModalStructure() {
+    // One lex-modal (full size) holds the header text, insights, summary,
+    // breakdown cards, the toolbar and the record table (docs/TABLE-STANDARD.md).
+    const helpButton = '<button type="button" id="drilldown-help" class="drilldown-help-btn" title="Help and documentation" aria-label="Help and documentation">' +
+      '<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>' +
+      '</button>';
     const modalHTML = `
-      <div id="drilldown-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <!-- Background overlay -->
-        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" id="drilldown-backdrop"></div>
+      <lex-modal id="drilldown-modal" size="full" heading="Loading..." hide-actions="true" header-actions="${this.escapeHtml(helpButton)}">
+        <div class="drilldown-body">
+          <p class="drilldown-description" id="drilldown-description"></p>
 
-        <!-- Modal panel (full-screen) -->
-        <div class="fixed inset-0 flex">
-          <div class="relative w-full h-full bg-white overflow-y-auto">
-            <!-- Header -->
-            <div class="bg-white px-4 py-5 sm:px-6 border-b border-gray-200">
-              <div class="flex items-center justify-between">
-                <div class="flex-1">
-                  <h3 class="text-lg font-semibold leading-6 text-gray-900" id="drilldown-title">
-                    Loading...
-                  </h3>
-                  <p class="mt-1 text-sm text-gray-500" id="drilldown-description">
-                    <!-- Description -->
-                  </p>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <button type="button" class="rounded-md bg-white text-gray-400 hover:text-blue-600 focus:outline-none" id="drilldown-help" title="Help & Documentation">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-                    </svg>
-                  </button>
-                  <button type="button" class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none" id="drilldown-close">
-                    <span class="sr-only">Close</span>
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+          <!-- Insights/Alerts (if any) -->
+          <div id="drilldown-insights" class="hidden mt-4 space-y-2"></div>
 
-              <!-- Insights/Alerts (if any) -->
-              <div id="drilldown-insights" class="hidden mt-4 space-y-2">
-                <!-- Insights will be rendered here -->
-              </div>
+          <!-- Filter toggles -->
+          <div id="drilldown-filter-container" class="hidden flex items-center space-x-2 mt-4"></div>
 
-              <!-- Filters and controls -->
-              <div class="mt-4 flex flex-wrap items-center gap-4">
-                <!-- Filter toggles -->
-                <div id="drilldown-filter-container" class="hidden flex items-center space-x-2">
-                  <!-- Filter buttons will be rendered here -->
-                </div>
-              </div>
-            </div>
-
-            <!-- Summary (if enabled) -->
-            <div id="drilldown-summary-container" class="hidden bg-gray-50 px-4 py-3 sm:px-6">
-              <div id="drilldown-summary" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-                <!-- Summary fields will be rendered here -->
-              </div>
-            </div>
-
-            <!-- Breakdown cards (data.breakdown_cards from v2 drilldown schema) -->
-            <div id="drilldown-breakdown-cards-container" class="drilldown-breakdown-cards-container hidden">
-              <div id="drilldown-breakdown-cards" class="drilldown-breakdown-cards-grid">
-                <!-- Breakdown cards rendered here by renderBreakdownCards() -->
-              </div>
-            </div>
-
-            <!-- Search bar with sort dropdown (positioned after filters, before table) -->
-            <div class="bg-white px-4 sm:px-6 pt-4">
-              <div class="flex items-center gap-3">
-                <!-- Search input -->
-                <div class="flex-1">
-                  <label for="drilldown-search" class="sr-only">Search</label>
-                  <input type="text" id="drilldown-search" placeholder="Search..." autocomplete="off"
-                    class="block w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                </div>
-
-                <!-- Search button -->
-                <button type="button" id="drilldown-search-btn" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                  <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Search
-                </button>
-
-                <!-- Sort dropdown -->
-                <div id="drilldown-sort-container" class="hidden">
-                  <label for="drilldown-sort-select" class="sr-only">Sort by</label>
-                  <select id="drilldown-sort-select" class="block rounded-md border border-gray-300 shadow-sm px-3 py-2 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                    <!-- Sort options will be rendered here -->
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <!-- Table container -->
-            <div class="bg-white px-4 sm:px-6 pb-4">
-              <div class="mt-4 flex flex-col">
-                <div class="overflow-x-auto">
-                  <div class="inline-block min-w-full align-middle">
-                    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                      <!-- Loading state -->
-                      <div id="drilldown-loading" class="flex items-center justify-center py-12">
-                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-                      </div>
-
-                      <!-- Table -->
-                      <table id="drilldown-table" class="min-w-full divide-y divide-gray-300 hidden">
-                        <thead class="bg-gray-50">
-                          <tr id="drilldown-table-header">
-                            <!-- Column headers will be rendered here -->
-                          </tr>
-                        </thead>
-                        <tbody id="drilldown-table-body" class="divide-y divide-gray-200 bg-white">
-                          <!-- Rows will be rendered here -->
-                        </tbody>
-                      </table>
-
-                      <!-- Empty state -->
-                      <div id="drilldown-empty" class="hidden text-center py-12">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                        </svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900">No data found</h3>
-                        <p class="mt-1 text-sm text-gray-500">Try adjusting your filters or search query.</p>
-                      </div>
-
-                      <!-- Error state -->
-                      <div id="drilldown-error" class="hidden text-center py-12">
-                        <svg class="mx-auto h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900">Error loading data</h3>
-                        <p class="mt-1 text-sm text-gray-500" id="drilldown-error-message">An error occurred while fetching drilldown data.</p>
-                        <button type="button" id="drilldown-retry" class="mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                          Retry
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Pagination -->
-            <div class="bg-white px-4 py-3 sm:px-6 border-t border-gray-200">
-              <div class="flex items-center justify-between">
-                <div class="flex-1 flex justify-between sm:hidden">
-                  <button type="button" id="drilldown-prev-mobile" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    Previous
-                  </button>
-                  <button type="button" id="drilldown-next-mobile" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    Next
-                  </button>
-                </div>
-                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                  <div>
-                    <p class="text-sm text-gray-700" id="drilldown-pagination-info">
-                      <!-- Pagination info -->
-                    </p>
-                  </div>
-                  <div>
-                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" id="drilldown-pagination">
-                      <!-- Page numbers will be rendered here -->
-                    </nav>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <!-- Summary (if enabled) -->
+          <div id="drilldown-summary-container" class="hidden bg-gray-50 px-4 py-3 mt-4 rounded-lg">
+            <div id="drilldown-summary" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4"></div>
           </div>
-        </div>
-      </div>
 
-      <!-- Help Modal -->
-      <div id="drilldown-help-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="help-modal-title" role="dialog" aria-modal="true">
-        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" id="drilldown-help-backdrop"></div>
-        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-          <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-3xl">
-            <div class="bg-white px-4 py-5 sm:px-6 border-b border-gray-200">
-              <div class="flex items-center justify-between">
-                <h3 class="text-lg font-semibold leading-6 text-gray-900" id="help-modal-title">Help & Documentation</h3>
-                <button type="button" class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none" id="drilldown-help-close">
-                  <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="bg-white px-4 py-5 sm:px-6 max-h-[70vh] overflow-y-auto">
-              <div id="drilldown-help-content">
-                <!-- Help content will be rendered here -->
-              </div>
-            </div>
+          <!-- Breakdown cards (data.breakdown_cards from v2 drilldown schema) -->
+          <div id="drilldown-breakdown-cards-container" class="drilldown-breakdown-cards-container hidden">
+            <div id="drilldown-breakdown-cards" class="drilldown-breakdown-cards-grid"></div>
           </div>
+
+          <!-- Toolbar: search, Sort by, order, count -->
+          <div class="drilldown-toolbar" role="search" aria-label="Search and sort records">
+            <div class="drilldown-toolbar-search">
+              <lex-input id="drilldown-search" placeholder="Search..." clearable="true" leading-icon="search"></lex-input>
+            </div>
+            <div id="drilldown-sort-container" class="drilldown-toolbar-group hidden">
+              <label class="drilldown-toolbar-label">Sort by:</label>
+              <lex-select id="drilldown-sort-select" options="[]"></lex-select>
+            </div>
+            <lex-btn id="drilldown-sort-order" variant="ghost" icon="true" title="Toggle sort order" data-order="asc">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
+            </lex-btn>
+            <div id="drilldown-count" class="drilldown-toolbar-label" aria-live="polite"></div>
+          </div>
+
+          <!-- Filters outside the table's columns (report selectors, breakdown cards) -->
+          <div id="drilldown-active-filters" class="flex flex-wrap items-center gap-2 mb-3"></div>
+
+          <!-- Loading state (first load of a drilldown) -->
+          <div id="drilldown-loading" class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          </div>
+
+          <!-- Error state (metadata or request refused) -->
+          <div id="drilldown-error" class="hidden text-center py-12">
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Error loading data</h3>
+            <p class="mt-1 text-sm text-gray-500" id="drilldown-error-message">An error occurred while fetching drilldown data.</p>
+            <lex-btn id="drilldown-retry" variant="primary" size="sm" class="mt-4">Retry</lex-btn>
+          </div>
+
+          <!-- Records: columns come from the drilldown metadata -->
+          <lex-table id="drilldown-table" class="drilldown-table lex-table--card" hidden
+            server-paging column-filters limit="20" id-key="_row_id"
+            empty-text="No data found" aria-label="Drilldown records"></lex-table>
         </div>
-      </div>
+      </lex-modal>
     `;
 
     document.body.insertAdjacentHTML('beforeend', modalHTML);
@@ -275,72 +152,82 @@ class DrilldownRenderer {
    * Attach event listeners to modal elements
    */
   attachEventListeners() {
-    // Close button
-    document.getElementById('drilldown-close')?.addEventListener('click', () => this.close());
-    document.getElementById('drilldown-backdrop')?.addEventListener('click', () => this.close());
+    const modal = document.getElementById('drilldown-modal');
+    // The modal's own close button, overlay and Escape emit lex-close.
+    modal?.addEventListener('lex-close', (e) => { if (e.target === modal) this.close(); });
+    // Header actions render inside the modal; delegate the help click.
+    modal?.addEventListener('click', (e) => {
+      if (e.target && e.target.closest && e.target.closest('#drilldown-help')) this.showHelp();
+    });
 
-    // Help button
-    document.getElementById('drilldown-help')?.addEventListener('click', () => this.showHelp());
-    document.getElementById('drilldown-help-close')?.addEventListener('click', () => this.closeHelp());
-    document.getElementById('drilldown-help-backdrop')?.addEventListener('click', () => this.closeHelp());
-
-    // Get search input element
+    // Search: 350 ms after typing stops, reload from page 1.
     const searchInput = document.getElementById('drilldown-search');
+    let searchTimer = null;
+    ['lex-input', 'lex-change'].forEach((name) => {
+      searchInput?.addEventListener(name, (e) => {
+        const value = String((e.detail && e.detail.value) || '').trim();
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          if (value === (this.searchQuery || '')) return;
+          this.searchQuery = value;
+          this.currentPage = 1;
+          this.fetchData();
+        }, 350);
+      });
+    });
 
-    // Search button (click to search)
-    document.getElementById('drilldown-search-btn')?.addEventListener('click', () => {
-      const searchInput = document.getElementById('drilldown-search');
-      this.searchQuery = searchInput?.value || '';
+    // Sort by + order button (kept in sync with header sorting in onTableSort).
+    document.getElementById('drilldown-sort-select')?.addEventListener('lex-change', (e) => {
+      const value = String((e.detail && e.detail.value) || '');
+      if (!value || value === this.sortBy) return;
+      this.sortBy = value;
+      this.currentPage = 1;
+      this.fetchData();
+    });
+    const orderBtn = document.getElementById('drilldown-sort-order');
+    orderBtn?.addEventListener('click', () => {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+      orderBtn.dataset.order = this.sortDirection;
+      if (!this.sortBy) return;
       this.currentPage = 1;
       this.fetchData();
     });
 
-    // Search on Enter key
-    searchInput?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        this.searchQuery = e.target.value;
-        this.currentPage = 1;
-        this.fetchData();
-      }
-    });
-
-    // Sort dropdown
-    document.getElementById('drilldown-sort-select')?.addEventListener('change', (e) => {
-      const value = e.target.value;
-      if (value) {
-        const [field, direction] = value.split('|');
-        this.sortBy = field;
-        this.sortDirection = direction || 'asc';
-        this.currentPage = 1;
-        this.fetchData();
-      }
-    });
-
-    // Export buttons
-    document.getElementById('drilldown-export-csv')?.addEventListener('click', () => this.exportData('csv'));
-    document.getElementById('drilldown-export-excel')?.addEventListener('click', () => this.exportData('excel'));
-
-    // Refresh button
-    document.getElementById('drilldown-refresh')?.addEventListener('click', () => this.fetchData());
-
     // Retry button
     document.getElementById('drilldown-retry')?.addEventListener('click', () => this.fetchData());
 
-    // Mobile pagination
-    document.getElementById('drilldown-prev-mobile')?.addEventListener('click', () => this.prevPage());
-    document.getElementById('drilldown-next-mobile')?.addEventListener('click', () => this.nextPage());
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      const helpModal = document.getElementById('drilldown-help-modal');
-
-      if (e.key === 'Escape') {
-        if (helpModal && !helpModal.classList.contains('hidden')) {
-          this.closeHelp();
-        } else if (!this.modal.classList.contains('hidden')) {
-          this.close();
+    const table = document.getElementById('drilldown-table');
+    if (table) {
+      // Paging, header sort and column filters: the table asks, we fetch.
+      table.addEventListener('lex-query-change', (e) => {
+        if (e.target === table) this.applyTableQuery(e.detail);
+      });
+      table.addEventListener('row-click', (e) => {
+        const row = e.detail && e.detail.row;
+        if (row) this.showRawData(row._raw || row);
+      });
+      // Buttons inside cells: lex-table's row-click ignores them.
+      table.addEventListener('click', (e) => {
+        const target = e.target;
+        if (!target || !target.closest) return;
+        const view = target.closest('[data-raw-row]');
+        if (view) {
+          e.stopPropagation();
+          const row = (this.currentData?.rows || [])[Number(view.getAttribute('data-raw-row'))];
+          if (row) this.showRawData(row);
+          return;
         }
-      }
+        const tip = target.closest('.cell-tooltip-trigger');
+        if (tip) {
+          e.stopPropagation();
+          this.showTooltip(tip);
+        }
+      });
+    }
+
+    // Close a cell tooltip when clicking anywhere else.
+    document.addEventListener('click', () => {
+      document.getElementById('cell-tooltip-popover')?.remove();
     });
   }
 
@@ -354,16 +241,15 @@ class DrilldownRenderer {
   async open(moduleKey, metricKey, options = {}) {
     const generation = ++this.contextGeneration;
     this.facetLabels.clear();
-    this.filterPopoverCleanup?.();
     // Initialize if not already done (lazy initialization)
     this.init();
 
     const { periodStart, periodEnd, organizationId, filters = {}, search = '',
       sortBy, sortDirection, viewFilter, viewType, ...extraFilters } = options;
 
-    // Show modal
-    this.modal.classList.remove('hidden');
-    document.body.classList.add('overflow-hidden');
+    // Show modal (lex-modal locks the page scroll itself)
+    this.modal.open = true;
+    this._tableContext = null;
 
     // Reset state
     this.currentPage = 1;
@@ -415,7 +301,7 @@ class DrilldownRenderer {
       this.buildRequestBody('execute');
 
       // Update modal header
-      document.getElementById('drilldown-title').textContent = config.drilldown.title || 'Drilldown Data';
+      this.modal.heading = config.drilldown.title || 'Drilldown Data';
       document.getElementById('drilldown-description').textContent = config.drilldown.description || '';
 
       // Set default sort if configured
@@ -497,34 +383,28 @@ class DrilldownRenderer {
     const style = document.createElement('style');
     style.id = 'drilldown-custom-styles';
     style.textContent = `
-      /* Override browser autofill yellow background */
-      #drilldown-search:-webkit-autofill,
-      #drilldown-search:-webkit-autofill:hover,
-      #drilldown-search:-webkit-autofill:focus,
-      #drilldown-search:-webkit-autofill:active {
-        -webkit-box-shadow: 0 0 0 30px white inset !important;
-        -webkit-text-fill-color: #111827 !important;
-        transition: background-color 5000s ease-in-out 0s;
+      #drilldown-modal .drilldown-body { padding: 0 4px 16px; }
+      #drilldown-modal .drilldown-description { color: var(--lex-text-secondary); font-size: 14px; margin: 0; }
+      #drilldown-modal .drilldown-help-btn { background: none; border: 0; color: var(--lex-text-secondary); cursor: pointer; padding: 4px; }
+      #drilldown-modal .drilldown-help-btn:hover { color: var(--lex-text-accent, #3b5bdb); }
+      #drilldown-modal .drilldown-toolbar {
+        align-items: center; background: var(--lex-bg-primary, #fff); border: 1px solid var(--lex-border-default);
+        border-radius: 8px; display: flex; flex-wrap: wrap; gap: 16px; margin: 16px 0; padding: 16px;
       }
-
-      /* Remove yellow border from all inputs and selects */
-      #drilldown-search:focus,
-      #drilldown-sort-select:focus {
-        outline: none !important;
-        box-shadow: 0 0 0 2px #3b82f6 !important;
-        border-color: transparent !important;
-      }
-
-      /* Ensure select dropdown arrow is visible */
-      #drilldown-sort-select {
-        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-        background-position: right 0.5rem center;
-        background-repeat: no-repeat;
-        background-size: 1.5em 1.5em;
-        padding-right: 2.5rem;
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        appearance: none;
+      #drilldown-modal .drilldown-toolbar-search { flex: 1; min-width: 200px; }
+      #drilldown-modal .drilldown-toolbar-group { align-items: center; display: flex; gap: 8px; }
+      #drilldown-modal .drilldown-toolbar-group.hidden { display: none; }
+      #drilldown-modal .drilldown-toolbar-label { color: var(--lex-text-secondary); font-size: 14px; white-space: nowrap; }
+      /* Columns come from metadata: every column gets a floor and the table scrolls sideways. */
+      #drilldown-table table { min-width: 960px; }
+      #drilldown-table th { min-width: 120px; white-space: nowrap; }
+      #drilldown-table th:last-child { min-width: 72px; width: 72px; }
+      #drilldown-table .drilldown-cell { display: block; white-space: nowrap; }
+      #drilldown-table .drilldown-cell--right { text-align: right; }
+      #drilldown-table .drilldown-cell--center { text-align: center; }
+      #drilldown-table .drilldown-view-btn {
+        background: none; border: 0; color: var(--lex-text-accent, #3b5bdb); cursor: pointer;
+        font-size: 13px; font-weight: 600; padding: 0; text-decoration: underline;
       }
     `;
     document.head.appendChild(style);
@@ -535,16 +415,16 @@ class DrilldownRenderer {
    */
   close() {
     this.contextGeneration++;
-    this.filterPopoverCleanup?.();
     if (!this.modal) {
       this.modal = document.getElementById('drilldown-modal');
     }
 
-    if (this.modal) {
-      this.modal.classList.add('hidden');
+    if (this.modal && this.modal.open) {
+      this.modal.open = false;
     }
-
-    document.body.classList.remove('overflow-hidden');
+    const tooltip = document.getElementById('cell-tooltip-popover');
+    if (tooltip && typeof tooltip.remove === 'function') tooltip.remove();
+    this._tableContext = null;
     this.currentConfig = null;
     this.currentData = null;
     this.activeBreakdownFilter = null;
@@ -679,11 +559,10 @@ class DrilldownRenderer {
     }
 
     // Hide loading state
-    document.getElementById('drilldown-loading').classList.add('hidden');
-    document.getElementById('drilldown-error').classList.add('hidden');
+    document.getElementById('drilldown-loading')?.classList.add('hidden');
+    document.getElementById('drilldown-error')?.classList.add('hidden');
 
     // Render advanced features
-    this.renderSortOptions();
     this.renderExportButtons();
 
     // Render insights first (even if no rows)
@@ -715,39 +594,8 @@ class DrilldownRenderer {
     // the section entirely per the drilldown v2 spec.
     this.renderBreakdownCards();
 
-    // Check if we have data rows
-    console.log('[DrilldownRenderer] Checking for rows:', {
-      hasRowsProperty: 'rows' in this.currentData,
-      rowsType: typeof this.currentData.rows,
-      rowsLength: this.currentData.rows ? this.currentData.rows.length : 'N/A'
-    });
-
-    if (!this.currentData.rows || this.currentData.rows.length === 0) {
-      console.log('[DrilldownRenderer] No rows found, showing empty state');
-      document.getElementById('drilldown-loading').classList.add('hidden');
-      document.getElementById('drilldown-table').classList.add('hidden');
-      document.getElementById('drilldown-empty').classList.remove('hidden');
-
-      // Render pagination even with 0 rows to show "Showing 0 to 0 of 0 results"
-      this.renderPagination();
-
-      // Don't return early - summary and insights are already rendered above
-      return;
-    }
-
-    // Show table (only if we have rows)
-    console.log('[DrilldownRenderer] Showing table with', this.currentData.rows.length, 'rows');
-    document.getElementById('drilldown-loading').classList.add('hidden');
-    document.getElementById('drilldown-empty').classList.add('hidden');
-    document.getElementById('drilldown-table').classList.remove('hidden');
-
-    // Render table
-    console.log('[DrilldownRenderer] Rendering table...');
+    // Rows, the empty state and paging live in the lex-table.
     this.renderTable();
-
-    // Render pagination
-    console.log('[DrilldownRenderer] Rendering pagination...');
-    this.renderPagination();
 
     console.log('[DrilldownRenderer] render() complete');
   }
@@ -1237,10 +1085,9 @@ class DrilldownRenderer {
       }
     }
 
-    // Reset to page 1 and re-render
+    // Reset to page 1 and re-fetch (the server filters)
     this.currentPage = 1;
-    this.renderTable();
-    this.renderPagination();
+    this.fetchData();
   }
 
   /**
@@ -1507,79 +1354,7 @@ class DrilldownRenderer {
     return `<svg class="h-6 w-6 ${stroke}" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">${path}</svg>`;
   }
 
-  /**
-   * Clamp a fixed-positioned popover so it stays inside the viewport.
-   * Anchored to a header rect; prefers below + right-aligned, flips to
-   * above when there is no room below, and slides left when the right
-   * edge would clip.
-   */
-  _positionPopover(popEl, anchorRect) {
-    const margin = 8;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    // Measure after the element is in the DOM (caller has done appendChild)
-    const popRect = popEl.getBoundingClientRect();
-    const popW = popRect.width || 320;
-    const popH = popRect.height || 200;
 
-    // Default placement: just below the anchor, left-aligned with it
-    let top = anchorRect.bottom + 6;
-    let left = anchorRect.left;
-
-    // Clip right edge: shift left so the popover fits
-    if (left + popW > vw - margin) {
-      left = vw - popW - margin;
-    }
-    // Clip left edge
-    if (left < margin) left = margin;
-
-    // If popover would extend past the viewport bottom, flip above the anchor
-    if (top + popH > vh - margin && anchorRect.top - popH - 6 > margin) {
-      top = anchorRect.top - popH - 6;
-    }
-    // Final clamp
-    if (top < margin) top = margin;
-
-    popEl.style.top = top + 'px';
-    popEl.style.left = left + 'px';
-  }
-
-  /**
-   * Open a small read-only popover that shows a column's description on
-   * click. Hover still gets the native title= tooltip; this gives users
-   * a substantive readable card they can leave open while reading.
-   */
-  openColumnInfoPopover(anchorEl, header, text) {
-    document.getElementById('drilldown-col-info-popover')?.remove();
-    document.getElementById('drilldown-col-filter-popover')?.remove();
-
-    const rect = anchorEl.getBoundingClientRect();
-    const pop = document.createElement('div');
-    pop.id = 'drilldown-col-info-popover';
-    pop.className = 'fixed z-[10000] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-80';
-    pop.innerHTML = `
-      <div class="flex items-start justify-between gap-2 mb-1">
-        <div class="text-xs font-semibold text-gray-700">${this.escapeHtml(header)}</div>
-        <button type="button" data-action="close" class="text-gray-400 hover:text-gray-700 leading-none" aria-label="Close">&times;</button>
-      </div>
-      <div class="text-xs text-gray-600 whitespace-pre-line">${this.escapeHtml(text)}</div>
-    `;
-    document.body.appendChild(pop);
-    this._positionPopover(pop, rect);
-
-    const close = () => {
-      pop.remove();
-      document.removeEventListener('mousedown', onOutside, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-    const onOutside = (e) => { if (!pop.contains(e.target)) close(); };
-    const onKey = (e) => { if (e.key === 'Escape') close(); };
-    pop.querySelector('[data-action="close"]').addEventListener('click', close);
-    setTimeout(() => {
-      document.addEventListener('mousedown', onOutside, true);
-      document.addEventListener('keydown', onKey, true);
-    }, 0);
-  }
 
   /**
    * Fetch DISTINCT values + counts for one column from the drilldown's
@@ -1632,439 +1407,290 @@ class DrilldownRenderer {
     }
   }
 
-  /**
-   * Open an Excel-style multi-select filter popover anchored to the funnel
-   * icon. Replaces the previous text-input / predeclared-enum dispatch with
-   * a single popover that loads the column's actual distinct values from
-   * the backend, so every column gets a smart filter list.
-   *
-   * Single-instance: opening one closes any prior info or filter popover.
-   */
-  openColumnFilterPopover(anchorEl, col) {
-    if (col.filterable === false) return;
-    this.filterPopoverCleanup?.();
-    const context = this.currentConfig;
-    const generation = this.contextGeneration;
-    const isCurrent = () => context === this.currentConfig && generation === this.contextGeneration;
-    document.getElementById('drilldown-col-filter-popover')?.remove();
-    document.getElementById('drilldown-col-info-popover')?.remove();
 
-    const field = col.field;
-    const header = col.header || field;
-
-    // Build a label map for predeclared enum columns so the user sees
-    // "Wire Transfer" instead of "wire_transfer" while counts/ordering
-    // still come from the data response.
-    const labelByValue = {};
-    if (Array.isArray(col.filter?.options)) {
-      for (const opt of col.filter.options) {
-        if (opt == null) continue;
-        const v = String(opt.value);
-        labelByValue[v] = opt.label != null ? String(opt.label) : v;
-      }
-    }
-
-    const existing = this.filters[field];
-    const initialChecked = new Set(
-      Array.isArray(existing) ? existing.map(String)
-        : (existing != null ? [String(existing)] : [])
-    );
-
-    const rect = anchorEl.getBoundingClientRect();
-    const pop = document.createElement('div');
-    pop.id = 'drilldown-col-filter-popover';
-    pop.className = 'fixed z-[10000] bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-72';
-    pop.innerHTML = `
-      <div class="text-xs font-semibold text-gray-700 mb-2">Filter ${this.escapeHtml(header)}</div>
-      <input type="text" data-role="search"
-             class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2"
-             placeholder="Search values..." />
-      <div data-role="body" class="text-xs text-gray-500 px-1 py-3 text-center">Loading values...</div>
-      <div data-role="hint" class="hidden text-[11px] text-gray-500 mt-2"></div>
-      <div class="flex justify-end gap-2 mt-3">
-        <button type="button" data-action="cancel" class="px-2 py-1 text-xs text-gray-600 hover:text-gray-900">Cancel</button>
-        <button type="button" data-action="clear" class="px-2 py-1 text-xs text-gray-500 hover:text-red-600">Clear</button>
-        <button type="button" data-action="apply" class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded">Apply</button>
-      </div>
-    `;
-    document.body.appendChild(pop);
-    this._positionPopover(pop, rect);
-
-    const searchEl = pop.querySelector('[data-role="search"]');
-    const bodyEl = pop.querySelector('[data-role="body"]');
-    const hintEl = pop.querySelector('[data-role="hint"]');
-
-    const close = () => {
-      pop.remove();
-      document.removeEventListener('mousedown', onOutside, true);
-      document.removeEventListener('keydown', onKey, true);
-      if (this.filterPopoverCleanup === close) this.filterPopoverCleanup = null;
-    };
-    const onOutside = (e) => { if (!pop.contains(e.target)) close(); };
-    const onKey = (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); close(); }
-    };
-    this.filterPopoverCleanup = close;
-
-    // Live checkbox state lives outside the DOM so search keystrokes can
-    // re-render the visible list without losing what the user has checked.
-    const checkedState = new Set(initialChecked);
-    let loadedValues = [];
-
-    const renderList = () => {
-      if (!isCurrent() || !document.body.contains(pop)) { close(); return; }
-      const term = (searchEl.value || '').trim().toLowerCase();
-      const visible = term
-        ? loadedValues.filter(v => {
-            const raw = String(v.value);
-            const label = typeof v.label === 'string' ? v.label : labelByValue[raw] || raw;
-            return raw.toLowerCase().includes(term) || label.toLowerCase().includes(term);
-          })
-        : loadedValues;
-
-      if (loadedValues.length === 0) {
-        bodyEl.innerHTML = '<div class="text-xs text-gray-500 px-1 py-3 text-center">No values found.</div>';
-        return;
-      }
-
-      const allVisibleChecked = visible.length > 0 && visible.every(v => checkedState.has(String(v.value)));
-
-      const rowsHtml = visible.map(v => {
-        const raw = String(v.value);
-        const label = typeof v.label === 'string' ? v.label : labelByValue[raw] || raw;
-        const isChecked = checkedState.has(raw) ? 'checked' : '';
-        return `
-          <label class="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 px-1 rounded">
-            <input type="checkbox" data-role="opt" value="${this.escapeHtml(raw)}" ${isChecked}
-                   class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-400" />
-            <span class="flex-1 truncate">${this.escapeHtml(label)}</span>
-            <span class="text-xs text-gray-400">(${v.count})</span>
-          </label>
-        `;
-      }).join('') || '<div class="text-xs text-gray-500 px-1 py-2 text-center">No matches.</div>';
-
-      bodyEl.innerHTML = `
-        <label class="flex items-center gap-2 py-1 text-sm font-medium text-gray-800 cursor-pointer hover:bg-gray-50 px-1 rounded border-b border-gray-100 mb-1">
-          <input type="checkbox" data-role="select-all" ${allVisibleChecked ? 'checked' : ''}
-                 class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-400" />
-          <span>(Select All${term ? ' visible' : ''})</span>
-        </label>
-        <div class="max-h-[250px] overflow-y-auto -mx-1">${rowsHtml}</div>
-      `;
-
-      bodyEl.querySelectorAll('[data-role="opt"]').forEach(cb => {
-        cb.addEventListener('change', (e) => {
-          const val = e.target.value;
-          if (e.target.checked) checkedState.add(val);
-          else checkedState.delete(val);
-          const selAll = bodyEl.querySelector('[data-role="select-all"]');
-          if (selAll) {
-            selAll.checked = visible.every(v => checkedState.has(String(v.value)));
-          }
-        });
-      });
-
-      const selAll = bodyEl.querySelector('[data-role="select-all"]');
-      if (selAll) {
-        selAll.addEventListener('change', (e) => {
-          const shouldCheck = e.target.checked;
-          for (const v of visible) {
-            const raw = String(v.value);
-            if (shouldCheck) checkedState.add(raw);
-            else checkedState.delete(raw);
-          }
-          renderList();
-        });
-      }
-    };
-
-    searchEl.addEventListener('input', renderList);
-    searchEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); apply(); }
-    });
-
-    const apply = () => {
-      if (!isCurrent() || !document.body.contains(pop)) { close(); return; }
-      const selected = Array.from(checkedState);
-      if (selected.length === 0) {
-        delete this.filters[field];
-      } else {
-        this.filters[field] = selected;
-      }
-      close();
-      this.currentPage = 1;
-      this.renderActiveFilters();
-      this.fetchData();
-    };
-    pop.querySelector('[data-action="cancel"]').addEventListener('click', close);
-    pop.querySelector('[data-action="clear"]').addEventListener('click', () => {
-      if (!isCurrent() || !document.body.contains(pop)) { close(); return; }
-      delete this.filters[field];
-      close();
-      this.currentPage = 1;
-      this.renderActiveFilters();
-      this.fetchData();
-    });
-    pop.querySelector('[data-action="apply"]').addEventListener('click', apply);
-
-    setTimeout(() => {
-      if (!isCurrent() || !document.body.contains(pop)) { close(); return; }
-      document.addEventListener('mousedown', onOutside, true);
-      document.addEventListener('keydown', onKey, true);
-    }, 0);
-
-    // Kick off the distinct fetch. If the user cancels before the response
-    // lands the popover is gone; we no-op via the document.body check.
-    this.fetchDistinctValues(field).then(({ values, hasMore, error }) => {
-      if (!document.body.contains(pop)) return;
-      if (!isCurrent()) { close(); return; }
-      loadedValues = values || [];
-      this.facetLabels.set(field, new Map(loadedValues.filter(value => typeof value.label === 'string')
-        .map(value => [String(value.value), value.label])));
-      renderList();
-      if (error) {
-        hintEl.textContent = `Could not load values: ${error}`;
-        hintEl.classList.remove('hidden', 'text-gray-500');
-        hintEl.classList.add('text-red-600');
-      } else if (hasMore) {
-        hintEl.textContent = `Showing top 1,000 of ${loadedValues.length}+ values. Type in the search box to narrow.`;
-        hintEl.classList.remove('hidden');
-      }
-    });
-  }
 
   /**
-   * Render active filter chips above the table. Each chip has an X button
-   * to clear that one filter. Renders into #drilldown-active-filters if
-   * that container exists; otherwise injects a transient div above the
-   * table header.
+   * Render the chips for filters on fields that are not table columns
+   * (report selectors passed to open(), breakdown cards on hidden fields).
+   * Column filters show in the table's own header menus.
    */
   renderActiveFilters() {
-    const entries = Object.entries(this.filters || {});
-    let container = document.getElementById('drilldown-active-filters');
-    if (!container) {
-      const table = document.getElementById('drilldown-table-header')?.closest('table');
-      if (!table) return;
-      container = document.createElement('div');
-      container.id = 'drilldown-active-filters';
-      container.className = 'flex flex-wrap items-center gap-2 mb-3';
-      table.parentElement.insertBefore(container, table);
-    }
+    const container = document.getElementById('drilldown-active-filters');
+    if (!container || !this.currentConfig) return;
+    const fields = new Set(this.tableColumns().map(col => col.field));
+    const entries = Object.entries(this.filters || {}).filter(([field]) => !fields.has(field));
     if (entries.length === 0) {
       container.innerHTML = '';
       return;
     }
-    const columnHeaders = {};
-    const columnOptionLabels = {};
-    for (const c of (this.currentConfig.columns || [])) {
-      columnHeaders[c.field] = c.header;
-      if (Array.isArray(c.filter?.options)) {
-        const map = {};
-        for (const opt of c.filter.options) map[String(opt.value)] = opt.label != null ? String(opt.label) : String(opt.value);
-        columnOptionLabels[c.field] = map;
-      }
-    }
     const chips = entries.map(([field, value]) => {
-      const label = columnHeaders[field] || field;
-      let display;
-      if (Array.isArray(value)) {
-        const labels = value.map(v => this.facetLabels.get(field)?.get(String(v))
-          ?? (columnOptionLabels[field] && columnOptionLabels[field][String(v)]) ?? String(v));
-        if (labels.length === 0) {
-          display = '';
-        } else if (labels.length <= 2) {
-          display = labels.join(', ');
-        } else {
-          display = `${labels.length} selected`;
-        }
-      } else {
-        display = String(value);
-      }
+      const values = (Array.isArray(value) ? value : [value]).map(v => this.facetLabels.get(field)?.get(String(v)) ?? String(v));
+      const display = values.length <= 2 ? values.join(', ') : `${values.length} selected`;
+      const label = (typeof window !== 'undefined' && window.Lex && window.Lex.Utils && window.Lex.Utils.humanizeLabel)
+        ? window.Lex.Utils.humanizeLabel(field) : field;
       return `<span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 border border-indigo-200">
         <span>${this.escapeHtml(label)}: ${this.escapeHtml(display)}</span>
         <button type="button" data-clear-filter="${this.escapeHtml(field)}" class="text-indigo-500 hover:text-indigo-800" aria-label="Clear filter">&times;</button>
       </span>`;
     }).join('');
-    const clearAll = entries.length > 1
-      ? `<button type="button" id="drilldown-clear-all-filters" class="text-xs text-gray-500 hover:text-gray-800 underline">Clear all</button>`
-      : '';
-    container.innerHTML = chips + clearAll;
+    container.innerHTML = chips;
     container.querySelectorAll('[data-clear-filter]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const field = btn.dataset.clearFilter;
         delete this.filters[field];
+        if (this.activeBreakdownFilter && this.activeBreakdownFilter.column === field) this.activeBreakdownFilter = null;
         this.currentPage = 1;
         this.renderActiveFilters();
         this.fetchData();
       });
     });
-    container.querySelector('#drilldown-clear-all-filters')?.addEventListener('click', () => {
-      this.filters = {};
-      this.currentPage = 1;
-      this.renderActiveFilters();
-      this.fetchData();
+  }
+
+  /**
+   * Load the Lex components the drilldown needs when the host page lacks
+   * them (module-execution.html and reporting load different sets).
+   * @returns {Promise<void>}
+   */
+  ensureComponents() {
+    if (typeof window === 'undefined' || !window.customElements || typeof document === 'undefined' || !DRILLDOWN_SCRIPT_BASE) {
+      return Promise.resolve();
+    }
+    const needed = [
+      ['lex-table', 'lex/components/data/lex-table.js'],
+      ['lex-input', 'lex/components/form/lex-input.js'],
+      ['lex-select', 'lex/components/form/lex-select.js'],
+      ['lex-btn', 'lex/components/foundation/lex-btn.js'],
+      ['lex-badge', 'lex/components/foundation/lex-badge.js']
+    ].filter(([tag]) => !window.customElements.get(tag));
+    const load = (path) => new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = DRILLDOWN_SCRIPT_BASE + path;
+      script.onload = () => resolve();
+      script.onerror = () => { console.error('[DrilldownRenderer] Could not load', path); resolve(); };
+      document.head.appendChild(script);
+    });
+    let chain = Promise.resolve();
+    if (needed.some(([tag]) => tag === 'lex-table') && !(window.Lex && window.Lex.withDataSource)) {
+      chain = chain.then(() => load('lex/lex.data.js'));
+    }
+    needed.forEach(([, path]) => { chain = chain.then(() => load(path)); });
+    return chain;
+  }
+
+  /** The metadata's columns that carry a field. */
+  tableColumns(config = this.currentConfig) {
+    return ((config && config.columns) || []).filter(col => col && col.field);
+  }
+
+  /**
+   * Table attributes for the current drilldown: one column per metadata
+   * column plus a blank-labelled actions column (no header filter).
+   * Pure, for unit tests.
+   */
+  static tableAttributes(columns) {
+    const cols = (columns || []).filter(col => col && col.field);
+    const label = (col) => String(col.header || col.field).replace(/,/g, ' ');
+    return {
+      columns: cols.map(col => col.field).concat('_actions').join(','),
+      labels: cols.map(label).concat('').join(','),
+      sortableColumns: cols.filter(col => col.sortable !== false).map(col => col.field).join(',')
+    };
+  }
+
+  /**
+   * Rows keep the record's raw values; formatting happens in the renderers.
+   * Pure, for unit tests.
+   */
+  static tableRows(rows, page, pageSize) {
+    const offset = (Math.max(1, Number(page) || 1) - 1) * (Number(pageSize) || 20);
+    return (rows || []).map((row, index) => Object.assign({}, row, {
+      _row_id: String(offset + index),
+      _row_index: index,
+      _actions: '',
+      _raw: row
+    }));
+  }
+
+  /**
+   * Turn the table's column filters into the drilldown body's filters
+   * ({ field: [values] }), keeping filters on fields that are not columns
+   * (report selectors, breakdown cards). Pure, for unit tests.
+   */
+  static mergeTableFilters(current, tableFilters, columnFields) {
+    const merged = {};
+    const fields = new Set(columnFields || []);
+    Object.keys(current || {}).forEach((field) => {
+      if (!fields.has(field)) merged[field] = current[field];
+    });
+    Object.keys(tableFilters || {}).forEach((field) => {
+      if (!fields.has(field)) return;
+      const filter = tableFilters[field];
+      const raw = filter && filter.value !== undefined ? filter.value : filter;
+      const values = (Array.isArray(raw) ? raw : [raw])
+        .map(v => String(v == null ? '' : v).trim()).filter(Boolean);
+      if (values.length) merged[field] = values;
+    });
+    return merged;
+  }
+
+  /** The body's filters on table columns, in lex-table's shape. Pure. */
+  static tableFilterState(filters, columnFields) {
+    const state = {};
+    const fields = new Set(columnFields || []);
+    Object.keys(filters || {}).forEach((field) => {
+      if (!fields.has(field)) return;
+      const raw = filters[field];
+      const values = (Array.isArray(raw) ? raw : [raw]).map(String).filter(Boolean);
+      if (values.length) state[field] = { operator: 'in', value: values };
+    });
+    return state;
+  }
+
+  /**
+   * Header filter options from the distinct endpoint's values. Metadata
+   * enum labels win; label-style columns (badge / enum) are capitalised;
+   * other values display as stored. Pure, for unit tests.
+   */
+  static filterOptionsFor(col, values) {
+    const labels = {};
+    if (Array.isArray(col && col.filter && col.filter.options)) {
+      col.filter.options.forEach((opt) => {
+        if (opt != null) labels[String(opt.value)] = opt.label != null ? String(opt.label) : String(opt.value);
+      });
+    }
+    const labelStyle = col && (col.type === 'badge' || (col.filter && col.filter.type === 'enum'));
+    const capital = (text) => {
+      const utils = typeof window !== 'undefined' && window.Lex && window.Lex.Utils;
+      if (utils && typeof utils.humanizeLabel === 'function') return utils.humanizeLabel(text);
+      const t = String(text).split('_').join(' ');
+      return t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+    };
+    return (values || []).filter(v => v && v.value !== null && v.value !== undefined && v.value !== '').map((v) => {
+      const raw = String(v.value);
+      let label = typeof v.label === 'string' ? v.label : (labels[raw] !== undefined ? labels[raw] : raw);
+      if (labelStyle && typeof v.label !== 'string' && labels[raw] === undefined) label = capital(raw);
+      return { value: raw, label };
     });
   }
 
   /**
-   * Render the data table
+   * Point the table at the current drilldown (columns, renderers, header
+   * filters) once per open.
+   */
+  configureTable(table) {
+    if (!table || this._tableContext === this.currentConfig) return;
+    this._tableContext = this.currentConfig;
+    const cols = this.tableColumns();
+    const attrs = DrilldownRenderer.tableAttributes(cols);
+    table.setAttribute('columns', attrs.columns);
+    table.setAttribute('labels', attrs.labels);
+    table.setAttribute('sortable-columns', attrs.sortableColumns);
+
+    const renderers = {};
+    cols.forEach((col) => {
+      renderers[col.field] = (value) => {
+        const formatted = col.type === 'badge'
+          ? this.renderBadgeColumn(value, col)
+          : this.formatValue(value, col.format || { type: col.type });
+        const tip = col.tooltip
+          ? `<svg class="inline-block ml-1 h-4 w-4 text-gray-400 cursor-pointer hover:text-gray-600 cell-tooltip-trigger" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-tooltip="${this.escapeHtml(col.tooltip)}"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+          : '';
+        return `<span class="drilldown-cell drilldown-cell--${this.escapeHtml(col.align || 'left')}">${formatted}${tip}</span>`;
+      };
+    });
+    renderers._actions = (_value, row) =>
+      `<button type="button" class="drilldown-view-btn" data-raw-row="${row ? row._row_index : ''}" title="View complete row data">View</button>`;
+    table.setCellRenderers(renderers);
+    table.setColumnFilterOptions({});
+    this.loadColumnFilterOptions(table, cols);
+  }
+
+  /**
+   * Every filterable column gets a header filter, its values from the
+   * drilldown's distinct endpoint (one request per column, once per open).
+   */
+  loadColumnFilterOptions(table, cols) {
+    const context = this.currentConfig;
+    const options = {};
+    const filterable = cols.filter(col => col.filterable !== false);
+    Promise.all(filterable.map(col => this.fetchDistinctValues(col.field).then(({ values }) => {
+      const list = DrilldownRenderer.filterOptionsFor(col, values);
+      if (list.length) options[col.field] = { options: list };
+    }))).then(() => {
+      if (context !== this.currentConfig || this._tableContext !== context) return;
+      table.setColumnFilterOptions(options);
+    });
+  }
+
+  /**
+   * The table asked for a page, a sort or a filter: copy it into the
+   * request state and fetch.
+   */
+  applyTableQuery(query) {
+    if (!query || !this.currentConfig) return;
+    const fields = this.tableColumns().map(col => col.field);
+    this.currentPage = Number(query.page) || 1;
+    if (query.limit) this.pageSize = Number(query.limit) || this.pageSize;
+    if (query.sortBy) {
+      this.sortBy = query.sortBy;
+      this.sortDirection = query.sortDir === 'desc' ? 'desc' : 'asc';
+    }
+    this.filters = DrilldownRenderer.mergeTableFilters(this.filters, query.filters, fields);
+    this.renderActiveFilters();
+    this.fetchData();
+  }
+
+  /**
+   * Hand the current page to the table, after syncing its sort, filters
+   * and page from the request state (outside filters, view toggles and
+   * breakdown cards change that state directly).
    */
   renderTable() {
-    // Render header
-    const headerHTML = this.currentConfig.columns.map(col => {
-      const sortable = col.sortable !== false;
-      const isSorted = this.sortBy === col.field;
-      const sortIcon = isSorted
-        ? (this.sortDirection === 'asc' ? '↑' : '↓')
-        : '';
-      const activeFilter = this.filters && this.filters[col.field];
-      const filterIconColor = activeFilter ? 'text-indigo-600' : 'text-gray-400';
-
-      return `
-        <th scope="col" class="px-3 py-3.5 text-${col.align || 'left'} text-xs font-semibold text-gray-900 ${sortable ? 'cursor-pointer hover:bg-gray-100' : ''}"
-            ${sortable ? `data-sort="${col.field}"` : ''}>
-          <div class="flex items-center ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : ''}">
-            <span>${col.header}</span>
-            ${col.description ? `<span class="ml-1 inline-flex" data-col-info="${this.escapeHtml(col.field)}" data-col-info-text="${this.escapeHtml(col.description)}" data-col-info-header="${this.escapeHtml(col.header)}" title="${this.escapeHtml(col.description)}" onclick="event.stopPropagation()" style="cursor: help;"><svg class="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></span>` : ''}
-            ${col.filterable === false ? '' : `<span class="ml-1 inline-flex cursor-pointer" data-col-filter="${this.escapeHtml(col.field)}" data-col-header="${this.escapeHtml(col.header)}" title="Filter ${this.escapeHtml(col.header)}"><svg class="h-3.5 w-3.5 ${filterIconColor} hover:text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg></span>`}
-            ${sortable ? `<span class="ml-1 text-gray-400">${sortIcon}</span>` : ''}
-          </div>
-        </th>
-      `;
-    }).join('');
-
-    // Add "Actions" header column for raw data viewer
-    const actionsHeader = `
-      <th scope="col" class="px-3 py-3.5 text-center text-xs font-semibold text-gray-900">
-        Actions
-      </th>
-    `;
-
-    document.getElementById('drilldown-table-header').innerHTML = headerHTML + actionsHeader;
-
-    // Attach sort handlers
-    document.querySelectorAll('[data-sort]').forEach(th => {
-      th.addEventListener('click', () => {
-        const field = th.dataset.sort;
-        if (this.sortBy === field) {
-          this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-          this.sortBy = field;
-          this.sortDirection = 'asc';
-        }
-        this.fetchData();
-      });
-    });
-
-    // Attach per-column filter handlers. Clicking the funnel icon opens
-    // an inline popover (Electron blocks window.prompt) anchored to the
-    // icon. The full column config is passed so the popover can dispatch
-    // on `col.filter?.type` (text vs enum vs future types).
-    const columnsByField = {};
-    for (const c of (this.currentConfig.columns || [])) columnsByField[c.field] = c;
-    document.querySelectorAll('[data-col-filter]').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const field = el.dataset.colFilter;
-        const col = columnsByField[field] || { field, header: el.dataset.colHeader || field };
-        this.openColumnFilterPopover(el, col);
-      });
-    });
-
-    // Info-icon click: show the column's description in a popover. Hover
-    // still gets the native title= tooltip; click opens a more
-    // substantial readable card that doesn't auto-dismiss.
-    document.querySelectorAll('[data-col-info]').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const text = el.dataset.colInfoText || '';
-        const header = el.dataset.colInfoHeader || el.dataset.colInfo || '';
-        this.openColumnInfoPopover(el, header, text);
-      });
-    });
-
-    // Render the active-filter chips bar above the table (if any).
-    this.renderActiveFilters();
-
-    // Render rows
-    const rowsHTML = this.currentData.rows.map((row, rowIndex) => {
-      const cellsHTML = this.currentConfig.columns.map(col => {
-        const value = row[col.field];
-        // Use badge renderer for badge columns, otherwise use standard formatter
-        const formattedValue = col.type === 'badge' ? this.renderBadgeColumn(value, col) : this.formatValue(value, col.format || {type: col.type});
-        // Add tooltip support for cells - render help icon next to value if tooltip exists
-        const tooltipIcon = col.tooltip ? `<svg class="inline-block ml-1 h-4 w-4 text-gray-400 cursor-pointer hover:text-gray-600 cell-tooltip-trigger" fill="none" viewBox="0 0 24 24" stroke="currentColor" data-tooltip="${this.escapeHtml(col.tooltip)}"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>` : '';
-        return `
-          <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 text-${col.align || 'left'}">
-            ${formattedValue}${tooltipIcon}
-          </td>
-        `;
-      }).join('');
-
-      // Add "View Raw Data" action column
-      const rawDataJSON = JSON.stringify(row).replace(/"/g, '&quot;');
-      const actionCell = `
-        <td class="whitespace-nowrap px-3 py-4 text-sm text-center">
-          <button
-            onclick="window.drilldownRenderer.toggleRawData(${rowIndex})"
-            class="text-indigo-600 hover:text-indigo-900 font-medium"
-            title="View complete row data">
-            <svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-            </svg>
-          </button>
-        </td>
-      `;
-
-      // Data row
-      const dataRow = `<tr class="hover:bg-gray-50" data-raw-data="${rawDataJSON}">${cellsHTML}${actionCell}</tr>`;
-
-      // Raw data viewer row (hidden by default)
-      const rawDataRow = `
-        <tr id="raw-data-row-${rowIndex}" class="hidden bg-gray-50">
-          <td colspan="${this.currentConfig.columns.length + 1}" class="px-0 py-0">
-            <div id="raw-data-content-${rowIndex}"></div>
-          </td>
-        </tr>
-      `;
-
-      return dataRow + rawDataRow;
-    }).join('');
-
-    document.getElementById('drilldown-table-body').innerHTML = rowsHTML;
-
-    // Attach click handlers for tooltips
-    this.attachTooltipHandlers();
-  }
-
-  /**
-   * Attach click handlers for cell tooltips
-   */
-  attachTooltipHandlers() {
-    // Remove any existing tooltip
-    const existingTooltip = document.getElementById('cell-tooltip-popover');
-    if (existingTooltip) {
-      existingTooltip.remove();
-    }
-
-    // Attach click handlers to all tooltip triggers
-    document.querySelectorAll('.cell-tooltip-trigger').forEach(trigger => {
-      trigger.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.showTooltip(trigger);
-      });
-    });
-
-    // Close tooltip when clicking outside
-    document.addEventListener('click', () => {
-      const tooltip = document.getElementById('cell-tooltip-popover');
-      if (tooltip) {
-        tooltip.remove();
+    const table = document.getElementById('drilldown-table');
+    if (!table || typeof table.setServerData !== 'function') {
+      if (typeof window !== 'undefined' && window.customElements && table) {
+        window.customElements.whenDefined('lex-table').then(() => this.render());
       }
+      return;
+    }
+    this.configureTable(table);
+    const fields = this.tableColumns().map(col => col.field);
+    const pagination = (this.currentData && this.currentData.pagination) || {};
+    const total = Number(pagination.totalRecords !== undefined ? pagination.totalRecords : pagination.total);
+    const rows = (this.currentData && this.currentData.rows) || [];
+    const tableFilters = DrilldownRenderer.tableFilterState(this.filters, fields);
+    const filtered = Boolean(this.searchQuery) || Object.keys(tableFilters).length > 0;
+
+    table.restoreQuery({
+      search: this.searchQuery || '',
+      sortBy: this.sortBy || undefined,
+      sortDir: this.sortDirection,
+      filters: tableFilters,
+      page: this.currentPage,
+      limit: this.pageSize
     });
+    table.emptyText = filtered
+      ? 'No matching records. Try a different search or clear the filters.'
+      : 'No data found';
+    table.hidden = false;
+    table.setServerData(DrilldownRenderer.tableRows(rows, this.currentPage, this.pageSize), {
+      page: Number(pagination.page) || this.currentPage,
+      limit: this.pageSize,
+      total: Number.isFinite(total) ? total : rows.length,
+      total_pages: pagination.totalPages
+    });
+
+    const count = document.getElementById('drilldown-count');
+    if (count) {
+      const n = Number.isFinite(total) ? total : rows.length;
+      count.textContent = `${n} ${n === 1 ? 'record' : 'records'}`;
+    }
+    this.renderSortOptions();
+    this.renderActiveFilters();
   }
+
+
 
   /**
    * Show tooltip popover near the clicked help icon
@@ -2107,90 +1733,7 @@ class DrilldownRenderer {
     }, 0);
   }
 
-  /**
-   * Render pagination controls
-   */
-  renderPagination() {
-    const { page, totalRecords, totalPages, hasNextPage, hasPreviousPage } = this.currentData.pagination;
 
-    // Update pagination info
-    const start = totalRecords === 0 ? 0 : (page - 1) * this.pageSize + 1;
-    const end = Math.min(page * this.pageSize, totalRecords);
-    document.getElementById('drilldown-pagination-info').textContent =
-      `Showing ${start} to ${end} of ${totalRecords} results`;
-
-    // Generate page numbers
-    const pages = this.generatePageNumbers(page, totalPages);
-    const paginationHTML = `
-      <button type="button" ${!hasPreviousPage ? 'disabled' : ''}
-              class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 ${!hasPreviousPage ? 'cursor-not-allowed opacity-50' : ''}"
-              onclick="window.drilldownRenderer.prevPage()">
-        <span class="sr-only">Previous</span>
-        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-        </svg>
-      </button>
-      ${pages.map(p => {
-        if (p === '...') {
-          return `<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">...</span>`;
-        }
-        const isActive = p === page;
-        return `
-          <button type="button"
-                  class="relative inline-flex items-center px-4 py-2 border ${isActive ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50'} text-sm font-medium"
-                  onclick="window.drilldownRenderer.goToPage(${p})">
-            ${p}
-          </button>
-        `;
-      }).join('')}
-      <button type="button" ${!hasNextPage ? 'disabled' : ''}
-              class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 ${!hasNextPage ? 'cursor-not-allowed opacity-50' : ''}"
-              onclick="window.drilldownRenderer.nextPage()">
-        <span class="sr-only">Next</span>
-        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-        </svg>
-      </button>
-    `;
-
-    document.getElementById('drilldown-pagination').innerHTML = paginationHTML;
-
-    // Update mobile buttons
-    const prevMobile = document.getElementById('drilldown-prev-mobile');
-    const nextMobile = document.getElementById('drilldown-next-mobile');
-    if (prevMobile) prevMobile.disabled = !hasPreviousPage;
-    if (nextMobile) nextMobile.disabled = !hasNextPage;
-  }
-
-  /**
-   * Generate page number array for pagination
-   */
-  generatePageNumbers(currentPage, totalPages) {
-    const delta = 2;
-    const range = [];
-    const rangeWithDots = [];
-    let l;
-
-    for (let i = 1; i <= totalPages; i++) {
-      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
-        range.push(i);
-      }
-    }
-
-    for (let i of range) {
-      if (l) {
-        if (i - l === 2) {
-          rangeWithDots.push(l + 1);
-        } else if (i - l !== 1) {
-          rangeWithDots.push('...');
-        }
-      }
-      rangeWithDots.push(i);
-      l = i;
-    }
-
-    return rangeWithDots;
-  }
 
   /**
    * Format a value according to format specification
@@ -2223,13 +1766,13 @@ class DrilldownRenderer {
         if (format.dateFormat) {
           return new Date(value).toLocaleDateString('en-US', Object.assign({ timeZone: getOrganizationTimezone() }, format.dateFormat));
         }
-        return formatDate(value);
+        return window.Lex?.Utils?.formatDate ? this.escapeHtml(window.Lex.Utils.formatDate(value)) : formatDate(value);
 
       case 'datetime':
         if (format.dateFormat) {
           return new Date(value).toLocaleString('en-US', Object.assign({ timeZone: getOrganizationTimezone() }, format.dateFormat));
         }
-        return formatDateTime(value);
+        return window.Lex?.Utils?.formatDateTime ? this.escapeHtml(window.Lex.Utils.formatDateTime(value)) : formatDateTime(value);
 
       default:
         return this.escapeHtml(String(value));
@@ -2364,20 +1907,17 @@ class DrilldownRenderer {
     return result;
   }
 
-  /**
-   * Show loading state
-   */
   showLoading() {
-    document.getElementById('drilldown-loading').classList.remove('hidden');
-    document.getElementById('drilldown-table').classList.add('hidden');
-    document.getElementById('drilldown-empty').classList.add('hidden');
-    document.getElementById('drilldown-error').classList.add('hidden');
+    // The first load of a drilldown shows the spinner; later loads keep the
+    // table on screen (its pager and header stay usable).
+    const table = document.getElementById('drilldown-table');
+    const firstLoad = !table || this._tableContext !== this.currentConfig || !this.currentConfig;
+    document.getElementById('drilldown-loading')?.classList.toggle('hidden', !firstLoad);
+    if (firstLoad && table) table.hidden = true;
+    document.getElementById('drilldown-error')?.classList.add('hidden');
 
-    // Reset pagination display to avoid showing stale counts
-    const paginationInfo = document.getElementById('drilldown-pagination-info');
-    if (paginationInfo) {
-      paginationInfo.textContent = 'Loading...';
-    }
+    const count = document.getElementById('drilldown-count');
+    if (count && firstLoad) count.textContent = '';
 
     // Hide summary and insights containers during loading
     const summaryContainer = document.getElementById('drilldown-summary-container');
@@ -2392,25 +1932,39 @@ class DrilldownRenderer {
    * Show error state
    */
   showError(message) {
-    document.getElementById('drilldown-loading').classList.add('hidden');
-    document.getElementById('drilldown-table').classList.add('hidden');
-    document.getElementById('drilldown-empty').classList.add('hidden');
-    document.getElementById('drilldown-error').classList.remove('hidden');
-    document.getElementById('drilldown-error-message').textContent = message;
+    document.getElementById('drilldown-loading')?.classList.add('hidden');
+    const table = document.getElementById('drilldown-table');
+    if (table) table.hidden = true;
+    document.getElementById('drilldown-error')?.classList.remove('hidden');
+    const text = document.getElementById('drilldown-error-message');
+    if (text) text.textContent = message;
+  }
+
+  /** A failure the user should see (export): Lex.Modal, never window.alert. */
+  notifyError(title, message) {
+    const lex = typeof window !== 'undefined' ? window.Lex : null;
+    if (lex && lex.Toast && typeof lex.Toast.error === 'function') {
+      lex.Toast.error(message);
+    } else if (lex && lex.Modal && typeof lex.Modal.alert === 'function') {
+      lex.Modal.alert(title, this.escapeHtml(message));
+    } else {
+      console.error('[DrilldownRenderer]', title, message);
+    }
   }
 
   /**
-   * Pagination methods
+   * Pagination is the table's own (lex-query-change). These stay for
+   * callers that page programmatically.
    */
   prevPage() {
-    if (this.currentData?.pagination.hasPreviousPage) {
+    if (this.currentData?.pagination?.hasPreviousPage) {
       this.currentPage--;
       this.fetchData();
     }
   }
 
   nextPage() {
-    if (this.currentData?.pagination.hasNextPage) {
+    if (this.currentData?.pagination?.hasNextPage) {
       this.currentPage++;
       this.fetchData();
     }
@@ -2471,28 +2025,24 @@ class DrilldownRenderer {
     document.getElementById('drilldown-match-content').innerHTML = contentHTML;
   }
 
-  /**
-   * Render sort options dropdown
-   */
   renderSortOptions() {
     const container = document.getElementById('drilldown-sort-container');
     const select = document.getElementById('drilldown-sort-select');
-    const sortOptions = this.currentConfig.sortOptions;
-
-    if (!sortOptions || sortOptions.length === 0) {
-      container.classList.add('hidden');
-      return;
+    const order = document.getElementById('drilldown-sort-order');
+    if (!container || !select || !this.currentConfig) return;
+    // Sort by lists the sortable columns with their header labels.
+    const options = this.tableColumns()
+      .filter(col => col.sortable !== false)
+      .map(col => ({ value: col.field, label: String(col.header || col.field) }));
+    container.classList.toggle('hidden', options.length === 0);
+    if (order) {
+      order.hidden = options.length === 0;
+      order.dataset.order = this.sortDirection === 'desc' ? 'desc' : 'asc';
     }
-
-    container.classList.remove('hidden');
-
-    const optionsHTML = sortOptions.map(option => {
-      const value = `${option.field}|${option.direction}`;
-      const selected = (option.default && !this.sortBy) || (this.sortBy === option.field && this.sortDirection === option.direction);
-      return `<option value="${value}" ${selected ? 'selected' : ''}>${this.escapeHtml(option.label)}</option>`;
-    }).join('');
-
-    select.innerHTML = `<option value="">Sort by...</option>${optionsHTML}`;
+    const json = JSON.stringify(options);
+    if (select.getAttribute('options') !== json) select.setAttribute('options', json);
+    const value = this.sortBy || '';
+    if (select.value !== value) select.value = value;
   }
 
   /**
@@ -2544,7 +2094,7 @@ class DrilldownRenderer {
       document.body.removeChild(a);
     } catch (error) {
       console.error('[DrilldownRenderer] Export error:', error);
-      alert(`Failed to export data: ${error.message}`);
+      this.notifyError('Export failed', `Failed to export data: ${error.message}`);
     }
   }
 
@@ -2552,21 +2102,16 @@ class DrilldownRenderer {
    * Show help modal
    */
   showHelp() {
-    const helpModal = document.getElementById('drilldown-help-modal');
-    const helpModalTitle = document.getElementById('help-modal-title');
-    const helpContent = document.getElementById('drilldown-help-content');
     const helpText = this.currentConfig?.helpText;
+    const lex = typeof window !== 'undefined' ? window.Lex : null;
 
     if (!helpText) {
-      alert('No help documentation available for this drilldown.');
+      if (lex && lex.Modal) lex.Modal.alert('Help', 'No help documentation available for this drilldown.');
       return;
     }
 
-    helpModal.classList.remove('hidden');
-
     // Set modal title to drilldown title (from helpText.title or current config title)
     const modalTitle = helpText?.title || this.currentConfig?.title || 'Help & Documentation';
-    helpModalTitle.textContent = modalTitle;
 
     // Render help content
     let html = '';
@@ -2655,15 +2200,29 @@ class DrilldownRenderer {
       html = '<p class="text-sm text-gray-500">No help documentation available.</p>';
     }
 
-    helpContent.innerHTML = html;
+    if (lex && lex.Modal && typeof lex.Modal.open === 'function') {
+      this._helpModal = lex.Modal.open({ heading: modalTitle, content: `<div class="drilldown-help-content">${html}</div>`, size: 'lg' });
+    }
   }
 
   /**
    * Close help modal
    */
   closeHelp() {
-    const helpModal = document.getElementById('drilldown-help-modal');
-    helpModal.classList.add('hidden');
+    if (this._helpModal && typeof this._helpModal.removeAfterClose === 'function') this._helpModal.removeAfterClose();
+    this._helpModal = null;
+  }
+
+
+  /** Tailwind badge classes -> lex-badge colour. Pure, for unit tests. */
+  static badgeColor(classes) {
+    const text = String(classes || '');
+    if (text.includes('green')) return 'green';
+    if (text.includes('red')) return 'red';
+    if (text.includes('yellow') || text.includes('orange')) return 'yellow';
+    if (text.includes('blue')) return 'blue';
+    if (text.includes('purple') || text.includes('indigo')) return 'indigo';
+    return 'gray';
   }
 
   /**
@@ -2671,7 +2230,11 @@ class DrilldownRenderer {
    */
   renderBadgeColumn(value, column) {
     if (column.type !== 'badge' || !column.legend) {
-      return this.formatValue(value, column.format);
+      if (column.type !== 'badge' || value === null || value === undefined || value === '') {
+        return this.formatValue(value, column.format);
+      }
+      const label = window.Lex?.Utils?.humanizeLabel ? window.Lex.Utils.humanizeLabel(String(value)) : String(value);
+      return `<lex-badge label="${this.escapeHtml(label)}" color="gray" size="sm"></lex-badge>`;
     }
 
     let displayValue = value;
@@ -2753,58 +2316,38 @@ class DrilldownRenderer {
     };
 
     const colorClass = getColorClass(legendKey, value);
+    const lexColor = DrilldownRenderer.badgeColor(colorClass);
 
     // Tooltip shows original value for reference (e.g., "Score: 20")
     const title = typeof value === 'number' ? `Score: ${value}` : '';
+    const text = typeof displayValue === 'string' && window.Lex?.Utils?.capitalizeFirst
+      ? window.Lex.Utils.capitalizeFirst(displayValue) : displayValue;
 
-    return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}" title="${title}">${this.escapeHtml(displayValue)}</span>`;
+    return `<lex-badge label="${this.escapeHtml(text)}" color="${lexColor}" size="sm" title="${this.escapeHtml(title)}"></lex-badge>`;
   }
 
   /**
-   * Toggle raw data viewer for a specific row
-   * @param {Number} rowIndex - Index of the row to toggle
+   * Show one record's complete data in a lex-modal (the row's View button
+   * or a row click).
+   * @param {Object} rowData - the record as the API returned it
    */
-  toggleRawData(rowIndex) {
-    const rawDataRow = document.getElementById(`raw-data-row-${rowIndex}`);
-    const rawDataContent = document.getElementById(`raw-data-content-${rowIndex}`);
-
-    if (!rawDataRow || !rawDataContent) {
-      console.error(`[DrilldownRenderer] Raw data elements not found for row ${rowIndex}`);
-      return;
-    }
-
-    // Toggle visibility
-    if (rawDataRow.classList.contains('hidden')) {
-      // Show raw data
-      rawDataRow.classList.remove('hidden');
-
-      // Get the row data
-      const rowData = this.currentData.rows[rowIndex];
-
-      if (!rowData) {
-        console.error(`[DrilldownRenderer] No data found for row ${rowIndex}`);
-        rawDataContent.innerHTML = '<div class="p-4 text-red-600">Error: Row data not found</div>';
-        return;
-      }
-
-      // Create and render the raw data viewer
-      if (typeof RawDataViewer !== 'undefined') {
-        const viewer = new RawDataViewer(rowData);
-        rawDataContent.innerHTML = viewer.render();
-      } else {
-        // Fallback if RawDataViewer not loaded
-        console.warn('[DrilldownRenderer] RawDataViewer class not found, using fallback JSON display');
-        rawDataContent.innerHTML = `
-          <div class="p-4">
-            <pre class="bg-gray-100 p-4 rounded overflow-x-auto text-xs">${JSON.stringify(rowData, null, 2)}</pre>
-          </div>
-        `;
-      }
+  showRawData(rowData) {
+    if (!rowData) return;
+    const lex = typeof window !== 'undefined' ? window.Lex : null;
+    let content;
+    if (typeof RawDataViewer !== 'undefined') {
+      content = new RawDataViewer(rowData).render();
     } else {
-      // Hide raw data
-      rawDataRow.classList.add('hidden');
-      rawDataContent.innerHTML = ''; // Clear content to save memory
+      content = `<pre class="bg-gray-100 p-4 rounded overflow-x-auto text-xs">${this.escapeHtml(JSON.stringify(rowData, null, 2))}</pre>`;
     }
+    if (lex && lex.Modal && typeof lex.Modal.open === 'function') {
+      lex.Modal.open({ heading: 'Record details', content, size: 'lg' });
+    }
+  }
+
+  /** Kept for callers that pass a row index on the current page. */
+  toggleRawData(rowIndex) {
+    this.showRawData((this.currentData?.rows || [])[rowIndex]);
   }
 }
 

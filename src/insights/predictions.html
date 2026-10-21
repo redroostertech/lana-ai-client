@@ -16,6 +16,20 @@
   <script src="../js/menu.js"></script>
   <script src="../js/notifications.js"></script>
   <script src="../js/insights.js"></script>
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="js/record-table-kit.js"></script>
+  <script src="js/predictions-tables.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -260,37 +274,11 @@
             </div>
           </div>
         </div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-16"></div></th>
-                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-28"></div></th>
-                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-20"></div></th>
-                <th class="px-6 py-3"><div class="h-4 bg-gray-200 rounded w-16"></div></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 animate-pulse">
-              <tr>
-                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-36"></div></td>
-                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
-                <td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-16 h-2 bg-gray-200 rounded-full"></div><div class="h-3 bg-gray-200 rounded w-8"></div></div></td>
-                <td class="px-6 py-4"><div class="flex gap-1"><div class="h-5 bg-gray-200 rounded w-16"></div><div class="h-5 bg-gray-200 rounded w-20"></div></div></td>
-              </tr>
-              <tr>
-                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-32"></div></td>
-                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
-                <td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-16 h-2 bg-gray-200 rounded-full"></div><div class="h-3 bg-gray-200 rounded w-8"></div></div></td>
-                <td class="px-6 py-4"><div class="flex gap-1"><div class="h-5 bg-gray-200 rounded w-20"></div><div class="h-5 bg-gray-200 rounded w-14"></div></div></td>
-              </tr>
-              <tr>
-                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-28"></div></td>
-                <td class="px-6 py-4"><div class="h-4 bg-gray-200 rounded w-24"></div></td>
-                <td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-16 h-2 bg-gray-200 rounded-full"></div><div class="h-3 bg-gray-200 rounded w-8"></div></div></td>
-                <td class="px-6 py-4"><div class="flex gap-1"><div class="h-5 bg-gray-200 rounded w-18"></div><div class="h-5 bg-gray-200 rounded w-16"></div></div></td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="p-6 space-y-4 animate-pulse">
+          <div class="h-10 bg-gray-200 rounded"></div>
+          <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div class="h-4 bg-gray-200 rounded w-2/3"></div>
+          <div class="h-4 bg-gray-200 rounded w-1/2"></div>
         </div>
       </div>
 
@@ -307,19 +295,7 @@
             </div>
           </div>
         </div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matter</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Est. Completion</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Confidence</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Factors</th>
-              </tr>
-            </thead>
-            <tbody id="caseDurationTable" class="divide-y divide-gray-200"></tbody>
-          </table>
-        </div>
+        <div id="caseDurationMount" class="p-4"></div>
       </div>
     </main>
   </div>
@@ -415,29 +391,12 @@
       `).join('');
     }
 
-    function renderCaseDurations(cases) {
-      const tbody = document.getElementById('caseDurationTable');
-      if (!cases || cases.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">No case duration predictions available</td></tr>';
-        return;
-      }
-      tbody.innerHTML = cases.map(c => `
-        <tr class="hover:bg-gray-50">
-          <td class="px-6 py-4 font-medium text-gray-900">${c.matterName}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${formatDate(c.estimatedCompletion)}</td>
-          <td class="px-6 py-4">
-            <div class="flex items-center gap-2">
-              <div class="w-16 h-2 bg-gray-200 rounded-full"><div class="h-full bg-purple-500 rounded-full" style="width: ${c.confidence * 100}%"></div></div>
-              <span class="text-xs text-gray-500">${Math.round(c.confidence * 100)}%</span>
-            </div>
-          </td>
-          <td class="px-6 py-4">
-            <div class="flex flex-wrap gap-1">
-              ${c.factors.map(f => `<span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">${f}</span>`).join('')}
-            </div>
-          </td>
-        </tr>
-      `).join('');
+    // Case durations: client-side lex-table (js/predictions-tables.js). The
+    // data still comes from Insights.getPredictions(), which is an empty stub.
+    async function renderCaseDurations(cases) {
+      const Predictions = window.LanaPredictionsTables;
+      const rows = (cases || []).map(Predictions.caseDurationRow);
+      await window.LanaRecordTableKit.mount(document.getElementById('caseDurationMount'), Predictions.caseDurationSpec(rows), { rows });
     }
 
     async function loadData() {

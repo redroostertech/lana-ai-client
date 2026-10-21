@@ -10044,6 +10044,7 @@
     });
 
     container.innerHTML = html;
+    mountDocumentTypesTable(docGenState.documentTypes);
   }
 
   function buildDocumentTypesContent(types) {
@@ -10057,33 +10058,63 @@
       '</div>';
     }
 
-    var html = '<div class="overflow-x-auto"><table class="w-full text-sm">' +
-      '<thead><tr class="border-b border-gray-200">' +
-        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Type</th>' +
-        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Documents</th>' +
-        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Confidence</th>' +
-        '<th class="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Structure</th>' +
-      '</tr></thead><tbody>';
+    // Rows, renderers and filters: js/shared/document-types-table.js.
+    // mountDocumentTypesTable() fills the table once the tab is in the DOM.
+    return '<div class="wd-doc-types">' +
+      '<div class="wd-doc-types-toolbar" role="search" aria-label="Search document types">' +
+        '<div class="wd-doc-types-search"><lex-input id="docTypesSearch" placeholder="Search document types..." clearable="true" leading-icon="search"></lex-input></div>' +
+        '<span id="docTypesCount" class="wd-table-muted text-sm whitespace-nowrap" aria-live="polite"></span>' +
+      '</div>' +
+      '<lex-table id="docTypesTable" class="wd-doc-types-table lex-table--card" column-filters' +
+        ' columns="document_type,source,document_count,confidence,structure,created_at"' +
+        ' labels="Type,Source,Documents,Confidence,Structure,Created"' +
+        ' search-keys="document_type"' +
+        ' sort-by="document_count" sort-dir="desc" limit="20" id-key="id"' +
+        ' empty-text="No document types learned yet" aria-label="Learned document types"></lex-table>' +
+    '</div>';
+  }
 
-    for (var i = 0; i < types.length; i++) {
-      var t = types[i];
-      var conf = t.confidence_score ? Math.round(t.confidence_score * 100) : 0;
-      var confColor = conf >= 70 ? 'text-green-600' : conf >= 40 ? 'text-amber-600' : 'text-red-500';
-      var hasStructure = t.has_structure || t.structure_version;
-      html += '<tr class="border-b border-gray-100 hover:bg-gray-50">' +
-        '<td class="py-2 px-3 font-medium text-gray-900">' + escapeHtml(t.document_type_label || t.document_type || 'Unknown') + '</td>' +
-        '<td class="py-2 px-3 text-gray-600">' + (t.document_count || 0) + '</td>' +
-        '<td class="py-2 px-3 ' + confColor + ' font-medium">' + conf + '%</td>' +
-        '<td class="py-2 px-3">' +
-          (hasStructure
-            ? '<span class="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">Learned</span>'
-            : '<span class="text-xs text-gray-400">Not analyzed</span>') +
-        '</td>' +
-      '</tr>';
-    }
-
-    html += '</tbody></table></div>';
-    return html;
+  /**
+   * Fill the Learned Document Types table (client-side: the API returns the
+   * matter's whole set) and wire its toolbar search and count.
+   * @param {Array} types - GET /api/v1/matters/:id/document-types data
+   */
+  function mountDocumentTypesTable(types) {
+    var helpers = window.LanaDocumentTypesTable;
+    var table = document.getElementById('docTypesTable');
+    if (!helpers || !table || !types || types.length === 0) return;
+    var whenReady = window.customElements && customElements.whenDefined
+      ? customElements.whenDefined('lex-table') : Promise.resolve();
+    whenReady.then(function () {
+      if (document.getElementById('docTypesTable') !== table) return;
+      var rows = helpers.buildRows(types);
+      var countEl = document.getElementById('docTypesCount');
+      function updateCount() {
+        var filtered = Boolean(table.searchText) || table.getActiveFilters().size > 0;
+        var n = filtered ? table.filteredRows.length : rows.length;
+        if (countEl) countEl.textContent = n + (n === 1 ? ' type' : ' types');
+        table.emptyText = helpers.emptyText(filtered);
+      }
+      table.setCellRenderers(helpers.renderers());
+      table.setColumnFilterOptions(helpers.filterOptions(rows, window.LanaLibraryColumnFilters));
+      table.setData(rows);
+      table.addEventListener('lex-filter-change', function (e) { if (e.target === table) updateCount(); });
+      var search = document.getElementById('docTypesSearch');
+      var debounce = null;
+      if (search) {
+        ['lex-input', 'lex-change'].forEach(function (name) {
+          search.addEventListener(name, function (e) {
+            var value = String((e.detail && e.detail.value) || '').trim();
+            clearTimeout(debounce);
+            debounce = setTimeout(function () {
+              if (table.dataSource) table.dataSource.setSearch(value);
+              updateCount();
+            }, 350);
+          });
+        });
+      }
+      updateCount();
+    });
   }
 
   function buildTemplateSetsContent(sets) {

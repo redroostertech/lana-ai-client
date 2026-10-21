@@ -141,3 +141,113 @@
 #dataVizTable table { min-width: 1100px; }
 #dataVizTable th { min-width: 120px; }
 #dataVizTable th:first-child { min-width: 200px; }
+
+/* Search Analytics: Top queries — Query, Type, Searches, Avg latency, Zero-result rate, CTR */
+#topQueriesTable table { min-width: 900px; }
+#topQueriesTable th:nth-child(2) { width: 120px; }
+#topQueriesTable th:nth-child(3) { width: 110px; }
+#topQueriesTable th:nth-child(4) { width: 120px; }
+#topQueriesTable th:nth-child(5) { width: 150px; }
+#topQueriesTable th:nth-child(6) { width: 90px; }
+
+/* Search Analytics: Zero-result queries — Query, Type, User, Workspace, Created */
+#zeroResultsTable table { min-width: 900px; }
+#zeroResultsTable th:nth-child(2) { width: 120px; }
+#zeroResultsTable th:nth-child(3) { width: 20%; }
+#zeroResultsTable th:nth-child(4) { width: 18%; }
+#zeroResultsTable th:nth-child(5) { width: 176px; }
+
+/* Search Analytics: Slow queries — Query, Type, Latency, Results, Workspace, Created */
+#slowQueriesTable table { min-width: 940px; }
+#slowQueriesTable th:nth-child(2) { width: 120px; }
+#slowQueriesTable th:nth-child(3) { width: 110px; }
+#slowQueriesTable th:nth-child(4) { width: 100px; }
+#slowQueriesTable th:nth-child(5) { width: 18%; }
+#slowQueriesTable th:nth-child(6) { width: 176px; }
+
+/* Settings > System Heartbeat: Summary, Trigger, Status, Duration, Created */
+#heartbeatHistoryTable table { min-width: 820px; }
+#heartbeatHistoryTable th:nth-child(2) { width: 120px; }
+#heartbeatHistoryTable th:nth-child(3) { width: 130px; }
+#heartbeatHistoryTable th:nth-child(4) { width: 120px; }
+#heartbeatHistoryTable th:nth-child(5) { width: 176px; }
+
+/* Admin dashboard previews: Name, Email|Organization, Status, Created */
+#recentUsersTable table,
+#recentMattersTable table { min-width: 640px; }
+#recentUsersTable th:nth-child(2),
+#recentMattersTable th:nth-child(2) { width: 30%; }
+#recentUsersTable th:nth-child(3),
+#recentMattersTable th:nth-child(3) { width: 110px; }
+#recentUsersTable th:nth-child(4),
+#recentMattersTable th:nth-child(4) { width: 176px; }
+
+/* Integrations: Endpoint, Service, Status, Duration, Created */
+#apiActivityTable table { min-width: 820px; }
+#apiActivityTable th:nth-child(2) { width: 150px; }
+#apiActivityTable th:nth-child(3) { width: 100px; }
+#apiActivityTable th:nth-child(4) { width: 110px; }
+#apiActivityTable th:nth-child(5) { width: 176px; }
+
+/* Block billing rules: Name, Required types, Composite type, Code, Priority,
+   Max gap, Status, Created, actions */
+#bbRulesTable table { min-width: 1180px; }
+#bbRulesTable th:nth-child(2) { width: 18%; }
+#bbRulesTable th:nth-child(3) { width: 16%; }
+#bbRulesTable th:nth-child(4) { width: 90px; }
+#bbRulesTable th:nth-child(5) { width: 100px; }
+#bbRulesTable th:nth-child(6) { width: 110px; }
+#bbRulesTable th:nth-child(7) { width: 110px; }
+#bbRulesTable th:nth-child(8) { width: 176px; }
+#bbRulesTable th:nth-child(9) { width: 150px; }
+
+.bb-row-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.bb-row-actions button {
+  appearance: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--lex-weight-semibold, 600);
+  padding: 0;
+}
+
+.bb-edit-btn { color: var(--lex-accent, #3b5bdb); }
+.bb-delete-btn { color: var(--lex-color-danger-600, #dc2626); }
+
+/* Trace details: SSE events — Event, Data, Offset, Created */
+#sseEventsTable table { min-width: 760px; }
+#sseEventsTable th:nth-child(1) { width: 170px; }
+#sseEventsTable th:nth-child(3) { width: 110px; }
+#sseEventsTable th:nth-child(4) { width: 176px; }
+
+/* Data Visualization drawer: connected data tables (columns vary by view). */
+.dataviz-connected { margin-bottom: 1.25rem; }
+
+.dataviz-connected-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.dataviz-connected-title {
+  color: var(--lex-text-primary);
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+}
+
+.dataviz-connected-count {
+  color: var(--lex-text-secondary);
+  font-size: 12px;
+}
+
+.dataviz-connected-table table { min-width: 640px; }
+.dataviz-connected-table th { min-width: 110px; }
+.dataviz-connected-table th:first-child { min-width: 180px; }

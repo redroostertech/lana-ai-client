@@ -17,10 +17,144 @@
     communication: 'Communication', case_management: 'Case Mgmt', general: 'General'
   };
 
+  var TABLE_ID = 'bbRulesTable';
+  var PAGE_SIZE = 200;   // the API's maximum page
+  var _count = null;
+
   function init() {
-    _loadRules();
-    _loadUtbmsCodes();
     _wireButtons();
+    _loadUtbmsCodes();
+    var table = document.getElementById(TABLE_ID);
+    if (!table || !window.AdminTableKit) return;
+    window.AdminTableKit.whenTableReady().then(function () {
+      _wireTable(table);
+      _loadRules();
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Table (docs/TABLE-STANDARD.md): every rule is loaded (all pages), so the
+  // table sorts, filters and pages them client-side.
+  // ---------------------------------------------------------------------------
+
+  function mapRule(r) {
+    return {
+      id: String(r.id || ''),
+      name: r.name || '',
+      required_activity_types: (r.required_activity_types || []).slice(),
+      composite_activity_type: r.composite_activity_type || '',
+      billing_code: r.billing_code || '',
+      priority: r.priority === null || r.priority === undefined ? null : Number(r.priority),
+      max_gap_minutes: r.max_gap_minutes === null || r.max_gap_minutes === undefined ? null : Number(r.max_gap_minutes),
+      status: r.is_active ? 'active' : 'inactive',
+      created_at: r.created_at || '',
+      actions: '',
+      _raw: r
+    };
+  }
+
+  function activityLabel(type) {
+    return ACTIVITY_LABELS[type] || Lex.Utils.humanizeLabel(type);
+  }
+
+  function cellRenderers() {
+    var kit = window.AdminTableKit;
+    return {
+      name: function (val, row) {
+        var raw = (row && row._raw) || {};
+        return kit.nameCell(val, raw.description || '');
+      },
+      required_activity_types: function (val, row) {
+        var types = (val || []).map(activityLabel).join(', ');
+        if (!types) return kit.muted('');
+        var min = row && row._raw ? row._raw.min_distinct_types : null;
+        var text = types + (min ? ' (min ' + min + ')' : '');
+        return '<span class="admin-table-text" title="' + kit.esc(text) + '">' + kit.esc(text) + '</span>';
+      },
+      composite_activity_type: function (val) {
+        return val ? '<span class="admin-table-text" title="' + kit.esc(val) + '">' + kit.esc(Lex.Utils.capitalizeFirst(val)) + '</span>' : kit.muted('');
+      },
+      billing_code: function (val) {
+        return val ? '<span class="admin-table-text">' + kit.esc(val) + '</span>' : kit.muted('');
+      },
+      priority: function (val) {
+        return val === null ? kit.muted('') : '<span class="admin-table-text">' + kit.esc(String(val)) + '</span>';
+      },
+      max_gap_minutes: function (val) {
+        return val === null ? kit.muted('') : '<span class="admin-table-text">' + kit.esc(val + ' min') + '</span>';
+      },
+      status: function (val) {
+        return kit.badge(val === 'active' ? 'Active' : 'Inactive', val === 'active' ? 'green' : 'gray');
+      },
+      created_at: function (val) { return kit.timeCell(val); },
+      actions: function (_val, row) {
+        var id = kit.esc(row.id);
+        var html = '<span class="bb-row-actions">' +
+          '<button type="button" class="bb-edit-btn" data-id="' + id + '">Edit</button>';
+        if (row.status === 'active') {
+          html += '<button type="button" class="bb-delete-btn" data-id="' + id + '">Deactivate</button>';
+        }
+        return html + '</span>';
+      }
+    };
+  }
+
+  var PRIORITY_RANGES = [
+    { value: 'lt50', label: 'Under 50', max: 50 },
+    { value: '50-100', label: '50–99', min: 50, max: 100 },
+    { value: '100-200', label: '100–199', min: 100, max: 200 },
+    { value: 'gte200', label: '200 or more', min: 200 }
+  ];
+  var GAP_RANGES = [
+    { value: 'lt15', label: 'Under 15 min', max: 15 },
+    { value: '15-30', label: '15–29 min', min: 15, max: 30 },
+    { value: 'gte30', label: '30 min or more', min: 30 }
+  ];
+
+  function filterOptions(rows) {
+    var client = window.AdminClientTables;
+    var kit = window.AdminTableKit;
+    return {
+      name: { text: true, placeholder: 'Name contains...' },
+      required_activity_types: {
+        options: ACTIVITY_TYPES.map(function (t) { return { value: t, label: activityLabel(t) }; }),
+        match: function (cell, values) {
+          var types = cell || [];
+          return values.some(function (v) { return types.indexOf(v) !== -1; });
+        }
+      },
+      composite_activity_type: { text: true, placeholder: 'Composite type contains...' },
+      billing_code: { options: client.valueOptions(rows, 'billing_code', String) },
+      priority: client.rangeFilter(PRIORITY_RANGES),
+      max_gap_minutes: client.rangeFilter(GAP_RANGES),
+      status: { options: kit.labelOptions(['active', 'inactive']) },
+      created_at: client.dateFilter()
+    };
+  }
+
+  function _wireTable(table) {
+    table.setCellRenderers(cellRenderers());
+    table.setColumnFilterOptions(filterOptions([]));
+    _count = window.AdminClientTables.bindCount(table, ['bbCount', 'bbSectionCount'], ['rule', 'rules']);
+    window.AdminTableKit.bindToolbar({
+      table: table,
+      searchId: 'bbSearch',
+      sortId: 'bbSort',
+      orderId: 'bbSortOrder',
+      filterId: 'bbStatusFilter',
+      filterKey: 'status',
+      noun: ['rule', 'rules'],
+      onSearch: function (term) {
+        if (table.dataSource) table.dataSource.setSearch(term);
+        _count.update();
+      }
+    });
+    table.addEventListener('empty-action', function () { _showRuleForm(null); });
+    table.addEventListener('row-click', function (e) {
+      var row = e.detail && e.detail.row;
+      if (row && row._raw) _showRuleForm(row._raw);
+    });
+    _wireTableActions(table);
   }
 
   function _wireButtons() {
@@ -34,31 +168,32 @@
     }
   }
 
-  function _loadRules() {
-    var loading = document.getElementById('bbRulesLoading');
-    var table = document.getElementById('bbRulesTable');
-    var empty = document.getElementById('bbRulesEmpty');
-    if (loading) loading.classList.remove('hidden');
-    if (table) table.classList.add('hidden');
-    if (empty) empty.classList.add('hidden');
-
-    api.get('/api/v1/billable-hours/block-billing/rules?include_inactive=true')
+  // Every page of rules (the API caps a page at 200), so the client-side
+  // table holds the whole set.
+  function _fetchAllRules(page, acc) {
+    return api.get('/api/v1/billable-hours/block-billing/rules?include_inactive=true&limit=' + PAGE_SIZE + '&page=' + page)
       .then(function (result) {
-        _rules = (result && result.data) || [];
-        if (loading) loading.classList.add('hidden');
-        if (_rules.length === 0) {
-          if (empty) empty.classList.remove('hidden');
-        } else {
-          if (table) {
-            table.classList.remove('hidden');
-            table.innerHTML = _renderTable(_rules);
-            _wireTableActions();
-          }
-        }
+        var rows = (result && result.data) || [];
+        var total = Number(result && result.pagination && result.pagination.total);
+        var all = acc.concat(rows);
+        if (rows.length === PAGE_SIZE && Number.isFinite(total) && all.length < total) return _fetchAllRules(page + 1, all);
+        return all;
+      });
+  }
+
+  function _loadRules() {
+    var table = document.getElementById(TABLE_ID);
+    if (!table) return;
+    _fetchAllRules(1, [])
+      .then(function (rules) {
+        _rules = rules;
+        var rows = rules.map(mapRule);
+        table.setColumnFilterOptions(filterOptions(rows));
+        table.setData(rows);
+        if (_count) _count.update();
       })
       .catch(function () {
-        if (loading) loading.classList.add('hidden');
-        if (empty) empty.classList.remove('hidden');
+        table.setError('Block billing rules could not be loaded. Check your connection and try again.');
       });
   }
 
@@ -72,68 +207,19 @@
       });
   }
 
-  function _renderTable(rules) {
-    var html = '<table style="width:100%;border-collapse:collapse;font-size:0.8125rem;">';
-    html += '<thead><tr style="background:var(--lex-bg-muted,#f9fafb);text-transform:uppercase;font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);">';
-    html += '<th style="padding:0.625rem 1rem;text-align:left;">Priority</th>';
-    html += '<th style="padding:0.625rem 1rem;text-align:left;">Name</th>';
-    html += '<th style="padding:0.625rem 1rem;text-align:left;">Required Types</th>';
-    html += '<th style="padding:0.625rem 1rem;text-align:left;">Composite Type</th>';
-    html += '<th style="padding:0.625rem 1rem;text-align:left;">Code</th>';
-    html += '<th style="padding:0.625rem 1rem;text-align:left;">Gap</th>';
-    html += '<th style="padding:0.625rem 1rem;text-align:center;">Active</th>';
-    html += '<th style="padding:0.625rem 1rem;text-align:right;">Actions</th>';
-    html += '</tr></thead><tbody>';
-
-    for (var i = 0; i < rules.length; i++) {
-      var r = rules[i];
-      var bg = i % 2 === 1 ? 'background:var(--lex-bg-muted,#f9fafb);' : '';
-      var opacity = r.is_active ? '' : 'opacity:0.5;';
-      var types = (r.required_activity_types || []).map(function (t) {
-        return ACTIVITY_LABELS[t] || t;
-      }).join(', ');
-
-      html += '<tr style="' + bg + opacity + '">';
-      html += '<td style="padding:0.625rem 1rem;font-weight:600;">' + _escapeHtml(String(r.priority)) + '</td>';
-      html += '<td style="padding:0.625rem 1rem;">';
-      html += '<div style="font-weight:600;">' + _escapeHtml(r.name) + '</div>';
-      if (r.description) html += '<div style="font-size:0.7rem;color:var(--lex-text-muted);margin-top:0.125rem;">' + _escapeHtml(r.description) + '</div>';
-      html += '</td>';
-      html += '<td style="padding:0.625rem 1rem;">' + _escapeHtml(types) + ' (min ' + r.min_distinct_types + ')</td>';
-      html += '<td style="padding:0.625rem 1rem;font-weight:600;color:var(--lex-color-blue-700,#1d4ed8);">' + _escapeHtml(r.composite_activity_type) + '</td>';
-      html += '<td style="padding:0.625rem 1rem;">' + _escapeHtml(r.billing_code || '-') + '</td>';
-      html += '<td style="padding:0.625rem 1rem;">' + r.max_gap_minutes + 'min</td>';
-      html += '<td style="padding:0.625rem 1rem;text-align:center;">';
-      html += r.is_active
-        ? '<span style="color:var(--lex-color-green-600);">Active</span>'
-        : '<span style="color:var(--lex-text-muted);">Inactive</span>';
-      html += '</td>';
-      html += '<td style="padding:0.625rem 1rem;text-align:right;">';
-      html += '<button class="bb-edit-btn" data-id="' + _escapeHtml(r.id) + '" style="font-size:0.75rem;color:var(--lex-color-blue-600);cursor:pointer;background:none;border:none;margin-right:0.5rem;">Edit</button>';
-      if (r.is_active) {
-        html += '<button class="bb-delete-btn" data-id="' + _escapeHtml(r.id) + '" style="font-size:0.75rem;color:var(--lex-color-red-600);cursor:pointer;background:none;border:none;">Deactivate</button>';
-      }
-      html += '</td>';
-      html += '</tr>';
-    }
-
-    html += '</tbody></table>';
-    return html;
-  }
-
-  function _wireTableActions() {
-    var table = document.getElementById('bbRulesTable');
-    if (!table) return;
-
+  // Edit / Deactivate buttons (lex-table's row-click ignores buttons).
+  function _wireTableActions(table) {
     table.addEventListener('click', function (e) {
       var editBtn = e.target.closest('.bb-edit-btn');
       if (editBtn) {
+        e.stopPropagation();
         var rule = _rules.find(function (r) { return r.id === editBtn.getAttribute('data-id'); });
         if (rule) _showRuleForm(rule);
         return;
       }
       var deleteBtn = e.target.closest('.bb-delete-btn');
       if (deleteBtn) {
+        e.stopPropagation();
         _deleteRule(deleteBtn.getAttribute('data-id'));
       }
     });
@@ -152,12 +238,9 @@
       typesHtml += (ACTIVITY_LABELS[t] || t) + '</label>';
     }
 
-    var codesHtml = '<option value="">None</option>';
-    for (var ci = 0; ci < _utbmsCodes.length; ci++) {
-      var c = _utbmsCodes[ci];
-      var selected = r.billing_code === c.code ? ' selected' : '';
-      codesHtml += '<option value="' + _escapeHtml(c.code) + '"' + selected + '>' + _escapeHtml(c.code + ' — ' + c.description) + '</option>';
-    }
+    var codeOptions = [{ value: '', label: 'None' }].concat(_utbmsCodes.map(function (c) {
+      return { value: String(c.code), label: c.code + ' — ' + c.description };
+    }));
 
     var inputStyle = 'width:100%;padding:0.375rem 0.625rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;';
 
@@ -182,7 +265,7 @@
     html += '<input type="text" id="bbFormComposite" value="' + _escapeHtml(r.composite_activity_type || '') + '" style="' + inputStyle + '" placeholder="e.g. Contract review and correspondence"></div>';
 
     html += '<div><label style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;">UTBMS Billing Code</label>';
-    html += '<select id="bbFormCode" style="' + inputStyle + '">' + codesHtml + '</select></div>';
+    html += '<lex-select id="bbFormCode" searchable="true" aria-label="UTBMS billing code" options=\'' + _escapeAttr(JSON.stringify(codeOptions)) + '\' value="' + _escapeHtml(r.billing_code || '') + '"></lex-select></div>';
 
     html += '<div><label style="font-size:0.75rem;font-weight:600;color:var(--lex-text-muted);display:block;margin-bottom:0.25rem;">Description Hint (for AI)</label>';
     html += '<textarea id="bbFormHint" style="' + inputStyle + 'min-height:3rem;resize:vertical;" placeholder="e.g. Reviewed documents and engaged in related correspondence regarding">' + _escapeHtml(r.description_hint || '') + '</textarea></div>';
@@ -234,7 +317,7 @@
       required_activity_types: types,
       min_distinct_types: parseInt(document.getElementById('bbFormMinTypes').value) || 2,
       composite_activity_type: compositeEl.value.trim(),
-      billing_code: document.getElementById('bbFormCode').value || null,
+      billing_code: String(document.getElementById('bbFormCode').value || '') || null,
       description_hint: document.getElementById('bbFormHint').value.trim() || null
     };
 
@@ -265,18 +348,12 @@
         });
     }
 
-    if (typeof Lex !== 'undefined' && Lex.Modal && Lex.Modal.confirm) {
-      Lex.Modal.confirm({
-        heading: 'Deactivate Rule',
-        message: 'Are you sure you want to deactivate this block billing rule?',
-        confirmLabel: 'Deactivate',
-        confirmVariant: 'danger'
-      }).then(function (confirmed) {
-        if (confirmed) doDelete();
-      });
-    } else if (window.confirm('Deactivate this block billing rule?')) {
-      doDelete();
-    }
+    Lex.Modal.confirm(
+      'Deactivate Rule',
+      'Are you sure you want to deactivate this block billing rule?',
+      doDelete,
+      { confirmText: 'Deactivate', variant: 'danger' }
+    );
   }
 
   function _initializeDefaults() {
@@ -300,6 +377,18 @@
     div.textContent = text || '';
     return div.innerHTML;
   }
+
+  // For a single-quoted attribute holding JSON.
+  function _escapeAttr(text) {
+    return String(text).split('&').join('&amp;').split("'").join('&#39;');
+  }
+
+  // Pure table logic, exposed for unit tests.
+  window.BlockBillingRulesTable = {
+    mapRule: mapRule,
+    cellRenderers: cellRenderers,
+    filterOptions: filterOptions
+  };
 
   document.addEventListener('DOMContentLoaded', init);
 })();

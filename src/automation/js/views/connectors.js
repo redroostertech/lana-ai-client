@@ -1,4 +1,4 @@
-import { badge, filterCollection, sectionIntro, surface } from '../shared/ui.js';
+import { badge, sectionIntro, surface } from '../shared/ui.js';
 import { escapeAttribute, escapeHtml, formatLabel, normalizeText } from '../shared/utils.js';
 import { hasAdminRole } from '../shared/access.js';
 import { connectorScopeLabel } from '../shared/connectors.js';
@@ -138,68 +138,6 @@ export function connectorCompact(context, connector) {
   `;
 }
 
-function matchesConnectorState(context, connector, filterState) {
-  if (!filterState || filterState === 'all') return true;
-  const status = resolveConnectorStatus(connector);
-
-  if (filterState === 'ready') return isConnectorReady(connector);
-  if (filterState === 'not_installed') return NOT_INSTALLED_STATUSES.has(status);
-  if (filterState === 'error') return status === 'error';
-  return true;
-}
-
-function connectorCategoryRaw(connector) {
-  return String(connector?.category || connector?.metadata?.category || '').toLowerCase();
-}
-
-function connectorAuthRaw(connector) {
-  return String(connector?.auth_type || connector?.auth?.type || '').toLowerCase();
-}
-
-function connectorVersionRaw(connector) {
-  return String(connector?.version || '').trim();
-}
-
-function connectorScopeRaw(connector) {
-  return connectorScopeLabel(connector).toLowerCase();
-}
-
-function matchesConnectorFilters(context, connector, filters) {
-  if (!matchesConnectorState(context, connector, filters.state)) return false;
-  if (filters.category && filters.category !== 'all' && connectorCategoryRaw(connector) !== filters.category) return false;
-  if (filters.auth && filters.auth !== 'all' && connectorAuthRaw(connector) !== filters.auth) return false;
-  if (filters.scope && filters.scope !== 'all' && connectorScopeRaw(connector) !== filters.scope) return false;
-  if (filters.version && filters.version !== 'all' && connectorVersionRaw(connector) !== filters.version) return false;
-  return true;
-}
-
-// Pull unique lowercased values for a given accessor, paired with the
-// original raw value so we can prettify the label via formatLabel.
-function uniqueOptions(list, accessor) {
-  const seen = new Map();
-  for (const item of list) {
-    const raw = accessor(item);
-    if (!raw) continue;
-    const key = raw.toLowerCase();
-    if (!seen.has(key)) {
-      seen.set(key, raw);
-    }
-  }
-  return Array.from(seen.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([value, raw]) => ({ value, raw }));
-}
-
-function connectorSortValue(context, connector, sortBy) {
-  if (sortBy === 'status') return connectorReadiness(context, connector).label;
-  if (sortBy === 'category') return connector.category || connector.metadata?.category || '';
-  if (sortBy === 'auth') return connector.auth_type || connector.auth?.type || '';
-  if (sortBy === 'scope') return connectorScopeLabel(connector);
-  if (sortBy === 'version') return connector.version || '1.0.0';
-  if (sortBy === 'id') return connector.id || connector.connector_id || '';
-  return connectorDisplayName(connector);
-}
-
 function connectorPinKey(connector) {
   return connector?.id || connector?.connector_id || connector?.connector_type || '';
 }
@@ -211,92 +149,69 @@ export function isConnectorPinned(context, connector) {
   return key ? pinned.includes(key) : false;
 }
 
-function sortConnectors(context, connectors, sortBy, sortDir) {
-  const dir = sortDir === 'desc' ? -1 : 1;
-  return [...connectors].sort((a, b) => {
-    // Pinned connectors always float to the top, regardless of sort field
-    const aPinned = isConnectorPinned(context, a);
-    const bPinned = isConnectorPinned(context, b);
-    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+// ── Connector Catalog table (js/shared/connector-table.js) ────────────────
+// The same lex-table as Data Connectors: client-side over the merged catalog,
+// raw values in rows, readiness badges, and a Created column from the
+// configured integration source (catalog-only rows have none).
 
-    const left = normalizeText(connectorSortValue(context, a, sortBy));
-    const right = normalizeText(connectorSortValue(context, b, sortBy));
-    if (left < right) return -1 * dir;
-    if (left > right) return 1 * dir;
-    return 0;
-  });
+const TABLE_ID = 'automationConnectorsTable';
+const TABLE_PREFIX = 'automationConnectors';
+
+function ConnectorTable() {
+  return typeof window !== 'undefined' ? window.LanaConnectorTable : null;
 }
 
-function sortIndicator(filters, field) {
-  if (filters.sortBy !== field) return '';
-  return filters.sortDir === 'desc' ? ' ↓' : ' ↑';
+function connectorTableStore(context) {
+  context.state.tables = context.state.tables || {};
+  if (!context.state.tables.connectors) context.state.tables.connectors = { query: null };
+  return context.state.tables.connectors;
 }
 
-function connectorTableRow(context, connector) {
-  const readiness = connectorReadiness(context, connector);
-  const connectorId = connector.id || connector.connector_id || '';
-  const safeId = escapeAttribute(connectorId);
-  const pinKey = connectorPinKey(connector);
-  const safePinKey = escapeAttribute(pinKey);
-  const pinned = isConnectorPinned(context, connector);
-  const pinLabel = pinned ? 'Unpin connector' : 'Pin connector to top';
-  const pinIcon = pinned
-    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.39 6.96L22 9.27l-5.45 4.73L17.82 22 12 18.27 6.18 22l1.27-7.99L2 9.27l7.61-.31L12 2z"/></svg>'
-    : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l2.39 6.96L22 9.27l-5.45 4.73L17.82 22 12 18.27 6.18 22l1.27-7.99L2 9.27l7.61-.31L12 2z"/></svg>';
+/**
+ * One row of raw values for a connector.
+ * @param {Object} context
+ * @param {Object} connector - an entry of getConnectorList(context)
+ */
+export function connectorTableRow(context, connector) {
+  const table = ConnectorTable();
+  const raw = connector?._raw || {};
+  const scope = connectorScopeLabel(connector) === 'Personal' ? 'user' : 'org';
+  return {
+    id: String(connector.id || connector.connector_id || ''),
+    pin_key: connectorPinKey(connector),
+    pinned: isConnectorPinned(context, connector) ? 'yes' : 'no',
+    name: connectorDisplayName(connector),
+    vendor: connector.vendor || connector.metadata?.vendor || '',
+    description: connector.description || connector.metadata?.description || '',
+    logo_url: connector.logo_url || connector.manifest?.icon || '',
+    category: String(connector.category || connector.metadata?.category || '').toLowerCase(),
+    auth_type: String(connector.auth_type || connector.auth?.type || '').toLowerCase(),
+    scope,
+    status: table ? table.automationStatusKey(resolveConnectorStatus(connector)) : resolveConnectorStatus(connector),
+    version: String(connector.version || '').replace(/^v/i, ''),
+    created_at: connector.created_at || raw.created_at || '',
+    connector_id: connector.connector_id || '',
+    multi_instance: isMultiInstanceEnabled(connector),
+    _raw: connector
+  };
+}
+
+// Open, Add instance and Update keep their data attributes: app.js handles
+// them with its document-level click listener.
+function connectorActionsCell(row) {
+  const name = escapeAttribute(row.name);
   return `
-    <tr class="connectors-row${pinned ? ' connectors-row-pinned' : ''}" data-open-connector-detail="${safeId}" tabindex="0" role="button" aria-label="Open ${escapeAttribute(connectorDisplayName(connector))}">
-      <td class="connectors-pin-cell">
-        <button
-          type="button"
-          class="connectors-pin-btn${pinned ? ' is-pinned' : ''}"
-          data-connector-pin="${safePinKey}"
-          aria-pressed="${pinned ? 'true' : 'false'}"
-          aria-label="${escapeAttribute(pinLabel)}"
-          title="${escapeAttribute(pinLabel)}"
-        >${pinIcon}</button>
-      </td>
-      <td>${escapeHtml(connectorDisplayName(connector))}</td>
-      <td>${escapeHtml(formatLabel(connector.category || connector.metadata?.category || 'connector'))}</td>
-      <td>${escapeHtml(formatLabel(connector.auth_type || connector.auth?.type || 'runtime'))}</td>
-      <td>${badge(connectorScopeLabel(connector), connectorScopeLabel(connector) === 'Personal' ? 'info' : '')}</td>
-      <td>${badge(readiness.label, readiness.tone)}</td>
-      <td>${escapeHtml(connector.version || '1.0.0')}</td>
-      <td>
-        <div class="connectors-row-actions">
-          <lex-btn variant="secondary" size="sm" data-open-connector-detail="${safeId}">Open</lex-btn>
-          ${isMultiInstanceEnabled(connector) ? `
-            <lex-btn
-              variant="ghost"
-              size="sm"
-              icon="true"
-              data-connector-add-instance="${escapeAttribute(connector.connector_id || '')}"
-              aria-label="Add another instance of ${escapeAttribute(connectorDisplayName(connector))}"
-              title="Add another instance"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 5v14M5 12h14"/>
-              </svg>
-            </lex-btn>
-          ` : ''}
-          ${connector.connector_id ? `
-            <lex-btn
-              variant="ghost"
-              size="sm"
-              icon="true"
-              data-connector-update="${escapeAttribute(connector.connector_id)}"
-              data-connector-update-name="${escapeAttribute(connectorDisplayName(connector))}"
-              aria-label="Update ${escapeAttribute(connectorDisplayName(connector))}"
-              title="Update connector (upload new version)"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21 12a9 9 0 11-3-6.7L21 8"/>
-                <path d="M21 3v5h-5"/>
-              </svg>
-            </lex-btn>
-          ` : ''}
-        </div>
-      </td>
-    </tr>
+    <lex-btn variant="secondary" size="sm" data-open-connector-detail="${escapeAttribute(row.id)}">Open</lex-btn>
+    ${row.multi_instance ? `
+      <lex-btn variant="ghost" size="sm" icon="true" data-connector-add-instance="${escapeAttribute(row.connector_id)}" aria-label="Add another instance of ${name}" title="Add another instance">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      </lex-btn>
+    ` : ''}
+    ${row.connector_id ? `
+      <lex-btn variant="ghost" size="sm" icon="true" data-connector-update="${escapeAttribute(row.connector_id)}" data-connector-update-name="${name}" aria-label="Update ${name}" title="Update connector (upload new version)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 11-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+      </lex-btn>
+    ` : ''}
   `;
 }
 
@@ -422,7 +337,6 @@ function buildReauthBanners(context, connectorList) {
 }
 
 export function renderConnectors(context) {
-  const filters = context.state.filters.connectors || {};
   const checklistItems = [
     {
       done: context.state.connectors.length > 0,
@@ -452,30 +366,11 @@ export function renderConnectors(context) {
   const allChecklistDone = checklistItems.every((item) => item.done);
   const tableSource = getConnectorList(context);
 
-  // Options for the new per-column dropdowns. Computed from the UNFILTERED
-  // source so picking one filter doesn't erase the choices in the others.
-  const categoryOptions = uniqueOptions(tableSource, (c) => connectorCategoryRaw(c));
-  const authOptions = uniqueOptions(tableSource, (c) => connectorAuthRaw(c));
-  const versionOptions = uniqueOptions(tableSource, (c) => connectorVersionRaw(c));
-
-  const visibleConnectors = filterCollection(
-    tableSource,
-    filters,
-    (connector) => [
-      connectorDisplayName(connector),
-      connector.description || connector.metadata?.description,
-      connector.auth_type || connector.auth?.type,
-      connectorScopeLabel(connector),
-      connector.category || connector.metadata?.category
-    ],
-    (connector, activeFilters) => matchesConnectorFilters(context, connector, activeFilters)
-  );
-  const sorted = sortConnectors(context, visibleConnectors, filters.sortBy || 'name', filters.sortDir || 'asc');
-  const perPage = Math.max(25, parseInt(filters.perPage, 10) || 25);
-  const totalPages = Math.max(1, Math.ceil(sorted.length / perPage));
-  const page = Math.min(Math.max(parseInt(filters.page, 10) || 1, 1), totalPages);
-  const start = (page - 1) * perPage;
-  const paged = sorted.slice(start, start + perPage);
+  const Table = ConnectorTable();
+  const store = connectorTableStore(context);
+  // The view re-renders by replacing innerHTML: keep the table's query.
+  const previous = typeof document !== 'undefined' ? document.getElementById(TABLE_ID) : null;
+  if (previous && Table) store.query = Table.snapshot(previous) || store.query;
 
   const canImport = hasAdminRole(context);
 
@@ -527,108 +422,36 @@ export function renderConnectors(context) {
       `
     })}
 
-    ${surface({
-      title: 'Connector Catalog',
-      subtitle: 'Filesystem-backed connector definitions with runtime readiness overlaid from configured instances.',
-      body: `
-        <div class="connectors-table-toolbar">
-          <label class="toolbar-search">
-            <span class="sr-only">Search connectors</span>
-            <input
-              type="search"
-              value="${escapeHtml(String(filters.query || ''))}"
-              placeholder="Search connectors by name, auth type, or description"
-              data-filter-view="connectors"
-              data-filter-field="query"
-            >
-          </label>
-          <label class="toolbar-select">
-            <span>State</span>
-            <select data-filter-view="connectors" data-filter-field="state">
-              <option value="all" ${filters.state === 'all' ? 'selected' : ''}>All</option>
-              <option value="ready" ${filters.state === 'ready' ? 'selected' : ''}>Ready</option>
-              <option value="not_installed" ${filters.state === 'not_installed' ? 'selected' : ''}>Not Installed</option>
-              <option value="error" ${filters.state === 'error' ? 'selected' : ''}>Error</option>
-            </select>
-          </label>
-          <label class="toolbar-select">
-            <span>Category</span>
-            <select data-filter-view="connectors" data-filter-field="category">
-              <option value="all" ${(filters.category || 'all') === 'all' ? 'selected' : ''}>All</option>
-              ${categoryOptions.map(({ value, raw }) => `
-                <option value="${escapeAttribute(value)}" ${filters.category === value ? 'selected' : ''}>${escapeHtml(formatLabel(raw))}</option>
-              `).join('')}
-            </select>
-          </label>
-          <label class="toolbar-select">
-            <span>Auth</span>
-            <select data-filter-view="connectors" data-filter-field="auth">
-              <option value="all" ${(filters.auth || 'all') === 'all' ? 'selected' : ''}>All</option>
-              ${authOptions.map(({ value, raw }) => `
-                <option value="${escapeAttribute(value)}" ${filters.auth === value ? 'selected' : ''}>${escapeHtml(formatLabel(raw))}</option>
-              `).join('')}
-            </select>
-          </label>
-          <label class="toolbar-select">
-            <span>Scope</span>
-            <select data-filter-view="connectors" data-filter-field="scope">
-              <option value="all" ${(filters.scope || 'all') === 'all' ? 'selected' : ''}>All</option>
-              <option value="personal" ${filters.scope === 'personal' ? 'selected' : ''}>Personal</option>
-              <option value="firm" ${filters.scope === 'firm' ? 'selected' : ''}>Firm</option>
-            </select>
-          </label>
-          <label class="toolbar-select">
-            <span>Version</span>
-            <select data-filter-view="connectors" data-filter-field="version">
-              <option value="all" ${(filters.version || 'all') === 'all' ? 'selected' : ''}>All</option>
-              ${versionOptions.map(({ value, raw }) => `
-                <option value="${escapeAttribute(value)}" ${filters.version === value ? 'selected' : ''}>${escapeHtml('v' + raw)}</option>
-              `).join('')}
-            </select>
-          </label>
-          <label class="toolbar-select">
-            <span>Rows</span>
-            <select data-filter-view="connectors" data-filter-field="perPage">
-              <option value="25" ${perPage === 25 ? 'selected' : ''}>25</option>
-              <option value="50" ${perPage === 50 ? 'selected' : ''}>50</option>
-              <option value="100" ${perPage === 100 ? 'selected' : ''}>100</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="connectors-table-wrap">
-          <table class="connectors-table">
-            <thead>
-              <tr>
-                <th class="connectors-pin-col"><span class="sr-only">Pinned</span></th>
-                <th><button type="button" class="connectors-sort-btn" data-connectors-sort="name">Name${sortIndicator(filters, 'name')}</button></th>
-                <th><button type="button" class="connectors-sort-btn" data-connectors-sort="category">Category${sortIndicator(filters, 'category')}</button></th>
-                <th><button type="button" class="connectors-sort-btn" data-connectors-sort="auth">Auth${sortIndicator(filters, 'auth')}</button></th>
-                <th><button type="button" class="connectors-sort-btn" data-connectors-sort="scope">Scope${sortIndicator(filters, 'scope')}</button></th>
-                <th><button type="button" class="connectors-sort-btn" data-connectors-sort="status">Status${sortIndicator(filters, 'status')}</button></th>
-                <th><button type="button" class="connectors-sort-btn" data-connectors-sort="version">Version${sortIndicator(filters, 'version')}</button></th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${paged.length
-                ? paged.map((connector) => connectorTableRow(context, connector)).join('')
-                : `<tr><td colspan="8" class="connectors-empty">No connectors match the current filters.</td></tr>`}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="connectors-pagination">
-          <div class="connectors-page-meta">
-            Showing ${sorted.length ? start + 1 : 0}-${Math.min(start + perPage, sorted.length)} of ${sorted.length}
-          </div>
-          <div class="row-actions">
-            <lex-btn variant="secondary" size="sm" data-connectors-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>Previous</lex-btn>
-            <span class="connectors-page-indicator">Page ${page} of ${totalPages}</span>
-            <lex-btn variant="secondary" size="sm" data-connectors-page="${page + 1}" ${page >= totalPages ? 'disabled' : ''}>Next</lex-btn>
-          </div>
-        </div>
-      `
-    })}
+    ${Table
+      ? Table.sectionMarkup({
+        prefix: TABLE_PREFIX,
+        tableId: TABLE_ID,
+        title: 'Connector Catalog',
+        subtitle: 'Filesystem-backed connector definitions with runtime readiness overlaid from configured instances.',
+        query: store.query
+      })
+      : emptyStateMarkup()}
   `;
+
+  if (Table) {
+    Table.mount({
+      prefix: TABLE_PREFIX,
+      tableId: TABLE_ID,
+      rows: tableSource.map((connector) => connectorTableRow(context, connector)),
+      statuses: Table.AUTOMATION_STATUSES,
+      store,
+      actionsCell: connectorActionsCell,
+      // A row click does what its Open button does (app.js opens the connector).
+      onRowClick: (row) => {
+        const table = document.getElementById(TABLE_ID);
+        const open = table ? Array.from(table.querySelectorAll('[data-open-connector-detail]'))
+          .find((button) => button.getAttribute('data-open-connector-detail') === row.id) : null;
+        if (open) open.click();
+      }
+    });
+  }
+}
+
+function emptyStateMarkup() {
+  return '<p class="muted">The connector table could not be loaded.</p>';
 }

@@ -12,6 +12,11 @@
   <script src="../js/tailwind-loader.js"></script>
 
   <link rel="stylesheet" href="../css/lex-chat.css">
+  <style>
+    /* ActionStep record tables (LanaActionstepTables) */
+    .actionstep-overdue .rtk-time { color: var(--lex-status-danger-text, #B42318); font-weight: 600; }
+    .actionstep-job-error { margin-top: 2px; font-size: 0.75rem; color: var(--lex-status-danger-text, #B42318); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
 </head>
 <body>
 
@@ -341,6 +346,11 @@
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
   <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
@@ -350,6 +360,10 @@
 
   <!-- Inject page content + hoist modals -->
   <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../insights/js/record-table-kit.js"></script>
+  <script src="js/integration-tables.js"></script>
+  <script src="js/actionstep-tables.js"></script>
 
   <!-- Page dependencies -->
   <script src="../js/chunked-uploader.js"></script>
@@ -1271,11 +1285,48 @@
       }
     }
 
-    // Global variables for output tab state
+    // Output tab: one data-type navigator plus one standard record table
+    // (LanaActionstepTables + LanaRecordTableKit). The table owns search,
+    // sort, filters and paging; the server pages each data type.
     let currentOutputDataType = 'matters';
-    let outputCurrentPage = 1;
-    let outputPageSize = 25;
-    let outputTotalRecords = 0;
+    let outputTableController = null;
+
+    // Opens the record's detail view, by data type (documents have none).
+    const ACTIONSTEP_DETAIL_OPENERS = {
+      matters: (row) => openMatterDetail(row.id),
+      participants: (row) => openParticipantDetail(row.id),
+      tasks: (row) => openTaskDetail(row.id),
+      notes: (row) => openFileNoteDetail(row.id)
+    };
+
+    /**
+     * Mounts a server-paged ActionStep entity table into container.
+     * @param {HTMLElement} container
+     * @param {string} type - matters | participants | tasks | notes | documents
+     * @param {Object} [options] - { id, light }
+     */
+    function mountActionstepEntityTable(container, type, options = {}) {
+      const tables = window.LanaActionstepTables;
+      const config = tables.entityConfig(type);
+      const spec = tables.entitySpec(type, options);
+      return window.LanaRecordTableKit.mount(container, spec, {
+        serverFilters: tables.entityServerFilters(type),
+        errorText: `${config.title} could not be loaded. Check your connection and try again.`,
+        load: async (query) => {
+          const params = tables.entityParams(type, query);
+          const response = await api.get(`${connectorApi(config.path)}?${params.toString()}`);
+          const records = tables.entityRecords(type, response);
+          return {
+            rows: records.map((record) => tables.entityRow(type, record)),
+            pagination: tables.entityPagination(response, query, records.length)
+          };
+        },
+        onRowClick: (row) => {
+          const open = ACTIONSTEP_DETAIL_OPENERS[type];
+          if (open && row && row.id) open(row);
+        }
+      });
+    }
 
     // Load Output Tab
     async function loadOutputTab() {
@@ -1322,87 +1373,13 @@
             </div>
           </div>
 
-          <!-- Right Panel - Data Table -->
-          <div class="flex-1 min-w-0">
-            <!-- Search and Filter Controls -->
-            <div class="mb-4 flex gap-4">
-              <div class="flex-1">
-                <input
-                  type="text"
-                  id="outputSearchInput"
-                  placeholder="Search..."
-                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-              <div>
-                <select
-                  id="outputFilterSelect"
-                  class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="closed">Closed</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Data Panel -->
-            <div id="outputDataPanel">
-              <!-- Data will be loaded here -->
-              <div class="flex items-center justify-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-              </div>
-            </div>
-
-            <!-- Pagination Controls -->
-            <div id="outputPagination" class="mt-4 flex items-center justify-between hidden">
-              <div class="text-sm text-gray-500">
-                <span id="outputPaginationInfo">Showing 0 of 0</span>
-              </div>
-              <div class="flex gap-2">
-                <button
-                  id="outputPrevBtn"
-                  onclick="changeOutputPage(-1)"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled
-                >
-                  Previous
-                </button>
-                <button
-                  id="outputNextBtn"
-                  onclick="changeOutputPage(1)"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </div>
+          <!-- Right Panel - Data Table (toolbar, heading, table and pager) -->
+          <div class="flex-1 min-w-0" id="outputDataPanel"></div>
         </div>
       `;
 
       // Load initial counts
       await updateOutputCounts();
-
-      // Setup search and filter event listeners
-      const searchInput = document.getElementById('outputSearchInput');
-      const filterSelect = document.getElementById('outputFilterSelect');
-
-      let searchTimeout;
-      searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-          outputCurrentPage = 1; // Reset to first page on search
-          loadOutputData(currentOutputDataType);
-        }, 500); // Debounce 500ms
-      });
-
-      filterSelect.addEventListener('change', () => {
-        outputCurrentPage = 1; // Reset to first page on filter change
-        loadOutputData(currentOutputDataType);
-      });
 
       // Load initial data (matters)
       await loadOutputData('matters');
@@ -1426,34 +1403,6 @@
       }
     }
 
-    // Change output page
-    function changeOutputPage(delta) {
-      outputCurrentPage += delta;
-      loadOutputData(currentOutputDataType);
-    }
-
-    // Update pagination controls
-    function updateOutputPagination(total) {
-      outputTotalRecords = total;
-      const pagination = document.getElementById('outputPagination');
-      const prevBtn = document.getElementById('outputPrevBtn');
-      const nextBtn = document.getElementById('outputNextBtn');
-      const info = document.getElementById('outputPaginationInfo');
-
-      if (total > 0) {
-        pagination.classList.remove('hidden');
-
-        const start = (outputCurrentPage - 1) * outputPageSize + 1;
-        const end = Math.min(outputCurrentPage * outputPageSize, total);
-        info.textContent = `Showing ${start}-${end} of ${total}`;
-
-        prevBtn.disabled = outputCurrentPage === 1;
-        nextBtn.disabled = end >= total;
-      } else {
-        pagination.classList.add('hidden');
-      }
-    }
-
     // Load output data for specific type
     async function loadOutputData(dataType) {
       currentOutputDataType = dataType;
@@ -1467,437 +1416,55 @@
       document.getElementById(`output-nav-${dataType}`).classList.add('bg-emerald-600', 'text-white', 'font-medium');
 
       const panel = document.getElementById('outputDataPanel');
-      panel.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
-
-      // Get search and filter values
-      const searchInput = document.getElementById('outputSearchInput');
-      const filterSelect = document.getElementById('outputFilterSelect');
-      const searchTerm = searchInput ? searchInput.value : '';
-      const statusFilter = filterSelect ? filterSelect.value : '';
-
+      if (!panel) return;
       try {
-        switch (dataType) {
-          case 'matters':
-            await loadMattersInOutput(searchTerm, statusFilter);
-            break;
-          case 'participants':
-            await loadParticipantsInOutput(searchTerm, statusFilter);
-            break;
-          case 'tasks':
-            await loadTasksInOutput(searchTerm, statusFilter);
-            break;
-          case 'notes':
-            await loadFileNotesInOutput(searchTerm, statusFilter);
-            break;
-          case 'documents':
-            await loadDocumentsInOutput(searchTerm, statusFilter);
-            break;
-        }
+        outputTableController = await mountActionstepEntityTable(panel, dataType, {
+          id: `actionstepOutput${dataType.charAt(0).toUpperCase()}${dataType.slice(1)}Table`,
+          light: true
+        });
       } catch (error) {
-        panel.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load ${dataType}: ${error.message}</div>`;
+        panel.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load ${window.LanaRecordTableKit.esc(dataType)}: ${window.LanaRecordTableKit.esc(error.message)}</div>`;
       }
     }
 
-    // Load matters in output panel
-    async function loadMattersInOutput(searchTerm = '', statusFilter = '') {
-      const panel = document.getElementById('outputDataPanel');
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        page: outputCurrentPage,
-        limit: outputPageSize
-      });
-
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-
-      if (statusFilter) {
-        params.append('status', statusFilter);
-      }
-
-      const result = await api.get(`${connectorApi('/data/matters')}?${params.toString()}`);
-
-      if (!result.records || result.records.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No matters found</div>';
-        updateOutputPagination(0);
-        return;
-      }
-
-      // Update pagination
-      const total = result.pagination?.total || result.records.length;
-      updateOutputPagination(total);
-
-      // Render table
-      let html = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-      `;
-
-      result.records.forEach(matter => {
-        html += `
-          <tr class="hover:bg-gray-50 cursor-pointer transition-colors"
-              data-matter-id="${matter.id}"
-              onclick="openMatterDetail('${matter.id}')">
-            <td class="px-6 py-4 text-sm font-medium text-gray-900">${matter.name || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${matter.reference || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${matter.status || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${matter.client_name || '-'}</td>
-          </tr>
-        `;
-      });
-
-      html += `
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      panel.innerHTML = html;
-    }
-
-    // Similar functions for other data types
-    async function loadParticipantsInOutput() {
-      const panel = document.getElementById('outputDataPanel');
-      const result = await api.get(`${connectorApi('/data/participants')}?limit=25`);
-
-      if (!result.records || result.records.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No participants found</div>';
-        return;
-      }
-
-      let html = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>';
-      html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
-
-      result.records.forEach(p => {
-        const participantType = p.is_company ? 'Company' : 'Individual';
-        html += `<tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="openParticipantDetail('${p.id}')">
-          <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.display_name || '-'}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${participantType}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${p.email || '-'}</td>
-        </tr>`;
-      });
-
-      html += '</tbody></table></div>';
-      panel.innerHTML = html;
-    }
-
-    async function loadTasksInOutput() {
-      const panel = document.getElementById('outputDataPanel');
-      const result = await api.get(`${connectorApi('/data/tasks')}?limit=25`);
-
-      if (!result.records || result.records.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No tasks found</div>';
-        return;
-      }
-
-      let html = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>';
-      html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
-
-      result.records.forEach(t => {
-        const dueDate = t.due_date ? new Date(t.due_date).toLocaleDateString() : '-';
-        html += `<tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="openTaskDetail('${t.id}')">
-          <td class="px-6 py-4 text-sm font-medium text-gray-900">${t.task_name || '-'}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${t.current_status || '-'}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${dueDate}</td>
-        </tr>`;
-      });
-
-      html += '</tbody></table></div>';
-      panel.innerHTML = html;
-    }
-
-    async function loadFileNotesInOutput() {
-      const panel = document.getElementById('outputDataPanel');
-      const result = await api.get(`${connectorApi('/data/file-notes')}?limit=25`);
-
-      if (!result.records || result.records.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No file notes found</div>';
-        return;
-      }
-
-      let html = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matter</th>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>';
-      html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
-
-      result.records.forEach(note => {
-        // Use first 100 chars of note_text as subject
-        const subject = note.note_text ? note.note_text.substring(0, 100) + (note.note_text.length > 100 ? '...' : '') : '-';
-        html += `<tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="openFileNoteDetail('${note.id}')">
-          <td class="px-6 py-4 text-sm font-medium text-gray-900">${subject}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${note.matter_name || '-'}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${note.created_at ? new Date(note.created_at).toLocaleDateString() : '-'}</td>
-        </tr>`;
-      });
-
-      html += '</tbody></table></div>';
-      panel.innerHTML = html;
-    }
-
-    async function loadDocumentsInOutput() {
-      const panel = document.getElementById('outputDataPanel');
-      const result = await api.get(`${connectorApi('/documents')}?limit=25`);
-
-      if (!result.documents || result.documents.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No documents found</div>';
-        return;
-      }
-
-      let html = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matter</th>';
-      html += '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>';
-      html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
-
-      result.documents.forEach(doc => {
-        html += `<tr class="hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm font-medium text-gray-900">${doc.filename || '-'}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${doc.matter_name || '-'}</td>
-          <td class="px-6 py-4 text-sm text-gray-500">${doc.file_size ? ChunkedUploader.formatBytes(doc.file_size) : '-'}</td>
-        </tr>`;
-      });
-
-      html += '</tbody></table></div>';
-      panel.innerHTML = html;
-    }
-
-    // Load matters
+    // Matters, Participants, Tasks and File notes tabs: the same standard
+    // tables as the Output tab, with the full toolbar.
     async function loadMatters() {
-      const result = await api.get(`${connectorApi('/data/matters')}?limit=25`);
-      const content = document.getElementById('tabContent');
-
-      if (!result.records || result.records.length === 0) {
-        content.innerHTML = '<div class="text-center text-gray-500 py-8">No matters found. Click "Import CSV Data" to import from ActionStep.</div>';
-        return;
-      }
-
-      const statusColors = {
-        'Active': 'bg-green-100 text-green-800',
-        'Closed': 'bg-gray-100 text-gray-800',
-        'Pending': 'bg-yellow-100 text-yellow-800'
-      };
-
-      content.innerHTML = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matter Name</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">File Ref</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned To</th>
-                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              ${result.records.map(m => `
-                <tr class="hover:bg-gray-50">
-                  <td class="px-4 py-3 font-medium text-gray-900">${m.matter_name || 'Untitled'}</td>
-                  <td class="px-4 py-3 text-sm text-gray-600">${m.file_reference || '-'}</td>
-                  <td class="px-4 py-3 text-sm text-gray-600">${m.action_type_name || '-'}</td>
-                  <td class="px-4 py-3 text-sm text-gray-600">${m.assigned_to_name || 'Unassigned'}</td>
-                  <td class="px-4 py-3 text-center">
-                    <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[m.status] || 'bg-gray-100'}">${m.status || 'Unknown'}</span>
-                  </td>
-                  <td class="px-4 py-3 text-sm text-gray-500">${m.date_created ? new Date(m.date_created).toLocaleDateString() : '-'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.records.length} of ${result.pagination?.total || result.records.length} matters</div>
-      `;
+      await mountActionstepEntityTable(document.getElementById('tabContent'), 'matters');
     }
 
-    // Load participants
     async function loadParticipants() {
-      const result = await api.get(`${connectorApi('/data/participants')}?limit=25`);
-      const content = document.getElementById('tabContent');
-
-      if (!result.records || result.records.length === 0) {
-        content.innerHTML = '<div class="text-center text-gray-500 py-8">No participants found</div>';
-        return;
-      }
-
-      content.innerHTML = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Type</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              ${result.records.map(p => `
-                <tr class="hover:bg-gray-50">
-                  <td class="px-4 py-3">
-                    <div class="font-medium text-gray-900">${p.display_name || p.company_name || 'Unknown'}</div>
-                    ${p.is_company && p.company_name ? '' : (p.company_name ? `<div class="text-sm text-gray-500">${p.company_name}</div>` : '')}
-                  </td>
-                  <td class="px-4 py-3 text-sm text-gray-600">${p.email || '-'}</td>
-                  <td class="px-4 py-3 text-sm text-gray-600">${p.phone || '-'}</td>
-                  <td class="px-4 py-3 text-sm text-gray-600">${[p.city, p.state_province].filter(Boolean).join(', ') || '-'}</td>
-                  <td class="px-4 py-3 text-center">
-                    <span class="px-2 py-1 text-xs font-medium rounded-full ${p.is_company ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">${p.is_company ? 'Company' : 'Person'}</span>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.records.length} of ${result.pagination?.total || result.records.length} participants</div>
-      `;
+      await mountActionstepEntityTable(document.getElementById('tabContent'), 'participants');
     }
 
-    // Load tasks
     async function loadTasks() {
-      const result = await api.get(`${connectorApi('/data/tasks')}?limit=25`);
-      const content = document.getElementById('tabContent');
-
-      if (!result.records || result.records.length === 0) {
-        content.innerHTML = '<div class="text-center text-gray-500 py-8">No tasks found</div>';
-        return;
-      }
-
-      const statusColors = {
-        'Completed': 'bg-green-100 text-green-800',
-        'In Progress': 'bg-blue-100 text-blue-800',
-        'Pending': 'bg-yellow-100 text-yellow-800',
-        'Overdue': 'bg-red-100 text-red-800'
-      };
-
-      content.innerHTML = `
-        <div class="space-y-3">
-          ${result.records.map(t => {
-            const isOverdue = !t.completed_timestamp && t.due_date && new Date(t.due_date) < LanaTime.nowDate();
-            const displayStatus = isOverdue ? 'Overdue' : (t.current_status || 'Pending');
-            return `
-              <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-lg ${isOverdue ? 'border-l-4 border-red-500' : ''}">
-                <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center ${t.completed_timestamp ? 'bg-green-100 border-green-500' : 'border-gray-300'}">
-                  ${t.completed_timestamp ? '<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
-                </div>
-                <div class="flex-1">
-                  <div class="font-medium text-gray-900 ${t.completed_timestamp ? 'line-through text-gray-500' : ''}">${t.task_name || 'Untitled Task'}</div>
-                  ${t.description ? `<p class="text-sm text-gray-500 mt-1">${t.description.substring(0, 150)}${t.description.length > 150 ? '...' : ''}</p>` : ''}
-                  <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                    ${t.matter_name ? `<span>Matter: ${t.matter_name}</span>` : ''}
-                    ${t.assigned_to_name ? `<span>Assigned: ${t.assigned_to_name}</span>` : ''}
-                    ${t.due_date ? `<span class="${isOverdue ? 'text-red-600 font-medium' : ''}">Due: ${new Date(t.due_date).toLocaleDateString()}</span>` : ''}
-                  </div>
-                </div>
-                <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[displayStatus] || 'bg-gray-100'}">${displayStatus}</span>
-              </div>
-            `;
-          }).join('')}
-        </div>
-        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.records.length} of ${result.pagination?.total || result.records.length} tasks</div>
-      `;
+      await mountActionstepEntityTable(document.getElementById('tabContent'), 'tasks');
     }
 
-    // Load file notes
     async function loadFileNotes() {
-      const result = await api.get(`${connectorApi('/data/file-notes')}?limit=25`);
-      const content = document.getElementById('tabContent');
-
-      if (!result.records || result.records.length === 0) {
-        content.innerHTML = '<div class="text-center text-gray-500 py-8">No file notes found</div>';
-        return;
-      }
-
-      content.innerHTML = `
-        <div class="space-y-4">
-          ${result.records.map(n => `
-            <div class="p-4 bg-gray-50 rounded-lg">
-              <div class="flex items-center justify-between mb-2">
-                <div class="font-medium text-gray-900">${n.matter_name || 'Unknown Matter'}</div>
-                <span class="text-xs text-gray-500">${n.note_timestamp ? timeAgo(n.note_timestamp) : ''}</span>
-              </div>
-              <p class="text-sm text-gray-700 whitespace-pre-wrap">${n.note_text?.substring(0, 500) || ''}${(n.note_text?.length || 0) > 500 ? '...' : ''}</p>
-              <div class="mt-2 text-xs text-gray-500">
-                By ${n.entered_by_name || 'Unknown'} ${n.source ? `via ${n.source}` : ''}
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        <div class="mt-4 text-sm text-gray-500 text-center">Showing ${result.records.length} of ${result.pagination?.total || result.records.length} notes</div>
-      `;
+      await mountActionstepEntityTable(document.getElementById('tabContent'), 'notes');
     }
 
-    // Load sync history
+    // Sync history: every sync log for this source (the logs endpoint pages
+    // but cannot sort or filter, so the whole set loads into a client table).
     async function loadSyncHistory() {
-      const result = await api.get(`${connectorApi('/logs')}?limit=20`);
       const content = document.getElementById('tabContent');
-
-      if (!result.logs || result.logs.length === 0) {
-        content.innerHTML = '<div class="text-center text-gray-500 py-8">No sync history found</div>';
-        return;
-      }
-
-      const statusColors = {
-        'completed': 'bg-green-100 text-green-800',
-        'failed': 'bg-red-100 text-red-800',
-        'running': 'bg-blue-100 text-blue-800'
-      };
-
-      content.innerHTML = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Processed</th>
-                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Created</th>
-                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Failed</th>
-                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              ${result.logs.map(l => {
-                const duration = l.completed_at && l.started_at
-                  ? Math.round((new Date(l.completed_at) - new Date(l.started_at)) / 1000) + 's'
-                  : '-';
-                return `
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 font-medium text-gray-900">${l.sync_type || 'Full'}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600">${l.started_at ? timeAgo(l.started_at) : '-'}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600">${duration}</td>
-                    <td class="px-4 py-3 text-sm text-right text-gray-600">${formatNumber(l.records?.processed || 0)}</td>
-                    <td class="px-4 py-3 text-sm text-right text-green-600">${formatNumber(l.records?.created || 0)}</td>
-                    <td class="px-4 py-3 text-sm text-right ${(l.records?.failed || 0) > 0 ? 'text-red-600' : 'text-gray-600'}">${formatNumber(l.records?.failed || 0)}</td>
-                    <td class="px-4 py-3 text-center">
-                      <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[l.status] || 'bg-gray-100'}">${l.status || 'unknown'}</span>
-                    </td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
+      const shared = window.LanaIntegrationTables;
+      const result = await window.LanaActionstepTables.fetchAllOffset(async (limit, offset) => {
+        const response = await api.get(`${connectorApi('/logs')}?limit=${limit}&offset=${offset}`);
+        return { rows: response.logs || [], total: response.pagination?.total };
+      }, 100, 50);
+      await window.LanaRecordTableKit.mount(content, {
+        id: 'actionstepSyncHistoryTable',
+        title: 'Sync history',
+        noun: ['sync', 'syncs'],
+        sortBy: 'created_at',
+        sortDir: 'desc',
+        minWidth: 900,
+        searchPlaceholder: 'Search syncs...',
+        emptyText: 'No sync history found',
+        columns: shared.syncLogColumns({ error: true })
+      }, { rows: result.rows.map(shared.syncLogRow) });
     }
 
     // Load Overview tab - Documentation style with Configuration Status
@@ -2615,12 +2182,6 @@
 
     // Load Execution Logs tab with Active Jobs, Pending Review, and Job History
     let logsRefreshInterval = null;
-    let logsHistoryPage = 1;
-    const logsHistoryPageSize = 20;
-    let logsHistorySortBy = 'updated_at';  // Default sort by most recently updated
-    let logsHistorySortDir = 'desc';
-    let logsHistoryFilterStatus = 'all';
-    let logsHistoryFilterType = 'all';
 
     async function loadExecutionLogs() {
       const content = document.getElementById('tabContent');
@@ -2680,30 +2241,7 @@
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
               </div>
             </div>
-            <!-- Pagination -->
-            <div id="jobHistoryPagination" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between hidden">
-              <div class="text-sm text-gray-500">
-                <span id="jobHistoryInfo">Showing 0-0 of 0</span>
-              </div>
-              <div class="flex gap-2">
-                <button
-                  onclick="changeJobHistoryPage(-1)"
-                  id="jobHistoryPrevBtn"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled
-                >
-                  Previous
-                </button>
-                <button
-                  onclick="changeJobHistoryPage(1)"
-                  id="jobHistoryNextBtn"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            <p id="jobHistoryTruncated" class="hidden px-6 pb-4 text-sm text-gray-500">Showing the most recent jobs only: the history is longer than this page can load at once.</p>
           </div>
         </div>
       `;
@@ -2886,303 +2424,76 @@
       }
     }
 
-    // Load job history with pagination
-    async function loadJobHistory() {
-      try {
-        const offset = (logsHistoryPage - 1) * logsHistoryPageSize;
+    // Load job history: every ActionStep sync log, document import and
+    // finished processing job, merged into one client-side table (three
+    // sources cannot be paged together on the server). Rows open the job's
+    // pipeline in a drawer.
+    let jobHistoryController = null;
+    let jobHistoryRowsCache = [];
 
-        // Fetch ActionStep-specific job history (sync logs, document imports, processing jobs, AI ingestions)
-        const [syncLogsResult, documentImportsResult, processingJobsResult] = await Promise.all([
-          api.get(`${connectorApi('/logs')}?limit=${logsHistoryPageSize}&offset=${offset}`),
-          api.get(`${connectorApi('/documents')}?limit=${logsHistoryPageSize}&offset=${offset}`),
-          // NEW: Fetch ALL ActionStep processing jobs (completed, failed, cancelled)
-          api.get(`${connectorApi('/processing-jobs')}?limit=100`)
+    async function loadJobHistory() {
+      const container = document.getElementById('jobHistoryContent');
+      if (!container) return;
+      const tables = window.LanaActionstepTables;
+      try {
+        const [logs, documents, processing] = await Promise.all([
+          tables.fetchAllOffset(async (limit, offset) => {
+            const response = await api.get(`${connectorApi('/logs')}?limit=${limit}&offset=${offset}`);
+            return { rows: response.logs || response.sync_logs || [], total: response.pagination?.total };
+          }, 100, 50),
+          // Document imports: the route is gone from the API (see backend gaps), so a failure is an empty list.
+          tables.fetchAllOffset(async (limit, offset) => {
+            const response = await api.get(`${connectorApi('/documents')}?limit=${limit}&offset=${offset}`);
+            return { rows: response.documents || [], total: response.pagination?.total };
+          }, 100, 50).catch(() => ({ rows: [], truncated: false })),
+          tables.fetchAllOffset(async (limit, offset) => {
+            const response = await api.get(`${connectorApi('/processing-jobs')}?limit=${limit}&offset=${offset}`);
+            return { rows: response.jobs || [] };
+          }, 100, 50)
         ]);
 
-        const container = document.getElementById('jobHistoryContent');
-        const pagination = document.getElementById('jobHistoryPagination');
-
-        // Map ActionStep sync logs to job format
-        const syncJobs = (syncLogsResult.logs || syncLogsResult.sync_logs || []).map(log => {
-          return {
-            id: log.id,
-            filename: `${log.sync_type || 'Full'} Sync`,
-            job_type: 'ActionStep Sync',
-            status: log.status,
-            created_at: log.started_at,
-            completed_at: log.completed_at,
-            processed_count: log.records?.processed || log.records_fetched || log.records_processed || 0,
-            error_message: log.error_message,
-            _isSync: true,
-            details: {
-              records_created: log.records?.created || log.records_created || 0,
-              records_updated: log.records?.updated || log.records_updated || 0,
-              records_failed: log.records?.failed || log.records_failed || 0
-            }
-          };
+        jobHistoryRowsCache = tables.buildJobHistoryRows({
+          logs: logs.rows,
+          documents: documents.rows,
+          processingJobs: processing.rows
         });
 
-        // Map ActionStep document imports to job format
-        const documentJobs = (documentImportsResult.documents || []).map(doc => {
-          return {
-            id: doc.id,
-            filename: doc.original_filename || doc.filename,
-            job_type: 'Document Import',
-            status: doc.status,
-            created_at: doc.created_at,
-            completed_at: doc.updated_at,
-            processed_count: 1,
-            error_message: doc.error_message,
-            _isDocument: true,
-            details: {
-              matter_id: doc.matter_id,
-              document_id: doc.document_id,
-              file_size: doc.file_size
-            }
-          };
-        });
+        const note = document.getElementById('jobHistoryTruncated');
+        if (note) note.classList.toggle('hidden', !(logs.truncated || documents.truncated || processing.truncated));
 
-        // NEW: Map storage processing jobs to job format (includes completed, failed, cancelled)
-        const processingJobs = (processingJobsResult.jobs || [])
-          .filter(job => !['pending', 'processing'].includes(job.status)) // Exclude active jobs (shown in Active Jobs section)
-          .map(job => {
-            return {
-              id: job.id,
-              filename: job.document_name,
-              job_type: 'Document Processing',
-              status: job.status,
-              created_at: job.queued_at || job.created_at,
-              completed_at: job.completed_at,
-              processed_count: job.progress_percentage,
-              error_message: job.error_message,
-              _isProcessing: true,
-              details: {
-                progress: job.progress_percentage,
-                strategy: job.processing_strategy,
-                priority: job.priority
-              }
-            };
-          });
-
-        // Merge all ActionStep-specific jobs (sync logs + document imports + processing jobs)
-        let allJobs = [...syncJobs, ...documentJobs, ...processingJobs];
-
-        // Apply status filter
-        if (logsHistoryFilterStatus !== 'all') {
-          allJobs = allJobs.filter(job => job.status === logsHistoryFilterStatus);
-        }
-
-        // Apply type filter
-        if (logsHistoryFilterType !== 'all') {
-          allJobs = allJobs.filter(job => job.job_type === logsHistoryFilterType);
-        }
-
-        // Apply sorting
-        allJobs.sort((a, b) => {
-          let aVal, bVal;
-
-          switch(logsHistorySortBy) {
-            case 'updated_at':
-              aVal = new Date(a.updated_at || a.created_at);
-              bVal = new Date(b.updated_at || b.created_at);
-              break;
-            case 'created_at':
-              aVal = new Date(a.created_at);
-              bVal = new Date(b.created_at);
-              break;
-            case 'filename':
-              aVal = (a.filename || a.id || '').toLowerCase();
-              bVal = (b.filename || b.id || '').toLowerCase();
-              break;
-            case 'status':
-              aVal = a.status || '';
-              bVal = b.status || '';
-              break;
-            case 'job_type':
-              aVal = a.job_type || '';
-              bVal = b.job_type || '';
-              break;
-            default:
-              aVal = new Date(a.updated_at || a.created_at);
-              bVal = new Date(b.updated_at || b.created_at);
-          }
-
-          if (logsHistorySortDir === 'asc') {
-            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-          } else {
-            return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-          }
-        });
-
-        const total = allJobs.length;
-
-        // Apply pagination
-        const paginatedJobs = allJobs.slice(offset, offset + logsHistoryPageSize);
-
-        if (!allJobs || allJobs.length === 0) {
-          container.innerHTML = `
-            <div class="text-center py-8 text-gray-500">
-              <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <p>No job history</p>
-            </div>
-          `;
-          pagination.classList.add('hidden');
+        if (jobHistoryController && container.contains(jobHistoryController.table)) {
+          jobHistoryController.setRows(jobHistoryRowsCache);
           return;
         }
-
-        const statusColors = {
-          'completed': 'bg-green-100 text-green-800',
-          'failed': 'bg-red-100 text-red-800',
-          'cancelled': 'bg-gray-100 text-gray-800'
-        };
-
-        const statusIcons = {
-          'completed': `<svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
-          'failed': `<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
-          'cancelled': `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>`
-        };
-
-        // Build filter/sort controls
-        const controlsHTML = `
-          <div class="mb-4 flex flex-wrap gap-3 items-center">
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-gray-700">Status:</label>
-              <select id="jobHistoryFilterStatus" class="text-sm border-gray-300 rounded-md">
-                <option value="all">All</option>
-                <option value="completed">Completed</option>
-                <option value="failed">Failed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-gray-700">Sort by:</label>
-              <select id="jobHistorySortBy" class="text-sm border-gray-300 rounded-md">
-                <option value="updated_at">Last Updated</option>
-                <option value="created_at">Created</option>
-                <option value="filename">Filename</option>
-                <option value="status">Status</option>
-                <option value="job_type">Type</option>
-              </select>
-              <button id="jobHistorySortDir" class="p-1 hover:bg-gray-100 rounded" title="Toggle sort direction">
-                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${logsHistorySortDir === 'desc' ? 'M19 9l-7 7-7-7' : 'M5 15l7-7 7 7'}"></path>
-                </svg>
-              </button>
-            </div>
-          </div>
-        `;
-
-        const jobsHTML = `
-          ${controlsHTML}
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-8"></th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Processed</th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${paginatedJobs.map((job, index) => {
-                  const duration = job.completed_at && job.created_at
-                    ? Math.round((new Date(job.completed_at) - new Date(job.created_at)) / 1000) + 's'
-                    : '-';
-
-                  const jobRowId = `job-row-${index}`;
-                  const jobDetailsId = `job-details-${index}`;
-
-                  return `
-                    <tr class="hover:bg-gray-50 cursor-pointer" onclick="toggleJobDetails('${jobDetailsId}', '${jobRowId}', event)">
-                      <td class="px-2 py-3">
-                        <button class="expand-btn text-gray-400 hover:text-gray-600" id="${jobRowId}">
-                          <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                          </svg>
-                        </button>
-                      </td>
-                      <td class="px-4 py-3">
-                        <div class="font-medium text-gray-900">${job.filename || job.id.substring(0, 8)}</div>
-                        ${job.error_message ? `<div class="text-xs text-red-600 mt-1">${job.error_message}</div>` : ''}
-                      </td>
-                      <td class="px-4 py-3 text-sm text-gray-600">${job.job_type || 'Processing'}</td>
-                      <td class="px-4 py-3 text-sm text-gray-600">${timeAgo(job.created_at)}</td>
-                      <td class="px-4 py-3 text-sm text-gray-600">${duration}</td>
-                      <td class="px-4 py-3 text-sm text-right text-gray-600">${typeof job.processed_count === 'string' ? job.processed_count : formatNumber(job.processed_count || 0)}</td>
-                      <td class="px-4 py-3 text-center">
-                        <div class="flex items-center justify-center gap-2">
-                          ${statusIcons[job.status] || ''}
-                          <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[job.status] || 'bg-gray-100 text-gray-800'}">${job.status}</span>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr id="${jobDetailsId}" class="hidden bg-gray-50">
-                      <td colspan="7" class="px-6 py-4">
-                        ${generateJobPipeline(job)}
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        `;
-
-        container.innerHTML = jobsHTML;
-
-        // Set filter/sort control values
-        document.getElementById('jobHistoryFilterStatus').value = logsHistoryFilterStatus;
-        document.getElementById('jobHistorySortBy').value = logsHistorySortBy;
-
-        // Add event listeners for filter/sort controls
-        document.getElementById('jobHistoryFilterStatus').addEventListener('change', (e) => {
-          logsHistoryFilterStatus = e.target.value;
-          logsHistoryPage = 1; // Reset to first page
-          loadJobHistory();
+        jobHistoryController = await window.LanaRecordTableKit.mount(container, tables.jobHistorySpec(), {
+          rows: jobHistoryRowsCache,
+          onRowClick: (row) => openJobDetails(row)
         });
-
-        document.getElementById('jobHistorySortBy').addEventListener('change', (e) => {
-          logsHistorySortBy = e.target.value;
-          loadJobHistory();
-        });
-
-        document.getElementById('jobHistorySortDir').addEventListener('click', () => {
-          logsHistorySortDir = logsHistorySortDir === 'desc' ? 'asc' : 'desc';
-          loadJobHistory();
-        });
-
-        // Update pagination
-        if (total > logsHistoryPageSize) {
-          pagination.classList.remove('hidden');
-          const start = offset + 1;
-          const end = Math.min(offset + logsHistoryPageSize, total);
-          document.getElementById('jobHistoryInfo').textContent = `Showing ${start}-${end} of ${total}`;
-          document.getElementById('jobHistoryPrevBtn').disabled = logsHistoryPage === 1;
-          document.getElementById('jobHistoryNextBtn').disabled = end >= total;
-        } else {
-          pagination.classList.add('hidden');
-        }
       } catch (error) {
         console.error('Failed to load job history:', error);
-        document.getElementById('jobHistoryContent').innerHTML = `
-          <div class="text-center py-8 text-red-500">
-            Failed to load job history
-          </div>
-        `;
+        if (jobHistoryController && container.contains(jobHistoryController.table)) {
+          jobHistoryController.setError('Job history could not be loaded. Check your connection and try again.');
+        } else {
+          container.innerHTML = `
+            <div class="text-center py-8 text-red-500">
+              Failed to load job history
+            </div>
+          `;
+        }
       }
     }
 
-    // Change job history page
-    function changeJobHistoryPage(delta) {
-      logsHistoryPage += delta;
-      loadJobHistory();
+    // A job's pipeline (stages, timings, errors) in a side panel.
+    function openJobDetails(row) {
+      if (!row || !row._job) return;
+      const job = row._job;
+      if (window.Lex && window.Lex.Drawer && typeof window.Lex.Drawer.open === 'function') {
+        window.Lex.Drawer.open({
+          heading: job.filename || 'Job details',
+          content: `<div class="p-4">${generateJobPipeline(job)}</div>`,
+          width: 'lg'
+        });
+      }
     }
 
     // Cancel a job - show confirmation modal
@@ -4553,7 +3864,7 @@
           ${renderDetailCard('Assignment & Tracking', [
             { label: 'Assigned To', value: matter.assigned_to_display_name },
             { label: 'Assigned To ID', value: matter.assigned_to_participant_id },
-            { label: 'Created At', value: formatDate(matter.created_at) },
+            { label: 'Created', value: formatDate(matter.created_at) },
             { label: 'Updated At', value: formatDate(matter.updated_at) }
           ])}
         </div>
@@ -4879,7 +4190,7 @@
         <!-- System Information -->
         ${renderDetailCard('System Information', [
           { label: 'ActionStep ID', value: participant.as_id },
-          { label: 'Created At', value: formatDate(participant.as_created_at) },
+          { label: 'Created', value: formatDate(participant.as_created_at) },
           { label: 'Updated At', value: formatDate(participant.as_updated_at) },
           { label: 'Synced At', value: formatDate(participant.synced_at) }
         ])}
@@ -4966,7 +4277,7 @@
         <!-- System Information -->
         ${renderDetailCard('System Information', [
           { label: 'ActionStep ID', value: task.as_id },
-          { label: 'Created At', value: formatDate(task.as_created_at) },
+          { label: 'Created', value: formatDate(task.as_created_at) },
           { label: 'Updated At', value: formatDate(task.as_updated_at) },
           { label: 'Synced At', value: formatDate(task.synced_at) }
         ])}
@@ -5033,7 +4344,7 @@
         ${renderDetailCard('System Information', [
           { label: 'ActionStep ID', value: note.as_id },
           { label: 'Synced At', value: formatDate(note.synced_at) },
-          { label: 'Created At', value: formatDate(note.created_at) },
+          { label: 'Created', value: formatDate(note.created_at) },
           { label: 'Updated At', value: formatDate(note.updated_at) }
         ])}
       `;

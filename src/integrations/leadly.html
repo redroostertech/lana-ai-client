@@ -335,12 +335,21 @@
   <script src="../js/lex/components/layout/lex-notification-panel.js"></script>
   <script src="../js/lex/components/layout/lex-app.js"></script>
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
 
   <!-- Inject page content + hoist modals -->
   <script src="../js/lex/lex-page-init.js"></script>
 
   <!-- Page dependencies -->
   <script src="../js/chunked-uploader.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../insights/js/record-table-kit.js"></script>
+  <script src="js/integration-tables.js"></script>
+  <script src="js/leadly-tables.js"></script>
 
   <!-- Page controller -->
   <script>
@@ -1885,9 +1894,7 @@
 
     // Global variables for output tab state
     let currentOutputDataType = 'matters';
-    let outputCurrentPage = 1;
-    let outputPageSize = 25;
-    let outputTotalRecords = 0;
+    let outputTableController = null;
 
     // Load Output Tab
     async function loadOutputTab() {
@@ -1930,59 +1937,10 @@
 
           <!-- Right Panel - Data Table -->
           <div class="flex-1 min-w-0">
-            <!-- Search and Filter Controls -->
-            <div class="mb-4 flex gap-4">
-              <div class="flex-1">
-                <input
-                  type="text"
-                  id="outputSearchInput"
-                  placeholder="Search..."
-                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-              <div>
-                <select
-                  id="outputFilterSelect"
-                  class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="closed">Closed</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Data Panel -->
+            <!-- Data Panel: one standard record table per data type (toolbar, count, pager) -->
             <div id="outputDataPanel">
-              <!-- Data will be loaded here -->
               <div class="flex items-center justify-center py-12">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-              </div>
-            </div>
-
-            <!-- Pagination Controls -->
-            <div id="outputPagination" class="mt-4 flex items-center justify-between hidden">
-              <div class="text-sm text-gray-500">
-                <span id="outputPaginationInfo">Showing 0 of 0</span>
-              </div>
-              <div class="flex gap-2">
-                <button
-                  id="outputPrevBtn"
-                  onclick="changeOutputPage(-1)"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled
-                >
-                  Previous
-                </button>
-                <button
-                  id="outputNextBtn"
-                  onclick="changeOutputPage(1)"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled
-                >
-                  Next
-                </button>
               </div>
             </div>
           </div>
@@ -1991,24 +1949,6 @@
 
       // Load initial counts
       await updateOutputCounts();
-
-      // Setup search and filter event listeners
-      const searchInput = document.getElementById('outputSearchInput');
-      const filterSelect = document.getElementById('outputFilterSelect');
-
-      let searchTimeout;
-      searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-          outputCurrentPage = 1; // Reset to first page on search
-          loadOutputData(currentOutputDataType);
-        }, 500); // Debounce 500ms
-      });
-
-      filterSelect.addEventListener('change', () => {
-        outputCurrentPage = 1; // Reset to first page on filter change
-        loadOutputData(currentOutputDataType);
-      });
 
       // Load initial data (contacts)
       await loadOutputData('contacts');
@@ -2031,41 +1971,10 @@
       }
     }
 
-    // Change output page
-    function changeOutputPage(delta) {
-      outputCurrentPage += delta;
-      loadOutputData(currentOutputDataType);
-    }
-
-    // Update pagination controls
-    function updateOutputPagination(total) {
-      outputTotalRecords = total;
-      const pagination = document.getElementById('outputPagination');
-      const prevBtn = document.getElementById('outputPrevBtn');
-      const nextBtn = document.getElementById('outputNextBtn');
-      const info = document.getElementById('outputPaginationInfo');
-
-      if (total > 0) {
-        pagination.classList.remove('hidden');
-
-        const start = (outputCurrentPage - 1) * outputPageSize + 1;
-        const end = Math.min(outputCurrentPage * outputPageSize, total);
-        info.textContent = `Showing ${start}-${end} of ${total}`;
-
-        prevBtn.disabled = outputCurrentPage === 1;
-        nextBtn.disabled = end >= total;
-      } else {
-        pagination.classList.add('hidden');
-      }
-    }
-
-    // Load output data for specific type
+    // Load output data for specific type: one server-paged lex-table per type
+    // (LanaLeadlyTables specs; search, sort, column filters and paging go to the API).
     async function loadOutputData(dataType) {
-      // Reset pagination when switching entity types
-      if (currentOutputDataType !== dataType) {
-        outputCurrentPage = 1;
-      }
-
+      const config = LanaLeadlyTables.OUTPUT_TYPES[dataType];
       currentOutputDataType = dataType;
 
       // Update navigation active state
@@ -2073,586 +1982,27 @@
         btn.classList.remove('bg-emerald-600', 'text-white', 'font-medium');
         btn.classList.add('text-gray-700', 'hover:bg-gray-200');
       });
-      document.getElementById(`output-nav-${dataType}`).classList.remove('text-gray-700', 'hover:bg-gray-200');
-      document.getElementById(`output-nav-${dataType}`).classList.add('bg-emerald-600', 'text-white', 'font-medium');
+      const navButton = document.getElementById(`output-nav-${dataType}`);
+      if (navButton) {
+        navButton.classList.remove('text-gray-700', 'hover:bg-gray-200');
+        navButton.classList.add('bg-emerald-600', 'text-white', 'font-medium');
+      }
 
       const panel = document.getElementById('outputDataPanel');
-      panel.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>';
+      if (!panel) return;
+      if (!config) {
+        panel.innerHTML = `<div class="text-center text-gray-500 py-8">Unknown data type: ${escapeHtml(dataType)}</div>`;
+        return;
+      }
 
-      // Get search and filter values
-      const searchInput = document.getElementById('outputSearchInput');
-      const filterSelect = document.getElementById('outputFilterSelect');
-      const searchTerm = searchInput ? searchInput.value : '';
-      const statusFilter = filterSelect ? filterSelect.value : '';
-
-      try {
-        switch (dataType) {
-          case 'contacts':
-            await loadContactsInOutput(searchTerm, statusFilter);
-            break;
-          case 'opportunities':
-            await loadOpportunitiesInOutput(searchTerm, statusFilter);
-            break;
-          case 'pipelines':
-            await loadPipelinesInOutput(searchTerm, statusFilter);
-            break;
-          case 'funnel':
-            await loadFunnelsInOutput(searchTerm, statusFilter);
-            break;
-          default:
-            panel.innerHTML = `<div class="text-center text-gray-500 py-8">Unknown data type: ${dataType}</div>`;
+      outputTableController = await LanaRecordTableKit.mount(panel, config.spec, {
+        serverFilters: config.serverFilters(),
+        errorText: `${config.spec.title} could not be loaded. Check your connection and try again.`,
+        load: async (query) => {
+          const response = await api.get(`${config.endpoint}?${LanaLeadlyTables.outputParams(dataType, query).toString()}`);
+          return LanaLeadlyTables.outputResult(dataType, response, query);
         }
-      } catch (error) {
-        panel.innerHTML = `<div class="text-center text-red-600 py-8">Failed to load ${dataType}: ${error.message}</div>`;
-      }
-    }
-
-    // Load connector data (generic function for new entity types)
-    async function loadConnectorDataInOutput(entityType, searchTerm = '') {
-      const panel = document.getElementById('outputDataPanel');
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        limit: outputPageSize,
-        offset: (outputCurrentPage - 1) * outputPageSize
       });
-
-      const result = await api.get(`/api/v1/leadly/data/${entityType}?${params.toString()}`);
-
-      if (!result.data || result.data.length === 0) {
-        panel.innerHTML = `<div class="text-center text-gray-500 py-8">No ${entityType.replace('_', ' ')} found</div>`;
-        updateOutputPagination(0);
-        return;
-      }
-
-      // Update pagination
-      updateOutputPagination(result.total || result.data.length);
-
-      // Render generic table
-      const entityLabel = entityType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-      panel.innerHTML = `
-        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <h3 class="text-lg font-semibold text-gray-900">${entityLabel}</h3>
-            <p class="text-sm text-gray-600 mt-1">Total: ${result.total || result.data.length} records</p>
-          </div>
-          <div class="divide-y divide-gray-200">
-            ${result.data.map(record => {
-              const data = typeof record.data === 'string' ? JSON.parse(record.data) : record.data;
-              return `
-                <div class="p-6 hover:bg-gray-50 transition-colors">
-                  <div class="flex items-start justify-between mb-3">
-                    <div class="flex-1">
-                      <h4 class="font-medium text-gray-900">${data.name || data.title || data.id || 'Untitled'}</h4>
-                      <p class="text-sm text-gray-500 mt-1">External ID: ${record.external_id}</p>
-                    </div>
-                    ${record.external_url ? `
-                      <a href="${record.external_url}" target="_blank" class="text-emerald-600 hover:text-emerald-700 text-sm font-medium flex items-center gap-1">
-                        View in GHL
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                        </svg>
-                      </a>
-                    ` : ''}
-                  </div>
-
-                  <div class="grid grid-cols-2 gap-4 text-sm">
-                    ${data.status ? `
-                      <div>
-                        <span class="text-gray-500">Status:</span>
-                        <span class="ml-2 font-medium text-gray-900">${data.status}</span>
-                      </div>
-                    ` : ''}
-                    ${data.description ? `
-                      <div class="col-span-2">
-                        <span class="text-gray-500">Description:</span>
-                        <p class="mt-1 text-gray-900">${data.description.substring(0, 200)}${data.description.length > 200 ? '...' : ''}</p>
-                      </div>
-                    ` : ''}
-                    ${record.source_created_at ? `
-                      <div>
-                        <span class="text-gray-500">Created:</span>
-                        <span class="ml-2 text-gray-900">${new Date(record.source_created_at).toLocaleDateString()}</span>
-                      </div>
-                    ` : ''}
-                    ${record.source_updated_at ? `
-                      <div>
-                        <span class="text-gray-500">Updated:</span>
-                        <span class="ml-2 text-gray-900">${new Date(record.source_updated_at).toLocaleDateString()}</span>
-                      </div>
-                    ` : ''}
-                  </div>
-
-                  <details class="mt-4">
-                    <summary class="cursor-pointer text-sm text-emerald-600 hover:text-emerald-700 font-medium">
-                      View Raw Data
-                    </summary>
-                    <pre class="mt-2 p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64">${JSON.stringify(data, null, 2)}</pre>
-                  </details>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      `;
-    }
-
-    // Load contacts in output panel
-    async function loadContactsInOutput(searchTerm = '', statusFilter = '') {
-      const panel = document.getElementById('outputDataPanel');
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        page: outputCurrentPage,
-        limit: outputPageSize
-      });
-
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-
-      if (statusFilter) {
-        params.append('status', statusFilter);
-      }
-
-      const result = await api.get(`/api/v1/leadly/contacts?${params.toString()}`);
-
-      if (!result.contacts || result.contacts.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No contacts found</div>';
-        updateOutputPagination(0);
-        return;
-      }
-
-      // Update pagination
-      const total = result.pagination?.total || result.contacts.length;
-      updateOutputPagination(total);
-
-      // Render table
-      let html = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-      `;
-
-      result.contacts.forEach(contact => {
-        const fullName = `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || '-';
-        html += `
-          <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 text-sm font-medium text-gray-900">${fullName}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${contact.email || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${contact.phone || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${contact.company || '-'}</td>
-          </tr>
-        `;
-      });
-
-      html += `
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      panel.innerHTML = html;
-    }
-
-    // Load opportunities in output panel
-    async function loadOpportunitiesInOutput(searchTerm = '', statusFilter = '') {
-      const panel = document.getElementById('outputDataPanel');
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        page: outputCurrentPage,
-        limit: outputPageSize
-      });
-
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-
-      if (statusFilter) {
-        params.append('status', statusFilter);
-      }
-
-      const result = await api.get(`/api/v1/leadly/opportunities?${params.toString()}`);
-
-      if (!result.opportunities || result.opportunities.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No opportunities found</div>';
-        updateOutputPagination(0);
-        return;
-      }
-
-      // Update pagination
-      const total = result.pagination?.total || result.opportunities.length;
-      updateOutputPagination(total);
-
-      // Render table
-      let html = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stage</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-      `;
-
-      result.opportunities.forEach(opp => {
-        html += `
-          <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 text-sm font-medium text-gray-900">${opp.name || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${opp.status || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${formatCurrency(opp.monetary_value || 0)}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${opp.stage_name || '-'}</td>
-          </tr>
-        `;
-      });
-
-      html += `
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      panel.innerHTML = html;
-    }
-
-    // Load pipelines in output panel
-    async function loadPipelinesInOutput(searchTerm = '', statusFilter = '') {
-      const panel = document.getElementById('outputDataPanel');
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        page: outputCurrentPage,
-        limit: outputPageSize
-      });
-
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-
-      const result = await api.get(`/api/v1/leadly/pipelines?${params.toString()}`);
-
-      if (!result.pipelines || result.pipelines.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No pipelines found</div>';
-        updateOutputPagination(0);
-        return;
-      }
-
-      // Update pagination
-      const total = result.pagination?.total || result.pipelines.length;
-      updateOutputPagination(total);
-
-      // Render table
-      let html = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pipeline Name</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stages</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opportunities</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Value</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-      `;
-
-      result.pipelines.forEach(pipeline => {
-        const stageCount = pipeline.stages ? pipeline.stages.length : 0;
-        const stageNames = pipeline.stages ? pipeline.stages.map(s => s.name).join(', ') : '-';
-
-        // Calculate total opportunities and value across all stages
-        const totalOpportunities = pipeline.stages ?
-          pipeline.stages.reduce((sum, stage) => sum + (stage.opportunity_count || 0), 0) : 0;
-        const totalValue = pipeline.stages ?
-          pipeline.stages.reduce((sum, stage) => sum + (stage.total_value || 0), 0) : 0;
-
-        html += `
-          <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 text-sm font-medium text-gray-900">${pipeline.name || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500" title="${stageNames}">
-              ${stageCount} stage${stageCount !== 1 ? 's' : ''}
-            </td>
-            <td class="px-6 py-4 text-sm text-gray-500">${totalOpportunities}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${formatCurrency(totalValue)}</td>
-          </tr>
-        `;
-      });
-
-      html += `
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      panel.innerHTML = html;
-    }
-
-    // Load tasks in output panel
-    async function loadTasksInOutput(searchTerm = '', statusFilter = '') {
-      const panel = document.getElementById('outputDataPanel');
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        page: outputCurrentPage,
-        limit: outputPageSize
-      });
-
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-
-      if (statusFilter) {
-        params.append('status', statusFilter);
-      }
-
-      const result = await api.get(`/api/v1/leadly/tasks?${params.toString()}`);
-
-      if (!result.tasks || result.tasks.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No tasks found</div>';
-        updateOutputPagination(0);
-        return;
-      }
-
-      // Update pagination
-      const total = result.pagination?.total || result.tasks.length;
-      updateOutputPagination(total);
-
-      // Render table
-      let html = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-      `;
-
-      result.tasks.forEach(task => {
-        const dueDate = task.due_date ? new Date(task.due_date).toLocaleDateString() : '-';
-        html += `
-          <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 text-sm font-medium text-gray-900">${task.title || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${task.status || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${dueDate}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${task.assigned_to || '-'}</td>
-          </tr>
-        `;
-      });
-
-      html += `
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      panel.innerHTML = html;
-    }
-
-    // Load funnels in output panel
-    async function loadFunnelsInOutput(searchTerm = '', statusFilter = '') {
-      const panel = document.getElementById('outputDataPanel');
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        page: outputCurrentPage,
-        limit: outputPageSize
-      });
-
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-
-      const result = await api.get(`/api/v1/leadly/funnels?${params.toString()}`);
-
-      if (!result.funnels || result.funnels.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No funnels found</div>';
-        updateOutputPagination(0);
-        return;
-      }
-
-      // Update pagination
-      const total = result.pagination?.total || result.funnels.length;
-      updateOutputPagination(total);
-
-      // Render table
-      let html = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Funnel Name</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Steps</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-      `;
-
-      result.funnels.forEach(funnel => {
-        const steps = funnel.steps ? (Array.isArray(funnel.steps) ? funnel.steps.length : Object.keys(funnel.steps).length) : 0;
-        const statusBadge = funnel.is_active
-          ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>'
-          : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>';
-
-        html += `
-          <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 text-sm font-medium text-gray-900">${funnel.name || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${funnel.category || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${steps} steps</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${statusBadge}</td>
-          </tr>
-        `;
-      });
-
-      html += `
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      panel.innerHTML = html;
-    }
-
-    // Load calendar events in output panel
-    async function loadCalendarEventsInOutput(searchTerm = '', statusFilter = '') {
-      const panel = document.getElementById('outputDataPanel');
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        page: outputCurrentPage,
-        limit: outputPageSize
-      });
-
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
-
-      if (statusFilter) {
-        params.append('status', statusFilter);
-      }
-
-      const result = await api.get(`/api/v1/leadly/calendar_events?${params.toString()}`);
-
-      if (!result.calendar_events || result.calendar_events.length === 0) {
-        panel.innerHTML = '<div class="text-center text-gray-500 py-8">No calendar events found</div>';
-        updateOutputPagination(0);
-        return;
-      }
-
-      // Update pagination
-      const total = result.pagination?.total || result.calendar_events.length;
-      updateOutputPagination(total);
-
-      // Render table
-      let html = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Time</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Time</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-      `;
-
-      result.calendar_events.forEach(event => {
-        const startTime = event.start_time ? new Date(event.start_time).toLocaleString() : '-';
-        const endTime = event.end_time ? new Date(event.end_time).toLocaleString() : '-';
-        html += `
-          <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 text-sm font-medium text-gray-900">${event.title || '-'}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${startTime}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${endTime}</td>
-            <td class="px-6 py-4 text-sm text-gray-500">${event.status || '-'}</td>
-          </tr>
-        `;
-      });
-
-      html += `
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      panel.innerHTML = html;
-    }
-
-    // Load sync history
-    async function loadSyncHistory() {
-      const result = await api.get('/api/v1/leadly/sync-logs?limit=20');
-      const content = document.getElementById('tabContent');
-
-      if (!result.logs || result.logs.length === 0) {
-        content.innerHTML = '<div class="text-center text-gray-500 py-8">No sync history found</div>';
-        return;
-      }
-
-      const statusColors = {
-        'completed': 'bg-green-100 text-green-800',
-        'failed': 'bg-red-100 text-red-800',
-        'running': 'bg-blue-100 text-blue-800'
-      };
-
-      content.innerHTML = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Processed</th>
-                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Created</th>
-                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Failed</th>
-                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              ${result.logs.map(l => {
-                const duration = l.completed_at && l.started_at
-                  ? Math.round((new Date(l.completed_at) - new Date(l.started_at)) / 1000) + 's'
-                  : '-';
-                return `
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 font-medium text-gray-900">${l.sync_type || 'Full'}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600">${l.started_at ? timeAgo(l.started_at) : '-'}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600">${duration}</td>
-                    <td class="px-4 py-3 text-sm text-right text-gray-600">${formatNumber(l.records_processed)}</td>
-                    <td class="px-4 py-3 text-sm text-right text-green-600">${formatNumber(l.records_created)}</td>
-                    <td class="px-4 py-3 text-sm text-right ${l.records_failed > 0 ? 'text-red-600' : 'text-gray-600'}">${formatNumber(l.records_failed)}</td>
-                    <td class="px-4 py-3 text-center">
-                      <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[l.status] || 'bg-gray-100'}">${l.status || 'unknown'}</span>
-                    </td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
     }
 
     // Load Overview tab - Documentation style with Configuration Status
@@ -3397,13 +2747,9 @@
     let activeJobsPage = 1;
     const activeJobsPageSize = 25;
 
-    // Job History pagination and filters
-    let logsHistoryPage = 1;
-    const logsHistoryPageSize = 25;
-    let logsHistorySortBy = 'updated_at';  // Default sort by most recently updated
-    let logsHistorySortDir = 'desc';
-    let logsHistoryFilterStatus = 'all';
-    let logsHistoryFilterType = 'all';
+    // Job History: a client-side lex-table over every finished sync log and
+    // document import (LanaLeadlyTables.jobHistorySpec)
+    let jobHistoryController = null;
 
     async function loadExecutionLogs() {
       const content = document.getElementById('tabContent');
@@ -3492,37 +2838,6 @@
               <!-- Job history will be loaded here -->
               <div class="flex items-center justify-center py-8">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-              </div>
-            </div>
-            <!-- Pagination -->
-            <div id="jobHistoryPagination" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between hidden">
-              <div class="text-sm text-gray-500">
-                <span id="jobHistoryInfo">Showing 0-0 of 0</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <button
-                  onclick="changeJobHistoryPage(-1)"
-                  id="jobHistoryPrevBtn"
-                  class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  disabled
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                  </svg>
-                </button>
-                <div id="jobHistoryPageNumbers" class="flex gap-1">
-                  <!-- Page number buttons will be inserted here -->
-                </div>
-                <button
-                  onclick="changeJobHistoryPage(1)"
-                  id="jobHistoryNextBtn"
-                  class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  disabled
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                  </svg>
-                </button>
               </div>
             </div>
           </div>
@@ -3785,347 +3100,55 @@
       }
     }
 
-    // Load job history with pagination
+    // Load job history: every finished sync log and document import (offset
+    // pages, no hidden cap) in one client-side table; a row opens its pipeline.
     async function loadJobHistory() {
+      const container = document.getElementById('jobHistoryContent');
+      if (!container) return;
       try {
-        const offset = (logsHistoryPage - 1) * logsHistoryPageSize;
-
-        // Fetch Leadly CRM-specific job history (sync logs, document imports, AI ingestions)
-        // Fetch a larger set and paginate client-side since we're merging multiple sources
-        const [syncLogsResult, documentImportsResult] = await Promise.all([
-          api.get(`/api/v1/leadly/sync-logs?limit=100`),
-          api.get(`/api/v1/leadly/documents?limit=100`)
+        const [syncLogs, documents] = await Promise.all([
+          LanaLeadlyTables.fetchAllOffsetPages(async (limit, offset) => {
+            const result = await api.get(`/api/v1/leadly/sync-logs?limit=${limit}&offset=${offset}`);
+            return result.logs || result.sync_logs || [];
+          }, 100, 50),
+          LanaLeadlyTables.fetchAllOffsetPages(async (limit, offset) => {
+            const result = await api.get(`/api/v1/leadly/documents?limit=${limit}&offset=${offset}`);
+            return result.documents || [];
+          }, 100, 50)
         ]);
+        const rows = LanaLeadlyTables.jobHistoryRows(syncLogs.rows, documents.rows);
 
-        const container = document.getElementById('jobHistoryContent');
-        const pagination = document.getElementById('jobHistoryPagination');
-
-        // Map Leadly CRM sync logs to job format
-        const syncJobs = (syncLogsResult.logs || syncLogsResult.sync_logs || []).map(log => {
-          return {
-            id: log.id,
-            filename: `${log.sync_type || 'Full'} Sync`,
-            job_type: 'Leadly CRM Sync',
-            status: log.status,
-            created_at: log.started_at,
-            completed_at: log.completed_at,
-            processed_count: log.records_fetched || log.records_processed || 0,
-            error_message: log.error_message,
-            _isSync: true,
-            details: {
-              records_created: log.records_created || 0,
-              records_updated: log.records_updated || 0,
-              records_failed: log.records_failed || 0
-            }
-          };
-        });
-
-        // Map Leadly CRM document imports to job format
-        const documentJobs = (documentImportsResult.documents || []).map(doc => {
-          return {
-            id: doc.id,
-            filename: doc.original_filename || doc.filename,
-            job_type: 'Document Import',
-            status: doc.status,
-            created_at: doc.created_at,
-            completed_at: doc.updated_at,
-            processed_count: 1,
-            error_message: doc.error_message,
-            _isDocument: true,
-            details: {
-              matter_id: doc.matter_id,
-              document_id: doc.document_id,
-              file_size: doc.file_size
-            }
-          };
-        });
-
-        // Merge all Leadly CRM-specific jobs
-        let allJobs = [...syncJobs, ...documentJobs];
-
-        // Filter out active/running jobs (they should only appear in Active Jobs table)
-        const activeStatuses = ['started', 'starting', 'running', 'queued'];
-        allJobs = allJobs.filter(job => !activeStatuses.includes(job.status));
-
-        // Apply status filter
-        if (logsHistoryFilterStatus !== 'all') {
-          allJobs = allJobs.filter(job => job.status === logsHistoryFilterStatus);
-        }
-
-        // Apply type filter
-        if (logsHistoryFilterType !== 'all') {
-          allJobs = allJobs.filter(job => job.job_type === logsHistoryFilterType);
-        }
-
-        // Apply sorting
-        allJobs.sort((a, b) => {
-          let aVal, bVal;
-
-          switch(logsHistorySortBy) {
-            case 'updated_at':
-              aVal = new Date(a.updated_at || a.created_at);
-              bVal = new Date(b.updated_at || b.created_at);
-              break;
-            case 'created_at':
-              aVal = new Date(a.created_at);
-              bVal = new Date(b.created_at);
-              break;
-            case 'filename':
-              aVal = (a.filename || a.id || '').toLowerCase();
-              bVal = (b.filename || b.id || '').toLowerCase();
-              break;
-            case 'status':
-              aVal = a.status || '';
-              bVal = b.status || '';
-              break;
-            case 'job_type':
-              aVal = a.job_type || '';
-              bVal = b.job_type || '';
-              break;
-            default:
-              aVal = new Date(a.updated_at || a.created_at);
-              bVal = new Date(b.updated_at || b.created_at);
-          }
-
-          if (logsHistorySortDir === 'asc') {
-            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-          } else {
-            return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-          }
-        });
-
-        const total = allJobs.length;
-
-        // Apply pagination
-        const paginatedJobs = allJobs.slice(offset, offset + logsHistoryPageSize);
-
-        if (!allJobs || allJobs.length === 0) {
-          container.innerHTML = `
-            <div class="text-center py-8 text-gray-500">
-              <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <p>No job history</p>
-            </div>
-          `;
-          pagination.classList.add('hidden');
+        // Refresh keeps the table (and its search, sort and filters) in place.
+        if (jobHistoryController && container.contains(jobHistoryController.table)) {
+          jobHistoryController.setRows(rows);
           return;
         }
-
-        const statusColors = {
-          'completed': 'bg-green-100 text-green-800',
-          'failed': 'bg-red-100 text-red-800',
-          'cancelled': 'bg-gray-100 text-gray-800'
-        };
-
-        const statusIcons = {
-          'completed': `<svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
-          'failed': `<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
-          'cancelled': `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>`
-        };
-
-        // Build filter/sort controls
-        const controlsHTML = `
-          <div class="mb-4 flex flex-wrap gap-3 items-center">
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-gray-700">Status:</label>
-              <select id="jobHistoryFilterStatus" class="text-sm border-gray-300 rounded-md">
-                <option value="all">All</option>
-                <option value="completed">Completed</option>
-                <option value="failed">Failed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-gray-700">Sort by:</label>
-              <select id="jobHistorySortBy" class="text-sm border-gray-300 rounded-md">
-                <option value="updated_at">Last Updated</option>
-                <option value="created_at">Created</option>
-                <option value="filename">Filename</option>
-                <option value="status">Status</option>
-                <option value="job_type">Type</option>
-              </select>
-              <button id="jobHistorySortDir" class="p-1 hover:bg-gray-100 rounded" title="Toggle sort direction">
-                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${logsHistorySortDir === 'desc' ? 'M19 9l-7 7-7-7' : 'M5 15l7-7 7 7'}"></path>
-                </svg>
-              </button>
-            </div>
-          </div>
-        `;
-
-        const jobsHTML = `
-          ${controlsHTML}
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-8"></th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Processed</th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${paginatedJobs.map((job, index) => {
-                  const duration = job.completed_at && job.created_at
-                    ? Math.round((new Date(job.completed_at) - new Date(job.created_at)) / 1000) + 's'
-                    : '-';
-
-                  const jobRowId = `job-row-${index}`;
-                  const jobDetailsId = `job-details-${index}`;
-
-                  return `
-                    <tr class="hover:bg-gray-50 cursor-pointer" onclick="toggleJobDetails('${jobDetailsId}', '${jobRowId}', event)">
-                      <td class="px-2 py-3">
-                        <button class="expand-btn text-gray-400 hover:text-gray-600" id="${jobRowId}">
-                          <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                          </svg>
-                        </button>
-                      </td>
-                      <td class="px-4 py-3">
-                        <div class="font-medium text-gray-900">${job.filename || job.id.substring(0, 8)}</div>
-                        ${job.error_message ? `<div class="text-xs text-red-600 mt-1">${job.error_message}</div>` : ''}
-                      </td>
-                      <td class="px-4 py-3 text-sm text-gray-600">${job.job_type || 'Processing'}</td>
-                      <td class="px-4 py-3 text-sm text-gray-600">${timeAgo(job.created_at)}</td>
-                      <td class="px-4 py-3 text-sm text-gray-600">${duration}</td>
-                      <td class="px-4 py-3 text-sm text-right text-gray-600">${typeof job.processed_count === 'string' ? job.processed_count : formatNumber(job.processed_count || 0)}</td>
-                      <td class="px-4 py-3 text-center">
-                        <div class="flex items-center justify-center gap-2">
-                          ${statusIcons[job.status] || ''}
-                          <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColors[job.status] || 'bg-gray-100 text-gray-800'}">${job.status}</span>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr id="${jobDetailsId}" class="hidden bg-gray-50">
-                      <td colspan="7" class="px-6 py-4">
-                        ${generateJobPipeline(job)}
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        `;
-
-        container.innerHTML = jobsHTML;
-
-        // Set filter/sort control values
-        document.getElementById('jobHistoryFilterStatus').value = logsHistoryFilterStatus;
-        document.getElementById('jobHistorySortBy').value = logsHistorySortBy;
-
-        // Add event listeners for filter/sort controls
-        document.getElementById('jobHistoryFilterStatus').addEventListener('change', (e) => {
-          logsHistoryFilterStatus = e.target.value;
-          logsHistoryPage = 1; // Reset to first page
-          loadJobHistory();
+        jobHistoryController = await LanaRecordTableKit.mount(container, LanaLeadlyTables.jobHistorySpec(), {
+          rows,
+          onRowClick: (row) => openJobDetails(row)
         });
-
-        document.getElementById('jobHistorySortBy').addEventListener('change', (e) => {
-          logsHistorySortBy = e.target.value;
-          loadJobHistory();
-        });
-
-        document.getElementById('jobHistorySortDir').addEventListener('click', () => {
-          logsHistorySortDir = logsHistorySortDir === 'desc' ? 'asc' : 'desc';
-          loadJobHistory();
-        });
-
-        // Update pagination
-        const totalPages = Math.ceil(total / logsHistoryPageSize);
-
-        if (total > logsHistoryPageSize) {
-          pagination.classList.remove('hidden');
-          const start = offset + 1;
-          const end = Math.min(offset + logsHistoryPageSize, total);
-          document.getElementById('jobHistoryInfo').textContent = `Showing ${start}-${end} of ${total}`;
-          document.getElementById('jobHistoryPrevBtn').disabled = logsHistoryPage === 1;
-          document.getElementById('jobHistoryNextBtn').disabled = end >= total;
-
-          // Generate page number buttons
-          const pageNumbersContainer = document.getElementById('jobHistoryPageNumbers');
-          pageNumbersContainer.innerHTML = '';
-
-          // Calculate page range to show (max 7 buttons)
-          let startPage = Math.max(1, logsHistoryPage - 3);
-          let endPage = Math.min(totalPages, startPage + 6);
-
-          // Adjust start if we're near the end
-          if (endPage - startPage < 6) {
-            startPage = Math.max(1, endPage - 6);
-          }
-
-          // Add first page and ellipsis if needed
-          if (startPage > 1) {
-            pageNumbersContainer.appendChild(createPageButton(1, logsHistoryPage));
-            if (startPage > 2) {
-              const ellipsis = document.createElement('span');
-              ellipsis.className = 'px-3 py-2 text-sm text-gray-500';
-              ellipsis.textContent = '...';
-              pageNumbersContainer.appendChild(ellipsis);
-            }
-          }
-
-          // Add page number buttons
-          for (let i = startPage; i <= endPage; i++) {
-            pageNumbersContainer.appendChild(createPageButton(i, logsHistoryPage));
-          }
-
-          // Add ellipsis and last page if needed
-          if (endPage < totalPages) {
-            if (endPage < totalPages - 1) {
-              const ellipsis = document.createElement('span');
-              ellipsis.className = 'px-3 py-2 text-sm text-gray-500';
-              ellipsis.textContent = '...';
-              pageNumbersContainer.appendChild(ellipsis);
-            }
-            pageNumbersContainer.appendChild(createPageButton(totalPages, logsHistoryPage));
-          }
-        } else {
-          pagination.classList.add('hidden');
-        }
       } catch (error) {
         console.error('Failed to load job history:', error);
-        document.getElementById('jobHistoryContent').innerHTML = `
-          <div class="text-center py-8 text-red-500">
-            Failed to load job history
-          </div>
-        `;
+        if (jobHistoryController && container.contains(jobHistoryController.table)) {
+          jobHistoryController.setError('Job history could not be loaded. Check your connection and try again.');
+        } else {
+          container.innerHTML = `
+            <div class="text-center py-8 text-red-500">
+              Failed to load job history
+            </div>
+          `;
+        }
       }
     }
 
-    // Change job history page
-    function changeJobHistoryPage(delta) {
-      logsHistoryPage += delta;
-      loadJobHistory();
-    }
-
-    // Go to specific page
-    function goToJobHistoryPage(page) {
-      logsHistoryPage = page;
-      loadJobHistory();
-    }
-
-    // Create page button helper for Job History
-    function createPageButton(pageNum, currentPage) {
-      const button = document.createElement('button');
-      button.textContent = pageNum;
-      button.onclick = () => goToJobHistoryPage(pageNum);
-
-      if (pageNum === currentPage) {
-        button.className = 'px-3 py-2 text-sm font-medium text-white bg-emerald-600 border border-emerald-600 rounded-lg';
-      } else {
-        button.className = 'px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors';
-      }
-
-      return button;
+    // A Job History row opens its pipeline in a drawer.
+    function openJobDetails(row) {
+      if (!row || !row._job) return;
+      Lex.Drawer.open({
+        heading: row.name || 'Job details',
+        content: `<div class="p-4">${generateJobPipeline(row._job)}</div>`,
+        width: 'lg'
+      });
     }
 
     // Active Jobs pagination functions
@@ -4174,30 +3197,6 @@
       } catch (error) {
         console.error('Failed to cancel job:', error);
         Toast.error('Failed to cancel job: ' + error.message);
-      }
-    }
-
-    // Toggle job details visibility
-    function toggleJobDetails(detailsId, rowId, event) {
-      // Prevent event bubbling if clicking on interactive elements within the row
-      if (event && event.target.closest('button, a')) {
-        event.stopPropagation();
-        return;
-      }
-
-      const detailsRow = document.getElementById(detailsId);
-      const expandBtn = document.getElementById(rowId);
-
-      if (!detailsRow || !expandBtn) return;
-
-      const svg = expandBtn.querySelector('svg');
-
-      if (detailsRow.classList.contains('hidden')) {
-        detailsRow.classList.remove('hidden');
-        if (svg) svg.style.transform = 'rotate(90deg)';
-      } else {
-        detailsRow.classList.add('hidden');
-        if (svg) svg.style.transform = 'rotate(0deg)';
       }
     }
 

@@ -9,7 +9,7 @@ class SearchAnalytics {
     this.customStartDate = null;
     this.customEndDate = null;
     this.charts = {};
-    this.currentSort = { column: 'frequency', direction: 'desc' };
+    this.tables = {};
     this.data = {
       overview: null,
       topQueries: [],
@@ -26,12 +26,14 @@ class SearchAnalytics {
   }
 
   setupEventListeners() {
-    // Date range selector
-    document.getElementById('dateRange').addEventListener('change', (e) => {
-      if (e.target.value === 'custom') {
+    // Date range selector (lex-select)
+    const range = document.getElementById('dateRange');
+    range.addEventListener('lex-change', (e) => {
+      const value = String((e.detail && e.detail.value) || '');
+      if (value === 'custom') {
         this.showCustomDateModal();
-      } else {
-        this.dateRange = parseInt(e.target.value);
+      } else if (value) {
+        this.dateRange = parseInt(value, 10);
         this.customStartDate = null;
         this.customEndDate = null;
         this.loadAllData();
@@ -43,42 +45,73 @@ class SearchAnalytics {
       this.exportToCSV();
     });
 
-    // Custom date modal
-    document.getElementById('cancelCustomDate').addEventListener('click', () => {
-      this.hideCustomDateModal();
-      document.getElementById('dateRange').value = this.dateRange.toString();
-    });
-
-    document.getElementById('applyCustomDate').addEventListener('click', () => {
+    // Custom date modal (lex-modal: Apply = lex-confirm)
+    const modal = document.getElementById('customDateModal');
+    modal.addEventListener('lex-confirm', () => {
       const startDate = document.getElementById('customStartDate').value;
       const endDate = document.getElementById('customEndDate').value;
 
       if (!startDate || !endDate) {
-        alert('Please select both start and end dates');
+        this.restoreRangeSelect();
+        Lex.Toast.error('Please select both start and end dates');
         return;
       }
 
       this.customStartDate = startDate;
       this.customEndDate = endDate;
-      this.hideCustomDateModal();
       this.loadAllData();
     });
-
-    // Table sorting
-    document.querySelectorAll('[data-sort]').forEach(header => {
-      header.addEventListener('click', () => {
-        const column = header.getAttribute('data-sort');
-        this.sortTable(column);
+    ['lex-cancel', 'lex-close'].forEach((name) => {
+      modal.addEventListener(name, () => {
+        if (!this.customStartDate) this.restoreRangeSelect();
       });
+    });
+
+    this.setupTables();
+  }
+
+  restoreRangeSelect() {
+    const range = document.getElementById('dateRange');
+    if (range) range.value = this.customStartDate ? 'custom' : this.dateRange.toString();
+  }
+
+  /**
+   * The three record tables: client-side lex-tables over each endpoint's
+   * list (docs/TABLE-STANDARD.md), with toolbar search and Sort by.
+   */
+  setupTables() {
+    const T = window.SearchAnalyticsTables;
+    const kit = window.AdminTableKit;
+    const specs = [
+      { key: 'topQueries', render: T.renderers.top(), noun: ['query', 'queries'] },
+      { key: 'zeroResults', render: T.renderers.zero(), noun: ['query', 'queries'] },
+      { key: 'slowQueries', render: T.renderers.slow(), noun: ['query', 'queries'] }
+    ];
+    kit.whenTableReady().then(() => {
+      specs.forEach((spec) => {
+        const table = document.getElementById(spec.key + 'Table');
+        if (!table) return;
+        table.setCellRenderers(spec.render);
+        const count = window.AdminClientTables.bindCount(table, [spec.key + 'Count', spec.key + 'SectionCount'], spec.noun);
+        kit.bindToolbar({
+          table: table,
+          searchId: spec.key + 'Search',
+          sortId: spec.key + 'Sort',
+          orderId: spec.key + 'SortOrder',
+          noun: spec.noun,
+          onSearch: (term) => {
+            if (table.dataSource) table.dataSource.setSearch(term);
+            count.update();
+          }
+        });
+        this.tables[spec.key] = { table: table, count: count };
+      });
+      if (this.data.overview) this.renderTables();
     });
   }
 
   showCustomDateModal() {
-    document.getElementById('customDateModal').classList.remove('hidden');
-  }
-
-  hideCustomDateModal() {
-    document.getElementById('customDateModal').classList.add('hidden');
+    document.getElementById('customDateModal').open = true;
   }
 
   async loadAllData() {
@@ -98,9 +131,7 @@ class SearchAnalytics {
 
       // Render all visualizations
       this.renderOverview();
-      this.renderTopQueries();
-      this.renderZeroResults();
-      this.renderSlowQueries();
+      this.renderTables();
       this.renderVolumeChart();
       this.renderLatencyChart();
 
@@ -108,7 +139,12 @@ class SearchAnalytics {
       document.getElementById('contentContainer').classList.remove('hidden');
     } catch (error) {
       console.error('Failed to load analytics data:', error);
-      alert('Failed to load analytics data. Please try again.');
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('contentContainer').classList.remove('hidden');
+      Object.keys(this.tables).forEach((key) => {
+        this.tables[key].table.setError('Search analytics could not be loaded. Check your connection and try again.');
+      });
+      Lex.Modal.alert('Search analytics', 'Failed to load analytics data. Please try again.');
     }
   }
 
@@ -121,88 +157,27 @@ class SearchAnalytics {
       params.append('days', this.dateRange);
     }
 
-    const response = await fetch(`/api/analytics/search/overview?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to load overview data');
-    }
-
-    this.data.overview = await response.json();
+    this.data.overview = await api.get(`/api/analytics/search/overview?${params}`);
   }
 
   async loadTopQueries() {
-    const params = new URLSearchParams();
-    params.append('limit', '50');
-    if (this.customStartDate && this.customEndDate) {
-      params.append('startDate', this.customStartDate);
-      params.append('endDate', this.customEndDate);
-    } else {
-      params.append('days', this.dateRange);
-    }
-
-    const response = await fetch(`/api/analytics/search/top-queries?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to load top queries');
-    }
-
-    this.data.topQueries = await response.json();
+    const params = window.SearchAnalyticsTables.periodParams(this.dateRange, this.customStartDate, this.customEndDate);
+    this.data.topQueries = await api.get(`/api/analytics/search/top-queries?${params}`);
   }
+
 
   async loadZeroResults() {
-    const params = new URLSearchParams();
-    params.append('limit', '50');
-    if (this.customStartDate && this.customEndDate) {
-      params.append('startDate', this.customStartDate);
-      params.append('endDate', this.customEndDate);
-    } else {
-      params.append('days', this.dateRange);
-    }
-
-    const response = await fetch(`/api/analytics/search/zero-results?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to load zero-result queries');
-    }
-
-    this.data.zeroResults = await response.json();
+    const params = window.SearchAnalyticsTables.periodParams(this.dateRange, this.customStartDate, this.customEndDate);
+    this.data.zeroResults = await api.get(`/api/analytics/search/zero-results?${params}`);
   }
+
 
   async loadSlowQueries() {
-    const params = new URLSearchParams();
-    params.append('threshold', '100');
-    params.append('limit', '50');
-    if (this.customStartDate && this.customEndDate) {
-      params.append('startDate', this.customStartDate);
-      params.append('endDate', this.customEndDate);
-    } else {
-      params.append('days', this.dateRange);
-    }
-
-    const response = await fetch(`/api/analytics/search/slow-queries?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to load slow queries');
-    }
-
-    this.data.slowQueries = await response.json();
+    const params = window.SearchAnalyticsTables.periodParams(this.dateRange, this.customStartDate, this.customEndDate);
+    params.set('threshold', String(window.SearchAnalyticsTables.SLOW_THRESHOLD_MS));
+    this.data.slowQueries = await api.get(`/api/analytics/search/slow-queries?${params}`);
   }
+
 
   async loadVolumeData() {
     const params = new URLSearchParams();
@@ -214,17 +189,7 @@ class SearchAnalytics {
       params.append('days', this.dateRange);
     }
 
-    const response = await fetch(`/api/analytics/search/volume?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to load volume data');
-    }
-
-    this.data.volumeData = await response.json();
+    this.data.volumeData = await api.get(`/api/analytics/search/volume?${params}`);
   }
 
   async loadLatencyData() {
@@ -236,17 +201,7 @@ class SearchAnalytics {
       params.append('days', this.dateRange);
     }
 
-    const response = await fetch(`/api/analytics/search/latency-distribution?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to load latency data');
-    }
-
-    this.data.latencyData = await response.json();
+    this.data.latencyData = await api.get(`/api/analytics/search/latency-distribution?${params}`);
   }
 
   renderOverview() {
@@ -260,77 +215,28 @@ class SearchAnalytics {
     document.getElementById('clickThroughRate').textContent = `${metrics.ctr_percent.toFixed(1)}%`;
   }
 
-  renderTopQueries() {
-    const tbody = document.getElementById('topQueriesTable');
-    tbody.innerHTML = '';
-
-    const queries = this.data.topQueries.top_queries || this.data.topQueries;
-
-    if (!queries || queries.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No data available</td></tr>';
-      return;
-    }
-
-    queries.forEach(query => {
-      const row = document.createElement('tr');
-      row.className = 'hover:bg-gray-50 cursor-pointer';
-      row.innerHTML = `
-        <td class="px-6 py-4 text-sm text-gray-900">${this.escapeHtml(query.query_text)}</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${query.frequency.toLocaleString()}</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${query.avg_latency_ms}ms</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${query.zero_result_rate_percent.toFixed(1)}%</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${query.ctr_percent.toFixed(1)}%</td>
-      `;
-      tbody.appendChild(row);
-    });
-  }
-
-  renderZeroResults() {
-    const tbody = document.getElementById('zeroResultsTable');
-    tbody.innerHTML = '';
-
-    const queries = this.data.zeroResults.zero_result_queries || this.data.zeroResults;
-
-    if (!queries || queries.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">No zero-result queries</td></tr>';
-      return;
-    }
-
-    queries.forEach(query => {
-      const row = document.createElement('tr');
-      row.className = 'hover:bg-gray-50 bg-red-50';
-      row.innerHTML = `
-        <td class="px-6 py-4 text-sm text-gray-900">${this.escapeHtml(query.query_text)}</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${this.formatTimestamp(query.created_at)}</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${this.escapeHtml(query.user_email || 'Unknown')}</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${this.escapeHtml(query.matter_name || 'N/A')}</td>
-      `;
-      tbody.appendChild(row);
-    });
-  }
-
-  renderSlowQueries() {
-    const tbody = document.getElementById('slowQueriesTable');
-    tbody.innerHTML = '';
-
-    const queries = this.data.slowQueries.slow_queries || this.data.slowQueries;
-
-    if (!queries || queries.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">No slow queries</td></tr>';
-      return;
-    }
-
-    queries.forEach(query => {
-      const row = document.createElement('tr');
-      const isVerySlow = query.latency_ms > 500;
-      row.className = `hover:bg-gray-50 ${isVerySlow ? 'bg-red-50' : ''}`;
-      row.innerHTML = `
-        <td class="px-6 py-4 text-sm text-gray-900">${this.escapeHtml(query.query_text)}</td>
-        <td class="px-6 py-4 text-sm ${isVerySlow ? 'text-red-600 font-semibold' : 'text-gray-900'}">${Math.round(query.latency_ms)}ms</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${this.formatTimestamp(query.created_at)}</td>
-        <td class="px-6 py-4 text-sm text-gray-900">${this.escapeHtml(query.user_email || 'Unknown')}</td>
-      `;
-      tbody.appendChild(row);
+  /**
+   * Hand each table its rows (raw values; renderers format them) and the
+   * header filters built from those rows.
+   */
+  renderTables() {
+    const T = window.SearchAnalyticsTables;
+    const lists = {
+      topQueries: (this.data.topQueries && this.data.topQueries.top_queries) || [],
+      zeroResults: (this.data.zeroResults && this.data.zeroResults.zero_result_queries) || [],
+      slowQueries: (this.data.slowQueries && this.data.slowQueries.slow_queries) || []
+    };
+    const mappers = { topQueries: T.mapTopQuery, zeroResults: T.mapZeroResult, slowQueries: T.mapSlowQuery };
+    const filters = { topQueries: T.filters.top, zeroResults: T.filters.zero, slowQueries: T.filters.slow };
+    Object.keys(lists).forEach((key) => {
+      const entry = this.tables[key];
+      if (!entry) return;
+      const rows = lists[key].map(mappers[key]);
+      entry.table.setColumnFilterOptions(filters[key](rows));
+      entry.table.setData(rows);
+      entry.count.update();
+      const note = document.getElementById(key + 'CapNote');
+      if (note) note.textContent = T.capNote(rows.length);
     });
   }
 
@@ -450,52 +356,6 @@ class SearchAnalytics {
     });
   }
 
-  sortTable(column) {
-    if (this.currentSort.column === column) {
-      this.currentSort.direction = this.currentSort.direction === 'asc' ? 'desc' : 'asc';
-    } else {
-      this.currentSort.column = column;
-      this.currentSort.direction = 'desc';
-    }
-
-    const queries = this.data.topQueries.top_queries || this.data.topQueries;
-
-    queries.sort((a, b) => {
-      let aVal, bVal;
-
-      switch (column) {
-        case 'query':
-          aVal = a.query_text.toLowerCase();
-          bVal = b.query_text.toLowerCase();
-          break;
-        case 'frequency':
-          aVal = a.frequency;
-          bVal = b.frequency;
-          break;
-        case 'latency':
-          aVal = a.avg_latency_ms;
-          bVal = b.avg_latency_ms;
-          break;
-        case 'zero':
-          aVal = a.zero_result_rate_percent;
-          bVal = b.zero_result_rate_percent;
-          break;
-        case 'ctr':
-          aVal = a.ctr_percent;
-          bVal = b.ctr_percent;
-          break;
-        default:
-          return 0;
-      }
-
-      if (aVal < bVal) return this.currentSort.direction === 'asc' ? -1 : 1;
-      if (aVal > bVal) return this.currentSort.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    this.renderTopQueries();
-  }
-
   exportToCSV() {
     const csvData = [];
 
@@ -503,7 +363,7 @@ class SearchAnalytics {
     csvData.push(['Query Text', 'Frequency', 'Avg Latency (ms)', 'Zero-Result Rate (%)', 'CTR (%)']);
 
     // Data
-    const queries = this.data.topQueries.top_queries || this.data.topQueries;
+    const queries = (this.data.topQueries && this.data.topQueries.top_queries) || [];
     queries.forEach(query => {
       csvData.push([
         query.query_text,
@@ -522,10 +382,6 @@ class SearchAnalytics {
     a.download = `search-analytics-${LanaTime.formatUtcDateOnly()}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-  }
-
-  formatTimestamp(timestamp) {
-    return formatDateTime(timestamp);
   }
 
   escapeHtml(text) {
