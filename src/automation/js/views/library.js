@@ -1,13 +1,25 @@
-import { badge, hydrateLexDataTable, lexDataTable, sectionIntro, surface } from '../shared/ui.js';
-import { escapeAttribute, formatDateTime, getOrganizationTimezone } from '../shared/utils.js';
+import {
+  badge,
+  createServerTableStore,
+  dateTimeCell,
+  invalidateServerTable,
+  matterLinkCell,
+  mountServerTable,
+  mutedCell,
+  nameCell,
+  relativeTimeCell,
+  sectionIntro,
+  serverTableSection,
+  surface,
+  textCell
+} from '../shared/ui.js';
+import { escapeAttribute } from '../shared/utils.js';
 
-const SORT_FIELDS = {
-  'created_at': (a) => new Date(a.created_at || 0).getTime(),
-  'updated_at': (a) => new Date(a.updated_at || 0).getTime(),
-  'last_executed_at': (a) => new Date(a.last_executed_at || 0).getTime(),
-  'automation_name': (a) => String(a.automation_name || '').toLowerCase(),
-  'category': (a) => String(a.category || '').toLowerCase()
-};
+const TABLE_ID = 'libraryAutomationsTable';
+const TOOLBAR_PREFIX = 'libraryAutomations';
+const Queries = () => window.AutomationTableQueries;
+
+const STATE_COLORS = { active: 'success', inactive: '' };
 
 function normalizeScopeType(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -20,161 +32,156 @@ function normalizeScopeType(value) {
   return '';
 }
 
-function scopeLabel(automation) {
+function automationScope(automation) {
   const config = automation.automation_config || automation.config || {};
   const scope = config.scope && typeof config.scope === 'object' ? config.scope : { type: config.scope };
-  const type = normalizeScopeType(
-    scope.type
-    || scope.scope_type
-    || automation.scope_type
-    || automation.scopeType
-    || ((scope.matter_id || scope.matterId || automation.matter_id || automation.client_matter_id) ? 'matter' : 'organization')
-  );
+  const matterId = automation.matter_id || scope.matter_id || scope.matterId || automation.client_matter_id || '';
+  const type = normalizeScopeType(scope.type || scope.scope_type || automation.scope_type || automation.scopeType)
+    || (matterId ? 'matter' : 'organization');
+  return {
+    type,
+    matterId: type === 'matter' ? matterId : '',
+    matterName: type === 'matter' ? (automation.matter_name || scope.matter_name || '') : ''
+  };
+}
 
-  if (type === 'matter') {
-    return `Matter: ${automation.matter_name || scope.matter_name || scope.matter_id || scope.matterId || automation.matter_id || automation.client_matter_id || 'Selected matter'}`;
+function automationState(automation) {
+  if (typeof automation.is_enabled === 'boolean') return automation.is_enabled ? 'active' : 'inactive';
+  if (typeof automation.is_active === 'boolean') return automation.is_active ? 'active' : 'inactive';
+  const state = String(automation.state || automation.status || '').toLowerCase();
+  return state === 'active' || state === 'enabled' ? 'active' : 'inactive';
+}
+
+// Rows keep raw values; the renderers format them.
+export function mapAutomationRow(automation) {
+  const scope = automationScope(automation);
+  return {
+    automation_id: automation.automation_id || automation.id || '',
+    name: automation.automation_name || automation.name || 'Unnamed automation',
+    description: automation.automation_description || automation.description || '',
+    category: automation.category || '',
+    automation_type: automation.automation_type || '',
+    scope: scope.type,
+    matter_id: scope.matterId,
+    matter_name: scope.matterName,
+    visibility: automation.visibility || 'private',
+    state: automationState(automation),
+    last_executed_at: automation.last_executed_at || '',
+    created_at: automation.created_at || '',
+    updated_at: automation.updated_at || '',
+    _raw: automation
+  };
+}
+
+function libraryStore(context) {
+  context.state.tables = context.state.tables || {};
+  if (!context.state.tables.library) {
+    context.state.tables.library = { ...createServerTableStore(), facets: null, seen: { category: [], automation_type: [] } };
   }
-
-  return 'Organization-wide';
+  return context.state.tables.library;
 }
 
-function sortAutomations(items, filters) {
-  const sortBy = SORT_FIELDS[filters.sortBy] ? filters.sortBy : 'created_at';
-  const sortDir = filters.sortDir === 'asc' ? 'asc' : 'desc';
-  const getKey = SORT_FIELDS[sortBy];
-  const getTieBreaker = SORT_FIELDS.automation_name;
+export function invalidateLibraryTable(context) {
+  invalidateServerTable(context.state.tables?.library);
+}
 
-  return [...items].sort((a, b) => {
-    const aKey = getKey(a);
-    const bKey = getKey(b);
-    if (aKey < bKey) return sortDir === 'asc' ? -1 : 1;
-    if (aKey > bKey) return sortDir === 'asc' ? 1 : -1;
+function cellRenderers() {
+  const Q = Queries();
+  const label = (value) => (value ? textCell(Q.humanizeLabel(value)) : mutedCell());
+  return {
+    name: (value, row) => nameCell(value, row.description),
+    category: label,
+    automation_type: label,
+    scope: (value, row) => {
+      if (value === 'matter') return matterLinkCell(row.matter_id, row.matter_name, 'Matter');
+      return value ? textCell(Q.humanizeLabel(value)) : mutedCell();
+    },
+    visibility: (value) => {
+      const option = Q.VISIBILITY_OPTIONS.find((entry) => entry.value === value);
+      return value ? textCell(option ? option.label : Q.humanizeLabel(value)) : mutedCell();
+    },
+    state: (value) => badge(Q.humanizeLabel(value || 'inactive'), STATE_COLORS[value] || ''),
+    last_executed_at: relativeTimeCell,
+    created_at: dateTimeCell,
+    updated_at: relativeTimeCell
+  };
+}
 
-    const aTie = getTieBreaker(a);
-    const bTie = getTieBreaker(b);
-    if (aTie < bTie) return -1;
-    if (aTie > bTie) return 1;
+function filterOptions(context, store) {
+  const Q = Queries();
+  const shared = window.LanaLibraryColumnFilters;
+  const known = (context.state.automations || []);
+  const categories = store.facets?.categories?.length
+    ? store.facets.categories
+    : [...known.map((item) => item.category), ...store.seen.category];
+  const types = store.facets?.automation_types?.length
+    ? store.facets.automation_types
+    : [...known.map((item) => item.automation_type), ...store.seen.automation_type];
+  const map = {
+    name: { text: true, placeholder: 'Name contains...' },
+    category: { options: Q.optionsFromValues(categories) },
+    automation_type: { options: Q.optionsFromValues(types) },
+    scope: { options: Q.SCOPE_OPTIONS },
+    visibility: { options: Q.VISIBILITY_OPTIONS },
+    state: { options: Q.STATE_OPTIONS }
+  };
+  if (shared) {
+    map.last_executed_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    map.updated_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+  }
+  return map;
+}
 
-    const aCreated = SORT_FIELDS.created_at(a);
-    const bCreated = SORT_FIELDS.created_at(b);
-    if (aCreated < bCreated) return sortDir === 'asc' ? -1 : 1;
-    if (aCreated > bCreated) return sortDir === 'asc' ? 1 : -1;
+function applyFilterOptions(context, store) {
+  const table = document.getElementById(TABLE_ID);
+  if (table && typeof table.setColumnFilterOptions === 'function') {
+    table.setColumnFilterOptions(filterOptions(context, store));
+  }
+}
 
-    return 0;
+// Category and type values in use; falls back to values seen when the
+// facet endpoint is missing (servers before the automations facets route).
+function loadFacets(context, store) {
+  if (store.facetsRequested) return;
+  store.facetsRequested = true;
+  context.fetchJson('/api/automations/facets', { headers: context.authHeaders() })
+    .then((response) => {
+      const Q = Queries();
+      store.facets = {
+        categories: Q.facetValues(response, 'categories'),
+        automation_types: Q.facetValues(response, 'automation_types')
+      };
+      applyFilterOptions(context, store);
+    })
+    .catch(() => {
+      store.facets = null;
+    });
+}
+
+function rememberSeen(context, store, rows) {
+  let changed = false;
+  ['category', 'automation_type'].forEach((field) => {
+    rows.forEach((row) => {
+      const value = row[field];
+      if (value && !store.seen[field].includes(value)) {
+        store.seen[field].push(value);
+        changed = true;
+      }
+    });
   });
+  if (changed && !store.facets) applyFilterOptions(context, store);
 }
 
-function renderLibraryLoadingRows(count = 4) {
-  return `
-    <style>
-      .library-loading-list {
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-      }
-      .library-loading-card {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 160px;
-        gap: 18px;
-        padding: 22px;
-        border: 1px solid var(--lex-border-subtle, #e5e7eb);
-        border-radius: 16px;
-        background: linear-gradient(180deg, rgba(248,250,252,0.9), rgba(241,245,249,0.7));
-      }
-      .library-loading-stack {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .library-loading-chip-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-      .library-loading-meta-row {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      .library-loading-block {
-        position: relative;
-        overflow: hidden;
-        border-radius: 999px;
-        background: #e5e7eb;
-        color: transparent;
-        user-select: none;
-      }
-      .library-loading-block--soft {
-        border-radius: 10px;
-      }
-      .library-loading-block::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        transform: translateX(-100%);
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent);
-        animation: library-loading-shimmer 1.35s ease-in-out infinite;
-      }
-      @keyframes library-loading-shimmer {
-        100% { transform: translateX(100%); }
-      }
-      @media (max-width: 900px) {
-        .library-loading-card {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
-    </style>
-    <div class="library-loading-list" aria-busy="true" aria-live="polite">
-      ${Array.from({ length: count }, (_, index) => `
-        <article class="library-loading-card" aria-hidden="true">
-          <div class="library-loading-stack">
-            <div class="library-loading-block library-loading-block--soft" style="width:${index % 2 === 0 ? '36%' : '44%'};height:24px;">&nbsp;</div>
-            <div class="library-loading-block library-loading-block--soft" style="width:92%;height:14px;">&nbsp;</div>
-            <div class="library-loading-chip-row">
-              <span class="library-loading-block" style="width:92px;height:26px;">&nbsp;</span>
-              <span class="library-loading-block" style="width:108px;height:26px;">&nbsp;</span>
-              <span class="library-loading-block" style="width:82px;height:26px;">&nbsp;</span>
-            </div>
-            <div class="library-loading-meta-row">
-              <span class="library-loading-block" style="width:124px;height:12px;">&nbsp;</span>
-              <span class="library-loading-block" style="width:132px;height:12px;">&nbsp;</span>
-            </div>
-          </div>
-          <div class="library-loading-stack" style="align-items:flex-end;">
-            <span class="library-loading-block" style="width:88px;height:26px;">&nbsp;</span>
-            <span class="library-loading-block library-loading-block--soft" style="width:108px;height:34px;">&nbsp;</span>
-          </div>
-        </article>
-      `).join('')}
-    </div>
-  `;
-}
-
-function renderLibraryLoadingTable(count = 6) {
-  const columns = ['Name', 'Category', 'Type', 'Scope', 'Visibility', 'State', 'Last Run', 'Updated'];
-  return `
-    <div class="automation-table-loading" aria-busy="true" aria-live="polite">
-      <div class="automation-table-loading__toolbar">
-        <span class="automation-table-loading__search">&nbsp;</span>
-        <span class="automation-table-loading__count">&nbsp;</span>
-      </div>
-      <div class="automation-table-loading__table" role="table" aria-label="Loading live automations">
-        <div class="automation-table-loading__header" role="row">
-          ${columns.map((column) => `<span role="columnheader">${escapeHtml(column)}</span>`).join('')}
-        </div>
-        ${Array.from({ length: count }, (_, rowIndex) => `
-          <div class="automation-table-loading__row" role="row" aria-hidden="true">
-            ${columns.map((_, columnIndex) => `
-              <span
-                class="automation-table-loading__cell"
-                style="width:${columnIndex === 0 ? (rowIndex % 2 === 0 ? '78%' : '64%') : (columnIndex % 2 === 0 ? '48%' : '58%')};"
-              >&nbsp;</span>
-            `).join('')}
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
+async function fetchAutomationsPage(context, query, search) {
+  const Q = Queries();
+  const params = Q.libraryParams(query, search);
+  const response = await context.fetchJson(`/api/automations?${params.toString()}`, { headers: context.authHeaders() });
+  const automations = response?.automations || response?.data || [];
+  return {
+    rows: automations.map(mapAutomationRow),
+    pagination: Q.tablePagination(response, query, automations.length)
+  };
 }
 
 export async function toggleAutomation(context, automationId, isEnabled) {
@@ -183,6 +190,7 @@ export async function toggleAutomation(context, automationId, isEnabled) {
       method: 'POST',
       headers: context.authHeaders()
     });
+    invalidateLibraryTable(context);
     await context.loadAutomations();
     context.renderCurrentView();
     context.flash(`Automation ${isEnabled ? 'deactivated' : 'activated'}.`);
@@ -192,22 +200,9 @@ export async function toggleAutomation(context, automationId, isEnabled) {
 }
 
 export function renderLibrary(context) {
-  const isLoading = Boolean(context.state.libraryLoading);
   const templateLibrary = context.getTemplateLibrary();
-  const timeZone = getOrganizationTimezone(context);
-  const automationRows = sortAutomations(context.state.automations, { sortBy: 'updated_at', sortDir: 'desc' }).map((automation) => ({
-    automation_id: automation.automation_id || '',
-    automation_name: automation.automation_name || 'Unnamed automation',
-    automation_description: automation.automation_description || automation.category || '',
-    category: automation.category || 'uncategorized',
-    automation_type: automation.automation_type || 'automation',
-    scope: scopeLabel(automation),
-    visibility: automation.visibility === 'org_wide' ? 'Org-Wide' : 'Private',
-    state: automation.is_enabled ? 'active' : 'inactive',
-    last_executed_at: formatDateTime(automation.last_executed_at, { timeZone }),
-    updated_at: formatDateTime(automation.updated_at || automation.created_at, { timeZone }),
-    created_at: automation.created_at || ''
-  }));
+  const store = libraryStore(context);
+  const Q = Queries();
 
   context.els.viewContent.innerHTML = `
     ${sectionIntro({
@@ -246,35 +241,58 @@ export function renderLibrary(context) {
       `
     })}
 
-    ${surface({
+    ${serverTableSection({
+      prefix: TOOLBAR_PREFIX,
+      store,
       title: 'Live Automations',
-      subtitle: 'Existing automations already published through the shared API.',
-      body: `
-        ${isLoading
-          ? `
-            <div class="muted" style="margin-bottom:12px;">Updating automation list...</div>
-            ${renderLibraryLoadingTable(6)}
-          `
-          : lexDataTable({
-            id: 'libraryAutomationsTable',
-            columns: ['automation_name', 'category', 'automation_type', 'scope', 'visibility', 'state', 'last_executed_at', 'updated_at'],
-            labels: ['Name', 'Category', 'Type', 'Scope', 'Visibility', 'State', 'Last Run', 'Updated'],
-            emptyText: 'No live automations found',
-            sortBy: 'updated_at',
-            sortDir: 'desc',
-            idKey: 'automation_id',
-            limit: 20,
-            ariaLabel: 'Live automations'
-          })}
-      `
+      searchLabel: 'Search and filter automations',
+      searchPlaceholder: 'Search automations...',
+      sortOptions: [
+        { value: 'updated_at', label: 'Updated' },
+        { value: 'created_at', label: 'Created' },
+        { value: 'last_executed_at', label: 'Last run' },
+        { value: 'name', label: 'Name' },
+        { value: 'category', label: 'Category' },
+        { value: 'automation_type', label: 'Type' },
+        { value: 'scope', label: 'Scope' },
+        { value: 'visibility', label: 'Visibility' },
+        { value: 'state', label: 'State' }
+      ],
+      filter: { label: 'State', key: 'state', options: Q.STATE_OPTIONS },
+      table: {
+        id: TABLE_ID,
+        columns: ['name', 'category', 'automation_type', 'scope', 'visibility', 'state', 'last_executed_at', 'created_at', 'updated_at'],
+        labels: ['Name', 'Category', 'Type', 'Scope', 'Visibility', 'State', 'Last run', 'Created', 'Updated'],
+        sortableColumns: Object.keys(Q.LIBRARY_SORT_BY),
+        sortBy: 'updated_at',
+        sortDir: 'desc',
+        idKey: 'automation_id',
+        emptyText: 'No live automations yet',
+        ariaLabel: 'Live automations'
+      }
     })}
   `;
 
-  if (!isLoading) {
-    hydrateLexDataTable('libraryAutomationsTable', automationRows, async (row) => {
+  mountServerTable({
+    id: TABLE_ID,
+    prefix: TOOLBAR_PREFIX,
+    store,
+    fetchPage: (query, search) => fetchAutomationsPage(context, query, search),
+    renderers: cellRenderers(),
+    filterOptions: () => filterOptions(context, store),
+    filterKey: 'state',
+    noun: ['automation', 'automations'],
+    emptyText: {
+      base: 'No live automations yet',
+      filtered: 'No matching automations. Try a different search or filter.'
+    },
+    errorText: 'Automations could not be loaded. Check your connection and try again.',
+    onLoaded: (result) => rememberSeen(context, store, result.rows),
+    onRowClick: async (row) => {
       if (row?.automation_id && typeof context.gotoLibraryDetail === 'function') {
         await context.gotoLibraryDetail(row.automation_id);
       }
-    });
-  }
+    }
+  });
+  loadFacets(context, store);
 }

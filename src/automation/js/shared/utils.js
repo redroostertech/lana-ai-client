@@ -21,7 +21,20 @@ function validTimezone(value) {
   }
 }
 
+function lexUtils() {
+  return typeof window !== 'undefined' && window.Lex && window.Lex.Utils ? window.Lex.Utils : null;
+}
+
+// The timezone dates display in. With Lex.Utils loaded this is the client's
+// own lookup (the user's profile, then the organization's, then the
+// browser's), so automation dates match every other page; an explicit
+// { timeZone } still wins. The local lookup below is the fallback.
 export function getOrganizationTimezone(contextOrOptions = {}) {
+  const utils = lexUtils();
+  if (utils && typeof utils.getOrganizationTimezone === 'function') {
+    const explicit = validTimezone(contextOrOptions?.timeZone || contextOrOptions?.timezone);
+    return explicit || utils.getOrganizationTimezone();
+  }
   const state = contextOrOptions?.state || contextOrOptions || {};
   const profile = state.userProfile || {};
   const storedUser = readStoredUser() || {};
@@ -61,6 +74,11 @@ function getDateParts(value, timeZone) {
 
 export function formatDateTime(value, contextOrOptions = {}) {
   if (!value) return 'Never';
+  // Lex.Utils reads API timestamps as UTC and formats "1/20/2026 3:16 PM".
+  const utils = lexUtils();
+  if (utils && typeof utils.formatDateTime === 'function') {
+    return utils.formatDateTime(value, { timeZone: getOrganizationTimezone(contextOrOptions) });
+  }
   const timeZone = getOrganizationTimezone(contextOrOptions);
   const parts = getDateParts(value, timeZone);
   if (!parts) return 'Never';
