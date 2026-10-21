@@ -176,6 +176,29 @@
     return Number(parts.month) + '/' + Number(parts.day) + '/' + parts.year;
   }
 
+  /**
+   * Uppercase the first letter of a display value ("template" -> "Template").
+   * Table standard: label-style cells and filter options start with a capital.
+   * @param {*} value
+   * @returns {string}
+   */
+  function capitalizeFirst(value) {
+    var text = value === null || value === undefined ? '' : String(value);
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+  }
+
+  /**
+   * An enum or slug as a readable label: "lead-management" -> "Lead management",
+   * "automation_execution" -> "Automation execution". Not for names, file names,
+   * emails or codes, which display as stored.
+   * @param {*} value
+   * @returns {string}
+   */
+  function humanizeLabel(value) {
+    var text = value === null || value === undefined ? '' : String(value);
+    return capitalizeFirst(text.split('_').join(' ').split('-').join(' ').split(' ').filter(Boolean).join(' '));
+  }
+
   function formatDateTime(dateString, options) {
     if (!dateString) return 'Never';
     var parts = dateParts(dateString, Object.assign({}, options || {}, { includeTime: true }));
@@ -533,6 +556,8 @@
     getOrganizationTimezone: getOrganizationTimezone,
     formatDate:         formatDate,
     formatDateTime:     formatDateTime,
+    capitalizeFirst:    capitalizeFirst,
+    humanizeLabel:      humanizeLabel,
     formatDateLong:     formatDateLong,
     formatDateWeekday:  formatDateWeekday,
     formatTime:         formatTime,
