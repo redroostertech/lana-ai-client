@@ -1308,6 +1308,9 @@
     return taskLoadPromise;
   }
 
+  // The tasks API's largest page.
+  var MAX_TASKS_PER_REQUEST = 100;
+
   function taskPagination(response, requested) {
     var data = (response && response.data) || response || {};
     var source = data.pagination || {};
@@ -1353,12 +1356,22 @@
       var response = await api.getMyTasks(Object.fromEntries(params.entries()));
       if (sequence !== taskLoadSequence) return state.tasks;
       var pagination = taskPagination(response, requested);
-      // A server that ignores offset answers every page with page 1. Say so
-      // instead of showing page 1's tasks again as if they were page N.
+      var tasks;
+      // A server that ignores offset answers every page with page 1. Within
+      // its 100-row limit, ask for every row up to this page and keep this
+      // page's slice; past that, say so instead of repeating page 1.
       if (requested.offset > 0 && pagination.offset !== undefined && Number(pagination.offset) !== requested.offset) {
-        throw new Error('This server cannot page tasks yet.');
+        var upTo = requested.offset + requested.limit;
+        if (upTo > MAX_TASKS_PER_REQUEST) throw new Error('This server cannot page tasks yet.');
+        params.set('limit', String(upTo));
+        params.delete('offset');
+        response = await api.getMyTasks(Object.fromEntries(params.entries()));
+        if (sequence !== taskLoadSequence) return state.tasks;
+        pagination = taskPagination(response, requested);
+        tasks = normalizeTasks(response).slice(requested.offset, upTo);
+      } else {
+        tasks = normalizeTasks(response);
       }
-      var tasks = normalizeTasks(response);
       state.tasks = tasks;
       syncTaskEmptyState(table, filters);
       table.setServerData(tasks.map(mapTaskForTable), pagination);
@@ -1370,7 +1383,7 @@
       state.tasks = [];
       if (typeof table.setServerError === 'function') {
         table.setServerError('Tasks could not be loaded. ' + (error && error.message === 'This server cannot page tasks yet.'
-          ? 'This server cannot show pages past the first yet.' : 'Check your connection and try again.'));
+          ? 'This server can only show the first 100 tasks until it is updated.' : 'Check your connection and try again.'));
       }
       updateTaskCount();
       return [];

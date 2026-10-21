@@ -93,16 +93,33 @@ describe('My Tasks server paging', () => {
     expect(table.setServerData.mock.calls[1][1]).toMatchObject({ page: 12, total: 230 });
   });
 
-  test('a server that ignores offset shows an error instead of repeating page 1', async () => {
-    const { table } = load(async () => ({
-      data: { tasks: [{ id: 't1', title: 'A' }], total: 150, pagination: { total: 150, limit: 20, offset: 0 } },
+  test('a server that ignores offset: pages within its 100-row limit come from one larger request', async () => {
+    const all = Array.from({ length: 100 }, (_, i) => ({ id: 't' + i, title: 'Task ' + i }));
+    const { table, api } = load(async (params) => ({
+      data: { tasks: all.slice(0, Number(params.limit)), total: 150, pagination: { total: 150, limit: Number(params.limit), offset: 0 } },
     }));
     await flush();
     table.query = Object.assign({}, table.query, { page: 2 });
     table.requestServerQuery();
     await flush();
+    const retry = api.getMyTasks.mock.calls[api.getMyTasks.mock.calls.length - 1][0];
+    expect(retry.limit).toBe('40');
+    expect(retry.offset).toBeUndefined();
+    const [rows, pagination] = table.setServerData.mock.calls[1];
+    expect(rows.map((r) => r.id)).toEqual(all.slice(20, 40).map((t) => t.id));
+    expect(pagination).toMatchObject({ page: 2, total: 150 });
+  });
+
+  test('a server that ignores offset: past 100 rows it says so instead of repeating page 1', async () => {
+    const { table } = load(async () => ({
+      data: { tasks: [{ id: 't1', title: 'A' }], total: 150, pagination: { total: 150, limit: 20, offset: 0 } },
+    }));
+    await flush();
+    table.query = Object.assign({}, table.query, { page: 6 });
+    table.requestServerQuery();
+    await flush();
     expect(table.setServerData).toHaveBeenCalledTimes(1);
-    expect(table.setServerError).toHaveBeenCalledWith(expect.stringContaining('pages past the first'));
+    expect(table.setServerError).toHaveBeenCalledWith(expect.stringContaining('only show the first 100 tasks'));
   });
 
   test('a failed load shows the table error state', async () => {
