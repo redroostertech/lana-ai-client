@@ -387,3 +387,17 @@ describe('lex-table public paging and search', () => {
     expect(lastEvent(table, 'lex-query-change').detail).toMatchObject({ page: 1, search: 'nightly' });
   });
 });
+
+describe('lex-table Actions column', () => {
+  test('a column keyed "actions" never filters or sorts, even when labelled', () => {
+    const window = loadLex();
+    const table = new window['lex-table']();
+    Object.assign(table, { limit: 20, columns: 'name,actions', labels: 'Name,Actions', columnFilters: true });
+    table.setData([{ id: 1, name: 'A', actions: '' }]);
+    const html = table.render();
+    expect(html).toContain('data-col-filter="name"');
+    expect(html).not.toContain('data-col-filter="actions"');
+    expect(table._isSortable('actions')).toBe(false);
+    expect(html).toContain('Actions');
+  });
+});

@@ -91,7 +91,7 @@ describe('integration-tables: connected sources and field mappings', () => {
   test('connected source columns: Created present, actions unlabelled, schedule labels', () => {
     const cols = tables.connectorSourceColumns();
     expect(cols.find((c) => c.key === 'created_at')).toMatchObject({ label: 'Created', kind: 'created' });
-    expect(cols.find((c) => c.key === 'actions').label).toBe('');
+    expect(cols.find((c) => c.key === 'actions').label).toBe('Actions');
     const kit = global.LanaRecordTableKit;
     const map = kit.filterOptionsFor({ columns: cols }, [{ schedule: 'hourly', category: 'crm', status: 'connected' }]);
     expect(map.schedule.options).toEqual([{ value: 'hourly', label: 'Every hour' }]);

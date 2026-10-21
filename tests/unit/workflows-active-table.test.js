@@ -107,11 +107,11 @@ describe('Active Workflows table', () => {
 describe('workflows/active.html follows the table standard markup', () => {
   const html = read('workflows/active.html');
 
-  test('one card lex-table with column filters, a Created column and a blank actions label', () => {
+  test('one card lex-table with column filters, a Created column and an Actions label', () => {
     expect(html).toContain('id="activeWorkflowsTable"');
     expect(html).toMatch(/class="admin-table lex-table--card"/);
     expect(html).toContain('column-filters');
-    expect(html).toContain('labels="Workflow,Status,Trigger,Runs,Success rate,Last run,Created,"');
+    expect(html).toContain('labels="Workflow,Status,Trigger,Runs,Success rate,Last run,Created,Actions"');
     expect(html).not.toMatch(/<lex-table[^>]*\s(searchable|filterable|compact)[\s>=]/);
   });
 

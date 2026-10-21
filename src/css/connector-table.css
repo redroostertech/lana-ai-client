@@ -2,7 +2,7 @@
    data-connectors.html and the automation app's Connectors view.
    Columns: Pin, Name, Category, Auth, Scope, Status, Version, Created, Actions */
 
-.connector-table table { min-width: 1080px; table-layout: fixed; }
+.connector-table table { min-width: 1260px; table-layout: fixed; }
 .connector-table th { white-space: nowrap; }
 .connector-table td { overflow: hidden; }
 .connector-table th:nth-child(1) { width: 44px; }
@@ -13,7 +13,8 @@
 .connector-table th:nth-child(7) { width: 96px; }
 .connector-table th:nth-child(8) { width: 176px; }
 .connector-table th:nth-child(9) { width: 150px; }
-/* Name (column 2) takes the rest. */
+/* Name (column 2) takes the rest: at the minimum width that is ~260px, so a
+   narrow window scrolls sideways instead of stacking the name letter by letter. */
 
 .connector-table-name-cell {
   align-items: center;
@@ -22,29 +23,9 @@
   min-width: 0;
 }
 
-.connector-table-logo {
-  align-items: center;
-  background: var(--lex-bg-accent-muted, var(--lex-bg-tertiary));
-  border-radius: var(--lex-radius-md, 8px);
-  color: var(--lex-text-accent, var(--lex-text-secondary));
-  display: inline-flex;
-  flex-shrink: 0;
-  font-size: 14px;
-  font-weight: 700;
-  height: 32px;
-  justify-content: center;
-  overflow: hidden;
-  width: 32px;
-}
-
-.connector-table-logo img {
-  height: 26px;
-  object-fit: contain;
-  width: 26px;
-}
-
 .connector-table-name-text {
   display: block;
+  flex: 1;
   min-width: 0;
 }
 

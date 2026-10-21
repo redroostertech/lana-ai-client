@@ -252,7 +252,7 @@
       { key: 'schedule', label: 'Schedule', kind: 'enum', width: '130px', labels: SCHEDULE_LABELS },
       { key: 'created_at', label: 'Created', kind: 'created' },
       {
-        key: 'actions', label: '', kind: 'actions', width: '120px',
+        key: 'actions', label: 'Actions', kind: 'actions', width: '120px',
         render: function (_value, row) {
           return kit ? kit.actionButton('sync', row.id, 'Sync now') : '';
         }
