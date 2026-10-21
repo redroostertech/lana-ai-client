@@ -139,6 +139,8 @@
     if (extensions.length) params.set('extensions', extensions.join(','));
     var workspaces = filterValues(filters.workspace);
     if (workspaces.length) params.set('workspaces', workspaces.join(','));
+    var template = filterValues(filters.is_template)[0];
+    if (template === 'yes' || template === 'no') params.set('is_template', template === 'yes' ? 'true' : 'false');
     var shared = ranges();
     if (shared) {
       var created = shared.editedRangeBounds(filterValues(filters.created_at)[0], now);
@@ -285,7 +287,8 @@
     var extensions = s.extensions && s.extensions.length ? s.extensions : DEFAULT_EXTENSIONS;
     var map = {
       name: { text: true, placeholder: 'File name contains...' },
-      type: { options: extensions.map(function (ext) { return { value: ext, label: String(ext).toUpperCase() }; }) }
+      type: { options: extensions.map(function (ext) { return { value: ext, label: String(ext).toUpperCase() }; }) },
+      is_template: { single: true, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] }
     };
     if (s.workspaces && s.workspaces.length) map.workspace = { options: s.workspaces };
     var shared = ranges();

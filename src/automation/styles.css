@@ -4774,9 +4774,9 @@ details[open].ld-step-raw > summary::before {
 }
 
 /* Narrow windows scroll sideways instead of squeezing the name column. */
-#libraryAutomationsTable table { min-width: 1240px; }
-#automationRunsTable table { min-width: 1180px; }
-#automationApprovalsTable table { min-width: 1080px; }
+#libraryAutomationsTable table { min-width: 1420px; }
+#automationRunsTable table { min-width: 1400px; }
+#automationApprovalsTable table { min-width: 1260px; }
 
 /* Library: Name, Category, Type, Scope, Visibility, State, Last run, Created, Updated */
 #libraryAutomationsTable th:nth-child(2) { width: 140px; }

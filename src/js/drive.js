@@ -767,6 +767,8 @@
     var filters = storageState.columnFilters || {};
     var ids = filterValues(filters.name);
     if (ids.length) params.append('matter_ids', ids.join(','));
+    var creator = filterValues(filters.created_by)[0];
+    if (creator) params.append('created_by', creator);
     var range = createdRange();
     if (range.after) params.append('created_after', range.after);
     if (range.before) params.append('created_before', range.before);
@@ -810,6 +812,7 @@
       return map;
     }
     if (workspaceFilterOptions.length) map.name = { options: workspaceFilterOptions };
+    map.created_by = { text: true, placeholder: 'Created by contains...' };
     map.size = { single: true, options: SIZE_BUCKETS.map(function (b) { return { value: b.value, label: b.label }; }) };
     return map;
   }
