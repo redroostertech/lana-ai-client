@@ -35,6 +35,15 @@
    Client-side tables can give supplied options a predicate instead of exact matching
    (e.g. date ranges): created_at: { single: true, options: [...], match: (cell, values) => bool }.
 
+   State without private fields (both modes):
+     table.setError(message)          // error state, client-side tables too
+     table.searchText                 // current search text
+     table.filteredRows               // client: every matching row (all pages); server: this page
+     table.restoreQuery({ search, sortBy, sortDir, filters, page, limit })  // set without fetching
+     table.resetQuery()               // default sort, no search/filters, page 1, without fetching
+   search-keys="name,email" limits client-side search to those columns.
+   Columns with a blank label (select, pin, actions) get no header filter.
+
    Events: row-click, sort-change, selection-change, bulk-action, lex-filter-change,
            lex-query-change (server paging)
 */
@@ -171,6 +180,9 @@
       lex-table.lex-table--filter-open .lex-table-scroll-area {
         overflow: visible !important;
       }
+      lex-table[hidden] {
+        display: none !important;
+      }
       lex-table.lex-table--card {
         display: block;
         background: var(--lex-bg-primary, #fff);
@@ -181,6 +193,10 @@
       }
 
       /* Page-size select */
+      .lex-page-size-lex-select {
+        display: inline-block;
+        min-width: 76px;
+      }
       .lex-page-size-select {
         appearance: none;
         -webkit-appearance: none;
@@ -492,6 +508,9 @@
         // Comma-separated column keys whose headers sort. Absent = every column;
         // empty = none. Server-paged tables list only what the API can sort.
         sortableColumns: { type: String },
+        // Comma-separated column keys the client-side search looks in
+        // (absent = every column).
+        searchKeys:    { type: String },
         bulkActions:   { type: Array, default: [] }   // [{label, action, variant, icon}]
       };
     }
@@ -544,6 +563,12 @@
 
     _hasColumnFilter(col) {
       if (!this.columnFilters) return false;
+      // Columns without a header label (select, pin, actions) take no filter.
+      if (this.labels) {
+        const index = this._getColumns().indexOf(col);
+        const label = this._getLabels()[index];
+        if (index !== -1 && label !== undefined && !String(label).trim()) return false;
+      }
       if (!this.serverPaging) return true;
       const config = this._columnFilterOptions[col];
       if (config && config.text) return true;
@@ -578,6 +603,7 @@
     }
 
     _getSearchColumns() {
+      if (this.searchKeys) return String(this.searchKeys).split(',').map(c => c.trim()).filter(Boolean);
       return this._getColumns();
     }
 
@@ -1027,9 +1053,11 @@
             <div class="lex-pagination-controls">
               <label class="lex-pagination-label">
                 <span>Show</span>
-                <select data-action="page-size" class="lex-page-size-select">
+                ${window.customElements && window.customElements.get('lex-select')
+                  ? `<lex-select data-action="page-size" class="lex-page-size-lex-select" size="sm" value="${currentLimit}" options='${JSON.stringify(pageSizes.map(s => ({ value: String(s), label: String(s) })))}' aria-label="Rows per page"></lex-select>`
+                  : `<select data-action="page-size" class="lex-page-size-select">
                   ${pageSizes.map(s => `<option value="${s}"${s === currentLimit ? ' selected' : ''}>${s}</option>`).join('')}
-                </select>
+                </select>`}
               </label>
               <div style="display:flex;gap:4px">
                 <button class="lex-page-btn" data-action="prev" ${pg.page <= 1 ? 'disabled' : ''}>Prev</button>
@@ -1134,6 +1162,12 @@
       this.delegate('change', '[data-action="page-size"]', (e) => {
         const newLimit = parseInt(e.target.value, 10);
         if (this.dataSource && newLimit > 0) this.dataSource.setLimit(newLimit);
+      });
+      // lex-select page size (when the component is loaded)
+      this.delegate('lex-change', '[data-action="page-size"]', (e) => {
+        e.stopPropagation();
+        const newLimit = parseInt(e.detail && e.detail.value, 10);
+        if (this.dataSource && newLimit > 0 && newLimit !== this.dataSource._pagination.limit) this.dataSource.setLimit(newLimit);
       });
 
       // Filter bar integration

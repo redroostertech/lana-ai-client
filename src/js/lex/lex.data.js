@@ -735,6 +735,63 @@
         this._ensureServerSource().setServerError(message);
       }
 
+      // Error state for either mode (client-side tables included); does not
+      // switch the table to server mode.
+      setError(message) {
+        if (!this.dataSource) this.dataSource = new LexDataSource(this, { autoFetch: false });
+        this.dataSource._loading = false;
+        this.dataSource._error = message || 'Failed to load data';
+        this._scheduleUpdate();
+        this.emit('lex-data-error', { error: this.dataSource._error });
+      }
+
+      // Current search text (toolbar or built-in).
+      get searchText() {
+        return this.dataSource ? (this.dataSource._searchQuery || '') : '';
+      }
+
+      // Client-side tables: every row that matches the current filters and
+      // search, sorted, across all pages. Server tables: the current page.
+      get filteredRows() {
+        const source = this.dataSource;
+        if (!source) return [];
+        if (!source._clientSideMode || !Array.isArray(source._rawData)) return Array.isArray(source._data) ? source._data.slice() : [];
+        return LexDataPipeline.process(source._rawData, {
+          filters: source._filters,
+          searchQuery: source._searchQuery,
+          searchColumns: this._getSearchColumns ? this._getSearchColumns() : null,
+          sortBy: source._sortBy,
+          sortDir: source._sortDir,
+          page: 1,
+          limit: 0
+        }).data;
+      }
+
+      // Set the whole query without asking for data: search, sort, filters
+      // ({ col: { operator, value } }), page and limit. Missing keys reset
+      // (no search, no filters, page 1). Follow with requestServerQuery() or
+      // let a client-side table re-render.
+      restoreQuery(query = {}) {
+        if (!this.dataSource) this.dataSource = new LexDataSource(this, { autoFetch: false });
+        const source = this.dataSource;
+        source._searchQuery = query.search || '';
+        source._filters = new Map(Object.entries(query.filters || {}));
+        source._sortBy = query.sortBy || this.sortBy || null;
+        source._sortDir = query.sortDir || this.sortDir || 'asc';
+        if (query.limit) source._pagination.limit = Number(query.limit) || source._pagination.limit;
+        source._pagination.page = Number(query.page) || 1;
+        if (query.sortBy) this.sortBy = query.sortBy;
+        if (query.sortDir) this.sortDir = query.sortDir;
+        if (source._clientSideMode) source._reprocess();
+        this._scheduleUpdate();
+      }
+
+      // Back to the default query (attribute sort, no search or filters,
+      // page 1) without asking for data.
+      resetQuery() {
+        this.restoreQuery({ limit: this.dataSource ? this.dataSource._pagination.limit : this.limit });
+      }
+
       // -----------------------------------------------------------------------
       // Filter/Search/Sort convenience methods (delegate to dataSource)
       // -----------------------------------------------------------------------
