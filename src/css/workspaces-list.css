@@ -1,0 +1,63 @@
+/* Workspaces list (lex-table #mattersListView): docs/TABLE-STANDARD.md.
+   Columns: [select], Name, Matter ID, Status, Type, Created, Last edited.
+   The name column takes the remaining width; short and date columns get
+   fixed widths so a full "10/20/2026 11:40 PM" never truncates. */
+.matters-list-table table {
+  table-layout: fixed;
+}
+
+.matters-list-table td {
+  overflow: hidden;
+}
+
+#mattersListView th {
+  white-space: nowrap;
+}
+
+/* Below this width the table scrolls sideways instead of squeezing names. */
+#mattersListView table { min-width: 980px; }
+
+#mattersListView th:nth-child(1) { width: 44px; }
+#mattersListView th:nth-child(3) { width: 150px; }
+#mattersListView th:nth-child(4) { width: 120px; }
+#mattersListView th:nth-child(5) { width: 136px; }
+#mattersListView th:nth-child(6) { width: 176px; }
+#mattersListView th:nth-child(7) { width: 150px; }
+
+.matters-list-name-cell {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.matters-list-name {
+  color: var(--lex-text-primary);
+  font-weight: var(--lex-weight-semibold, 600);
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+
+.matters-list-pin {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 0;
+  padding: 2px 0 0;
+}
+
+.matters-list-id {
+  color: var(--lex-text-tertiary);
+  display: block;
+  font-family: var(--lex-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matters-list-muted {
+  color: var(--lex-text-secondary);
+  white-space: nowrap;
+}

@@ -82,7 +82,10 @@
       columnFilters: {},
       totalResults: 0,
       currentPage: 1,
-      totalPages: 0
+      // The list table's page size (its own pager's select; 20 by default).
+      pageSize: 20,
+      totalPages: 0,
+      filesTotal: 0
     };
   }
 
@@ -272,12 +275,13 @@
       });
     }
 
-    // Pagination - lex-pagination fires 'page-change'
+    // Grid view pager (lex-pagination 'page-change'). The list view uses the
+    // table's own pager; both load the same server page.
     var drivePagination = document.getElementById('drivePagination');
     if (drivePagination) {
       drivePagination.addEventListener('page-change', function (e) {
         storageState.currentPage = e.detail.page;
-        if (isBrainchildScope() || isOrgKnowledgeScope()) return; // notes scope is single-page
+        if (isBrainchildScope() || isOrgKnowledgeScope()) return; // the notes grid shows every note
         loadMatters();
       });
     }
@@ -312,12 +316,22 @@
       listTable.addEventListener('click', handleListActionClick);
     }
 
-    // Files (search matches) table: a row opens the file viewer.
+    // Files (search matches) table: server-paged by the library files API.
+    // A row opens the file viewer; the workspace link opens the workspace.
     var filesTable = document.getElementById('filesListView');
     if (filesTable) {
+      if (typeof filesTable.setCellRenderers === 'function') filesTable.setCellRenderers(filesCellRenderers());
+      if (typeof filesTable.setColumnFilterOptions === 'function') filesTable.setColumnFilterOptions(filesFilterOptions());
+      filesTable.addEventListener('lex-query-change', function (e) { fetchFilesPage(e.detail || {}); });
       filesTable.addEventListener('row-click', function (e) {
         var row = e.detail && e.detail.row;
         if (row) openRecentFile(row.id, row.matterKey);
+      });
+      filesTable.addEventListener('click', function (e) {
+        var link = e.target && e.target.closest ? e.target.closest('[data-workspace-id]') : null;
+        if (!link) return;
+        e.stopPropagation();
+        openWorkspaceDetails(link.getAttribute('data-workspace-id'));
       });
     }
   }
@@ -336,7 +350,9 @@
       storageState.sortOrder = query.sortDir === 'desc' ? 'desc' : 'asc';
     }
     storageState.columnFilters = query.filters || {};
-    storageState.currentPage = 1;
+    // The table's pager: a filter or sort change already reset it to page 1.
+    storageState.currentPage = Number(query.page) || 1;
+    storageState.pageSize = Number(query.limit) || storageState.pageSize || 20;
 
     syncSortControls();
     if (isBrainchildScope()) { renderBrainchildScope(); return; }
@@ -502,7 +518,7 @@
     try {
       var params = new URLSearchParams({
         page: storageState.currentPage,
-        limit: 100,
+        limit: storageState.pageSize || 20,
         sort: storageState.sortBy,
         order: storageState.sortOrder
       });
@@ -571,17 +587,9 @@
     var resultsCountEl = document.getElementById('resultsCount');
     if (!resultsCountEl) return;
 
-    var total = storageState.totalResults;
-    var start = total > 0 ? (storageState.currentPage - 1) * 100 + 1 : 0;
-    var end = Math.min(storageState.currentPage * 100, total);
-
-    if (total === 0) {
-      resultsCountEl.textContent = 'No results found';
-    } else if (storageState.searchQuery || storageState.sourceFilter !== 'all') {
-      resultsCountEl.textContent = 'Showing ' + start + '-' + end + ' of ' + total + ' results';
-    } else {
-      resultsCountEl.textContent = total + ' workspace' + (total !== 1 ? 's' : '');
-    }
+    // The server's total; the table's pager shows the page range.
+    var total = Number(storageState.totalResults) || 0;
+    resultsCountEl.textContent = total + ' workspace' + (total !== 1 ? 's' : '');
 
     // Section header count
     var sectionCount = document.getElementById('driveSectionCount');
@@ -713,9 +721,11 @@
   // ── List table (lex-table) ───────────────────────────────────────────
   //
   // #listView is one lex-table for every scope: workspaces, Knowledgebase
-  // folders and notes, and Shared Knowledge notes. This page keeps paging
-  // (#drivePagination, shared with the grid view) and hands each page to the
-  // table whole, so the table's own pager stays hidden.
+  // folders and notes, and Shared Knowledge notes. The table's own pager is
+  // the list's only pager. Workspaces page on the server (one request per
+  // table page); the notes scopes hold their whole list, so this page sorts,
+  // filters and slices it to the table's page. #drivePagination pages the
+  // grid view only.
 
   // Table column <-> storage sort field.
   var SORT_FIELD_BY_COLUMN = { name: 'name', created_at: 'created_at', size: 'document_count' };
@@ -815,6 +825,8 @@
     if (!window.LanaLibraryColumnFilters) return;
     window.LanaLibraryColumnFilters.loadWorkspaceOptions(window.api).then(function (options) {
       workspaceFilterOptions = options;
+      var files = filesTable();
+      if (files && typeof files.setColumnFilterOptions === 'function') files.setColumnFilterOptions(filesFilterOptions());
       var table = document.getElementById('listView');
       if (table && typeof table.setColumnFilterOptions === 'function' && !isBrainchildScope() && !isOrgKnowledgeScope()) {
         table.setColumnFilterOptions(listFilterOptions([]));
@@ -843,8 +855,8 @@
       created_at: function (val) {
         return '<span class="drive-list-muted">' + escapeHtml(val ? Lex.Utils.formatDateTime(val) : '\u2014') + '</span>';
       },
-      size: function (val) {
-        return '<span class="drive-list-muted">' + escapeHtml(val || '') + '</span>';
+      size: function (val, row) {
+        return '<span class="drive-list-muted">' + escapeHtml(listSizeText(row) || '\u2014') + '</span>';
       },
       actions: function (val, row) {
         if (row.kind === 'matter') {
@@ -862,25 +874,72 @@
     };
   }
 
+  // Size cells: rows keep the raw count, this builds the label.
+  function listSizeText(row) {
+    if (!row) return '';
+    if (row.kind === 'matter') {
+      var folders = (row._matter && row._matter.child_folder_count) || 0;
+      var files = Number(row.size) || 0;
+      return files + ' file' + (files !== 1 ? 's' : '') + ' \u2022 ' + folders + ' folder' + (folders !== 1 ? 's' : '');
+    }
+    if (row.kind === 'bc-folder') {
+      var notes = Number(row.size) || 0;
+      return notes + ' note' + (notes !== 1 ? 's' : '');
+    }
+    return 'Note';
+  }
+
   /**
-   * Hand one page of rows to the list table. The page owns paging, so the
-   * table always holds exactly one page.
-   * @param {Array} rows - list row view models ({ key, kind, name, ... })
+   * One page of a whole, already sorted list: the notes scopes' rows after
+   * the column filters, sliced to the table's page.
+   * @param {Array} rows
+   * @param {number} page - 1-based
+   * @param {number} limit
+   * @returns {{ rows: Array, pagination: Object }}
    */
-  function setListRows(rows) {
+  function pageOfRows(rows, page, limit) {
+    var size = Math.max(1, Number(limit) || 20);
+    var totalPages = Math.max(1, Math.ceil(rows.length / size));
+    var current = Math.min(Math.max(1, Number(page) || 1), totalPages);
+    return {
+      rows: rows.slice((current - 1) * size, current * size),
+      pagination: { page: current, limit: size, total: rows.length, total_pages: totalPages }
+    };
+  }
+
+  /**
+   * Hand rows to the list table. Workspaces pass the server's pagination for
+   * the one page they hold; the notes scopes pass their whole list, which is
+   * filtered and sliced to the table's page here.
+   * @param {Array} rows - list row view models ({ key, kind, name, ... })
+   * @param {Object} [pagination] - server pagination for a workspaces page
+   */
+  function setListRows(rows, pagination) {
     var table = document.getElementById('listView');
     if (!table) return;
     if (typeof table.setServerData !== 'function') {
       if (window.customElements) {
-        window.customElements.whenDefined('lex-table').then(function () { setListRows(rows); });
+        window.customElements.whenDefined('lex-table').then(function () { setListRows(rows, pagination); });
       }
       return;
     }
     table.setCellRenderers(listCellRenderers());
     table.setColumnFilterOptions(listFilterOptions(rows));
     updateSortHeaderIndicators();
-    if (isBrainchildScope() || isOrgKnowledgeScope()) rows = filterNoteRows(rows);
-    table.setServerData(rows, { page: 1, limit: Math.max(rows.length, 1), total: rows.length, totalPages: 1 });
+    var filtered = Object.keys(storageState.columnFilters || {}).length > 0;
+    table.emptyText = filtered ? 'Nothing matches these filters. Try a different filter.' : 'Nothing here yet';
+    if (isBrainchildScope() || isOrgKnowledgeScope()) {
+      var page = pageOfRows(filterNoteRows(rows), storageState.currentPage, storageState.pageSize);
+      storageState.currentPage = page.pagination.page;
+      table.setServerData(page.rows, page.pagination);
+      return;
+    }
+    table.setServerData(rows, pagination || {
+      page: storageState.currentPage,
+      limit: storageState.pageSize || 20,
+      total: storageState.totalResults,
+      total_pages: storageState.totalPages
+    });
   }
 
   /**
@@ -894,9 +953,9 @@
         kind: 'matter',
         name: folder.name,
         matterId: folder.matter_id,
-        created_by: '\u2014',
+        created_by: '',
         created_at: folder.created_at,
-        size: (folder.document_count || 0) + ' files \u2022 ' + (folder.child_folder_count || 0) + ' folders',
+        size: folder.document_count || 0,
         _matter: folder
       };
     }));
@@ -921,50 +980,127 @@
 
   // ── Files load (search-only) ─────────────────────────────────────────
 
-  /**
-   * Map the matters sort field to a /storage/library/files sort_by value. The files
-   * endpoint maps 'name' -> filename internally, supports created_at / updated_at
-   * directly, and does not understand the matters-only counts; those fall back to
-   * 'name'.
-   * @param {string} sortBy
-   * @returns {string}
-   */
-  function mapFilesSortBy(sortBy) {
-    if (sortBy === 'created_at' || sortBy === 'updated_at') return sortBy;
-    return 'name';
+  // ── Files search results (lex-table #filesListView) ──────────────────
+  //
+  // Server-paged by /api/v1/storage/library/files, like the Document
+  // Library: the table owns its page, sort and column filters, and the
+  // toolbar search feeds the API's search.
+
+  var filesLoadSequence = 0;
+
+  function filesTable() {
+    return document.getElementById('filesListView');
+  }
+
+  function filesCellRenderers() {
+    return {
+      name: function (val, row) {
+        return '<div class="drive-list-name-cell"><span class="drive-list-file-icon">' + getFileIconSVG(row.contentType) + '</span>' +
+          '<div class="drive-list-name-text"><div class="drive-list-name" title="' + escapeHtml(val) + '">' + escapeHtml(val) + '</div></div></div>';
+      },
+      workspace: function (val, row) {
+        if (!row.matterKey) return '<span class="drive-list-muted">\u2014</span>';
+        var label = val || row.matterKey;
+        return '<button type="button" class="drive-list-workspace-link" data-workspace-id="' + escapeHtml(row.matterKey) + '" title="Open ' + escapeHtml(label) + '">' + escapeHtml(label) + '</button>';
+      },
+      created_at: function (val) { return '<span class="drive-list-muted">' + escapeHtml(val ? Lex.Utils.formatDateTime(val) : '\u2014') + '</span>'; },
+      size: function (val) { return '<span class="drive-list-muted">' + escapeHtml(formatFileSize(val || 0) || '\u2014') + '</span>'; }
+    };
+  }
+
+  function filesFilterOptions() {
+    var shared = window.LanaLibraryColumnFilters;
+    var params = window.LanaListQueryParams;
+    var map = { name: { text: true, placeholder: 'File name contains...' } };
+    if (workspaceFilterOptions.length) map.workspace = { options: workspaceFilterOptions };
+    if (params) {
+      map.size = {
+        single: true,
+        options: Object.keys(params.FILE_SIZE_RANGES).map(function (key) { return { value: key, label: params.FILE_SIZE_RANGES[key].label }; })
+      };
+    }
+    if (shared) map.created_at = { single: true, options: shared.EDITED_RANGE_OPTIONS };
+    return map;
+  }
+
+  function mapFileForTable(file) {
+    return {
+      id: file.id,
+      name: file.filename || file.original_filename || 'Untitled',
+      workspace: file.matter_name || '',
+      created_at: file.created_at || '',
+      size: Number(file.file_size || 0),
+      contentType: file.content_type,
+      matterKey: file.client_matter || '',
+      _raw: file
+    };
+  }
+
+  function openWorkspaceDetails(matterId) {
+    if (!matterId) return;
+    if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
+      Lex.Nav.go('workspace-details.html', { params: { id: matterId }, context: { referrer: 'drive.html' } });
+      return;
+    }
+    window.location.href = 'workspace-details.html?id=' + encodeURIComponent(matterId);
   }
 
   /**
-   * Load matching files for the current search query from
-   * /api/v1/storage/library/files and render the Files section. Files are fetched
-   * ONLY while searching: when the query is empty the section is cleared and
-   * hidden so the default root view stays matters-only. The Source filter applies
-   * to matters only and is intentionally not passed to this endpoint.
+   * Matching files for the current search. Files are fetched ONLY while
+   * searching: with no query the section is cleared and hidden so the root
+   * view stays workspaces-only. The Source filter applies to workspaces only.
+   * With a query, the files table asks for page 1 (fetchFilesPage).
    */
   async function loadRootFiles() {
     var query = (storageState.searchQuery || '').trim();
+    var table = filesTable();
 
-    if (!query) {
+    if (!query || !table || typeof table.requestServerQuery !== 'function') {
+      filesLoadSequence++;
       storageState.files = [];
+      storageState.filesTotal = 0;
       renderFilesSection();
       return;
     }
+    table.requestServerQuery({ resetPage: true });
+  }
+
+  /**
+   * Answers the files table's lex-query-change with one page of matches.
+   * @param {Object} query - { page, limit, sortBy, sortDir, filters }
+   */
+  async function fetchFilesPage(query) {
+    var search = (storageState.searchQuery || '').trim();
+    var table = filesTable();
+    var sequence = ++filesLoadSequence;
+    if (!search || !table) return;
+    var builder = window.LanaListQueryParams;
+    var filtered = Object.keys(query.filters || {}).length > 0;
+    table.emptyText = filtered ? 'No matching files. Try a different filter.' : 'No matching files';
 
     try {
-      var params = new URLSearchParams({
-        search: query,
-        page: 1,
-        page_size: 50,
-        sort_by: mapFilesSortBy(storageState.sortBy),
-        sort_order: storageState.sortOrder
-      });
-
+      if (!builder) throw new Error('List query helpers are unavailable.');
+      var params = builder.libraryFilesParams(query, { search: search });
       var response = await api.get('/api/v1/storage/library/files?' + params.toString());
+      if (sequence !== filesLoadSequence) return;
       var files = (response && (response.files || response.documents)) || [];
-      storageState.files = Array.isArray(files) ? files : [];
+      files = Array.isArray(files) ? files : [];
+      var source = (response && response.pagination) || {};
+      var total = Number(source.total !== undefined ? source.total : (response && response.total));
+      storageState.files = files;
+      storageState.filesTotal = Number.isFinite(total) ? total : files.length;
+      table.setServerData(files.map(mapFileForTable), {
+        page: source.page || query.page || 1,
+        page_size: source.page_size || source.limit || Number(params.get('page_size')),
+        total: storageState.filesTotal,
+        total_pages: source.total_pages !== undefined ? source.total_pages : source.totalPages
+      });
     } catch (error) {
+      if (sequence !== filesLoadSequence) return;
       console.error('[Drive] Failed to load files:', error);
       storageState.files = [];
+      storageState.filesTotal = 0;
+      table.setServerError('Files could not be loaded. Check your connection and try again.');
     }
 
     renderFilesSection();
@@ -986,8 +1122,12 @@
 
     var files = Array.isArray(storageState.files) ? storageState.files : [];
     var searching = !!(storageState.searchQuery && storageState.searchQuery.trim());
+    var table = filesTable();
+    var filesFiltered = !!(table && table.dataSource && table.dataSource.getActiveFilters().size);
 
-    if (!searching || files.length === 0) {
+    // A search with no file matches hides the section, unless the files
+    // table's own filters emptied it (it then offers Clear filters).
+    if (!searching || (files.length === 0 && !filesFiltered)) {
       section.classList.add('hidden');
       if (gridEl) gridEl.classList.add('hidden');
       if (listEl) listEl.classList.add('hidden');
@@ -998,7 +1138,8 @@
 
     section.classList.remove('hidden');
     if (countEl) {
-      countEl.textContent = files.length + ' file' + (files.length !== 1 ? 's' : '');
+      var filesTotal = Number(storageState.filesTotal) || 0;
+      countEl.textContent = filesTotal + ' file' + (filesTotal !== 1 ? 's' : '');
     }
 
     if (storageState.viewMode === 'grid') {
@@ -1057,35 +1198,10 @@
   }
 
   /**
-   * Render file rows into the Files list view, mirroring the matters list row
-   * structure/classes. Columns: Name, Workspace, Created, Size. Clicking a row
-   * opens the file viewer via openRecentFile.
-   * @param {Array} files
+   * The Files list view holds the table's current page, set by
+   * fetchFilesPage; nothing to render here.
    */
-  function renderFilesListView(files) {
-    var table = document.getElementById('filesListView');
-    if (!table || typeof table.setData !== 'function') return;
-    table.setCellRenderers({
-      name: function (val, row) {
-        return '<div class="drive-list-name-cell"><span class="drive-list-file-icon">' + getFileIconSVG(row.contentType) + '</span>' +
-          '<div class="drive-list-name-text"><div class="drive-list-name" title="' + escapeHtml(val) + '">' + escapeHtml(val) + '</div></div></div>';
-      },
-      workspace: function (val) { return '<span class="drive-list-muted">' + escapeHtml(val || '\u2014') + '</span>'; },
-      created_at: function (val) { return '<span class="drive-list-muted">' + escapeHtml(val ? Lex.Utils.formatDateTime(val) : '\u2014') + '</span>'; },
-      size: function (val) { return '<span class="drive-list-muted">' + escapeHtml(val || '') + '</span>'; }
-    });
-    table.setData((files || []).map(function (file) {
-      return {
-        id: file.id,
-        name: file.filename || file.original_filename || 'Untitled',
-        workspace: file.matter_name || file.client_matter || '',
-        created_at: file.created_at || '',
-        size: formatFileSize(file.file_size || 0),
-        contentType: file.content_type,
-        matterKey: file.client_matter || ''
-      };
-    }));
-  }
+  function renderFilesListView() {}
 
   // ── Brainchild scope (personal notes) ────────────────────────────────
   //
@@ -1300,14 +1416,9 @@
     if (sectionCount) sectionCount.textContent = countText;
     if (resultsCountEl) resultsCountEl.textContent = countText;
 
-    // Pagination is matters-only; hide its counts in this scope.
+    // The grid pager is for workspaces; the list uses the table's pager.
     var pager = document.getElementById('drivePagination');
-    if (pager) {
-      pager.page = 1;
-      pager.totalPages = 1;
-      pager.total = itemCount;
-      pager.limit = itemCount || 1;
-    }
+    if (pager) pager.classList.add('hidden');
 
     var emptyEl = document.getElementById('contentEmpty');
     var gridViewEl = document.getElementById('gridView');
@@ -1586,7 +1697,7 @@
         name: folder.name || '',
         created_by: 'You',
         created_at: '',
-        size: count + ' note' + (count !== 1 ? 's' : '')
+        size: count
       };
     });
     var noteRows = listBrainchildNotes.map(function (row, index) {
@@ -1598,7 +1709,7 @@
         index: index,
         created_by: 'You',
         created_at: row.updated_at || '',
-        size: 'Note',
+        size: '',
         _note: row
       };
     });
@@ -1858,14 +1969,9 @@
     if (sectionCount) sectionCount.textContent = countText;
     if (resultsCountEl) resultsCountEl.textContent = countText;
 
-    // Pagination is matters-only; pin it to a single page in this scope.
+    // The grid pager is for workspaces; the list uses the table's pager.
     var pager = document.getElementById('drivePagination');
-    if (pager) {
-      pager.page = 1;
-      pager.totalPages = 1;
-      pager.total = items.length;
-      pager.limit = items.length || 1;
-    }
+    if (pager) pager.classList.add('hidden');
 
     if (items.length === 0) {
       renderOrgKnowledgeEmpty();
@@ -1963,7 +2069,7 @@
         name: item.title || 'Untitled note',
         created_by: item.created_by_name || 'a teammate',
         created_at: item.created_at || '',
-        size: 'Note'
+        size: ''
       };
     }));
   }
@@ -2243,10 +2349,12 @@
     var pager = document.getElementById('drivePagination');
     if (!pager) return;
 
+    // Grid view only: the list view's pager is the table's own.
+    pager.classList.toggle('hidden', storageState.viewMode !== 'grid' || (storageState.totalPages || 1) <= 1);
     pager.page = storageState.currentPage;
     pager.totalPages = storageState.totalPages || 1;
     pager.total = storageState.totalResults || 0;
-    pager.limit = 100;
+    pager.limit = storageState.pageSize || 20;
   }
 
   /**

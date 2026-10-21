@@ -20,13 +20,16 @@
     planSelectedMatterName: null
   };
 
-  // The /api/v1/tasks/my endpoint caps `limit` at 100, so we page through
-  // up to TASK_FETCH_MAX rows to gather the full set for lex-table's
-  // client-side search/sort/filter/pagination. Past TASK_FETCH_MAX we stop
-  // and accept truncation rather than spamming the API; a user with that
-  // many open assignments warrants a different UX anyway.
-  var TASK_PAGE_LIMIT = 100;
-  var TASK_FETCH_MAX = 500;
+  // My Tasks is a server-paged table (docs/TABLE-STANDARD.md): GET
+  // /api/v1/tasks/my pages (limit <= 100 + offset), sorts every sortable
+  // column, searches, and filters status and priority itself, and returns
+  // the total. Each table page is one request, so no task is ever dropped
+  // by a client-side cap. LanaListQueryParams.myTasksParams maps the query.
+  var taskSearchTerm = '';
+  var taskSearchDebounce = null;
+  var taskLoadSequence = 0;
+  var taskLoadPromise = Promise.resolve([]);
+  var taskWorkspaceOptions = [];
 
   var TASK_PLAN_ROLES = ['system_admin', 'org_admin', 'admin', 'upper_leader', 'senior_leader', 'senior_user'];
 
@@ -42,11 +45,12 @@
     return value ? Lex.Utils.formatDate(value) : '';
   }
 
+  // Dates go through Lex.Utils (the user's timezone).
   function formatDateTime(value) {
     if (!value) return '';
-    var d = new Date(value);
-    if (isNaN(d.getTime())) return formatDate(value);
-    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    if (typeof Lex.Utils.formatDateTime !== 'function') return formatDate(value);
+    var text = Lex.Utils.formatDateTime(value);
+    return text === 'Never' ? '' : text;
   }
 
   function normalizeTasks(response) {
@@ -81,13 +85,11 @@
 
   function statusSelectHtml(task) {
     var current = normalizeStatus(task.status);
-    var options = STATUS_OPTIONS.map(function (opt) {
-      var selected = opt.value === current ? ' selected' : '';
-      return '<option value="' + opt.value + '"' + selected + '>' + esc(opt.label) + '</option>';
-    }).join('');
+    var options = JSON.stringify(STATUS_OPTIONS);
     return [
       '<span class="my-task-status-control">',
-      '  <select class="my-task-status-select" data-task-status-select aria-label="Update status">' + options + '</select>',
+      '  <lex-select class="my-task-status-select" data-task-status-select aria-label="Update status"' +
+        ' value="' + esc(current) + '" options="' + esc(options) + '"></lex-select>',
       '</span>'
     ].join('');
   }
@@ -1211,17 +1213,17 @@
     state.viewingTask = null;
   }
 
-  // Map a raw task into the row shape lex-table sees. Keep humanized values
-  // in the visible columns so the column-filter dropdowns show pretty labels
-  // (e.g. "In Progress" rather than "in_progress") while preserving the
-  // original task in `_raw` for row-click / action handlers.
+  // Map a raw task into the row shape lex-table sees. Rows keep raw values
+  // (status and priority codes, the matter id, ISO dates); the renderers
+  // and the supplied filter options carry the readable labels. The original
+  // task stays in `_raw` for row-click / action handlers.
   function mapTaskForTable(task) {
     return {
       id: task.id,
       title: task.title || 'Untitled task',
-      workspace_matter: taskMatterLabel(task),
-      status: statusLabel(task.status),
-      priority: priorityLabel(task.priority || 'normal'),
+      workspace_matter: task.matter_id || '',
+      status: normalizeStatus(task.status),
+      priority: String(task.priority || 'normal').toLowerCase(),
       due_date: task.due_date || '',
       created_at: task.created_at || '',
       updated_at: task.updated_at || '',
@@ -1232,7 +1234,7 @@
   function cellRenderers() {
     return {
       title: function (val) {
-        return '<div class="my-task-table__title">' + esc(val || '') + '</div>';
+        return '<div class="my-task-table__title" title="' + esc(val || '') + '">' + esc(val || '') + '</div>';
       },
       workspace_matter: function (val, row) {
         var task = row && row._raw;
@@ -1257,7 +1259,7 @@
         return '<lex-badge label="' + esc(priorityLabel(raw)) + '" color="' + esc(priorityColor(raw)) + '"></lex-badge>';
       },
       due_date: function (val) {
-        return val ? esc(formatDate(val)) : '<span class="my-task-detail__muted">—</span>';
+        return val ? '<span class="my-task-table__created">' + esc(formatDate(val)) + '</span>' : '<span class="my-task-detail__muted">—</span>';
       },
       created_at: function (val) {
         return val ? '<span class="my-task-table__created">' + esc(Lex.Utils.formatDateTime(val)) + '</span>' : '<span class="my-task-detail__muted">—</span>';
@@ -1265,49 +1267,134 @@
     };
   }
 
-  // Created filters by date range (Today / 7 / 30 days / older), the same
-  // ranges the library tables offer, matched in the user's timezone.
+  // Every column filters (the table standard): Task by text, Workspace by
+  // workspace, Status and Priority by value, Due and Created by range.
   function columnFilterOptions() {
+    var params = window.LanaListQueryParams;
     var ranges = window.LanaLibraryColumnFilters;
-    if (!ranges) return {};
+    var map = { title: { text: true, placeholder: 'Task contains...' } };
+    if (taskWorkspaceOptions.length) map.workspace_matter = { options: taskWorkspaceOptions };
+    if (params) {
+      map.status = { options: params.TASK_STATUS_OPTIONS };
+      map.priority = { options: params.TASK_PRIORITY_OPTIONS };
+      map.due_date = { single: true, options: params.TASK_DUE_OPTIONS };
+    }
+    if (ranges) map.created_at = { single: true, options: ranges.EDITED_RANGE_OPTIONS };
+    return map;
+  }
+
+  function loadTaskWorkspaceOptions() {
+    var ranges = window.LanaLibraryColumnFilters;
+    if (!ranges || typeof ranges.loadWorkspaceOptions !== 'function') return;
+    ranges.loadWorkspaceOptions(window.api).then(function (options) {
+      var table = el('myTasksTable');
+      if (!table || !options || !options.length) return;
+      taskWorkspaceOptions = options;
+      if (typeof table.setColumnFilterOptions === 'function') table.setColumnFilterOptions(columnFilterOptions());
+    });
+  }
+
+  // Asks the table for its current query; the answer arrives as
+  // lex-query-change and lands in fetchTaskPage. Resolves with that page.
+  function loadTasks(options) {
+    var table = el('myTasksTable');
+    if (!table || typeof table.requestServerQuery !== 'function') return Promise.resolve([]);
+    table.requestServerQuery({ resetPage: !!(options && options.resetPage) });
+    return taskLoadPromise;
+  }
+
+  function fetchTaskPage(query) {
+    taskLoadPromise = doFetchTaskPage(query || {});
+    return taskLoadPromise;
+  }
+
+  // The tasks API's largest page.
+  var MAX_TASKS_PER_REQUEST = 100;
+
+  function taskPagination(response, requested) {
+    var data = (response && response.data) || response || {};
+    var source = data.pagination || {};
+    var total = Number(source.total !== undefined ? source.total : data.total);
     return {
-      created_at: {
-        single: true,
-        options: ranges.EDITED_RANGE_OPTIONS,
-        match: function (cell, values) { return ranges.inEditedRange(cell, values[0]); }
-      }
+      page: requested.page,
+      limit: requested.limit,
+      total: Number.isFinite(total) ? total : 0,
+      offset: source.offset
     };
   }
 
-  async function loadTasks() {
+  // Empty copy follows the search and filters: a filtered-empty table
+  // offers Clear filters instead of the create button.
+  function syncTaskEmptyState(table, filters) {
+    var filtered = Boolean(taskSearchTerm || Object.keys(filters || {}).length);
+    table.emptyText = filtered ? 'No matching tasks. Try a different search or filter.' : 'No tasks assigned to you';
+    table.emptyActionLabel = filtered ? '' : 'Create a task';
+  }
+
+  async function doFetchTaskPage(query) {
     var table = el('myTasksTable');
-    if (!table) return;
+    var builder = window.LanaListQueryParams;
+    if (!table) return [];
+    var sequence = ++taskLoadSequence;
+    var filters = query.filters || {};
+
+    // The toolbar Status select mirrors the Status column's filter.
+    var statusSelect = el('myTasksStatusFilter');
+    var picked = builder ? builder.filterValues(filters.status) : [];
+    var statusValue = picked.length === 1 ? picked[0] : 'all';
+    if (statusSelect && statusSelect.value !== statusValue) statusSelect.value = statusValue;
+    syncTaskToolbarSort(query.sortBy, query.sortDir);
+
     try {
-      var collected = [];
-      var offset = 0;
-      while (collected.length < TASK_FETCH_MAX) {
-        var batch = normalizeTasks(await api.getMyTasks({
-          limit: TASK_PAGE_LIMIT,
-          offset: offset,
-          sort_by: 'updated_at',
-          sort_dir: 'DESC'
-        }));
-        if (!batch.length) break;
-        collected = collected.concat(batch);
-        if (batch.length < TASK_PAGE_LIMIT) break;
-        offset += TASK_PAGE_LIMIT;
+      if (!builder) throw new Error('List query helpers are unavailable.');
+      var params = builder.myTasksParams(query, { search: taskSearchTerm });
+      var requested = {
+        page: Number(query.page) || 1,
+        limit: Number(params.get('limit')) || 20,
+        offset: Number(params.get('offset')) || 0
+      };
+      var response = await api.getMyTasks(Object.fromEntries(params.entries()));
+      if (sequence !== taskLoadSequence) return state.tasks;
+      var pagination = taskPagination(response, requested);
+      var tasks;
+      // A server that ignores offset answers every page with page 1. Within
+      // its 100-row limit, ask for every row up to this page and keep this
+      // page's slice; past that, say so instead of repeating page 1.
+      if (requested.offset > 0 && pagination.offset !== undefined && Number(pagination.offset) !== requested.offset) {
+        var upTo = requested.offset + requested.limit;
+        if (upTo > MAX_TASKS_PER_REQUEST) throw new Error('This server cannot page tasks yet.');
+        params.set('limit', String(upTo));
+        params.delete('offset');
+        response = await api.getMyTasks(Object.fromEntries(params.entries()));
+        if (sequence !== taskLoadSequence) return state.tasks;
+        pagination = taskPagination(response, requested);
+        tasks = normalizeTasks(response).slice(requested.offset, upTo);
+      } else {
+        tasks = normalizeTasks(response);
       }
-      state.tasks = collected;
-      table.setData(collected.map(mapTaskForTable));
+      state.tasks = tasks;
+      syncTaskEmptyState(table, filters);
+      table.setServerData(tasks.map(mapTaskForTable), pagination);
       updateTaskCount();
-      return collected;
+      return tasks;
     } catch (error) {
-      Lex.Toast.error(error.message || 'Unable to load tasks');
+      if (sequence !== taskLoadSequence) return state.tasks;
+      console.error('[MyTasks] Failed to load tasks:', error);
       state.tasks = [];
-      if (typeof table.setData === 'function') table.setData([]);
+      if (typeof table.setServerError === 'function') {
+        table.setServerError('Tasks could not be loaded. ' + (error && error.message === 'This server cannot page tasks yet.'
+          ? 'This server can only show the first 100 tasks until it is updated.' : 'Check your connection and try again.'));
+      }
       updateTaskCount();
       return [];
     }
+  }
+
+  function syncTaskToolbarSort(column, direction) {
+    var select = el('myTasksSort');
+    var button = el('myTasksSortOrder');
+    if (select && column && select.value !== column) select.value = column;
+    if (button) button.dataset.order = direction === 'asc' ? 'asc' : 'desc';
   }
 
   // Reflect the table's current (post-search/filter) row total in the toolbar
@@ -2625,12 +2712,24 @@
     } catch (_) {
       return;
     }
-    var taskId = params.get('task');
-    if (!taskId || !Array.isArray(tasks)) return;
-    var task = tasks.find(function (item) {
+    var taskId = params.get('task') || params.get('task_id');
+    if (!taskId) return;
+    var task = (Array.isArray(tasks) ? tasks : []).find(function (item) {
       return String(item.id || item.task_id || '') === String(taskId);
     });
-    if (task) requestAnimationFrame(function () { openTaskDetails(task); });
+    if (task) {
+      requestAnimationFrame(function () { openTaskDetails(task); });
+      return;
+    }
+    // Not on the first page: fetch it by id (matter_id scopes a matter task).
+    if (!api || typeof api.get !== 'function') return;
+    var matterId = params.get('matter_id');
+    api.get('/api/v1/tasks/' + encodeURIComponent(taskId) + (matterId ? '?matter_id=' + encodeURIComponent(matterId) : ''))
+      .then(function (response) {
+        var found = response && (response.data || response.task);
+        if (found && found.id) openTaskDetails(found);
+      })
+      .catch(function () { /* the task stays reachable through the table */ });
   }
 
   function bindEvents() {
@@ -2653,8 +2752,15 @@
         if (task) openTaskDetails(task);
       });
 
-      // Keep the toolbar count in sync as the client-side pipeline reprocesses.
-      table.addEventListener('lex-filter-change', updateTaskCount);
+      // The table asks for a page (paging, sort, column filters).
+      table.addEventListener('lex-query-change', function (event) {
+        if (event.target && event.target !== table) return;
+        fetchTaskPage(event.detail);
+      });
+      // A header click sorted the table: mirror it in the toolbar.
+      table.addEventListener('sort-change', function (event) {
+        if (event.detail) syncTaskToolbarSort(event.detail.sortBy, event.detail.sortDir);
+      });
       table.addEventListener('lex-data-loaded', updateTaskCount);
 
       // Empty-state CTA: "Create a task" on a genuine no-data state opens the new
@@ -2662,12 +2768,17 @@
       table.addEventListener('empty-action', function () { openNewTaskModal(); });
 
       // --- Library-style toolbar: search / sort / order / status filter ---
+      // Search: 350 ms after typing stops (at once on clear), reload page 1.
       var searchInput = el('myTasksSearch');
       if (searchInput) {
         var runSearch = function (event) {
-          if (table.dataSource) {
-            table.dataSource.setSearch(event && event.detail ? event.detail.value : '');
-          }
+          var value = String((event && event.detail ? event.detail.value : '') || '').trim();
+          clearTimeout(taskSearchDebounce);
+          taskSearchDebounce = setTimeout(function () {
+            if (value === taskSearchTerm) return;
+            taskSearchTerm = value;
+            loadTasks({ resetPage: true });
+          }, value ? 350 : 0);
         };
         searchInput.addEventListener('lex-input', runSearch);
         searchInput.addEventListener('lex-change', runSearch);
@@ -2809,11 +2920,11 @@
         });
       });
 
-      // Inline status change from the details list.
-      modalContent.addEventListener('change', function (event) {
-        var select = event.target.closest('[data-task-status-select]');
+      // Inline status change from the details list (lex-select).
+      modalContent.addEventListener('lex-change', function (event) {
+        var select = event.target && event.target.closest ? event.target.closest('[data-task-status-select]') : null;
         if (!select) return;
-        setTaskStatus(select.value);
+        setTaskStatus(event.detail && event.detail.value !== undefined ? event.detail.value : select.value);
       });
 
       modalContent.addEventListener('lex-change', function (event) {
@@ -2989,6 +3100,7 @@
     bindEvents();
     applyTaskPlanRoleGate();
     handleInitialAction();
+    loadTaskWorkspaceOptions();
     loadTasks().then(handleInitialTask);
   }
 
