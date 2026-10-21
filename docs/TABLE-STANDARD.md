@@ -124,6 +124,8 @@ table.requestServerQuery();                          // first load
   - Render a `<button data-matter-id>` and handle the click with one delegated listener on the table, because lex-table's row-click ignores buttons.
 - **Status and priority use `lex-badge`**, each with a colour map. Never show raw enum text (`in_progress`, `lead-management`). Humanize it, or use a label map.
 - **Empty cells** show a muted em dash: `<span class="…muted">—</span>`.
+- **Capital first letter.** Every label-style value in a cell or filter option starts with a capital letter: types, categories, statuses, priorities, sources, triggers, scopes and visibility. Use `Lex.Utils.humanizeLabel(value)` for enums and slugs (`lead-management` → "Lead management", `automation_execution` → "Automation execution") or `Lex.Utils.capitalizeFirst(value)` for words. Header labels are uppercased by CSS.
+  - Exception: content stored exactly as written displays as stored. That covers file names, user-entered titles and names, emails, IDs and codes.
 
 ## 6. Dates
 
