@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/lex-chat.css">
   <link rel="stylesheet" href="css/workspace-summary.css">
+  <link rel="stylesheet" href="css/workspace-data.css">
   <!-- lana-ask-btn.css replaced by self-contained lex-ask-lana-btn component -->
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
   <script src="js/tailwind-loader.js"></script>
@@ -42,6 +43,7 @@
             heading="Connected Data"
             subtitle="Browse and query data connected to this workspace"
           >
+            <lex-btn id="wsDataImportBtn" variant="primary" size="sm" leading-icon="upload">Import CSV</lex-btn>
             <lex-ask-lana-btn panel="wsDataLana" size="sm"></lex-ask-lana-btn>
           </lex-banner>
 
@@ -52,46 +54,74 @@
             <div style="display:flex;gap:0.75rem;margin-bottom:0.75rem;" id="wsDataStatCards"></div>
           </div>
 
-          <!-- Table area -->
-          <div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:0 1rem 1rem;">
-            <lex-card padding="none" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
-              <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;flex-shrink:0;flex-wrap:wrap;">
-                <lex-select
-                  id="wsDataEntityFilter"
-                  placeholder="All Entity Types"
-                  size="sm"
-                  style="width:200px;"
-                ></lex-select>
-                <lex-select
-                  id="wsDataConnectorFilter"
-                  placeholder="All Connectors"
-                  size="sm"
-                  style="width:200px;"
-                ></lex-select>
-                <div style="flex:1;"></div>
-                <input
-                  type="text"
-                  id="wsDataSearch"
-                  placeholder="Search records..."
-                  style="width:240px;padding:6px 12px;border:1px solid var(--lex-border-default, #e5e7eb);border-radius:6px;font-size:13px;outline:none;"
-                >
-                <lex-btn id="wsDataImportBtn" variant="primary" size="sm" leading-icon="upload">Import CSV</lex-btn>
+          <!-- Table area: toolbar card, section heading, table (docs/TABLE-STANDARD.md) -->
+          <div class="ws-data-table-area">
+            <div class="ws-data-toolbar bg-white rounded-lg shadow-sm border mb-4 p-4" role="search" aria-label="Search and filter connected data">
+              <div class="flex items-center gap-4 flex-wrap">
+                <div class="flex-1 min-w-[200px]">
+                  <lex-input
+                    id="wsDataSearch"
+                    placeholder="Search records..."
+                    clearable="true"
+                    leading-icon="search"
+                  ></lex-input>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <label class="ws-data-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+                  <lex-select
+                    id="wsDataSort"
+                    options='[{"value":"synced_at","label":"Synced"},{"value":"created_at","label":"Created"},{"value":"external_id","label":"ID"},{"value":"entity_type","label":"Entity type"},{"value":"connector_id","label":"Connector"}]'
+                    value="synced_at"
+                  ></lex-select>
+                </div>
+
+                <lex-btn id="wsDataSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                  </svg>
+                </lex-btn>
+
+                <div class="flex items-center gap-2">
+                  <label class="ws-data-toolbar-label text-sm whitespace-nowrap">Entity type:</label>
+                  <lex-select
+                    id="wsDataEntityFilter"
+                    options='[{"value":"all","label":"All"}]'
+                    value="all"
+                  ></lex-select>
+                </div>
+
+                <div id="wsDataCount" class="ws-data-toolbar-label text-sm whitespace-nowrap" aria-live="polite"></div>
               </div>
-              <div id="wsDataImportStrip" class="ws-import-strip" hidden></div>
-              <div id="wsDataImportHistory" class="ws-import-history" data-testid="workspace-csv-import-history" hidden></div>
+            </div>
+
+            <div id="wsDataImportStrip" class="ws-import-strip" hidden></div>
+            <div id="wsDataImportHistory" class="ws-import-history" data-testid="workspace-csv-import-history" hidden></div>
+
+            <section aria-labelledby="wsDataSectionHeading">
+              <div class="flex items-center justify-between mb-3">
+                <h2 id="wsDataSectionHeading" class="ws-data-section-title text-lg font-semibold">Records</h2>
+                <span id="wsDataSectionCount" class="ws-data-toolbar-label text-sm"></span>
+              </div>
+
               <lex-table
                 id="wsDataTable"
-                columns="external_id,entity_type,connector_id,raw_data,ai_action"
-                labels="ID,Entity Type,Connector,Data,&#8203;"
-                searchable
-                filterable
-                empty-text="No connected data found"
+                class="lex-table--card"
+                column-filters
+                server-paging
+                columns="external_id,entity_type,connector_id,raw_data,synced_at,created_at,ai_action"
+                labels="ID,Entity type,Connector,Data,Synced,Created,&#8203;"
+                sortable-columns="external_id,entity_type,connector_id,synced_at,created_at"
                 sort-by="synced_at"
                 sort-dir="desc"
-                style="flex:1;min-height:0;overflow:hidden;"
+                limit="20"
+                id-key="id"
+                empty-text="No connected data yet"
+                empty-action-label="Import CSV"
+                empty-action-icon="upload"
+                aria-label="Connected data table"
               ></lex-table>
-              <lex-pagination id="wsDataPagination" style="padding:0 1rem;flex-shrink:0;"></lex-pagination>
-            </lex-card>
+            </section>
           </div>
 
         </div>
@@ -350,9 +380,9 @@
   <script src="js/lex/components/foundation/lex-card.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
-  <script src="js/lex/components/data/lex-pagination.js"></script>
 
   <!-- Mermaid -->
   <script src="js/vendor/mermaid.min.js"></script>
@@ -385,6 +415,8 @@
   <script src="js/lex/lex-page-init.js"></script>
 
   <!-- Page controller -->
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/workspace-data-table.js"></script>
   <script src="js/workspace-data.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

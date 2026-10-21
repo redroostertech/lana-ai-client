@@ -56,36 +56,55 @@
         </div>
       </section>
 
-      <section class="metric-catalog-toolbar">
-        <input id="metricCatalogSearch" type="search" placeholder="Search by key, name, description..." autocomplete="off" class="metric-catalog-toolbar__search" />
-        <select id="metricCatalogExecutableFilter" class="metric-catalog-toolbar__select" aria-label="Executable filter">
-          <option value="">All metrics</option>
-          <option value="true">Executable only</option>
-          <option value="false">Planned only</option>
-        </select>
-        <select id="metricCatalogDomainFilter" class="metric-catalog-toolbar__select" aria-label="Domain filter">
-          <option value="">All domains</option>
-        </select>
-        <select id="metricCatalogEntityFilter" class="metric-catalog-toolbar__select" aria-label="Required entity filter">
-          <option value="">All entities</option>
-        </select>
-        <select id="metricCatalogAudienceFilter" class="metric-catalog-toolbar__select" aria-label="Audience filter">
-          <option value="">All audiences</option>
-        </select>
-        <lex-btn id="metricCatalogRunAllBtn" variant="primary" size="sm">Run All</lex-btn>
-      </section>
+      <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md section 2) -->
+      <div class="metric-catalog-toolbar bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter metrics">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="metricCatalogSearch" placeholder="Search by key, name, description..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+            <lex-select
+              id="metricCatalogSort"
+              options='[{"value":"display_name","label":"Name"},{"value":"domain","label":"Domain"},{"value":"audience","label":"Audience"},{"value":"status","label":"Status"},{"value":"executable","label":"Executable"},{"value":"last_run_status","label":"Last run"},{"value":"last_run_value","label":"Value"},{"value":"goal_target","label":"Goal"}]'
+              value="display_name"
+            ></lex-select>
+          </div>
+          <lex-btn id="metricCatalogSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="asc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Executable:</label>
+            <lex-select
+              id="metricCatalogExecutableFilter"
+              options='[{"value":"all","label":"All metrics"},{"value":"true","label":"Executable only"},{"value":"false","label":"Planned only"}]'
+              value="all"
+            ></lex-select>
+          </div>
+          <div id="metricCatalogCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
+          <lex-btn id="metricCatalogRunAllBtn" variant="primary" size="sm">Run All</lex-btn>
+        </div>
+      </div>
 
-      <section class="metric-catalog-card">
+      <section class="metric-catalog-list" aria-labelledby="metricCatalogHeading">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="metricCatalogHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Metrics</h2>
+          <span id="metricCatalogSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
+        </div>
         <lex-table
           id="metricCatalogTable"
-          sortable
-          paginated
-          page-size="25"
-          columns="display_name,display_status,executable_label,last_run_status,last_run_value,goal_target,actions"
-          labels="Name,Status,Executable,Last Run,Value,Goal,Actions"
+          class="lex-table--card"
+          column-filters
+          columns="display_name,domain,audience,entity_keys,status,executable,last_run_status,last_run_value,goal_target,actions"
+          labels="Name,Domain,Audience,Entities,Status,Executable,Last run,Value,Goal,Actions"
+          sortable-columns="display_name,domain,audience,status,executable,last_run_status,last_run_value,goal_target"
           sort-by="display_name"
           sort-dir="asc"
-          empty-text="No metrics match the current filters"
+          limit="20"
+          id-key="key"
+          empty-text="No metrics in the registry"
           aria-label="Metric catalog"
         ></lex-table>
       </section>
@@ -127,7 +146,9 @@
   <script src="../js/lex/components/foundation/lex-drawer.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-tabs.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-segmented.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
@@ -143,6 +164,8 @@
   <script src="../js/shared/current-pipeline-presentation.js"></script>
   <script src="../js/shared/acquisition-source-presentation.js"></script>
   <script src="../js/shared/metric-card-preview.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/shared/metric-tables.js"></script>
   <script src="../js/admin/metric-catalog.js"></script>
   <script src="../js/auth-guard.js"></script>
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

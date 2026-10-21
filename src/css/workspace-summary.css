@@ -1539,3 +1539,43 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* ── Workspace details tables: Connected Data modal + Activity drawer ──
+   (docs/TABLE-STANDARD.md; rows and renderers in
+   js/shared/workspace-details-tables.js) */
+#cdModalTable th,
+#activityDrawerTable th { white-space: nowrap; }
+
+#cdModalTable table { min-width: 960px; table-layout: fixed; }
+#activityDrawerTable table { min-width: 640px; }
+
+/* Connected data: Name, Type, Source, Detail, Status, Created
+   (the selection checkbox column comes first) */
+#cdModalTable th:first-child { width: 44px; }
+#cdModalTable th:nth-child(3) { width: 132px; }
+#cdModalTable th:nth-child(4) { width: 15%; }
+#cdModalTable th:nth-child(5) { width: 24%; }
+#cdModalTable th:nth-child(6) { width: 112px; }
+#cdModalTable th:nth-child(7) { width: 176px; }
+#cdModalTable td { overflow: hidden; max-width: 0; }
+
+/* Activity: Activity, Type, Created */
+#activityDrawerTable th:nth-child(2) { width: 150px; }
+#activityDrawerTable th:nth-child(3) { width: 176px; }
+
+#cdModalTable .wd-table-name,
+#activityDrawerTable .wd-table-name {
+  color: var(--lex-text-primary);
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+#cdModalTable .wd-table-name,
+#cdModalTable .wd-table-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#activityDrawerTable .wd-table-name strong { font-weight: 600; }
+.wd-table-muted { color: var(--lex-text-secondary); }
+.wd-table-time { white-space: nowrap; }

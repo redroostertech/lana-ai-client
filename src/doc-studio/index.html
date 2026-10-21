@@ -320,7 +320,72 @@
             lana
             lana-context-type="full_chat"
           ></lex-banner>
-          <div id="libraryList" class="library-list"></div>
+          <div id="libraryList" class="library-list">
+            <div class="library-table-toolbar" role="search" aria-label="Search and filter the library">
+              <div class="library-table-toolbar-row">
+                <div class="library-table-toolbar-search">
+                  <lex-input id="docStudioLibrarySearch" placeholder="Search files..." clearable="true" leading-icon="search"></lex-input>
+                </div>
+                <div class="library-table-toolbar-group">
+                  <label class="library-table-toolbar-label">Sort by:</label>
+                  <lex-select
+                    id="docStudioLibrarySort"
+                    options='[{"value":"created_at","label":"Created"},{"value":"name","label":"File"},{"value":"style","label":"Style"},{"value":"cards","label":"Sections"}]'
+                    value="created_at"
+                  ></lex-select>
+                </div>
+                <lex-btn id="docStudioLibrarySortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                  </svg>
+                </lex-btn>
+                <div class="library-table-toolbar-group">
+                  <label class="library-table-toolbar-label">Source:</label>
+                  <lex-select
+                    id="docStudioLibrarySource"
+                    options='[{"value":"studio","label":"Doc Studio files"},{"value":"stored","label":"Documents"}]'
+                    value="studio"
+                  ></lex-select>
+                </div>
+                <div id="docStudioLibraryCount" class="library-table-toolbar-label"></div>
+              </div>
+            </div>
+
+            <div class="library-section-heading">
+              <h2 id="docStudioLibrarySectionTitle" class="library-section-title">Doc Studio files</h2>
+              <span id="docStudioLibrarySectionCount" class="library-table-toolbar-label" aria-live="polite"></span>
+            </div>
+
+            <lex-table
+              id="docStudioLibraryTable"
+              class="lex-table--card"
+              column-filters
+              columns="name,style,cards,created_at"
+              labels="File,Style,Sections,Created"
+              sort-by="created_at"
+              sort-dir="desc"
+              limit="20"
+              id-key="id"
+              empty-text="No saved Doc Studio files yet."
+              aria-label="Doc Studio files"
+            ></lex-table>
+            <lex-table
+              id="docStudioStoredTable"
+              class="lex-table--card"
+              column-filters
+              server-paging
+              columns="name,type,workspace,is_template,created_at,updated_at"
+              labels="File,Type,Matter,Template,Created,Last edited"
+              sortable-columns="name,created_at,updated_at"
+              sort-by="updated_at"
+              sort-dir="desc"
+              limit="20"
+              id-key="id"
+              empty-text="No organization documents yet."
+              aria-label="Documents"
+              style="display: none"
+            ></lex-table>
+          </div>
         </section>
       </section>
     </main>
@@ -363,6 +428,8 @@
     <script src="../js/lex/index.js"></script>
     <script src="../js/sidebar-footer-hydrate.js"></script>
     <script src="../js/shared/document-library-mapper.js"></script>
+    <script src="../js/shared/library-column-filters.js"></script>
+    <script src="../js/shared/doc-studio-library-table.js"></script>
     <script>
       (function () {
         function mountDocStudio() {

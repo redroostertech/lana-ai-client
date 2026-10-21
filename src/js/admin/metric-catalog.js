@@ -70,7 +70,6 @@
   // opens. Values: undefined (not loaded), 'pending', 'error', or the usage object.
   var usageByKey = {};
   var allMetrics = [];
-  var visibleMetrics = [];
   var passedCount = 0;
   var failedCount = 0;
   // Per-metric run timeout. A single metric whose calculation hangs server-side
@@ -113,58 +112,32 @@
     return (typeof window !== 'undefined' && window.MetricGoalFormMapper) || null;
   }
 
+  function tables() {
+    return window.LanaMetricTables;
+  }
+
+  // Rows keep raw values (docs/TABLE-STANDARD.md section 5): codes, booleans
+  // and numbers, formatted by the cell renderers. The display_* fields and
+  // executable_label are for the detail drawer only.
   function normalizeMetric(metric) {
-    var executableLabel = metric.executable === true ? 'Yes' : 'No';
-    var statusLabel = metric.display_status || metric.status || 'unknown';
-    return Object.assign({}, metric, {
-      executable_label: executableLabel,
-      display_name: metric.display_name || metric.title || metric.name || metric.key,
+    return Object.assign(tables().mapCatalogMetric(metric), {
+      executable_label: metric.executable === true ? 'Yes' : 'No',
       display_domain: metric.display_domain || '-',
       display_primary_audience: metric.display_primary_audience || '-',
-      display_status: statusLabel,
-      // Sortable underlying values for the Last Run / Value columns.
-      // Filled in just before render from lastRunByKey so the table can
-      // sort numerically (value) or alphabetically (status) without
-      // re-parsing the rendered HTML.
-      last_run_status: 'never',
-      last_run_value: null,
-      // Sortable underlying target for the Goal column; stamped each render
-      // from goalIndex (goals load after the catalog) by stampGoalsToRows.
-      goal_target: null,
-      actions: 'actions_placeholder',
+      display_status: metric.display_status || metric.status || 'unknown',
     });
   }
 
-  // Produce a sortable numeric (or null) for the Value column from a metric
-  // run result. Mirrors the categorical logic in summarizeRunValue but
-  // returns the raw underlying number / array-length / null so lex-table
-  // can sort it correctly.
   function sortableRunValue(value) {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'number') return isFinite(value) ? value : null;
-    if (typeof value === 'boolean') return value ? 1 : 0;
-    if (typeof value === 'string') {
-      var asNum = Number(value);
-      return value.trim() !== '' && isFinite(asNum) ? asNum : null;
-    }
-    if (Array.isArray(value)) return value.length;
-    if (typeof value === 'object') {
-      var candidates = ['value', 'total', 'count', 'amount', 'rate', 'percentage', 'percent'];
-      for (var i = 0; i < candidates.length; i++) {
-        if (Object.prototype.hasOwnProperty.call(value, candidates[i])) {
-          return sortableRunValue(value[candidates[i]]);
-        }
-      }
-    }
-    return null;
+    return tables().sortableRunValue(value);
   }
 
   // Stamp each visible metric with the latest run status + sortable value
   // pulled from lastRunByKey. Called every render so a fresh run shows up
   // in the table immediately and the sort indicator stays consistent.
   function applyRunStateToRows() {
-    for (var i = 0; i < visibleMetrics.length; i++) {
-      var m = visibleMetrics[i];
+    for (var i = 0; i < allMetrics.length; i++) {
+      var m = allMetrics[i];
       var run = lastRunByKey[m.key];
       if (!run) {
         m.last_run_status = 'never';
@@ -179,99 +152,9 @@
     }
   }
 
-  // Normalize an entity name to snake_case so the filter option value is
-  // stable regardless of whether the registry shipped "Calendar Event",
-  // "calendar event", or "calendar_event". The display label is still
-  // produced via humanize() so the dropdown reads naturally.
-  function normalizeEntityKey(name) {
-    return String(name == null ? '' : name)
-      .trim()
-      .toLowerCase()
-      .replace(/[\s.\-]+/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_|_$/g, '');
-  }
-
-  function buildFilters() {
-    var domainSel = el('metricCatalogDomainFilter');
-    var audienceSel = el('metricCatalogAudienceFilter');
-    var entitySel = el('metricCatalogEntityFilter');
-    if (!domainSel || !audienceSel) return;
-
-    var domains = new Set();
-    var audiences = new Set();
-    // Track entity options as normalized key -> humanized display label so
-    // duplicates collapse (e.g. "Calendar Event" + "calendar_event" become
-    // one option) while the label stays human-readable.
-    var entityLabels = {};
-    allMetrics.forEach(function (m) {
-      if (m.domain) domains.add(m.domain);
-      if (m.primaryAudience) audiences.add(m.primaryAudience);
-      if (Array.isArray(m.entities)) {
-        m.entities.forEach(function (raw) {
-          var name = entityName(raw);
-          if (!name) return;
-          var key = normalizeEntityKey(name);
-          if (!key) return;
-          if (!entityLabels[key]) entityLabels[key] = humanize(name);
-        });
-      }
-    });
-
-    function fill(select, set) {
-      // Drop existing dynamic options (keep the first "all" option).
-      while (select.options.length > 1) select.remove(1);
-      Array.from(set).sort().forEach(function (raw) {
-        var opt = document.createElement('option');
-        opt.value = raw;
-        // Use the humanizer pattern from the registry.
-        opt.textContent = String(raw).replace(/[_.-]+/g, ' ').replace(/\b\w/g, function (l) { return l.toUpperCase(); });
-        select.appendChild(opt);
-      });
-    }
-    fill(domainSel, domains);
-    fill(audienceSel, audiences);
-
-    if (entitySel) {
-      while (entitySel.options.length > 1) entitySel.remove(1);
-      Object.keys(entityLabels).sort().forEach(function (key) {
-        var opt = document.createElement('option');
-        opt.value = key;
-        opt.textContent = entityLabels[key];
-        entitySel.appendChild(opt);
-      });
-    }
-  }
-
-  function applyFilters() {
-    var search = (el('metricCatalogSearch') || {}).value || '';
-    var executable = (el('metricCatalogExecutableFilter') || {}).value || '';
-    var domain = (el('metricCatalogDomainFilter') || {}).value || '';
-    var audience = (el('metricCatalogAudienceFilter') || {}).value || '';
-    var entity = (el('metricCatalogEntityFilter') || {}).value || '';
-
-    var q = search.trim().toLowerCase();
-
-    visibleMetrics = allMetrics.filter(function (m) {
-      if (executable === 'true' && m.executable !== true) return false;
-      if (executable === 'false' && m.executable === true) return false;
-      if (domain && m.domain !== domain) return false;
-      if (audience && m.primaryAudience !== audience) return false;
-      if (entity) {
-        if (!Array.isArray(m.entities)) return false;
-        var hasEntity = m.entities.some(function (raw) {
-          return normalizeEntityKey(entityName(raw)) === entity;
-        });
-        if (!hasEntity) return false;
-      }
-      if (q) {
-        var hay = [m.key, m.name, m.title, m.description, m.domain, m.primaryAudience]
-          .filter(Boolean).join(' ').toLowerCase();
-        if (hay.indexOf(q) === -1) return false;
-      }
-      return true;
-    });
-    renderTable();
+  // The metrics the table's search and filters keep, across every page.
+  function visibleMetrics() {
+    return tables().filteredRows(el('metricCatalogTable'));
   }
 
   function statusPill(status) {
@@ -325,7 +208,7 @@
 
   function lastRunValueCell(metric) {
     var run = lastRunByKey[metric.key];
-    if (!run || run.status !== 'pass') return '<span class="metric-catalog-muted">-</span>';
+    if (!run || run.status !== 'pass') return '<span class="metric-catalog-muted">\u2014</span>';
     var summary = summarizeRunValue(run.value);
     return '<span class="metric-catalog-runcell-value">' + escapeHtml(summary) + '</span>';
   }
@@ -336,7 +219,7 @@
   function goalCell(metric) {
     var mapper = goalMapper();
     if (!mapper || !mapper.hasAnyGoal(goalIndex, metric.key)) {
-      return '<span class="metric-catalog-muted">-</span>';
+      return '<span class="metric-catalog-muted">\u2014</span>';
     }
     var period = mapper.getGoal(goalIndex, metric.key, 'monthly') ? 'monthly' : 'weekly';
     var goal = mapper.getGoal(goalIndex, metric.key, period);
@@ -358,36 +241,65 @@
     return html;
   }
 
+  function badge(label, color) {
+    return '<lex-badge label="' + escapeHtml(label) + '" color="' + escapeHtml(color) + '"></lex-badge>';
+  }
+
+  function muted(text) {
+    return '<span class="metric-catalog-muted">' + escapeHtml(text || '\u2014') + '</span>';
+  }
+
+  var RUN_STATUS_COLORS = { pass: 'green', fail: 'red', pending: 'blue' };
+
+  function cellRenderers() {
+    var shared = tables();
+    return {
+      display_name: function (value, row) {
+        // Description lives in the side panel — keep the table row clean.
+        return '<span class="metric-catalog-name" title="' + escapeHtml(row.key) + '">' + escapeHtml(value || row.key) + '</span>';
+      },
+      domain: function (value) { return value ? escapeHtml(shared.humanizeLabel(value)) : muted(); },
+      audience: function (value) { return value ? escapeHtml(shared.humanizeLabel(value)) : muted(); },
+      entity_keys: function (value) {
+        var labels = (Array.isArray(value) ? value : []).map(shared.humanizeLabel);
+        if (!labels.length) return muted();
+        var text = labels.join(', ');
+        return '<span class="metric-catalog-cell-truncate" title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>';
+      },
+      status: function (value) {
+        return value ? badge(shared.humanizeLabel(value), shared.catalogStatusColor(value)) : muted();
+      },
+      executable: function (value) {
+        return value ? badge('Executable', 'green') : badge('Planned', 'gray');
+      },
+      last_run_status: function (value, row) {
+        if (!value || value === 'never') return muted(shared.runStatusLabel('never'));
+        var run = lastRunByKey[row.key] || {};
+        var html = badge(shared.runStatusLabel(value), RUN_STATUS_COLORS[value] || 'gray');
+        return value === 'fail' && run.error ? '<span title="' + escapeHtml(run.error) + '">' + html + '</span>' : html;
+      },
+      last_run_value: function (_value, row) { return lastRunValueCell(row); },
+      goal_target: function (_value, row) { return goalCell(row); },
+      actions: function (_value, row) { return actionsCell(row); },
+    };
+  }
+
+  function syncEmptyText(table) {
+    table.emptyText = tables().emptyText(table,
+      'No metrics in the registry',
+      'No matching metrics. Try a different search or clear the filters.');
+  }
+
   function renderTable() {
     var table = el('metricCatalogTable');
-    if (!table) return;
-
-    if (typeof table.setCellRenderers === 'function') {
-      table.setCellRenderers({
-        display_name: function (value) {
-          // Description lives in the side panel — keep the table row clean.
-          return '<strong>' + escapeHtml(value || '-') + '</strong>';
-        },
-        display_status: function (value) { return statusPill(value); },
-        executable_label: function (value) {
-          var ok = value === 'Yes';
-          return '<span class="metric-catalog-pill ' + (ok ? 'metric-catalog-pill--ok' : 'metric-catalog-pill--muted') + '">' + escapeHtml(value) + '</span>';
-        },
-        last_run_status: function (_value, row) { return lastRunStatusCell(row); },
-        last_run_value: function (_value, row) { return lastRunValueCell(row); },
-        goal_target: function (_value, row) { return goalCell(row); },
-        actions: function (_value, row) { return actionsCell(row); },
-      });
-    }
-
-    if (typeof table.setData === 'function') {
-      // Stamp the current run state onto each row first so the table's
-      // built-in sort works on real underlying values (numeric for the
-      // Value column, status string for the Last Run column).
-      applyRunStateToRows();
-      stampGoalsToRows();
-      table.setData(visibleMetrics);
-    }
+    if (!table || typeof table.setData !== 'function') return;
+    // Stamp the current run state and goals onto each row first so the
+    // table's sort and filters work on real underlying values.
+    applyRunStateToRows();
+    stampGoalsToRows();
+    syncEmptyText(table);
+    table.setData(allMetrics);
+    if (toolbar) toolbar.updateCount();
   }
 
   // Stamp each visible metric with its sortable goal target (monthly preferred,
@@ -395,8 +307,8 @@
   // goalIndex live for display; this only feeds the table's built-in sort.
   function stampGoalsToRows() {
     var mapper = goalMapper();
-    for (var i = 0; i < visibleMetrics.length; i++) {
-      var m = visibleMetrics[i];
+    for (var i = 0; i < allMetrics.length; i++) {
+      var m = allMetrics[i];
       var goal = mapper && (mapper.getGoal(goalIndex, m.key, 'monthly') || mapper.getGoal(goalIndex, m.key, 'weekly'));
       var raw = goal ? goal.target_value : null;
       m.goal_target = (raw != null && isFinite(Number(raw))) ? Number(raw) : null;
@@ -473,7 +385,7 @@
     passedCount = 0;
     failedCount = 0;
     refreshRunCounts();
-    var queue = visibleMetrics.slice();
+    var queue = visibleMetrics();
     // Sequential to keep DB load reasonable on a 300+ metric run.
     for (var i = 0; i < queue.length; i++) {
       // eslint-disable-next-line no-await-in-loop
@@ -1113,13 +1025,10 @@
     var g = goal || {};
     var targetType = g.target_type || 'static';
 
-    function typeOption(value, label) {
-      var sel = targetType === value ? ' selected' : '';
-      return '<option value="' + value + '"' + sel + '>' + label + '</option>';
-    }
-    function periodOption(value, label) {
-      var sel = period === value ? ' selected' : '';
-      return '<option value="' + value + '"' + sel + '>' + label + '</option>';
+    // Dropdowns are lex-select, never native selects.
+    function lexSelect(id, options, value) {
+      return '<lex-select id="' + id + '" class="metric-catalog-goal-field__select" options=\'' +
+        escapeHtml(JSON.stringify(options)) + '\' value="' + escapeHtml(value) + '"></lex-select>';
     }
 
     var html = '<div class="metric-catalog-goal-form">';
@@ -1129,19 +1038,18 @@
     html += '</div>';
 
     html += '<div class="metric-catalog-goal-form__row">';
-    html += '<label class="metric-catalog-goal-field">'
+    html += '<div class="metric-catalog-goal-field">'
       + '<span class="metric-catalog-goal-field__label">Period</span>'
-      + '<select id="metricGoalPeriod" class="metric-catalog-goal-field__input">'
-      + periodOption('monthly', 'Monthly')
-      + periodOption('weekly', 'Weekly')
-      + '</select></label>';
-    html += '<label class="metric-catalog-goal-field">'
+      + lexSelect('metricGoalPeriod', [{ value: 'monthly', label: 'Monthly' }, { value: 'weekly', label: 'Weekly' }], period)
+      + '</div>';
+    html += '<div class="metric-catalog-goal-field">'
       + '<span class="metric-catalog-goal-field__label">Type</span>'
-      + '<select id="metricGoalType" class="metric-catalog-goal-field__input">'
-      + typeOption('static', 'Static')
-      + typeOption('rolling_average', 'Rolling average')
-      + typeOption('growth_rate', 'Growth rate')
-      + '</select></label>';
+      + lexSelect('metricGoalType', [
+        { value: 'static', label: 'Static' },
+        { value: 'rolling_average', label: 'Rolling average' },
+        { value: 'growth_rate', label: 'Growth rate' }
+      ], targetType)
+      + '</div>';
     html += '</div>';
 
     html += '<p class="metric-catalog-goal-help" id="metricGoalTypeHelp">' + goalTypeHelp(targetType) + '</p>';
@@ -1293,8 +1201,8 @@
     function bindPeriodSelect() {
       var sel = el('metricGoalPeriod');
       if (!sel) return;
-      sel.addEventListener('change', function () {
-        currentPeriod = sel.value;
+      sel.addEventListener('lex-change', function (event) {
+        currentPeriod = (event && event.detail && event.detail.value) || sel.value;
         var body = bodyNode();
         if (body) body.innerHTML = renderGoalForm(metric, currentPeriod);
         bindPeriodSelect();
@@ -1312,12 +1220,13 @@
       var typeSel = el('metricGoalType');
       var helpNode = el('metricGoalTypeHelp');
       if (!typeSel || !helpNode) return;
-      typeSel.addEventListener('change', function () {
-        helpNode.textContent = goalTypeHelp(typeSel.value);
+      typeSel.addEventListener('lex-change', function (event) {
+        var type = (event && event.detail && event.detail.value) || typeSel.value;
+        helpNode.textContent = goalTypeHelp(type);
         var labelNode = el('metricGoalTargetValueLabel');
-        if (labelNode) labelNode.textContent = targetValueLabel(typeSel.value);
+        if (labelNode) labelNode.textContent = targetValueLabel(type);
         var hintNode = el('metricGoalTargetValueHint');
-        if (hintNode) hintNode.textContent = targetValueHint(typeSel.value);
+        if (hintNode) hintNode.textContent = targetValueHint(type);
         refreshSuggestionRow();
       });
     }
@@ -1420,19 +1329,24 @@
     setTimeout(wireGoalButtons, 50);
   }
 
+  var toolbar = null;
+
   function wireToolbar() {
-    var search = el('metricCatalogSearch');
-    if (search) {
-      var t;
-      search.addEventListener('input', function () {
-        clearTimeout(t);
-        t = setTimeout(applyFilters, 150);
-      });
+    var table = el('metricCatalogTable');
+    if (table && tables()) {
+      // Search also covers the key and description, which have no column.
+      table._getSearchColumns = function () {
+        return ['display_name', 'key', 'title', 'description', 'domain', 'audience'];
+      };
+      table.addEventListener('lex-filter-change', function () { syncEmptyText(table); });
+      toolbar = tables().bindClientToolbar(table, {
+        search: 'metricCatalogSearch',
+        sort: 'metricCatalogSort',
+        order: 'metricCatalogSortOrder',
+        filter: 'metricCatalogExecutableFilter',
+        counts: ['metricCatalogCount', 'metricCatalogSectionCount']
+      }, { filterKey: 'executable', noun: ['metric', 'metrics'], defaultSort: 'display_name' });
     }
-    ['metricCatalogExecutableFilter', 'metricCatalogDomainFilter', 'metricCatalogEntityFilter', 'metricCatalogAudienceFilter'].forEach(function (id) {
-      var node = el(id);
-      if (node) node.addEventListener('change', applyFilters);
-    });
     var runAll = el('metricCatalogRunAllBtn');
     if (runAll) runAll.addEventListener('click', runVisible);
 
@@ -1503,12 +1417,23 @@
   async function load() {
     if (!window.api || typeof api.getMetricCatalog !== 'function') return;
     try {
-      var response = await api.getMetricCatalog({ limit: 500 });
-      var rows = Array.isArray(response && response.data) ? response.data : [];
-      allMetrics = rows.map(normalizeMetric);
-      buildFilters();
-      applyFilters();
-      updateSummary(response && response.summary);
+      // The registry pages at most 500 per request; read every page so the
+      // client-side table holds the whole catalog, never a capped slice.
+      var result = await tables().fetchAllPages(async function (limit, offset) {
+        var page = await api.getMetricCatalog({ limit: limit, offset: offset });
+        return {
+          rows: Array.isArray(page && page.data) ? page.data : [],
+          total: page && page.pagination ? page.pagination.total : undefined,
+          summary: page && page.summary
+        };
+      }, 500, 20);
+      allMetrics = result.rows.map(normalizeMetric);
+      var table = el('metricCatalogTable');
+      if (table && typeof table.setColumnFilterOptions === 'function') {
+        table.setColumnFilterOptions(tables().catalogFilterOptions(allMetrics));
+      }
+      renderTable();
+      updateSummary(result.first && result.first.summary);
       // Goals load after the catalog so a slow/failed goals call never blocks
       // the table (already rendered above). Await them so a deep-linked goal
       // editor (from a reporting card) opens with the existing goal populated.
@@ -1554,8 +1479,16 @@
     // Lex.Auth role source the page already gates access on; non-admins reach
     // the catalog but see no Goal action.
     isGoalAdmin = !!(window.Lex && Lex.Auth && (Lex.Auth.isSystemAdmin() || Lex.Auth.isOrgAdmin()));
-    wireToolbar();
-    load();
+    var ready = window.customElements && typeof window.customElements.whenDefined === 'function'
+      ? window.customElements.whenDefined('lex-table')
+      : Promise.resolve();
+    ready.then(function () {
+      var table = el('metricCatalogTable');
+      // Renderers must be registered before the first setData.
+      if (table && typeof table.setCellRenderers === 'function') table.setCellRenderers(cellRenderers());
+      wireToolbar();
+      load();
+    });
   }
 
   if (document.readyState === 'loading') {

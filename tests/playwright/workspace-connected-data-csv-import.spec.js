@@ -884,10 +884,11 @@ test.describe('Workspace connected data CSV import', () => {
     expect(requestUrl.searchParams.get('connector_id')).toBe('manual');
     expect(requestUrl.searchParams.get('search')).toBe('Avery');
     expect(requestUrl.searchParams.get('page')).toBe('2');
-    await expect(page.locator('#wsDataSearch')).toHaveValue('Avery');
+    await expect(page.locator('#wsDataSearch')).toHaveAttribute('value', 'Avery');
     await expect(page.locator('#wsDataEntityFilter')).toHaveAttribute('value', 'lead');
-    await expect(page.locator('#wsDataConnectorFilter')).toHaveAttribute('value', 'manual');
     await expect(page.locator('#wsDataEntityFilter')).toHaveAttribute('options', /"value":"lead"/);
+    // The connector deep link lands in the Connector column's header filter.
+    await expect(page.locator('#wsDataTable [data-col-filter="connector_id"]')).toHaveClass(/lex-th-filter--active/);
   });
 
   test('routes Workspace Summary connected-data import action into the CSV wizard', async ({ page }, testInfo) => {
@@ -1602,7 +1603,7 @@ test.describe('Workspace connected data CSV import', () => {
     await expect(page.locator('#wsDataBanner')).toBeVisible();
     await expect(page.getByRole('table', { name: /Data table/i })).toBeVisible();
     await expect(page.locator('#wsDataTable')).toHaveAttribute('columns', /external_id,entity_type,connector_id,raw_data/);
-    await expect(page.locator('#wsDataTable')).toHaveAttribute('labels', /ID,Entity Type,Connector,Data/);
+    await expect(page.locator('#wsDataTable')).toHaveAttribute('labels', /ID,Entity type,Connector,Data,Synced,Created/);
 
     const openImport = await clickControl(page, [
       '[data-testid="workspace-csv-import-open"]',

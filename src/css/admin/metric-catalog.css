@@ -51,42 +51,46 @@
   color: #b91c1c;
 }
 
+/* Toolbar card (docs/TABLE-STANDARD.md section 2); layout comes from the
+   utility classes on the card. */
 .metric-catalog-toolbar {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin: 1rem 0 0.75rem;
-  flex-wrap: wrap;
-}
-
-.metric-catalog-toolbar__search {
-  flex: 1 1 280px;
-  min-width: 240px;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--lex-border-default, #e5e7eb);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  background: #fff;
-}
-
-.metric-catalog-toolbar__select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--lex-border-default, #e5e7eb);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  background: #fff;
-  min-width: 140px;
-}
-
-.metric-catalog-card {
-  background: #fff;
-  border: 1px solid var(--lex-border-subtle, #e5e7eb);
-  border-radius: 0.5rem;
-  padding: 0.5rem;
+  border-color: var(--lex-border-default, #e5e7eb);
 }
 
 .metric-catalog-name {
-  max-width: 26rem;
+  color: var(--lex-text-primary);
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.metric-catalog-cell-truncate {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Metric catalog table widths (docs/TABLE-STANDARD.md section 8):
+   Name, Domain, Audience, Entities, Status, Executable, Last run, Value,
+   Goal, Actions. The name column takes the rest. */
+#metricCatalogTable th { white-space: nowrap; }
+#metricCatalogTable table { min-width: 1320px; }
+#metricCatalogTable th:nth-child(2) { width: 12%; }
+#metricCatalogTable th:nth-child(3) { width: 10%; }
+#metricCatalogTable th:nth-child(4) { width: 14%; }
+#metricCatalogTable td:nth-child(4) { max-width: 0; overflow: hidden; }
+#metricCatalogTable th:nth-child(5) { width: 104px; }
+#metricCatalogTable th:nth-child(6) { width: 128px; }
+#metricCatalogTable th:nth-child(7) { width: 124px; }
+#metricCatalogTable th:nth-child(8) { width: 104px; }
+#metricCatalogTable th:nth-child(9) { width: 104px; }
+#metricCatalogTable th:nth-child(10) { width: 300px; }
+/* Actions holds buttons, not data: lex-table has no per-column filter
+   opt-out yet, so hide the filter icon it adds there. */
+#metricCatalogTable th:nth-child(10) .lex-th-filter { display: none; }
+
+.metric-catalog-goal-field__select {
+  display: block;
 }
 
 .metric-catalog-name__desc {

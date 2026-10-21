@@ -9,7 +9,9 @@
   // State
   var allSkills = [];
   var filteredSkills = [];
-  var searchTerm = '';
+  var searchTerm = '';         // lower-cased, for the grid
+  var searchText = '';         // as typed, for the list table
+  var searchDebounce = null;
   var selectedCategory = 'all';
   var viewMode = 'list'; // 'list' or 'grid' — default to list
   var selectedSkill = null;
@@ -54,8 +56,8 @@
 
   // DOM Elements
   var searchInput, categoryFilter, gridViewBtn, listViewBtn;
-  var loadingState, skillsGridContainer, gridEmptyState, filterChips;
-  var gridViewContainer, skillsListView, gridPagination, listPagination;
+  var loadingState, skillsGridContainer, gridEmptyState;
+  var gridViewContainer, skillsListView, gridPagination;
   var skillDetailsModal, matterSelectorModal;
 
   /**
@@ -112,17 +114,21 @@
     }
 
     // Get DOM elements
-    searchInput = document.getElementById('search-input');
+    searchInput = document.getElementById('skillsSearch');
     categoryFilter = document.getElementById('category-filter');
     gridViewBtn = document.getElementById('grid-view-btn');
     listViewBtn = document.getElementById('list-view-btn');
     loadingState = document.getElementById('loading-state');
     skillsGridContainer = document.getElementById('skills-grid-container');
     gridEmptyState = document.getElementById('grid-empty-state');
-    filterChips = document.getElementById('filter-chips');
     gridViewContainer = document.getElementById('grid-view-container');
     skillsListView = document.getElementById('skillsListView');
     if (skillsListView) {
+      // Renderers and filter options must be registered before the first setData.
+      if (typeof skillsListView.setCellRenderers === 'function' && window.LanaSkillsTable) {
+        skillsListView.setCellRenderers(window.LanaSkillsTable.cellRenderers());
+        skillsListView.setColumnFilterOptions(window.LanaSkillsTable.columnFilterOptions([], window.LanaLibraryColumnFilters));
+      }
       // Empty-state CTA: "Create a skill" reuses the header create action.
       skillsListView.addEventListener('empty-action', function () {
         var b = document.getElementById('create-skill-btn');
@@ -130,7 +136,6 @@
       });
     }
     gridPagination = document.getElementById('grid-pagination');
-    listPagination = document.getElementById('list-pagination');
     skillDetailsModal = document.getElementById('skill-details-modal');
     matterSelectorModal = document.getElementById('matter-selector-modal');
 
@@ -154,14 +159,30 @@
    * Attach event listeners
    */
   function attachEventListeners() {
-    // Search (grid view)
+    // Toolbar search (lex-input: lex-input while typing, lex-change on clear)
     if (searchInput) {
-      searchInput.addEventListener('input', debounce(handleSearch, 300));
+      searchInput.addEventListener('lex-input', handleSearch);
+      searchInput.addEventListener('lex-change', handleSearch);
     }
 
-    // Category filter (lex-select — fires lex-change)
+    // Toolbar category filter (lex-select — fires lex-change)
     if (categoryFilter) {
       categoryFilter.addEventListener('lex-change', handleCategoryChange);
+    }
+
+    // Toolbar sort: Sort by select + order toggle drive the table
+    var sortSelect = document.getElementById('skillsSort');
+    var sortOrderBtn = document.getElementById('skillsSortOrder');
+    if (sortSelect) {
+      sortSelect.addEventListener('lex-change', function(e) {
+        applyListSort((e.detail && e.detail.value) || 'created_at', currentSortOrder());
+      });
+    }
+    if (sortOrderBtn) {
+      sortOrderBtn.addEventListener('click', function() {
+        sortOrderBtn.dataset.order = currentSortOrder() === 'asc' ? 'desc' : 'asc';
+        applyListSort(sortSelect ? sortSelect.value : 'created_at', currentSortOrder());
+      });
     }
 
     // View toggle (lex-btn components)
@@ -269,6 +290,16 @@
         gridPage = e.detail && e.detail.page ? e.detail.page : 1;
         renderGridView();
       });
+    }
+
+    // List view: header sort mirrors into the toolbar; count, empty copy and
+    // the Category select follow the table's own filter state (Clear filters).
+    if (skillsListView) {
+      skillsListView.addEventListener('sort-change', function(e) {
+        if (e.detail) syncToolbarSort(e.detail.sortBy, e.detail.sortDir);
+      });
+      skillsListView.addEventListener('lex-filter-change', syncListState);
+      skillsListView.addEventListener('lex-data-loaded', syncListState);
     }
 
     // List view row-click — open skill in builder modal
@@ -1730,67 +1761,24 @@
       }
       return response.json();
     }).then(function(data) {
-      allSkills = data.skills || data.data || [];
+      var skills = data.skills || data.data || [];
+      var tableApi = window.LanaSkillsTable;
 
-      // Flatten and normalize fields for lex-table compatibility
-      allSkills = allSkills.map(function(skill) {
-        var meta = skill.metadata || {};
-        var config = skill.skill_config || {};
-        return Object.assign({}, skill, {
-          description: skill.skill_description || skill.description || config.description || meta.description || '',
-          category: skill.category || config.category || meta.category || 'automation',
-          skill_type: skill.skill_type || config.skill_type || meta.skill_type || '',
-          version: skill.skill_version || skill.version || config.version || meta.version || '1.0.0',
-          installation_count: skill.installation_count || skill.total_executions || 0,
-          tags: meta.tags || []
-        });
+      // One object per skill: the original fields plus the table's raw row
+      // values (slugs, counts, ISO timestamps). Formatting is the renderers' job.
+      allSkills = skills.map(function(skill) {
+        return Object.assign({}, skill, tableApi.mapSkillRow(skill));
       });
 
       filteredSkills = allSkills.slice();
-
-      // Format rows for lex-table display
-      var formattedSkills = allSkills.map(function(skill) {
-        var out = Object.assign({}, skill);
-
-        // Truncate long descriptions
-        if (out.description && out.description.length > 100) {
-          out.description = out.description.substring(0, 97) + '...';
-        }
-
-        // Format category: replace hyphens/underscores with spaces, title-case
-        if (out.category) {
-          out.category = out.category.split(/[-_]/).map(function(w) {
-            return w.charAt(0).toUpperCase() + w.substring(1);
-          }).join(' ');
-        }
-
-        // Format skill_type similarly
-        if (out.skill_type) {
-          out.skill_type = out.skill_type.split(/[-_]/).map(function(w) {
-            return w.charAt(0).toUpperCase() + w.substring(1);
-          }).join(' ');
-        }
-
-        // created_at stays raw: lex-table shows it with Lex.Utils.formatDateTime
-        // and sorts it as a date.
-
-        return out;
-      });
-
-      // Populate lex-table for list view
-      if (skillsListView && typeof skillsListView.setData === 'function') {
-        skillsListView.setData(formattedSkills);
-      }
-
-      // Update grid if in grid view
-      if (viewMode === 'grid') {
-        renderGridView();
-      }
+      populateListView(allSkills);
+      filterSkills();
 
       hideLoading();
     }).catch(function(error) {
       console.error('Error loading skills:', error);
       showToast('Failed to load skills. Please try again.', 'error');
+      showListLoadError();
       hideLoading();
       showGridEmpty();
     });
@@ -2554,14 +2542,110 @@
   // ═══════════════════════════════════════════════════════════════
 
   function handleSearch(e) {
-    searchTerm = e.target.value.toLowerCase();
-    filterSkills();
+    var value = String((e && e.detail && e.detail.value) || '').trim();
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(function() {
+      if (value === searchText) return;
+      searchText = value;
+      searchTerm = value.toLowerCase();
+      if (skillsListView && skillsListView.dataSource) skillsListView.dataSource.setSearch(searchText);
+      filterSkills();
+    }, 300);
   }
 
+  // The Category select writes into the table's filter state, so the table's
+  // Clear filters resets it too; syncListState mirrors it back for the grid.
   function handleCategoryChange(e) {
     var detail = e.detail || {};
     selectedCategory = detail.value || 'all';
+    if (skillsListView) {
+      if (selectedCategory === 'all') skillsListView.removeFilter('category');
+      else skillsListView.addFilter('category', 'in', [selectedCategory]);
+    }
     filterSkills();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // List table (docs/TABLE-STANDARD.md)
+  // ═══════════════════════════════════════════════════════════════
+
+  function populateListView(rows) {
+    if (!skillsListView || typeof skillsListView.setData !== 'function') return;
+    var tableApi = window.LanaSkillsTable;
+    skillsListView.setColumnFilterOptions(tableApi.columnFilterOptions(rows, window.LanaLibraryColumnFilters));
+    if (categoryFilter) {
+      categoryFilter.setAttribute('options', JSON.stringify(tableApi.categoryFilterOptions(rows)));
+    }
+    skillsListView.setData(rows);
+    // Re-apply toolbar state the table may not have had a data source for yet.
+    if (skillsListView.dataSource) {
+      if (searchText) skillsListView.dataSource.setSearch(searchText);
+      if (selectedCategory !== 'all') skillsListView.addFilter('category', 'in', [selectedCategory]);
+    }
+    syncListState();
+  }
+
+  function showListLoadError() {
+    if (!skillsListView || typeof skillsListView.setData !== 'function') return;
+    skillsListView.emptyText = 'Skills could not be loaded. Check your connection and try again.';
+    skillsListView.emptyActionLabel = '';
+    skillsListView.setData([]);
+    setSkillsCount('');
+  }
+
+  function setSkillsCount(text) {
+    ['skillsCount', 'skillsSectionCount'].forEach(function(id) {
+      var node = document.getElementById(id);
+      if (node) node.textContent = text;
+    });
+  }
+
+  function currentListFilters() {
+    var source = skillsListView && skillsListView.dataSource;
+    return source && source.query ? (source.query.filters || {}) : {};
+  }
+
+  function syncListState() {
+    if (!skillsListView) return;
+    var tableApi = window.LanaSkillsTable;
+    var filters = currentListFilters();
+    var filtered = tableApi.isFiltered(searchText, filters);
+    skillsListView.emptyText = tableApi.emptyText(filtered);
+    skillsListView.emptyActionLabel = filtered ? '' : 'Create a skill';
+
+    // Clear filters (or a header filter) may have changed the category.
+    var category = filters.category && Array.isArray(filters.category.value) && filters.category.value.length === 1
+      ? String(filters.category.value[0]) : 'all';
+    if (category !== selectedCategory) {
+      selectedCategory = category;
+      if (viewMode === 'grid') filterSkills();
+    }
+    if (categoryFilter && categoryFilter.value !== category) categoryFilter.value = category;
+
+    if (viewMode === 'list') {
+      var pagination = skillsListView.dataSource ? skillsListView.dataSource.pagination : null;
+      setSkillsCount(tableApi.countLabel(pagination ? pagination.total : allSkills.length));
+    }
+  }
+
+  function currentSortOrder() {
+    var button = document.getElementById('skillsSortOrder');
+    return button && button.dataset.order === 'asc' ? 'asc' : 'desc';
+  }
+
+  function applyListSort(column, direction) {
+    if (!skillsListView) return;
+    skillsListView.sortBy = column;
+    skillsListView.sortDir = direction;
+    if (skillsListView.dataSource) skillsListView.dataSource.setSort(column, direction);
+  }
+
+  // A header click sorted the table: mirror it in the toolbar.
+  function syncToolbarSort(column, direction) {
+    var select = document.getElementById('skillsSort');
+    var button = document.getElementById('skillsSortOrder');
+    if (select && column && select.value !== column) select.value = column;
+    if (button) button.dataset.order = direction === 'asc' ? 'asc' : 'desc';
   }
 
   function handleMatterSearch(e) {
@@ -2613,44 +2697,10 @@
     });
 
     gridPage = 1; // Reset to first page
-    renderGridView();
-    updateFilterChips();
-  }
-
-  function updateFilterChips() {
-    if (!filterChips) return;
-
-    var chips = [];
-
-    if (searchTerm) {
-      chips.push('<span class="filter-chip">Search: "' + escapeHtml(searchTerm) + '"'
-        + '<button class="filter-chip-remove" data-filter="search">&times;</button></span>');
+    if (viewMode === 'grid') {
+      renderGridView();
+      setSkillsCount(window.LanaSkillsTable.countLabel(filteredSkills.length));
     }
-
-    if (selectedCategory !== 'all') {
-      chips.push('<span class="filter-chip">Category: ' + formatCategory(selectedCategory)
-        + '<button class="filter-chip-remove" data-filter="category">&times;</button></span>');
-    }
-
-    filterChips.innerHTML = chips.join('');
-
-    // Attach remove listeners
-    var removeButtons = filterChips.querySelectorAll('.filter-chip-remove');
-    removeButtons.forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var filterType = btn.dataset.filter;
-        if (filterType === 'search') {
-          searchInput.value = '';
-          searchTerm = '';
-        } else if (filterType === 'category') {
-          if (categoryFilter && typeof categoryFilter.setValue === 'function') {
-            categoryFilter.setValue('all');
-          }
-          selectedCategory = 'all';
-        }
-        filterSkills();
-      });
-    });
   }
 
   function setViewMode(mode) {
@@ -2663,12 +2713,11 @@
       // Show grid, hide list
       if (gridViewContainer) gridViewContainer.classList.remove('hidden');
       if (skillsListView) skillsListView.style.display = 'none';
-      if (listPagination) listPagination.style.display = 'none';
       // Load data for grid if needed
       if (allSkills.length === 0) {
         loadSkills();
       } else {
-        renderGridView();
+        filterSkills();
       }
     } else {
       if (listViewBtn) listViewBtn.setAttribute('variant', 'primary');
@@ -2676,10 +2725,11 @@
       // Show list, hide grid
       if (gridViewContainer) gridViewContainer.classList.add('hidden');
       if (skillsListView) skillsListView.style.display = '';
-      if (listPagination) listPagination.style.display = '';
       // Load data for list if needed
       if (allSkills.length === 0) {
         loadSkills();
+      } else {
+        syncListState();
       }
     }
   }
