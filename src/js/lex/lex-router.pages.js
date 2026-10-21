@@ -214,6 +214,7 @@
       activeNav: 'document-library',
       scripts: [
         'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-dropdown-btn.js',
         'js/time-utils.js',
         'js/app-catalog.js',
         'js/lex/components/foundation/lex-drawer.js',
@@ -643,6 +644,7 @@
       activeNav: 'connectors',
       scripts: [
         'js/lex/components/form/lex-select.js',
+        'js/lex/components/form/lex-dropdown-btn.js',
         'js/utils/event-display-names.js',
         'js/services/feature-tracker.js',
         'js/activity-heatmap.js',

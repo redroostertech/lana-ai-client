@@ -1079,7 +1079,7 @@
     ];
     var json = JSON.stringify(items).split('&').join('&amp;').split('"').join('&quot;')
       .split('<').join('&lt;').split('>').join('&gt;');
-    wrap.innerHTML = '<lex-dropdown-btn data-task-actions-menu button-label="Actions" align="end" options="' + json + '"></lex-dropdown-btn>';
+    wrap.innerHTML = '<lex-dropdown-btn data-task-actions-menu button-label="Actions" align="end" floating options="' + json + '"></lex-dropdown-btn>';
   }
 
   function closeoutValue(id) {

@@ -617,7 +617,87 @@
     }
   };
 
+  // Floating layers: menus rendered at body level (position: fixed) so a
+  // container with overflow hidden/auto cannot clip them. compute() is pure
+  // (rects in, coordinates out); place() measures and positions an element;
+  // track() keeps it placed while the page scrolls or resizes.
+  const Floating = {
+    // anchor: a DOMRect-like box ({ left, top, right?, bottom?, width?, height? }).
+    // size: { width, height } of the floating box. viewport: { width, height }.
+    // opts: align start | end | center, placement bottom (default) | top,
+    // gap (4) between anchor and box, margin (8) kept from the viewport edge.
+    // Returns { top, left, placement, maxHeight } where maxHeight is null when
+    // the box fits, else the room on the chosen side.
+    compute(anchor, size, viewport, opts) {
+      const o = opts || {};
+      const gap = typeof o.gap === 'number' ? o.gap : 4;
+      const margin = typeof o.margin === 'number' ? o.margin : 8;
+      const left0 = Number(anchor && anchor.left) || 0;
+      const top0 = Number(anchor && anchor.top) || 0;
+      const right0 = anchor && anchor.right != null ? Number(anchor.right) : left0 + (Number(anchor && anchor.width) || 0);
+      const bottom0 = anchor && anchor.bottom != null ? Number(anchor.bottom) : top0 + (Number(anchor && anchor.height) || 0);
+      const w = Math.max(0, Number(size && size.width) || 0);
+      const h = Math.max(0, Number(size && size.height) || 0);
+      const vw = Number(viewport && viewport.width) || 0;
+      const vh = Number(viewport && viewport.height) || 0;
+
+      const below = vh - margin - (bottom0 + gap);
+      const above = top0 - gap - margin;
+      let placement = o.placement === 'top' ? 'top' : 'bottom';
+      if (placement === 'bottom' && h > below && above > below) placement = 'top';
+      else if (placement === 'top' && h > above && below > above) placement = 'bottom';
+      const room = Math.max(0, Math.floor(placement === 'bottom' ? below : above));
+      const maxHeight = h > room ? room : null;
+      const usedH = maxHeight === null ? h : maxHeight;
+      const top = placement === 'bottom' ? bottom0 + gap : top0 - gap - usedH;
+
+      let left;
+      if (o.align === 'end') left = right0 - w;
+      else if (o.align === 'center') left = left0 + (right0 - left0) / 2 - w / 2;
+      else left = left0;
+      left = Math.min(left, vw - w - margin);
+      left = Math.max(margin, left);
+      return { top: Math.round(top), left: Math.round(left), placement, maxHeight };
+    },
+
+    viewport() {
+      return { width: global.innerWidth || 0, height: global.innerHeight || 0 };
+    },
+
+    // Position el (already position: fixed and in the document) next to the
+    // anchor rect. Sets top/left and, when it does not fit, max-height.
+    place(el, anchorRect, opts) {
+      if (!el || !anchorRect) return null;
+      el.style.maxHeight = '';
+      const box = el.getBoundingClientRect();
+      const size = { width: el.offsetWidth || box.width || 0, height: el.offsetHeight || box.height || 0 };
+      const pos = Floating.compute(anchorRect, size, Floating.viewport(), opts);
+      el.style.top = pos.top + 'px';
+      el.style.left = pos.left + 'px';
+      if (pos.maxHeight !== null) el.style.maxHeight = pos.maxHeight + 'px';
+      el.setAttribute('data-placement', pos.placement);
+      return pos;
+    },
+
+    // Re-place el on scroll (capture phase, so scrolling any ancestor counts)
+    // and resize. getRect returns the current anchor rect, or null to skip.
+    // Returns stop().
+    track(el, getRect, opts) {
+      const update = () => {
+        const rect = getRect();
+        if (rect) Floating.place(el, rect, opts);
+      };
+      global.addEventListener('scroll', update, true);
+      global.addEventListener('resize', update);
+      return function stop() {
+        global.removeEventListener('scroll', update, true);
+        global.removeEventListener('resize', update);
+      };
+    }
+  };
+
   global.Lex.OverlayStack = OverlayStack;
+  global.Lex.Floating = Floating;
   global.Lex.ScrollLock = ScrollLock;
   global.Lex.FocusTrap = FocusTrap;
   global.Lex.version = LEX_VERSION;

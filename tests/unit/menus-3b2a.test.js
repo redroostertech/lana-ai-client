@@ -73,6 +73,7 @@ describe('MatterDocumentsView kebab menus are lex-dropdown-btn', () => {
     expect(menu.getAttribute('data-doc-id')).toBe('doc-1');
     expect(menu.hasAttribute('icon-only')).toBe(true);
     expect(menu.getAttribute('align')).toBe('end');
+    expect(menu.hasAttribute('floating')).toBe(true);
     expect(menu.getAttribute('aria-label')).toBe('File actions');
     const items = optionsOf(menu);
     expect(items.map((i) => i.value || (i.divider && '|'))).toEqual(['open', 'download', 'rename', '|', 'delete']);
@@ -89,9 +90,12 @@ describe('MatterDocumentsView kebab menus are lex-dropdown-btn', () => {
   test('choosing an item runs the same action (Open calls onFileOpen)', async () => {
     const { window, root, onFileOpen } = mount();
     const menu = root.querySelector('.mdv-kebab-menu');
-    click(window, menu.querySelector('.lex-ddbtn-trigger'));
+    const trigger = menu.querySelector('.lex-ddbtn-trigger');
+    click(window, trigger);
     await tick(window);
-    const open = menu.querySelector('.lex-ddbtn-item[data-value="open"]');
+    // floating: the open menu is in a body-level layer, found by aria-controls.
+    const list = window.document.getElementById(trigger.getAttribute('aria-controls'));
+    const open = list.querySelector('.lex-ddbtn-item[data-value="open"]');
     expect(open).not.toBeNull();
     click(window, open);
     expect(onFileOpen).toHaveBeenCalledWith('doc-1');
@@ -100,10 +104,14 @@ describe('MatterDocumentsView kebab menus are lex-dropdown-btn', () => {
   test('a click inside the menu does not reach the row delegation', async () => {
     const { window, root, onFileOpen } = mount();
     const menu = root.querySelector('.mdv-kebab-menu');
-    click(window, menu.querySelector('.lex-ddbtn-trigger'));
+    const trigger = menu.querySelector('.lex-ddbtn-trigger');
+    click(window, trigger);
     await tick(window);
     expect(onFileOpen).not.toHaveBeenCalled();
-    expect(menu.querySelector('.lex-ddbtn-dropdown--open')).not.toBeNull();
+    const list = window.document.getElementById(trigger.getAttribute('aria-controls'));
+    expect(list.classList.contains('lex-ddbtn-dropdown--open')).toBe(true);
+    click(window, list.querySelector('.lex-ddbtn-item[data-value="download"]'));
+    expect(onFileOpen).not.toHaveBeenCalled();
   });
 });
 

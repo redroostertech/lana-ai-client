@@ -357,13 +357,15 @@ describe('Document Library integration', () => {
     expect(controller).toContain('data-action="insert-template-variable"');
     expect(controller).toContain('data-template-variable="true"');
     expect(controller).toContain('data-user-mention="true"');
-    expect(controller).toContain('data-template-variable-search');
-    expect(controller).toContain('data-template-variable-back');
-    expect(controller).toContain('data-template-date-source');
-    expect(controller).toContain('data-template-date-format');
-    expect(controller).toContain('data-mention-user');
-    expect(controller).toContain('data-mention-property');
-    expect(controller).toContain("!event.target.closest('[data-template-variable-search]')");
+    // The autocomplete menu is Lex.Menu.openAt (tests/unit/file-editor-variable-autocomplete.test.js).
+    expect(controller).toContain('Lex.Menu.openAt(templateVariableMenuAnchor, items, menuOptions)');
+    expect(controller).toContain('onInput: handleTemplateVariableSearch');
+    expect(controller).toContain("handleTemplateVariableOption({ templateVariableBack: '' })");
+    expect(controller).toContain('data: { templateDateSource: option.key }');
+    expect(controller).toContain('data: { templateDateFormat: option.key }');
+    expect(controller).toContain('data: { mentionUser: option.id }');
+    expect(controller).toContain('data: { mentionProperty: option.key }');
+    expect(controller).toContain('return menu.handleKey(event);');
     expect(controller).toContain('#{{entity:property_key}}');
     expect(controller).toContain('#{{date:todays_date:format}}');
     expect(controller).toContain('@{{user_id:property_key}}');
@@ -432,12 +434,8 @@ describe('Document Library integration', () => {
     expect(css).toContain('.file-editor-shell .file-editor-workspace.has-review-dock');
     expect(css).toContain('.office-template-variable');
     expect(css).toContain('.office-user-mention');
-    expect(css).toContain('.office-template-variable-menu');
-    expect(css).toContain('.office-template-variable-search');
-    expect(css).toContain('.office-template-variable-back');
-    expect(css).toContain('.office-template-variable-person');
-    expect(css).toContain('background: #fff;');
-    expect(css).toContain('width: min(300px, calc(100vw - 24px));');
+    // The variable autocomplete menu is styled by Lex.Menu (lex-dropdown-btn.js), not page CSS.
+    expect(css).not.toContain('.office-template-variable-menu');
     expect(css).toContain('.office-doc-page h3');
     expect(css).toContain('.office-doc-page h4');
     expect(css).toContain('.office-doc-subheading');

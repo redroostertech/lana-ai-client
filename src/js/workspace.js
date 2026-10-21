@@ -113,7 +113,7 @@
         { value: 'delete', label: 'Delete', icon: 'trash-2', danger: true }
       ];
       return '<lex-dropdown-btn class="matter-options-menu' + (className ? ' ' + className : '') + '"' +
-        ' data-matter-id="' + escapeHtml(matter.matter_id) + '" icon="more-vertical" icon-only variant="ghost" align="end"' +
+        ' data-matter-id="' + escapeHtml(matter.matter_id) + '" icon="more-vertical" icon-only variant="ghost" align="end" floating' +
         ' aria-label="More options" options="' + escapeHtml(JSON.stringify(items)) + '"' +
         ' onclick="event.stopPropagation()"></lex-dropdown-btn>';
     }

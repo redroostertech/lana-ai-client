@@ -5655,21 +5655,29 @@
     return null;
   }
 
-  function templateVariableMenu() {
-    var menu = el('officeTemplateVariableMenu');
-    if (menu) return menu;
-    menu = document.createElement('div');
-    menu.id = 'officeTemplateVariableMenu';
-    menu.className = 'office-template-variable-menu';
-    menu.hidden = true;
-    document.body.appendChild(menu);
-    return menu;
-  }
+  // The autocomplete is a Lex.Menu (js/lex/components/form/lex-dropdown-btn.js):
+  // a floating menu at the caret rect whose keyboard is driven from the
+  // document page, so focus and the caret stay in the contenteditable.
+  var templateVariableMenuController = null;
 
   function hideTemplateVariableMenu() {
-    var menu = el('officeTemplateVariableMenu');
-    if (menu) menu.hidden = true;
+    var menu = templateVariableMenuController;
+    templateVariableMenuController = null;
     templateVariableMenuState = null;
+    if (menu && menu.open) menu.close('host');
+  }
+
+  // Where the menu hangs: the live trigger text rect while it still has a box
+  // (so the menu follows the caret when the page scrolls), else the rect
+  // captured when the menu opened (toolbar button or an empty caret).
+  function templateVariableMenuAnchor() {
+    var state = templateVariableMenuState;
+    if (!state) return null;
+    if (state.anchorMode !== 'toolbar' && state.range && typeof state.range.getBoundingClientRect === 'function') {
+      var live = state.range.getBoundingClientRect();
+      if (live && (live.width || live.height)) return live;
+    }
+    return state.anchorRect || { left: 24, top: 100, right: 24, bottom: 124, width: 0, height: 24 };
   }
 
   function templateVariableTrigger() {
@@ -5755,30 +5763,13 @@
     });
   }
 
-  function positionTemplateVariableMenu(anchorRect) {
-    var menu = templateVariableMenu();
-    var rect = anchorRect || { left: 24, top: 100, bottom: 124, width: 0 };
-    menu.hidden = false;
-    var width = menu.offsetWidth || 260;
-    var left = rect.left + ((rect.width || 0) / 2) - (width / 2);
-    var top = rect.bottom + 8;
-    var height = menu.offsetHeight || 280;
-    left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
-    if (top + height > window.innerHeight - 12 && rect.top - height - 8 > 12) {
-      top = rect.top - height - 8;
-    }
-    top = Math.max(12, Math.min(top, window.innerHeight - height - 12));
-    menu.style.left = Math.round(left) + 'px';
-    menu.style.top = Math.round(top) + 'px';
-  }
-
   function renderTemplateVariableMenu() {
     var state = templateVariableMenuState;
-    var menu = templateVariableMenu();
     if (!state) {
-      menu.hidden = true;
+      hideTemplateVariableMenu();
       return;
     }
+    if (!window.Lex || !Lex.Menu || typeof Lex.Menu.openAt !== 'function') return;
     var isMention = state.kind === 'mention';
     var entity = !isMention && state.entityKey ? templateVariableEntity(state.entityKey) : null;
     var user = isMention && state.userId ? mentionUserById(state.userId) : null;
@@ -5814,50 +5805,102 @@
         ? 'Search formats...'
         : (entity ? 'Search properties...' : 'Search entities...');
     var canGoBack = Boolean((isMention && user) || (!isMention && (entity || state.dateSourceKey)));
-    var rows = options.map(function (option, index) {
-      var active = index === state.activeIndex ? ' is-active' : '';
+    var items = options.map(function (option) {
       if (isMention && user) {
         var value = mentionUserPropertyValue(user, option.key);
-        return '<button class="office-template-variable-option' + active + '" type="button" data-mention-property="' + esc(option.key) + '">' +
-          '<span>' + esc(option.label) + '</span><code>' + esc(value || mentionUserLiteral(user.id, option.key)) + '</code></button>';
+        return { value: option.key, label: option.label, meta: value || mentionUserLiteral(user.id, option.key), data: { mentionProperty: option.key } };
       }
       if (isMention) {
-        return '<button class="office-template-variable-option office-template-variable-person' + active + '" type="button" data-mention-user="' + esc(option.id) + '">' +
-          '<span class="office-template-variable-avatar">' + esc(initialsForName(option.label)) + '</span>' +
-          '<span class="office-template-variable-person-copy"><strong>' + esc(option.label) + '</strong><code>' + esc(option.email || option.username || option.id) + '</code></span></button>';
+        return { value: option.id, label: option.label, meta: option.email || option.username || option.id, avatar: initialsForName(option.label), data: { mentionUser: option.id } };
       }
       if (isDateEntity && state.dateSourceKey) {
-        return '<button class="office-template-variable-option' + active + '" type="button" data-template-date-format="' + esc(option.key) + '">' +
-          '<span>' + esc(option.label) + '</span><code>' + esc(option.example || templateVariableLiteral('date', state.dateSourceKey, option.key)) + '</code></button>';
+        return { value: option.key, label: option.label, meta: option.example || templateVariableLiteral('date', state.dateSourceKey, option.key), data: { templateDateFormat: option.key } };
       }
       if (isDateEntity) {
-        return '<button class="office-template-variable-option' + active + '" type="button" data-template-date-source="' + esc(option.key) + '">' +
-          '<span>' + esc(option.label) + '</span><code>' + esc(templateVariableLiteral('date', option.key, 'format')) + '</code></button>';
+        return { value: option.key, label: option.label, meta: templateVariableLiteral('date', option.key, 'format'), data: { templateDateSource: option.key } };
       }
       if (entity) {
-        return '<button class="office-template-variable-option' + active + '" type="button" data-template-variable-property="' + esc(option.key) + '">' +
-          '<span>' + esc(option.label) + '</span><code>' + esc(templateVariableLiteral(entity.key, option.key)) + '</code></button>';
+        return { value: option.key, label: option.label, meta: templateVariableLiteral(entity.key, option.key), data: { templateVariableProperty: option.key } };
       }
-      return '<button class="office-template-variable-option' + active + '" type="button" data-template-variable-entity="' + esc(option.key) + '">' +
-        '<span>' + esc(option.label) + '</span><code>' + esc(option.key) + '</code></button>';
-    }).join('');
-    menu.innerHTML = '<div class="office-template-variable-menu-head">' +
-      '<div class="office-template-variable-menu-title">' +
-      (canGoBack ? '<button class="office-template-variable-back" type="button" data-template-variable-back title="Back">' + toolbarIcon('arrow-left', 'Back') + '</button>' : '') +
-      '<span><strong>' + esc(title) + '</strong><code>' + esc(hint) + '</code></span></div>' +
-      '<input class="office-template-variable-search" type="search" data-template-variable-search placeholder="' + esc(searchPlaceholder) + '" value="' + esc(searchValue || '') + '" autocomplete="off">' +
-      '</div>' +
-      '<div class="office-template-variable-options">' + (rows || '<div class="office-template-variable-empty">No matching fields</div>') + '</div>';
-    positionTemplateVariableMenu(state.anchorRect);
+      return { value: option.key, label: option.label, meta: option.key, data: { templateVariableEntity: option.key } };
+    });
+    var menuOptions = {
+      id: 'officeTemplateVariableMenu',
+      heading: title,
+      hint: hint,
+      onBack: canGoBack ? function () { handleTemplateVariableOption({ templateVariableBack: '' }); } : null,
+      search: { value: searchValue || '', placeholder: searchPlaceholder, onInput: handleTemplateVariableSearch },
+      emptyText: 'No matching fields',
+      activeIndex: state.activeIndex,
+      align: 'center',
+      gap: 8,
+      margin: 12,
+      width: 'min(300px, calc(100vw - 24px))',
+      tabSelects: true,
+      owner: fallbackDocPage(),
+      // The toolbar's insert-variable button reopens the picker itself.
+      ignoreOutside: function (target) {
+        return Boolean(target && target.closest && target.closest('[data-action="insert-template-variable"]'));
+      },
+      onSelect: function (item) { handleTemplateVariableOption(item.data); },
+      onActiveChange: function (index) {
+        if (templateVariableMenuState) templateVariableMenuState.activeIndex = index;
+      },
+      // Escape or a click outside closed it.
+      onClose: function () {
+        if (templateVariableMenuController && !templateVariableMenuController.open) {
+          templateVariableMenuController = null;
+          templateVariableMenuState = null;
+        }
+      }
+    };
+    if (templateVariableMenuController && templateVariableMenuController.open) {
+      templateVariableMenuController.update(items, menuOptions);
+    } else {
+      templateVariableMenuController = Lex.Menu.openAt(templateVariableMenuAnchor, items, menuOptions);
+    }
+  }
+
+  // Typing in the menu's search box filters the current level.
+  function handleTemplateVariableSearch(value) {
+    var state = templateVariableMenuState;
+    if (!state) return;
+    value = value || '';
+    if (state.kind === 'mention') {
+      if (state.userId) {
+        state.propertyQuery = value;
+      } else {
+        state.userQuery = value;
+      }
+    } else if (state.entityKey === 'date' && state.dateSourceKey) {
+      state.formatQuery = value;
+    } else if (state.entityKey) {
+      state.propertyQuery = value;
+    } else {
+      state.entityQuery = value;
+    }
+    state.activeIndex = 0;
+    renderTemplateVariableMenu();
+  }
+
+  // The open menu already reflects this trigger text: keep its level and
+  // highlight. keyup runs this after every key, so without the check an
+  // ArrowDown or an Enter that drilled into a level was undone on release.
+  function templateVariableMenuShowing(kind, raw) {
+    var state = templateVariableMenuState;
+    return Boolean(state && state.kind === kind && state.raw === raw &&
+      templateVariableMenuController && templateVariableMenuController.open);
   }
 
   function updateTemplateVariableAutocomplete() {
     var mentionTrigger = mentionUserTrigger();
     if (mentionTrigger) {
+      if (templateVariableMenuShowing('mention', mentionTrigger.raw)) return;
       var mentionRect = mentionTrigger.range.getBoundingClientRect();
       var mentionUser = mentionTrigger.propertyMode ? mentionUserById(mentionTrigger.userQuery) : null;
       templateVariableMenuState = {
         kind: 'mention',
+        raw: mentionTrigger.raw,
         range: mentionTrigger.range,
         userQuery: mentionTrigger.userQuery,
         userId: mentionUser ? mentionUser.id : '',
@@ -5873,10 +5916,12 @@
       hideTemplateVariableMenu();
       return;
     }
+    if (templateVariableMenuShowing('template', trigger.raw)) return;
     var rangeRect = trigger.range.getBoundingClientRect();
     var entity = trigger.propertyMode ? templateVariableEntity(trigger.entityQuery) : null;
     templateVariableMenuState = {
       kind: 'template',
+      raw: trigger.raw,
       range: trigger.range,
       entityQuery: trigger.entityQuery,
       entityKey: entity ? entity.key : '',
@@ -5993,9 +6038,12 @@
     syncDocumentToolbarState();
   }
 
+  // option: a menu item's data ({ templateVariableEntity: key }, ...) or an
+  // element whose dataset has the same keys.
   function handleTemplateVariableOption(option) {
     if (!option || !templateVariableMenuState) return;
-    if (option.dataset.templateVariableBack !== undefined) {
+    var data = option.dataset || option;
+    if (data.templateVariableBack !== undefined) {
       if (templateVariableMenuState.kind === 'mention') {
         templateVariableMenuState.userId = '';
         templateVariableMenuState.propertyQuery = '';
@@ -6010,8 +6058,8 @@
       renderTemplateVariableMenu();
       return;
     }
-    var mentionUserId = option.dataset.mentionUser;
-    var mentionPropertyKey = option.dataset.mentionProperty;
+    var mentionUserId = data.mentionUser;
+    var mentionPropertyKey = data.mentionProperty;
     if (mentionUserId) {
       templateVariableMenuState.kind = 'mention';
       templateVariableMenuState.userId = mentionUserId;
@@ -6024,10 +6072,10 @@
       insertMentionUserToken(templateVariableMenuState.userId, mentionPropertyKey);
       return;
     }
-    var entityKey = option.dataset.templateVariableEntity;
-    var propertyKey = option.dataset.templateVariableProperty;
-    var dateSourceKey = option.dataset.templateDateSource;
-    var dateFormatKey = option.dataset.templateDateFormat;
+    var entityKey = data.templateVariableEntity;
+    var propertyKey = data.templateVariableProperty;
+    var dateSourceKey = data.templateDateSource;
+    var dateFormatKey = data.templateDateFormat;
     if (entityKey) {
       templateVariableMenuState.entityKey = entityKey;
       templateVariableMenuState.propertyQuery = '';
@@ -6054,26 +6102,12 @@
     }
   }
 
+  // Keys from the document page: ArrowUp/ArrowDown move, Enter/Tab pick,
+  // Escape closes. Returns true when the menu used the key.
   function handleTemplateVariableKeydown(event) {
-    var menu = el('officeTemplateVariableMenu');
-    if (!templateVariableMenuState || !menu || menu.hidden) return false;
-    var options = menu.querySelectorAll('.office-template-variable-option');
-    if (event.key === 'Escape') {
-      hideTemplateVariableMenu();
-      return true;
-    }
-    if (!options.length) return false;
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      var delta = event.key === 'ArrowDown' ? 1 : -1;
-      templateVariableMenuState.activeIndex = (templateVariableMenuState.activeIndex + delta + options.length) % options.length;
-      renderTemplateVariableMenu();
-      return true;
-    }
-    if (event.key === 'Enter' || event.key === 'Tab') {
-      handleTemplateVariableOption(options[templateVariableMenuState.activeIndex || 0]);
-      return true;
-    }
-    return false;
+    var menu = templateVariableMenuController;
+    if (!templateVariableMenuState || !menu || !menu.open) return false;
+    return menu.handleKey(event);
   }
 
   function syncActiveDocContent(options) {
@@ -7446,7 +7480,6 @@
     });
 
     document.addEventListener('click', function (event) {
-      var variableTarget = event.target.closest('[data-template-variable-entity], [data-template-variable-property], [data-template-date-source], [data-template-date-format], [data-mention-user], [data-mention-property], [data-template-variable-back]');
       var actionTarget = event.target.closest('[data-action]');
       var filterTarget = event.target.closest('[data-filter]');
       var fileTarget = event.target.closest('[data-file-id]');
@@ -7454,13 +7487,12 @@
       var slideTarget = event.target.closest('[data-slide-index]');
       var file = activeFile();
 
-      if (variableTarget) {
-        handleTemplateVariableOption(variableTarget);
-        return;
-      }
-
-      if (templateVariableMenuState &&
-          !(event.target.closest && event.target.closest('#officeTemplateVariableMenu')) &&
+      // composedPath: picking a level re-renders the menu, so the clicked row
+      // is already detached from it here.
+      var menuEl = templateVariableMenuController && templateVariableMenuController.element;
+      var inVariableMenu = Boolean(menuEl && (menuEl.contains(event.target) ||
+        (typeof event.composedPath === 'function' && event.composedPath().indexOf(menuEl) !== -1)));
+      if (templateVariableMenuState && !inVariableMenu &&
           !(actionTarget && actionTarget.dataset.action === 'insert-template-variable')) {
         hideTemplateVariableMenu();
       }
@@ -7953,34 +7985,6 @@
     });
 
     document.addEventListener('input', function (event) {
-      var searchTarget = event.target.closest && event.target.closest('[data-template-variable-search]');
-      if (!searchTarget || !templateVariableMenuState) return;
-      var value = searchTarget.value || '';
-      if (templateVariableMenuState.kind === 'mention') {
-        if (templateVariableMenuState.userId) {
-          templateVariableMenuState.propertyQuery = value;
-        } else {
-          templateVariableMenuState.userQuery = value;
-        }
-      } else if (templateVariableMenuState.entityKey === 'date' && templateVariableMenuState.dateSourceKey) {
-        templateVariableMenuState.formatQuery = value;
-      } else if (templateVariableMenuState.entityKey) {
-        templateVariableMenuState.propertyQuery = value;
-      } else {
-        templateVariableMenuState.entityQuery = value;
-      }
-      templateVariableMenuState.activeIndex = 0;
-      renderTemplateVariableMenu();
-      var nextSearch = el('officeTemplateVariableMenu') && el('officeTemplateVariableMenu').querySelector('[data-template-variable-search]');
-      if (nextSearch && typeof nextSearch.focus === 'function') {
-        nextSearch.focus();
-        try {
-          nextSearch.setSelectionRange(nextSearch.value.length, nextSearch.value.length);
-        } catch (_) {}
-      }
-    });
-
-    document.addEventListener('input', function (event) {
       var file = activeFile();
       if (!file) return;
 
@@ -8054,10 +8058,6 @@
         return;
       }
       if (event.target && event.target.id === 'officeDocPage' && handleTemplateVariableKeydown(event)) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-      if (event.target && event.target.closest && event.target.closest('[data-template-variable-search]') && handleTemplateVariableKeydown(event)) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -8158,12 +8158,6 @@
         // Keep the document caret/selection (shell or embed) and any pending
         // embed typing session alive so the picker can capture the insertion
         // point when the click handler opens it.
-        event.preventDefault();
-      }
-      if (event.target &&
-          event.target.closest &&
-          event.target.closest('#officeTemplateVariableMenu') &&
-          !event.target.closest('[data-template-variable-search]')) {
         event.preventDefault();
       }
     });
