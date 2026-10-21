@@ -271,88 +271,74 @@ const ConversationActionsModal = {
   _renameModal: null,
   _renameInput: null,
 
-  // Wire up modal elements (re-binds on every call to handle SPA navigation
-  // where the DOM elements are replaced by the router).
-  // Injects modal HTML into document.body if not already present (so it works
-  // on any page, not just search-conversations.html).
+  // Build the actions <lex-modal> on first use (it owns the backdrop, header
+  // close button, Escape, focus trap and scroll lock). Safe to call on every
+  // SPA init; it no-ops once the modal exists on the page.
   init() {
-    var actionsModal = document.getElementById('conversationActionsModal');
-
-    // Inject modal DOM if not present on the current page
-    if (!actionsModal) {
-      this._injectModalHtml();
-      actionsModal = document.getElementById('conversationActionsModal');
-    }
-
-    if (!actionsModal) return;
-
-    // Skip if already bound to THIS exact element
-    if (this._boundActionsModal === actionsModal) return;
-
-    // Close on background click
-    actionsModal.onclick = (e) => {
-      if (e.target === actionsModal) {
-        this.close();
-      }
-    };
-
-    this._boundActionsModal = actionsModal;
+    this._ensureActionsModal();
   },
 
-  // Inject the conversation actions + rename modal HTML into document.body.
-  // Called by init() when the modal elements are not found on the current page.
-  _injectModalHtml() {
-    var container = document.createElement('div');
-    container.id = 'conversation-modals-injected';
-    container.innerHTML =
-      '<div id="conversationActionsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 9999;">' +
-        '<div class="bg-white rounded-xl shadow-2xl w-full max-w-md" onclick="event.stopPropagation()">' +
-          '<div class="flex items-center justify-between p-6 border-b border-gray-200">' +
-            '<h2 class="text-xl font-semibold text-gray-900">Conversation Options</h2>' +
-            '<button onclick="ConversationActionsModal.close()" class="text-gray-400 hover:text-gray-600 transition-colors">' +
-              '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' +
-            '</button>' +
-          '</div>' +
-          '<div class="p-6">' +
-            '<h3 id="modalConversationTitle" class="text-lg font-medium text-gray-900 mb-6"></h3>' +
-            '<div class="space-y-3">' +
-              '<button onclick="ConversationActionsModal.editConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group">' +
-                '<div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">' +
-                  '<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>' +
-                '</div>' +
-                '<div class="flex-1"><div class="font-medium text-gray-900">Rename Conversation</div><div class="text-sm text-gray-500">Change the conversation name</div></div>' +
-              '</button>' +
-              '<button id="togglePinConversationBtn" onclick="ConversationActionsModal.togglePin()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-yellow-300 hover:bg-yellow-50 transition-all group">' +
-                '<div class="flex-shrink-0 w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center group-hover:bg-yellow-200 transition-colors">' +
-                  '<svg id="togglePinConversationIcon" class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>' +
-                '</div>' +
-                '<div class="flex-1"><div id="togglePinConversationLabel" class="font-medium text-gray-900">Pin Conversation</div><div id="togglePinConversationDescription" class="text-sm text-gray-500">Keep this conversation at the top of the list</div></div>' +
-              '</button>' +
-              '<button id="viewMatterDetailsBtn" onclick="ConversationActionsModal.viewMatterDetails()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group hidden">' +
-                '<div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">' +
-                  '<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>' +
-                '</div>' +
-                '<div class="flex-1"><div class="font-medium text-gray-900">View Matter Details</div><div class="text-sm text-gray-500">Open the associated matter</div></div>' +
-              '</button>' +
-              '<button onclick="ConversationActionsModal.deleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all group">' +
-                '<div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">' +
-                  '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' +
-                '</div>' +
-                '<div class="flex-1"><div class="font-medium text-gray-900">Archive Conversation</div><div class="text-sm text-gray-500">Hide from the list — can be restored later</div></div>' +
-              '</button>' +
-              '<button onclick="ConversationActionsModal.permanentDeleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-400 hover:bg-red-50 transition-all group">' +
-                '<div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">' +
-                  '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
-                '</div>' +
-                '<div class="flex-1"><div class="font-medium text-red-700">Delete Permanently</div><div class="text-sm text-gray-500">Hard delete — cannot be recovered</div></div>' +
-              '</button>' +
+  // Resolves the actions <lex-modal>, loading lex components if the page
+  // has not. The element keeps the legacy #conversationActionsModal id.
+  async _ensureActionsModal() {
+    var existing = document.getElementById('conversationActionsModal');
+    if (existing && existing === this._boundActionsModal) return existing;
+    if (this._actionsModalPending) return this._actionsModalPending;
+
+    var self = this;
+    this._actionsModalPending = this._ensureLexComponents().then(function () {
+      self._actionsModalPending = null;
+      var current = document.getElementById('conversationActionsModal');
+      if (current && current === self._boundActionsModal) return current;
+      if (current) current.remove();
+
+      var modal = document.createElement('lex-modal');
+      modal.id = 'conversationActionsModal';
+      modal.heading = 'Conversation Options';
+      modal.size = 'md';
+      modal.hideActions = true;
+      modal.innerHTML =
+        '<h3 id="modalConversationTitle" class="text-lg font-medium text-gray-900 mb-6"></h3>' +
+        '<div class="space-y-3">' +
+          '<button onclick="ConversationActionsModal.editConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group">' +
+            '<div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">' +
+              '<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>' +
             '</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    // NOTE: The Rename modal is no longer injected here. It's built lazily
-    // as a <lex-modal> (Lex-styled chrome + buttons) via _ensureRenameModal().
-    document.body.appendChild(container);
+            '<div class="flex-1"><div class="font-medium text-gray-900">Rename Conversation</div><div class="text-sm text-gray-500">Change the conversation name</div></div>' +
+          '</button>' +
+          '<button id="togglePinConversationBtn" onclick="ConversationActionsModal.togglePin()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-yellow-300 hover:bg-yellow-50 transition-all group">' +
+            '<div class="flex-shrink-0 w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center group-hover:bg-yellow-200 transition-colors">' +
+              '<svg id="togglePinConversationIcon" class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>' +
+            '</div>' +
+            '<div class="flex-1"><div id="togglePinConversationLabel" class="font-medium text-gray-900">Pin Conversation</div><div id="togglePinConversationDescription" class="text-sm text-gray-500">Keep this conversation at the top of the list</div></div>' +
+          '</button>' +
+          '<button id="viewMatterDetailsBtn" onclick="ConversationActionsModal.viewMatterDetails()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group hidden">' +
+            '<div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">' +
+              '<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>' +
+            '</div>' +
+            '<div class="flex-1"><div class="font-medium text-gray-900">View Matter Details</div><div class="text-sm text-gray-500">Open the associated matter</div></div>' +
+          '</button>' +
+          '<button onclick="ConversationActionsModal.deleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all group">' +
+            '<div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">' +
+              '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' +
+            '</div>' +
+            '<div class="flex-1"><div class="font-medium text-gray-900">Archive Conversation</div><div class="text-sm text-gray-500">Hide from the list — can be restored later</div></div>' +
+          '</button>' +
+          '<button onclick="ConversationActionsModal.permanentDeleteConversation()" class="w-full flex items-center gap-3 p-4 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-red-400 hover:bg-red-50 transition-all group">' +
+            '<div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">' +
+              '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
+            '</div>' +
+            '<div class="flex-1"><div class="font-medium text-red-700">Delete Permanently</div><div class="text-sm text-gray-500">Hard delete — cannot be recovered</div></div>' +
+          '</button>' +
+        '</div>';
+      // Escape, the header close button and the backdrop dismiss the modal
+      // on their own; clear the selection the same way close() does.
+      modal.addEventListener('lex-close', function () { self._clearSelection(); });
+      document.body.appendChild(modal);
+      self._boundActionsModal = modal;
+      return modal;
+    });
+    return this._actionsModalPending;
   },
 
   // Ensure lex-modal, lex-input, and lex-btn custom elements are defined.
@@ -412,7 +398,8 @@ const ConversationActionsModal = {
     var modal = document.createElement('lex-modal');
     modal.heading = 'Rename Conversation';
     modal.size = 'md';
-    modal.hideActions = true; // we render a custom footer with <lex-btn>s
+    // Footer: data-slot="footer" lex-btns replace the built-in confirm/cancel;
+    // Rename submits the form from the footer (lex-btn form="id").
     modal.id = 'renameConversationModal'; // preserved for legacy querySelector calls
     modal.innerHTML =
       '<form id="renameConversationForm" class="rename-conversation-form" novalidate>' +
@@ -425,10 +412,8 @@ const ConversationActionsModal = {
           'required="true"' +
         '></lex-input>' +
       '</form>' +
-      '<div class="rename-conversation-footer">' +
-        '<lex-btn id="renameCancelBtn" variant="secondary" type="button">Cancel</lex-btn>' +
-        '<lex-btn id="renameConfirmBtn" variant="primary" type="button">Rename</lex-btn>' +
-      '</div>';
+      '<lex-btn data-slot="footer" id="renameCancelBtn" variant="secondary" type="button">Cancel</lex-btn>' +
+      '<lex-btn data-slot="footer" id="renameConfirmBtn" variant="primary" type="submit" form="renameConversationForm">Rename</lex-btn>';
 
     document.body.appendChild(modal);
 
@@ -442,10 +427,8 @@ const ConversationActionsModal = {
     if (cancelBtn) {
       cancelBtn.addEventListener('click', function () { self.closeRename(); });
     }
-    var confirmBtn = modal.querySelector('#renameConfirmBtn');
-    if (confirmBtn) {
-      confirmBtn.addEventListener('click', function () { self.confirmRename(); });
-    }
+    // Rename is type="submit" form="renameConversationForm": the submit
+    // listener below handles it.
 
     // Enter key submits, Escape cancels (Escape is also handled by lex-modal natively).
     var form = modal.querySelector('#renameConversationForm');
@@ -474,7 +457,7 @@ const ConversationActionsModal = {
     modal.addEventListener('lex-close', function () { self._onRenameDismissed(); });
     modal.addEventListener('lex-cancel', function () { self._onRenameDismissed(); });
 
-    // Inject minimal styling for the form + footer layout (no inline styles
+    // Inject minimal styling for the form layout (no inline styles
     // per the client's page-hygiene rule). One-time per page load.
     this._injectRenameStyles();
 
@@ -491,16 +474,7 @@ const ConversationActionsModal = {
     style.id = 'rename-conversation-modal-styles';
     style.setAttribute('data-source', 'components.js:ConversationActionsModal');
     style.textContent = [
-      '.rename-conversation-form { display: block; margin-bottom: 16px; }',
-      '.rename-conversation-footer {',
-      '  display: flex;',
-      '  align-items: center;',
-      '  justify-content: flex-end;',
-      '  gap: 8px;',
-      '  margin-top: 8px;',
-      '  padding-top: 16px;',
-      '  border-top: 1px solid var(--lex-border-subtle, rgba(0,0,0,0.06));',
-      '}'
+      '.rename-conversation-form { display: block; }'
     ].join('\n');
     document.head.appendChild(style);
   },
@@ -515,9 +489,8 @@ const ConversationActionsModal = {
   },
 
   // Open conversation actions modal
-  open(conversationId, conversationTitle, matterId, isPinned, options) {
-    this.init(); // Ensure modal is initialized
-
+  // Resolves once the modal is showing (it may first load lex components).
+  async open(conversationId, conversationTitle, matterId, isPinned, options) {
     options = options || {};
 
     this.selectedConversationId = options.registryId || conversationId;
@@ -535,10 +508,13 @@ const ConversationActionsModal = {
       .split('&#96;').join('`')
       .split('&amp;').join('&');
 
-    document.getElementById('modalConversationTitle').textContent = decodedTitle;
+    const modal = await this._ensureActionsModal();
+    if (!modal) return;
+
+    modal.querySelector('#modalConversationTitle').textContent = decodedTitle;
 
     // Show/hide matter details button
-    const matterBtn = document.getElementById('viewMatterDetailsBtn');
+    const matterBtn = modal.querySelector('#viewMatterDetailsBtn');
     if (matterId && matterId !== 'null') {
       matterBtn.classList.remove('hidden');
     } else {
@@ -546,9 +522,9 @@ const ConversationActionsModal = {
     }
 
     // Update Pin/Unpin label + icon based on current state
-    const pinLabel = document.getElementById('togglePinConversationLabel');
-    const pinDesc = document.getElementById('togglePinConversationDescription');
-    const pinIcon = document.getElementById('togglePinConversationIcon');
+    const pinLabel = modal.querySelector('#togglePinConversationLabel');
+    const pinDesc = modal.querySelector('#togglePinConversationDescription');
+    const pinIcon = modal.querySelector('#togglePinConversationIcon');
     if (pinLabel) pinLabel.textContent = this.selectedConversationIsPinned ? 'Unpin Conversation' : 'Pin Conversation';
     if (pinDesc) pinDesc.textContent = this.selectedConversationIsPinned
       ? 'Remove from pinned'
@@ -562,18 +538,17 @@ const ConversationActionsModal = {
     }
 
     // Show modal
-    const modal = document.getElementById('conversationActionsModal');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+    modal.open = true;
   },
 
   // Close conversation actions modal
   close() {
     const modal = document.getElementById('conversationActionsModal');
-    if (modal) {
-      modal.classList.remove('flex');
-      modal.classList.add('hidden');
-    }
+    if (modal) modal.open = false;
+    this._clearSelection();
+  },
+
+  _clearSelection() {
     this.selectedConversationId = null;
     this.selectedConversationTitle = null;
     this.selectedConversationIsProject = false;
@@ -591,12 +566,9 @@ const ConversationActionsModal = {
       return;
     }
 
-    // Hide actions modal
+    // Hide actions modal (keeps the selection for the rename)
     const actionsModal = document.getElementById('conversationActionsModal');
-    if (actionsModal) {
-      actionsModal.classList.remove('flex');
-      actionsModal.classList.add('hidden');
-    }
+    if (actionsModal) actionsModal.open = false;
 
     // Lazy-build the lex-modal on first use (loads lex components if needed).
     await this._ensureRenameModal();

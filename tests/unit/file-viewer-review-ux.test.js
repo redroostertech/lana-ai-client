@@ -80,9 +80,12 @@ describe('file-viewer review UX foundation', () => {
     expect(html).toContain('id="metaActionsFooter" data-slot="footer"');
     expect(html).toContain('id="metaCancelBtn"');
     expect(html).toContain('id="metaSaveBtn"');
-    expect(pageJs).toContain("closest('.lex-drawer-footer')");
-    expect(pageJs).toContain("footerShell.classList.add('hidden')");
-    expect(drawerJs).toContain('.lex-drawer-footer.hidden');
+    // The footer shell is toggled through the drawer API, not by reaching
+    // into .lex-drawer-footer.
+    expect(pageJs).toContain("footer.closest('lex-drawer')");
+    expect(pageJs).toContain('drawer.setFooterVisible(visible)');
+    expect(pageJs).not.toContain("closest('.lex-drawer-footer')");
+    expect(drawerJs).toContain('setFooterVisible(visible)');
   });
 
   test('lets AI Summary fill the file info drawer height', () => {

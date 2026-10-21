@@ -209,11 +209,10 @@
       </div>
       <div class="flex gap-3">
         <lex-btn type="button" onclick="closeTaskModal()" variant="secondary">Cancel</lex-btn>
-        <lex-btn id="taskSubmitBtn" type="button" variant="primary" onclick="document.getElementById(&#39;taskForm&#39;).requestSubmit()">Save Task</lex-btn>
+        <lex-btn id="taskSubmitBtn" type="submit" form="taskForm" variant="primary">Save Task</lex-btn>
       </div>
     </div>'>
       <form id="taskForm" onsubmit="saveTask(event)" class="p-6 space-y-5">
-        <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
         <input type="hidden" id="taskId">
 
         <div id="taskTitleField">
@@ -288,9 +287,8 @@
 
   <!-- Create Task Plan Modal -->
   <lex-modal id="taskPlanModal" heading="Create Task Plan" size="lg" hide-actions
-    footer-content='<lex-btn type="button" onclick="closeTaskPlanModal()" variant="secondary">Cancel</lex-btn><lex-btn id="taskPlanSubmitBtn" type="button" variant="primary" onclick="document.getElementById(&#39;taskPlanForm&#39;).requestSubmit()">Save Task Plan</lex-btn>'>
+    footer-content='<lex-btn type="button" onclick="closeTaskPlanModal()" variant="secondary">Cancel</lex-btn><lex-btn id="taskPlanSubmitBtn" type="submit" form="taskPlanForm" variant="primary">Save Task Plan</lex-btn>'>
     <form id="taskPlanForm" onsubmit="saveTaskPlan(event)" class="p-6 space-y-5">
-        <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
       <lex-input id="taskPlanTitle" label="Plan name" required placeholder="e.g. New client intake checklist"></lex-input>
 
       <lex-textarea id="taskPlanDescription" label="Description" rows="3" placeholder="Describe what this plan accomplishes..."></lex-textarea>
@@ -307,9 +305,8 @@
 
   <!-- Contact Modal -->
   <lex-modal id="contactModal" heading="Add Contact" size="lg" hide-actions
-    footer-content='<lex-btn type="button" onclick="closeContactModal()" variant="secondary">Cancel</lex-btn><lex-btn id="contactSubmitBtn" type="button" variant="primary" onclick="document.getElementById(&#39;contactForm&#39;).requestSubmit()">Save Contact</lex-btn>'>
+    footer-content='<lex-btn type="button" onclick="closeContactModal()" variant="secondary">Cancel</lex-btn><lex-btn id="contactSubmitBtn" type="submit" form="contactForm" variant="primary">Save Contact</lex-btn>'>
       <form id="contactForm" onsubmit="saveContact(event)" class="p-6 space-y-5">
-        <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
         <input type="hidden" id="contactMatterId">
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -344,9 +341,8 @@
 
   <!-- Edit Contact Modal -->
   <lex-modal id="editContactModal" heading="Edit Contact" size="lg" hide-actions
-    footer-content='<lex-btn type="button" onclick="closeEditContactModal()" variant="secondary">Cancel</lex-btn><lex-btn id="editContactSubmitBtn" type="button" variant="primary" onclick="document.getElementById(&#39;editContactForm&#39;).requestSubmit()">Save Changes</lex-btn>'>
+    footer-content='<lex-btn type="button" onclick="closeEditContactModal()" variant="secondary">Cancel</lex-btn><lex-btn id="editContactSubmitBtn" type="submit" form="editContactForm" variant="primary">Save Changes</lex-btn>'>
       <form id="editContactForm" onsubmit="updateContact(event)" class="p-6 space-y-5">
-        <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
         <input type="hidden" id="editContactId">
         <input type="hidden" id="editContactMatterId">
 
@@ -448,9 +444,8 @@
 
   <!-- Doc Studio Document Creation Modal -->
   <lex-modal id="createDocStudioDocumentModal" heading="Create with Doc Studio" size="lg" hide-actions close-on-overlay
-    footer-content='<lex-btn type="button" id="cancelDocStudioDocumentBtn" variant="secondary">Cancel</lex-btn><lex-btn type="button" id="generateDocStudioDocumentBtn" variant="primary" onclick="document.getElementById(&#39;createDocStudioDocumentForm&#39;).requestSubmit()">Generate</lex-btn>'>
+    footer-content='<lex-btn type="button" id="cancelDocStudioDocumentBtn" variant="secondary">Cancel</lex-btn><lex-btn type="submit" form="createDocStudioDocumentForm" id="generateDocStudioDocumentBtn" variant="primary">Generate</lex-btn>'>
     <form id="createDocStudioDocumentForm" class="p-6 space-y-5">
-      <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
       <p class="text-sm text-gray-500">Generate a workspace-specific file from selected or all workspace documents</p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <lex-select id="docStudioOutputFormat" label="Format"
@@ -570,8 +565,7 @@
   <!-- Shared With Drawer -->
   <lex-drawer id="sharedWithDrawer" heading="Shared With" subtitle="People with access to this matter" width="sm">
     <div>
-      <div class="flex items-center justify-end mb-4">
-        <div class="flex items-center gap-1">
+        <div data-slot="header-actions" class="flex items-center gap-1">
           <button onclick="openManageShareModal(currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id)" class="p-1.5 rounded transition-colors" style="color: var(--lex-text-secondary)" title="Add people" onmouseover="this.style.color='var(--lex-text-accent)'" onmouseout="this.style.color='var(--lex-text-secondary)'">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           </button>
@@ -579,7 +573,6 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
           </button>
         </div>
-      </div>
       <div id="sharedWithDrawerList"></div>
     </div>
   </lex-drawer>
@@ -587,7 +580,7 @@
   <!-- Contacts Drawer -->
   <lex-drawer id="contactsDrawer" heading="Contacts" subtitle="People associated with this matter" width="sm">
     <div>
-      <div class="flex items-center justify-end mb-4">
+      <div data-slot="header-actions" class="flex items-center gap-1">
         <button onclick="openAddContactModal(currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id)" class="p-1.5 rounded transition-colors" style="color: var(--lex-text-secondary)" title="Add contact" onmouseover="this.style.color='var(--lex-text-accent)'" onmouseout="this.style.color='var(--lex-text-secondary)'">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         </button>
@@ -599,7 +592,7 @@
   <!-- Linked Matters Drawer -->
   <lex-drawer id="linkedMattersDrawer" heading="Linked Workspaces" subtitle="Matters linked to this one" width="sm">
     <div>
-      <div class="flex items-center justify-end mb-4">
+      <div data-slot="header-actions" class="flex items-center gap-1">
         <button onclick="openCreateLinkModal(currentMatterData && currentMatterData.matter && currentMatterData.matter.matter_id)" class="p-1.5 rounded transition-colors" style="color: var(--lex-text-secondary)" title="Link matter" onmouseover="this.style.color='var(--lex-text-accent)'" onmouseout="this.style.color='var(--lex-text-secondary)'">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
         </button>
@@ -611,7 +604,7 @@
   <!-- Custom Fields Drawer -->
   <lex-drawer id="customFieldsDrawer" heading="Custom Fields" subtitle="All custom fields for this matter" width="sm">
     <div>
-      <div class="flex items-center justify-end mb-4">
+      <div data-slot="header-actions" class="flex items-center gap-1">
         <button id="drawerCustomFieldsEditBtn" onclick="if (window.currentMatterData && window.currentMatterData.matter) window.openEditCustomFieldsModal(window.currentMatterData.matter.matter_id)" class="p-1.5 rounded transition-colors" style="color: var(--lex-text-secondary)" title="Edit custom fields" onmouseover="this.style.color='var(--lex-text-accent)'" onmouseout="this.style.color='var(--lex-text-secondary)'">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
         </button>
@@ -970,9 +963,8 @@
 
   <!-- Edit Matter Modal (for inline editing from detail page) -->
   <lex-modal id="detailMatterModal" heading="Edit Matter" size="full" hide-actions
-    footer-content='<lex-btn type="button" id="cancelDetailMatterBtn" variant="secondary">Cancel</lex-btn><lex-btn id="detailMatterSubmitBtn" type="button" variant="primary" onclick="document.getElementById(&#39;detailMatterForm&#39;).requestSubmit()">Save Changes</lex-btn>'>
+    footer-content='<lex-btn type="button" id="cancelDetailMatterBtn" variant="secondary">Cancel</lex-btn><lex-btn id="detailMatterSubmitBtn" type="submit" form="detailMatterForm" variant="primary">Save Changes</lex-btn>'>
     <form id="detailMatterForm" class="max-w-2xl mx-auto px-6 py-8 space-y-6">
-        <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
       <input type="hidden" id="detailMatterId">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <lex-input id="detailMatterName" label="Matter Name" required></lex-input>
@@ -1120,9 +1112,8 @@
 
   <!-- Template Set Modal -->
   <lex-modal id="templateSetModal" heading="Create Template Set" size="lg" hide-actions
-    footer-content='<lex-btn type="button" onclick="closeTemplateSetModal()" variant="secondary">Cancel</lex-btn><lex-btn type="button" variant="primary" id="tsSubmitBtn" onclick="document.getElementById(&#39;templateSetForm&#39;).requestSubmit()">Create Set</lex-btn>'>
+    footer-content='<lex-btn type="button" onclick="closeTemplateSetModal()" variant="secondary">Cancel</lex-btn><lex-btn type="submit" form="templateSetForm" variant="primary" id="tsSubmitBtn">Create Set</lex-btn>'>
     <form id="templateSetForm" onsubmit="saveTemplateSet(event)" class="p-6 space-y-5">
-        <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
       <input type="hidden" id="tsEditId">
       <lex-input id="tsName" label="Name" required placeholder="e.g., Engagement Letters"></lex-input>
       <lex-textarea id="tsDescription" label="Description" rows="2" placeholder="What documents does this set represent?"></lex-textarea>

@@ -9,7 +9,7 @@
  *   WidgetConfigModal.open()   - Opens the modal
  *   WidgetConfigModal.close()  - Closes the modal
  *
- * Depends on: api (global ApiClient), WidgetRenderer (global), lex-select
+ * Depends on: api (global ApiClient), WidgetRenderer (global), lex-modal + lex-btn, lex-select
  */
 const WidgetConfigModal = (function() {
   /** Cached modal DOM element */
@@ -50,31 +50,14 @@ const WidgetConfigModal = (function() {
   function createModal() {
     if (modalElement) return;
 
-    var modal = document.createElement('div');
+    // <lex-modal> owns the backdrop, header close button, Escape, focus trap
+    // and scroll lock. The footer buttons keep their legacy ids.
+    var modal = document.createElement('lex-modal');
     modal.id = 'widgetConfigModal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4';
-    modal.style.zIndex = '9999';
+    modal.heading = 'Add Widget';
+    modal.size = 'md';
 
-    // Click outside to close
-    modal.addEventListener('click', function(e) {
-      if (e.target === modal) close();
-    });
-
-    modal.innerHTML = '<div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">'
-
-      // Header
-      + '<div class="flex items-center justify-between p-6 border-b border-gray-200">'
-      + '<h2 class="text-xl font-semibold text-gray-900">Add Widget</h2>'
-      + '<button id="closeWidgetModal" class="text-gray-400 hover:text-gray-600 transition-colors">'
-      + '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
-      + '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>'
-      + '</svg>'
-      + '</button>'
-      + '</div>'
-
-      // Body
-      + '<div class="p-6">'
-
+    modal.innerHTML = ''
       // Widget type selector
       + '<div class="mb-4">'
       + '<label class="block text-sm font-medium text-gray-700 mb-1">Widget Type</label>'
@@ -90,20 +73,14 @@ const WidgetConfigModal = (function() {
       // Dynamic type-specific config area
       + '<div id="widgetTypeConfig" class="mb-4"></div>'
 
-      // Action buttons
-      + '<div class="flex justify-end gap-3">'
-      + '<button id="cancelWidgetBtn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>'
-      + '<button id="saveWidgetBtn" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">Add Widget</button>'
-      + '</div>'
-
-      + '</div>'
-      + '</div>';
+      // Footer actions (moved into the modal footer by lex-modal)
+      + '<lex-btn data-slot="footer" id="cancelWidgetBtn" variant="secondary">Cancel</lex-btn>'
+      + '<lex-btn data-slot="footer" id="saveWidgetBtn" variant="primary">Add Widget</lex-btn>';
 
     document.body.appendChild(modal);
     modalElement = modal;
 
     // Wire up buttons
-    modal.querySelector('#closeWidgetModal').addEventListener('click', close);
     modal.querySelector('#cancelWidgetBtn').addEventListener('click', close);
     modal.querySelector('#saveWidgetBtn').addEventListener('click', save);
     modal.querySelector('#widgetTypeSelect').addEventListener('lex-change', onTypeChange);
@@ -139,8 +116,7 @@ const WidgetConfigModal = (function() {
     modalElement.querySelector('#widgetTypeConfig').innerHTML = '';
 
     // Show modal
-    modalElement.classList.remove('hidden');
-    modalElement.classList.add('flex');
+    modalElement.open = true;
   }
 
   /**
@@ -148,8 +124,7 @@ const WidgetConfigModal = (function() {
    */
   function close() {
     if (modalElement) {
-      modalElement.classList.add('hidden');
-      modalElement.classList.remove('flex');
+      modalElement.open = false;
     }
   }
 
@@ -270,8 +245,7 @@ const WidgetConfigModal = (function() {
 
     var saveBtn = modalElement.querySelector('#saveWidgetBtn');
     try {
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Adding...';
+      saveBtn.loading = true;
 
       await api.createDashboardWidget(payload);
       close();
@@ -285,8 +259,7 @@ const WidgetConfigModal = (function() {
       Lex.Modal.alertAsync('Could not add widget', 'Failed to add widget. Please try again.');
     } finally {
       if (saveBtn) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Add Widget';
+        saveBtn.loading = false;
       }
     }
   }

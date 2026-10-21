@@ -18,7 +18,8 @@ import {
   loadLibraryDetailAutomation,
   loadMatterAttachments,
   loadAutomationRuns,
-  renderLibraryDetail
+  renderLibraryDetail,
+  syncLibraryDetailModals
 } from './js/views/library-detail.js';
 import {
   applyTemplate,
@@ -304,7 +305,6 @@ function cacheElements() {
   els.flash = document.getElementById('flash');
   els.viewContent = document.getElementById('view-content');
   els.templateModal = document.getElementById('template-modal');
-  els.templateModalTitle = document.getElementById('template-modal-title');
   els.templateModalDescription = document.getElementById('template-modal-description');
   els.templateModalRecommended = document.getElementById('template-modal-recommended');
   els.templateModalApps = document.getElementById('template-modal-apps');
@@ -326,19 +326,31 @@ function cacheElements() {
   els.connectorImportSubmit = document.getElementById('connector-import-submit');
 
   els.connectorConfirmModal = document.getElementById('connector-confirm-modal');
-  els.connectorConfirmTitle = document.getElementById('connector-confirm-title');
   els.connectorConfirmMessage = document.getElementById('connector-confirm-message');
   els.connectorConfirmSubmit = document.getElementById('connector-confirm-submit');
   els.connectorConfirmCancel = document.getElementById('connector-confirm-cancel');
 
   els.connectorAddInstanceModal = document.getElementById('connector-add-instance-modal');
-  els.connectorAddInstanceConnectorName = document.getElementById('connector-add-instance-connector-name');
   els.connectorAddInstanceLabel = document.getElementById('connector-add-instance-label');
   els.connectorAddInstanceHelper = document.getElementById('connector-add-instance-helper');
   els.connectorAddInstanceKey = document.getElementById('connector-add-instance-key');
   els.connectorAddInstanceForm = document.getElementById('connector-add-instance-form');
   els.connectorAddInstanceError = document.getElementById('connector-add-instance-error');
   els.connectorAddInstanceSubmit = document.getElementById('connector-add-instance-submit');
+}
+
+// The five automation dialogs are lex-modals: the component owns the backdrop,
+// header close, Escape and focus trap. These helpers keep the call sites short.
+function setModalOpen(modal, open) {
+  if (modal) modal.open = Boolean(open);
+}
+
+// lex-btn renders its label inside <slot-content>; writing textContent on the
+// host would replace its inner <button>.
+function setLexBtnText(btn, text) {
+  if (!btn) return;
+  const slot = btn.querySelector('slot-content');
+  (slot || btn).textContent = text;
 }
 
 function bindGlobalEvents() {
@@ -374,8 +386,20 @@ function bindGlobalEvents() {
   document.body.addEventListener('lex-change', onAppInput);
   document.body.addEventListener('lex-composer-send', onHomeComposerSend);
   document.body.addEventListener('lex-close', onAppLexClose);
+  // Header close / Escape / backdrop on a lex-modal emit lex-close; run the
+  // same state reset the Cancel buttons do.
+  els.templateModal?.addEventListener('lex-close', () => closeTemplateModal());
+  els.checkDataModal?.addEventListener('lex-close', () => closeCheckDataModal());
+  els.connectorImportModal?.addEventListener('lex-close', () => closeConnectorImportModal());
+  els.connectorConfirmModal?.addEventListener('lex-close', () => closeConnectorConfirmModal());
+  els.connectorAddInstanceModal?.addEventListener('lex-close', () => closeAddInstanceModal());
+  // Footer "Create Instance" is <lex-btn type="submit" form=…>; Enter in the
+  // key field submits the same form.
+  els.connectorAddInstanceForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    submitAddInstance();
+  });
   document.body.addEventListener('breadcrumb-navigate', onBreadcrumbNavigate);
-  document.addEventListener('keydown', onGlobalKeydown);
 
   // Dirty-state guard: warn before the user closes/reloads the tab while in
   // edit mode with unsaved changes.
@@ -904,6 +928,8 @@ function renderCurrentView() {
   if (state.currentView === 'connector-detail') renderConnectorDetail(context);
   if (state.currentView === 'library') renderLibrary(context);
   if (state.currentView === 'library-detail') renderLibraryDetail(context);
+  // Library-detail dialogs live outside #view-content; close them on any other view.
+  else syncLibraryDetailModals(context, {});
   if (state.currentView === 'builder') renderBuilder(context);
   if (state.currentView === 'runs') renderRuns(context);
   if (state.currentView === 'approvals') renderApprovals(context);
@@ -1096,35 +1122,10 @@ async function tryResumeSession() {
 }
 
 async function onAppClick(event) {
-  if (event.target.closest('[data-connector-import-close]') || event.target.closest('[data-connector-import-overlay]')) {
-    closeConnectorImportModal();
-    return;
-  }
-
-  if (event.target.closest('[data-connector-confirm-close]') || event.target.closest('[data-connector-confirm-overlay]')) {
-    closeConnectorConfirmModal();
-    return;
-  }
-
-  if (event.target.closest('[data-add-instance-close]') || event.target.closest('[data-add-instance-overlay]')) {
-    closeAddInstanceModal();
-    return;
-  }
-
-  if (event.target.closest('[data-check-data-modal-close]') || event.target.closest('[data-check-data-modal-overlay]')) {
-    closeCheckDataModal();
-    return;
-  }
-
   if (event.target.closest('[data-check-data-go]')) {
     closeCheckDataModal();
     setView('connectors');
     await refreshCurrentView();
-    return;
-  }
-
-  if (event.target.closest('[data-template-modal-close]') || event.target.closest('[data-template-modal-overlay]')) {
-    closeTemplateModal();
     return;
   }
 
@@ -1914,7 +1915,7 @@ function openTemplateModal(templateId) {
   const steps = buildTemplateSteps(template);
   const appTypes = resolveTemplateAppTypes(template);
 
-  els.templateModalTitle.textContent = template.name || 'Automation Template';
+  els.templateModal.heading = template.name || 'Automation Template';
   els.templateModalDescription.textContent = template.description || template.bestFor || 'Use this template to launch your workflow quickly.';
   els.templateModalRecommended.textContent = template.bestFor || 'Recommended for you';
   els.templateModalApps.innerHTML = appTypes.map((typeLabel) => `
@@ -1927,14 +1928,13 @@ function openTemplateModal(templateId) {
     </li>
   `).join('');
   els.templateModalTry.dataset.templateId = template.id;
-  els.templateModalTry.textContent = 'Continue to Builder';
+  setLexBtnText(els.templateModalTry, 'Continue to Builder');
 
-  els.templateModal.classList.remove('hidden');
+  setModalOpen(els.templateModal, true);
 }
 
 function closeTemplateModal() {
-  if (!els.templateModal) return;
-  els.templateModal.classList.add('hidden');
+  setModalOpen(els.templateModal, false);
 }
 
 function openCheckDataModal(templateId) {
@@ -1960,12 +1960,11 @@ function openCheckDataModal(templateId) {
     </li>
   `).join('');
 
-  els.checkDataModal.classList.remove('hidden');
+  setModalOpen(els.checkDataModal, true);
 }
 
 function closeCheckDataModal() {
-  if (!els.checkDataModal) return;
-  els.checkDataModal.classList.add('hidden');
+  setModalOpen(els.checkDataModal, false);
 }
 
 function buildTemplateSteps(template) {
@@ -2063,41 +2062,6 @@ function resolveTemplateAppTypes(template) {
 
   return [...new Set(picked.map((category) => typeLabelMap[category] || category))]
     .slice(0, 4);
-}
-
-function onGlobalKeydown(event) {
-  // Enter submits the Add Instance form when the key input is focused
-  if (
-    event.key === 'Enter' &&
-    els.connectorAddInstanceModal &&
-    !els.connectorAddInstanceModal.classList.contains('hidden') &&
-    document.activeElement === els.connectorAddInstanceKey
-  ) {
-    event.preventDefault();
-    submitAddInstance();
-    return;
-  }
-
-  if (event.key !== 'Escape') return;
-  if (els.connectorAddInstanceModal && !els.connectorAddInstanceModal.classList.contains('hidden')) {
-    closeAddInstanceModal();
-    return;
-  }
-  if (els.connectorImportModal && !els.connectorImportModal.classList.contains('hidden')) {
-    closeConnectorImportModal();
-    return;
-  }
-  if (els.connectorConfirmModal && !els.connectorConfirmModal.classList.contains('hidden')) {
-    closeConnectorConfirmModal();
-    return;
-  }
-  if (els.checkDataModal && !els.checkDataModal.classList.contains('hidden')) {
-    closeCheckDataModal();
-    return;
-  }
-  if (els.templateModal && !els.templateModal.classList.contains('hidden')) {
-    closeTemplateModal();
-  }
 }
 
 async function loadDashboard() {
@@ -2564,20 +2528,18 @@ function openConnectorConfirmModal(mode, connectorId) {
     ? `Permanently delete "${connector.name}"? All synced data, configuration, and custom UI files will be removed. This cannot be undone.`
     : `Uninstall "${connector.name}"? The connection will be disconnected but configuration and synced data will be preserved.`;
 
-  if (els.connectorConfirmTitle) els.connectorConfirmTitle.textContent = title;
+  els.connectorConfirmModal.heading = title;
   if (els.connectorConfirmMessage) els.connectorConfirmMessage.textContent = body;
   if (els.connectorConfirmSubmit) {
-    els.connectorConfirmSubmit.textContent = mode === 'delete' ? 'Delete Permanently' : 'Uninstall';
+    setLexBtnText(els.connectorConfirmSubmit, mode === 'delete' ? 'Delete Permanently' : 'Uninstall');
     els.connectorConfirmSubmit.setAttribute('variant', mode === 'delete' ? 'danger' : 'primary');
   }
 
-  els.connectorConfirmModal.classList.remove('hidden');
+  setModalOpen(els.connectorConfirmModal, true);
 }
 
 function closeConnectorConfirmModal() {
-  if (els.connectorConfirmModal) {
-    els.connectorConfirmModal.classList.add('hidden');
-  }
+  setModalOpen(els.connectorConfirmModal, false);
   state.connectorConfirm = { mode: null, connectorId: null, busy: false };
 }
 
@@ -2634,9 +2596,7 @@ function openAddInstanceModal(slug) {
     error: null
   };
 
-  if (els.connectorAddInstanceConnectorName) {
-    els.connectorAddInstanceConnectorName.textContent = connector.name || slug;
-  }
+  els.connectorAddInstanceModal.heading = `Add ${connector.name || slug} Instance`;
   if (els.connectorAddInstanceLabel) {
     els.connectorAddInstanceLabel.textContent = multi.instance_label || 'Instance name';
   }
@@ -2656,7 +2616,7 @@ function openAddInstanceModal(slug) {
     els.connectorAddInstanceSubmit.removeAttribute('disabled');
   }
 
-  els.connectorAddInstanceModal.classList.remove('hidden');
+  setModalOpen(els.connectorAddInstanceModal, true);
 
   // Focus the input after the modal renders
   requestAnimationFrame(() => {
@@ -2668,7 +2628,7 @@ function openAddInstanceModal(slug) {
 
 function closeAddInstanceModal() {
   if (!els.connectorAddInstanceModal) return;
-  els.connectorAddInstanceModal.classList.add('hidden');
+  setModalOpen(els.connectorAddInstanceModal, false);
   state.connectorAddInstance = {
     open: false,
     slug: null,
@@ -2760,12 +2720,12 @@ function openConnectorImportModal(opts = {}) {
   };
   resetConnectorImportDom();
   applyConnectorImportModalContext();
-  els.connectorImportModal.classList.remove('hidden');
+  setModalOpen(els.connectorImportModal, true);
 }
 
 function closeConnectorImportModal() {
   if (!els.connectorImportModal) return;
-  els.connectorImportModal.classList.add('hidden');
+  setModalOpen(els.connectorImportModal, false);
   state.connectorImport = {
     open: false,
     selectedFile: null,
@@ -2781,26 +2741,25 @@ function closeConnectorImportModal() {
 // Update the import modal chrome (title, description, submit label) based on
 // whether we're running a fresh import or an "Update <connector>" flow.
 function applyConnectorImportModalContext() {
-  const titleEl = document.getElementById('connector-import-modal-title');
   const descEl = els.connectorImportModal?.querySelector('.template-modal-description');
   const submitEl = els.connectorImportSubmit;
   const ctx = state.connectorImport;
 
   if (ctx?.targetConnectorId && ctx.targetConnectorName) {
-    if (titleEl) titleEl.textContent = `Update ${ctx.targetConnectorName}`;
+    if (els.connectorImportModal) els.connectorImportModal.heading = `Update ${ctx.targetConnectorName}`;
     if (descEl) {
       descEl.innerHTML = `Upload a ZIP package to update <strong>${escapeHtmlSafe(ctx.targetConnectorName)}</strong>. ` +
         'The new version will replace the current files and apply to every instance of this connector. ' +
         'The manifest must match — uploading a ZIP for a different connector will be rejected.';
     }
-    if (submitEl) submitEl.textContent = 'Upload Update';
+    if (submitEl) setLexBtnText(submitEl, 'Upload Update');
   } else {
-    if (titleEl) titleEl.textContent = 'Import Connector';
+    if (els.connectorImportModal) els.connectorImportModal.heading = 'Import Connector';
     if (descEl) {
       descEl.innerHTML = 'Upload a ZIP package containing <code>manifest.json</code>, <code>connector.json</code>, and optional UI assets. ' +
         'The backend validates the manifest, hook code, and UI files before installing.';
     }
-    if (submitEl) submitEl.textContent = 'Upload Connector';
+    if (submitEl) setLexBtnText(submitEl, 'Upload Connector');
   }
 }
 

@@ -62,54 +62,42 @@
   </div>
 
   <!-- Template Details Modal -->
-  <div id="templateModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-      <div class="p-6 border-b border-gray-100">
-        <div class="flex items-start justify-between">
-          <div class="flex items-center gap-4">
-            <div id="modalIcon" class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            </div>
-            <div>
-              <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Template Name</h3>
-              <span id="modalCategory" class="text-sm text-indigo-600">Category</span>
-            </div>
-          </div>
-          <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
+  <lex-modal id="templateModal" heading="Template" size="md">
+    <div>
+      <div class="flex items-center gap-4 mb-4">
+        <div id="modalIcon" class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+          <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+        </div>
+        <span id="modalCategory" class="text-sm text-indigo-600">Category</span>
+      </div>
+      <p id="modalDescription" class="text-gray-600 mb-6">Description</p>
+
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="text-center p-4 bg-gray-50 rounded-lg">
+          <p class="text-2xl font-bold text-gray-900" id="modalNodes">-</p>
+          <p class="text-sm text-gray-500">Workflow Steps</p>
+        </div>
+        <div class="text-center p-4 bg-gray-50 rounded-lg">
+          <p class="text-2xl font-bold text-green-600" id="modalPopularity">-</p>
+          <p class="text-sm text-gray-500">Popularity Score</p>
         </div>
       </div>
-      <div class="p-6">
-        <p id="modalDescription" class="text-gray-600 mb-6">Description</p>
 
-        <div class="grid grid-cols-2 gap-4 mb-6">
-          <div class="text-center p-4 bg-gray-50 rounded-lg">
-            <p class="text-2xl font-bold text-gray-900" id="modalNodes">-</p>
-            <p class="text-sm text-gray-500">Workflow Steps</p>
-          </div>
-          <div class="text-center p-4 bg-gray-50 rounded-lg">
-            <p class="text-2xl font-bold text-green-600" id="modalPopularity">-</p>
-            <p class="text-sm text-gray-500">Popularity Score</p>
-          </div>
-        </div>
-
-        <h4 class="font-medium text-gray-900 mb-3">What this workflow does:</h4>
-        <ul id="modalFeatures" class="space-y-2 mb-6">
-          <!-- Populated by JavaScript -->
-        </ul>
-
-        <div class="flex gap-3">
-          <button onclick="installTemplate()" class="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
-            Install Template
-          </button>
-          <button onclick="closeModal()" class="px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
-        </div>
-      </div>
+      <h4 class="font-medium text-gray-900 mb-3">What this workflow does:</h4>
+      <ul id="modalFeatures" class="space-y-2">
+        <!-- Populated by JavaScript -->
+      </ul>
     </div>
-  </div>
+    <lex-btn data-slot="footer" variant="secondary" onclick="closeModal()">Cancel</lex-btn>
+    <lex-btn data-slot="footer" variant="primary" onclick="installTemplate()">Install Template</lex-btn>
+  </lex-modal>
+
+  <!-- Lex UI (lex-modal) — loaded after the markup so it upgrades with its children -->
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <!-- lex-modal before lex-btn: the modal clones its children on upgrade, so footer lex-btns must still be un-upgraded -->
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
 
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
@@ -211,7 +199,7 @@
       const colors = getColorClass(selectedTemplate.category);
       document.getElementById('modalIcon').className = `w-12 h-12 rounded-lg flex items-center justify-center ${colors.bg} ${colors.text}`;
       document.getElementById('modalIcon').innerHTML = iconMap[selectedTemplate.icon] || iconMap['document'];
-      document.getElementById('modalTitle').textContent = selectedTemplate.name;
+      templateModal.heading = selectedTemplate.name;
       document.getElementById('modalCategory').textContent = selectedTemplate.category;
       document.getElementById('modalDescription').textContent = selectedTemplate.description;
       document.getElementById('modalNodes').textContent = selectedTemplate.nodes;
@@ -225,11 +213,13 @@
         </li>
       `).join('');
 
-      document.getElementById('templateModal').classList.remove('hidden');
+      templateModal.open = true;
     }
 
+    const templateModal = document.getElementById('templateModal');
+
     function closeModal() {
-      document.getElementById('templateModal').classList.add('hidden');
+      templateModal.open = false;
       selectedTemplate = null;
     }
 
@@ -253,9 +243,7 @@
       }
     }
 
-    document.getElementById('templateModal').addEventListener('click', (e) => {
-      if (e.target.id === 'templateModal') closeModal();
-    });
+    templateModal.addEventListener('lex-close', () => { selectedTemplate = null; });
 
     async function loadTemplates() {
       try {

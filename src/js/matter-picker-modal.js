@@ -156,12 +156,11 @@ const MatterPickerModal = {
     // Picker-mode chrome: when the modal is reused as a generic matter
     // picker (onSelect callback), the user is in a sub-flow under another
     // modal. Surface that with lex-modal's back chevron leading the title and
-    // hide the default X close button. Default "Select Matter" flow keeps the
-    // standard chrome.
+    // hide the default X close button (hide-close). Default "Select Matter"
+    // flow keeps the standard chrome.
     var isPickerMode = !!this._onSelect;
     this.modal.backButton = isPickerMode;
-    this.modal.classList.toggle('npm-picker-mode', isPickerMode);
-    if (isPickerMode) MatterPickerModal._injectPickerStyles();
+    this.modal.hideClose = isPickerMode;
 
     this.modal.open = true;
     this.isOpen = true;
@@ -401,23 +400,6 @@ const MatterPickerModal = {
     window.location.href = NavigationHelpers.resolvePath('workspaces.html') + '?action=create';
   },
 
-  // ── Picker-mode chrome (back chevron, no X) ─────────────────────────────
-
-  _stylesInjected: false,
-
-  /**
-   * The back chevron is lex-modal's own `backButton`. lex-modal has no option
-   * to hide its X close button, so picker mode keeps this one rule until the
-   * component grows one (e.g. a `hide-close` attribute).
-   */
-  _injectPickerStyles() {
-    if (MatterPickerModal._stylesInjected) return;
-    MatterPickerModal._stylesInjected = true;
-    var style = document.createElement('style');
-    style.setAttribute('data-source', 'matter-picker-modal');
-    style.textContent = 'lex-modal.npm-picker-mode .lex-modal-close { display: none !important; }';
-    document.head.appendChild(style);
-  },
 
   // ── Component lazy-loading ───────────────────────────────────────────────
 

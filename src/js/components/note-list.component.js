@@ -89,6 +89,7 @@ class NoteListComponent {
    */
   async init() {
     this.render();
+    this.mountModals();
     this.attachEventListeners();
     await this.loadNotes();
     await this.loadStatistics();
@@ -138,119 +139,75 @@ class NoteListComponent {
           </div>
         </div>
       </div>
-
-      <!-- Note View Modal -->
-      <div id="notesViewModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center p-6">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden">
-          <div class="flex-shrink-0 border-b border-gray-200 px-6 py-4 flex items-start justify-between gap-4">
-            <div class="min-w-0">
-              <h3 id="notesViewTitle" class="text-xl font-semibold text-gray-900 truncate">Untitled Note</h3>
-              <div id="notesViewMeta" class="mt-1 flex items-center gap-2 text-xs text-gray-500"></div>
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-              <button id="notesViewEditBtn" class="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Edit</button>
-              <button id="notesViewClose" class="p-2 text-gray-400 hover:text-gray-700 rounded-md hover:bg-gray-100" title="Close note">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div class="flex-1 overflow-y-auto px-6 py-5">
-            <div id="notesViewContent" class="prose max-w-none text-gray-700 leading-relaxed"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Focus Mode Modal -->
-      <div id="notesFocusModal" class="hidden fixed inset-0 z-50 bg-white">
-        <div class="h-full flex flex-col">
-          <!-- Modal Header -->
-          <div class="flex-shrink-0 border-b border-gray-200 px-8 py-4 flex items-center justify-between">
-            <div class="flex items-center gap-4">
-              <button id="notesFocusClose" class="text-gray-400 hover:text-gray-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
-              <span class="text-sm text-gray-500">Focus Mode</span>
-            </div>
-          </div>
-
-          <!-- Modal Content - Notion Style -->
-          <div class="flex-1 overflow-y-auto">
-            <div class="max-w-4xl mx-auto px-8 py-12">
-              <input
-                type="text"
-                id="notesFocusTitleInput"
-                class="w-full text-4xl font-bold text-gray-900 border-none outline-none mb-4 placeholder-gray-300"
-                placeholder="Untitled"
-              />
-              <div
-                id="notesFocusEditorContainer"
-                contenteditable="true"
-                class="w-full text-base text-gray-700 outline-none min-h-[500px] leading-relaxed"
-                data-placeholder="Start writing..."
-              ></div>
-            </div>
-          </div>
-
-          <!-- Modal Footer - Fixed CTAs -->
-          <div class="flex-shrink-0 border-t border-gray-200 px-8 py-4 flex justify-end gap-3">
-            <button id="notesFocusClearBtn" class="px-5 py-2.5 text-sm text-gray-600 hover:text-gray-800 font-medium">Clear</button>
-            <button id="notesFocusSaveBtn" class="px-5 py-2.5 lex-bg-accent hover:lex-bg-accent text-white rounded-lg text-sm font-medium transition-colors">Save Note</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Delete Confirmation Modal -->
-      <div id="notesDeleteModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform transition-all">
-          <!-- Modal Header -->
-          <div class="flex items-center gap-3 px-6 py-5 border-b border-gray-200">
-            <!-- Icon -->
-            <div class="flex items-center justify-center w-10 h-10 bg-red-100 rounded-lg flex-shrink-0">
-              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-            </div>
-
-            <!-- Title -->
-            <h3 class="text-lg font-semibold text-gray-900 flex-1">Delete Note</h3>
-
-            <!-- Close button -->
-            <button id="notesDeleteModalClose" class="text-gray-400 hover:text-gray-600 transition-colors">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </button>
-          </div>
-
-          <!-- Modal Body -->
-          <div class="px-6 py-5">
-            <p class="text-gray-700 text-base">
-              Are you sure you want to delete "<span id="notesDeleteModalTitle" class="font-semibold text-gray-900"></span>"?
-            </p>
-            <p class="text-sm text-gray-500 mt-2">
-              This action cannot be undone.
-            </p>
-          </div>
-
-          <!-- Modal Footer -->
-          <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3">
-            <button id="notesDeleteModalCancel" class="px-4 py-2 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg font-medium transition-colors">
-              Cancel
-            </button>
-            <button id="notesDeleteModalConfirm" class="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors flex items-center gap-2">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-              Delete Note
-            </button>
-          </div>
-        </div>
-      </div>
     `;
+  }
+
+  /**
+   * Mount the note view and focus-mode dialogs as lex-modals on <body>
+   * (re-mounting replaces earlier instances). The component supplies the
+   * title, close button, backdrop, Escape, focus trap and scroll lock.
+   * Buttons inside are handled by delegation on the modal element, so the
+   * handlers survive the component capturing its children.
+   */
+  mountModals() {
+    ['notesViewModal', 'notesFocusModal'].forEach((id) => {
+      const existing = document.getElementById(id);
+      if (existing) existing.remove();
+    });
+
+    const viewModal = document.createElement('lex-modal');
+    viewModal.id = 'notesViewModal';
+    viewModal.setAttribute('heading', 'Untitled Note');
+    viewModal.setAttribute('size', 'xl');
+    viewModal.setAttribute('hide-actions', '');
+    viewModal.innerHTML = `
+      <div id="notesViewMeta" class="mb-4 flex items-center gap-2 text-xs text-gray-500"></div>
+      <div id="notesViewContent" class="prose max-w-none text-gray-700 leading-relaxed"></div>
+      <button type="button" data-slot="footer" id="notesViewEditBtn" class="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Edit</button>
+    `;
+
+    const focusModal = document.createElement('lex-modal');
+    focusModal.id = 'notesFocusModal';
+    focusModal.setAttribute('heading', 'Focus Mode');
+    focusModal.setAttribute('size', 'full');
+    focusModal.setAttribute('hide-actions', '');
+    focusModal.innerHTML = `
+      <div class="max-w-4xl mx-auto px-8 py-8">
+        <input
+          type="text"
+          id="notesFocusTitleInput"
+          class="w-full text-4xl font-bold text-gray-900 border-none outline-none mb-4 placeholder-gray-300"
+          placeholder="Untitled"
+        />
+        <div
+          id="notesFocusEditorContainer"
+          contenteditable="true"
+          class="w-full text-base text-gray-700 outline-none min-h-[500px] leading-relaxed"
+          data-placeholder="Start writing..."
+        ></div>
+      </div>
+      <button type="button" data-slot="footer" id="notesFocusClearBtn" class="px-5 py-2.5 text-sm text-gray-600 hover:text-gray-800 font-medium">Clear</button>
+      <button type="button" data-slot="footer" id="notesFocusSaveBtn" class="px-5 py-2.5 lex-bg-accent hover:lex-bg-accent text-white rounded-lg text-sm font-medium transition-colors">Save Note</button>
+    `;
+
+    document.body.appendChild(viewModal);
+    document.body.appendChild(focusModal);
+
+    viewModal.addEventListener('click', (e) => {
+      const editBtn = e.target.closest && e.target.closest('#notesViewEditBtn');
+      if (!editBtn) return;
+      const noteId = editBtn.getAttribute('data-note-id');
+      this.closeNoteView();
+      this.handleEditNote(noteId);
+    });
+    focusModal.addEventListener('click', (e) => {
+      if (!e.target.closest) return;
+      if (e.target.closest('#notesFocusSaveBtn')) this.handleSaveNote(true);
+      else if (e.target.closest('#notesFocusClearBtn')) this.handleClearNote(true);
+    });
+
+    // Header close, backdrop and Escape: keep the hidden composer in sync.
+    focusModal.addEventListener('lex-close', () => this.closeFocusMode());
   }
 
   /**
@@ -279,44 +236,6 @@ class NoteListComponent {
     const focusToggle = document.getElementById('notesFocusModeToggle');
     if (focusToggle) {
       focusToggle.addEventListener('click', () => this.toggleFocusMode());
-    }
-
-    // Focus Mode Close
-    const focusClose = document.getElementById('notesFocusClose');
-    if (focusClose) {
-      focusClose.addEventListener('click', () => this.closeFocusMode());
-    }
-
-    // Focus Mode Save
-    const focusSaveBtn = document.getElementById('notesFocusSaveBtn');
-    if (focusSaveBtn) {
-      focusSaveBtn.addEventListener('click', () => this.handleSaveNote(true));
-    }
-
-    // View Modal Close/Edit
-    const viewModal = document.getElementById('notesViewModal');
-    const viewClose = document.getElementById('notesViewClose');
-    const viewEditBtn = document.getElementById('notesViewEditBtn');
-    if (viewClose) {
-      viewClose.addEventListener('click', () => this.closeNoteView());
-    }
-    if (viewEditBtn) {
-      viewEditBtn.addEventListener('click', () => {
-        const noteId = viewEditBtn.getAttribute('data-note-id');
-        this.closeNoteView();
-        this.handleEditNote(noteId);
-      });
-    }
-    if (viewModal) {
-      viewModal.addEventListener('click', (e) => {
-        if (e.target === viewModal) this.closeNoteView();
-      });
-    }
-
-    // Focus Mode Clear
-    const focusClearBtn = document.getElementById('notesFocusClearBtn');
-    if (focusClearBtn) {
-      focusClearBtn.addEventListener('click', () => this.handleClearNote(true));
     }
 
     // Click on note items (delegated)
@@ -350,21 +269,6 @@ class NoteListComponent {
         }
       });
     }
-
-    // ESC key to close focus mode
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        const viewModal = document.getElementById('notesViewModal');
-        if (viewModal && !viewModal.classList.contains('hidden')) {
-          this.closeNoteView();
-          return;
-        }
-        const modal = document.getElementById('notesFocusModal');
-        if (modal && !modal.classList.contains('hidden')) {
-          this.closeFocusMode();
-        }
-      }
-    });
   }
 
   /**
@@ -528,16 +432,15 @@ class NoteListComponent {
     }
 
     const modal = document.getElementById('notesViewModal');
-    const title = document.getElementById('notesViewTitle');
     const meta = document.getElementById('notesViewMeta');
     const content = document.getElementById('notesViewContent');
     const editBtn = document.getElementById('notesViewEditBtn');
 
-    if (!modal || !title || !meta || !content || !editBtn) return;
+    if (!modal || !meta || !content || !editBtn) return;
 
     const relativeDate = this.options.apiClient.formatRelativeDate(note.updated_at || note.created_at);
 
-    title.textContent = note.title || 'Untitled Note';
+    modal.heading = note.title || 'Untitled Note';
     meta.innerHTML = '';
 
     const dateEl = document.createElement('span');
@@ -553,7 +456,7 @@ class NoteListComponent {
 
     content.innerHTML = this.renderNoteContent(note.content || '<p>No content</p>');
     editBtn.setAttribute('data-note-id', note.note_id);
-    modal.classList.remove('hidden');
+    modal.open = true;
   }
 
   /**
@@ -561,7 +464,7 @@ class NoteListComponent {
    */
   closeNoteView() {
     const modal = document.getElementById('notesViewModal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) modal.open = false;
   }
 
   /**
@@ -989,7 +892,7 @@ class NoteListComponent {
     }
 
     // Show modal
-    modal.classList.remove('hidden');
+    modal.open = true;
 
     // Update toggle appearance
     if (toggle) {
@@ -1043,7 +946,7 @@ class NoteListComponent {
     }
 
     // Hide modal
-    modal.classList.add('hidden');
+    if (modal.open) modal.open = false;
 
     // Update toggle appearance
     if (toggle) {
@@ -1235,63 +1138,15 @@ class NoteListComponent {
   }
 
   /**
-   * Show delete confirmation modal
+   * Ask for delete confirmation (Lex.Modal.confirmAsync escapes the title)
    */
-  showDeleteModal(noteTitle, onConfirm) {
-    const modal = document.getElementById('notesDeleteModal');
-    const titleSpan = document.getElementById('notesDeleteModalTitle');
-    const closeBtn = document.getElementById('notesDeleteModalClose');
-    const cancelBtn = document.getElementById('notesDeleteModalCancel');
-    const confirmBtn = document.getElementById('notesDeleteModalConfirm');
-
-    if (!modal || !titleSpan || !closeBtn || !cancelBtn || !confirmBtn) {
-      console.error('[NoteList] Delete modal elements not found');
-      return;
-    }
-
-    // Set the note title in the modal
-    titleSpan.textContent = noteTitle;
-
-    // Show the modal
-    modal.classList.remove('hidden');
-
-    // Handle cancel/close
-    const handleCancel = () => {
-      modal.classList.add('hidden');
-      closeBtn.removeEventListener('click', handleCancel);
-      cancelBtn.removeEventListener('click', handleCancel);
-      confirmBtn.removeEventListener('click', handleConfirm);
-    };
-
-    // Handle confirm
-    const handleConfirm = () => {
-      modal.classList.add('hidden');
-      closeBtn.removeEventListener('click', handleCancel);
-      cancelBtn.removeEventListener('click', handleCancel);
-      confirmBtn.removeEventListener('click', handleConfirm);
-      onConfirm();
-    };
-
-    // Attach event listeners
-    closeBtn.addEventListener('click', handleCancel);
-    cancelBtn.addEventListener('click', handleCancel);
-    confirmBtn.addEventListener('click', handleConfirm);
-
-    // Close modal on backdrop click
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        handleCancel();
-      }
-    });
-
-    // Close modal on ESC key
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        handleCancel();
-        document.removeEventListener('keydown', handleEscape);
-      }
-    };
-    document.addEventListener('keydown', handleEscape);
+  async showDeleteModal(noteTitle, onConfirm) {
+    const confirmed = await window.Lex.Modal.confirmAsync(
+      'Delete note',
+      `Are you sure you want to delete "${noteTitle}"? This action cannot be undone.`,
+      { variant: 'danger', confirmText: 'Delete note' }
+    );
+    if (confirmed) onConfirm();
   }
 
   /**

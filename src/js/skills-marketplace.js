@@ -99,16 +99,10 @@
       importSkillBtn.addEventListener('click', openSkillImportModal);
     }
 
-    // Modal close buttons — covers all modals including import modal
-    const modalCloseButtons = document.querySelectorAll('.modal-close');
-    modalCloseButtons.forEach(function(btn) {
-      btn.addEventListener('click', closeAllModals);
-    });
-
-    // Modal overlay clicks
-    const modalOverlays = document.querySelectorAll('.modal-overlay');
-    modalOverlays.forEach(function(overlay) {
-      overlay.addEventListener('click', closeAllModals);
+    // lex-modal header close, backdrop and Escape all emit lex-close.
+    ['skill-details-modal', 'matter-selector-modal', 'skill-import-modal'].forEach(function(id) {
+      const modalEl = document.getElementById(id);
+      if (modalEl) modalEl.addEventListener('lex-close', closeAllModals);
     });
 
     // Modal action buttons
@@ -411,7 +405,7 @@
       ` : ''}
     `;
 
-    modal.classList.remove('hidden');
+    modal.open = true;
   }
 
   /**
@@ -426,7 +420,7 @@
     if (!modal || !mattersList) return;
 
     // Close skill details modal
-    skillDetailsModal.classList.add('hidden');
+    skillDetailsModal.open = false;
 
     try {
       // Load matters
@@ -472,7 +466,7 @@
         });
       });
 
-      modal.classList.remove('hidden');
+      modal.open = true;
     } catch (error) {
       console.error('Error loading matters:', error);
       showToast('Failed to load matters. Please try again.', 'error');
@@ -673,8 +667,8 @@
    * Close all modals
    */
   function closeAllModals() {
-    skillDetailsModal.classList.add('hidden');
-    matterSelectorModal.classList.add('hidden');
+    skillDetailsModal.open = false;
+    matterSelectorModal.open = false;
     selectedSkill = null;
     selectedMatters = [];
     closeSkillImportModal();
@@ -694,7 +688,7 @@
     }
     var modal = document.getElementById('skill-import-modal');
     if (modal) {
-      modal.classList.remove('hidden');
+      modal.open = true;
     }
   }
 
@@ -704,7 +698,7 @@
   function closeSkillImportModal() {
     var modal = document.getElementById('skill-import-modal');
     if (modal) {
-      modal.classList.add('hidden');
+      modal.open = false;
     }
     clearSkillImportFile();
     skillImportState.isImporting = false;

@@ -189,29 +189,22 @@
     </div>
   </div>
 
-  <!-- Template Selection Modal -->
-  <div id="templateModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
-      <div class="p-6 border-b border-gray-100">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-gray-900">Load from Template</h3>
-          <button onclick="closeTemplateModal()" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-      </div>
-      <div class="p-6 overflow-y-auto max-h-[60vh]">
-        <div id="templateList" class="grid grid-cols-2 gap-4">
-          <!-- Populated by JS -->
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- Template Selection Modal: a lex-modal built by the page script below
+       (lex-modal.js loads in <head>, so declarative markup here would upgrade
+       before its children are parsed). -->
 
   <script src="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.js"></script>
   <script>
     if (!api.requireAuth()) throw new Error('Not authenticated');
     renderMenu('#mainNav');
+
+    const templateModal = document.createElement('lex-modal');
+    templateModal.id = 'templateModal';
+    templateModal.heading = 'Load from template';
+    templateModal.size = 'lg';
+    templateModal.hideActions = true;
+    templateModal.innerHTML = '<div id="templateList" class="grid grid-cols-2 gap-4"></div>';
+    document.body.appendChild(templateModal);
 
     // Sidebar toggle
     const sidebar = document.getElementById('sidebar');
@@ -386,7 +379,7 @@
       try {
         const data = await Workflows.getTemplates();
         renderTemplateList(data.templates);
-        document.getElementById('templateModal').classList.remove('hidden');
+        templateModal.open = true;
       } catch (error) {
         Toast.error('Failed to load templates');
         console.error(error);
@@ -509,13 +502,8 @@
     }
 
     function closeTemplateModal() {
-      document.getElementById('templateModal').classList.add('hidden');
+      templateModal.open = false;
     }
-
-    // Close modal on backdrop click
-    document.getElementById('templateModal').addEventListener('click', (e) => {
-      if (e.target.id === 'templateModal') closeTemplateModal();
-    });
 
     // Initialize
     initBuilder();
