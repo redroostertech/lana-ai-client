@@ -225,7 +225,45 @@ A list API behind a server table must support:
 
 ---
 
-## 14. Inventory and migration order (2026-10-21)
+## 14. Status (2026-10-21, local development, not pushed)
+
+**Done:**
+- **Wave 1:** every lex-table page.
+- **Wave 2:** the hand-built tables and card or div lists, including Insights, Integrations, Workflows, the admin pages, connectors, billable hours, roles, management boards, plugins, task plans, approvals, recordings and matters.
+- **Wave 3:**
+  - All native `alert`/`confirm`/`prompt` replaced with `Lex.Modal`.
+  - lex-modal misuse fixed.
+  - Every native `<select>` replaced with `lex-select`, except `js/test/test-runner.html`, a standalone harness that loads no Lex code.
+  - Hand-built overlays and menus replaced with lex-modal, lex-drawer and lex-dropdown-btn.
+- Component gaps closed:
+  - lex-table: state API, `setSearch`, `pagination`.
+  - Lex.Modal: promise API, footer slot, flush, width, palette, `hide-close`, `close-on-escape`.
+  - Escape closes only the topmost overlay.
+  - lex-drawer: header-actions slot, `setFooterVisible`, `contentRoot`.
+  - lex-btn: `form` and `label`.
+  - lex-form: external submit.
+  - lex-select: early properties, disabled options and dividers, array value under `multiple`.
+  - lex-dropdown-btn: icon trigger, end alignment, links, danger items, separators, keyboard support, Escape.
+  - LexElement: adopts children parsed after an early upgrade (Lex loaded in `<head>`).
+
+**Chef (release-3.0.0, merged by the release agent):**
+- fix/automation-list-filters and fix/library-file-family are in development's 13 commits.
+- fix/admin-list-filters (7cf1b6318) and fix/misc-list-filters (c452f33d0) are ready. The Deck Studio commit 825ca5c83 hides existing decks until they're backfilled.
+- fix/tasks-matters-list-filters is still in progress.
+- Until chef 3.0.0 is live, new client filters send parameters that the running server ignores, or fall back to built-in option lists.
+
+**Known leftovers:**
+- lex-dropdown-btn has no free-floating option (drive.css works around clipping).
+- connector-viewer's topbar connector switcher.
+- The file editor's caret-anchored variable autocomplete: no component positions at a text caret.
+- The admin/settings notification panel.
+- `bindFooterSubmit` in js/pages/my-tasks.js.
+- On matters.html the LANA dock covers the header user menu at about 1400px wide. This existed before this work.
+- Errors that existed before this work: onboarding.html (`api` declared twice) and admin/dashboard.html (`isSystemAdmin` declared twice).
+- workflows/active and insights/predictions have stubbed data sources.
+- Skills calls `/api/v1/skills`, which chef no longer mounts. Chef says to use `GET /automations`.
+
+## 15. Inventory and migration order (2026-10-21)
 
 Status: ✓ meets the standard. ~ close. ✗ needs migration.
 
