@@ -156,129 +156,95 @@
   </div>
 
   <!-- Directory Browser Modal -->
-  <div id="directoryBrowserModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-900">Select Import Directory</h3>
-        <button onclick="closeDirectoryBrowser()" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
+  <lex-modal id="directoryBrowserModal" heading="Select Import Directory" size="xl">
+    <!-- Volume Selector -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Storage Volume</label>
+      <lex-select id="volumeSelector" placeholder="Loading volumes..." options='[]' value=""></lex-select>
+    </div>
 
-      <!-- Modal Body -->
-      <div class="flex-1 overflow-hidden flex flex-col p-6">
-        <!-- Volume Selector -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Storage Volume</label>
-          <lex-select id="volumeSelector" placeholder="Loading volumes..." options='[]' value=""></lex-select>
-        </div>
+    <!-- Manual Path Entry (optional) -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">
+        Or Enter Path Manually
+        <span class="text-xs font-normal text-gray-500">(Optional)</span>
+      </label>
+      <input
+        type="text"
+        id="manualPathInput"
+        placeholder="e.g., /Volumes/chef-primary/my-folder"
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+        onchange="updateSelectedPathFromManual()"
+      />
+      <p class="mt-1 text-xs text-gray-500">Type a full path if you know it, or use the volume selector and browser above</p>
+    </div>
 
-        <!-- Manual Path Entry (optional) -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Or Enter Path Manually
-            <span class="text-xs font-normal text-gray-500">(Optional)</span>
-          </label>
+    <!-- Browse Section -->
+    <div id="browseSection">
+      <!-- Current Path Display -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Current Path</label>
+        <div class="flex items-center gap-2">
           <input
             type="text"
-            id="manualPathInput"
-            placeholder="e.g., /Volumes/chef-primary/my-folder"
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
-            onchange="updateSelectedPathFromManual()"
+            id="currentPath"
+            readonly
+            class="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-600"
+            value="/"
           />
-          <p class="mt-1 text-xs text-gray-500">Type a full path if you know it, or use the volume selector and browser above</p>
-        </div>
-
-        <!-- Browse Section -->
-        <div id="browseSection">
-          <!-- Current Path Display -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Current Path</label>
-            <div class="flex items-center gap-2">
-              <input
-                type="text"
-                id="currentPath"
-                readonly
-                class="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-600"
-                value="/"
-              />
-              <button onclick="createNewFolder()" id="createFolderBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                New Folder
-              </button>
-            </div>
-          </div>
-
-          <!-- Directory Browser -->
-          <div class="flex-1 border border-gray-200 rounded-lg overflow-hidden flex flex-col">
-            <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 text-sm font-medium text-gray-700">
-              Directories
-            </div>
-            <div id="directoryList" class="flex-1 overflow-y-auto p-2">
-              <!-- Directory items will be loaded here -->
-              <div class="flex items-center justify-center py-8 text-gray-500">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-              </div>
-            </div>
-          </div>
+          <button onclick="createNewFolder()" id="createFolderBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            New Folder
+          </button>
         </div>
       </div>
 
-      <!-- Modal Footer -->
-      <div class="flex items-center justify-between p-6 border-t border-gray-200">
-        <p class="text-sm text-gray-500">
-          Selected: <span id="selectedPath" class="font-medium text-gray-900">/</span>
-        </p>
-        <div class="flex gap-3">
-          <button onclick="closeDirectoryBrowser()" class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
-          <button onclick="selectDirectory()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
-            Select This Directory
-          </button>
+      <!-- Directory Browser -->
+      <div class="flex-1 border border-gray-200 rounded-lg overflow-hidden flex flex-col">
+        <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 text-sm font-medium text-gray-700">
+          Directories
+        </div>
+        <div id="directoryList" class="flex-1 overflow-y-auto p-2">
+          <!-- Directory items will be loaded here -->
+          <div class="flex items-center justify-center py-8 text-gray-500">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+
+    <div data-slot="footer" class="flex items-center justify-between gap-3 w-full">
+      <p class="text-sm text-gray-500">
+        Selected: <span id="selectedPath" class="font-medium text-gray-900">/</span>
+      </p>
+      <div class="flex gap-3">
+        <lex-btn variant="secondary" onclick="closeDirectoryBrowser()">Cancel</lex-btn>
+        <lex-btn variant="primary" onclick="selectDirectory()">Select This Directory</lex-btn>
+      </div>
+    </div>
+  </lex-modal>
 
   <!-- Settings Modal -->
-  <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
-    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-      <div class="p-6 border-b border-gray-200">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-gray-900">Leadly CRM Configuration</h3>
-          <button onclick="hideSettings()" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
+  <lex-modal id="settingsModal" heading="Leadly CRM Configuration" size="md">
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Import Directory</label>
+        <div id="settingsImportDir" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700 font-mono text-sm">-</div>
+        <p class="text-xs text-gray-500 mt-1">Configured via ACTIONSTEP_IMPORT_DIR in .env</p>
       </div>
-      <div class="p-6 space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Import Directory</label>
-          <div id="settingsImportDir" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700 font-mono text-sm">-</div>
-          <p class="text-xs text-gray-500 mt-1">Configured via ACTIONSTEP_IMPORT_DIR in .env</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Sync Frequency</label>
-          <div id="settingsSyncFreq" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700">-</div>
-          <p class="text-xs text-gray-500 mt-1">Configured via ACTIONSTEP_SYNC_FREQUENCY in .env</p>
-        </div>
-        <div class="pt-4 border-t">
-          <p class="text-sm text-gray-500">To change these settings, update your <code class="bg-gray-200 px-1 rounded">.env</code> file and restart the server.</p>
-        </div>
-        <div class="flex justify-end pt-2">
-          <button onclick="hideSettings()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">
-            Close
-          </button>
-        </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Sync Frequency</label>
+        <div id="settingsSyncFreq" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700">-</div>
+        <p class="text-xs text-gray-500 mt-1">Configured via ACTIONSTEP_SYNC_FREQUENCY in .env</p>
+      </div>
+      <div class="pt-4 border-t">
+        <p class="text-sm text-gray-500">To change these settings, update your <code class="bg-gray-200 px-1 rounded">.env</code> file and restart the server.</p>
       </div>
     </div>
-  </div>
+    <lex-btn data-slot="footer" variant="secondary" onclick="hideSettings()">Close</lex-btn>
+  </lex-modal>
 
   </template>
 
@@ -318,7 +284,6 @@
   <script src="../js/lex/components/foundation/lex-loader.js"></script>
   <script src="../js/lex/components/foundation/lex-toast.js"></script>
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
-  <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
@@ -329,6 +294,8 @@
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <!-- lex-btn after lex-modal/lex-drawer: their footers hold declarative lex-btns -->
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
@@ -341,6 +308,7 @@
   <script src="../js/shared/library-column-filters.js"></script>
   <script src="../insights/js/record-table-kit.js"></script>
   <script src="js/integration-tables.js"></script>
+  <script src="js/connector-import-dialogs.js"></script>
   <script src="js/leadly-tables.js"></script>
 
   <!-- Page controller -->
@@ -3748,7 +3716,7 @@
     }
 
     function showSettings() {
-      document.getElementById('settingsModal').classList.remove('hidden');
+      document.getElementById('settingsModal').open = true;
       if (dashboardData?.config) {
         document.getElementById('settingsImportDir').textContent = dashboardData.config.import_directory || 'Not set';
         document.getElementById('settingsSyncFreq').textContent = formatSyncFrequency(dashboardData.config.sync_frequency);
@@ -3757,7 +3725,7 @@
 
     // Hide settings modal
     function hideSettings() {
-      document.getElementById('settingsModal').classList.add('hidden');
+      document.getElementById('settingsModal').open = false;
     }
 
     // Directory Browser State
@@ -3782,7 +3750,7 @@
     // Open directory browser modal
     async function openDirectoryBrowser() {
       const modal = document.getElementById('directoryBrowserModal');
-      modal.classList.remove('hidden');
+      modal.open = true;
 
       // Load available volumes
       try {
@@ -3813,7 +3781,16 @@
 
     // Close directory browser modal
     function closeDirectoryBrowser() {
-      document.getElementById('directoryBrowserModal').classList.add('hidden');
+      document.getElementById('directoryBrowserModal').open = false;
+      resetDirectoryBrowser();
+    }
+
+    // The modal's own close button, backdrop click and Escape emit lex-close.
+    document.addEventListener('lex-close', (event) => {
+      if (event.target && event.target.id === 'directoryBrowserModal') resetDirectoryBrowser();
+    });
+
+    function resetDirectoryBrowser() {
       currentBrowsePath = '/';
 
       // Reset manual path input
@@ -3966,64 +3943,8 @@
 
     // Create new folder
     async function createNewFolder() {
-      // Show inline input dialog
-      const dialogHtml = `
-        <div id="folderNameDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
-          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Create New Folder</h3>
-            <input
-              type="text"
-              id="folderNameInput"
-              placeholder="Enter folder name"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 mb-2"
-              autofocus
-            />
-            <p class="text-xs text-gray-500 mb-4">Only letters, numbers, hyphens, and underscores allowed</p>
-            <div class="flex gap-3 justify-end">
-              <button onclick="cancelFolderCreation()" class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">
-                Cancel
-              </button>
-              <button onclick="confirmFolderCreation()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg">
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-
-      document.body.insertAdjacentHTML('beforeend', dialogHtml);
-
-      // Focus input and handle Enter key
-      const input = document.getElementById('folderNameInput');
-      input.focus();
-      input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          confirmFolderCreation();
-        }
-      });
-    }
-
-    function cancelFolderCreation() {
-      const dialog = document.getElementById('folderNameDialog');
-      if (dialog) dialog.remove();
-    }
-
-    async function confirmFolderCreation() {
-      const folderName = document.getElementById('folderNameInput').value.trim();
-
-      if (!folderName) {
-        Toast.error('Please enter a folder name');
-        return;
-      }
-
-      // Validate folder name
-      if (!/^[a-zA-Z0-9_-]+$/.test(folderName)) {
-        Toast.error('Folder name can only contain letters, numbers, hyphens, and underscores');
-        return;
-      }
-
-      // Remove dialog
-      cancelFolderCreation();
+      const folderName = await ConnectorImportDialogs.promptFolderName();
+      if (!folderName) return;
 
       try {
         const newPath = `${currentBrowsePath}/${folderName}`.replace(/\/+/g, '/');
@@ -4075,128 +3996,42 @@
     // Setup Required modal
     function showSetupRequiredModal(event) {
       event?.stopPropagation(); // Prevent event bubbling
-
-      const modalHtml = `
-        <div id="setupRequiredModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;" onclick="closeSetupRequiredModal()">
-          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900">Setup Required</h3>
-              </div>
-            </div>
-
-            <div class="mb-6">
-              <p class="text-sm text-gray-700">Set up the folder where your Leadly CRM files will be stored and processed. This only takes a minute.</p>
-            </div>
-
-            <div class="flex justify-end">
-              <button onclick="closeSetupRequiredModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg">
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      ConnectorImportDialogs.showSetupRequired('Leadly CRM');
     }
 
-    function closeSetupRequiredModal() {
-      const modal = document.getElementById('setupRequiredModal');
-      if (modal) modal.remove();
-    }
-
-    // Delete configuration dialog
+    // Delete configuration dialog (type DELETE to confirm)
     function showDeleteConfigDialog() {
-      const dialogHtml = `
-        <div id="deleteConfigDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 10000;">
-          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900">Delete Configuration</h3>
-                <p class="text-sm text-gray-600 mt-1">This action cannot be undone</p>
-              </div>
-            </div>
-
-            <div class="mb-4">
-              <p class="text-sm text-gray-700 mb-3">This will delete your Leadly CRM configuration settings. Your synced data (matters, participants, etc.) will <strong>NOT</strong> be deleted.</p>
-              <p class="text-sm text-gray-700 mb-3">To confirm, type <strong>DELETE</strong> in the box below:</p>
-              <input
-                type="text"
-                id="deleteConfirmInput"
-                placeholder="Type DELETE"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                autofocus
-              />
-            </div>
-
-            <div class="flex gap-3 justify-end">
-              <button onclick="closeDeleteConfigDialog()" class="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">
-                Cancel
-              </button>
-              <button onclick="confirmDeleteConfig()" id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                Delete Configuration
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-
-      document.body.insertAdjacentHTML('beforeend', dialogHtml);
-
-      // Focus input and enable button when DELETE is typed
-      const input = document.getElementById('deleteConfirmInput');
-      const confirmBtn = document.getElementById('confirmDeleteBtn');
-
-      input.addEventListener('input', (e) => {
-        confirmBtn.disabled = e.target.value !== 'DELETE';
-      });
-
-      input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && e.target.value === 'DELETE') {
-          confirmDeleteConfig();
-        }
+      ConnectorImportDialogs.confirmTypedDelete({
+        connectorLabel: 'Leadly CRM',
+        onConfirm: deleteConfiguration
       });
     }
 
     function closeDeleteConfigDialog() {
-      const dialog = document.getElementById('deleteConfigDialog');
-      if (dialog) {
-        dialog.remove();
-      }
+      const dialog = ConnectorImportDialogs.activeDelete();
+      if (dialog) dialog.close();
     }
 
     async function confirmDeleteConfig() {
-      const confirmBtn = document.getElementById('confirmDeleteBtn');
+      const dialog = ConnectorImportDialogs.activeDelete();
+      if (dialog) await dialog.confirm();
+    }
 
+    // Throws on failure so the dialog stays open for a retry.
+    async function deleteConfiguration() {
       try {
-        confirmBtn.disabled = true;
-        confirmBtn.textContent = 'Deleting...';
-
         await api.delete('/api/v1/leadly/config');
-
-        closeDeleteConfigDialog();
-        Toast.success('Configuration deleted successfully');
-
-        // Reload the dashboard to show "Needs Setup" state
-        setTimeout(() => {
-          loadDashboard();
-        }, 500);
       } catch (error) {
         Toast.error(error.message || 'Failed to delete configuration');
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = 'Delete Configuration';
+        throw error;
       }
+
+      Toast.success('Configuration deleted successfully');
+
+      // Reload the dashboard to show "Needs Setup" state
+      setTimeout(() => {
+        loadDashboard();
+      }, 500);
     }
 
     // ========================================

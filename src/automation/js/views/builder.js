@@ -1718,55 +1718,46 @@ export function renderBuilder(context) {
         </div>
       </footer>
 
-      <div class="builder-publish-modal ${context.state.builder.publishModalOpen ? '' : 'hidden'}" role="dialog" aria-modal="true" aria-labelledby="builder-publish-title">
-        <div class="builder-publish-overlay" data-close-publish-modal></div>
-        <div class="builder-publish-panel">
-          <div class="builder-publish-header">
-            <h3 id="builder-publish-title">Publish Automation</h3>
-            <lex-btn variant="ghost" size="sm" data-close-publish-modal>Close</lex-btn>
-          </div>
-          <div class="builder-publish-body">
-            <div class="form-grid">
-              <div class="automation-field">
-                <span>Scope</span>
-                ${builderSelect('data-builder-field="scopeType"', SCOPE_SELECT_OPTIONS, context.state.builder.scopeType)}
-              </div>
-              <div class="automation-field">
-                <span>Publish state</span>
-                ${builderSelect('data-builder-field="publishMode"', PUBLISH_SELECT_OPTIONS, context.state.builder.publishMode)}
-              </div>
-              ${context.state.builder.scopeType === 'matter' ? `
-                <div class="automation-field full">
-                  <span>Matter</span>
-                  ${builderSelect('data-builder-field="matterId" searchable', context.state.matters.map((matter) => ({ value: matterRef(matter), label: matter.name || matterRef(matter) })), context.state.builder.matterId, 'Select a matter')}
-                </div>
-              ` : ''}
+      <lex-modal id="builder-publish-modal" heading="Publish Automation" size="lg" hide-actions data-builder-publish-modal ${context.state.builder.publishModalOpen ? 'open' : ''}>
+        <div class="builder-publish-body">
+          <div class="form-grid">
+            <div class="automation-field">
+              <span>Scope</span>
+              ${builderSelect('data-builder-field="scopeType"', SCOPE_SELECT_OPTIONS, context.state.builder.scopeType)}
             </div>
-            ${metaGrid([
-              { label: 'Quick Start', value: selectedTemplate.name },
-              { label: 'Trigger', value: context.state.builder.triggerEvent },
-              { label: 'Scope', value: context.state.builder.scopeType === 'matter' ? `Matter: ${selectedMatterName(context)}` : 'Organization-wide' },
-              { label: 'Publish', value: context.state.builder.publishMode === 'enabled' ? 'Live' : 'Disabled' }
-            ])}
-            ${(() => {
-              const failing = preflight.filter((item) => !item.done);
-              if (failing.length === 0) return '';
-              return `
-                <div class="builder-publish-blockers" role="alert">
-                  <strong>Resolve before ${isEdit ? 'saving' : 'publishing'}:</strong>
-                  <ul>
-                    ${failing.map((item) => `<li><strong>${escapeHtml(item.title)}</strong> — ${escapeHtml(item.description)}</li>`).join('')}
-                  </ul>
-                </div>
-              `;
-            })()}
+            <div class="automation-field">
+              <span>Publish state</span>
+              ${builderSelect('data-builder-field="publishMode"', PUBLISH_SELECT_OPTIONS, context.state.builder.publishMode)}
+            </div>
+            ${context.state.builder.scopeType === 'matter' ? `
+              <div class="automation-field full">
+                <span>Matter</span>
+                ${builderSelect('data-builder-field="matterId" searchable', context.state.matters.map((matter) => ({ value: matterRef(matter), label: matter.name || matterRef(matter) })), context.state.builder.matterId, 'Select a matter')}
+              </div>
+            ` : ''}
           </div>
-          <div class="builder-publish-footer">
-            <lex-btn variant="secondary" size="sm" data-close-publish-modal>Cancel</lex-btn>
-            <lex-btn id="create-automation-btn" variant="primary" size="sm" ${preflight.every((item) => item.done) ? '' : 'disabled'}>${isEdit ? 'Save Changes' : 'Publish Automation'}</lex-btn>
-          </div>
+          ${metaGrid([
+            { label: 'Quick Start', value: selectedTemplate.name },
+            { label: 'Trigger', value: context.state.builder.triggerEvent },
+            { label: 'Scope', value: context.state.builder.scopeType === 'matter' ? `Matter: ${selectedMatterName(context)}` : 'Organization-wide' },
+            { label: 'Publish', value: context.state.builder.publishMode === 'enabled' ? 'Live' : 'Disabled' }
+          ])}
+          ${(() => {
+            const failing = preflight.filter((item) => !item.done);
+            if (failing.length === 0) return '';
+            return `
+              <div class="builder-publish-blockers" role="alert">
+                <strong>Resolve before ${isEdit ? 'saving' : 'publishing'}:</strong>
+                <ul>
+                  ${failing.map((item) => `<li><strong>${escapeHtml(item.title)}</strong> — ${escapeHtml(item.description)}</li>`).join('')}
+                </ul>
+              </div>
+            `;
+          })()}
         </div>
-      </div>
+        <lex-btn data-slot="footer" variant="secondary" size="sm" data-close-publish-modal>Cancel</lex-btn>
+        <lex-btn data-slot="footer" id="create-automation-btn" variant="primary" size="sm" ${preflight.every((item) => item.done) ? '' : 'disabled'}>${isEdit ? 'Save Changes' : 'Publish Automation'}</lex-btn>
+      </lex-modal>
     </section>
   `;
 }

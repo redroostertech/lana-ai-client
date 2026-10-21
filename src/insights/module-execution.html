@@ -18,6 +18,7 @@
   <script src="../js/api.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
+  <script src="../js/shared/header-user-menu.js"></script>
   <script src="../js/navigation-helpers.js"></script>
   <script src="../js/conversation-search-modal.js"></script>
   <script src="../js/notifications.js"></script>
@@ -161,163 +162,14 @@
           </button>
 
           <!-- User Menu -->
-          <div class="relative" id="userMenu">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-gray-900 p-1" title="Settings">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-              </svg>
-            </button>
-            <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-              <a href="../settings-v2.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
-              <hr class="my-1">
-              <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sign out</button>
-            </div>
-          </div>
+          <div class="relative" id="userMenu" data-header-user-menu data-settings-href="../settings-v2.html" data-login-href="../login.html"></div>
         </div>
       </div>
     </header>
 
-    <!-- Notification Panel Overlay -->
-    <div id="notificationOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
+    <!-- Notifications: js/notifications.js mounts its own lex-drawer (#notificationPanel). -->
 
-    <!-- Notification Slide-out Panel -->
-    <div id="notificationPanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
-        <div class="flex items-center gap-3">
-          <button id="markAllReadBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium hidden">Mark all read</button>
-          <button id="refreshNotificationsBtn" class="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </button>
-          <button id="closeNotificationPanel" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="flex border-b border-gray-200 px-6 flex-shrink-0">
-        <button id="filterAll" class="px-4 py-3 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">All</button>
-        <button id="filterUnread" class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700">Unread</button>
-      </div>
-      <div id="notificationList" class="flex-1 overflow-y-auto">
-        <div id="notificationLoading" class="p-8 text-center">
-          <div class="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-          <p class="text-gray-500 mt-3 text-sm">Loading notifications...</p>
-        </div>
-      </div>
-      <div id="notificationLoadingMore" class="hidden p-4 border-t border-gray-100 text-center flex-shrink-0">
-        <div class="animate-spin w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full mx-auto"></div>
-      </div>
-    </div>
-
-    <!-- Data Override Panel Overlay -->
-    <div id="dataOverrideOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity"></div>
-
-    <!-- Data Override Slide-out Panel -->
-    <div id="dataOverridePanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Override Target Value</h2>
-        <button id="closeDataOverridePanel" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto p-6">
-        <!-- Metric Info -->
-        <div class="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-          <h3 id="overrideMetricName" class="font-semibold text-gray-900 mb-1"></h3>
-          <p id="overrideMetricDescription" class="text-sm text-gray-600"></p>
-          <div class="mt-3 text-xs text-gray-500">
-            <p>Period: <span id="overridePeriodRange" class="font-medium text-gray-700"></span></p>
-          </div>
-        </div>
-
-        <!-- Current Value Display -->
-        <div class="mb-6">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Current Target</label>
-          <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <p id="overrideCurrentValue" class="text-2xl font-bold text-gray-900">-</p>
-            <p class="text-xs text-gray-500 mt-1">Default target value</p>
-          </div>
-        </div>
-
-        <!-- Override Form -->
-        <form id="overrideForm" class="space-y-4">
-          <div>
-            <label for="overrideValue" class="block text-sm font-medium text-gray-700 mb-2">
-              New Target Value <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              id="overrideValue"
-              step="0.01"
-              required
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Enter new target value"
-            >
-            <p class="text-xs text-gray-500 mt-1">This target will replace the default target for this period.</p>
-          </div>
-
-          <div>
-            <label for="overrideNotes" class="block text-sm font-medium text-gray-700 mb-2">
-              Notes (Optional)
-            </label>
-            <textarea
-              id="overrideNotes"
-              rows="3"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Why are you overriding this value?"
-            ></textarea>
-          </div>
-
-          <!-- Override Type (Hidden - always 'manual') -->
-          <input type="hidden" id="overrideType" value="manual">
-
-          <!-- Period Data (Hidden - populated when panel opens) -->
-          <input type="hidden" id="overridePeriodStart">
-          <input type="hidden" id="overridePeriodEnd">
-          <input type="hidden" id="overridePeriodType">
-          <input type="hidden" id="overrideModuleKey">
-          <input type="hidden" id="overrideMetricKey">
-
-          <!-- Action Buttons -->
-          <div class="flex gap-3 pt-4">
-            <button
-              type="submit"
-              id="saveOverrideBtn"
-              class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              <span id="saveOverrideBtnText">Save Override</span>
-              <svg id="saveOverrideBtnSpinner" class="hidden animate-spin inline-block w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </button>
-            <button
-              type="button"
-              onclick="closeDataOverridePanel()"
-              class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-
-        <!-- Existing Overrides -->
-        <div id="existingOverridesSection" class="hidden mt-8 pt-6 border-t border-gray-200">
-          <h3 class="text-sm font-semibold text-gray-900 mb-3">Existing Override</h3>
-          <div id="existingOverridesList" class="space-y-2">
-            <!-- Populated dynamically -->
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Data override: InsightsOverlays.overridePanel() mounts the shared lex-drawer (#dataOverridePanel). -->
 
     <!-- Module Side Menu -->
     <aside id="moduleSidebar" class="fixed left-64 top-16 bottom-0 w-64 bg-white border-r border-gray-200 z-10 hidden lg:block flex flex-col">
@@ -1065,19 +917,7 @@
       });
     }
 
-    // User menu toggle
-    const userMenu = document.getElementById('userMenu');
-    const userDropdown = document.getElementById('userDropdown');
-    userMenu.addEventListener('click', () => userDropdown.classList.toggle('hidden'));
-    document.addEventListener('click', (e) => {
-      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
-    });
-
-    // Logout
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await api.logout();
-      window.location.href = '../login.html';
-    });
+    // The header account menu (#userMenu) is rendered and wired by js/shared/header-user-menu.js.
 
     // Sidebar toggle
     const sidebar = document.getElementById('sidebar');
@@ -1207,7 +1047,7 @@
 
     // Open data sources modal
     function openDataSourcesModal() {
-      const modal = document.getElementById('dataSourcesModal');
+      const modal = InsightsOverlays.pageModal('dataSourcesModal', { heading: 'Data sources' });
       const list = document.getElementById('dataSourcesList');
 
       // Clear existing list
@@ -1243,13 +1083,12 @@
       }
 
       // Show modal
-      modal.classList.remove('hidden');
+      modal.open = true;
     }
 
     // Close data sources modal
     function closeDataSourcesModal() {
-      const modal = document.getElementById('dataSourcesModal');
-      modal.classList.add('hidden');
+      InsightsOverlays.closeModal('dataSourcesModal');
     }
 
     // Expose to global scope for onclick handlers
@@ -1314,7 +1153,7 @@
 
     // Open missing entities modal
     function openMissingEntitiesModal() {
-      const modal = document.getElementById('missingEntitiesModal');
+      const modal = InsightsOverlays.pageModal('missingEntitiesModal', { heading: 'Missing data entities', size: 'lg' });
       const list = document.getElementById('missingEntitiesList');
 
       // Clear existing list
@@ -1357,14 +1196,20 @@
       }
 
       // Show modal
-      modal.classList.remove('hidden');
+      modal.open = true;
     }
 
     // Close missing entities modal
     function closeMissingEntitiesModal() {
-      const modal = document.getElementById('missingEntitiesModal');
-      modal.classList.add('hidden');
+      InsightsOverlays.closeModal('missingEntitiesModal');
     }
+
+    // Footer "Connect integrations" (was a link to the integrations page)
+    document.addEventListener('click', (e) => {
+      if (e.target.closest && e.target.closest('#missingEntitiesModal [data-connect-integrations]')) {
+        window.location.href = '../integrations.html';
+      }
+    });
 
     // Expose to global scope for onclick handlers
     window.closeMissingEntitiesModal = closeMissingEntitiesModal;
@@ -1516,13 +1361,11 @@
     // Show drill-down modal for lead source
     async function showLeadSourceDrilldown(metricKey, source) {
       LanaInsightsTables.resetFetchNotes();
-      const modal = document.getElementById('drilldownModal');
-      const title = document.getElementById('drilldownTitle');
-      const content = document.getElementById('drilldownContent');
+      const content = InsightsOverlays.drilldownContent();
 
-      title.textContent = `Leads from: ${source}`;
+      const drilldownTitle = `Leads from: ${source}`;
       content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading leads...</p></div>';
-      modal.classList.remove('hidden');
+      InsightsOverlays.openDrilldown(drilldownTitle);
 
       try {
         // Fetch leads from this source
@@ -1576,7 +1419,7 @@
 
     // Close drilldown modal
     function closeDrilldownModal() {
-      document.getElementById('drilldownModal').classList.add('hidden');
+      InsightsOverlays.closeDrilldown();
     }
 
     // Expose to global scope for onclick handlers
@@ -1589,7 +1432,7 @@
         return;
       }
 
-      const modal = document.getElementById('moduleInfoModal');
+      const modal = InsightsOverlays.pageModal('moduleInfoModal', { heading: 'Module information', size: 'lg' });
 
       // Populate modal with module metadata
       document.getElementById('modalModuleName').textContent = currentModuleMetadata.moduleName;
@@ -1619,12 +1462,12 @@
       }
 
       // Show modal
-      modal.classList.remove('hidden');
+      modal.open = true;
     }
 
     // Close module info modal
     function closeModuleInfo() {
-      document.getElementById('moduleInfoModal').classList.add('hidden');
+      InsightsOverlays.closeModal('moduleInfoModal');
     }
 
     // Expose to global scope for onclick handlers
@@ -1657,78 +1500,12 @@
       }
     }
 
-    // Attach click handlers for cell tooltips
-    function attachCellTooltipHandlers() {
-      // Remove any existing tooltip
-      const existingTooltip = document.getElementById('cell-tooltip-popover');
-      if (existingTooltip) {
-        existingTooltip.remove();
-      }
-
-      // Attach click handlers to all tooltip triggers
-      document.querySelectorAll('.cell-tooltip-trigger').forEach(trigger => {
-        trigger.addEventListener('click', (e) => {
-          e.stopPropagation();
-          showCellTooltip(trigger);
-        });
-      });
-
-      // Close tooltip when clicking outside
-      const closeHandler = () => {
-        const tooltip = document.getElementById('cell-tooltip-popover');
-        if (tooltip) {
-          tooltip.remove();
-        }
-      };
-      document.addEventListener('click', closeHandler);
-    }
-
-    // Show tooltip popover near the clicked help icon
-    function showCellTooltip(trigger) {
-      // Remove any existing tooltip
-      const existingTooltip = document.getElementById('cell-tooltip-popover');
-      if (existingTooltip) {
-        existingTooltip.remove();
-        return; // Toggle behavior - click again to close
-      }
-
-      const tooltipText = trigger.getAttribute('data-tooltip');
-      if (!tooltipText) return;
-
-      // Create tooltip element
-      const tooltip = document.createElement('div');
-      tooltip.id = 'cell-tooltip-popover';
-      tooltip.className = 'absolute z-50 bg-gray-900 text-white text-sm rounded-lg shadow-lg p-3 max-w-xs';
-      tooltip.innerHTML = tooltipText;
-      tooltip.style.pointerEvents = 'none'; // Don't interfere with clicks
-
-      // Position tooltip near the trigger
-      const rect = trigger.getBoundingClientRect();
-      tooltip.style.left = `${rect.left + window.scrollX}px`;
-      tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
-
-      // Add to DOM
-      document.body.appendChild(tooltip);
-
-      // Adjust position if it goes off-screen
-      setTimeout(() => {
-        const tooltipRect = tooltip.getBoundingClientRect();
-        if (tooltipRect.right > window.innerWidth) {
-          tooltip.style.left = `${window.innerWidth - tooltipRect.width - 10}px`;
-        }
-        if (tooltipRect.bottom > window.innerHeight) {
-          tooltip.style.top = `${rect.top + window.scrollY - tooltipRect.height - 5}px`;
-        }
-      }, 0);
-    }
 
     // Render generic drilldown table from config
     // Show drill-down for any metric (Generic + Legacy fallback)
     async function showMetricDrilldown(metricKey, metricName) {
       LanaInsightsTables.resetFetchNotes();
-      const modal = document.getElementById('drilldownModal');
-      const title = document.getElementById('drilldownTitle');
-      const content = document.getElementById('drilldownContent');
+      const content = InsightsOverlays.drilldownContent();
 
       try {
         const periodStart = LanaTime.utcDayStart(document.getElementById('periodStart').value);
@@ -1745,9 +1522,9 @@
         }
 
         // If generic drilldown not available, open the legacy modal
-        title.textContent = `${metricName} - Details`;
+        const drilldownTitle = `${metricName} - Details`;
         content.innerHTML = '<div class="text-center py-8"><div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-gray-600 mt-4">Loading data...</p></div>';
-        modal.classList.remove('hidden');
+        InsightsOverlays.openDrilldown(drilldownTitle);
 
         console.log(`[Drilldown] Falling back to legacy drilldown for ${metricKey}`);
 
@@ -3643,83 +3420,18 @@
      * @param {string} uniqueId - Unique identifier for the modal
      * @returns {string} HTML string for help icon and modal
      */
+    /**
+     * Help icon for a visualization's helpText. Clicking it opens a lex-modal
+     * (js: insights/js/insights-overlays.js).
+     * @param {Object} helpText - Help text configuration with title and sections
+     * @param {string} uniqueId - Unique identifier for the help entry
+     * @returns {string} HTML string for the help icon button
+     */
     function renderHelpTextModal(helpText, uniqueId) {
-      if (!helpText || !helpText.sections || helpText.sections.length === 0) {
-        return '';
-      }
-
-      const modalId = `help-modal-${uniqueId}`;
-
-      // Generate sections HTML with markdown support
-      const sectionsHTML = helpText.sections.map(section => {
-        let contentHTML = '';
-
-        if (section.content) {
-          // Content may contain line breaks, lists, etc. - use block rendering
-          contentHTML = `<div class="text-sm text-gray-700 leading-relaxed">${renderMarkdownBlock(section.content)}</div>`;
-        }
-
-        if (section.bullets && section.bullets.length > 0) {
-          const bulletsHTML = section.bullets.map(bullet =>
-            // Bullets may contain inline markdown (bold, etc.)
-            `<li class="text-sm text-gray-700 leading-relaxed">${renderMarkdownInline(bullet)}</li>`
-          ).join('');
-          contentHTML = `<ul class="list-disc pl-5 space-y-2">${bulletsHTML}</ul>`;
-        }
-
-        return `
-          <div class="mb-6">
-            <h4 class="text-md font-semibold text-gray-900 mb-3">${renderMarkdownInline(section.heading)}</h4>
-            ${contentHTML}
-          </div>
-        `;
-      }).join('');
-
-      return `
-        <!-- Help Icon Button -->
-        <button
-          onclick="document.getElementById('${modalId}').classList.remove('hidden')"
-          class="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
-          title="Click for help understanding this chart"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-        </button>
-
-        <!-- Help Modal -->
-        <div id="${modalId}" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <!-- Modal Header -->
-            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h3 class="text-xl font-bold text-gray-900">${helpText.title || 'Help'}</h3>
-              <button
-                onclick="document.getElementById('${modalId}').classList.add('hidden')"
-                class="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
-            </div>
-
-            <!-- Modal Content -->
-            <div class="px-6 py-6">
-              ${sectionsHTML}
-            </div>
-
-            <!-- Modal Footer -->
-            <div class="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
-              <button
-                onclick="document.getElementById('${modalId}').classList.add('hidden')"
-                class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                Got it!
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
+      return InsightsOverlays.helpButton(helpText, uniqueId, {
+        renderInline: renderMarkdownInline,
+        renderBlock: renderMarkdownBlock
+      });
     }
 
     /**
@@ -4781,93 +4493,41 @@
     });
 
     // ========================================================================
-    // DATA OVERRIDE PANEL FUNCTIONS
+    // DATA OVERRIDE PANEL (shared lex-drawer: js/components/data-override-panel.js)
     // ========================================================================
 
-    // Global state for data override panel
-    let currentOverrideMetric = null;
-    let currentOverrideData = null;
+    // The page's one DataOverridePanel, created on first use.
+    function dataOverridePanel() {
+      return InsightsOverlays.overridePanel({
+        apiClient: api,
+        formatNumber,
+        formatDateRange,
+        onError: (error) => showError(error.message || 'Failed to save override. Please try again.'),
+        onSaveSuccess: (metricName) => showInfo(`Override saved for ${metricName}. Re-execute module to see updated values.`),
+        onDeleteSuccess: () => showInfo('Override deleted successfully. Re-execute module to see updated values.')
+      });
+    }
 
     // Open data override panel
     function openDataOverridePanel(metricKey, metricName, metricDescription, currentValue, overrideType = 'target') {
-      const moduleKey = document.getElementById('moduleSelect').value;
-      const periodType = lexSelectValue(document.getElementById('periodType'));
-      const periodStart = document.getElementById('periodStart').value;
-      const periodEnd = document.getElementById('periodEnd').value;
-
-      if (!periodStart || !periodEnd) {
-        showError('Please select a date range first');
+      const panel = dataOverridePanel();
+      if (!panel) {
+        showError('The override panel could not be loaded. Please reload the page.');
         return;
       }
-
-      // Store current metric info
-      currentOverrideMetric = {
-        key: metricKey,
-        name: metricName,
-        description: metricDescription,
-        currentValue: currentValue,
-        overrideType: overrideType
-      };
-
-      // Populate panel
-      document.getElementById('overrideMetricName').textContent = metricName;
-      document.getElementById('overrideMetricDescription').textContent = metricDescription || 'No description available';
-      document.getElementById('overridePeriodRange').textContent = formatDateRange(
-        new Date(LanaTime.utcDayStart(periodStart)),
-        new Date(LanaTime.utcDayEnd(periodEnd))
-      );
-
-      // Update labels based on override type
-      const valueLabel = overrideType === 'target' ? 'Current Target' : 'Current Value';
-      document.getElementById('overrideCurrentValue').parentElement.querySelector('p.text-xs').textContent = valueLabel;
-      document.getElementById('overrideCurrentValue').textContent = formatNumber(currentValue, 2);
-
-      // Reset form
-      document.getElementById('overrideForm').reset();
-      document.getElementById('overrideValue').value = '';
-      document.getElementById('overrideNotes').value = '';
-      document.getElementById('overrideType').value = overrideType;
-
-      // Store period data in hidden form inputs (FIX for button click bug)
-      document.getElementById('overridePeriodStart').value = periodStart;
-      document.getElementById('overridePeriodEnd').value = periodEnd;
-      document.getElementById('overridePeriodType').value = periodType;
-      document.getElementById('overrideModuleKey').value = moduleKey;
-      document.getElementById('overrideMetricKey').value = metricKey;
-
-      // Load existing overrides for this metric
-      loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd);
-
-      // Show panel
-      const overlay = document.getElementById('dataOverrideOverlay');
-      const panel = document.getElementById('dataOverridePanel');
-
-      overlay.classList.remove('hidden');
-      panel.classList.remove('translate-x-full');
-
-      // Prevent body scroll
-      document.body.style.overflow = 'hidden';
+      panel.open(metricKey, metricName, metricDescription, currentValue, {
+        periodStart: document.getElementById('periodStart').value,
+        periodEnd: document.getElementById('periodEnd').value,
+        periodType: lexSelectValue(document.getElementById('periodType')),
+        moduleKey: document.getElementById('moduleSelect').value
+      }, overrideType);
     }
 
     // Close data override panel
     function closeDataOverridePanel() {
-      const overlay = document.getElementById('dataOverrideOverlay');
-      const panel = document.getElementById('dataOverridePanel');
-
-      panel.classList.add('translate-x-full');
-      overlay.classList.add('hidden');
-
-      // Restore body scroll
-      document.body.style.overflow = '';
-
-      // Clear state
-      currentOverrideMetric = null;
-      currentOverrideData = null;
+      const panel = dataOverridePanel();
+      if (panel) panel.close();
     }
-
-    // Close panel when clicking overlay
-    document.getElementById('dataOverrideOverlay').addEventListener('click', closeDataOverridePanel);
-    document.getElementById('closeDataOverridePanel').addEventListener('click', closeDataOverridePanel);
 
     // Expose data override panel functions globally for onclick handlers
     window.openDataOverridePanel = openDataOverridePanel;
@@ -4879,407 +4539,125 @@
     // Expose module info function for Learn More button
     window.showModuleInfo = showModuleInfo;
 
-    // Load existing overrides for a metric
-    async function loadExistingOverrides(moduleKey, metricKey, periodStart, periodEnd) {
-      try {
-        const periodStartISO = LanaTime.utcDayStart(periodStart);
-        const periodEndISO = LanaTime.utcDayEnd(periodEnd);
-
-        const data = await api.get(`/api/v1/modules/${moduleKey}/data-overrides`, {
-          periodStart: periodStartISO,
-          periodEnd: periodEndISO
-        });
-
-        // Filter to current metric
-        const metricOverrides = data.filter(o => o.metric_key === metricKey);
-
-        const existingSection = document.getElementById('existingOverridesSection');
-        const existingList = document.getElementById('existingOverridesList');
-
-        if (metricOverrides.length > 0) {
-          existingSection.classList.remove('hidden');
-          existingList.innerHTML = metricOverrides.map(override => `
-            <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <div class="flex items-start justify-between mb-2">
-                <div class="flex-1">
-                  <p class="text-sm font-semibold text-gray-900">Override Value: ${formatNumber(override.override_value, 2)}</p>
-                  <p class="text-xs text-gray-500 mt-1">
-                    Period: ${formatDateRange(override.period_start, override.period_end)}
-                  </p>
-                  ${override.notes ? `<p class="text-xs text-gray-600 mt-1 italic">"${override.notes}"</p>` : ''}
-                </div>
-                <button
-                  onclick="deleteOverride('${override.override_id}')"
-                  class="text-red-600 hover:text-red-800 ml-2"
-                  title="Delete override"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                  </svg>
-                </button>
-              </div>
-              <div class="text-xs text-gray-400">
-                Created: ${new Date(override.created_at).toLocaleDateString()}
-              </div>
-            </div>
-          `).join('');
-        } else {
-          existingSection.classList.add('hidden');
-        }
-      } catch (error) {
-        console.error('Failed to load existing overrides:', error);
-        // Non-critical - just hide the section
-        document.getElementById('existingOverridesSection').classList.add('hidden');
-      }
-    }
-
-    // Save data override
-    document.getElementById('overrideForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      if (!currentOverrideMetric) {
-        showError('No metric selected for override');
-        return;
-      }
-
-      // Read from hidden inputs in the form (FIX for button click bug)
-      const moduleKey = document.getElementById('overrideModuleKey').value;
-      const periodType = document.getElementById('overridePeriodType').value;
-      const periodStart = document.getElementById('overridePeriodStart').value;
-      const periodEnd = document.getElementById('overridePeriodEnd').value;
-      const overrideValue = parseFloat(document.getElementById('overrideValue').value);
-      const overrideNotes = document.getElementById('overrideNotes').value.trim();
-      const overrideType = document.getElementById('overrideType').value;
-
-      // Validation
-      if (!periodStart || !periodEnd) {
-        showError('Period dates are missing. Please close and reopen the panel.');
-        return;
-      }
-
-      if (isNaN(overrideValue)) {
-        showError('Please enter a valid numeric value');
-        return;
-      }
-
-      // Convert to ISO
-      const periodStartISO = LanaTime.utcDayStart(periodStart);
-      const periodEndISO = LanaTime.utcDayEnd(periodEnd);
-
-      // Show loading state
-      const saveBtn = document.getElementById('saveOverrideBtn');
-      const saveBtnText = document.getElementById('saveOverrideBtnText');
-      const saveBtnSpinner = document.getElementById('saveOverrideBtnSpinner');
-
-      saveBtn.disabled = true;
-      saveBtnText.textContent = 'Saving...';
-      saveBtnSpinner.classList.remove('hidden');
-
-      try {
-        await api.post(`/api/v1/modules/${moduleKey}/data-overrides`, {
-          metricKey: currentOverrideMetric.key,
-          periodStart: periodStartISO,
-          periodEnd: periodEndISO,
-          periodType: periodType,
-          overrideValue: overrideValue,
-          overrideType: overrideType,
-          notes: overrideNotes || null
-        });
-
-        showInfo(`Override saved for ${currentOverrideMetric.name}. Re-execute module to see updated values.`);
-
-        // Close panel
-        closeDataOverridePanel();
-
-        // Optionally auto-refresh module execution
-        // await executeModule();
-
-      } catch (error) {
-        console.error('Failed to save override:', error);
-        showError(error.message || 'Failed to save override. Please try again.');
-      } finally {
-        saveBtn.disabled = false;
-        saveBtnText.textContent = 'Save Override';
-        saveBtnSpinner.classList.add('hidden');
-      }
-    });
-
-    // Delete data override
-    async function deleteOverride(overrideId) {
-      const confirmed = await Lex.Modal.confirmAsync('Delete override', 'Are you sure you want to delete this override?', {
-        confirmText: 'Delete',
-        variant: 'danger'
-      });
-      if (!confirmed) {
-        return;
-      }
-
-      const moduleKey = document.getElementById('moduleSelect').value;
-
-      try {
-        await api.delete(`/api/v1/modules/${moduleKey}/data-overrides/${overrideId}`);
-
-        showInfo('Override deleted successfully. Re-execute module to see updated values.');
-
-        // Reload existing overrides
-        const periodStart = document.getElementById('periodStart').value;
-        const periodEnd = document.getElementById('periodEnd').value;
-        await loadExistingOverrides(moduleKey, currentOverrideMetric.key, periodStart, periodEnd);
-
-      } catch (error) {
-        console.error('Failed to delete override:', error);
-        showError(error.message || 'Failed to delete override. Please try again.');
-      }
-    }
-
   </script>
 
+  <!-- Page modals: InsightsOverlays.openModal(id) builds a lex-modal from each <template id="<id>Template">. -->
   <!-- Data Sources Modal -->
-  <div id="dataSourcesModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-6 w-full max-w-md">
-      <div class="bg-white rounded-lg shadow-xl">
-        <!-- Modal Header -->
-        <div class="flex items-start justify-between p-5 border-b border-gray-200">
-          <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
-            </svg>
-            Data Sources
-          </h3>
-          <button
-            onclick="closeDataSourcesModal()"
-            class="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-
-        <!-- Modal Content -->
-        <div class="p-5">
-          <p class="text-sm text-gray-600 mb-4">This report pulls data from the following connectors:</p>
-          <div id="dataSourcesList" class="space-y-3">
-            <!-- Connectors will be dynamically inserted here -->
-          </div>
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="flex justify-end p-5 border-t border-gray-200">
-          <button
-            onclick="closeDataSourcesModal()"
-            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
+  <template id="dataSourcesModalTemplate">
+    <p class="text-sm text-gray-600 mb-4">This report pulls data from the following connectors:</p>
+    <div id="dataSourcesList" class="space-y-3">
+      <!-- Connectors will be dynamically inserted here -->
     </div>
-  </div>
+    <lex-btn data-slot="footer" variant="secondary" data-action="cancel">Close</lex-btn>
+  </template>
 
   <!-- Missing Entities Modal -->
-  <div id="missingEntitiesModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-6 w-full max-w-2xl">
-      <div class="bg-white rounded-lg shadow-xl">
-        <!-- Modal Header -->
-        <div class="flex items-start justify-between p-5 border-b border-gray-200">
-          <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-            </svg>
-            Missing Data Entities
-          </h3>
-          <button onclick="closeMissingEntitiesModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-
-        <!-- Modal Content -->
-        <div class="p-5">
-          <!-- Warning Message -->
-          <div class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <div class="flex gap-3">
-              <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <div>
-                <p class="text-sm font-medium text-amber-900">Incomplete Data</p>
-                <p class="text-sm text-amber-700 mt-1">
-                  This report requires data entities that are not currently available in your system.
-                  Missing entities may result in incomplete or inaccurate metrics.
-                  Connect the appropriate data sources to enable full reporting functionality.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Missing Entities Table -->
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entity Type</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Impact</th>
-                </tr>
-              </thead>
-              <tbody id="missingEntitiesList" class="bg-white divide-y divide-gray-200">
-                <!-- Missing entities will be dynamically inserted here -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="flex justify-between p-5 border-t border-gray-200">
-          <a href="../integrations.html" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-            </svg>
-            Connect Integrations
-          </a>
-          <button onclick="closeMissingEntitiesModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors">
-            Close
-          </button>
+  <template id="missingEntitiesModalTemplate">
+    <!-- Warning Message -->
+    <div class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+      <div class="flex gap-3">
+        <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <div>
+          <p class="text-sm font-medium text-amber-900">Incomplete Data</p>
+          <p class="text-sm text-amber-700 mt-1">
+            This report requires data entities that are not currently available in your system.
+            Missing entities may result in incomplete or inaccurate metrics.
+            Connect the appropriate data sources to enable full reporting functionality.
+          </p>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Drill-down Modal -->
-  <div id="drilldownModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
-    <div class="relative w-full h-full p-6 bg-white">
-      <!-- Modal Header -->
-      <div class="flex items-start justify-between mb-6 pb-4 border-b border-gray-200">
-        <h3 id="drilldownTitle" class="text-2xl font-semibold text-gray-900"></h3>
-        <button
-          onclick="closeDrilldownModal()"
-          class="text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Content -->
-      <div id="drilldownContent" class="mt-4 overflow-y-auto" style="max-height: calc(100vh - 180px);">
-        <!-- Content will be dynamically inserted here -->
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="mt-6 pt-4 border-t border-gray-200 flex justify-end">
-        <button
-          onclick="closeDrilldownModal()"
-          class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-        >
-          Close
-        </button>
-      </div>
+    <!-- Missing Entities Table -->
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entity Type</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Impact</th>
+          </tr>
+        </thead>
+        <tbody id="missingEntitiesList" class="bg-white divide-y divide-gray-200">
+          <!-- Missing entities will be dynamically inserted here -->
+        </tbody>
+      </table>
     </div>
-  </div>
+    <lex-btn data-slot="footer" variant="primary" leading-icon="plus" data-connect-integrations>Connect integrations</lex-btn>
+    <lex-btn data-slot="footer" variant="secondary" data-action="cancel">Close</lex-btn>
+  </template>
+
+  <!-- Drill-down modal: InsightsOverlays.openDrilldown() mounts a full-size lex-modal (#drilldownModal). -->
 
   <!-- Module Info Modal -->
-  <div id="moduleInfoModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-6 w-full max-w-2xl">
-      <div class="bg-white rounded-lg shadow-xl">
-        <!-- Modal Header -->
-        <div class="flex items-start justify-between p-5 border-b border-gray-200">
-          <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+  <template id="moduleInfoModalTemplate">
+    <div class="space-y-4">
+      <!-- Module Name -->
+      <div>
+        <h4 class="text-lg font-semibold text-gray-900" id="modalModuleName"></h4>
+        <p class="text-sm text-gray-500" id="modalModuleKey"></p>
+      </div>
+
+      <!-- Description -->
+      <div>
+        <h5 class="text-sm font-medium text-gray-700 mb-1">Description</h5>
+        <p class="text-sm text-gray-600" id="modalModuleDescription"></p>
+      </div>
+
+      <!-- Metadata Grid -->
+      <div class="grid grid-cols-2 gap-4 pt-2">
+        <!-- Version -->
+        <div class="flex items-start gap-3">
+          <div class="flex-shrink-0 w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
             </svg>
-            Module Information
-          </h3>
-          <button
-            onclick="closeModuleInfo()"
-            class="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-
-        <!-- Modal Content -->
-        <div class="p-5 space-y-4">
-          <!-- Module Name -->
+          </div>
           <div>
-            <h4 class="text-lg font-semibold text-gray-900" id="modalModuleName"></h4>
-            <p class="text-sm text-gray-500" id="modalModuleKey"></p>
-          </div>
-
-          <!-- Description -->
-          <div>
-            <h5 class="text-sm font-medium text-gray-700 mb-1">Description</h5>
-            <p class="text-sm text-gray-600" id="modalModuleDescription"></p>
-          </div>
-
-          <!-- Metadata Grid -->
-          <div class="grid grid-cols-2 gap-4 pt-2">
-            <!-- Version -->
-            <div class="flex items-start gap-3">
-              <div class="flex-shrink-0 w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                </svg>
-              </div>
-              <div>
-                <p class="text-xs font-medium text-gray-500">Version</p>
-                <p class="text-sm font-semibold text-gray-900" id="modalModuleVersion"></p>
-              </div>
-            </div>
-
-            <!-- Metrics Count -->
-            <div class="flex items-start gap-3">
-              <div class="flex-shrink-0 w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-              </div>
-              <div>
-                <p class="text-xs font-medium text-gray-500">Metrics</p>
-                <p class="text-sm font-semibold text-gray-900" id="modalModuleMetrics"></p>
-              </div>
-            </div>
-
-            <!-- Category -->
-            <div class="flex items-start gap-3">
-              <div class="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                </svg>
-              </div>
-              <div>
-                <p class="text-xs font-medium text-gray-500">Category</p>
-                <p class="text-sm font-semibold text-gray-900 capitalize" id="modalModuleCategory"></p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Status Badge -->
-          <div class="pt-2">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-medium text-gray-500">Status:</span>
-              <span id="modalModuleStatus" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"></span>
-            </div>
+            <p class="text-xs font-medium text-gray-500">Version</p>
+            <p class="text-sm font-semibold text-gray-900" id="modalModuleVersion"></p>
           </div>
         </div>
 
-        <!-- Modal Footer -->
-        <div class="flex justify-end p-5 border-t border-gray-200">
-          <button
-            onclick="closeModuleInfo()"
-            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-          >
-            Close
-          </button>
+        <!-- Metrics Count -->
+        <div class="flex items-start gap-3">
+          <div class="flex-shrink-0 w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-xs font-medium text-gray-500">Metrics</p>
+            <p class="text-sm font-semibold text-gray-900" id="modalModuleMetrics"></p>
+          </div>
+        </div>
+
+        <!-- Category -->
+        <div class="flex items-start gap-3">
+          <div class="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-xs font-medium text-gray-500">Category</p>
+            <p class="text-sm font-semibold text-gray-900 capitalize" id="modalModuleCategory"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Badge -->
+      <div class="pt-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-medium text-gray-500">Status:</span>
+          <span id="modalModuleStatus" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"></span>
         </div>
       </div>
     </div>
-  </div>
+    <lex-btn data-slot="footer" variant="secondary" data-action="cancel">Close</lex-btn>
+  </template>
 
   </div>
 
@@ -5309,6 +4687,12 @@
   <script src="../js/shared/library-column-filters.js"></script>
   <script src="js/record-table-kit.js"></script>
   <script src="js/insights-tables.js"></script>
+  <script src="js/insights-overlays.js"></script>
+  <!-- Shared data-override lex-drawer (used through InsightsOverlays.overridePanel) -->
+  <script type="module">
+    import { DataOverridePanel } from '../js/components/data-override-panel.js';
+    window.DataOverridePanel = DataOverridePanel;
+  </script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>
 

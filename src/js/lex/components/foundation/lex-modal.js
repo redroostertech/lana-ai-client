@@ -243,6 +243,9 @@
         max-height: calc(88vh - 32px);
       }
 
+      .lex-modal-header[data-empty] {
+        display: none;
+      }
       .lex-modal-close[hidden] {
         display: none !important;
       }
@@ -271,7 +274,7 @@
         padding: 12px 24px;
       }
 
-      .lex-modal-panel--full:not(:has(.lex-modal-header)) .lex-modal-footer {
+      .lex-modal-panel--full:not(:has(.lex-modal-header:not([data-empty]))) .lex-modal-footer {
         border-radius: 0;
       }
 
@@ -490,9 +493,10 @@
       html += `<div class="lex-modal-backdrop" data-action="overlay"></div>`;
       html += `<div class="${panelCls}" role="dialog" aria-modal="true"${labelledBy}${panelStyle}>`;
 
-      // Header (a palette never has one)
-      if (this.heading && !palette) {
-        html += `<div class="lex-modal-header">`;
+      // Header (a palette never has one). Without a heading it is rendered
+      // hidden, so a heading set later shows it.
+      if (!palette) {
+        html += `<div class="lex-modal-header"${this.heading ? '' : ' data-empty'}>`;
         html += `<div class="lex-modal-title-group">`;
         html += `<button type="button" class="lex-modal-back" data-action="back" aria-label="${this.escapeHtml(this.backLabel || 'Back')}"${this.backButton ? '' : ' hidden'}>${BACK_SVG}</button>`;
         html += `<h3 id="${this._titleId}" class="lex-modal-title">${this.escapeHtml(this.heading)}</h3>`;
@@ -542,6 +546,8 @@
       if (changedProps && changedProps.has('heading')) {
         const titleEl = this.querySelector('.lex-modal-title');
         if (titleEl) titleEl.textContent = this.heading;
+        const headerEl = this.querySelector('.lex-modal-header');
+        if (headerEl && !this.palette) headerEl.toggleAttribute('data-empty', !this.heading);
         const panel = this.querySelector('.lex-modal-panel');
         if (panel && this.palette) {
           if (this.heading) panel.setAttribute('aria-label', this.heading);
@@ -583,6 +589,11 @@
           backBtn.hidden = !this.backButton;
           backBtn.setAttribute('aria-label', this.backLabel || 'Back');
         }
+      }
+
+      const overlayStack = window.Lex && window.Lex.OverlayStack;
+      if (overlayStack) {
+        if (this.open) overlayStack.opened(this); else overlayStack.closed(this);
       }
 
       if (!this.open) {
@@ -694,6 +705,8 @@
       // ESC key to close
       const escHandler = (e) => {
         if (e.key === 'Escape' && this.open && this.closeOnEscape !== false) {
+          const stack = window.Lex && window.Lex.OverlayStack;
+          if (stack && (!stack.isTop(this) || !stack.claimEscape(e))) return;
           this.emit('lex-close');
           this.open = false;
         }

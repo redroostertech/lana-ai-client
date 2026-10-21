@@ -445,6 +445,11 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         }
       }
 
+      const overlayStack = window.Lex && window.Lex.OverlayStack;
+      if (overlayStack) {
+        if (this.open) overlayStack.opened(this); else overlayStack.closed(this);
+      }
+
       if (!this.open) {
         // Deactivate focus trap and restore previously focused element.
         if (this._focusTrapCleanup) {
@@ -545,6 +550,8 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       // ESC key
       const escHandler = (e) => {
         if (e.key === 'Escape' && this.open) {
+          const stack = window.Lex && window.Lex.OverlayStack;
+          if (stack && (!stack.isTop(this) || !stack.claimEscape(e))) return;
           this.emit('lex-close');
           this.open = false;
         }

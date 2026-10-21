@@ -199,6 +199,9 @@ export class DataOverridePanel {
     if (this.form) {
       this.form.addEventListener('submit', (e) => this._handleFormSubmit(e));
     }
+
+    // Delete buttons on the rendered existing overrides
+    this.attachDeleteHandlers();
   }
 
   /**
@@ -628,11 +631,15 @@ export class DataOverridePanel {
   }
 
   /**
-   * Attach event delegation for delete buttons
-   * Call this method after rendering overrides
+   * Attach event delegation for delete buttons (done by the constructor;
+   * idempotent)
    */
   attachDeleteHandlers() {
-    this.elements.existingList?.addEventListener('click', (e) => {
+    const list = this.elements.existingList;
+    // One delegated listener per list element, however many instances or calls.
+    if (!list || list.__overrideDeleteBound) return;
+    list.__overrideDeleteBound = true;
+    list.addEventListener('click', (e) => {
       const deleteBtn = e.target.closest('.delete-override-btn');
       if (deleteBtn) {
         const overrideId = deleteBtn.dataset.overrideId;

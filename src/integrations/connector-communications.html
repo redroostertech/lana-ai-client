@@ -15,6 +15,8 @@
   <script src="../js/components.js"></script>
   <script src="../js/lex/lex.core.js"></script>
   <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/connectors.js"></script>
@@ -152,30 +154,6 @@
         </div>
       </div>
 
-      <!-- Configuration Modal -->
-      <div id="configModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-          <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Configure Connector</h3>
-            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-          </div>
-          <form id="configForm" class="p-6 space-y-6">
-            <div id="formFields">
-              <!-- Dynamic form fields will be inserted here -->
-            </div>
-            <div class="flex gap-3 pt-4 border-t border-gray-100">
-              <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors">
-                Cancel
-              </button>
-              <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">
-                Save Configuration
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
     </main>
   </div>
 
@@ -208,6 +186,29 @@
     document.getElementById('closeSidebar').addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
 
     let currentConnectorId = null;
+
+    // Configuration dialog: a lex-modal built here (not declared in the
+    // markup) so its children exist when it upgrades; lex-modal supplies the
+    // backdrop, close button, Escape and focus trap. The footer Save button
+    // submits #configForm from outside it.
+    function ensureConfigModal() {
+      let modal = document.getElementById('configModal');
+      if (modal) return modal;
+      modal = document.createElement('lex-modal');
+      modal.id = 'configModal';
+      modal.setAttribute('heading', 'Configure Connector');
+      modal.innerHTML = `
+        <form id="configForm" class="space-y-6">
+          <div id="formFields"></div>
+        </form>
+        <lex-btn data-slot="footer" variant="secondary" data-config-cancel>Cancel</lex-btn>
+        <lex-btn data-slot="footer" type="submit" form="configForm" variant="primary">Save Configuration</lex-btn>`;
+      document.body.appendChild(modal);
+      modal.querySelector('[data-config-cancel]').addEventListener('click', () => closeModal());
+      modal.addEventListener('lex-close', () => { currentConnectorId = null; });
+      return modal;
+    }
+    ensureConfigModal();
     let connectorData = {};
 
     // Status badge helper
@@ -317,14 +318,14 @@
     function configureConnector(connectorId) {
       currentConnectorId = connectorId;
       const connector = connectorData[connectorId];
-      document.getElementById('modalTitle').textContent = `Configure ${connector?.name || connectorId}`;
+      ensureConfigModal().heading = `Configure ${connector?.name || connectorId}`;
       renderFormFields(connectorId);
-      document.getElementById('configModal').classList.remove('hidden');
+      ensureConfigModal().open = true;
     }
 
     // Close modal
     function closeModal() {
-      document.getElementById('configModal').classList.add('hidden');
+      ensureConfigModal().open = false;
       currentConnectorId = null;
     }
 
@@ -451,11 +452,6 @@
         console.error(error);
       }
     }
-
-    // Close modal on escape key
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeModal();
-    });
 
     // Initialize
     loadConnectors();

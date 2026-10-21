@@ -556,6 +556,29 @@
   global.Lex = global.Lex || {};
   global.Lex.LexElement = LexElement;
   global.Lex.defineLex = defineLex;
+  // Open overlays (lex-modal, lex-drawer) in opening order, so Escape closes
+  // only the topmost one.
+  const OverlayStack = {
+    _seq: 0,
+    opened(el) { if (!el._lexOverlaySeq) el._lexOverlaySeq = ++this._seq; },
+    closed(el) { el._lexOverlaySeq = 0; },
+    isTop(el) {
+      if (!el._lexOverlaySeq) return true;   // not tracked: behave as before
+      const open = document.querySelectorAll('lex-modal, lex-drawer');
+      for (const other of open) {
+        if (other !== el && other._lexOverlaySeq > el._lexOverlaySeq && other.open) return false;
+      }
+      return true;
+    },
+    // One Escape press closes one overlay.
+    claimEscape(event) {
+      if (event.__lexOverlayEscapeHandled) return false;
+      event.__lexOverlayEscapeHandled = true;
+      return true;
+    }
+  };
+
+  global.Lex.OverlayStack = OverlayStack;
   global.Lex.ScrollLock = ScrollLock;
   global.Lex.FocusTrap = FocusTrap;
   global.Lex.version = LEX_VERSION;
