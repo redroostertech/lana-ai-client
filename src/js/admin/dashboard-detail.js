@@ -974,7 +974,10 @@
 
   async function deleteCurrentDashboard() {
     if (!currentDashboardId) return;
-    var confirmed = window.confirm('Delete "' + (currentDashboardName || 'this dashboard') + '"?');
+    var confirmed = await Lex.Modal.confirmAsync('Delete dashboard', 'Delete "' + (currentDashboardName || 'this dashboard') + '"?', {
+      variant: 'danger',
+      confirmText: 'Delete'
+    });
     if (!confirmed) return;
 
     try {

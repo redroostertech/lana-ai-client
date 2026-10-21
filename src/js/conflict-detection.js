@@ -568,11 +568,11 @@ class ConflictDetection {
    * Show error message
    */
   showError(message) {
-    // Use existing Toast if available, otherwise alert
+    // Use the legacy Toast if the page has one, otherwise the Lex toast
     if (window.Toast) {
       window.Toast.error(message);
     } else {
-      alert(message);
+      window.Lex.Toast.error(message);
     }
   }
 

@@ -1065,22 +1065,15 @@
   // Inject (or refresh) the "Actions" dropdown in the modal header, next to the
   // close button. Edit / Mark Complete (or Reopen) / Delete live here so they're
   // reachable from the header instead of a button row at the bottom of the body.
+  // The wrapper comes from the modal's header-actions attribute (my-tasks.html),
+  // which lex-modal renders between the title and its close button.
   function renderHeaderActions(modal, task) {
-    var header = modal.querySelector('.lex-modal-header');
-    if (!header) return;
+    var wrap = modal.querySelector('[data-task-actions-wrap]');
+    if (!wrap) return;
 
     var isComplete = normalizeStatus(task.status) === 'complete';
     var completeLabel = isComplete ? 'Reopen' : 'Mark Complete';
     var completeAction = isComplete ? 'reopen' : 'complete';
-
-    var wrap = header.querySelector('[data-task-actions-wrap]');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.className = 'my-task-header-actions';
-      wrap.setAttribute('data-task-actions-wrap', '');
-      var closeBtn = header.querySelector('.lex-modal-close');
-      header.insertBefore(wrap, closeBtn);
-    }
 
     var chevron = '<svg class="my-task-actions-btn__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
     wrap.innerHTML = [
@@ -1829,7 +1822,10 @@
     }
 
     if (action === 'delete') {
-      var confirmDelete = window.confirm('Delete this task? This cannot be undone.');
+      var confirmDelete = await Lex.Modal.confirmAsync('Delete Task', 'Delete this task? This cannot be undone.', {
+        variant: 'danger',
+        confirmText: 'Delete'
+      });
       if (!confirmDelete) return;
       try {
         await api.deleteTask(task.id);
@@ -3054,6 +3050,7 @@
       createForm.addEventListener('submit', submitNewTask);
       createForm.addEventListener('lex-submit', submitNewTask);
     }
+    bindFooterSubmit(el('myTaskSaveBtn'), createForm, submitNewTask);
     if (cancelBtn) cancelBtn.addEventListener('click', closeNewTaskModal);
     if (matterPickBtn) matterPickBtn.addEventListener('click', openMatterPicker);
     if (userPickBtn) userPickBtn.addEventListener('click', openUserPicker);
@@ -3091,8 +3088,26 @@
       planForm.addEventListener('submit', submitNewTaskPlan);
       planForm.addEventListener('lex-submit', submitNewTaskPlan);
     }
+    bindFooterSubmit(el('myTaskPlanSaveBtn'), planForm, submitNewTaskPlan);
     if (planCancelBtn) planCancelBtn.addEventListener('click', closeNewTaskPlanModal);
     if (planMatterPickBtn) planMatterPickBtn.addEventListener('click', openPlanMatterPicker);
+  }
+
+  // The create modals keep their Save button in the lex-modal footer
+  // (footer-content), outside the lex-form, so a click no longer reaches the
+  // form's submit delegation. Validate the form and hand the same
+  // { detail: { valid, values } } shape the lex-submit event carries.
+  function bindFooterSubmit(button, form, handler) {
+    if (!button || !form) return;
+    button.addEventListener('click', function (event) {
+      if (event) event.preventDefault();
+      var result = typeof form.validate === 'function' ? form.validate() : { valid: true, errors: [] };
+      var values = typeof form.getValues === 'function' ? form.getValues() : {};
+      handler({
+        preventDefault: function () {},
+        detail: { valid: result.valid, values: values, errors: result.errors }
+      });
+    });
   }
 
   function init() {

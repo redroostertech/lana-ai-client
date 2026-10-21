@@ -779,7 +779,7 @@ export class FunnelChartRenderer {
   _showHelpModal() {
     if (this.config.helpText) {
       console.log('[FunnelChartRenderer] Help text:', this.config.helpText);
-      alert(this.config.helpText);
+      Lex.Modal.alertAsync(this.config.title || 'About this chart', this.config.helpText);
     }
   }
 

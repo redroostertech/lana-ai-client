@@ -220,7 +220,8 @@ describe('metric-tables', () => {
     test('the dashboard library has no custom dropdown menu or window.confirm-only delete', () => {
       const js = fs.readFileSync(path.join(SRC, 'js/admin/dashboard-library.js'), 'utf8');
       expect(js).not.toContain('insights-action-menu');
-      expect(js).toContain('Lex.Modal.confirm');
+      expect(js).toContain('Lex.Modal.confirmAsync');
+      expect(js).not.toMatch(/window\.confirm\(/);
     });
   });
 });

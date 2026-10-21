@@ -2438,11 +2438,7 @@
       }
     };
     var message = 'Release the saved draft for "' + (file.filename || file.title || 'this document') + '" as a new version?';
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm('Release Version', message, run, { confirmText: 'Release Version' });
-    } else if (window.confirm(message)) {
-      run();
-    }
+    Lex.Modal.confirm('Release Version', message, run, { confirmText: 'Release Version' });
   }
 
   async function retryReleaseApproval(file) {
@@ -6827,6 +6823,14 @@
       typeof officeEditorInstance.applyEdits === 'function');
   }
 
+  function promptForLinkUrl() {
+    return Lex.Modal.prompt('Insert Link', {
+      label: 'Paste a URL',
+      placeholder: 'https://',
+      confirmText: 'Insert link'
+    });
+  }
+
   function handleEmbedToolbarCommand(file, command, value) {
     var ranges = embedToolbarSelectionRanges;
     embedToolbarSelectionRanges = null;
@@ -6886,8 +6890,9 @@
       return;
     }
     if (command === 'createLink') {
-      var href = window.prompt ? window.prompt('Paste a URL') : '';
-      if (href) applyEmbedLinkCommand(file, href, ranges);
+      promptForLinkUrl().then(function (href) {
+        if (href) applyEmbedLinkCommand(file, href, ranges);
+      });
       return;
     }
     if (command === 'unlink') {
@@ -7214,8 +7219,12 @@
       }, 0);
       return;
     }
-    var query = window.prompt ? window.prompt('Collaborator name or email') : '';
-    if (query) addCollaboratorFromQuery(file, query, ['read']).catch(function (error) { toast(error.message); });
+    Lex.Modal.prompt('Share Document', {
+      label: 'Collaborator name or email',
+      confirmText: 'Share'
+    }).then(function (query) {
+      if (query) addCollaboratorFromQuery(file, query, ['read']).catch(function (error) { toast(error.message); });
+    });
   }
 
   async function removeCollaborator(file, collaboratorId) {
@@ -7241,20 +7250,16 @@
         toast((error && error.message) || 'Collaborator access could not be removed.');
       });
     };
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      Lex.Modal.open({
-        heading: 'Remove Document Access',
-        size: 'sm',
-        content: '<div class="office-edit-change-modal"><p>Remove <strong>' + esc(collaborator.name) +
-          '</strong> from this document? The document and its review history will not be deleted.</p></div>',
-        confirmText: 'Remove access',
-        cancelText: 'Keep access',
-        destructive: true,
-        onConfirm: remove
-      });
-      return;
-    }
-    if (window.confirm && window.confirm('Remove ' + collaborator.name + ' from this document?')) remove();
+    Lex.Modal.open({
+      heading: 'Remove Document Access',
+      size: 'sm',
+      content: '<div class="office-edit-change-modal"><p>Remove <strong>' + esc(collaborator.name) +
+        '</strong> from this document? The document and its review history will not be deleted.</p></div>',
+      confirmText: 'Remove access',
+      cancelText: 'Keep access',
+      destructive: true,
+      onConfirm: remove
+    });
   }
 
   async function sendSignaturePacket(file) {
@@ -7303,9 +7308,18 @@
       var current = currentUserRecord() || {};
       var defaultSignature = current.full_name || current.fullName || current.display_name ||
         [current.first_name || '', current.last_name || ''].join(' ').trim();
-      var signatureText = window.prompt ? window.prompt('Type your legal signature to confirm consent', defaultSignature || '') : '';
+      var signatureText = await Lex.Modal.prompt('Sign Document', {
+        label: 'Type your legal signature to confirm consent',
+        value: defaultSignature || '',
+        confirmText: 'Continue',
+        required: true
+      });
       if (!signatureText) return;
-      if (!window.confirm || !window.confirm(consentDisclosure + '\n\nApply the typed signature "' + signatureText + '"?')) return;
+      var consented = await Lex.Modal.confirmAsync('Apply the typed signature "' + signatureText + '"?', consentDisclosure, {
+        confirmText: 'Apply signature',
+        size: 'lg'
+      });
+      if (!consented) return;
       details = {
         consent: true,
         consent_disclosure: consentDisclosure,
@@ -7313,7 +7327,11 @@
         signature_method: 'typed'
       };
     } else {
-      var reason = window.prompt ? window.prompt('Reason for declining (optional)', '') : '';
+      var reason = await Lex.Modal.prompt('Decline Signature', {
+        label: 'Reason for declining (optional)',
+        value: '',
+        confirmText: 'Decline'
+      });
       if (reason === null) return;
       details = { decline_reason: reason || undefined };
     }
@@ -7352,9 +7370,20 @@
         return;
       }
       if (command === 'createLink') {
-        value = window.prompt ? window.prompt('Paste a URL') : '';
-        if (!value) return;
+        // The link dialog takes focus, so remember the selection and put it
+        // back before execCommand applies the link.
+        selectionInsideDoc();
+        promptForLinkUrl().then(function (href) {
+          if (!href) return;
+          restoreDocSelection();
+          execFallbackDocCommand(command, href);
+        });
+        return;
       }
+      execFallbackDocCommand(command, value);
+    }
+
+    function execFallbackDocCommand(command, value) {
       var page = fallbackDocPage();
       if (page && typeof page.focus === 'function') page.focus();
       try {

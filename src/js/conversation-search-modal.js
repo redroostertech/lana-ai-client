@@ -320,7 +320,7 @@ const ConversationSearchModal = {
       throw new Error('LANA dock navigation is not available');
     } catch (error) {
       console.error('[ConversationSearchModal.selectConversation] ERROR:', error);
-      alert(`Error selecting conversation: ${error.message}`);
+      window.Lex.Modal.alertAsync('Conversation Unavailable', `Error selecting conversation: ${error.message}`);
     }
   },
 

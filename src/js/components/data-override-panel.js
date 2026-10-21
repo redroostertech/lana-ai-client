@@ -75,8 +75,8 @@ export class DataOverridePanel {
     this.onSaveSuccess = config.onSaveSuccess || (() => {});
     this.onDeleteSuccess = config.onDeleteSuccess || (() => {});
     this.onError = config.onError || ((error) => {
-      // Default error handling - show alert
-      alert(error.message || 'An unexpected error occurred');
+      // Default error handling - show an error dialog
+      Lex.Modal.alertAsync('Something went wrong', error.message || 'An unexpected error occurred');
     });
     this.formatNumber = config.formatNumber || this._defaultFormatNumber.bind(this);
     this.formatDateRange = config.formatDateRange || this._defaultFormatDateRange.bind(this);
@@ -558,7 +558,11 @@ export class DataOverridePanel {
    * @returns {Promise<void>}
    */
   async delete(overrideId) {
-    if (!confirm('Are you sure you want to delete this override?')) {
+    const confirmed = await Lex.Modal.confirmAsync('Delete override', 'Are you sure you want to delete this override?', {
+      confirmText: 'Delete',
+      variant: 'danger'
+    });
+    if (!confirmed) {
       return;
     }
 

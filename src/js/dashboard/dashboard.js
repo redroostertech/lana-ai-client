@@ -1615,15 +1615,14 @@
   }
 
   function renderDashboardTaskHeaderActions(drawerEl, task) {
-    var headerActions = drawerEl.querySelector('.lex-drawer-header-actions');
-    if (!headerActions) return;
+    if (typeof drawerEl.setHeaderActions !== 'function') return;
 
     var isComplete = (task.status === 'complete' || task.status === 'completed');
     var completeLabel = isComplete ? 'Reopen' : 'Mark Complete';
     var completeAction = isComplete ? 'reopen' : 'complete';
     var chevron = '<svg class="cc-task-actions-btn__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
 
-    headerActions.innerHTML = [
+    drawerEl.setHeaderActions([{ html: [
       '<div class="cc-task-header-actions" data-task-actions-wrap>',
       '  <button type="button" class="cc-task-actions-btn" data-task-actions-toggle aria-haspopup="true" aria-expanded="false">',
       '    <span>Actions</span>' + chevron,
@@ -1634,7 +1633,7 @@
       '    <button type="button" role="menuitem" class="cc-task-actions-menu__danger" data-task-action="delete">Delete</button>',
       '  </div>',
       '</div>'
-    ].join('');
+    ].join('') }]);
   }
 
   function closeDashboardTaskActionsMenu(drawerEl) {
@@ -1719,7 +1718,11 @@
     if (deleteBtn) {
       deleteBtn.addEventListener('click', async function () {
         closeDashboardTaskActionsMenu(drawerEl);
-        if (!window.confirm('Delete this task?')) return;
+        var confirmed = await Lex.Modal.confirmAsync('Delete task', 'Delete this task?', {
+          confirmText: 'Delete',
+          variant: 'danger'
+        });
+        if (!confirmed) return;
         try {
           await api.deleteTask(taskId);
           drawerEl.remove();
@@ -1761,8 +1764,7 @@
         if (bodyEl) {
           bodyEl.outerHTML = renderTaskEditBody(drawerEl._task || task, users);
         }
-        var headerActions = drawerEl.querySelector('.lex-drawer-header-actions');
-        if (headerActions) headerActions.innerHTML = '';
+        if (typeof drawerEl.setHeaderActions === 'function') drawerEl.setHeaderActions([]);
         wireTaskDrawerHandlers(drawerEl);
       });
     }

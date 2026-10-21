@@ -1016,7 +1016,7 @@
     // responsive even if the catalog fetch takes a beat.
     var modal = window.Lex.Modal.open({
       heading: entry.name,
-      content: renderMetricInfoBody(entry, null),
+      content: '<div data-metric-info-root>' + renderMetricInfoBody(entry, null) + '</div>',
       size: 'md',
       hideActions: true
     });
@@ -1026,10 +1026,10 @@
     var finalize = function (detail) {
       entry.detail = detail;
       var body = renderMetricInfoBody(entry, detail);
-      // Update ONLY the modal's body container. Setting modal.innerHTML would
-      // wipe the lex-modal's overlay/backdrop/dialog chrome (rendered by the
-      // component), making the modal vanish — the "flash" on open.
-      var bodyEl = modal && typeof modal.querySelector === 'function' ? modal.querySelector('.lex-modal-body') : null;
+      // Update ONLY our own content root inside the modal. Setting
+      // modal.innerHTML would wipe the lex-modal's chrome (the "flash" on
+      // open), and the component's internal body class is not public API.
+      var bodyEl = modal && typeof modal.querySelector === 'function' ? modal.querySelector('[data-metric-info-root]') : null;
       if (bodyEl) {
         bodyEl.innerHTML = body;
       }

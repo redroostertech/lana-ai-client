@@ -535,6 +535,7 @@
   <script src="../js/lex/components/foundation/lex-toast.js"></script>
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
@@ -6732,9 +6733,11 @@
     async function switchToLanaManagedCredentials() {
       if (!state.sourceId || !isLanaManagedAvailable()) return;
 
-      const confirmed = window.confirm(
-        `Remove your own OAuth app credentials for ${state.connectorName} and use LANA-managed credentials instead?\n\n` +
-        'Existing connections will need to be re-authorized.'
+      const confirmed = await Lex.Modal.confirmAsync(
+        'Use LANA-managed credentials',
+        `Remove your own OAuth app credentials for ${state.connectorName} and use LANA-managed credentials instead? ` +
+        'Existing connections will need to be re-authorized.',
+        { confirmText: 'Switch credentials', variant: 'danger' }
       );
       if (!confirmed) return;
 
@@ -7439,7 +7442,7 @@
           ? `${formatNumber(count)} filtered row${count === 1 ? '' : 's'}`
           : `${formatNumber(count)} selected row${count === 1 ? '' : 's'}`;
 
-        if (!window.confirm(`Unassign ${target} from their current matters? Source data is not modified.`)) {
+        if (!(await Lex.Modal.confirmAsync('Unassign from matters', `Unassign ${target} from their current matters? Source data is not modified.`, { confirmText: 'Unassign' }))) {
           return;
         }
 

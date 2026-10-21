@@ -575,9 +575,9 @@
 
   function openDetailDrawer(metric) {
     if (!window.Lex || !Lex.Drawer) return;
-    Lex.Drawer.open({
+    var drawer = Lex.Drawer.open({
       heading: metric.display_name || metric.key,
-      content: renderDrawerBody(metric),
+      content: '<div data-metric-drawer-body>' + renderDrawerBody(metric) + '</div>',
       width: 'lg',
       buttons: [
         { label: 'Run now', variant: 'primary', id: 'metricCatalogDrawerRun' },
@@ -596,7 +596,7 @@
           runBtn.disabled = true;
           runBtn.textContent = 'Running...';
           await runMetric(metric.key);
-          var body = document.querySelector('.lex-drawer__body, .lex-drawer-body');
+          var body = drawer && drawer.querySelector('[data-metric-drawer-body]');
           if (body) body.innerHTML = renderDrawerBody(metric);
           runBtn.disabled = false;
           runBtn.textContent = 'Run again';
@@ -718,9 +718,9 @@
   function openPlaygroundDrawer(metric) {
     if (!window.Lex || !Lex.Drawer) return;
 
-    Lex.Drawer.open({
+    var drawer = Lex.Drawer.open({
       heading: 'Playground: ' + (metric.display_name || metric.key),
-      content: playgroundBodyHtml(),
+      content: '<div data-metric-drawer-body>' + playgroundBodyHtml() + '</div>',
       width: 'xl',
       buttons: [
         { label: 'Close', variant: 'secondary', id: 'metricPlaygroundClose' },
@@ -735,8 +735,9 @@
     var activeTab = 'dashboard';
     var definitionLoaded = false;
 
+    // This drawer's own content root (not the component's internal body).
     function bodyNode() {
-      return document.querySelector('.lex-drawer__body, .lex-drawer-body');
+      return drawer ? drawer.querySelector('[data-metric-drawer-body]') : null;
     }
 
     function renderActiveCard() {
@@ -1124,9 +1125,9 @@
     goalEditorState = { formatToken: '', recommendations: {} };
     var definitionFetched = false;
 
-    Lex.Drawer.open({
+    var drawer = Lex.Drawer.open({
       heading: 'Goal: ' + (metric.display_name || metric.key),
-      content: renderGoalForm(metric, currentPeriod),
+      content: '<div data-metric-drawer-body>' + renderGoalForm(metric, currentPeriod) + '</div>',
       width: 'md',
       buttons: [
         { label: 'Save goal', variant: 'primary', id: 'metricGoalSave' },
@@ -1135,8 +1136,9 @@
       ],
     });
 
+    // This drawer's own content root (not the component's internal body).
     function bodyNode() {
-      return document.querySelector('.lex-drawer__body, .lex-drawer-body');
+      return drawer ? drawer.querySelector('[data-metric-drawer-body]') : null;
     }
 
     // Reflect the Remove button availability against the period currently shown.

@@ -1046,13 +1046,18 @@
         var action = e.detail && e.detail.action;
         if (action === 'delete' && e.detail.items) {
           var ids = e.detail.items.map(function (m) { return m.matter_id; });
-          if (ids.length > 0 && confirm('Delete ' + ids.length + ' matter(s)? This cannot be undone.')) {
+          if (ids.length === 0) return;
+          Lex.Modal.confirmAsync('Delete Matters', 'Delete ' + ids.length + ' matter(s)? This cannot be undone.', {
+            confirmText: 'Delete',
+            variant: 'danger'
+          }).then(function (confirmed) {
+            if (!confirmed) return;
             Promise.all(ids.map(function (id) { return api.deleteMatter(id); })).then(function () {
               Lex.Toast.success(ids.length + ' matter(s) deleted');
               _mattersTable.deselectAll();
               loadMatters();
             });
-          }
+          });
         }
       });
     }

@@ -1849,16 +1849,12 @@
 
     var title = 'Remove from Shared Knowledge';
     var message = 'Remove this note from your organization\'s shared knowledge? Your personal Brainchild copy is not affected.';
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm(title, message, run, {
-        confirmText: 'Remove',
-        cancelText: 'Cancel',
-        variant: 'default',
-        size: 'sm'
-      });
-    } else if (window.confirm(message)) {
-      run();
-    }
+    Lex.Modal.confirm(title, message, run, {
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      variant: 'default',
+      size: 'sm'
+    });
   }
 
   // ── Shared Knowledge scope (org promoted notes) ──────────────────────

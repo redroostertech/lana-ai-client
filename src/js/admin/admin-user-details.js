@@ -499,6 +499,17 @@
     setInputValue('userRole', roleId);
   }
 
+  // The submit button sits in the lex-modal footer (footer-content), outside
+  // the lex-form, so validate and read the form the way lex-submit would.
+  function _bindFooterSubmit(button, form, onSubmit) {
+    if (!button || !form) return;
+    button.addEventListener('click', function () {
+      var result = typeof form.validate === 'function' ? form.validate() : { valid: true, errors: [] };
+      var values = typeof form.getValues === 'function' ? form.getValues() : {};
+      onSubmit({ valid: result.valid, values: values, errors: result.errors });
+    });
+  }
+
   function _wireEditModal() {
     var modal = el('userModal');
     var form  = el('userForm');
@@ -506,13 +517,15 @@
     if (form._detailsWired) return;
     form._detailsWired = true;
 
-    form.addEventListener('lex-submit', function (e) {
-      if (!e.detail.valid) {
+    function onSubmit(detail) {
+      if (!detail.valid) {
         Lex.Toast.error('Please fill in all required fields');
         return;
       }
-      _handleEditSubmit(e.detail.values);
-    });
+      _handleEditSubmit(detail.values);
+    }
+    form.addEventListener('lex-submit', function (e) { onSubmit(e.detail); });
+    _bindFooterSubmit(el('userModalSaveBtn'), form, onSubmit);
 
     var cancelBtn = el('userModalCancelBtn');
     if (cancelBtn) {
@@ -631,13 +644,15 @@
     }
 
     // Form submit
-    form.addEventListener('lex-submit', function (e) {
-      if (!e.detail.valid) {
+    function onSubmit(detail) {
+      if (!detail.valid) {
         Lex.Toast.error('Please fill in both password fields');
         return;
       }
-      _handleResetPasswordSubmit(e.detail.values);
-    });
+      _handleResetPasswordSubmit(detail.values);
+    }
+    form.addEventListener('lex-submit', function (e) { onSubmit(e.detail); });
+    _bindFooterSubmit(el('resetPasswordSubmitBtn'), form, onSubmit);
 
     // Cancel button
     var cancelBtn = el('resetPasswordCancelBtn');

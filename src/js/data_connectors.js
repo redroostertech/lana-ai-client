@@ -858,14 +858,10 @@
       };
     }
 
-    // Update the lex-modal heading to reflect the connector name, then open it.
-    // lex-modal skips re-rendering after first render, so update the heading DOM directly.
+    // Show the connector name through the lex-modal heading property, then open it.
     var detailsModal = document.getElementById('connectorDetailsModal');
-    var detailsTitle = detailsModal ? detailsModal.querySelector('.lex-modal-title') : null;
-    if (detailsTitle) {
-      detailsTitle.textContent = nc.name;
-    }
     if (detailsModal) {
+      detailsModal.heading = nc.name || 'Connector Details';
       detailsModal.open = true;
     }
   }
@@ -905,13 +901,9 @@
       }
     }
 
-    // Update the lex-modal heading to show the connector name.
-    // lex-modal skips re-rendering after first render, so update the heading DOM directly.
+    // Show the connector name through the lex-modal heading property.
     var modal = document.getElementById('connectorActionsModal');
-    var modalTitle = modal ? modal.querySelector('.lex-modal-title') : null;
-    if (modalTitle) {
-      modalTitle.textContent = connectorName;
-    }
+    if (modal) modal.heading = connectorName;
 
     var deleteButton = document.getElementById('actionDelete');
     deleteButton.style.display = 'flex';
@@ -983,9 +975,10 @@
       '</label>' +
     '</div>';
 
-    Lex.Modal.confirm('Uninstall Connector', message, function () {
-      var purgeData = document.getElementById('purgeDataCheckbox') && document.getElementById('purgeDataCheckbox').checked;
-      confirmUninstallConnector(purgeData);
+    var confirmModal = Lex.Modal.confirm('Uninstall Connector', message, function () {
+      // Scope the lookup to this dialog rather than querying the whole document.
+      var purgeBox = confirmModal && confirmModal.querySelector('#purgeDataCheckbox');
+      confirmUninstallConnector(Boolean(purgeBox && purgeBox.checked));
     }, { variant: 'default', confirmText: 'Uninstall', cancelText: 'Cancel', size: 'sm' });
   }
 

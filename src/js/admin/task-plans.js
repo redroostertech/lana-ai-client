@@ -997,6 +997,22 @@
     }
   }
 
+  /**
+   * The modal's Save button lives in the lex-modal footer (footer-content),
+   * outside lex-form, so lex-form's submit-button delegation never sees the
+   * click. Re-emit lex-submit with the same detail lex-form produces so the
+   * existing submit handler runs unchanged.
+   */
+  function _requestFormSubmit(form) {
+    if (!form || typeof form.getValues !== 'function') return;
+    var result = (form.novalidate || typeof form.validate !== 'function')
+      ? { valid: true, errors: [] }
+      : form.validate();
+    form.dispatchEvent(new CustomEvent('lex-submit', {
+      detail: { values: form.getValues(), valid: result.valid, errors: result.errors }
+    }));
+  }
+
   function bindEvents() {
     var createBtn = el('createTaskPlanBtn');
     var cancelBtn = el('taskPlanCancelBtn');
@@ -1019,6 +1035,11 @@
       itemForm.addEventListener('lex-submit', saveItem);
     }
     if (itemCancelBtn) itemCancelBtn.addEventListener('click', closeItemModal);
+    // Save buttons sit in the modal footers, outside their lex-forms.
+    var saveBtn = el('taskPlanSaveBtn');
+    var itemSaveBtn = el('taskPlanItemSaveBtn');
+    if (saveBtn && form) saveBtn.addEventListener('click', function () { _requestFormSubmit(form); });
+    if (itemSaveBtn && itemForm) itemSaveBtn.addEventListener('click', function () { _requestFormSubmit(itemForm); });
     if (type) {
       type.addEventListener('change', syncDraftMode);
       type.addEventListener('lex-change', syncDraftMode);

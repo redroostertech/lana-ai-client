@@ -208,8 +208,10 @@
     </div>
 
     <!-- Matter Modal -->
-    <lex-modal id="matterModal" heading="Create Matter" size="full" hide-actions>
+    <lex-modal id="matterModal" heading="Create Matter" size="full" hide-actions
+      footer-content='<lex-btn type="button" id="cancelMatterBtn" variant="secondary">Cancel</lex-btn><lex-btn type="button" id="saveMatterBtn" variant="primary" onclick="document.getElementById(&#39;matterForm&#39;).requestSubmit()">Save Matter</lex-btn>'>
         <form id="matterForm" class="max-w-2xl mx-auto px-6 py-8 space-y-6">
+          <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
           <input type="hidden" id="matterId">
           <div id="matterIdDisplay" class="hidden">
             <label class="block text-sm font-medium text-gray-700 mb-1">Matter ID</label>
@@ -296,16 +298,15 @@
 
           <div id="conflictDetectionContainer"></div>
 
-          <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
-            <lex-btn type="button" id="cancelMatterBtn" variant="secondary">Cancel</lex-btn>
-            <lex-btn type="submit" variant="primary">Save Matter</lex-btn>
-          </div>
         </form>
     </lex-modal>
 
     <!-- Create Matter from Workspace Modal -->
-    <lex-modal id="workspaceMatterModal" heading="Create New Matter in Workspace" subtitle="This matter will be automatically linked to the workspace" size="full" hide-actions>
+    <lex-modal id="workspaceMatterModal" heading="Create New Matter in Workspace" size="full" hide-actions
+      footer-content='<lex-btn type="button" id="cancelWorkspaceMatterBtn" variant="secondary">Cancel</lex-btn><lex-btn type="button" id="createWorkspaceMatterBtn" variant="primary" onclick="document.getElementById(&#39;workspaceMatterForm&#39;).requestSubmit()">Create Matter</lex-btn>'>
         <form id="workspaceMatterForm" class="max-w-2xl mx-auto px-6 py-8 space-y-6">
+          <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
+          <p class="text-sm text-gray-500">This matter will be automatically linked to the workspace</p>
           <input type="hidden" id="workspaceIdForMatter">
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -343,10 +344,6 @@
 
           <div id="workspaceConflictDetectionContainer"></div>
 
-          <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
-            <lex-btn type="button" id="cancelWorkspaceMatterBtn" variant="secondary">Cancel</lex-btn>
-            <lex-btn type="submit" variant="primary">Create Matter</lex-btn>
-          </div>
         </form>
     </lex-modal>
 

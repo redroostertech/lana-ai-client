@@ -130,8 +130,8 @@
 
     <!-- ================================================================
          Edit User Modal
-         hide-actions: the form has its own Save button so we suppress the
-         modal footer. data-hoist: moved to document.body so it is not
+         hide-actions + footer-content: Cancel/Save live in the modal footer and
+         admin-user-details.js submits the form from Save. data-hoist: moved to document.body so it is not
          clipped by lex-content's overflow stacking context.
          ================================================================ -->
     <lex-modal
@@ -140,7 +140,7 @@
       size="md"
       hide-actions
       data-hoist
-    >
+      footer-content="<lex-btn id=&quot;userModalCancelBtn&quot; variant=&quot;secondary&quot; size=&quot;md&quot;>Cancel</lex-btn><lex-btn id=&quot;userModalSaveBtn&quot; variant=&quot;primary&quot; size=&quot;md&quot;>Save</lex-btn>">
       <lex-form id="userForm">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
           <lex-input
@@ -184,18 +184,13 @@
           options='[]'
           style="margin-bottom:1.25rem;"
         ></lex-select>
-        <!-- Form footer: Cancel + Save buttons inside the form -->
-        <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.75rem;border-top:1px solid var(--lex-border-subtle);">
-          <lex-btn id="userModalCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="userModalSaveBtn"   variant="primary"   size="md" type="submit">Save</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
 
 
     <!-- ================================================================
          Reset Password Modal
-         hide-actions: the form has its own Reset button.
+         hide-actions + footer-content: Cancel/Reset live in the modal footer.
          data-hoist: same stacking context fix as above.
          ================================================================ -->
     <lex-modal
@@ -204,7 +199,7 @@
       size="sm"
       hide-actions
       data-hoist
-    >
+      footer-content="<lex-btn id=&quot;resetPasswordCancelBtn&quot; variant=&quot;secondary&quot; size=&quot;md&quot;>Cancel</lex-btn><lex-btn id=&quot;resetPasswordSubmitBtn&quot; variant=&quot;danger&quot; size=&quot;md&quot;>Reset Password</lex-btn>">
       <lex-form id="resetPasswordForm">
         <p class="lex-text-secondary" style="font-size:var(--lex-body-sm-size,0.875rem);margin-bottom:1rem;">
           Set a new temporary password for this user. They will be prompted to change it on next login.
@@ -230,11 +225,6 @@
           class="lex-text-tertiary"
           style="font-size:var(--lex-body-xs-size,0.75rem);margin-top:0.5rem;margin-bottom:1.25rem;"
         ></div>
-        <!-- Form footer -->
-        <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.75rem;border-top:1px solid var(--lex-border-subtle);">
-          <lex-btn id="resetPasswordCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="resetPasswordSubmitBtn" variant="danger"    size="md" type="submit">Reset Password</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
 

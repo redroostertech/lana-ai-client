@@ -255,22 +255,10 @@
   }
 
   function confirmDelete(name) {
-    var message = 'Delete "' + (name || 'this dashboard') + '"?';
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      return new Promise(function (resolve) {
-        var settled = false;
-        var modal = Lex.Modal.confirm('Delete dashboard', escapeHtml(message), function () {
-          settled = true;
-          resolve(true);
-        }, { variant: 'danger', confirmText: 'Delete' });
-        ['lex-cancel', 'lex-close'].forEach(function (eventName) {
-          modal.addEventListener(eventName, function () {
-            if (!settled) { settled = true; resolve(false); }
-          });
-        });
-      });
-    }
-    return Promise.resolve(window.confirm(message));
+    return Lex.Modal.confirmAsync('Delete dashboard', 'Delete "' + (name || 'this dashboard') + '"?', {
+      variant: 'danger',
+      confirmText: 'Delete'
+    });
   }
 
   async function deleteDashboard(id, name, sourceDashboards) {

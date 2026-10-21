@@ -750,7 +750,7 @@ async function onBreadcrumbNavigate(event) {
 
   // Dirty-state guard when leaving the builder in edit mode
   if (state.currentView === 'builder' && state.builder.editMode?.isEdit && builderIsDirty()) {
-    if (!window.confirm('Discard unsaved changes to this automation?')) {
+    if (!(await window.Lex.Modal.confirmAsync('Discard changes', 'Discard unsaved changes to this automation?', { confirmText: 'Discard', variant: 'danger' }))) {
       return;
     }
     state.builder.editMode = { isEdit: false, automationId: null, originalAutomation: null, loading: false };
@@ -1333,7 +1333,7 @@ async function onAppClick(event) {
     const context = createContext();
     // In edit mode, confirm before replacing the loaded config with a template
     if (state.builder.editMode?.isEdit) {
-      if (!window.confirm('Replace current configuration with a Quick Start template? Unsaved changes will be lost.')) {
+      if (!(await window.Lex.Modal.confirmAsync('Start from a template', 'Replace current configuration with a Quick Start template? Unsaved changes will be lost.', { confirmText: 'Replace', variant: 'danger' }))) {
         return;
       }
       // Clear edit mode since user is explicitly starting fresh from a template
@@ -1355,7 +1355,7 @@ async function onAppClick(event) {
   if (cancelEditBtn) {
     const automationId = cancelEditBtn.dataset.editAutomationId || null;
     if (state.builder.editMode?.isEdit && builderIsDirty()) {
-      if (!window.confirm('Discard unsaved changes to this automation?')) {
+      if (!(await window.Lex.Modal.confirmAsync('Discard changes', 'Discard unsaved changes to this automation?', { confirmText: 'Discard', variant: 'danger' }))) {
         return;
       }
     }
@@ -1402,7 +1402,7 @@ async function onAppClick(event) {
     const automationId = builderDeleteBtn.dataset.editAutomationId;
     const automationName = builderDeleteBtn.dataset.editAutomationName || 'this automation';
     if (!automationId) return;
-    if (!window.confirm(`Delete "${automationName}"? This cannot be undone.`)) return;
+    if (!(await window.Lex.Modal.confirmAsync('Delete automation', `Delete "${automationName}"? This cannot be undone.`, { confirmText: 'Delete', variant: 'danger' }))) return;
     try {
       await fetchJson(`/api/v1/automations/${encodeURIComponent(automationId)}`, {
         method: 'DELETE',

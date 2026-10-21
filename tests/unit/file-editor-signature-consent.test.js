@@ -28,11 +28,19 @@ describe('File Editor server signature consent contract', () => {
       editor.indexOf('function bindEvents()')
     );
     const missingDisclosureGuard = responseSource.indexOf("typeof consentDisclosure !== 'string' || !consentDisclosure.trim()");
-    const signaturePrompt = responseSource.indexOf("window.prompt('Type your legal signature to confirm consent'");
+    const signaturePrompt = responseSource.indexOf("label: 'Type your legal signature to confirm consent'");
+    const consentConfirm = responseSource.indexOf("await Lex.Modal.confirmAsync('Apply the typed signature \"' + signatureText + '\"?', consentDisclosure");
 
     expect(responseSource).toContain('packet && packet.signature_consent_disclosure');
     expect(responseSource).toContain('consent_disclosure: consentDisclosure');
-    expect(responseSource).toContain("if (!window.confirm || !window.confirm(consentDisclosure + '\\n\\nApply the typed signature");
+    // The typed signature and the consent confirmation go through Lex.Modal
+    // (no system dialogs); the disclosure is the confirm dialog's message and
+    // cancelling either dialog returns before the signer status is updated.
+    expect(responseSource).not.toMatch(/window\.(prompt|confirm)/);
+    expect(responseSource).toContain('await Lex.Modal.prompt(');
+    expect(consentConfirm).toBeGreaterThan(signaturePrompt);
+    expect(responseSource).toContain('if (!consented) return;');
+    expect(responseSource.indexOf('if (!consented) return;')).toBeLessThan(responseSource.indexOf('service.updateSignerStatus('));
     expect(missingDisclosureGuard).toBeGreaterThan(-1);
     expect(signaturePrompt).toBeGreaterThan(missingDisclosureGuard);
     expect(responseSource).not.toContain('I agree to use an electronic signature');

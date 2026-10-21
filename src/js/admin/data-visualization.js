@@ -1022,14 +1022,15 @@
     // Reset connected rows cache for this drawer session
     _connectedRows = {};
 
-    Lex.Drawer.open({
-      heading: Lex.Utils.escapeHtml(String(title)),
+    // lex-drawer escapes its heading itself, so pass the plain title.
+    var drawer = Lex.Drawer.open({
+      heading: String(title),
       content: html,
       width: 'lg'
     });
 
-    // Wire navigation links via delegation on the drawer content
-    _wireDrawerNavLinks();
+    // Wire navigation links via delegation on this drawer element
+    _wireDrawerNavLinks(drawer);
 
     // Each connected section is a server-paged lex-table filtered to this record.
     for (var fi = 0; fi < connections.length; fi++) {
@@ -1227,13 +1228,10 @@
     group_id:              'mcp_groups'
   };
 
-  function _wireDrawerNavLinks() {
-    // The drawer DOM is created async by Lex.Drawer.open().
-    // Wait a tick for it to render, then attach handler to the drawer body.
-    setTimeout(function () {
-      var body = document.querySelector('.lex-drawer-body');
-      if (body) _attachNavHandler(body);
-    }, 50);
+  function _wireDrawerNavLinks(drawer) {
+    // Lex.Drawer.open() returns the drawer element; delegate on it directly
+    // instead of querying the document for drawer internals.
+    if (drawer) _attachNavHandler(drawer);
   }
 
   function _attachNavHandler(container) {

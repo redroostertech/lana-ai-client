@@ -519,7 +519,7 @@
    * When more than 5 rows are selected, prompts the user for confirmation
    * before proceeding.
    */
-  function _executeBulkAnnotate() {
+  async function _executeBulkAnnotate() {
     var dataIds = Object.keys(_selectedRowIds);
     if (!dataIds.length) return;
 
@@ -538,9 +538,11 @@
 
     // Confirm when applying to a large selection to prevent accidental bulk operations
     if (dataIds.length > 5) {
-      var confirmed = window.confirm(
+      var confirmed = await Lex.Modal.confirmAsync(
+        'Apply Annotation',
         'You are about to apply a "' + annotationType + '" annotation to ' +
-        dataIds.length + ' records. Continue?'
+        dataIds.length + ' records. Continue?',
+        { confirmText: 'Apply' }
       );
       if (!confirmed) return;
     }
@@ -2261,7 +2263,7 @@
     _setImportStep('promotion');
   }
 
-  function _promoteCsvImport() {
+  async function _promoteCsvImport() {
     if (_importWizard.busy) return;
     var jobId = _getImportJobId();
     if (!jobId) {
@@ -2271,11 +2273,14 @@
 
     var summary = _getImportValidationSummary();
     if (summary && summary.invalidRows > 0) {
-      var confirmed = window.confirm(
+      var confirmed = await Lex.Modal.confirmAsync(
+        'Import Valid Rows',
         'This import has ' + summary.invalidRows + ' invalid row' + (summary.invalidRows === 1 ? '' : 's') +
-        '. Only valid rows will be imported. Continue?'
+        '. Only valid rows will be imported. Continue?',
+        { confirmText: 'Import' }
       );
       if (!confirmed) return;
+      if (_importWizard.busy) return;
     }
 
     var rows = _normalizeImportRows(_importWizard.rows.length ? _importWizard.rows : ((_importWizard.validation && _importWizard.validation.outcomes) || []));

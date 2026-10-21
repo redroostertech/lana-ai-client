@@ -500,44 +500,38 @@
         '<p style="margin-bottom:16px;font-size:var(--lex-body-sm-size);color:var(--lex-text-secondary);">Scan this QR code with your authenticator app:</p>' +
         '<img src="' + esc(result.qr_code) + '" alt="MFA QR Code" style="display:block;margin:0 auto 16px;max-width:200px;">' +
         '<p style="font-size:var(--lex-body-xs-size);color:var(--lex-text-tertiary);margin-bottom:16px;">Or enter this key manually: <strong>' + esc(result.secret) + '</strong></p>' +
-        '<lex-input id="sv2-mfa-verify-input" placeholder="Enter 6-digit code" maxlength="6"></lex-input>' +
-        '<div style="margin-top:16px;">' +
-          '<lex-btn id="sv2-mfa-verify-btn" variant="primary" size="sm">Verify &amp; Enable</lex-btn>' +
-        '</div>';
+        '<lex-input id="sv2-mfa-verify-input" placeholder="Enter 6-digit code" maxlength="6"></lex-input>';
 
-      Lex.Modal.open({
+      var modal = Lex.Modal.open({
         heading: 'Setup Two-Factor Authentication',
         content: content,
         hideActions: true,
-        size: 'md'
+        size: 'md',
+        footerContent: '<lex-btn id="sv2-mfa-verify-btn" variant="primary" size="sm">Verify &amp; Enable</lex-btn>'
       });
 
-      // Wire verify button after modal opens
-      setTimeout(function () {
-        var verifyBtn = document.getElementById('sv2-mfa-verify-btn');
-        if (verifyBtn) {
-          verifyBtn.addEventListener('click', function () {
-            var tokenInput = document.getElementById('sv2-mfa-verify-input');
-            var token = tokenInput ? tokenInput.value : '';
-            if (!token) {
-              if (tokenInput) tokenInput.error = 'Please enter the 6-digit code';
-              return;
-            }
+      // Lex.Modal.open renders synchronously; query within this modal only.
+      var verifyBtn = modal.querySelector('#sv2-mfa-verify-btn');
+      if (verifyBtn) {
+        verifyBtn.addEventListener('click', function () {
+          var tokenInput = modal.querySelector('#sv2-mfa-verify-input');
+          var token = tokenInput ? tokenInput.value : '';
+          if (!token) {
+            if (tokenInput) tokenInput.error = 'Please enter the 6-digit code';
+            return;
+          }
 
-            verifyBtn.loading = true;
-            api.verifyMfa(token).then(function () {
-              Lex.Toast.success('MFA enabled successfully');
-              // Close modal
-              var modal = document.querySelector('lex-modal[open]');
-              if (modal) modal.open = false;
-              loadMfaStatus();
-            }).catch(function () {
-              if (tokenInput) tokenInput.error = 'Invalid code. Please try again.';
-              verifyBtn.loading = false;
-            });
+          verifyBtn.loading = true;
+          api.verifyMfa(token).then(function () {
+            Lex.Toast.success('MFA enabled successfully');
+            closeOpenedModal(modal);
+            loadMfaStatus();
+          }).catch(function () {
+            if (tokenInput) tokenInput.error = 'Invalid code. Please try again.';
+            verifyBtn.loading = false;
           });
-        }
-      }, 100);
+        });
+      }
     }).catch(function (error) {
       Lex.Toast.error(error.message || 'Failed to setup MFA');
     });
@@ -547,54 +541,60 @@
     var content = document.createElement('div');
     content.innerHTML =
       '<p class="sv2-modal-copy">Confirm your account password to disable two-factor authentication.</p>' +
-      '<lex-input id="sv2-mfa-disable-password" label="Password" type="password" required="true"></lex-input>' +
-      '<div class="sv2-form-actions">' +
-        '<lex-btn id="sv2-mfa-disable-confirm-btn" variant="danger" size="sm">Disable MFA</lex-btn>' +
-        '<lex-btn id="sv2-mfa-disable-cancel-btn" variant="ghost" size="sm">Cancel</lex-btn>' +
-      '</div>';
+      '<lex-input id="sv2-mfa-disable-password" label="Password" type="password" required="true"></lex-input>';
 
     var modal = Lex.Modal.open({
       heading: 'Disable MFA',
       content: content,
       hideActions: true,
       size: 'sm',
-      closeOnOverlay: true
+      closeOnOverlay: true,
+      footerContent:
+        '<lex-btn id="sv2-mfa-disable-cancel-btn" variant="ghost" size="sm">Cancel</lex-btn>' +
+        '<lex-btn id="sv2-mfa-disable-confirm-btn" variant="danger" size="sm">Disable MFA</lex-btn>'
     });
 
-    setTimeout(function () {
-      var passwordInput = document.getElementById('sv2-mfa-disable-password');
-      var confirmBtn = document.getElementById('sv2-mfa-disable-confirm-btn');
-      var cancelBtn = document.getElementById('sv2-mfa-disable-cancel-btn');
+    // Lex.Modal.open renders synchronously; query within this modal only.
+    var passwordInput = modal.querySelector('#sv2-mfa-disable-password');
+    var confirmBtn = modal.querySelector('#sv2-mfa-disable-confirm-btn');
+    var cancelBtn = modal.querySelector('#sv2-mfa-disable-cancel-btn');
 
-      if (cancelBtn) {
-        cancelBtn.addEventListener('click', function () {
-          if (modal) modal.open = false;
-        });
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        closeOpenedModal(modal);
+      });
+    }
+
+    if (!confirmBtn) return;
+    confirmBtn.addEventListener('click', function () {
+      var password = passwordInput ? passwordInput.value : '';
+      if (!password) {
+        if (passwordInput) passwordInput.error = 'Password is required';
+        return;
       }
 
-      if (!confirmBtn) return;
-      confirmBtn.addEventListener('click', function () {
-        var password = passwordInput ? passwordInput.value : '';
-        if (!password) {
-          if (passwordInput) passwordInput.error = 'Password is required';
-          return;
+      confirmBtn.loading = true;
+      api.disableMfa(password).then(function () {
+        Lex.Toast.success('MFA disabled');
+        closeOpenedModal(modal);
+        loadMfaStatus();
+      }).catch(function (error) {
+        if (passwordInput && error && (error.status === 400 || error.status === 401)) {
+          passwordInput.error = error.message || 'Invalid password';
+        } else {
+          Lex.Toast.error(error.message || 'Failed to disable MFA');
         }
-
-        confirmBtn.loading = true;
-        api.disableMfa(password).then(function () {
-          Lex.Toast.success('MFA disabled');
-          if (modal) modal.open = false;
-          loadMfaStatus();
-        }).catch(function (error) {
-          if (passwordInput && error && (error.status === 400 || error.status === 401)) {
-            passwordInput.error = error.message || 'Invalid password';
-          } else {
-            Lex.Toast.error(error.message || 'Failed to disable MFA');
-          }
-          confirmBtn.loading = false;
-        });
+        confirmBtn.loading = false;
       });
-    }, 100);
+    });
+  }
+
+  // Close a modal created by Lex.Modal.open through its own close lifecycle
+  // (exit animation, then removal) so its ids never linger in the document.
+  function closeOpenedModal(modal) {
+    if (!modal) return;
+    if (typeof modal.removeAfterClose === 'function') modal.removeAfterClose();
+    else modal.open = false;
   }
 
 

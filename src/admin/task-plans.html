@@ -108,7 +108,7 @@
       id="taskPlanModal"
       heading="Create Task Plan"
       size="lg"
-      hide-actions
+      footer-content='<lex-btn id="taskPlanCancelBtn" variant="secondary" size="md">Cancel</lex-btn><lex-btn id="taskPlanSaveBtn" variant="primary" size="md" type="submit">Create Draft</lex-btn>'
       data-hoist
     >
       <lex-form id="taskPlanForm">
@@ -179,10 +179,6 @@
           auto-resize
         ></lex-textarea>
 
-        <div class="task-plan-modal-actions">
-          <lex-btn id="taskPlanCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="taskPlanSaveBtn" variant="primary" size="md" type="submit">Create Draft</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
 
@@ -190,7 +186,7 @@
       id="taskPlanItemModal"
       heading="Plan Item"
       size="md"
-      hide-actions
+      footer-content='<lex-btn id="taskPlanItemCancelBtn" variant="secondary" size="md">Cancel</lex-btn><lex-btn id="taskPlanItemSaveBtn" variant="primary" size="md" type="submit">Save Item</lex-btn>'
       data-hoist
     >
       <lex-form id="taskPlanItemForm">
@@ -237,10 +233,6 @@
           label="Due Date"
           type="date"
         ></lex-input>
-        <div class="task-plan-modal-actions">
-          <lex-btn id="taskPlanItemCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="taskPlanItemSaveBtn" variant="primary" size="md" type="submit">Save Item</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
   </template>
