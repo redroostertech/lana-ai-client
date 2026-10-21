@@ -233,6 +233,8 @@ Lex.state.onAuthChange(callback); // subscribe
 
 ### `<lex-btn>`
 
+**`form="formId"`** submits that form from outside it (e.g. a modal footer) — no hidden submit buttons or requestSubmit helpers.
+
 **Purpose:** Primary interactive button with icon support, loading state, and variants.
 
 | Property | Type | Default | Description |
@@ -282,6 +284,8 @@ Lex.state.onAuthChange(callback); // subscribe
 
 ### `<lex-modal>`
 
+**Footer and header:** `footer-content` (first render only), or children with `data-slot="footer"` (they replace the built-in confirm/cancel), or `modal.setFooterContent(html)` after render. `modal.setHeaderActions(html)`. `hide-close` removes the header close button. Call `modal.keepOpen()` in a `lex-confirm` listener to stay open. For window.confirm/alert/prompt use `Lex.Modal.confirmAsync/alertAsync/prompt` (escaped text). Never reach into `.lex-modal-title`/`.lex-modal-close`.
+
 **Purpose:** Centered overlay dialog with backdrop, focus trap, scroll lock, and confirm/cancel actions.
 
 | Property | Type | Default | Description |
@@ -309,6 +313,8 @@ Lex.Modal.confirm({ heading: 'Delete?', body: '...', variant: 'danger' })
 - Use `hideActions` when the modal body contains its own form with submit button
 
 ### `<lex-drawer>`
+
+**Header actions and footer:** children with `data-slot="header-actions"` move into the header and `data-slot="footer"` into the footer. `drawer.setHeaderActions([...])`, `drawer.setFooterVisible(bool)`, `drawer.contentRoot` (the element page content lives in; use it rather than querying `.lex-drawer-body`).
 
 **Purpose:** Slide-in side panel from left or right edge with same overlay infrastructure as modal.
 

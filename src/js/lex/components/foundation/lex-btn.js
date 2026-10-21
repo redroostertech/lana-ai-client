@@ -176,6 +176,8 @@
         disabled:     { type: Boolean, default: false, reflect: true },
         loading:      { type: Boolean, default: false },
         type:         { type: String, default: 'button' },
+        // id of a <form> this button submits from outside it (e.g. a modal footer)
+        form:         { type: String, default: '' },
         icon:         { type: Boolean, default: false },
         badge:        { type: Number, default: 0 },
         leadingIcon:  { type: String, default: '' },
@@ -280,6 +282,7 @@
 
       return `${badgeHtml}<button
           type="${this.type}"
+          ${this.form ? `form="${this.escapeHtml ? this.escapeHtml(this.form) : this.form}"` : ''}
           class="lex-btn-inner"
           style="${cssVars}${sizeStyle}"
           ${this.disabled || this.loading ? 'disabled' : ''}
