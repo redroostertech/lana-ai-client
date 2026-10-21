@@ -79,7 +79,7 @@ describe('automation table queries', () => {
   describe('Run History (GET /api/executions)', () => {
     test('maps the page to limit/offset and the default sort', () => {
       const params = paramsObject(Q.runsParams({ page: 3, limit: 25, sortBy: 'started_at', sortDir: 'desc', filters: {} }, 'nightly'));
-      expect(params).toEqual({ limit: '25', offset: '50', sort_by: 'created_at', sort_dir: 'desc', query: 'nightly' });
+      expect(params).toEqual({ limit: '25', offset: '50', sort_by: 'started_at', sort_dir: 'desc', query: 'nightly' });
     });
 
     test('maps each column to its API sort name', () => {
@@ -91,8 +91,8 @@ describe('automation table queries', () => {
       expect(sortOf('status')).toBe('status');
       expect(sortOf('duration')).toBe('duration');
       expect(sortOf('created_at')).toBe('created_at');
-      expect(sortOf('unknown')).toBe('created_at');
-      expect(sortOf('started_at')).toBe('created_at');
+      expect(sortOf('unknown')).toBe('started_at');
+      expect(sortOf('started_at')).toBe('started_at');
     });
 
     test('maps every column filter to its API parameter', () => {

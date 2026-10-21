@@ -155,10 +155,21 @@
     return values.map(function (value) { return titleCase(value); }).join(', ');
   }
 
-  function formatDate(value) {
-    if (window.Lex && Lex.Utils && typeof Lex.Utils.formatDate === 'function') return Lex.Utils.formatDate(value);
-    var date = new Date(value);
-    return Number.isNaN(date.getTime()) ? String(value || '') : date.toLocaleString();
+  // lex-select helpers: options are { value, label } objects; the current
+  // value is kept when it is still offered.
+  function setSelectOptions(id, options, keepValue) {
+    var select = el(id);
+    if (!select) return;
+    var current = select.value;
+    select.options = options;
+    var values = options.map(function (option) { return option.value; });
+    if (keepValue && current && values.indexOf(current) !== -1) select.value = current;
+    else if (values.indexOf(select.value) === -1) select.value = values.length ? values[0] : '';
+  }
+
+  function selectValue(id) {
+    var select = el(id);
+    return select ? String(select.value || '') : '';
   }
 
   function statusColor(status) {
@@ -422,108 +433,298 @@
     ].join('');
   }
 
+  // ---------------------------------------------------------------------
+  // Provider instances and routes tables (docs/TABLE-STANDARD.md).
+  // GET /communications/providers and /routes return the organization's
+  // whole set (a handful of rows, no paging), so both tables are client-side.
+  // ---------------------------------------------------------------------
+
+  var CHANNEL_LABELS = { email: 'Email', sms: 'SMS', voice: 'Voice' };
+  var PROVIDER_STATUSES = ['active', 'inactive', 'disabled'];
+  var DIRECTIONS = ['outbound', 'bidirectional', 'inbound'];
+  var READINESS_LABELS = { ready: 'Ready', not_ready: 'Not ready', unknown: 'Unknown' };
+  var READINESS_COLORS = { ready: 'green', not_ready: 'yellow', unknown: 'gray' };
+  var AUTH_OWNER_LABELS = { connectors: 'Connector auth', communications: 'Encrypted config' };
+  var ENABLED_LABELS = { enabled: 'Enabled', disabled: 'Disabled' };
+  // Priority ranges (min inclusive, max exclusive).
+  var PRIORITY_RANGES = [
+    { value: 'lt100', label: 'Under 100', min: -Infinity, max: 100 },
+    { value: '100', label: '100', min: 100, max: 101 },
+    { value: 'gt100', label: 'Over 100', min: 101, max: Infinity }
+  ];
+
+  var tables = {
+    providers: { id: 'commProvidersTable', noun: ['provider instance', 'provider instances'], search: '', filters: 0, toolbar: null, wired: false },
+    routes: { id: 'commRoutesTable', noun: ['route', 'routes'], search: '', filters: 0, toolbar: null, wired: false }
+  };
+
+  function channelLabel(channel) {
+    var key = String(channel || '').toLowerCase();
+    return CHANNEL_LABELS[key] || (window.Lex && Lex.Utils && Lex.Utils.humanizeLabel ? Lex.Utils.humanizeLabel(key) : titleCase(key));
+  }
+
+  function readinessKey(readiness) {
+    if (!readiness || typeof readiness.ready !== 'boolean') return 'unknown';
+    return readiness.ready ? 'ready' : 'not_ready';
+  }
+
+  function providerKeyLabel(key) {
+    var registry = registryProviderForKey(key);
+    return (registry && registry.display_name) || titleCase(key);
+  }
+
+  function priorityInRange(cell, value) {
+    var range = PRIORITY_RANGES.find(function (r) { return r.value === value; });
+    if (!range) return true;
+    var n = Number(cell);
+    return n >= range.min && n < range.max;
+  }
+
+  function createdMatch(cell, values) {
+    var ranges = window.LanaLibraryColumnFilters;
+    return ranges ? ranges.inEditedRange(cell, values[0]) : true;
+  }
+
+  /** One provider-instance row: raw values, the record as _raw. */
+  function mapProvider(provider) {
+    var p = provider || {};
+    var blockers = p.readiness && Array.isArray(p.readiness.blockers) ? p.readiness.blockers : [];
+    return {
+      id: String(p.id || ''),
+      name: providerLabel(p),
+      provider_key: normalizeProviderKey(p.provider_key),
+      channel: String(p.channel || ''),
+      status: String(p.status || 'active'),
+      readiness: readinessKey(p.readiness),
+      blockers: blockers.length,
+      auth_owner: isConnectorOwned(p) ? 'connectors' : 'communications',
+      created_at: p.created_at || '',
+      actions: '',
+      _raw: p
+    };
+  }
+
+  /** One route row: raw values, the record as _raw. */
+  function mapRoute(route) {
+    var r = route || {};
+    var priority = r.priority === undefined || r.priority === null ? 100 : Number(r.priority);
+    return {
+      id: String(r.id || ''),
+      name: String(r.display_name || r.route_key || ''),
+      route_key: String(r.route_key || ''),
+      provider: String(r.provider_id || ''),
+      provider_name: String(r.provider_display_name || r.provider_key || ''),
+      channel: String(r.channel || ''),
+      direction: String(r.direction || 'outbound'),
+      enabled: r.is_enabled === false ? 'disabled' : 'enabled',
+      readiness: readinessKey(r.readiness),
+      priority: priority,
+      identity: String(r.identity_display_name || r.identity_key || ''),
+      created_at: r.created_at || '',
+      actions: '',
+      _raw: r
+    };
+  }
+
+  function readinessCell(kit, val, row) {
+    var label = READINESS_LABELS[val] || READINESS_LABELS.unknown;
+    var html = kit.badge(label, READINESS_COLORS[val] || 'gray');
+    if (row.blockers) html += ' <span class="admin-table-sub">' + kit.esc(row.blockers + ' blocker' + (row.blockers === 1 ? '' : 's')) + '</span>';
+    return html;
+  }
+
+  function providerCellRenderers() {
+    var kit = window.AdminTableKit;
+    return {
+      name: function (val, row) { return kit.nameCell(val, row.id); },
+      provider_key: function (val) { return val ? '<span class="admin-table-text">' + kit.esc(providerKeyLabel(val)) + '</span>' : kit.muted(''); },
+      channel: function (val) { return val ? kit.badge(channelLabel(val), 'blue') : kit.muted(''); },
+      status: function (val) { return kit.badge(titleCaseFirst(val), statusColor(val)); },
+      readiness: function (val, row) { return readinessCell(kit, val, row); },
+      auth_owner: function (val) { return kit.badge(AUTH_OWNER_LABELS[val] || titleCaseFirst(val), val === 'connectors' ? 'blue' : 'green'); },
+      created_at: function (val) { return kit.timeCell(val); },
+      actions: function (val, row) {
+        var id = kit.esc(row.id);
+        var name = kit.esc(row.name);
+        return '<div class="comm-row-actions">' +
+          '<lex-btn size="sm" variant="secondary" data-provider-edit="' + id + '" aria-label="Edit ' + name + '">Edit</lex-btn>' +
+          '<lex-btn size="sm" variant="secondary" data-provider-readiness="' + id + '" aria-label="Refresh readiness for ' + name + '">Refresh readiness</lex-btn>' +
+          '</div>';
+      }
+    };
+  }
+
+  function routeCellRenderers() {
+    var kit = window.AdminTableKit;
+    return {
+      name: function (val, row) { return kit.nameCell(val || row.route_key, row.route_key && row.route_key !== val ? row.route_key : ''); },
+      provider: function (val, row) { return row.provider_name ? '<span class="admin-table-text" title="' + kit.esc(row.provider_name) + '">' + kit.esc(row.provider_name) + '</span>' : kit.muted(''); },
+      channel: function (val) { return val ? kit.badge(channelLabel(val), 'blue') : kit.muted(''); },
+      direction: function (val) { return kit.badge(titleCaseFirst(val), 'gray'); },
+      enabled: function (val) { return kit.badge(ENABLED_LABELS[val] || titleCaseFirst(val), val === 'enabled' ? 'green' : 'gray'); },
+      readiness: function (val, row) { return readinessCell(kit, val, row); },
+      priority: function (val) { return '<span class="admin-table-text">' + kit.esc(val) + '</span>'; },
+      identity: function (val) { return val ? '<span class="admin-table-text" title="' + kit.esc(val) + '">' + kit.esc(val) + '</span>' : kit.muted('None'); },
+      created_at: function (val) { return kit.timeCell(val); },
+      actions: function (val, row) {
+        return '<div class="comm-row-actions"><lex-btn size="sm" variant="secondary" data-route-edit="' + kit.esc(row.id) + '" aria-label="Edit ' + kit.esc(row.name) + '">Edit</lex-btn></div>';
+      }
+    };
+  }
+
+  function titleCaseFirst(value) {
+    if (window.Lex && Lex.Utils && typeof Lex.Utils.humanizeLabel === 'function') return Lex.Utils.humanizeLabel(value);
+    var text = String(value || '').replace(/[_-]+/g, ' ');
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  function uniqueOptions(rows, key, labelFn) {
+    var seen = {};
+    var options = [];
+    (rows || []).forEach(function (row) {
+      var value = row[key];
+      if (value === '' || value === undefined || value === null || seen[value]) return;
+      seen[value] = true;
+      options.push({ value: String(value), label: labelFn(row) });
+    });
+    return options.sort(function (a, b) { return a.label.localeCompare(b.label); });
+  }
+
+  /** Header filters for every provider column. */
+  function providerFilterOptions(rows) {
+    var kit = window.AdminTableKit;
+    var keys = REQUIRED_PROVIDER_KEYS.slice();
+    (rows || []).forEach(function (row) { if (row.provider_key && keys.indexOf(row.provider_key) === -1) keys.push(row.provider_key); });
+    var created = kit.dateRangeFilter();
+    created.match = createdMatch;
+    return {
+      name: { text: true, placeholder: 'Name contains...' },
+      provider_key: { options: keys.map(function (key) { return { value: key, label: providerKeyLabel(key) }; }) },
+      channel: { options: kit.labelOptions(Object.keys(CHANNEL_LABELS), CHANNEL_LABELS) },
+      status: { options: kit.labelOptions(PROVIDER_STATUSES) },
+      readiness: { options: kit.labelOptions(Object.keys(READINESS_LABELS), READINESS_LABELS) },
+      auth_owner: { options: kit.labelOptions(Object.keys(AUTH_OWNER_LABELS), AUTH_OWNER_LABELS) },
+      created_at: created
+    };
+  }
+
+  /** Header filters for every route column. */
+  function routeFilterOptions(rows) {
+    var kit = window.AdminTableKit;
+    var created = kit.dateRangeFilter();
+    created.match = createdMatch;
+    return {
+      name: { text: true, placeholder: 'Name contains...' },
+      provider: { options: uniqueOptions(rows, 'provider', function (row) { return row.provider_name || row.provider; }) },
+      channel: { options: kit.labelOptions(Object.keys(CHANNEL_LABELS), CHANNEL_LABELS) },
+      direction: { options: kit.labelOptions(DIRECTIONS) },
+      enabled: { options: kit.labelOptions(Object.keys(ENABLED_LABELS), ENABLED_LABELS) },
+      readiness: { options: kit.labelOptions(Object.keys(READINESS_LABELS), READINESS_LABELS) },
+      priority: {
+        single: true,
+        options: PRIORITY_RANGES.map(function (r) { return { value: r.value, label: r.label }; }),
+        match: function (cell, values) { return priorityInRange(cell, values[0]); }
+      },
+      identity: { text: true, placeholder: 'Identity contains...' },
+      created_at: created
+    };
+  }
+
+  function syncEmptyText(name, table) {
+    var info = tables[name];
+    if (!window.AdminTableKit) return;
+    table.emptyText = window.AdminTableKit.emptyText(Boolean(info.search || info.filters), info.noun[1]);
+  }
+
+  function updateCount(name, table, fallback) {
+    var info = tables[name];
+    if (!info.toolbar) return;
+    if (Array.isArray(table.filteredRows)) info.toolbar.setCount(table.filteredRows.length);
+    else if (fallback !== undefined) info.toolbar.setCount(fallback);
+  }
+
+  function wireTable(name, prefix, filterKey, renderers) {
+    var info = tables[name];
+    var table = el(info.id);
+    if (!table || !window.AdminTableKit) return Promise.resolve(null);
+    return window.AdminTableKit.whenTableReady().then(function () {
+      if (el(info.id) !== table) return null;
+      if (table._commWired) return table;
+      table._commWired = true;
+      info.search = '';
+      info.filters = 0;
+      table.setCellRenderers(renderers);
+      info.toolbar = window.AdminTableKit.bindToolbar({
+        table: table,
+        searchId: prefix + 'Search',
+        sortId: prefix + 'Sort',
+        orderId: prefix + 'SortOrder',
+        filterId: prefix + 'MainFilter',
+        filterKey: filterKey,
+        countIds: [prefix + 'Count', prefix + 'SectionCount'],
+        noun: info.noun,
+        onSearch: function (term) {
+          info.search = term;
+          if (table.dataSource) table.dataSource.setSearch(term);
+        }
+      });
+      table.addEventListener('lex-filter-change', function (event) {
+        if (event.target !== table) return;
+        info.filters = Object.keys((event.detail && event.detail.filters) || {}).length;
+        syncEmptyText(name, table);
+        updateCount(name, table);
+      });
+      return table;
+    });
+  }
+
+  function fillTable(name, table, rows, filterOptions, unavailableMessage) {
+    if (!table) return;
+    table.setColumnFilterOptions(filterOptions);
+    if (unavailableMessage) {
+      if (tables[name].toolbar) tables[name].toolbar.setCount(null);
+      if (typeof table.setError === 'function') { table.setError(unavailableMessage); return; }
+      table.emptyText = unavailableMessage;
+      table.setData([]);
+      return;
+    }
+    syncEmptyText(name, table);
+    table.setData(rows);
+    updateCount(name, table, rows.length);
+  }
+
   function renderProviderInstances() {
     var status = el('providerInstancesStatus');
-    var container = el('providerInstancesList');
-    if (!container) return;
-
-    if (state.endpoints.providers !== 'loaded') {
-      if (status) status.textContent = 'Provider instance endpoint is unavailable. Existing account status cannot be listed here.';
-      renderEmpty(container, 'No provider instances can be listed from this environment.');
-      populateProviderFormOptions();
-      return;
-    }
-
-    if (status) {
-      status.textContent = state.providers.length
-        ? state.providers.length + ' provider instance' + (state.providers.length === 1 ? '' : 's') + ' found.'
-        : 'No provider instances have been created yet.';
-    }
-    if (!state.providers.length) {
-      renderEmpty(container, 'No provider instances reported by the communications service.');
-      populateProviderFormOptions();
-      return;
-    }
-
-    container.innerHTML = state.providers.map(function (provider) {
-      var readiness = provider.readiness || {};
-      return [
-        '<div class="rounded-lg border border-gray-200 bg-white p-4">',
-          '<div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">',
-            '<div>',
-              '<div class="text-sm font-semibold lex-text-primary">' + esc(providerLabel(provider)) + '</div>',
-              '<div class="mt-1 text-xs lex-text-muted">' + esc(provider.provider_key || 'provider') + ' / ' + esc(provider.channel || 'channel') + '</div>',
-            '</div>',
-            '<div class="flex flex-wrap gap-2">',
-              '<lex-badge label="' + esc(titleCase(provider.status || 'active')) + '" color="' + esc(statusColor(provider.status || 'active')) + '"></lex-badge>',
-              readinessBadges(readiness),
-            '</div>',
-          '</div>',
-          '<div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs lex-text-secondary">',
-            '<div><span class="font-semibold lex-text-primary">ID:</span> ' + esc(provider.id || 'Unknown') + '</div>',
-            '<div><span class="font-semibold lex-text-primary">Auth owner:</span> ' + esc(isConnectorOwned(provider) ? 'connectors' : 'communications') + '</div>',
-            '<div><span class="font-semibold lex-text-primary">Created:</span> ' + esc(provider.created_at ? formatDate(provider.created_at) : 'Unknown') + '</div>',
-          '</div>',
-          '<div class="mt-3 flex flex-wrap gap-2">',
-            '<button type="button" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium lex-text-primary" data-provider-edit="' + esc(provider.id) + '">Edit</button>',
-            '<button type="button" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium lex-text-primary" data-provider-readiness="' + esc(provider.id) + '">Refresh readiness</button>',
-          '</div>',
-        '</div>'
-      ].join('');
-    }).join('');
     populateProviderFormOptions();
+    var loaded = state.endpoints.providers === 'loaded';
+    if (status) {
+      status.textContent = !loaded
+        ? 'Provider instance endpoint is unavailable. Existing account status cannot be listed here.'
+        : (state.providers.length ? '' : 'No provider instances have been created yet.');
+      status.classList.toggle('hidden', loaded && state.providers.length > 0);
+    }
+    var rows = loaded ? state.providers.map(mapProvider) : [];
+    return wireTable('providers', 'commProviders', 'status', providerCellRenderers()).then(function (table) {
+      fillTable('providers', table, rows, providerFilterOptions(rows),
+        loaded ? '' : 'No provider instances can be listed from this environment.');
+    });
   }
 
   function renderRoutes() {
     var status = el('routesStatus');
-    var container = el('routesList');
-    if (!container) return;
-
-    if (state.endpoints.routes !== 'loaded') {
-      if (status) status.textContent = 'Route endpoint is unavailable. Route status cannot be listed here.';
-      renderEmpty(container, 'No routes can be listed from this environment.');
-      populateRouteControls();
-      return;
-    }
-
-    if (status) {
-      status.textContent = state.routes.length
-        ? state.routes.length + ' route' + (state.routes.length === 1 ? '' : 's') + ' found.'
-        : 'No routes have been created yet.';
-    }
-    if (!state.routes.length) {
-      renderEmpty(container, 'No communications routes reported by the communications service.');
-      populateRouteControls();
-      return;
-    }
-
-    container.innerHTML = state.routes.map(function (route) {
-      return [
-        '<div class="rounded-lg border border-gray-200 bg-white p-4">',
-          '<div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">',
-            '<div>',
-              '<div class="text-sm font-semibold lex-text-primary">' + esc(route.display_name || route.route_key || 'Route') + '</div>',
-              '<div class="mt-1 text-xs lex-text-muted">' + esc(route.route_key || 'route') + ' / ' + esc(route.provider_display_name || route.provider_key || 'provider') + '</div>',
-            '</div>',
-            '<div class="flex flex-wrap gap-2">',
-              '<lex-badge label="' + esc(titleCase(route.channel || 'channel')) + '" color="blue"></lex-badge>',
-              '<lex-badge label="' + esc(titleCase(route.direction || 'outbound')) + '" color="gray"></lex-badge>',
-              '<lex-badge label="' + esc(route.is_enabled === false ? 'Disabled' : 'Enabled') + '" color="' + esc(route.is_enabled === false ? 'gray' : 'green') + '"></lex-badge>',
-              readinessBadges(route.readiness),
-            '</div>',
-          '</div>',
-          '<div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs lex-text-secondary">',
-            '<div><span class="font-semibold lex-text-primary">Priority:</span> ' + esc(route.priority === undefined || route.priority === null ? 100 : route.priority) + '</div>',
-            '<div><span class="font-semibold lex-text-primary">Identity:</span> ' + esc(route.identity_display_name || route.identity_key || 'None') + '</div>',
-            '<div><span class="font-semibold lex-text-primary">Created:</span> ' + esc(route.created_at ? formatDate(route.created_at) : 'Unknown') + '</div>',
-          '</div>',
-          '<div class="mt-3 flex flex-wrap gap-2">',
-            '<button type="button" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium lex-text-primary" data-route-edit="' + esc(route.id) + '">Edit</button>',
-          '</div>',
-        '</div>'
-      ].join('');
-    }).join('');
     populateRouteControls();
+    var loaded = state.endpoints.routes === 'loaded';
+    if (status) {
+      status.textContent = !loaded
+        ? 'Route endpoint is unavailable. Route status cannot be listed here.'
+        : (state.routes.length ? '' : 'No routes have been created yet.');
+      status.classList.toggle('hidden', loaded && state.routes.length > 0);
+    }
+    var rows = loaded ? state.routes.map(mapRoute) : [];
+    return wireTable('routes', 'commRoutes', 'channel', routeCellRenderers()).then(function (table) {
+      fillTable('routes', table, rows, routeFilterOptions(rows),
+        loaded ? '' : 'No routes can be listed from this environment.');
+    });
   }
 
   function setEndpoint(name, status) {
@@ -531,23 +732,13 @@
   }
 
   function populateProviderFormOptions() {
-    var providerKeySelect = el('providerKeySelect');
-    var providerEditSelect = el('providerEditSelect');
-    if (providerKeySelect) {
-      var selected = providerKeySelect.value;
-      providerKeySelect.innerHTML = state.registryProviders.map(function (provider) {
-        var key = normalizeProviderKey(provider.key || provider.provider_key);
-        return '<option value="' + esc(key) + '">' + esc(provider.display_name || titleCase(key)) + '</option>';
-      }).join('');
-      if (selected) providerKeySelect.value = selected;
-    }
-    if (providerEditSelect) {
-      var current = providerEditSelect.value;
-      providerEditSelect.innerHTML = '<option value="">Create new provider</option>' + state.providers.map(function (provider) {
-        return '<option value="' + esc(provider.id) + '">' + esc(providerLabel(provider)) + ' (' + esc(provider.channel || 'channel') + ')</option>';
-      }).join('');
-      if (current) providerEditSelect.value = current;
-    }
+    setSelectOptions('providerKeySelect', state.registryProviders.map(function (provider) {
+      var key = normalizeProviderKey(provider.key || provider.provider_key);
+      return { value: key, label: provider.display_name || titleCase(key) };
+    }), true);
+    setSelectOptions('providerEditSelect', [{ value: '', label: 'Create new provider' }].concat(state.providers.map(function (provider) {
+      return { value: String(provider.id), label: providerLabel(provider) + ' (' + channelLabel(provider.channel || 'channel') + ')' };
+    })), true);
     refreshProviderChannels();
     renderCredentialFields();
   }
@@ -556,13 +747,11 @@
     var keySelect = el('providerKeySelect');
     var channelSelect = el('providerChannelSelect');
     if (!keySelect || !channelSelect) return;
-    var selectedChannel = channelSelect.value;
     var registry = registryProviderForKey(keySelect.value) || state.registryProviders[0];
-    var channels = providerChannels(registry);
-    channelSelect.innerHTML = channels.map(function (channel) {
-      return '<option value="' + esc(channel) + '">' + esc(titleCase(channel)) + '</option>';
-    }).join('');
-    if (selectedChannel && channels.indexOf(selectedChannel) !== -1) channelSelect.value = selectedChannel;
+    var channels = registry ? providerChannels(registry) : [];
+    setSelectOptions('providerChannelSelect', channels.map(function (channel) {
+      return { value: channel, label: channelLabel(channel) };
+    }), true);
   }
 
   function fillProviderForm(providerId) {
@@ -657,36 +846,22 @@
   }
 
   function populateRouteControls() {
-    var providerSelect = el('routeProviderSelect');
-    var routeEditSelect = el('routeEditSelect');
-    var testRouteSelect = el('testRouteSelect');
-
-    if (providerSelect) {
-      var selectedProvider = providerSelect.value;
-      providerSelect.innerHTML = state.providers.length
-        ? state.providers.map(function (provider) {
-          return '<option value="' + esc(provider.id) + '">' + esc(providerLabel(provider)) + ' (' + esc(provider.channel || 'channel') + ')</option>';
-        }).join('')
-        : '<option value="">Create a provider first</option>';
-      if (selectedProvider) providerSelect.value = selectedProvider;
-    }
-    if (routeEditSelect) {
-      var selectedRoute = routeEditSelect.value;
-      routeEditSelect.innerHTML = '<option value="">Create new route</option>' + state.routes.map(function (route) {
-        return '<option value="' + esc(route.id) + '">' + esc(route.display_name || route.route_key || route.id) + '</option>';
-      }).join('');
-      if (selectedRoute) routeEditSelect.value = selectedRoute;
-    }
-    if (testRouteSelect) {
-      var previewRoutes = state.routes.filter(function (route) {
-        return route.channel === 'email' || route.channel === 'sms';
-      });
-      testRouteSelect.innerHTML = previewRoutes.length
-        ? previewRoutes.map(function (route) {
-          return '<option value="' + esc(route.id) + '">' + esc(route.display_name || route.route_key || route.id) + ' (' + esc(route.channel || 'channel') + ')</option>';
-        }).join('')
-        : '<option value="">Create an email or SMS route first</option>';
-    }
+    setSelectOptions('routeProviderSelect', state.providers.length
+      ? state.providers.map(function (provider) {
+        return { value: String(provider.id), label: providerLabel(provider) + ' (' + channelLabel(provider.channel || 'channel') + ')' };
+      })
+      : [{ value: '', label: 'Create a provider first' }], true);
+    setSelectOptions('routeEditSelect', [{ value: '', label: 'Create new route' }].concat(state.routes.map(function (route) {
+      return { value: String(route.id), label: route.display_name || route.route_key || String(route.id) };
+    })), true);
+    var previewRoutes = state.routes.filter(function (route) {
+      return route.channel === 'email' || route.channel === 'sms';
+    });
+    setSelectOptions('testRouteSelect', previewRoutes.length
+      ? previewRoutes.map(function (route) {
+        return { value: String(route.id), label: (route.display_name || route.route_key || String(route.id)) + ' (' + channelLabel(route.channel || 'channel') + ')' };
+      })
+      : [{ value: '', label: 'Create an email or SMS route first' }], true);
     syncRouteChannelToProvider();
   }
 
@@ -984,6 +1159,11 @@
     });
   }
 
+  function scrollToForm(id) {
+    var form = el(id);
+    if (form && typeof form.scrollIntoView === 'function') form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   function wireEvents() {
     var refreshBtn = el('refreshCommunicationsBtn');
     if (refreshBtn) refreshBtn.addEventListener('click', function () {
@@ -1016,28 +1196,30 @@
     if (previewBtn) previewBtn.addEventListener('click', previewTestSend);
 
     var providerKeySelect = el('providerKeySelect');
-    if (providerKeySelect) providerKeySelect.addEventListener('change', function () {
+    if (providerKeySelect) providerKeySelect.addEventListener('lex-change', function () {
       refreshProviderChannels();
       renderCredentialFields();
     });
 
     var providerEditSelect = el('providerEditSelect');
-    if (providerEditSelect) providerEditSelect.addEventListener('change', function () {
+    if (providerEditSelect) providerEditSelect.addEventListener('lex-change', function () {
       fillProviderForm(providerEditSelect.value);
     });
 
     var routeProviderSelect = el('routeProviderSelect');
-    if (routeProviderSelect) routeProviderSelect.addEventListener('change', syncRouteChannelToProvider);
+    if (routeProviderSelect) routeProviderSelect.addEventListener('lex-change', syncRouteChannelToProvider);
 
     var routeEditSelect = el('routeEditSelect');
-    if (routeEditSelect) routeEditSelect.addEventListener('change', function () {
+    if (routeEditSelect) routeEditSelect.addEventListener('lex-change', function () {
       fillRouteForm(routeEditSelect.value);
     });
 
     document.addEventListener('click', function (event) {
+      if (!event.target || !event.target.closest) return;
       var providerEdit = event.target.closest('[data-provider-edit]');
       if (providerEdit) {
         fillProviderForm(providerEdit.getAttribute('data-provider-edit'));
+        scrollToForm('providerForm');
         return;
       }
       var providerReadiness = event.target.closest('[data-provider-readiness]');
@@ -1048,7 +1230,26 @@
         return;
       }
       var routeEdit = event.target.closest('[data-route-edit]');
-      if (routeEdit) fillRouteForm(routeEdit.getAttribute('data-route-edit'));
+      if (routeEdit) {
+        fillRouteForm(routeEdit.getAttribute('data-route-edit'));
+        scrollToForm('routeForm');
+      }
+    });
+
+    // A row click opens the record in its edit form.
+    var providersTable = el('commProvidersTable');
+    if (providersTable) providersTable.addEventListener('row-click', function (event) {
+      var row = event.detail && event.detail.row;
+      if (!row || !row.id) return;
+      fillProviderForm(row.id);
+      scrollToForm('providerForm');
+    });
+    var routesTable = el('commRoutesTable');
+    if (routesTable) routesTable.addEventListener('row-click', function (event) {
+      var row = event.detail && event.detail.row;
+      if (!row || !row.id) return;
+      fillRouteForm(row.id);
+      scrollToForm('routeForm');
     });
 
     document.addEventListener('lex-refresh', function (event) {
@@ -1074,6 +1275,17 @@
     renderReadiness();
     refreshAll();
   }
+
+  // Pure table logic, exposed for unit tests.
+  window.CommunicationsTables = {
+    mapProvider: mapProvider,
+    mapRoute: mapRoute,
+    providerCellRenderers: providerCellRenderers,
+    routeCellRenderers: routeCellRenderers,
+    providerFilterOptions: providerFilterOptions,
+    routeFilterOptions: routeFilterOptions,
+    priorityInRange: priorityInRange
+  };
 
   init();
 })();

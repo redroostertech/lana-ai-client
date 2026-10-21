@@ -88,30 +88,67 @@
               <!-- Summary card -->
               <div id="bhSummaryCard" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:1rem;margin-bottom:1.5rem;">
               </div>
-              <!-- Filters bar -->
-              <div id="bhFiltersBar" style="margin-bottom:1rem;"></div>
+              <style>
+                /* Time entries table (docs/TABLE-STANDARD.md section 8) */
+                .bh-date-input { padding: 0.25rem 0.5rem; border: 1px solid var(--lex-border-default, #e5e7eb); border-radius: 0.375rem; font-size: 0.8125rem; }
+                .bh-cell-name { color: var(--lex-text-primary); display: block; font-size: 13px; font-weight: 620; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .bh-cell-text, .bh-cell-muted, .bh-cell-time { display: block; font-size: 12px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .bh-cell-text { color: var(--lex-text-primary); font-size: 13px; }
+                .bh-cell-muted, .bh-cell-time { color: var(--lex-text-secondary); }
+                .bh-cell-time { font-variant-numeric: tabular-nums; }
+                .bh-cell-hours { display: block; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--lex-color-blue-700, #1d4ed8); white-space: nowrap; }
+                .bh-row-actions { display: flex; gap: 0.25rem; justify-content: flex-end; flex-wrap: nowrap; }
+                .bh-row-btn { padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; background: var(--lex-bg-primary, #fff); color: var(--lex-text-primary); border: 1px solid var(--lex-border-default, #e5e7eb); border-radius: 0.25rem; cursor: pointer; white-space: nowrap; font-family: inherit; }
+                .bh-row-btn--approve { background: var(--lex-color-green-50, #f0fdf4); color: var(--lex-color-green-700, #15803d); border-color: var(--lex-color-green-200, #bbf7d0); }
+                .bh-row-btn--reject { background: var(--lex-color-red-50, #fef2f2); color: var(--lex-color-red-700, #b91c1c); border-color: var(--lex-color-red-200, #fecaca); }
+                .bh-row-btn--warn { background: var(--lex-color-amber-50, #fffbeb); color: var(--lex-color-amber-700, #b45309); border-color: var(--lex-color-amber-200, #fde68a); }
+                .bh-overlap-list { display: flex; flex-direction: column; gap: 0.5rem; }
+                .bh-overlap-heading { font-size: 0.7rem; font-weight: 600; color: var(--lex-color-amber-800, #92400e); text-transform: uppercase; letter-spacing: 0.05em; }
+                .bh-overlap-item { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.625rem 0.75rem; border: 1px solid var(--lex-color-amber-200, #fde68a); border-radius: 0.375rem; }
+                .bh-overlap-item .bh-row-actions { justify-content: flex-start; flex-wrap: wrap; }
+                .bh-overlap-item .bh-cell-name { white-space: normal; }
+                #bhEntriesTable table { table-layout: fixed; min-width: 1180px; }
+                #bhEntriesTable th { white-space: nowrap; }
+                #bhEntriesTable td { overflow: hidden; }
+                #bhEntriesTable th:nth-child(1) { width: 44px; }
+                #bhEntriesTable th:nth-child(3) { width: 90px; }
+                #bhEntriesTable th:nth-child(4) { width: 140px; }
+                #bhEntriesTable th:nth-child(5) { width: 110px; }
+                #bhEntriesTable th:nth-child(6) { width: 120px; }
+                #bhEntriesTable th:nth-child(7), #bhEntriesTable th:nth-child(8) { width: 176px; }
+                #bhEntriesTable th:nth-child(9) { width: 210px; }
+              </style>
+              <!-- Toolbar: search, sort, status, period, count -->
+              <div id="bhFiltersBar" class="mb-4"></div>
               <!-- Time entries table -->
-              <div id="bhEntriesSection">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                  <div style="font-size:0.9rem;font-weight:600;color:var(--lex-text-primary);">Time Entries</div>
+              <section id="bhEntriesSection" aria-labelledby="bhEntriesHeading">
+                <div class="flex items-center justify-between mb-3" style="gap:0.75rem;flex-wrap:wrap;">
+                  <div class="flex items-center gap-3">
+                    <h2 id="bhEntriesHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">Time Entries</h2>
+                    <span id="bhEntriesSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
+                  </div>
                   <div style="display:flex;gap:0.5rem;">
                     <lex-btn id="bhAddManualBtn" variant="primary" size="sm">+ New entry</lex-btn>
                     <lex-btn id="bhGenerateBtn" variant="outline" size="sm">Generate for Today</lex-btn>
                   </div>
                 </div>
-                <div id="bhEntriesLoading" class="animate-pulse flex flex-col gap-2">
-                  <div class="cc-skeleton" style="height:2.5rem;width:100%;"></div>
-                  <div class="cc-skeleton" style="height:2.5rem;width:100%;"></div>
-                  <div class="cc-skeleton" style="height:2.5rem;width:100%;"></div>
-                </div>
-                <div id="bhEntriesList" class="hidden" style="display:flex;flex-direction:column;gap:0;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.5rem;overflow:hidden;">
-                </div>
-                <div id="bhEntriesEmpty" class="hidden" style="text-align:center;padding:2rem;color:var(--lex-text-muted);font-size:0.875rem;">
-                  No time entries for this matter yet. Click "Generate for Today" to create drafts from today's activity.
-                </div>
-                <!-- Pagination -->
-                <div id="bhPagination" style="margin-top:0.5rem;"></div>
-              </div>
+                <lex-table
+                  id="bhEntriesTable"
+                  class="lex-table--card"
+                  column-filters
+                  selectable
+                  bulk-actions='[{"label":"Approve selected","action":"approve"},{"label":"Reject selected","action":"reject","variant":"danger"}]'
+                  columns="description,duration_minutes,activity_type,source,status,start_time,created_at,actions"
+                  labels="Entry,Hours,Type,Source,Status,Worked,Created,"
+                  search-keys="description,activity_type,status,source"
+                  sort-by="start_time"
+                  sort-dir="desc"
+                  limit="20"
+                  id-key="id"
+                  empty-text="No time entries for this period. Use &quot;Generate for Today&quot; to create drafts from today's activity."
+                  aria-label="Time entries"
+                ></lex-table>
+              </section>
             </div>
             <div id="tabContentDocGeneration" class="hidden p-6"></div>
             <div id="tabContentAnalytics" class="hidden p-6">
@@ -1250,6 +1287,7 @@
   <script src="js/workspace-switcher.js"></script>
   <script src="js/workspace-billable-hours.js"></script>
   <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/admin/admin-table-kit.js"></script>
   <script src="js/shared/workspace-details-tables.js"></script>
   <script src="js/workspace-details.js"></script>
 

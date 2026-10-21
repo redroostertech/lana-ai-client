@@ -76,6 +76,7 @@
         'js/workspace-switcher.js',
         'js/workspace-billable-hours.js',
         'js/shared/library-column-filters.js',
+        'js/admin/admin-table-kit.js',
         'js/shared/workspace-details-tables.js',
         'js/workspace-details.js'
       ],
@@ -514,8 +515,20 @@
     'admin/plugins.html': {
       title: 'Plugins',
       activeNav: 'admin',
-      scripts: [],
-      stylesheets: []
+      scripts: [
+        'js/lex/components/foundation/lex-breadcrumb.js',
+        'js/lex/components/foundation/lex-banner.js',
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-tabs.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/data/lex-table.js',
+        'js/shared/library-column-filters.js',
+        'js/admin/admin-table-kit.js',
+        'js/admin/admin-plugins.js'
+      ],
+      stylesheets: [
+        'css/admin/admin-tables.css'
+      ]
     },
 
     'admin/search-analytics.html': {
@@ -546,11 +559,16 @@
         'js/components/management-board-components.js',
         'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
         'js/services/session-tracking-service.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/data/lex-table.js',
+        'js/shared/library-column-filters.js',
+        'js/admin/admin-table-kit.js',
         'js/pages/management-boards-team-performance.js',
         'js/pages/management-boards-main.js'
       ],
       stylesheets: [
         'css/session-tracking.css',
+        'css/admin/admin-tables.css',
         'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
       ]
     },
@@ -726,9 +744,18 @@
       title: 'Active Workflows',
       activeNav: 'workflows',
       scripts: [
-        'js/workflows.js'
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-drawer.js',
+        'js/lex/components/form/lex-select.js',
+        'js/lex/components/data/lex-table.js',
+        'js/shared/library-column-filters.js',
+        'js/admin/admin-table-kit.js',
+        'js/workflows.js',
+        'js/pages/workflows-active.js'
       ],
-      stylesheets: []
+      stylesheets: [
+        'css/admin/admin-tables.css'
+      ]
     },
 
     'workflows/execution-logs.html': {

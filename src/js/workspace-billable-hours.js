@@ -1,7 +1,12 @@
 /**
  * Workspace Billable Hours Tab
- * Renders summary metrics, time entry list with pagination, date filters,
- * bulk actions, and review/approve modal for a specific matter's billable hours.
+ * Renders summary metrics, the time entries lex-table (docs/TABLE-STANDARD.md)
+ * with its toolbar, period, bulk actions, and the review/approve drawer for a
+ * specific matter's billable hours.
+ *
+ * @requires lex-table.js, lex-badge.js, lex-input.js, lex-select.js, lex-drawer.js, lex-modal.js
+ * @requires library-column-filters.js - Created / Worked range filters
+ * @requires admin-table-kit.js        - AdminTableKit toolbar wiring
  */
 
 (function () {
@@ -9,12 +14,8 @@
 
   var _matterId = null;
   var _entries = [];
-  var _currentPage = 1;
-  var _totalPages = 1;
-  var _pageSize = 25;
   var _dateFrom = '';
   var _dateTo = '';
-  var _selectedIds = {};
   var ADMIN_BILLABLE_ROLES = ['system_admin', 'org_admin', 'organization_admin', 'admin'];
 
   /**
@@ -23,8 +24,6 @@
    */
   window.renderBillableHoursTab = function (matter) {
     _matterId = matter.matter_id;
-    _currentPage = 1;
-    _selectedIds = {};
 
     // If the caller deep-linked with `bhFrom` / `bhTo` (e.g. the dashboard
     // widget's "Review" button on a draft), honour that window so the row
@@ -55,44 +54,76 @@
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // Filters Bar
+  // Toolbar (docs/TABLE-STANDARD.md section 2) + period
   // ═══════════════════════════════════════════════════════════════
+
+  var SORT_ICON = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>';
 
   function _renderFilters() {
     var container = document.getElementById('bhFiltersBar');
     if (!container) return;
 
-    container.innerHTML = '<div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">' +
-      '<label style="font-size:0.75rem;color:var(--lex-text-muted);font-weight:600;">From</label>' +
-      '<input type="date" id="bhDateFrom" value="' + Lex.Utils.escapeHtml(_dateFrom) + '" style="padding:0.25rem 0.5rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;">' +
-      '<label style="font-size:0.75rem;color:var(--lex-text-muted);font-weight:600;">To</label>' +
-      '<input type="date" id="bhDateTo" value="' + Lex.Utils.escapeHtml(_dateTo) + '" style="padding:0.25rem 0.5rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;">' +
-      '<lex-btn id="bhFilterApplyBtn" variant="outline" size="sm">Apply</lex-btn>' +
-      '<div id="bhBulkActions" style="display:none;margin-left:auto;gap:0.5rem;">' +
-        '<lex-btn id="bhBulkApproveBtn" variant="primary" size="sm">Approve Selected</lex-btn>' +
-        '<lex-btn id="bhBulkRejectBtn" variant="danger" size="sm">Reject Selected</lex-btn>' +
-      '</div>' +
-    '</div>';
+    // Already wired to this table: keep the toolbar (and its search, sort and
+    // filter state) and only show the new period.
+    var existing = _table();
+    if (existing && existing._bhReady && document.getElementById('bhEntriesSearch')) {
+      var fromEl = document.getElementById('bhDateFrom');
+      var toEl = document.getElementById('bhDateTo');
+      if (fromEl) fromEl.value = _dateFrom;
+      if (toEl) toEl.value = _dateTo;
+      return;
+    }
 
-    // Wire date filter
+    var esc = Lex.Utils.escapeHtml;
+    var sortOptions = JSON.stringify([
+      { value: 'start_time', label: 'Worked' },
+      { value: 'created_at', label: 'Created' },
+      { value: 'duration_minutes', label: 'Hours' },
+      { value: 'status', label: 'Status' },
+      { value: 'activity_type', label: 'Type' },
+      { value: 'description', label: 'Entry' }
+    ]);
+    var statusOptions = JSON.stringify([{ value: 'all', label: 'All' }].concat(STATUS_OPTIONS));
+
+    container.innerHTML =
+      '<div class="bg-white rounded-lg shadow-sm border p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter time entries">' +
+        '<div class="flex items-center gap-4 flex-wrap">' +
+          '<div class="flex-1 min-w-[200px]">' +
+            '<lex-input id="bhEntriesSearch" placeholder="Search time entries..." clearable="true" leading-icon="search"></lex-input>' +
+          '</div>' +
+          '<div class="flex items-center gap-2">' +
+            '<label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>' +
+            '<lex-select id="bhEntriesSort" options=\'' + esc(sortOptions) + '\' value="start_time"></lex-select>' +
+          '</div>' +
+          '<lex-btn id="bhEntriesSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">' + SORT_ICON + '</lex-btn>' +
+          '<div class="flex items-center gap-2">' +
+            '<label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>' +
+            '<lex-select id="bhEntriesStatusFilter" options=\'' + esc(statusOptions) + '\' value="all"></lex-select>' +
+          '</div>' +
+          '<div class="flex items-center gap-2">' +
+            '<label for="bhDateFrom" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">From</label>' +
+            '<input type="date" id="bhDateFrom" class="bh-date-input" value="' + esc(_dateFrom) + '">' +
+            '<label for="bhDateTo" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">to</label>' +
+            '<input type="date" id="bhDateTo" class="bh-date-input" value="' + esc(_dateTo) + '">' +
+            '<lex-btn id="bhFilterApplyBtn" variant="outline" size="sm">Apply</lex-btn>' +
+          '</div>' +
+          '<div id="bhEntriesCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>' +
+        '</div>' +
+      '</div>';
+
+    // Period: reload the whole set for the new window.
     var applyBtn = document.getElementById('bhFilterApplyBtn');
-    if (applyBtn && !applyBtn._bhWired) {
-      applyBtn._bhWired = true;
+    if (applyBtn) {
       applyBtn.addEventListener('click', function () {
         var fromInput = document.getElementById('bhDateFrom');
         var toInput = document.getElementById('bhDateTo');
         _dateFrom = fromInput ? fromInput.value : '';
         _dateTo = toInput ? toInput.value : '';
-        _currentPage = 1;
-        _selectedIds = {};
-        _loadEntries({ matter_id: _matterId });
-        _loadSummary({ matter_id: _matterId });
+        _refresh();
       });
     }
 
-    // Wire bulk actions
-    _wireBulkActions();
-    _updateBulkActionsVisibility();
+    _initEntriesTable();
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -143,137 +174,287 @@
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Time Entries List
+  // Time Entries table (docs/TABLE-STANDARD.md)
+  //
+  // GET /billable-hours/drafts pages (page/limit, max 200) but cannot sort,
+  // search or filter beyond one status, so the table loads every entry for
+  // the matter and period by walking the pages (no hidden cap), then sorts,
+  // searches and filters in the browser. Rows keep raw values.
   // ═══════════════════════════════════════════════════════════════
 
-  function _loadEntries(matter) {
-    var loadingEl = document.getElementById('bhEntriesLoading');
-    var listEl = document.getElementById('bhEntriesList');
-    var emptyEl = document.getElementById('bhEntriesEmpty');
-    if (!listEl) return;
+  var DRAFTS_PAGE_SIZE = 200;
+  var TABLE_ID = 'bhEntriesTable';
 
-    if (loadingEl) loadingEl.classList.remove('hidden');
-    listEl.classList.add('hidden');
-    if (emptyEl) emptyEl.classList.add('hidden');
+  var STATUS_OPTIONS = [
+    { value: 'draft', label: 'Draft' },
+    { value: 'submitted', label: 'Submitted' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'invoiced', label: 'Invoiced' }
+  ];
 
-    var mid = matter.matter_id || _matterId;
-    var url = '/api/v1/billable-hours/drafts?matter_id=' + encodeURIComponent(mid) +
-      '&status=all&limit=' + _pageSize + '&page=' + _currentPage;
-    if (_dateFrom) url += '&date_from=' + encodeURIComponent(_dateFrom);
-    if (_dateTo) url += '&date_to=' + encodeURIComponent(_dateTo);
-    url = _appendAdminScope(url);
+  var STATUS_COLORS = { draft: 'yellow', submitted: 'blue', approved: 'green', invoiced: 'purple' };
 
-    api.get(url)
-      .then(function (result) {
-        _entries = (result && result.data) || [];
-        var pagination = result && result.pagination;
-        if (pagination) {
-          _totalPages = pagination.totalPages || 1;
-          _currentPage = pagination.page || 1;
-        }
+  var SOURCE_LABELS = { activity: 'Auto', manual: 'Manual', imported: 'Imported' };
+  var SOURCE_TITLES = {
+    activity: 'Auto-tracked from activity',
+    manual: 'Manually entered by user',
+    imported: 'Imported from external system'
+  };
 
-        if (loadingEl) loadingEl.classList.add('hidden');
+  var _loadSeq = 0;
+  var _toolbar = null;
 
-        if (_entries.length === 0 && _currentPage === 1) {
-          if (emptyEl) emptyEl.classList.remove('hidden');
-          _renderPagination(0);
-          return;
-        }
-
-        listEl.classList.remove('hidden');
-        listEl.innerHTML = _buildEntriesList(_entries);
-        _wireEntryActions();
-        _renderPagination(pagination ? pagination.total : _entries.length);
-      })
-      .catch(function () {
-        if (loadingEl) loadingEl.classList.add('hidden');
-        if (emptyEl) {
-          emptyEl.textContent = 'Failed to load time entries.';
-          emptyEl.classList.remove('hidden');
-        }
-      });
+  /**
+   * One page of the matter's time entries (every status, the period, and the
+   * admin all-users scope).
+   */
+  function draftsUrl(matterId, page, period, adminScope) {
+    var url = '/api/v1/billable-hours/drafts?matter_id=' + encodeURIComponent(matterId) +
+      '&status=all&limit=' + DRAFTS_PAGE_SIZE + '&page=' + (page || 1);
+    if (period && period.from) url += '&date_from=' + encodeURIComponent(period.from);
+    if (period && period.to) url += '&date_to=' + encodeURIComponent(period.to);
+    if (adminScope) url += '&all_users=true';
+    return url;
   }
 
-  function _buildEntriesList(entries) {
-    var html = '';
+  function _num(value) {
+    var n = Number(value);
+    return isFinite(n) ? n : 0;
+  }
 
-    // Header row with select-all
-    var hasDrafts = entries.some(function (e) { return e.status === 'draft'; });
-    if (hasDrafts) {
-      html += '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 1rem;background:var(--lex-bg-muted,#f9fafb);border-bottom:1px solid var(--lex-border-default,#e5e7eb);font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;">';
-      html += '<input type="checkbox" id="bhSelectAll" style="cursor:pointer;">';
-      html += '<span>Select all drafts</span>';
-      html += '</div>';
+  function entryRow(e) {
+    return {
+      id: String(e.id || ''),
+      description: String(e.description || ''),
+      duration_minutes: _num(e.duration_minutes),
+      activity_type: String(e.activity_type || ''),
+      source: String(e.source || ''),
+      status: String(e.status || 'draft'),
+      start_time: e.start_time || '',
+      created_at: e.created_at || '',
+      actions: '',
+      _raw: e
+    };
+  }
+
+  function _esc(value) {
+    return Lex.Utils.escapeHtml(value == null ? '' : String(value));
+  }
+
+  function _muted(text) {
+    return '<span class="bh-cell-muted">' + _esc(text || '—') + '</span>';
+  }
+
+  function _badge(label, color, title) {
+    if (!label) return _muted('');
+    return '<lex-badge label="' + _esc(label) + '" color="' + _esc(color || 'gray') + '" size="sm"' +
+      (title ? ' title="' + _esc(title) + '"' : '') + '></lex-badge>';
+  }
+
+  function _time(value) {
+    if (!value) return _muted('');
+    var text = Lex.Utils.formatDateTime(value);
+    return '<time class="bh-cell-time" datetime="' + _esc(value) + '" title="' + _esc(text) + '">' + _esc(text) + '</time>';
+  }
+
+  function _label(value) {
+    if (!value) return '';
+    return typeof Lex.Utils.humanizeLabel === 'function' ? Lex.Utils.humanizeLabel(value) : String(value);
+  }
+
+  function entryRenderers() {
+    return {
+      description: function (val) {
+        var text = val || 'No description';
+        return '<span class="bh-cell-name" title="' + _esc(text) + '">' + _esc(text) + '</span>';
+      },
+      duration_minutes: function (val) {
+        return '<span class="bh-cell-hours">' + (_num(val) / 60).toFixed(1) + 'h</span>';
+      },
+      activity_type: function (val) { return val ? '<span class="bh-cell-text">' + _esc(_label(val)) + '</span>' : _muted(''); },
+      source: function (val) {
+        return val ? _badge(SOURCE_LABELS[val] || _label(val), val === 'manual' ? 'blue' : (val === 'imported' ? 'purple' : 'gray'), SOURCE_TITLES[val]) : _muted('');
+      },
+      status: function (val) { return _badge(_label(val), STATUS_COLORS[val] || 'gray'); },
+      start_time: _time,
+      created_at: _time,
+      actions: function (val, row) {
+        var e = row._raw || {};
+        var id = _esc(row.id);
+        var html = '<div class="bh-row-actions">';
+        var overlaps = Array.isArray(e.has_overlap_with) ? e.has_overlap_with : [];
+        if (overlaps.length > 0) {
+          html += '<button type="button" class="bh-row-btn bh-row-btn--warn" data-bh-action="overlap" data-id="' + id + '" title="Overlaps ' +
+            overlaps.length + ' other ' + (overlaps.length === 1 ? 'entry' : 'entries') + '">Overlap</button>';
+        }
+        if (row.status === 'draft') {
+          html += '<button type="button" class="bh-row-btn bh-row-btn--approve" data-bh-action="approve" data-id="' + id + '">Approve</button>';
+          html += '<button type="button" class="bh-row-btn bh-row-btn--reject" data-bh-action="reject" data-id="' + id + '">Reject</button>';
+        }
+        return html + '</div>';
+      }
+    };
+  }
+
+  function _createdRange() {
+    var shared = window.LanaLibraryColumnFilters;
+    return {
+      single: true,
+      options: shared ? shared.EDITED_RANGE_OPTIONS : [],
+      match: function (cell, values) { return !!shared && shared.inEditedRange(cell, values[0]); }
+    };
+  }
+
+  function _minutesInRange(cell, range) {
+    var parts = String(range || '').split('-');
+    var n = _num(cell);
+    var min = parts[0] === '' ? -Infinity : Number(parts[0]);
+    var max = parts[1] === '' || parts[1] === undefined ? Infinity : Number(parts[1]);
+    return n >= min && n < max;
+  }
+
+  function entryFilters(rows) {
+    var types = {};
+    (rows || []).forEach(function (r) { if (r.activity_type) types[r.activity_type] = true; });
+    var typeOptions = Object.keys(types).sort().map(function (t) { return { value: t, label: _label(t) }; });
+    var map = {
+      description: { text: true, placeholder: 'Entry contains...' },
+      duration_minutes: {
+        single: true,
+        options: [
+          { value: '0-30', label: 'Under 30 minutes' },
+          { value: '30-120', label: '30 minutes to 2 hours' },
+          { value: '120-', label: '2 hours or more' }
+        ],
+        match: function (cell, values) { return _minutesInRange(cell, values[0]); }
+      },
+      source: { options: Object.keys(SOURCE_LABELS).map(function (k) { return { value: k, label: SOURCE_LABELS[k] }; }) },
+      status: { options: STATUS_OPTIONS.slice() },
+      start_time: _createdRange(),
+      created_at: _createdRange()
+    };
+    if (typeOptions.length) map.activity_type = { options: typeOptions };
+    return map;
+  }
+
+  function _table() {
+    return document.getElementById(TABLE_ID);
+  }
+
+  function _entryById(id) {
+    for (var i = 0; i < _entries.length; i++) {
+      if (_entries[i].id === id) return _entries[i];
     }
+    return null;
+  }
 
-    for (var i = 0; i < entries.length; i++) {
-      var e = entries[i];
-      var hours = ((e.duration_minutes || 0) / 60).toFixed(1);
-      var date = e.start_time ? Lex.Utils.formatDateTime(e.start_time, { dateOnly: true }) : '-';
-      var statusColor = _getStatusColor(e.status);
-      var description = e.description || 'No description';
-      if (description.length > 120) description = description.substring(0, 117) + '...';
+  function _initEntriesTable() {
+    var table = _table();
+    var kit = window.AdminTableKit;
+    if (!table || !kit || table._bhReady) return;
+    table._bhReady = true;
+    kit.whenTableReady().then(function () {
+      if (_table() !== table) return;
+      table.setCellRenderers(entryRenderers());
+      table.setColumnFilterOptions(entryFilters(_entries.map(entryRow)));
+      _toolbar = kit.bindToolbar({
+        table: table,
+        searchId: 'bhEntriesSearch',
+        sortId: 'bhEntriesSort',
+        orderId: 'bhEntriesSortOrder',
+        filterId: 'bhEntriesStatusFilter',
+        filterKey: 'status',
+        countIds: ['bhEntriesCount', 'bhEntriesSectionCount'],
+        noun: ['entry', 'entries']
+      });
+      // After bindToolbar's listeners, so these counts win.
+      table.addEventListener('lex-filter-change', function (e) { if (e.target === table) _recount(); });
+      table.addEventListener('lex-data-loaded', function (e) { if (e.target === table) _recount(); });
 
-      var bgStyle = i % 2 === 1 ? 'background:var(--lex-bg-muted,#f9fafb);' : '';
-      var isChecked = !!_selectedIds[e.id];
+      table.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('[data-bh-action]') : null;
+        if (!btn) return;
+        e.stopPropagation();
+        var id = btn.getAttribute('data-id');
+        var action = btn.getAttribute('data-bh-action');
+        if (action === 'approve') _approveEntry(id);
+        else if (action === 'reject') _confirmReject(id);
+        else if (action === 'overlap') _openOverlapDrawer(id);
+      });
 
-      html += '<div class="bh-entry-row" data-entry-id="' + Lex.Utils.escapeHtml(e.id) + '" style="' + bgStyle + 'display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background=\'var(--lex-bg-accent-subtle,#eff6ff)\'" onmouseout="this.style.background=\'' + (i % 2 === 1 ? 'var(--lex-bg-muted,#f9fafb)' : '') + '\'">';
+      table.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row && row._raw) _openEntryModal(row._raw);
+      });
 
-      // Checkbox for drafts
-      if (e.status === 'draft') {
-        html += '<input type="checkbox" class="bh-entry-checkbox" data-id="' + Lex.Utils.escapeHtml(e.id) + '" ' + (isChecked ? 'checked' : '') + ' style="cursor:pointer;" onclick="event.stopPropagation();">';
-      } else if (hasDrafts) {
-        html += '<div style="width:1rem;"></div>';
-      }
+      table.addEventListener('bulk-action', function (e) {
+        var detail = e.detail || {};
+        var items = detail.items || [];
+        if (detail.action === 'approve') _bulkAction('approve', items);
+        else if (detail.action === 'reject') _confirmBulkReject(items);
+      });
 
-      // Hours badge
-      html += '<div style="min-width:3.5rem;text-align:center;padding:0.25rem 0.5rem;background:var(--lex-bg-accent-subtle,#eff6ff);border-radius:0.375rem;font-size:0.875rem;font-weight:700;color:var(--lex-color-blue-700,#1d4ed8);">' + hours + 'h</div>';
+      _showRows();
+    });
+  }
 
-      // Description + date
-      html += '<div style="flex:1;min-width:0;">';
-      html += '<div style="font-size:0.8125rem;color:var(--lex-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + Lex.Utils.escapeHtml(description) + '</div>';
-      html += '<div style="font-size:0.7rem;color:var(--lex-text-muted);">' + Lex.Utils.escapeHtml(date) + ' - ' + Lex.Utils.escapeHtml(e.activity_type || 'general') + '</div>';
-      html += '</div>';
+  function _recount() {
+    var table = _table();
+    if (!table || !_toolbar) return;
+    _toolbar.setCount(Array.isArray(table.filteredRows) ? table.filteredRows.length : _entries.length);
+    var filtered = Boolean(table.searchText) || (typeof table.getActiveFilters === 'function' && Object.keys(table.getActiveFilters() || {}).length > 0);
+    table.emptyText = filtered
+      ? 'No matching time entries. Try a different search or clear the filters.'
+      : 'No time entries for this period. Use "Generate for Today" to create drafts from today\'s activity.';
+  }
 
-      // Source badge (Auto / Manual / Imported) — surfaces the row's
-      // origin so users can tell auto-tracked time from manually entered
-      // time at a glance.
-      var sourceBadge = _getSourceBadge(e.source);
-      if (sourceBadge) {
-        html += '<div title="' + Lex.Utils.escapeHtml(sourceBadge.title) + '" style="flex-shrink:0;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.65rem;font-weight:600;background:' + sourceBadge.bg + ';color:' + sourceBadge.text + ';">' + Lex.Utils.escapeHtml(sourceBadge.label) + '</div>';
-      }
+  function _showRows() {
+    var table = _table();
+    if (!table || typeof table.setData !== 'function') return;
+    var rows = _entries.map(entryRow);
+    table.setColumnFilterOptions(entryFilters(rows));
+    if (typeof table.deselectAll === 'function') table.deselectAll();
+    table.setData(rows);
+    _recount();
+  }
 
-      // Overlap warning — flagged when this entry overlaps another on the
-      // same (user, matter, day). Clicking the badge expands an inline panel
-      // beneath the row showing the conflicting entries with resolve actions
-      // (see _toggleOverlapPanel / _renderOverlapPanel below).
-      var overlaps = Array.isArray(e.has_overlap_with) ? e.has_overlap_with : [];
-      if (overlaps.length > 0) {
-        var overlapTitle = 'Overlaps ' + overlaps.length + ' other ' + (overlaps.length === 1 ? 'entry' : 'entries') + ' — click to resolve';
-        html += '<button type="button" class="bh-overlap-badge" data-id="' + Lex.Utils.escapeHtml(e.id) + '" title="' + Lex.Utils.escapeHtml(overlapTitle) + '" style="flex-shrink:0;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.65rem;font-weight:600;background:var(--lex-color-amber-50,#fffbeb);color:var(--lex-color-amber-700,#b45309);border:1px solid var(--lex-color-amber-200,#fde68a);cursor:pointer;font-family:inherit;">⚠ Overlap</button>';
-      }
-
-      // Status badge
-      html += '<div style="flex-shrink:0;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.7rem;font-weight:600;background:' + statusColor.bg + ';color:' + statusColor.text + ';">' + Lex.Utils.escapeHtml(e.status || 'draft') + '</div>';
-
-      // Action buttons for drafts
-      if (e.status === 'draft') {
-        html += '<div style="display:flex;gap:0.25rem;flex-shrink:0;">';
-        html += '<button class="bh-approve-btn" data-id="' + Lex.Utils.escapeHtml(e.id) + '" style="padding:0.25rem 0.5rem;font-size:0.7rem;font-weight:600;background:var(--lex-color-green-50,#f0fdf4);color:var(--lex-color-green-700,#15803d);border:1px solid var(--lex-color-green-200,#bbf7d0);border-radius:0.25rem;cursor:pointer;">Approve</button>';
-        html += '<button class="bh-reject-btn" data-id="' + Lex.Utils.escapeHtml(e.id) + '" style="padding:0.25rem 0.5rem;font-size:0.7rem;font-weight:600;background:var(--lex-color-red-50,#fef2f2);color:var(--lex-color-red-700,#b91c1c);border:1px solid var(--lex-color-red-200,#fecaca);border-radius:0.25rem;cursor:pointer;">Reject</button>';
-        html += '</div>';
-      }
-
-      html += '</div>';
-
-      // Inline overlap-resolution panel — hidden until the user clicks the
-      // ⚠ Overlap badge on this row. Rendered as a sibling of the row so
-      // the row's hover/striping styles aren't disturbed.
-      if (overlaps.length > 0) {
-        html += '<div class="bh-overlap-panel" data-for-id="' + Lex.Utils.escapeHtml(e.id) + '" style="display:none;padding:0.75rem 1rem 0.875rem 3rem;background:var(--lex-color-amber-50,#fffbeb);border-bottom:1px solid var(--lex-color-amber-200,#fde68a);"></div>';
-      }
+  /**
+   * Every page of the matter's entries for the period.
+   */
+  function fetchAllEntries(matterId, period, adminScope, getter) {
+    var get = getter || function (url) { return api.get(url); };
+    var rows = [];
+    function next(page) {
+      return get(draftsUrl(matterId, page, period, adminScope)).then(function (result) {
+        var data = (result && Array.isArray(result.data)) ? result.data : [];
+        rows = rows.concat(data);
+        var total = Number(result && result.pagination && result.pagination.total);
+        var more = data.length >= DRAFTS_PAGE_SIZE && (!isFinite(total) || rows.length < total);
+        return more ? next(page + 1) : rows;
+      });
     }
-    return html;
+    return next(1);
+  }
+
+  function _loadEntries(matter) {
+    var seq = ++_loadSeq;
+    var mid = (matter && matter.matter_id) || _matterId;
+    return fetchAllEntries(mid, { from: _dateFrom, to: _dateTo }, _isAdminBillableHoursUser())
+      .then(function (entries) {
+        if (seq !== _loadSeq) return;
+        _entries = entries;
+        _showRows();
+      })
+      .catch(function (err) {
+        if (seq !== _loadSeq) return;
+        console.error('[billable-hours] time entries load failed:', err);
+        var table = _table();
+        if (_toolbar) _toolbar.setCount(null);
+        if (!table) return;
+        var message = 'Time entries could not be loaded. Check your connection and try again.';
+        if (typeof table.setError === 'function') table.setError(message);
+        else if (typeof table.setServerError === 'function') table.setServerError(message);
+      });
   }
 
   function _appendAdminScope(url) {
@@ -326,192 +507,77 @@
   // ─────────────────────────────────────────────────────────────
   // Overlap resolution
   // ─────────────────────────────────────────────────────────────
-  // Build the inline panel content for a row. Resolves the UUIDs in
-  // has_overlap_with against the already-loaded _entries array (no extra
-  // fetches). For each overlap we show hours, truncated description, source
-  // badge, a "Jump to" link and a Resolve dropdown.
+  // The row's Overlap button opens a lex-drawer listing the entries that
+  // overlap it (resolved against the loaded set; no extra fetches). Each
+  // overlap offers Open, Delete this overlap and, when both are drafts on
+  // the same matter, Merge into the other. "Keep both" is closing the drawer.
   function _renderOverlapPanel(entry) {
     var ids = Array.isArray(entry.has_overlap_with) ? entry.has_overlap_with : [];
-    var others = ids
-      .map(function (id) { return _entries.find(function (en) { return en.id === id; }); })
-      .filter(function (x) { return !!x; });
+    var others = ids.map(_entryById).filter(function (x) { return !!x; });
 
-    var html = '';
-    html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-color-amber-800,#92400e);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Overlapping entries (' + ids.length + ')</div>';
+    var html = '<div class="bh-overlap-list">';
+    html += '<div class="bh-overlap-heading">Overlapping entries (' + ids.length + ')</div>';
 
     if (others.length === 0) {
-      // Backend listed UUIDs not present in the current page — likely a row
-      // outside the current pagination/date filter. Tell the user rather
-      // than silently rendering nothing.
-      html += '<div style="font-size:0.75rem;color:var(--lex-text-muted);">';
-      html += 'Overlapping entries are outside the current filter. Adjust the date range or pagination to see them.';
-      html += '</div>';
-      return html;
+      // The API listed ids outside the loaded period.
+      html += '<div class="bh-cell-muted">Overlapping entries are outside the current period. Widen the date range to see them.</div>';
+      return html + '</div>';
     }
 
-    html += '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
     for (var i = 0; i < others.length; i++) {
       var o = others[i];
       var oHours = ((o.duration_minutes || 0) / 60).toFixed(1);
-      var oDesc = o.description || 'No description';
-      if (oDesc.length > 100) oDesc = oDesc.substring(0, 97) + '...';
-      var oSource = _getSourceBadge(o.source);
       var canMerge = entry.status === 'draft' && o.status === 'draft' && entry.matter_id === o.matter_id;
-
-      html += '<div class="bh-overlap-item" data-id="' + Lex.Utils.escapeHtml(o.id) + '" style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0.625rem;background:white;border:1px solid var(--lex-color-amber-200,#fde68a);border-radius:0.375rem;">';
-
-      html += '<div style="min-width:2.75rem;text-align:center;padding:0.125rem 0.375rem;background:var(--lex-bg-accent-subtle,#eff6ff);border-radius:0.25rem;font-size:0.75rem;font-weight:700;color:var(--lex-color-blue-700,#1d4ed8);">' + oHours + 'h</div>';
-
-      html += '<div style="flex:1;min-width:0;">';
-      html += '<div style="font-size:0.75rem;color:var(--lex-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + Lex.Utils.escapeHtml(oDesc) + '</div>';
-      html += '<div style="font-size:0.65rem;color:var(--lex-text-muted);">' + Lex.Utils.escapeHtml(o.activity_type || 'general') + ' • ' + Lex.Utils.escapeHtml(o.status || 'draft') + '</div>';
+      html += '<div class="bh-overlap-item" data-id="' + _esc(o.id) + '">';
+      html += '<div class="bh-overlap-main">';
+      html += '<div class="bh-cell-name">' + oHours + 'h · ' + _esc(o.description || 'No description') + '</div>';
+      html += '<div class="bh-cell-muted">' + _esc(_label(o.activity_type || 'general')) + ' · ' + _esc(_label(o.status || 'draft')) +
+        (o.source ? ' · ' + _esc(SOURCE_LABELS[o.source] || _label(o.source)) : '') + '</div>';
       html += '</div>';
-
-      if (oSource) {
-        html += '<div title="' + Lex.Utils.escapeHtml(oSource.title) + '" style="flex-shrink:0;padding:0.125rem 0.375rem;border-radius:9999px;font-size:0.6rem;font-weight:600;background:' + oSource.bg + ';color:' + oSource.text + ';">' + Lex.Utils.escapeHtml(oSource.label) + '</div>';
+      html += '<div class="bh-row-actions">';
+      html += '<button type="button" class="bh-row-btn" data-overlap-action="open" data-other-id="' + _esc(o.id) + '">Open</button>';
+      html += '<button type="button" class="bh-row-btn bh-row-btn--reject" data-overlap-action="delete" data-other-id="' + _esc(o.id) + '">Delete this overlap</button>';
+      if (canMerge) {
+        html += '<button type="button" class="bh-row-btn" data-overlap-action="merge" data-source-id="' + _esc(entry.id) + '" data-other-id="' + _esc(o.id) + '">Merge into the other</button>';
       }
-
-      html += '<button type="button" class="bh-overlap-jump" data-id="' + Lex.Utils.escapeHtml(o.id) + '" style="flex-shrink:0;padding:0.125rem 0.375rem;font-size:0.65rem;font-weight:600;background:none;color:var(--lex-color-blue-600,#2563eb);border:1px solid var(--lex-color-blue-200,#bfdbfe);border-radius:0.25rem;cursor:pointer;">Jump to</button>';
-
-      html += '<button type="button" class="bh-overlap-resolve" data-source-id="' + Lex.Utils.escapeHtml(entry.id) + '" data-other-id="' + Lex.Utils.escapeHtml(o.id) + '" data-can-merge="' + (canMerge ? '1' : '0') + '" style="flex-shrink:0;padding:0.125rem 0.5rem;font-size:0.65rem;font-weight:600;background:var(--lex-color-amber-100,#fef3c7);color:var(--lex-color-amber-800,#92400e);border:1px solid var(--lex-color-amber-300,#fcd34d);border-radius:0.25rem;cursor:pointer;">Resolve ▾</button>';
-
-      html += '</div>'; // .bh-overlap-item
+      html += '</div></div>';
     }
-    html += '</div>';
-
-    return html;
+    return html + '</div>';
   }
 
-  // Open or close the inline overlap panel for the row whose badge was
-  // clicked. Only one panel is open at a time per row, but multiple rows can
-  // be expanded simultaneously.
-  function _toggleOverlapPanel(entryId) {
-    var listEl = document.getElementById('bhEntriesList');
-    if (!listEl) return;
-    var panel = listEl.querySelector('.bh-overlap-panel[data-for-id="' + cssEscape(entryId) + '"]');
-    if (!panel) return;
-    var entry = _entries.find(function (en) { return en.id === entryId; });
-    if (!entry) return;
-
-    if (panel.style.display === 'none' || panel.style.display === '') {
-      panel.innerHTML = _renderOverlapPanel(entry);
-      panel.style.display = 'block';
-    } else {
-      panel.style.display = 'none';
-      panel.innerHTML = '';
-    }
-  }
-
-  // Smooth-scroll the list to the row identified by entry id and briefly
-  // highlight it so the user can see where they landed.
-  function _jumpToRow(entryId) {
-    var listEl = document.getElementById('bhEntriesList');
-    if (!listEl) return;
-    var row = listEl.querySelector('.bh-entry-row[data-entry-id="' + cssEscape(entryId) + '"]');
-    if (!row) return;
-    if (typeof row.scrollIntoView === 'function') {
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-    var prevBg = row.style.background;
-    row.style.transition = 'background 0.4s';
-    row.style.background = 'var(--lex-color-amber-100,#fef3c7)';
-    setTimeout(function () {
-      row.style.background = prevBg;
-    }, 1200);
-  }
-
-  // Show a small chooser popover for the Resolve button. The popover offers
-  // three actions:
-  //   • Keep both       — close the chooser, no API call (informational)
-  //   • Delete this overlap — POST .../drafts/<otherId>/reject
-  //   • Merge into other  — POST .../drafts/<sourceId>/merge { merge_with_id: otherId }
-  // "Merge" is only offered when both entries are drafts on the same matter.
-  function _showResolveChooser(anchorEl, sourceId, otherId, canMerge) {
-    // Tear down any existing open chooser first.
-    var existing = document.getElementById('bhResolveChooser');
-    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
-
-    var rect = anchorEl.getBoundingClientRect();
-    var pop = document.createElement('div');
-    pop.id = 'bhResolveChooser';
-    pop.style.cssText = [
-      'position:fixed',
-      'top:' + (rect.bottom + 4) + 'px',
-      'left:' + Math.max(8, rect.right - 200) + 'px',
-      'min-width:200px',
-      'background:white',
-      'border:1px solid var(--lex-border-default,#e5e7eb)',
-      'border-radius:0.5rem',
-      'box-shadow:0 8px 24px rgba(0,0,0,0.12)',
-      'z-index:10000',
-      'padding:0.25rem',
-      'font-size:0.8125rem'
-    ].join(';');
-
-    function makeItem(label, danger) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = label;
-      btn.style.cssText = [
-        'display:block',
-        'width:100%',
-        'text-align:left',
-        'padding:0.4rem 0.625rem',
-        'background:none',
-        'border:none',
-        'border-radius:0.25rem',
-        'cursor:pointer',
-        'font-size:0.8125rem',
-        'color:' + (danger ? 'var(--lex-color-red-700,#b91c1c)' : 'var(--lex-text-primary)')
-      ].join(';');
-      btn.addEventListener('mouseover', function () {
-        btn.style.background = danger ? 'var(--lex-color-red-50,#fef2f2)' : 'var(--lex-bg-muted,#f9fafb)';
-      });
-      btn.addEventListener('mouseout', function () { btn.style.background = 'none'; });
-      return btn;
-    }
-
-    var keepBtn = makeItem('Keep both', false);
-    keepBtn.addEventListener('click', function () { closeChooser(); });
-    pop.appendChild(keepBtn);
-
-    var deleteBtn = makeItem('Delete this overlap', true);
-    deleteBtn.addEventListener('click', function () {
-      closeChooser();
-      _resolveDelete(otherId);
+  function _openOverlapDrawer(entryId) {
+    var entry = _entryById(entryId);
+    if (!entry || !Lex.Drawer) return;
+    var drawer = Lex.Drawer.open({
+      heading: 'Resolve overlap',
+      content: _renderOverlapPanel(entry),
+      width: 'md',
+      buttons: []
     });
-    pop.appendChild(deleteBtn);
-
-    if (canMerge) {
-      var mergeBtn = makeItem('Merge into the other', false);
-      mergeBtn.addEventListener('click', function () {
-        closeChooser();
-        _resolveMerge(sourceId, otherId);
-      });
-      pop.appendChild(mergeBtn);
-    }
-
-    function closeChooser() {
-      if (pop.parentNode) pop.parentNode.removeChild(pop);
-      document.removeEventListener('click', outsideHandler, true);
-    }
-    function outsideHandler(ev) {
-      if (!pop.contains(ev.target)) closeChooser();
-    }
-    // Defer attaching the outside-click handler until the current click event
-    // has finished propagating, otherwise we'd close immediately.
-    setTimeout(function () {
-      document.addEventListener('click', outsideHandler, true);
-    }, 0);
-
-    document.body.appendChild(pop);
+    var root = (drawer && drawer.addEventListener) ? drawer : document;
+    var handler = function (ev) {
+      var btn = ev.target && ev.target.closest ? ev.target.closest('[data-overlap-action]') : null;
+      if (!btn) return;
+      var action = btn.getAttribute('data-overlap-action');
+      var otherId = btn.getAttribute('data-other-id');
+      root.removeEventListener('click', handler);
+      if (Lex.Drawer.close) Lex.Drawer.close();
+      if (action === 'open') {
+        var other = _entryById(otherId);
+        if (other) _openEntryModal(other);
+      } else if (action === 'delete') {
+        _resolveDelete(otherId);
+      } else if (action === 'merge') {
+        _resolveMerge(btn.getAttribute('data-source-id'), otherId);
+      }
+    };
+    root.addEventListener('click', handler);
   }
 
   function _resolveDelete(entryId) {
     api.post('/api/v1/billable-hours/drafts/' + entryId + '/reject')
       .then(function () {
         if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Overlapping entry deleted');
-        delete _selectedIds[entryId];
         _refresh();
       })
       .catch(function (err) {
@@ -532,180 +598,6 @@
       });
   }
 
-  // Minimal CSS attribute-selector escaper. UUIDs don't need escaping but
-  // we guard against unexpected characters to keep querySelector safe.
-  function cssEscape(s) {
-    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(s);
-    return String(s).replace(/[^a-zA-Z0-9_-]/g, function (c) { return '\\' + c; });
-  }
-
-  function _getStatusColor(status) {
-    var map = {
-      draft: { bg: 'var(--lex-color-amber-50,#fffbeb)', text: 'var(--lex-color-amber-700,#b45309)' },
-      submitted: { bg: 'var(--lex-color-blue-50,#eff6ff)', text: 'var(--lex-color-blue-700,#1d4ed8)' },
-      approved: { bg: 'var(--lex-color-green-50,#f0fdf4)', text: 'var(--lex-color-green-700,#15803d)' },
-      invoiced: { bg: 'var(--lex-color-purple-50,#faf5ff)', text: 'var(--lex-color-purple-700,#7e22ce)' }
-    };
-    return map[status] || map.draft;
-  }
-
-  // Source-of-row badge: 'activity' rows came from the incremental writer,
-  // 'manual' rows from a user-created entry, 'imported' from a connector
-  // ingest. Returns null for unknown values so the UI quietly degrades.
-  function _getSourceBadge(source) {
-    var map = {
-      activity: { label: 'Auto',     title: 'Auto-tracked from activity',           bg: 'var(--lex-bg-muted,#f3f4f6)',          text: 'var(--lex-text-muted,#6b7280)' },
-      manual:   { label: 'Manual',   title: 'Manually entered by user',             bg: 'var(--lex-color-blue-50,#eff6ff)',     text: 'var(--lex-color-blue-700,#1d4ed8)' },
-      imported: { label: 'Imported', title: 'Imported from external system',        bg: 'var(--lex-color-purple-50,#faf5ff)',   text: 'var(--lex-color-purple-700,#7e22ce)' }
-    };
-    return map[source] || null;
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Pagination
-  // ═══════════════════════════════════════════════════════════════
-
-  function _renderPagination(total) {
-    var container = document.getElementById('bhPagination');
-    if (!container) return;
-
-    if (!total || _totalPages <= 1) {
-      container.innerHTML = '';
-      return;
-    }
-
-    var html = '<div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;font-size:0.8125rem;color:var(--lex-text-muted);">';
-    html += '<span>Showing ' + ((_currentPage - 1) * _pageSize + 1) + '-' + Math.min(_currentPage * _pageSize, total) + ' of ' + total + '</span>';
-    html += '<div style="display:flex;gap:0.25rem;">';
-
-    if (_currentPage > 1) {
-      html += '<button class="bh-page-btn" data-page="' + (_currentPage - 1) + '" style="padding:0.25rem 0.625rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.25rem;cursor:pointer;font-size:0.8125rem;background:white;">Prev</button>';
-    }
-
-    var startPage = Math.max(1, _currentPage - 2);
-    var endPage = Math.min(_totalPages, _currentPage + 2);
-    for (var p = startPage; p <= endPage; p++) {
-      var active = p === _currentPage;
-      html += '<button class="bh-page-btn" data-page="' + p + '" style="padding:0.25rem 0.625rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.25rem;cursor:pointer;font-size:0.8125rem;' + (active ? 'background:var(--lex-color-blue-600,#2563eb);color:white;border-color:var(--lex-color-blue-600,#2563eb);' : 'background:white;') + '">' + p + '</button>';
-    }
-
-    if (_currentPage < _totalPages) {
-      html += '<button class="bh-page-btn" data-page="' + (_currentPage + 1) + '" style="padding:0.25rem 0.625rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.25rem;cursor:pointer;font-size:0.8125rem;background:white;">Next</button>';
-    }
-
-    html += '</div></div>';
-    container.innerHTML = html;
-
-    // Wire page buttons
-    var btns = container.querySelectorAll('.bh-page-btn');
-    for (var bi = 0; bi < btns.length; bi++) {
-      btns[bi].addEventListener('click', function (e) {
-        _currentPage = parseInt(e.target.getAttribute('data-page'));
-        _loadEntries({ matter_id: _matterId });
-      });
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Entry Actions (approve, reject, click to edit, checkboxes)
-  // ═══════════════════════════════════════════════════════════════
-
-  function _wireEntryActions() {
-    var listEl = document.getElementById('bhEntriesList');
-    if (!listEl) return;
-
-    // Remove old listeners by cloning
-    var newList = listEl.cloneNode(true);
-    listEl.parentNode.replaceChild(newList, listEl);
-
-    newList.addEventListener('click', function (e) {
-      var approveBtn = e.target.closest('.bh-approve-btn');
-      if (approveBtn) {
-        e.stopPropagation();
-        _approveEntry(approveBtn.getAttribute('data-id'));
-        return;
-      }
-
-      var rejectBtn = e.target.closest('.bh-reject-btn');
-      if (rejectBtn) {
-        e.stopPropagation();
-        _confirmReject(rejectBtn.getAttribute('data-id'));
-        return;
-      }
-
-      // Overlap badge → toggle inline panel beneath this row.
-      var overlapBadge = e.target.closest('.bh-overlap-badge');
-      if (overlapBadge) {
-        e.stopPropagation();
-        _toggleOverlapPanel(overlapBadge.getAttribute('data-id'));
-        return;
-      }
-
-      // "Jump to" link inside an overlap panel → scroll/highlight the other row.
-      var jumpBtn = e.target.closest('.bh-overlap-jump');
-      if (jumpBtn) {
-        e.stopPropagation();
-        _jumpToRow(jumpBtn.getAttribute('data-id'));
-        return;
-      }
-
-      // "Resolve ▾" → open the chooser popover for this overlap pair.
-      var resolveBtn = e.target.closest('.bh-overlap-resolve');
-      if (resolveBtn) {
-        e.stopPropagation();
-        _showResolveChooser(
-          resolveBtn,
-          resolveBtn.getAttribute('data-source-id'),
-          resolveBtn.getAttribute('data-other-id'),
-          resolveBtn.getAttribute('data-can-merge') === '1'
-        );
-        return;
-      }
-
-      // Clicks inside an open overlap panel shouldn't bubble up to "open
-      // detail modal" — the panel is supposed to be a quiet inline UI.
-      if (e.target.closest('.bh-overlap-panel')) {
-        e.stopPropagation();
-        return;
-      }
-
-      // Click on row → open detail modal
-      var row = e.target.closest('.bh-entry-row');
-      if (row) {
-        var entryId = row.getAttribute('data-entry-id');
-        var entry = _entries.find(function (en) { return en.id === entryId; });
-        if (entry) _openEntryModal(entry);
-      }
-    });
-
-    // Wire checkboxes
-    newList.addEventListener('change', function (e) {
-      if (e.target.classList.contains('bh-entry-checkbox')) {
-        var id = e.target.getAttribute('data-id');
-        if (e.target.checked) {
-          _selectedIds[id] = true;
-        } else {
-          delete _selectedIds[id];
-        }
-        _updateBulkActionsVisibility();
-      }
-
-      if (e.target.id === 'bhSelectAll') {
-        var checkboxes = newList.querySelectorAll('.bh-entry-checkbox');
-        for (var ci = 0; ci < checkboxes.length; ci++) {
-          checkboxes[ci].checked = e.target.checked;
-          var cid = checkboxes[ci].getAttribute('data-id');
-          if (e.target.checked) {
-            _selectedIds[cid] = true;
-          } else {
-            delete _selectedIds[cid];
-          }
-        }
-        _updateBulkActionsVisibility();
-      }
-    });
-  }
-
   function _approveEntry(entryId) {
     api.post('/api/v1/billable-hours/drafts/' + entryId + '/approve')
       .then(function () {
@@ -718,25 +610,19 @@
   }
 
   function _confirmReject(entryId) {
-    if (typeof Lex !== 'undefined' && Lex.Modal && Lex.Modal.confirm) {
-      Lex.Modal.confirm({
-        heading: 'Reject Entry',
-        message: 'Are you sure you want to reject this time entry? This action cannot be undone.',
-        confirmLabel: 'Reject',
-        confirmVariant: 'danger'
-      }).then(function (confirmed) {
-        if (confirmed) _rejectEntry(entryId);
-      });
-    } else {
-      _rejectEntry(entryId);
-    }
+    Lex.Modal.confirm(
+      'Reject entry',
+      'Reject this time entry? This action cannot be undone.',
+      function () { _rejectEntry(entryId); },
+      { variant: 'danger', confirmText: 'Reject' }
+    );
   }
 
   function _rejectEntry(entryId) {
     api.post('/api/v1/billable-hours/drafts/' + entryId + '/reject')
       .then(function () {
         if (typeof Lex !== 'undefined' && Lex.Toast) Lex.Toast.success('Entry rejected');
-        delete _selectedIds[entryId];
+        if (Lex.Drawer && document.querySelector && document.querySelector('lex-drawer')) Lex.Drawer.close();
         _refresh();
       })
       .catch(function () {
@@ -745,54 +631,48 @@
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Bulk Actions
+  // Bulk Actions (lex-table selectable + bulk-actions)
   // ═══════════════════════════════════════════════════════════════
 
-  function _wireBulkActions() {
-    var bulkApproveBtn = document.getElementById('bhBulkApproveBtn');
-    if (bulkApproveBtn && !bulkApproveBtn._bhWired) {
-      bulkApproveBtn._bhWired = true;
-      bulkApproveBtn.addEventListener('click', function () {
-        _bulkAction('approve');
-      });
-    }
-
-    var bulkRejectBtn = document.getElementById('bhBulkRejectBtn');
-    if (bulkRejectBtn && !bulkRejectBtn._bhWired) {
-      bulkRejectBtn._bhWired = true;
-      bulkRejectBtn.addEventListener('click', function () {
-        if (typeof Lex !== 'undefined' && Lex.Modal && Lex.Modal.confirm) {
-          Lex.Modal.confirm({
-            heading: 'Reject Selected Entries',
-            message: 'Are you sure you want to reject ' + Object.keys(_selectedIds).length + ' entries? This cannot be undone.',
-            confirmLabel: 'Reject All',
-            confirmVariant: 'danger'
-          }).then(function (confirmed) {
-            if (confirmed) _bulkAction('reject');
-          });
-        } else {
-          _bulkAction('reject');
-        }
-      });
-    }
+  // Only drafts can be approved or rejected; other selected rows are skipped.
+  function _draftIds(items) {
+    return (items || []).filter(function (row) { return row && row.status === 'draft'; })
+      .map(function (row) { return row.id; });
   }
 
-  function _bulkAction(action) {
-    var ids = Object.keys(_selectedIds);
-    if (ids.length === 0) return;
+  function _confirmBulkReject(items) {
+    var ids = _draftIds(items);
+    if (ids.length === 0) {
+      if (Lex.Toast) Lex.Toast.info('Only draft entries can be rejected');
+      return;
+    }
+    Lex.Modal.confirm(
+      'Reject selected entries',
+      'Reject ' + ids.length + ' draft ' + (ids.length === 1 ? 'entry' : 'entries') + '? This cannot be undone.',
+      function () { _bulkAction('reject', items); },
+      { variant: 'danger', confirmText: 'Reject all' }
+    );
+  }
+
+  function _bulkAction(action, items) {
+    var ids = _draftIds(items);
+    var skipped = (items || []).length - ids.length;
+    if (ids.length === 0) {
+      if (Lex.Toast) Lex.Toast.info('Only draft entries can be ' + (action === 'approve' ? 'approved' : 'rejected'));
+      return;
+    }
 
     var completed = 0;
     var failed = 0;
-    var total = ids.length;
 
     function processNext(idx) {
       if (idx >= ids.length) {
-        _selectedIds = {};
         if (typeof Lex !== 'undefined' && Lex.Toast) {
+          var tail = skipped > 0 ? ' (' + skipped + ' not drafts, skipped)' : '';
           if (failed > 0) {
-            Lex.Toast.warning(completed + ' ' + action + 'd, ' + failed + ' failed');
+            Lex.Toast.warning(completed + ' ' + action + 'd, ' + failed + ' failed' + tail);
           } else {
-            Lex.Toast.success(completed + ' entr' + (completed !== 1 ? 'ies' : 'y') + ' ' + action + 'd');
+            Lex.Toast.success(completed + ' entr' + (completed !== 1 ? 'ies' : 'y') + ' ' + action + 'd' + tail);
           }
         }
         _refresh();
@@ -809,13 +689,6 @@
     }
 
     processNext(0);
-  }
-
-  function _updateBulkActionsVisibility() {
-    var bulkEl = document.getElementById('bhBulkActions');
-    if (!bulkEl) return;
-    var count = Object.keys(_selectedIds).length;
-    bulkEl.style.display = count > 0 ? 'flex' : 'none';
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -840,7 +713,7 @@
       html += '<div style="font-size:2rem;font-weight:700;color:var(--lex-color-blue-700,#1d4ed8);">' + hours + 'h</div>';
     }
     html += '<div>';
-    html += '<div style="font-size:0.875rem;font-weight:600;color:var(--lex-text-primary);">' + Lex.Utils.escapeHtml(entry.activity_type || 'general') + '</div>';
+    html += '<div style="font-size:0.875rem;font-weight:600;color:var(--lex-text-primary);">' + Lex.Utils.escapeHtml(_label(entry.activity_type || 'general')) + '</div>';
     html += '<div style="font-size:0.75rem;color:var(--lex-text-muted);">' + Lex.Utils.escapeHtml(date) + '</div>';
     html += '</div>';
     html += '</div>';
@@ -863,11 +736,11 @@
     // Details grid — rate becomes editable when entry is owner-editable
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">';
     var fields = [
-      { label: 'Status', value: entry.status },
+      { label: 'Status', value: _label(entry.status || 'draft') },
       { label: 'Billing Code', value: entry.billing_code || '-' },
       { label: 'Duration', value: entry.duration_minutes + ' minutes (' + hours + 'h)' },
       { label: 'Billable', value: entry.is_billable ? 'Yes' : 'No' },
-      { label: 'Source', value: entry.source || 'manual' }
+      { label: 'Source', value: SOURCE_LABELS[entry.source || 'manual'] || _label(entry.source) }
     ];
     for (var fi = 0; fi < fields.length; fi++) {
       var f = fields[fi];
@@ -909,14 +782,11 @@
       if (mergeTargets.length > 0) {
         html += '<div style="display:flex;align-items:center;gap:0.25rem;">';
         html += '<span style="font-size:0.75rem;color:var(--lex-color-blue-600);">Merge with:</span>';
-        html += '<select id="bhMergeTarget" style="font-size:0.75rem;padding:0.125rem 0.25rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.25rem;">';
-        for (var mi = 0; mi < mergeTargets.length; mi++) {
-          var mt = mergeTargets[mi];
+        var mergeOptions = mergeTargets.map(function (mt) {
           var mtHours = ((mt.duration_minutes || 0) / 60).toFixed(1);
-          var mtLabel = mtHours + 'h — ' + (mt.activity_type || 'general');
-          html += '<option value="' + mt.id + '">' + Lex.Utils.escapeHtml(mtLabel) + '</option>';
-        }
-        html += '</select>';
+          return { value: String(mt.id), label: mtHours + 'h — ' + _label(mt.activity_type || 'general') };
+        });
+        html += '<lex-select id="bhMergeTarget" options=\'' + Lex.Utils.escapeHtml(JSON.stringify(mergeOptions)) + '\' value="' + Lex.Utils.escapeHtml(mergeOptions[0].value) + '"></lex-select>';
         html += '<button id="bhMergeBtn" style="font-size:0.75rem;color:var(--lex-color-blue-600);cursor:pointer;background:none;border:none;padding:0;font-weight:600;">Merge</button>';
         html += '</div>';
       }
@@ -953,7 +823,7 @@
     }
 
     Lex.Drawer.open({
-      heading: 'Time Entry — ' + hours + 'h ' + Lex.Utils.escapeHtml(entry.activity_type || ''),
+      heading: 'Time Entry — ' + hours + 'h ' + _label(entry.activity_type || ''),
       content: html,
       width: 'lg',
       buttons: buttons
@@ -1297,14 +1167,15 @@
     // Activity type
     html += '<div>';
     html += '<label style="' + labelStyle + '">Activity Type</label>';
-    html += '<select id="manualEntryType" style="' + inputStyle + '">';
-    html += '<option value="general">General</option>';
-    html += '<option value="research">Research</option>';
-    html += '<option value="review">Review</option>';
-    html += '<option value="drafting">Drafting</option>';
-    html += '<option value="communication">Communication</option>';
-    html += '<option value="case_management">Case Management</option>';
-    html += '</select>';
+    var typeOptions = [
+      { value: 'general', label: 'General' },
+      { value: 'research', label: 'Research' },
+      { value: 'review', label: 'Review' },
+      { value: 'drafting', label: 'Drafting' },
+      { value: 'communication', label: 'Communication' },
+      { value: 'case_management', label: 'Case management' }
+    ];
+    html += '<lex-select id="manualEntryType" options=\'' + Lex.Utils.escapeHtml(JSON.stringify(typeOptions)) + '\' value="general"></lex-select>';
     html += '</div>';
 
     // Two-column row for billing code + rate
@@ -1500,4 +1371,16 @@
     return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // Pure table logic, exposed for unit tests.
+  window.WorkspaceBillableHoursTable = {
+    draftsUrl: draftsUrl,
+    fetchAllEntries: fetchAllEntries,
+    entryRow: entryRow,
+    entryRenderers: entryRenderers,
+    entryFilters: entryFilters,
+    draftIds: _draftIds,
+    DRAFTS_PAGE_SIZE: DRAFTS_PAGE_SIZE
+  };
+
 })();
+

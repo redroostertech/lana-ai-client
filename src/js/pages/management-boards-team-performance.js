@@ -227,22 +227,6 @@ class TeamPerformanceBoard {
         </div>
       </div>
 
-      <!-- User Drill-Down Modal -->
-      <div id="user-drilldown-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-          <div class="flex items-center justify-between p-6 border-b flex-shrink-0">
-            <h3 id="modal-user-name" class="text-2xl font-bold text-gray-900"></h3>
-            <button id="close-modal-btn" class="text-gray-500 hover:text-gray-700 transition">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
-          </div>
-          <div id="modal-content" class="flex-1 overflow-y-auto p-6">
-            <!-- User session timeline will be rendered here -->
-          </div>
-        </div>
-      </div>
     `;
 
     // Render sub-components
@@ -477,77 +461,82 @@ class TeamPerformanceBoard {
   }
 
   /**
-   * Render leaderboard table
+   * Render the contributors table: client-side lex-table over the ranked
+   * top_users the analytics API returns (docs/TABLE-STANDARD.md).
    */
   renderLeaderboard(topContributors) {
     const container = document.getElementById('leaderboard-container');
     if (!container) return;
-
-    if (!topContributors || topContributors.length === 0) {
-      container.innerHTML = `
-        <div class="p-8 text-center text-gray-500">
-          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-          </svg>
-          <p class="text-lg font-medium">No contributor data available</p>
-        </div>
-      `;
-      return;
-    }
+    const table = TeamPerformanceBoard.contributorsTable;
+    const rows = (topContributors || []).map(table.mapContributor);
 
     container.innerHTML = `
-      <table class="w-full">
-        <thead class="bg-gray-50 border-b border-gray-200">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sessions</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Time</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Duration</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          ${topContributors.map((user, index) => `
-            <tr class="hover:bg-gray-50 transition">
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full ${
-                  index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                  index === 1 ? 'bg-gray-100 text-gray-800' :
-                  index === 2 ? 'bg-orange-100 text-orange-800' :
-                  'bg-gray-50 text-gray-600'
-                } font-semibold text-sm">
-                  ${index + 1}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center">
-                  <div class="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-semibold mr-3">
-                    ${user.userName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div class="text-sm font-medium text-gray-900">${user.userName}</div>
-                    <div class="text-sm text-gray-500">${user.userEmail || ''}</div>
-                  </div>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${user.sessionCount}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDuration(user.totalActiveTime)}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDuration(user.avgSessionDuration)}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm">
-                <button
-                  class="text-indigo-600 hover:text-indigo-800 font-medium view-details-btn"
-                  data-user-id="${user.userId}"
-                  data-user-name="${user.userName}"
-                >
-                  View Details →
-                </button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      <style>
+        /* User, Email, Sessions, Avg session, Last active */
+        #teamContributorsTable table { min-width: 820px; }
+        #teamContributorsTable th { white-space: nowrap; }
+        #teamContributorsTable th:nth-child(2) { width: 28%; }
+        #teamContributorsTable th:nth-child(3) { width: 110px; }
+        #teamContributorsTable th:nth-child(4) { width: 130px; }
+        #teamContributorsTable th:nth-child(5) { width: 176px; }
+      </style>
+      <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and sort contributors">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="teamContributorsSearch" placeholder="Search contributors..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+            <lex-select id="teamContributorsSort" options='[{"value":"session_count","label":"Sessions"},{"value":"name","label":"User"},{"value":"email","label":"Email"},{"value":"avg_session_seconds","label":"Avg session"},{"value":"last_active_at","label":"Last active"}]' value="session_count"></lex-select>
+          </div>
+          <lex-btn id="teamContributorsSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div id="teamContributorsCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+        </div>
+      </div>
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="admin-table-section-title text-lg font-semibold">Contributors</h4>
+        <span id="teamContributorsSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+      </div>
+      <lex-table
+        id="teamContributorsTable"
+        class="admin-table lex-table--card"
+        column-filters
+        columns="name,email,session_count,avg_session_seconds,last_active_at"
+        labels="User,Email,Sessions,Avg session,Last active"
+        sort-by="session_count"
+        sort-dir="desc"
+        limit="20"
+        id-key="id"
+        empty-text="No contributor data for this period"
+        aria-label="Top contributors"
+      ></lex-table>
     `;
+
+    const el = document.getElementById('teamContributorsTable');
+    const kit = window.AdminTableKit;
+    if (!el || !kit) return;
+    kit.whenTableReady().then(() => {
+      if (document.getElementById('teamContributorsTable') !== el) return;
+      el.setCellRenderers(table.cellRenderers(this));
+      el.setColumnFilterOptions(table.filterOptions());
+      kit.bindToolbar({
+        table: el,
+        searchId: 'teamContributorsSearch',
+        sortId: 'teamContributorsSort',
+        orderId: 'teamContributorsSortOrder',
+        countIds: ['teamContributorsCount', 'teamContributorsSectionCount'],
+        noun: ['contributor', 'contributors']
+      });
+      el.addEventListener('row-click', (e) => {
+        const row = e.detail && e.detail.row;
+        if (row && row.id) this.showUserDrillDown(row.id, row.name);
+      });
+      el.setData(rows);
+    });
   }
 
   /**
@@ -573,80 +562,55 @@ class TeamPerformanceBoard {
         await this.refresh();
       });
     }
-
-    // View details buttons
-    document.querySelectorAll('.view-details-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const userId = e.currentTarget.dataset.userId;
-        const userName = e.currentTarget.dataset.userName;
-        await this.showUserDrillDown(userId, userName);
-      });
-    });
-
-    // Close modal button
-    const closeModalBtn = document.getElementById('close-modal-btn');
-    if (closeModalBtn) {
-      closeModalBtn.addEventListener('click', () => {
-        this.hideUserDrillDown();
-      });
-    }
-
-    // Close modal on backdrop click
-    const drilldownModal = document.getElementById('user-drilldown-modal');
-    if (drilldownModal) {
-      drilldownModal.addEventListener('click', (e) => {
-        if (e.target.id === 'user-drilldown-modal') {
-          this.hideUserDrillDown();
-        }
-      });
-    }
   }
 
   /**
-   * Show user drill-down modal
+   * Show a contributor's sessions in a lex-modal.
    */
   async showUserDrillDown(userId, userName) {
-    try {
-      const modal = document.getElementById('user-drilldown-modal');
-      const modalContent = document.getElementById('modal-content');
-      const modalUserName = document.getElementById('modal-user-name');
-
-      // Show modal with loading state
-      modal.classList.remove('hidden');
-      modalUserName.textContent = userName;
-      modalContent.innerHTML = `
-        <div class="text-center py-12">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-indigo-600 mx-auto"></div>
-          <p class="text-gray-600 mt-4">Loading session details...</p>
+    this.hideUserDrillDown();
+    const modal = Lex.Modal.open({
+      heading: userName || 'Contributor',
+      size: 'lg',
+      content: `
+        <div data-tp-drilldown>
+          <div class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-indigo-600 mx-auto"></div>
+            <p class="text-gray-600 mt-4">Loading session details...</p>
+          </div>
         </div>
-      `;
+      `
+    });
+    // Above the full-screen Team Performance overlay (z-50).
+    if (modal && modal.style) modal.style.setProperty('--lex-z-modal', '60');
+    this.drilldownModal = modal;
+    const body = () => (modal && modal.querySelector ? modal.querySelector('[data-tp-drilldown]') : null);
 
-      // Fetch user session details
+    try {
       const userAnalytics = await SessionTrackingService.getTeamAnalytics(this.options.dateRange, userId);
-
-      // Render session timeline
-      this.renderUserSessionTimeline(modalContent, userAnalytics);
+      const target = body();
+      if (target) this.renderUserSessionTimeline(target, userAnalytics);
     } catch (error) {
       console.error('[TeamPerformanceBoard] Failed to load user details:', error);
-      const modalContent = document.getElementById('modal-content');
-      modalContent.innerHTML = `
-        <div class="text-center py-12">
-          <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          <p class="text-red-600 font-medium">Failed to load user details</p>
-          <p class="text-gray-600 text-sm mt-2">${error.message}</p>
-        </div>
-      `;
+      const target = body();
+      if (target) {
+        target.innerHTML = `
+          <div class="text-center py-12">
+            <p class="text-red-600 font-medium">Failed to load user details</p>
+            <p class="text-gray-600 text-sm mt-2">${TeamPerformanceBoard.contributorsTable.esc(error.message || '')}</p>
+          </div>
+        `;
+      }
     }
   }
 
   /**
-   * Hide user drill-down modal
+   * Close the contributor modal.
    */
   hideUserDrillDown() {
-    const modal = document.getElementById('user-drilldown-modal');
-    modal.classList.add('hidden');
+    const modal = this.drilldownModal;
+    this.drilldownModal = null;
+    if (modal && modal.isConnected) modal.open = false;
   }
 
   /**
@@ -693,7 +657,7 @@ class TeamPerformanceBoard {
               <div class="border-l-4 border-indigo-500 bg-gray-50 p-4 rounded-r-lg">
                 <div class="flex justify-between items-start mb-2">
                   <div>
-                    <div class="font-semibold text-gray-900">${formatDateTime(session.startedAt)}</div>
+                    <div class="font-semibold text-gray-900">${TeamPerformanceBoard.contributorsTable.esc(Lex.Utils.formatDateTime(session.startedAt))}</div>
                     <div class="text-sm text-gray-600">Duration: ${this.formatDuration(session.duration || 0)}</div>
                   </div>
                   <span class="px-3 py-1 rounded-full text-xs font-medium ${
@@ -701,13 +665,13 @@ class TeamPerformanceBoard {
                     session.endReason === 'timeout' ? 'bg-yellow-100 text-yellow-800' :
                     'bg-gray-100 text-gray-800'
                   }">
-                    ${session.endReason || 'Active'}
+                    ${TeamPerformanceBoard.contributorsTable.esc(Lex.Utils.humanizeLabel(session.endReason || 'active'))}
                   </span>
                 </div>
                 ${session.matterContext ? `
                   <div class="mt-3 bg-white p-3 rounded border border-gray-200">
                     <div class="text-sm font-medium text-gray-700 mb-1">Matter Context:</div>
-                    <div class="text-sm text-gray-900">${session.matterContext.matterName || session.matterContext.matterId}</div>
+                    <div class="text-sm text-gray-900">${TeamPerformanceBoard.contributorsTable.esc(session.matterContext.matterName || session.matterContext.matterId)}</div>
                   </div>
                 ` : ''}
               </div>
@@ -761,6 +725,7 @@ class TeamPerformanceBoard {
    */
   destroy() {
     this.stopAutoRefresh();
+    this.hideUserDrillDown();
 
     // Destroy chart instances
     Object.values(this.chartInstances).forEach(chart => chart.destroy());
@@ -794,4 +759,88 @@ class TeamPerformanceBoard {
     };
     return icons[iconName] || '';
   }
+}
+
+/**
+ * Contributors table logic (pure, exposed for unit tests as
+ * window.TeamContributorsTable). Rows keep raw values; renderers format.
+ */
+TeamPerformanceBoard.contributorsTable = (function () {
+  const DASH = '—';
+
+  // Sessions and Avg session ranges: min inclusive, max exclusive.
+  const SESSION_RANGES = [
+    { value: '1-9', label: '1 to 9', min: 1, max: 10 },
+    { value: '10-49', label: '10 to 49', min: 10, max: 50 },
+    { value: '50+', label: '50 or more', min: 50, max: null }
+  ];
+  const DURATION_RANGES = [
+    { value: 'lt5m', label: 'Under 5 minutes', min: 0, max: 300 },
+    { value: '5-30m', label: '5 to 30 minutes', min: 300, max: 1800 },
+    { value: '30-60m', label: '30 to 60 minutes', min: 1800, max: 3600 },
+    { value: 'gt1h', label: 'Over 1 hour', min: 3600, max: null }
+  ];
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  function inRange(ranges, cell, values) {
+    const range = ranges.find(r => r.value === String(values && values[0]));
+    if (!range) return true;
+    const n = Number(cell);
+    if (!Number.isFinite(n)) return false;
+    return n >= range.min && (range.max === null || n < range.max);
+  }
+
+  function mapContributor(user) {
+    const u = user || {};
+    const name = String(u.userName || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || '');
+    return {
+      id: String(u.userId || u.user_id || ''),
+      name,
+      email: String(u.email || u.userEmail || ''),
+      session_count: Number(u.sessionsCount != null ? u.sessionsCount : (u.session_count || 0)) || 0,
+      avg_session_seconds: Number(u.avgSessionDuration != null ? u.avgSessionDuration : (u.avg_session_duration_seconds || 0)) || 0,
+      last_active_at: u.lastActiveAt || u.last_active_at || '',
+      _raw: u
+    };
+  }
+
+  function cellRenderers(board) {
+    const kit = window.AdminTableKit;
+    const duration = (s) => (board && typeof board.formatDuration === 'function') ? board.formatDuration(s) : String(s);
+    return {
+      name: (val) => kit.nameCell(val || DASH),
+      email: (val) => val ? '<span class="admin-table-text" title="' + kit.esc(val) + '">' + kit.esc(val) + '</span>' : kit.muted(''),
+      session_count: (val) => '<span class="admin-table-text">' + kit.esc(String(Number(val) || 0)) + '</span>',
+      avg_session_seconds: (val) => '<span class="admin-table-text">' + kit.esc(duration(Number(val) || 0)) + '</span>',
+      last_active_at: (val) => kit.relativeCell(val)
+    };
+  }
+
+  function filterOptions() {
+    const ranges = window.LanaLibraryColumnFilters;
+    const plain = (list) => list.map(r => ({ value: r.value, label: r.label }));
+    return {
+      name: { text: true, placeholder: 'Name contains...' },
+      email: { text: true, placeholder: 'Email contains...' },
+      session_count: { single: true, options: plain(SESSION_RANGES), match: (cell, values) => inRange(SESSION_RANGES, cell, values) },
+      avg_session_seconds: { single: true, options: plain(DURATION_RANGES), match: (cell, values) => inRange(DURATION_RANGES, cell, values) },
+      last_active_at: {
+        single: true,
+        options: ranges ? ranges.EDITED_RANGE_OPTIONS : [],
+        match: (cell, values) => (ranges ? ranges.inEditedRange(cell, values[0]) : true)
+      }
+    };
+  }
+
+  return { esc, mapContributor, cellRenderers, filterOptions, SESSION_RANGES, DURATION_RANGES };
+})();
+
+if (typeof window !== 'undefined') {
+  window.TeamPerformanceBoard = TeamPerformanceBoard;
+  window.TeamContributorsTable = TeamPerformanceBoard.contributorsTable;
 }

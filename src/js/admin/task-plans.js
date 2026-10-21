@@ -15,8 +15,23 @@
     editingPlanId: null,
     editingItemIndex: null,
     unavailable: false,
-    loading: false
+    loading: false,
+    reopenDrawer: false,
+    loadGen: 0
   };
+
+  var TABLE_ID = 'taskPlansTable';
+
+  // GET /api/v1/task-plans caps one request at 100 rows and pages by an
+  // updated_at cursor (no total, no offset), so the page walks the cursor
+  // until hasMore is false and gives the table the whole set (client mode).
+  var PAGE_SIZE = 100;
+
+  var PLAN_STATUSES = ['draft', 'published', 'archived'];
+
+  var SOURCE_TYPE_LABELS = { manual: 'Manual', lana_draft: 'Lana draft' };
+
+  var toolbar = null;
 
   function el(id) {
     return document.getElementById(id);
@@ -34,10 +49,6 @@
 
   function esc(value) {
     return Lex.Utils.escapeHtml(value === null || value === undefined ? '' : String(value));
-  }
-
-  function formatDate(value) {
-    return value ? Lex.Utils.formatDate(value) : '-';
   }
 
   function normalizePlans(response) {
@@ -104,8 +115,7 @@
   }
 
   function statusLabel(status) {
-    if (status === 'in_review') return 'In Review';
-    return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Draft';
+    return status ? Lex.Utils.humanizeLabel(status) : 'Draft';
   }
 
   function planTitle(plan) {
@@ -273,36 +283,240 @@
     console.warn('[TaskPlans] Service unavailable:', error && error.message);
   }
 
+  // --- Plans table (docs/TABLE-STANDARD.md) ------------------------------
+
+  function kit() {
+    return window.AdminTableKit;
+  }
+
+  function planMatterId(plan) {
+    return (plan && (plan.matter_id || (plan.metadata && plan.metadata.source_matter_id))) || '';
+  }
+
+  // Assigned to: 'organization', 'unassigned' or the target user's id.
+  function planAssignedValue(plan) {
+    var target = planTarget(plan);
+    if (target.type === 'organization') return 'organization';
+    if (target.type === 'user' && target.user_id) return String(target.user_id);
+    return 'unassigned';
+  }
+
+  function assignedLabel(value) {
+    if (!value || value === 'unassigned') return 'Unassigned';
+    if (value === 'organization') return 'Entire organization';
+    return userLabelById(value);
+  }
+
+  function sourceTypeLabel(value) {
+    if (!value) return '';
+    return SOURCE_TYPE_LABELS[value] || Lex.Utils.humanizeLabel(value);
+  }
+
+  /** One table row per plan: raw values, the record as _raw. */
+  function mapPlan(plan) {
+    var itemCount = plan.item_count !== undefined && plan.item_count !== null
+      ? Number(plan.item_count)
+      : planItems(plan).length;
+    return {
+      id: String(getPlanId(plan) || ''),
+      title: planTitle(plan),
+      description: plan.description || '',
+      status: getPlanStatus(plan),
+      source_type: String(plan.source_type || ''),
+      workspace: String(planMatterId(plan)),
+      item_count: Number.isFinite(itemCount) ? itemCount : 0,
+      assigned: planAssignedValue(plan),
+      created_at: plan.created_at || '',
+      updated_at: plan.updated_at || '',
+      _raw: plan
+    };
+  }
+
+  function cellRenderers() {
+    var k = kit();
+    return {
+      title: function (val) { return k.nameCell(val); },
+      status: function (val) { return k.badge(statusLabel(val), statusBadgeColor(val)); },
+      source_type: function (val) {
+        return val ? '<span class="admin-table-text">' + esc(sourceTypeLabel(val)) + '</span>' : k.muted('');
+      },
+      // The list API returns the scope's matter id only (no name).
+      workspace: function (val) { return val ? k.matterLink(val, val) : k.muted(''); },
+      item_count: function (val) { return '<span class="admin-table-text">' + esc(Number(val) || 0) + '</span>'; },
+      assigned: function (val) {
+        return '<span class="admin-table-text" title="' + esc(assignedLabel(val)) + '">' + esc(assignedLabel(val)) + '</span>';
+      },
+      created_at: function (val) { return k.timeCell(val); },
+      updated_at: function (val) { return k.relativeCell(val); }
+    };
+  }
+
+  var ITEM_COUNT_RANGES = [
+    { value: '0', label: 'No items', min: 0, max: 1 },
+    { value: '1-5', label: '1 to 5', min: 1, max: 6 },
+    { value: '6-20', label: '6 to 20', min: 6, max: 21 },
+    { value: '21+', label: 'More than 20', min: 21, max: Infinity }
+  ];
+
+  function inCountRange(cell, value) {
+    var range = ITEM_COUNT_RANGES.filter(function (r) { return r.value === value; })[0];
+    var n = Number(cell);
+    if (!range || !Number.isFinite(n)) return false;
+    return n >= range.min && n < range.max;
+  }
+
+  function dateRange() {
+    var shared = window.LanaLibraryColumnFilters;
+    return {
+      single: true,
+      options: kit().dateRangeFilter().options,
+      match: function (cell, values) { return shared ? shared.inEditedRange(cell, values[0]) : true; }
+    };
+  }
+
+  function uniqueValues(rows, key) {
+    var seen = [];
+    (rows || []).forEach(function (row) {
+      var value = row[key];
+      if (value !== '' && value !== null && value !== undefined && seen.indexOf(value) === -1) seen.push(value);
+    });
+    return seen;
+  }
+
+  /** Header filters for every column. */
+  function filterOptions(rows) {
+    var statuses = PLAN_STATUSES.slice();
+    uniqueValues(rows, 'status').forEach(function (s) { if (statuses.indexOf(s) === -1) statuses.push(s); });
+    var types = ['manual', 'lana_draft'];
+    uniqueValues(rows, 'source_type').forEach(function (t) { if (types.indexOf(t) === -1) types.push(t); });
+    var assigned = ['unassigned', 'organization'];
+    uniqueValues(rows, 'assigned').forEach(function (a) { if (assigned.indexOf(a) === -1) assigned.push(a); });
+    var map = {
+      title: { text: true, placeholder: 'Plan name contains...' },
+      status: { options: kit().labelOptions(statuses) },
+      source_type: { options: types.map(function (t) { return { value: t, label: sourceTypeLabel(t) }; }) },
+      item_count: {
+        single: true,
+        options: ITEM_COUNT_RANGES.map(function (r) { return { value: r.value, label: r.label }; }),
+        match: function (cell, values) { return inCountRange(cell, values[0]); }
+      },
+      assigned: { options: assigned.map(function (a) { return { value: a, label: assignedLabel(a) }; }) },
+      created_at: dateRange(),
+      updated_at: dateRange()
+    };
+    var workspaces = uniqueValues(rows, 'workspace');
+    if (workspaces.length) map.workspace = { options: workspaces.map(function (w) { return { value: w, label: w }; }) };
+    return map;
+  }
+
+  function table() {
+    return el(TABLE_ID);
+  }
+
+  function updateCount() {
+    var t = table();
+    if (!t || !toolbar) return;
+    if (Array.isArray(t.filteredRows)) toolbar.setCount(t.filteredRows.length);
+    else toolbar.refreshCount();
+  }
+
   function renderList() {
-    var container = el('taskPlansList');
-    if (!container) return;
+    var t = table();
+    if (!t || typeof t.setData !== 'function') return;
+    var rows = state.plans.map(mapPlan);
+    t.setColumnFilterOptions(filterOptions(rows));
+    t.setData(rows);
+    updateCount();
+  }
 
-    if (state.loading) {
-      container.innerHTML = '<lex-spinner label="Loading task plans"></lex-spinner>';
-      return;
+  function initTable() {
+    var t = table();
+    if (!t) return Promise.resolve();
+    return kit().whenTableReady().then(function () {
+      if (table() !== t) return;
+      t.setCellRenderers(cellRenderers());
+      t.setColumnFilterOptions(filterOptions([]));
+      toolbar = kit().bindToolbar({
+        table: t,
+        searchId: 'taskPlansSearch',
+        sortId: 'taskPlansSort',
+        orderId: 'taskPlansSortOrder',
+        filterId: 'taskPlansStatusFilter',
+        filterKey: 'status',
+        countIds: ['taskPlansCount', 'taskPlansSectionCount'],
+        noun: ['plan', 'plans']
+      });
+      ['lex-data-loaded', 'lex-filter-change'].forEach(function (name) {
+        t.addEventListener(name, function (e) { if (e.target === t) updateCount(); });
+      });
+      t.addEventListener('lex-filter-change', function (e) {
+        if (e.target !== t) return;
+        var filters = (e.detail && e.detail.filters) || {};
+        t.emptyText = kit().emptyText(Object.keys(filters).length > 0 || Boolean(t.searchText), 'task plans');
+      });
+      t.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row && row.id) openPlan(row.id);
+      });
+      t.addEventListener('empty-action', openCreateModal);
+    });
+  }
+
+  /** Every plan, walking the list API's updated_at cursor. */
+  async function fetchAllPlans() {
+    var plans = [];
+    var seen = {};
+    var cursor = null;
+    for (;;) {
+      var params = { limit: PAGE_SIZE };
+      if (cursor) params.cursor = cursor;
+      var response = await api.getTaskPlans(params);
+      var page = normalizePlans(response);
+      page.forEach(function (plan) {
+        var id = getPlanId(plan);
+        if (id && !seen[id]) {
+          seen[id] = true;
+          plans.push(plan);
+        }
+      });
+      var data = response && response.data ? response.data : response;
+      var hasMore = data && data.hasMore !== undefined ? Boolean(data.hasMore) : page.length === PAGE_SIZE;
+      var last = page.length ? page[page.length - 1].updated_at : null;
+      // Stop when the server says so or the cursor would not move.
+      if (!hasMore || !last || last === cursor) break;
+      cursor = new Date(last).toISOString();
     }
+    return plans;
+  }
 
-    if (!state.plans.length) {
-      container.innerHTML =
-        '<lex-empty icon="document" message="No task plans" description="Create a draft plan to get started."></lex-empty>';
-      return;
+  function drawer() {
+    return el('taskPlanDrawer');
+  }
+
+  function openPlan(planId) {
+    var d = drawer();
+    selectPlan(planId);
+    if (d) d.open = true;
+  }
+
+  // A lex-modal opened from the drawer: close the drawer while it is up (the
+  // drawer's focus trap would hold Tab), reopen it when the modal closes.
+  function suspendDrawer() {
+    var d = drawer();
+    if (d && d.open) {
+      state.reopenDrawer = true;
+      d.open = false;
     }
+  }
 
-    container.innerHTML = state.plans.map(function (plan) {
-      var id = getPlanId(plan);
-      var status = getPlanStatus(plan);
-      var selectedClass = id === state.selectedId ? ' is-selected' : '';
-      var created = plan.updated_at || plan.created_at;
-      return [
-        '<button class="task-plan-row' + selectedClass + '" type="button" data-plan-id="' + esc(id) + '">',
-        '  <span>',
-        '    <span class="task-plan-row__title">' + esc(planTitle(plan)) + '</span>',
-        '    <span class="task-plan-row__meta">Updated ' + esc(formatDate(created)) + '</span>',
-        '  </span>',
-        '  <lex-badge label="' + esc(statusLabel(status)) + '" color="' + esc(statusBadgeColor(status)) + '"></lex-badge>',
-        '</button>'
-      ].join('');
-    }).join('');
+  function resumeDrawer() {
+    var d = drawer();
+    if (!state.reopenDrawer) return;
+    state.reopenDrawer = false;
+    if (d && selectedPlan()) {
+      renderDetail(selectedPlan());
+      d.open = true;
+    }
   }
 
   function renderDetail(plan) {
@@ -352,7 +566,7 @@
       '<div class="task-plan-detail__header">',
       '  <div>',
       '    <h2 class="task-plan-detail__title">' + esc(planTitle(plan)) + '</h2>',
-      '    <div class="task-plan-detail__meta">Created ' + esc(formatDate(plan.created_at)) + ' &middot; Updated ' + esc(formatDate(plan.updated_at)) + '</div>',
+      '    <div class="task-plan-detail__meta">Created ' + esc(plan.created_at ? Lex.Utils.formatDateTime(plan.created_at) : '-') + ' &middot; Updated ' + esc(plan.updated_at ? Lex.Utils.timeAgo(plan.updated_at) : '-') + '</div>',
       '    <div class="task-plan-detail__meta">' + esc(targetMeta) + '</div>',
       '  </div>',
       '  <lex-badge label="' + esc(statusLabel(status)) + '" color="' + esc(statusBadgeColor(status)) + '"></lex-badge>',
@@ -378,31 +592,28 @@
 
   async function loadPlans() {
     var workspace = el('taskPlansWorkspace');
+    var gen = ++state.loadGen;
     state.loading = true;
     state.unavailable = false;
     hide('taskPlansUnavailable');
     show(workspace);
-    if (workspace) Lex.Redact.on(workspace);
-    renderList();
 
     try {
-      var response = await api.getTaskPlans({ limit: 50 });
-      state.plans = normalizePlans(response);
-      if (!state.selectedId && state.plans.length) {
-        state.selectedId = getPlanId(state.plans[0]);
-      }
-      if (state.selectedId && state.plans.length) {
-        var exists = state.plans.some(function (plan) { return getPlanId(plan) === state.selectedId; });
-        if (!exists) state.selectedId = getPlanId(state.plans[0]);
+      var plans = await fetchAllPlans();
+      if (gen !== state.loadGen) return;
+      state.plans = plans;
+      if (state.selectedId && !selectedPlan()) {
+        state.selectedId = null;
+        var d = drawer();
+        if (d) d.open = false;
       }
       renderList();
-      renderDetail(selectedPlan());
+      if (state.selectedId) renderDetail(selectedPlan());
     } catch (error) {
+      if (gen !== state.loadGen) return;
       setUnavailable(error);
     } finally {
-      state.loading = false;
-      if (workspace) Lex.Redact.off(workspace);
-      if (!state.unavailable) renderList();
+      if (gen === state.loadGen) state.loading = false;
     }
   }
 
@@ -417,12 +628,12 @@
       state.users = [];
     }
     syncUserSelectOptions();
-    renderDetail(selectedPlan());
+    if (state.plans.length) renderList();
+    if (state.selectedId) renderDetail(selectedPlan());
   }
 
   async function selectPlan(planId) {
     state.selectedId = planId;
-    renderList();
     renderDetail(selectedPlan());
 
     try {
@@ -435,8 +646,7 @@
           break;
         }
       }
-      renderList();
-      renderDetail(detailed);
+      if (state.selectedId === planId) renderDetail(detailed);
     } catch (error) {
       console.warn('[TaskPlans] Detail unavailable:', error && error.message);
     }
@@ -473,6 +683,7 @@
   function openEditPlanModal() {
     var plan = selectedPlan();
     if (!plan || getPlanStatus(plan) === 'published') return;
+    suspendDrawer();
 
     var modal = el('taskPlanModal');
     var title = el('taskPlanTitle');
@@ -508,6 +719,7 @@
     var modal = el('taskPlanModal');
     state.editingPlanId = null;
     if (modal) modal.open = false;
+    resumeDrawer();
   }
 
   function isLanaDraftMode() {
@@ -599,8 +811,12 @@
       await loadPlans();
       // loadPlans() refreshes the list rows which omit per-plan items.
       // Re-fetch the selected plan's detail so items render immediately
-      // after create/update.
-      if (state.selectedId) await selectPlan(state.selectedId);
+      // after create/update, and show it in the drawer.
+      if (state.selectedId) {
+        state.reopenDrawer = true;
+        await selectPlan(state.selectedId);
+        resumeDrawer();
+      }
     } catch (error) {
       Lex.Toast.error(error.message || (isLanaDraftMode() ? 'Unable to generate Lana draft' : 'Unable to create task plan'));
     } finally {
@@ -609,6 +825,7 @@
   }
 
   function openItemModal(index) {
+    suspendDrawer();
     var plan = selectedPlan();
     var items = planItems(plan).map(normalizeItem);
     var item = index !== null && index !== undefined ? items[index] : {};
@@ -639,6 +856,7 @@
     var modal = el('taskPlanItemModal');
     state.editingItemIndex = null;
     if (modal) modal.open = false;
+    resumeDrawer();
   }
 
   function readItemPayload() {
@@ -717,29 +935,38 @@
     Lex.Toast.success('Task plan items updated');
   }
 
-  async function deletePlan() {
+  function deletePlan() {
     var plan = selectedPlan();
     var planId = getPlanId(plan);
     if (!planId) return;
 
-    var confirmed = window.confirm('Delete this task plan? Draft plans will be archived; published plans remain in audit history.');
-    if (!confirmed) return;
+    suspendDrawer();
+    var modal = Lex.Modal.confirm(
+      'Delete task plan',
+      'Delete this task plan? Draft plans will be archived; published plans remain in audit history.',
+      function () {
+        state.reopenDrawer = false;
+        confirmDeletePlan(planId);
+      },
+      { variant: 'danger', confirmText: 'Delete' }
+    );
+    if (modal && modal.addEventListener) {
+      modal.addEventListener('lex-cancel', resumeDrawer);
+      modal.addEventListener('lex-close', resumeDrawer);
+    }
+  }
 
-    var deleteBtn = el('deleteTaskPlanBtn');
-    if (deleteBtn) deleteBtn.loading = true;
-
+  async function confirmDeletePlan(planId) {
     try {
       await api.deleteTaskPlan(planId);
       Lex.Toast.success('Task plan deleted');
       state.plans = state.plans.filter(function (entry) { return getPlanId(entry) !== planId; });
-      state.selectedId = state.plans.length ? getPlanId(state.plans[0]) : null;
+      state.selectedId = null;
+      var d = drawer();
+      if (d) d.open = false;
       renderList();
-      renderDetail(selectedPlan());
-      if (state.selectedId) await selectPlan(state.selectedId);
     } catch (error) {
       Lex.Toast.error(error.message || 'Unable to delete task plan');
-    } finally {
-      if (deleteBtn) deleteBtn.loading = false;
     }
   }
 
@@ -778,7 +1005,6 @@
     var itemCancelBtn = el('taskPlanItemCancelBtn');
     var type = el('taskPlanType');
     var targetType = el('taskPlanTargetType');
-    var list = el('taskPlansList');
     var detail = el('taskPlanDetail');
     var matterPickBtn = el('taskPlanMatterPickBtn');
 
@@ -803,12 +1029,14 @@
     }
     if (matterPickBtn) matterPickBtn.addEventListener('click', openPlanMatterPicker);
 
-    if (list) {
-      list.addEventListener('click', function (event) {
-        var row = event.target.closest('.task-plan-row');
-        if (row && row.dataset.planId) selectPlan(row.dataset.planId);
-      });
-    }
+    ['taskPlanModal', 'taskPlanItemModal'].forEach(function (id) {
+      var modal = el(id);
+      if (modal) {
+        modal.addEventListener('lex-close', function (e) {
+          if (e.target === modal) resumeDrawer();
+        });
+      }
+    });
 
     if (detail) {
       detail.addEventListener('click', function (event) {
@@ -843,13 +1071,28 @@
       return;
     }
     bindEvents();
-    loadUsers();
-    loadPlans();
+    initTable().then(function () {
+      loadUsers();
+      loadPlans();
+    });
 
     if (getUrlAction() === 'create') {
       openCreateModal();
     }
   }
+
+  // Pure table logic, exposed for unit tests.
+  window.TaskPlansTable = {
+    mapPlan: mapPlan,
+    cellRenderers: cellRenderers,
+    filterOptions: filterOptions,
+    fetchAllPlans: fetchAllPlans,
+    inCountRange: inCountRange,
+    assignedLabel: assignedLabel,
+    statusLabel: statusLabel,
+    sourceTypeLabel: sourceTypeLabel,
+    _state: state
+  };
 
   init();
 })();
