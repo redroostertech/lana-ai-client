@@ -1080,28 +1080,31 @@
     return (task && (task.id || task.task_id)) || '';
   }
 
-  function renderTaskStatusPill(task, opts) {
-    opts = opts || {};
-    var size = opts.size || 'sm';
+  // JSON for a double-quoted attribute (a lex-dropdown-btn options list).
+  function jsonAttr(value) {
+    return JSON.stringify(value).split('&').join('&amp;').split('"').join('&quot;')
+      .split('<').join('&lt;').split('>').join('&gt;');
+  }
+
+  // Status menu on a task row: a lex-dropdown-btn whose trigger reads the
+  // current status (tinted by data-status-color in dashboard-command-center.css)
+  // and whose items are the valid statuses, the current one checked.
+  // attachZoneDTaskHandlers runs the choice.
+  function renderTaskStatusPill(task) {
     var status = task.status || 'pending';
     var label = taskStatusLabel(status);
-    var color = taskStatusColor(status);
     var taskId = getTaskId(task);
+    var items = TASK_STATUSES.map(function (value) {
+      var item = { value: value, label: taskStatusLabel(value) };
+      if (value === status) item.icon = 'check';
+      return item;
+    });
 
-    return [
-      '<button type="button"',
-      '  class="cc-task-status-pill"',
-      '  data-task-status-pill="1"',
-      '  data-task-id="' + escHtml(taskId) + '"',
-      '  data-current-status="' + escHtml(status) + '"',
-      '  aria-haspopup="listbox"',
-      '  aria-expanded="false"',
-      '  title="Change status"',
-      '  style="display:inline-flex;align-items:center;gap:4px;border:none;background:transparent;padding:0;cursor:pointer;font:inherit;color:inherit;">',
-      '  <lex-badge label="' + escHtml(label) + '" color="' + color + '"' + (size === 'lg' ? '' : '') + '></lex-badge>',
-      '  <span aria-hidden="true" style="font-size:0.65em;line-height:1;color:var(--lex-color-text-muted,#6b7280);">▾</span>',
-      '</button>'
-    ].join('');
+    return '<lex-dropdown-btn class="cc-task-status-pill" data-task-status-pill="1"' +
+      ' data-task-id="' + escHtml(taskId) + '" data-current-status="' + escHtml(status) + '"' +
+      ' data-status-color="' + taskStatusColor(status) + '" variant="ghost" align="end"' +
+      ' button-label="' + escHtml(label) + '" aria-label="' + escHtml('Change status: ' + label) + '"' +
+      ' options="' + jsonAttr(items) + '"></lex-dropdown-btn>';
   }
 
   function renderTaskStatusSelect(task) {
@@ -1288,26 +1291,7 @@
 
   // ---- Zone D event wiring (status menu + detail drawer + actions) -------
 
-  // One-time state used to dismiss the floating status menu when the user
-  // clicks elsewhere. We attach the listener lazily.
-  var _zoneDStatusMenuListenerAttached = false;
-  function ensureZoneDStatusMenuDismissListener() {
-    if (_zoneDStatusMenuListenerAttached) return;
-    _zoneDStatusMenuListenerAttached = true;
-    document.addEventListener('click', function (event) {
-      var menu = document.getElementById('ccTaskStatusMenu');
-      if (!menu) return;
-      if (menu.contains(event.target)) return;
-      // Don't close immediately if the click is on a status pill — that path
-      // toggles the menu via its own handler.
-      if (event.target.closest && event.target.closest('[data-task-status-pill]')) return;
-      menu.remove();
-    }, true);
-  }
-
   function attachZoneDTaskHandlers(contentEl, taskLookup) {
-    ensureZoneDStatusMenuDismissListener();
-
     // Group rows still navigate to the my-tasks page (no per-task drawer for
     // a roll-up entry).
     var groupRows = contentEl.querySelectorAll('[data-nav="my-tasks"]');
@@ -1328,92 +1312,17 @@
       });
     }
 
-    // Status pill: clicking opens a small floating menu of valid statuses.
+    // Status menus (lex-dropdown-btn): a chosen status other than the
+    // current one is saved.
     var pills = contentEl.querySelectorAll('[data-task-status-pill]');
     for (var k = 0; k < pills.length; k++) {
-      pills[k].addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
+      pills[k].addEventListener('lex-select', function (event) {
         var taskId = this.getAttribute('data-task-id');
         var current = this.getAttribute('data-current-status') || 'pending';
-        showTaskStatusMenu(this, taskId, current);
+        var status = event.detail && event.detail.value;
+        if (status && status !== current) updateTaskStatusFromZoneD(taskId, status);
       });
     }
-  }
-
-  function showTaskStatusMenu(anchorEl, taskId, currentStatus) {
-    // Toggle if already open against the same anchor.
-    var existing = document.getElementById('ccTaskStatusMenu');
-    if (existing) {
-      existing.remove();
-      if (existing.getAttribute('data-anchor-id') === taskId) return;
-    }
-
-    var menu = document.createElement('div');
-    menu.id = 'ccTaskStatusMenu';
-    menu.setAttribute('data-anchor-id', taskId || '');
-    menu.setAttribute('role', 'listbox');
-    menu.style.cssText = [
-      'position:absolute',
-      'z-index:1000',
-      'min-width:160px',
-      'background:var(--lex-color-bg-elevated,#fff)',
-      'border:1px solid var(--lex-color-border,#e5e7eb)',
-      'border-radius:8px',
-      'box-shadow:0 8px 24px rgba(15,23,42,0.12)',
-      'padding:4px',
-      'display:flex',
-      'flex-direction:column'
-    ].join(';');
-
-    var rect = anchorEl.getBoundingClientRect();
-    menu.style.top = (window.scrollY + rect.bottom + 4) + 'px';
-    menu.style.left = (window.scrollX + Math.max(0, rect.right - 160)) + 'px';
-
-    TASK_STATUSES.forEach(function (status) {
-      var item = document.createElement('button');
-      item.type = 'button';
-      item.setAttribute('role', 'option');
-      item.style.cssText = [
-        'display:flex',
-        'align-items:center',
-        'gap:8px',
-        'padding:6px 10px',
-        'background:transparent',
-        'border:none',
-        'border-radius:6px',
-        'cursor:pointer',
-        'font:inherit',
-        'color:inherit',
-        'text-align:left',
-        'width:100%'
-      ].join(';');
-      item.innerHTML =
-        '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + statusDotColor(status) + ';"></span>' +
-        '<span>' + escHtml(taskStatusLabel(status)) + '</span>' +
-        (status === currentStatus ? '<span aria-hidden="true" style="margin-left:auto;color:var(--lex-color-primary-600,#2563eb);">✓</span>' : '');
-      item.addEventListener('mouseenter', function () { item.style.background = 'rgba(0,0,0,0.04)'; });
-      item.addEventListener('mouseleave', function () { item.style.background = 'transparent'; });
-      item.addEventListener('click', function (event) {
-        event.stopPropagation();
-        menu.remove();
-        if (status !== currentStatus) {
-          updateTaskStatusFromZoneD(taskId, status);
-        }
-      });
-      menu.appendChild(item);
-    });
-
-    document.body.appendChild(menu);
-  }
-
-  function statusDotColor(status) {
-    var color = taskStatusColor(status);
-    if (color === 'green')  return '#10b981';
-    if (color === 'yellow') return '#f59e0b';
-    if (color === 'blue')   return '#3b82f6';
-    if (color === 'red')    return '#ef4444';
-    return '#9ca3af';
   }
 
   async function updateTaskStatusFromZoneD(taskId, newStatus) {
@@ -1619,51 +1528,37 @@
     var isComplete = (task.status === 'complete' || task.status === 'completed');
     var completeLabel = isComplete ? 'Reopen' : 'Mark Complete';
     var completeAction = isComplete ? 'reopen' : 'complete';
-    var chevron = '<svg class="cc-task-actions-btn__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+    var items = [
+      { value: 'edit', label: 'Edit', icon: 'edit' },
+      { value: completeAction, label: completeLabel, icon: isComplete ? 'rotate-ccw' : 'check' },
+      { divider: true },
+      { value: 'delete', label: 'Delete', icon: 'trash-2', danger: true }
+    ];
 
-    drawerEl.setHeaderActions([{ html: [
-      '<div class="cc-task-header-actions" data-task-actions-wrap>',
-      '  <button type="button" class="cc-task-actions-btn" data-task-actions-toggle aria-haspopup="true" aria-expanded="false">',
-      '    <span>Actions</span>' + chevron,
-      '  </button>',
-      '  <div class="cc-task-actions-menu hidden" role="menu">',
-      '    <button type="button" role="menuitem" data-task-action="edit">Edit</button>',
-      '    <button type="button" role="menuitem" data-task-action="' + completeAction + '">' + completeLabel + '</button>',
-      '    <button type="button" role="menuitem" class="cc-task-actions-menu__danger" data-task-action="delete">Delete</button>',
-      '  </div>',
-      '</div>'
-    ].join('') }]);
-  }
-
-  function closeDashboardTaskActionsMenu(drawerEl) {
-    if (!drawerEl) return;
-    var menu = drawerEl.querySelector('.cc-task-actions-menu');
-    var toggle = drawerEl.querySelector('[data-task-actions-toggle]');
-    if (menu) menu.classList.add('hidden');
-    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    drawerEl.setHeaderActions([{ html:
+      '<lex-dropdown-btn class="cc-task-header-actions" data-task-actions-menu button-label="Actions" align="end"' +
+      ' options="' + jsonAttr(items) + '"></lex-dropdown-btn>'
+    }]);
   }
 
   function wireTaskDrawerHandlers(drawerEl) {
     var task = drawerEl._task || {};
     var taskId = getTaskId(task);
 
-    var actionsToggle = drawerEl.querySelector('[data-task-actions-toggle]');
-    if (actionsToggle) {
-      actionsToggle.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        var menu = drawerEl.querySelector('.cc-task-actions-menu');
-        if (!menu) return;
-        var isHidden = menu.classList.contains('hidden');
-        menu.classList.toggle('hidden', !isHidden);
-        actionsToggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+    // Header "Actions" menu (lex-dropdown-btn): Edit / Mark Complete or
+    // Reopen / Delete. The menu is re-rendered with the header, so each
+    // element is wired once.
+    var actionsMenu = drawerEl.querySelector('[data-task-actions-menu]');
+    if (actionsMenu && !actionsMenu.__ccWired) {
+      actionsMenu.__ccWired = true;
+      actionsMenu.addEventListener('lex-select', function (event) {
+        var action = event.detail && event.detail.value;
+        if (action === 'complete') completeTask();
+        else if (action === 'reopen') updateTaskStatusFromDrawer(drawerEl, taskId, 'pending');
+        else if (action === 'delete') deleteTask();
+        else if (action === 'edit') editTask();
       });
     }
-
-    drawerEl.addEventListener('click', function (event) {
-      if (event.target.closest && event.target.closest('.cc-task-header-actions')) return;
-      closeDashboardTaskActionsMenu(drawerEl);
-    });
 
     var statusSelect = drawerEl.querySelector('[data-task-status-select]');
     if (statusSelect) {
@@ -1672,67 +1567,40 @@
       });
     }
 
-    // Status pill — same in both view and edit modes.
-    var pill = drawerEl.querySelector('[data-task-status-pill]');
-    if (pill) {
-      pill.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        var current = pill.getAttribute('data-current-status') || 'pending';
-        showTaskStatusMenu(pill, taskId, current);
-      });
-    }
-
     // Mark Complete (view mode).
-    var completeBtn = drawerEl.querySelector('[data-task-action="complete"]');
-    if (completeBtn) {
-      completeBtn.addEventListener('click', async function () {
-        closeDashboardTaskActionsMenu(drawerEl);
-        try {
-          if (typeof api.completeTask === 'function') {
-            await api.completeTask(taskId);
-          } else {
-            await api.updateTask(taskId, { status: 'complete' });
-          }
-          drawerEl.remove();
-          await renderZoneD();
-        } catch (err) {
-          console.error('[Dashboard Zone D] Failed to complete task:', err);
-          if (window.Lex && Lex.Toast && Lex.Toast.error) {
-            Lex.Toast.error('Could not complete task: ' + (err && err.message || 'unknown error'));
-          }
+    async function completeTask() {
+      try {
+        if (typeof api.completeTask === 'function') {
+          await api.completeTask(taskId);
+        } else {
+          await api.updateTask(taskId, { status: 'complete' });
         }
-      });
+        drawerEl.remove();
+        await renderZoneD();
+      } catch (err) {
+        console.error('[Dashboard Zone D] Failed to complete task:', err);
+        if (window.Lex && Lex.Toast && Lex.Toast.error) {
+          Lex.Toast.error('Could not complete task: ' + (err && err.message || 'unknown error'));
+        }
+      }
     }
 
-    var reopenBtn = drawerEl.querySelector('[data-task-action="reopen"]');
-    if (reopenBtn) {
-      reopenBtn.addEventListener('click', async function () {
-        closeDashboardTaskActionsMenu(drawerEl);
-        await updateTaskStatusFromDrawer(drawerEl, taskId, 'pending');
+    async function deleteTask() {
+      var confirmed = await Lex.Modal.confirmAsync('Delete task', 'Delete this task?', {
+        confirmText: 'Delete',
+        variant: 'danger'
       });
-    }
-
-    var deleteBtn = drawerEl.querySelector('[data-task-action="delete"]');
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', async function () {
-        closeDashboardTaskActionsMenu(drawerEl);
-        var confirmed = await Lex.Modal.confirmAsync('Delete task', 'Delete this task?', {
-          confirmText: 'Delete',
-          variant: 'danger'
-        });
-        if (!confirmed) return;
-        try {
-          await api.deleteTask(taskId);
-          drawerEl.remove();
-          await renderZoneD();
-        } catch (err) {
-          console.error('[Dashboard Zone D] Failed to delete task:', err);
-          if (window.Lex && Lex.Toast && Lex.Toast.error) {
-            Lex.Toast.error('Could not delete task: ' + (err && err.message || 'unknown error'));
-          }
+      if (!confirmed) return;
+      try {
+        await api.deleteTask(taskId);
+        drawerEl.remove();
+        await renderZoneD();
+      } catch (err) {
+        console.error('[Dashboard Zone D] Failed to delete task:', err);
+        if (window.Lex && Lex.Toast && Lex.Toast.error) {
+          Lex.Toast.error('Could not delete task: ' + (err && err.message || 'unknown error'));
         }
-      });
+      }
     }
 
     var matterLink = drawerEl.querySelector('[data-task-matter-link]');
@@ -1753,19 +1621,15 @@
 
     // Edit (view mode → edit mode). Lazy-load org users for the assignee
     // picker, then swap the drawer body and re-wire handlers.
-    var editBtn = drawerEl.querySelector('[data-task-action="edit"]');
-    if (editBtn) {
-      editBtn.addEventListener('click', async function () {
-        closeDashboardTaskActionsMenu(drawerEl);
-        editBtn.setAttribute('disabled', 'true');
-        var users = await loadOrgUsersForPicker();
-        var bodyEl = drawerEl.querySelector('[data-task-body]');
-        if (bodyEl) {
-          bodyEl.outerHTML = renderTaskEditBody(drawerEl._task || task, users);
-        }
-        if (typeof drawerEl.setHeaderActions === 'function') drawerEl.setHeaderActions([]);
-        wireTaskDrawerHandlers(drawerEl);
-      });
+    async function editTask() {
+      if (actionsMenu) actionsMenu.disabled = true;
+      var users = await loadOrgUsersForPicker();
+      var bodyEl = drawerEl.querySelector('[data-task-body]');
+      if (bodyEl) {
+        bodyEl.outerHTML = renderTaskEditBody(drawerEl._task || task, users);
+      }
+      if (typeof drawerEl.setHeaderActions === 'function') drawerEl.setHeaderActions([]);
+      wireTaskDrawerHandlers(drawerEl);
     }
 
     // Cancel (edit mode → view mode).

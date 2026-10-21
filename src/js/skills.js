@@ -212,7 +212,7 @@
     if (learnMoreCloseBtn) {
       learnMoreCloseBtn.addEventListener('click', function() {
         var modal = document.getElementById('learn-more-modal');
-        if (modal) modal.classList.add('hidden');
+        if (modal) modal.open = false;
       });
     }
 
@@ -222,16 +222,14 @@
       importSkillBtn.addEventListener('click', openSkillImportModal);
     }
 
-    // Modal close buttons — covers all modals including import modal
-    var modalCloseButtons = document.querySelectorAll('.modal-close');
-    modalCloseButtons.forEach(function(btn) {
-      btn.addEventListener('click', closeAllModals);
-    });
-
-    // Modal overlay clicks
-    var modalOverlays = document.querySelectorAll('.modal-overlay');
-    modalOverlays.forEach(function(overlay) {
-      overlay.addEventListener('click', closeAllModals);
+    // lex-modal header close, backdrop and Escape all emit lex-close.
+    ['learn-more-modal', 'skill-details-modal', 'matter-selector-modal', 'skill-import-modal'].forEach(function(id) {
+      var modalEl = document.getElementById(id);
+      if (modalEl) {
+        modalEl.addEventListener('lex-close', function(e) {
+          if (e.target === modalEl) closeAllModals();
+        });
+      }
     });
 
     // Modal action buttons
@@ -312,10 +310,13 @@
       });
     }
 
-    // Skill Builder modal buttons
-    var closeSkillBuilderBtn = document.getElementById('closeSkillBuilderBtn');
-    if (closeSkillBuilderBtn) {
-      closeSkillBuilderBtn.addEventListener('click', closeSkillBuilder);
+    // Skill Builder: the lex-modal header close emits lex-close (Escape and
+    // backdrop are off for the builder so a stray key cannot drop the draft).
+    var skillBuilderModal = document.getElementById('createSkillModal');
+    if (skillBuilderModal) {
+      skillBuilderModal.addEventListener('lex-close', function(e) {
+        if (e.target === skillBuilderModal) closeSkillBuilder();
+      });
     }
     var cancelSkillBuilderBtn = document.getElementById('cancelSkillBuilderBtn');
     if (cancelSkillBuilderBtn) {
@@ -355,7 +356,7 @@
 
   function openLearnMoreModal() {
     var modal = document.getElementById('learn-more-modal');
-    if (modal) modal.classList.remove('hidden');
+    if (modal) modal.open = true;
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -655,8 +656,7 @@
     }
 
     // Show modal
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+    modal.open = true;
   }
 
   /**
@@ -831,10 +831,7 @@
    */
   function closeSkillBuilder() {
     var modal = document.getElementById('createSkillModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
+    if (modal) modal.open = false;
     // Reset state
     skillSteps = [];
     editingSkillId = null;
@@ -2021,7 +2018,7 @@
     if (installBtn) installBtn.classList.add('hidden');
 
     body.innerHTML = tabBar + overviewHtml + settingsHtml + runsHtml;
-    modal.classList.remove('hidden');
+    modal.open = true;
 
     // ── Wire tab switching ─────────────────────────────────────────
     var tabBtns = body.querySelectorAll('.ld-tab');
@@ -2288,35 +2285,42 @@
   }
 
   /**
+   * These modals open on top of the Skill Details lex-modal. Every open
+   * lex-modal listens for Escape on document, so one Escape would close both;
+   * stop it at the nested modal (focus is trapped inside it) and close only it.
+   */
+  function escapeClosesOnlyNested(modal) {
+    modal.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      modal.removeAfterClose();
+    });
+  }
+
+  /**
    * Open a simple JSON-editor modal for config overrides (GAP-1).
    */
   function openEditOverridesModal(matterId, skillId, currentOverridesJson, callback) {
-    // Reuse the learn-more modal slot as a temporary container; or inject inline modal
     var existing = document.getElementById('ld-overrides-modal');
     if (existing) existing.remove();
 
     var parsed = '{}';
     try { parsed = JSON.stringify(JSON.parse(currentOverridesJson), null, 2); } catch (e) { parsed = '{}'; }
 
-    var modal = document.createElement('div');
+    // lex-modal (Lex.Modal.open removes it on close, backdrop click and Escape).
+    var modal = window.Lex.Modal.open({
+      heading: 'Edit Config Overrides',
+      size: 'md',
+      content: '<p class="text-xs text-gray-500 mb-3">JSON overrides applied when this skill runs in this matter context.</p>'
+        + '<textarea id="ld-overrides-input" rows="8" style="width:100%;font-family:monospace;font-size:12px;border:1px solid var(--lex-border-default);border-radius:8px;padding:10px;resize:vertical;" spellcheck="false">' + escapeHtml(parsed) + '</textarea>'
+        + '<div id="ld-overrides-error" class="text-xs text-red-500 mt-1 hidden"></div>'
+        + '<lex-btn data-slot="footer" id="ld-overrides-cancel" variant="secondary">Cancel</lex-btn>'
+        + '<lex-btn data-slot="footer" id="ld-overrides-save" variant="primary">Save</lex-btn>'
+    });
     modal.id = 'ld-overrides-modal';
-    modal.className = 'modal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:10010;display:flex;align-items:center;justify-content:center;';
-    modal.innerHTML = '<div class="modal-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);"></div>'
-      + '<div style="position:relative;background:#fff;border-radius:12px;padding:24px;width:480px;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
-      + '<h3 class="text-lg font-semibold mb-3" style="color:var(--lex-text-primary);">Edit Config Overrides</h3>'
-      + '<p class="text-xs text-gray-500 mb-3">JSON overrides applied when this skill runs in this matter context.</p>'
-      + '<textarea id="ld-overrides-input" rows="8" style="width:100%;font-family:monospace;font-size:12px;border:1px solid var(--lex-border-default);border-radius:8px;padding:10px;resize:vertical;" spellcheck="false">' + escapeHtml(parsed) + '</textarea>'
-      + '<div id="ld-overrides-error" class="text-xs text-red-500 mt-1 hidden"></div>'
-      + '<div class="flex gap-2 justify-end mt-4">'
-      + '<button id="ld-overrides-cancel" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50" style="border-color:var(--lex-border-default);">Cancel</button>'
-      + '<button id="ld-overrides-save" class="px-4 py-2 text-sm text-white rounded-lg" style="background:var(--lex-text-accent);">Save</button>'
-      + '</div></div>';
+    escapeClosesOnlyNested(modal);
 
-    document.body.appendChild(modal);
-
-    modal.querySelector('.modal-overlay').addEventListener('click', function() { modal.remove(); });
-    modal.querySelector('#ld-overrides-cancel').addEventListener('click', function() { modal.remove(); });
+    modal.querySelector('#ld-overrides-cancel').addEventListener('click', function() { modal.removeAfterClose(); });
     modal.querySelector('#ld-overrides-save').addEventListener('click', function() {
       var txt = modal.querySelector('#ld-overrides-input').value;
       var errEl = modal.querySelector('#ld-overrides-error');
@@ -2330,18 +2334,16 @@
 
       var url = '/api/v1/matters/' + encodeURIComponent(matterId) + '/skills/' + encodeURIComponent(skillId) + '/config';
       var saveBtn = modal.querySelector('#ld-overrides-save');
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
+      saveBtn.loading = true;
 
       (window.api ? window.api.patch(url, { config_overrides: parsed2 }) : fetch(url, { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' }, body: JSON.stringify({ config_overrides: parsed2 }) }).then(function(r) { return r.json(); }))
         .then(function() {
-          modal.remove();
+          modal.removeAfterClose();
           showToast('Config overrides saved', 'success');
           if (callback) callback();
         })
         .catch(function(err) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save';
+          saveBtn.loading = false;
           errEl.textContent = 'Save failed: ' + ((err && err.message) || 'Unknown error');
           errEl.classList.remove('hidden');
         });
@@ -2356,25 +2358,21 @@
     var existing = document.getElementById('ld-attach-modal');
     if (existing) existing.remove();
 
-    var modal = document.createElement('div');
+    // lex-modal (Lex.Modal.open removes it on close, backdrop click and Escape).
+    var modal = window.Lex.Modal.open({
+      heading: 'Attach Skill to Matter',
+      width: '520px',
+      content: '<input id="ld-attach-search" type="text" placeholder="Search matters..." class="mb-3 px-3 py-2 text-sm border rounded-lg w-full" style="border-color:var(--lex-border-default);">'
+        + '<div id="ld-attach-matters" class="overflow-y-auto space-y-1" style="max-height:320px;border:1px solid var(--lex-border-default);border-radius:8px;padding:8px;">'
+        + '<div class="flex justify-center py-4"><div class="animate-spin w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div></div>'
+        + '</div>'
+        + '<lex-btn data-slot="footer" id="ld-attach-cancel" variant="secondary">Cancel</lex-btn>'
+        + '<lex-btn data-slot="footer" id="ld-attach-confirm" variant="primary" disabled>Attach</lex-btn>'
+    });
     modal.id = 'ld-attach-modal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:10010;display:flex;align-items:center;justify-content:center;';
-    modal.innerHTML = '<div class="modal-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);"></div>'
-      + '<div style="position:relative;background:#fff;border-radius:12px;padding:24px;width:520px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
-      + '<h3 class="text-lg font-semibold mb-3" style="color:var(--lex-text-primary);">Attach Skill to Matter</h3>'
-      + '<input id="ld-attach-search" type="text" placeholder="Search matters..." class="mb-3 px-3 py-2 text-sm border rounded-lg w-full" style="border-color:var(--lex-border-default);">'
-      + '<div id="ld-attach-matters" class="flex-1 overflow-y-auto space-y-1 mb-4" style="max-height:320px;border:1px solid var(--lex-border-default);border-radius:8px;padding:8px;">'
-      + '<div class="flex justify-center py-4"><div class="animate-spin w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div></div>'
-      + '</div>'
-      + '<div class="flex gap-2 justify-end">'
-      + '<button id="ld-attach-cancel" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50" style="border-color:var(--lex-border-default);">Cancel</button>'
-      + '<button id="ld-attach-confirm" class="px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50" style="background:var(--lex-text-accent);" disabled>Attach</button>'
-      + '</div></div>';
+    escapeClosesOnlyNested(modal);
 
-    document.body.appendChild(modal);
-
-    modal.querySelector('.modal-overlay').addEventListener('click', function() { modal.remove(); });
-    modal.querySelector('#ld-attach-cancel').addEventListener('click', function() { modal.remove(); });
+    modal.querySelector('#ld-attach-cancel').addEventListener('click', function() { modal.removeAfterClose(); });
 
     var selectedMatterId = null;
 
@@ -2429,21 +2427,19 @@
     modal.querySelector('#ld-attach-confirm').addEventListener('click', function() {
       if (!selectedMatterId) return;
       var confirmBtn = modal.querySelector('#ld-attach-confirm');
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = 'Attaching...';
+      confirmBtn.loading = true;
 
       var url = '/api/v1/matters/' + encodeURIComponent(selectedMatterId) + '/skills';
       (window.api ? window.api.post(url, { skill_id: skillId, enabled: true, config_overrides: {} }) : fetch(url, { method: 'POST', headers: { 'Authorization': 'Bearer ' + getAuthToken(), 'Content-Type': 'application/json' }, body: JSON.stringify({ skill_id: skillId, enabled: true, config_overrides: {} }) }).then(function(r) { return r.json(); }))
         .then(function() {
-          modal.remove();
+          modal.removeAfterClose();
           showToast('Skill attached to matter', 'success');
           // Refresh attachments if the settings tab is open
           ldAttachmentsLoaded = false;
           loadSkillMatterAttachments(skillId);
         })
         .catch(function(err) {
-          confirmBtn.disabled = false;
-          confirmBtn.textContent = 'Attach';
+          confirmBtn.loading = false;
           showToast('Failed to attach: ' + ((err && err.message) || 'Unknown error'), 'error');
         });
     });
@@ -2461,7 +2457,7 @@
     if (!modal || !mattersList) return;
 
     // Close skill details modal
-    if (skillDetailsModal) skillDetailsModal.classList.add('hidden');
+    if (skillDetailsModal) skillDetailsModal.open = false;
 
     var baseUrl = window.api && window.api.baseUrl ? window.api.baseUrl : (window.LanaConfig && window.LanaConfig.API_BASE_URL ? window.LanaConfig.API_BASE_URL : '');
     fetch(baseUrl + '/api/v1/matters', {
@@ -2502,7 +2498,7 @@
         });
       });
 
-      modal.classList.remove('hidden');
+      modal.open = true;
     }).catch(function(error) {
       console.error('Error loading matters:', error);
       showToast('Failed to load matters. Please try again.', 'error');
@@ -2770,15 +2766,15 @@
   // ═══════════════════════════════════════════════════════════════
 
   function closeAllModals() {
-    if (skillDetailsModal) skillDetailsModal.classList.add('hidden');
-    if (matterSelectorModal) matterSelectorModal.classList.add('hidden');
+    if (skillDetailsModal) skillDetailsModal.open = false;
+    if (matterSelectorModal) matterSelectorModal.open = false;
     var learnMoreModal = document.getElementById('learn-more-modal');
-    if (learnMoreModal) learnMoreModal.classList.add('hidden');
+    if (learnMoreModal) learnMoreModal.open = false;
     selectedSkill = null;
     selectedMatters = [];
     closeSkillImportModal();
     // BUG-009 FIX: Do NOT call closeSkillBuilder() here.
-    // closeAllModals() is triggered by generic .modal-close buttons and overlay clicks.
+    // closeAllModals() is triggered by the other modals' lex-close (close, backdrop, Escape).
     // If the builder modal is open, those generic handlers would destroy unsaved builder state
     // (skillSteps, editingSkillId, mxDiagnostics) even when the user is still working.
     // The builder has its own dedicated close/cancel buttons wired to closeSkillBuilder().
@@ -2797,14 +2793,14 @@
     }
     var modal = document.getElementById('skill-import-modal');
     if (modal) {
-      modal.classList.remove('hidden');
+      modal.open = true;
     }
   }
 
   function closeSkillImportModal() {
     var modal = document.getElementById('skill-import-modal');
     if (modal) {
-      modal.classList.add('hidden');
+      modal.open = false;
     }
     clearSkillImportFile();
     skillImportState.isImporting = false;

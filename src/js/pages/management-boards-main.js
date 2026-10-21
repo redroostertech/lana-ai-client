@@ -425,27 +425,7 @@ function setupUIEventListeners() {
     if (userInitialsEl) userInitialsEl.textContent = initials;
   }
 
-  // User menu toggle
-  const userMenu = document.getElementById('userMenu');
-  const userDropdown = document.getElementById('userDropdown');
-  if (userMenu && userDropdown) {
-    userMenu.addEventListener('click', (e) => {
-      e.stopPropagation();
-      userDropdown.classList.toggle('hidden');
-    });
-    document.addEventListener('click', (e) => {
-      if (!userMenu.contains(e.target)) userDropdown.classList.add('hidden');
-    });
-  }
-
-  // Logout handler
-  const logoutBtn = document.getElementById('logoutBtn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', async () => {
-      await api.logout();
-      window.location.href = '../login.html';
-    });
-  }
+  // Account menu: js/shared/header-user-menu.js renders and wires #userMenu.
 
   // Sidebar toggle for mobile
   const sidebar = document.getElementById('sidebar');

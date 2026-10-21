@@ -273,46 +273,6 @@
       </form>
     </lex-modal>
 
-    <!-- Matter Actions Modal -->
-    <lex-modal id="matterActionsModal" heading="Folder Options" size="md" hide-actions="true">
-      <div class="space-y-4">
-        <div class="mb-4 p-4 rounded-lg" style="background-color: var(--lex-bg-secondary)">
-          <p class="text-sm font-medium mb-1" style="color: var(--lex-text-secondary)">Folder:</p>
-          <p id="modalMatterName" class="text-base font-medium" style="color: var(--lex-text-primary)"></p>
-          <p id="modalMatterId" class="text-sm" style="color: var(--lex-text-secondary)"></p>
-        </div>
-        <div class="space-y-3">
-          <button onclick="openMatterFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 rounded-lg transition-all group" style="border-color: var(--lex-border-default)">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background-color: var(--lex-bg-accent-muted)">
-              <svg class="w-5 h-5" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-            </div>
-            <div class="flex-1 text-left">
-              <p class="font-medium" style="color: var(--lex-text-primary)">Open Folder</p>
-              <p class="text-sm" style="color: var(--lex-text-secondary)">View files and folders</p>
-            </div>
-          </button>
-          <button id="togglePinBtn" onclick="togglePinFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 rounded-lg transition-all group" style="border-color: var(--lex-border-default)">
-            <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>
-            </div>
-            <div class="flex-1 text-left">
-              <p id="pinBtnLabel" class="font-medium" style="color: var(--lex-text-primary)">Pin Folder</p>
-              <p id="pinBtnDesc" class="text-sm" style="color: var(--lex-text-secondary)">Add to pinned folders</p>
-            </div>
-          </button>
-          <button onclick="deleteMatterFromModal()" class="w-full flex items-center gap-3 px-4 py-3 bg-white border-2 rounded-lg transition-all group" style="border-color: var(--lex-border-default)">
-            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-            </div>
-            <div class="flex-1 text-left">
-              <p class="font-medium" style="color: var(--lex-text-primary)">Delete Folder</p>
-              <p class="text-sm" style="color: var(--lex-text-secondary)">Permanently delete this folder and all its contents</p>
-            </div>
-          </button>
-        </div>
-      </div>
-    </lex-modal>
-
     <!-- Delete Matter Confirmation Modal -->
     <lex-modal id="deleteMatterConfirmModal" heading="Delete Folder" size="md" variant="danger" hide-actions="true"
       footer-content='<lex-btn onclick="closeDeleteMatterConfirmModal()" variant="secondary">Cancel</lex-btn><lex-btn id="confirmDeleteMatterBtn" onclick="confirmDeleteMatter()" variant="danger">Delete Folder</lex-btn>'>
@@ -397,6 +357,7 @@
   <script src="js/lex/components/foundation/lex-modal.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/components/data/lex-pagination.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>
   <script src="js/shared/library-column-filters.js"></script>

@@ -100,6 +100,24 @@
         .split("'").join('&#039;');
     }
 
+    // Matter options menu (Edit / Archive or Unarchive / Delete) on grid
+    // cards, list rows and pinned cards: a lex-dropdown-btn carrying the
+    // matter id. The click stops at the host so the card does not open;
+    // handleMatterOptionsSelect runs the item.
+    function matterOptionsMenuHtml(matter, className) {
+      var isArchived = matter.status === 'archived';
+      var items = [
+        { value: 'edit', label: 'Edit', icon: 'edit' },
+        { value: isArchived ? 'unarchive' : 'archive', label: isArchived ? 'Unarchive' : 'Archive', icon: 'archive' },
+        { divider: true },
+        { value: 'delete', label: 'Delete', icon: 'trash-2', danger: true }
+      ];
+      return '<lex-dropdown-btn class="matter-options-menu' + (className ? ' ' + className : '') + '"' +
+        ' data-matter-id="' + escapeHtml(matter.matter_id) + '" icon="more-vertical" icon-only variant="ghost" align="end"' +
+        ' aria-label="More options" options="' + escapeHtml(JSON.stringify(items)) + '"' +
+        ' onclick="event.stopPropagation()"></lex-dropdown-btn>';
+    }
+
     // Helper function to render a single matter card
     function renderMatterCard(matter) {
       // Escape all user-controlled data to prevent XSS
@@ -171,11 +189,7 @@
             </div>
             <div class="flex items-center justify-between text-xs text-gray-400">
               <span>Created ${formatDate(matter.created_at)}</span>
-              <button onclick="event.stopPropagation(); showMatterOptions('${escapedMatterId}', this)" class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors" title="More options">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
-                </svg>
-              </button>
+              ${matterOptionsMenuHtml(matter)}
             </div>
           </div>
         </div>
@@ -225,11 +239,7 @@
         '  <td class="px-4 py-3 whitespace-nowrap">' + typeBadge + '</td>',
         '  <td class="px-4 py-3 whitespace-nowrap text-sm" style="color: var(--lex-text-secondary)">' + formatDate(matter.created_at) + '</td>',
         '  <td class="px-4 py-3 whitespace-nowrap text-sm" onclick="event.stopPropagation()">',
-        '    <button onclick="event.stopPropagation(); showMatterOptions(\'' + escapedMatterId + '\', this)" class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors" title="More options">',
-        '      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>',
-        '      </svg>',
-        '    </button>',
+        '    ' + matterOptionsMenuHtml(matter),
         '  </td>',
         '</tr>'
       ].join('');
@@ -258,11 +268,7 @@
         '      <p class="text-xs truncate mt-1" style="color: var(--lex-text-secondary)">' + (escapedClientName || escapedMatterId) + '</p>',
         '      <div class="flex items-center gap-2 mt-2">' + typeBadge + ' ' + statusBadge(matter.status || 'active') + '</div>',
         '    </div>',
-        '    <button onclick="event.stopPropagation(); showMatterOptions(\'' + escapedMatterId + '\', this)" class="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors opacity-0 group-hover:opacity-100" title="More options">',
-        '      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
-        '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>',
-        '      </svg>',
-        '    </button>',
+        '    ' + matterOptionsMenuHtml(matter, 'flex-shrink-0'),
         '  </div>',
         '</div>'
       ].join('');
@@ -1740,91 +1746,18 @@
       updateSelectionUI();
     }
 
-    // Shared matter options dropdown (fixed-position, used by grid, list, and pinned cards)
-    window.showMatterOptions = function(matterId, triggerEl) {
-      var dropdown = document.getElementById('matterOptionsDropdown');
-      if (!dropdown) return;
-
-      var isAlreadyOpen = !dropdown.classList.contains('hidden') && dropdown._currentMatterId === matterId;
-      // Close if already open for this matter
-      if (isAlreadyOpen) {
-        dropdown.classList.add('hidden');
-        dropdown._currentMatterId = null;
-        return;
-      }
-
-      // Position relative to the trigger button
-      var rect = triggerEl.getBoundingClientRect();
-      dropdown.style.top = (rect.bottom + 4) + 'px';
-      dropdown.style.left = (rect.right - 128) + 'px'; // 128 = w-32 (8rem)
-
-      // Flip above if not enough room below
-      var dropdownHeight = 80; // approximate height of 2 menu items
-      if (rect.bottom + 4 + dropdownHeight > window.innerHeight) {
-        dropdown.style.top = (rect.top - 4 - dropdownHeight) + 'px';
-      }
-
-      // Clamp left edge so it doesn't go offscreen
-      var left = rect.right - 128;
-      if (left < 8) left = 8;
-      dropdown.style.left = left + 'px';
-
-      // Find the matter object so the Archive button knows whether it's
-      // currently archived (label flips to "Unarchive") and so we can call
-      // the right API endpoint.
-      var targetMatter = null;
-      for (var i = 0; i < currentMatters.length; i++) {
-        if (currentMatters[i].matter_id === matterId) { targetMatter = currentMatters[i]; break; }
-      }
-      var isArchived = !!(targetMatter && targetMatter.status === 'archived');
-
-      // Wire up actions for this matter
-      var editBtn = document.getElementById('matterOptionsEdit');
-      var archiveBtn = document.getElementById('matterOptionsArchive');
-      var deleteBtn = document.getElementById('matterOptionsDelete');
-      if (editBtn) {
-        editBtn.onclick = function() { dropdown.classList.add('hidden'); dropdown._currentMatterId = null; editMatter(matterId); };
-      }
-      if (archiveBtn) {
-        archiveBtn.textContent = isArchived ? 'Unarchive' : 'Archive';
-        archiveBtn.onclick = function() {
-          dropdown.classList.add('hidden');
-          dropdown._currentMatterId = null;
-          if (isArchived) {
-            unarchiveMatter(matterId);
-          } else {
-            archiveMatter(matterId);
-          }
-        };
-      }
-      if (deleteBtn) {
-        deleteBtn.onclick = function() { dropdown.classList.add('hidden'); dropdown._currentMatterId = null; deleteMatter(matterId); };
-      }
-
-      dropdown._currentMatterId = matterId;
-      dropdown.classList.remove('hidden');
-
-      // Close on outside click
-      setTimeout(function() {
-        var closeOnClickOutside = function(ev) {
-          if (!dropdown.contains(ev.target) && ev.target !== triggerEl && !triggerEl.contains(ev.target)) {
-            dropdown.classList.add('hidden');
-            dropdown._currentMatterId = null;
-            document.removeEventListener('click', closeOnClickOutside);
-          }
-        };
-        document.addEventListener('click', closeOnClickOutside);
-      }, 0);
-    };
-
-    // Close shared dropdown on scroll (prevents stale position)
-    window.addEventListener('scroll', function() {
-      var dropdown = document.getElementById('matterOptionsDropdown');
-      if (dropdown && !dropdown.classList.contains('hidden')) {
-        dropdown.classList.add('hidden');
-        dropdown._currentMatterId = null;
-      }
-    }, true);
+    // Matter options menus (lex-dropdown-btn, see matterOptionsMenuHtml).
+    function handleMatterOptionsSelect(event) {
+      var host = event.target && event.target.closest ? event.target.closest('lex-dropdown-btn.matter-options-menu') : null;
+      if (!host || !event.detail) return;
+      var matterId = host.getAttribute('data-matter-id');
+      var action = event.detail.value;
+      if (action === 'edit') editMatter(matterId);
+      else if (action === 'archive') archiveMatter(matterId);
+      else if (action === 'unarchive') unarchiveMatter(matterId);
+      else if (action === 'delete') deleteMatter(matterId);
+    }
+    trackDocListener('lex-select', handleMatterOptionsSelect);
 
     // Update selection UI (checkboxes, count, bulk actions visibility)
     function updateSelectionUI() {
@@ -3209,10 +3142,6 @@
 
     // 2. Restore body scroll (modals/drawers set overflow:hidden)
     document.body.style.overflow = '';
-
-    // 3. Close the shared matter options dropdown
-    var matterDropdown = document.getElementById('matterOptionsDropdown');
-    if (matterDropdown) { matterDropdown.classList.add('hidden'); matterDropdown._currentMatterId = null; }
 
     // 3a. Remove tracked document-level listeners (catches listeners missed by snapshot approach)
     _documentListeners.forEach(function (entry) {

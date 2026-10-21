@@ -704,32 +704,23 @@
 
   function openConnectorDashboardModal(url, connectorName) {
     var modal = document.getElementById('connectorDashboardModal');
+    if (!modal) return;
+    // lex-modal copies its children when it upgrades; look the frame up now.
     var frame = document.getElementById('connectorDashboardFrame');
-    var title = document.getElementById('connectorDashboardTitle');
-    var urlEl = document.getElementById('connectorDashboardUrl');
-    var openNewBtn = document.getElementById('connectorDashboardOpenNewBtn');
+    if (!frame) return;
 
-    if (!modal || !frame) return;
-
-    if (title) title.textContent = connectorName || 'Connector Dashboard';
-    if (urlEl) urlEl.textContent = url || '';
-    if (openNewBtn) {
-      openNewBtn.onclick = function () {
-        window.open(url, '_blank', 'noopener,noreferrer');
-      };
-    }
+    modal.heading = connectorName || 'Connector Dashboard';
     frame.src = url;
-    modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
+    modal.open = true;
   }
 
+  // Unload the dashboard (stops its timers and requests) and close the modal.
   function closeConnectorDashboardModal() {
     var modal = document.getElementById('connectorDashboardModal');
     var frame = document.getElementById('connectorDashboardFrame');
 
     if (frame) frame.src = 'about:blank';
-    if (modal) modal.classList.add('hidden');
-    document.body.style.overflow = '';
+    if (modal) modal.open = false;
   }
 
   // ── Install connector ───────────────────────────────────────────────
@@ -1669,6 +1660,18 @@
     };
     window.addEventListener('message', embeddedBackHandler);
     _documentListeners.push({ event: 'message', handler: embeddedBackHandler, target: window });
+
+    // Header close button or Escape closes the lex-modal; unload the frame too.
+    var dashboardModal = document.getElementById('connectorDashboardModal');
+    if (dashboardModal) {
+      var dashboardCloseHandler = function (event) {
+        if (event.target !== dashboardModal) return;
+        var frame = document.getElementById('connectorDashboardFrame');
+        if (frame) frame.src = 'about:blank';
+      };
+      dashboardModal.addEventListener('lex-close', dashboardCloseHandler);
+      _documentListeners.push({ event: 'lex-close', handler: dashboardCloseHandler, target: dashboardModal });
+    }
 
     var embeddedOpenExternalHandler = function (event) {
       var data = event && event.data;

@@ -692,28 +692,12 @@
     </div>
   </lex-drawer>
 
-  <!-- Create Skill Modal - Full Screen Skill Builder -->
-  <div id="createSkillModal" data-hoist class="fixed inset-0 bg-white hidden flex-col" style="z-index: 10001;">
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white shadow-sm">
-      <div class="flex items-center gap-3">
-        <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--lex-bg-accent-soft)">
-          <svg class="w-6 h-6" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-          </svg>
-        </div>
-        <div>
-          <h2 class="text-xl font-semibold text-gray-900">Skill Builder</h2>
-          <p class="text-sm text-gray-500">Create a multi-step automated skill</p>
-        </div>
-      </div>
-      <button onclick="closeCreateSkillModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-    </div>
-
-    <div class="flex-1 overflow-hidden flex">
+  <!-- Create Skill Modal - Full Screen Skill Builder (lex-modal; Escape and backdrop do not discard the draft).
+       The body is sized to the viewport minus header and footer so both panels and the
+       Drawflow canvas keep their own scrolling. -->
+  <lex-modal id="createSkillModal" heading="Skill Builder" size="full" flush close-on-escape="false" close-on-overlay="false" data-hoist
+    footer-content='<div class="mr-auto text-sm text-gray-600"><span id="workflow-step-count">0</span> steps configured</div><lex-btn type="button" onclick="closeCreateSkillModal()" variant="secondary">Cancel</lex-btn><lex-btn type="button" onclick="saveSkill()" variant="primary" leading-icon="check">Save Skill</lex-btn>'>
+    <div class="overflow-hidden flex" style="height: calc(100dvh - 7.5rem);">
       <!-- SIMPLE MODE -->
       <div id="simple-workflow-mode" class="flex-1 flex">
         <div class="flex-1 p-6 bg-gray-50 overflow-y-auto">
@@ -871,45 +855,13 @@
       </div>
     </div>
 
-    <div class="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
-      <div class="text-sm text-gray-600">
-        <span id="workflow-step-count">0</span> steps configured
-      </div>
-      <div class="flex gap-3">
-        <button onclick="closeCreateSkillModal()"
-                class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button onclick="saveSkill()"
-                class="px-5 py-2.5 text-sm font-medium text-white rounded-lg transition-colors flex items-center gap-2" style="background: var(--lex-bg-accent)">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-          Save Skill
-        </button>
-      </div>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Import Skill Modal -->
-  <div id="importSkillModal" data-hoist class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4" style="z-index: 10001;">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--lex-bg-accent-soft)">
-            <svg class="w-6 h-6" style="color: var(--lex-text-accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold text-gray-900">Import Skill</h2>
-            <p class="text-sm text-gray-500">Import an existing skill from a JSON file</p>
-          </div>
-        </div>
-        <button onclick="closeImportSkillModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto p-6">
+  <lex-modal id="importSkillModal" heading="Import Skill" width="768px" data-hoist
+    footer-content='<lex-btn type="button" onclick="closeImportSkillModal()" variant="secondary">Cancel</lex-btn><lex-btn type="button" id="import-skill-btn" onclick="submitImportSkill()" variant="primary" leading-icon="upload" disabled>Import Skill</lex-btn>'>
+      <div>
+        <p class="text-sm text-gray-500 mb-4">Import an existing skill from a JSON file</p>
         <div id="skill-drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer">
           <input type="file" id="skill-file-input" accept=".json" class="hidden">
           <div id="skill-upload-prompt">
@@ -947,19 +899,7 @@
         </div>
       </div>
 
-      <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-        <button onclick="closeImportSkillModal()"
-                class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          Cancel
-        </button>
-        <button id="import-skill-btn" onclick="submitImportSkill()" disabled
-                class="px-5 py-2.5 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" style="background: var(--lex-bg-accent)">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path></svg>
-          Import Skill
-        </button>
-      </div>
-    </div>
-  </div>
+  </lex-modal>
 
   <!-- Edit Matter Modal (for inline editing from detail page) -->
   <lex-modal id="detailMatterModal" heading="Edit Matter" size="full" hide-actions
@@ -1195,6 +1135,7 @@
   <script src="js/lex/components/foundation/lex-accordion.js"></script>
   <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/form/lex-dropdown-btn.js"></script>
   <script src="js/lex/components/form/lex-checkbox.js"></script>
   <script src="js/lex/components/form/lex-textarea.js"></script>
   <script src="js/lex/components/data/lex-table.js"></script>

@@ -224,8 +224,8 @@ test.describe('workspace closeout commentary', () => {
     await expect(page.getByText('Follow up with event lead').first()).toBeVisible();
 
     await page.getByText('Follow up with event lead').first().click();
-    await page.locator('[data-task-actions-toggle]').click();
-    await page.locator('[data-task-action="complete"]').click();
+    await page.locator('[data-task-actions-menu] .lex-ddbtn-trigger').click();
+    await page.locator('[data-task-actions-menu] .lex-ddbtn-item[data-value="complete"]').click();
     await expectVisiblePanelScreenshot(page, '#myTaskCloseoutModal .p-5', 'my-tasks-closeout-desktop');
 
     await setLexValue(page, '#myTaskCloseoutReason', 'Call completed and next step is ready');

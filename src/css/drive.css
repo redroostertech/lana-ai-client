@@ -200,16 +200,12 @@
   white-space: nowrap;
 }
 
-.drive-list-menu {
-  background: none;
-  border: 0;
-  color: var(--lex-text-tertiary);
-  cursor: pointer;
-  padding: 4px;
-}
-
-.drive-list-menu:hover {
-  color: var(--lex-text-primary);
+/* The folder menu in a list row is a lex-dropdown-btn. While it is open the
+   table's scroll area stops clipping, so the menu shows past the last row
+   (the same rule lex-table applies to an open column filter). */
+lex-table:has(.drive-list-menu .lex-ddbtn-dropdown--open),
+lex-table:has(.drive-list-menu .lex-ddbtn-dropdown--open) .lex-table-scroll-area {
+  overflow: visible !important;
 }
 
 /* Column widths (docs/TABLE-STANDARD.md, section 8). Headers stay on one

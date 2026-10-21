@@ -499,17 +499,6 @@
     setInputValue('userRole', roleId);
   }
 
-  // The submit button sits in the lex-modal footer (footer-content), outside
-  // the lex-form, so validate and read the form the way lex-submit would.
-  function _bindFooterSubmit(button, form, onSubmit) {
-    if (!button || !form) return;
-    button.addEventListener('click', function () {
-      var result = typeof form.validate === 'function' ? form.validate() : { valid: true, errors: [] };
-      var values = typeof form.getValues === 'function' ? form.getValues() : {};
-      onSubmit({ valid: result.valid, values: values, errors: result.errors });
-    });
-  }
-
   function _wireEditModal() {
     var modal = el('userModal');
     var form  = el('userForm');
@@ -524,8 +513,8 @@
       }
       _handleEditSubmit(detail.values);
     }
+    // Save is <lex-btn type="submit" form="userForm"> in the modal footer.
     form.addEventListener('lex-submit', function (e) { onSubmit(e.detail); });
-    _bindFooterSubmit(el('userModalSaveBtn'), form, onSubmit);
 
     var cancelBtn = el('userModalCancelBtn');
     if (cancelBtn) {
@@ -651,8 +640,8 @@
       }
       _handleResetPasswordSubmit(detail.values);
     }
+    // Reset is <lex-btn type="submit" form="resetPasswordForm"> in the modal footer.
     form.addEventListener('lex-submit', function (e) { onSubmit(e.detail); });
-    _bindFooterSubmit(el('resetPasswordSubmitBtn'), form, onSubmit);
 
     // Cancel button
     var cancelBtn = el('resetPasswordCancelBtn');
