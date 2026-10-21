@@ -118,3 +118,37 @@ describe('lex-modal slots and lex-drawer additions', () => {
     expect(host.querySelector('lex-btn button').getAttribute('form')).toBe('f1');
   });
 });
+
+describe('overlay stacking and late headings', () => {
+  test('Escape closes only the topmost overlay', async () => {
+    const window = boot();
+    window.eval(read('lex/components/foundation/lex-drawer.js'));
+    const host = window.document.createElement('div');
+    host.innerHTML = '<lex-drawer id="d" heading="Details"><p>x</p></lex-drawer><lex-modal id="m" heading="Confirm"><p>y</p></lex-modal>';
+    window.document.body.appendChild(host);
+    const drawer = host.querySelector('#d');
+    const modal = host.querySelector('#m');
+    drawer.open = true; await tick(window);
+    modal.open = true; await tick(window);
+    window.document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await tick(window);
+    expect(modal.open).toBeFalsy();
+    expect(drawer.open).toBe(true);
+    window.document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await tick(window);
+    expect(drawer.open).toBeFalsy();
+  });
+
+  test('a modal created without a heading shows its header once a heading is set', async () => {
+    const window = boot();
+    const modal = window.document.createElement('lex-modal');
+    modal.innerHTML = '<p>Body</p>';
+    window.document.body.appendChild(modal);
+    modal.open = true; await tick(window);
+    const header = modal.querySelector('.lex-modal-header');
+    expect(header.hasAttribute('data-empty')).toBe(true);
+    modal.heading = 'Details'; await tick(window);
+    expect(header.hasAttribute('data-empty')).toBe(false);
+    expect(modal.querySelector('.lex-modal-title').textContent).toBe('Details');
+  });
+});
