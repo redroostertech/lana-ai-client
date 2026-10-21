@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -47,23 +48,51 @@
       <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"User Management"}]'></lex-breadcrumb>
 
 
-      <!-- ================================================================
-           Users Table — Tier 3 (setData) for custom column rendering.
-           Columns: user_display (avatar+name+email), username, role_name,
-                    status (pill), created_at (formatted date), Actions (injected).
-           ================================================================ -->
-      <lex-card padding="none">
+      <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+      <div class="bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter users">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="usersSearch" placeholder="Search users..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+            <lex-select id="usersSort" options='[{"value":"created_at","label":"Created"},{"value":"email","label":"Email"},{"value":"username","label":"Username"},{"value":"status","label":"Status"}]' value="created_at"></lex-select>
+          </div>
+          <lex-btn id="usersSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Status:</label>
+            <lex-select id="usersStatusFilter" options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"},{"value":"suspended","label":"Suspended"},{"value":"deactivated","label":"Deactivated"}]' value="all"></lex-select>
+          </div>
+          <div id="usersCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+        </div>
+      </div>
+
+      <section aria-labelledby="usersHeading">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="usersHeading" class="admin-table-section-title text-lg font-semibold">All Users</h2>
+          <span id="usersSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+        </div>
+
         <lex-table
           id="usersTable"
-          columns="user_display,username,role_name,status,created_at"
-          labels="User,Username,Role,Status,Created"
-          searchable
-          empty-text="No users found"
+          class="admin-table lex-table--card"
+          column-filters
+          server-paging
+          columns="name,email,username,role,status,created_at"
+          labels="Name,Email,Username,Role,Status,Created"
+          sortable-columns="email,username,status,created_at"
           sort-by="created_at"
           sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No users yet"
+          aria-label="Users"
         ></lex-table>
-        <lex-pagination id="pagination" style="padding:0 1rem;"></lex-pagination>
-      </lex-card>
+      </section>
 
     </main>
 
@@ -210,7 +239,6 @@
   <script src="../js/lex/components/foundation/lex-kv.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
-  <script src="../js/lex/components/data/lex-pagination.js"></script>
   <script src="../js/lex/components/form/lex-form.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
@@ -221,6 +249,8 @@
   <script src="../js/admin/admin-switcher.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/admin-users.pagination.js"></script>
   <script src="../js/admin/admin-users.js"></script>
 

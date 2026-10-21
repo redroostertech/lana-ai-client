@@ -65,46 +65,153 @@
     return sign + Math.abs(pct).toFixed(1) + '%';
   }
 
-  function formatDate(value) {
-    if (!value) return '-';
-    var date = new Date(value);
-    if (!isFinite(date.getTime())) return '-';
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(date);
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
-  function normalizeRowValue(value) {
-    if (value == null) return '';
-    if (typeof value === 'object') return JSON.stringify(value);
-    return value;
+  function tables() {
+    return window.LanaMetricTables;
   }
 
-  function flattenRows(rows) {
-    return (Array.isArray(rows) ? rows : []).map(function (row) {
-      if (!row || typeof row !== 'object' || Array.isArray(row)) {
-        return { value: normalizeRowValue(row) };
-      }
-      return Object.keys(row).reduce(function (acc, key) {
-        acc[key] = normalizeRowValue(row[key]);
-        return acc;
-      }, {});
+  function muted() {
+    return '<span class="metric-detail-muted">\u2014</span>';
+  }
+
+  // Dates go through Lex.Utils (API time is UTC; shown in the user's zone).
+  function dateTimeCell(value) {
+    if (!value || !window.Lex || !Lex.Utils) return muted();
+    var text = Lex.Utils.formatDateTime(value);
+    if (!text || text === 'Never') return muted();
+    return '<time class="metric-detail-time" datetime="' + escapeHtml(value) + '">' + escapeHtml(text) + '</time>';
+  }
+
+  function dateCell(value) {
+    if (!value || !window.Lex || !Lex.Utils) return muted();
+    var text = Lex.Utils.formatDate(value);
+    if (!text || text === '-' || text === 'Never') return muted();
+    return '<time class="metric-detail-time" datetime="' + escapeHtml(value) + '" title="' + escapeHtml(Lex.Utils.formatDateTime(value)) + '">' + escapeHtml(text) + '</time>';
+  }
+
+  var SNAPSHOT_STATUS_COLORS = { success: 'green', ok: 'green', error: 'red', failed: 'red', partial: 'yellow', historical_unverified: 'yellow' };
+
+  function snapshotRenderers() {
+    return {
+      created_at: dateTimeCell,
+      value: function (value, row) {
+        var text = formatValue(value, row.format);
+        return text === '-' ? muted() : escapeHtml(text);
+      },
+      status: function (value) {
+        if (!value) return muted();
+        return '<lex-badge label="' + escapeHtml(tables().humanizeLabel(value)) + '" color="' +
+          escapeHtml(SNAPSHOT_STATUS_COLORS[String(value).toLowerCase()] || 'gray') + '"></lex-badge>';
+      },
+      period_start: dateCell,
+      period_end: dateCell,
+    };
+  }
+
+  function rawRenderers(dateColumns, columns) {
+    var renderers = {};
+    columns.forEach(function (col) {
+      renderers[col] = dateColumns.indexOf(col) !== -1
+        ? dateTimeCell
+        : function (value) {
+          if (value === null || value === undefined || value === '') return muted();
+          var text = String(value);
+          return '<span class="metric-detail-cell-truncate" title="' + escapeHtml(text) + '">' + escapeHtml(text) + '</span>';
+        };
     });
+    return renderers;
   }
 
-  function setTableData(tableId, rows) {
-    var table = el(tableId);
-    var normalized = flattenRows(rows);
-    if (!table || typeof table.setData !== 'function') return;
+  var toolbars = {};
 
-    if (normalized.length > 0) {
-      table.setAttribute('columns', Object.keys(normalized[0]).slice(0, 12).join(','));
+  function setEmptyText(table, emptyCopy, filteredCopy) {
+    table.emptyText = tables().emptyText(table, emptyCopy, filteredCopy);
+  }
+
+  function setSelectOptions(id, options, value) {
+    var select = el(id);
+    if (!select) return;
+    select.options = options;
+    if (value !== undefined) select.value = value;
+  }
+
+  function renderSnapshots(snapshots) {
+    var table = el('metricSnapshotsTable');
+    if (!table || typeof table.setData !== 'function') return;
+    var shared = tables();
+    var rows = (snapshots || []).map(shared.mapSnapshot);
+    var filters = shared.snapshotFilterOptions(rows);
+    table.setColumnFilterOptions(filters);
+    setSelectOptions('metricSnapshotsStatusFilter',
+      [{ value: 'all', label: 'All' }].concat(filters.status.options));
+    var empty = function () {
+      setEmptyText(table, 'No snapshots captured yet', 'No matching snapshots. Try a different search or clear the filters.');
+    };
+    if (!toolbars.snapshots) {
+      toolbars.snapshots = shared.bindClientToolbar(table, {
+        search: 'metricSnapshotsSearch',
+        sort: 'metricSnapshotsSort',
+        order: 'metricSnapshotsSortOrder',
+        filter: 'metricSnapshotsStatusFilter',
+        counts: ['metricSnapshotsCount', 'metricSnapshotsSectionCount']
+      }, { filterKey: 'status', noun: ['snapshot', 'snapshots'], defaultSort: 'created_at' });
+      table.addEventListener('lex-filter-change', empty);
     }
-    table.setData(normalized);
+    empty();
+    table.setData(rows);
+    toolbars.snapshots.updateCount();
+  }
+
+  function renderRawData(sourceRows) {
+    var table = el('metricRawDataTable');
+    if (!table || typeof table.setData !== 'function') return;
+    var shared = tables();
+    var model = shared.rawDataTable(sourceRows, 12);
+    if (model.columns.length) {
+      table.setAttribute('columns', model.columns.join(','));
+      table.setAttribute('labels', model.labels.join(','));
+    }
+    table.setCellRenderers(rawRenderers(model.dateColumns, model.columns));
+    var filterMap = {};
+    model.dateColumns.forEach(function (col) {
+      var range = shared.createdRangeFilter();
+      if (range) filterMap[col] = range;
+    });
+    table.setColumnFilterOptions(filterMap);
+    var sortOptions = model.columns.map(function (col, i) { return { value: col, label: model.labels[i] }; });
+    var defaultSort = model.columns.indexOf('created_at') !== -1 ? 'created_at' : (model.columns[0] || '');
+    var defaultDir = defaultSort === 'created_at' ? 'desc' : 'asc';
+    setSelectOptions('metricRawDataSort', sortOptions, defaultSort);
+    var order = el('metricRawDataSortOrder');
+    if (order) order.dataset.order = defaultDir;
+    var empty = function () {
+      setEmptyText(table, 'No source records for this period', 'No matching source records. Try a different search or clear the filters.');
+    };
+    if (!toolbars.raw) {
+      toolbars.raw = shared.bindClientToolbar(table, {
+        search: 'metricRawDataSearch',
+        sort: 'metricRawDataSort',
+        order: 'metricRawDataSortOrder',
+        counts: ['metricRawDataCount', 'metricRawDataSectionCount']
+      }, { noun: ['record', 'records'], defaultSort: defaultSort });
+      table.addEventListener('lex-filter-change', empty);
+    }
+    empty();
+    table.setData(model.rows);
+    if (defaultSort && table.dataSource) {
+      table.sortBy = defaultSort;
+      table.sortDir = defaultDir;
+      table.dataSource.setSort(defaultSort, defaultDir);
+    }
+    toolbars.raw.updateCount();
   }
 
   function renderBreadcrumb(metric) {
@@ -177,16 +284,8 @@
       }
       setText('metricDirection', directionLabel);
 
-      setTableData('metricSnapshotsTable', (payload.snapshots || []).map(function (snapshot) {
-        return {
-          captured_at: formatDate(snapshot.captured_at),
-          value: formatValue(snapshot.value_numeric, snapshot.format),
-          status: snapshot.calculation_status,
-          period_start: formatDate(snapshot.period_start),
-          period_end: formatDate(snapshot.period_end),
-        };
-      }));
-      setTableData('metricRawDataTable', payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : []);
+      renderSnapshots(payload.snapshots || []);
+      renderRawData(payload.raw_data && payload.raw_data.rows ? payload.raw_data.rows : []);
     } catch (err) {
       console.error('[MetricDetail] Failed to load metric detail:', err);
       setText('metricTitle', 'Metric unavailable');
@@ -232,7 +331,15 @@
       return;
     }
     initDetailTabs();
-    loadMetricDetail();
+    var ready = window.customElements && typeof window.customElements.whenDefined === 'function'
+      ? window.customElements.whenDefined('lex-table')
+      : Promise.resolve();
+    ready.then(function () {
+      var snapshots = el('metricSnapshotsTable');
+      // Renderers must be registered before the first setData.
+      if (snapshots && typeof snapshots.setCellRenderers === 'function') snapshots.setCellRenderers(snapshotRenderers());
+      loadMetricDetail();
+    });
   }
 
   init();

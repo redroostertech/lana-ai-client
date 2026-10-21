@@ -371,7 +371,7 @@
   var STATUS_DEFAULT_TOKEN = { bg: 'var(--lex-status-neutral-bg, #F5F3F0)', text: 'var(--lex-status-neutral-text, #423F3A)' };
 
   function statusBadge(status) {
-    var escaped = escapeHtml(status);
+    var escaped = escapeHtml(humanizeLabel(status));
     var tokens = STATUS_TOKEN_STYLES[status] || STATUS_DEFAULT_TOKEN;
     var inlineStyle = 'background:' + tokens.bg + ';color:' + tokens.text + ';';
     return '<span style="display:inline-flex;align-items:center;padding:2px 8px;font-size:var(--lex-body-xs-size,0.75rem);font-weight:500;border-radius:var(--lex-radius-full,9999px);' + inlineStyle + '">' + escaped + '</span>';

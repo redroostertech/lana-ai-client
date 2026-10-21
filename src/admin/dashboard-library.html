@@ -48,30 +48,54 @@
         <div id="dashboardLibraryPinnedGrid" class="insights-pinned-grid"></div>
       </section>
 
-      <section class="insights-section" aria-labelledby="dashboardLibraryHeading">
-        <div class="insights-section-header">
-          <div>
-            <div class="insights-section-title" id="dashboardLibraryHeading">Dashboard Library</div>
-            <div class="insights-section-subtitle">Role-aware dashboard groups backed by report modules and metric catalog entries</div>
+      <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md section 2) -->
+      <div class="bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter dashboards">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="dashboardLibrarySearch" placeholder="Search dashboards..." clearable="true" leading-icon="search"></lex-input>
           </div>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+            <lex-select
+              id="dashboardLibrarySort"
+              options='[{"value":"updated_at","label":"Last edited"},{"value":"created_at","label":"Created"},{"value":"name","label":"Name"},{"value":"audience","label":"Audience"},{"value":"category","label":"Category"}]'
+              value="updated_at"
+            ></lex-select>
+          </div>
+          <lex-btn id="dashboardLibrarySortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Audience:</label>
+            <lex-select id="dashboardLibraryAudienceFilter" options='[{"value":"all","label":"All"}]' value="all"></lex-select>
+          </div>
+          <div id="dashboardLibraryCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
+        </div>
+      </div>
+
+      <section class="insights-section" aria-labelledby="dashboardLibraryHeading">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="dashboardLibraryHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">Dashboard Library</h2>
+          <span id="dashboardLibrarySectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
         </div>
 
-        <div class="insights-library-card">
-          <lex-table
-            id="dashboardLibraryTable"
-            searchable
-            filterable
-            column-filters
-            compact
-            limit="10"
-            columns="pin,name,audience,category,scope,visibility,state,actions"
-            labels=" ,Name,Audience,Category,Scope,Visibility,State,Actions"
-            sort-by="name"
-            sort-dir="asc"
-            empty-text="No dashboards found"
-            aria-label="Dashboard library"
-          ></lex-table>
-        </div>
+        <lex-table
+          id="dashboardLibraryTable"
+          class="lex-table--card"
+          column-filters
+          columns="pin,name,audience,category,scope,visibility,state,created_at,updated_at,actions"
+          labels=" ,Name,Audience,Category,Scope,Visibility,State,Created,Last edited,Actions"
+          sortable-columns="name,audience,category,scope,visibility,state,created_at,updated_at"
+          sort-by="updated_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="row_id"
+          empty-text="No dashboards yet"
+          empty-action-label="Create Dashboard"
+          aria-label="Dashboard library"
+        ></lex-table>
       </section>
     </main>
   </template>
@@ -105,7 +129,10 @@
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
-  <script src="../js/lex/components/data/lex-filter-bar.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/components/form/lex-segmented.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
@@ -115,6 +142,8 @@
   <script src="../js/lex/components/layout/lex-app.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/shared/metric-tables.js"></script>
   <script src="../js/admin/dashboard-catalog.js"></script>
   <script src="../js/admin/dashboard-library.js"></script>
   <script src="../js/auth-guard.js"></script>

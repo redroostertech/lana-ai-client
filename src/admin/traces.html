@@ -41,6 +41,7 @@
     }
   </style>
 
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
 </head>
 <body>
@@ -78,65 +79,51 @@
            ══════════════════════════════════════════════════════════════ -->
       <div id="traceListView">
 
-        <!-- Filters -->
-        <lex-card compact style="margin-bottom:1.5rem;">
-          <h3 class="text-sm font-semibold lex-text-primary mb-3">Filters</h3>
-          <div class="flex flex-wrap gap-4 items-end">
+        <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+        <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter traces">
+          <div class="flex items-center gap-4 flex-wrap">
             <div class="flex-1 min-w-[200px]">
-              <lex-input
-                id="filterConversation"
-                label="Conversation, Session, or Trace ID"
-                placeholder="Optional identifier"
-              ></lex-input>
+              <lex-input id="tracesSearch" placeholder="Search messages, or paste a conversation, session or trace ID..." clearable="true" leading-icon="search"></lex-input>
             </div>
-            <div class="flex-1 min-w-[140px]">
-              <lex-select
-                id="filterStatus"
-                label="Status"
-                placeholder="All Statuses"
-                options='[{"value":"completed","label":"Completed"},{"value":"failed","label":"Failed"},{"value":"pending","label":"Pending"},{"value":"aborted","label":"Aborted"}]'
-              ></lex-select>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+              <lex-select id="tracesSort" options='[{"value":"created_at","label":"Created"},{"value":"status","label":"Status"},{"value":"chat_mode","label":"Route"},{"value":"duration","label":"Duration"}]' value="created_at"></lex-select>
             </div>
-            <div class="flex-1 min-w-[140px]">
-              <lex-select
-                id="filterMode"
-                label="Route"
-                placeholder="All Routes"
-                options='[{"value":"unified","label":"Unified"},{"value":"workspace","label":"Workspace"},{"value":"document","label":"Document"},{"value":"agentic","label":"Agentic"},{"value":"rag","label":"RAG"},{"value":"general","label":"General"},{"value":"data","label":"Data"},{"value":"insights","label":"Insights"},{"value":"automations","label":"Automations"},{"value":"text_transform","label":"Text transform"},{"value":"pending_detection","label":"Pending route"}]'
-              ></lex-select>
+            <lex-btn id="tracesSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+              </svg>
+            </lex-btn>
+            <div class="flex items-center gap-2">
+              <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Status:</label>
+              <lex-select id="tracesStatusFilter" options='[{"value":"all","label":"All"},{"value":"completed","label":"Completed"},{"value":"failed","label":"Failed"},{"value":"pending","label":"Pending"},{"value":"aborted","label":"Aborted"}]' value="all"></lex-select>
             </div>
-            <div class="flex-1 min-w-[140px]">
-              <lex-input
-                id="filterDate"
-                type="date"
-                label="Date"
-              ></lex-input>
-            </div>
-            <div class="flex gap-2" style="padding-bottom:2px;">
-              <lex-btn id="applyFiltersBtn" variant="primary" size="md">Apply</lex-btn>
-              <lex-btn id="clearFiltersBtn" variant="secondary" size="md">Clear</lex-btn>
-            </div>
+            <div id="tracesCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
           </div>
-        </lex-card>
+        </div>
 
-        <!-- Traces Table -->
-        <lex-card padding="none">
+        <section aria-labelledby="tracesHeading">
+          <div class="flex items-center justify-between mb-3">
+            <h2 id="tracesHeading" class="admin-table-section-title text-lg font-semibold">All Traces</h2>
+            <span id="tracesSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+          </div>
+
           <lex-table
             id="tracesTable"
-            columns="timestamp,user_message,chat_mode,status,duration,llm_calls"
-            labels="Timestamp,User Message,Route,Status,Duration,LLM Calls"
-            empty-text="No traces found"
+            class="admin-table lex-table--card"
+            column-filters
+            server-paging
+            columns="user_message,chat_mode,status,duration,llm_calls,created_at"
+            labels="Message,Route,Status,Duration,LLM calls,Created"
+            sortable-columns="chat_mode,status,duration,created_at"
+            sort-by="created_at"
+            sort-dir="desc"
+            limit="20"
+            id-key="id"
+            empty-text="No traces yet"
+            aria-label="Chat traces"
           ></lex-table>
-
-          <!-- Pagination -->
-          <div id="paginationRow" class="flex items-center justify-between" style="padding:0.75rem 1.5rem;">
-            <span id="paginationInfo" class="text-xs lex-text-tertiary"></span>
-            <div class="flex gap-2">
-              <lex-btn id="prevPageBtn" variant="secondary" size="sm" disabled>Previous</lex-btn>
-              <lex-btn id="nextPageBtn" variant="secondary" size="sm" disabled>Next</lex-btn>
-            </div>
-          </div>
-        </lex-card>
+        </section>
 
       </div>
 
@@ -152,7 +139,7 @@
               <h2 class="text-lg font-semibold lex-text-primary">Trace Details</h2>
               <p id="traceIdDisplay" class="text-xs lex-text-tertiary mt-1 font-mono"></p>
             </div>
-            <lex-badge id="detailStatusBadge" variant="neutral">--</lex-badge>
+            <lex-badge id="detailStatusBadge" color="gray" label="--"></lex-badge>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -318,6 +305,8 @@
   <script src="../js/admin/admin-switcher.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/admin-traces.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

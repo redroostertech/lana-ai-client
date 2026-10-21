@@ -472,36 +472,13 @@
   overflow-wrap: anywhere;
 }
 
-/* Inline status <select> in the details list */
+/* Inline status lex-select in the details list */
 .my-task-status-control {
   display: inline-flex;
 }
 
 .my-task-status-select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding: 0.3125rem 1.75rem 0.3125rem 0.625rem;
-  border: 1px solid var(--lex-border-default);
-  border-radius: var(--lex-radius-md, 8px);
-  background-color: var(--lex-bg-primary);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  color: var(--lex-text-primary);
-  font: inherit;
-  font-size: var(--lex-body-sm-size, 0.875rem);
-  font-weight: var(--lex-weight-medium, 500);
-  cursor: pointer;
-}
-
-.my-task-status-select:hover {
-  border-color: var(--lex-border-strong, var(--lex-border-default));
-}
-
-.my-task-status-select:focus-visible {
-  outline: none;
-  border-color: var(--lex-accent, var(--lex-border-strong));
-  box-shadow: 0 0 0 3px var(--lex-accent-subtle, rgba(99, 102, 241, 0.18));
+  min-width: 10rem;
 }
 
 /* Matter title hyperlink (replaces the old "Open Matter" button) */
@@ -1610,12 +1587,15 @@
 }
 
 /* Task, Workspace | Matter, Status, Priority, Due, Created */
-#myTasksTable th:nth-child(1) { width: 32%; }
-#myTasksTable th:nth-child(2) { width: 22%; }
-#myTasksTable th:nth-child(3) { width: 11%; }
-#myTasksTable th:nth-child(4) { width: 10%; }
-#myTasksTable th:nth-child(5) { width: 9%; }
-#myTasksTable th:nth-child(6) { width: 16%; }
+/* Headers (label + sort arrow + filter icon) stay on one line; below the
+   min-width the table scrolls sideways; dates never truncate. */
+#myTasksTable th { white-space: nowrap; }
+#myTasksTable table { min-width: 960px; }
+#myTasksTable th:nth-child(2) { width: 24%; }
+#myTasksTable th:nth-child(3) { width: 128px; }
+#myTasksTable th:nth-child(4) { width: 112px; }
+#myTasksTable th:nth-child(5) { width: 120px; }
+#myTasksTable th:nth-child(6) { width: 176px; }
 
 #myTasksTable td:nth-child(2) {
   max-width: 0;

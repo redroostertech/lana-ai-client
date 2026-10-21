@@ -8,7 +8,6 @@ const state = {
   view: 'slides',
   presentationId: null,
   presentations: [],
-  libraryDocuments: [],
   selectedSlideIndex: 0,
   templateGalleryOpen: false,
   templates: [],
@@ -1927,23 +1926,6 @@ function formatDate(value) {
   }
 }
 
-// Library row shaping is owned by the shared, pure window.DocumentLibraryMapper
-// module (src/js/shared/document-library-mapper.js). Doc Studio and the
-// Brainchild surface consume the same normalization contract so identical
-// documents never drift between the two surfaces. Do NOT re-implement
-// fileExtension / humanFileType / filename / row mapping here — extend the
-// shared mapper instead.
-function libraryItems() {
-  const mapper = window.DocumentLibraryMapper;
-  if (!mapper || typeof mapper.normalizeLibraryItems !== 'function') {
-    return [];
-  }
-  return mapper.normalizeLibraryItems({
-    documents: Array.isArray(state.libraryDocuments) ? state.libraryDocuments : [],
-    presentations: Array.isArray(state.presentations) ? state.presentations : []
-  }, 'org');
-}
-
 function presentationPreview(presentation) {
   const title = presentation.title || 'Untitled file';
   const subtitle = presentation.subtitle || '';
@@ -1960,77 +1942,72 @@ function presentationPreview(presentation) {
   `;
 }
 
-function renderLibrary() {
-  if (!elements.libraryList) {
-    return;
-  }
+// The library is two tables behind the toolbar's Source select: Doc Studio
+// files (the whole presentations list, client-side) and the organization's
+// stored documents (server-paged). Rows, renderers, filters and the toolbar
+// live in the shared src/js/shared/doc-studio-library-table.js, which the
+// Brainchild Organization scope uses too. Do NOT re-implement row mapping here.
+let libraryController = null;
 
-  const items = libraryItems();
-  if (!items.length) {
-    elements.libraryList.innerHTML = `
-      <lex-empty
-        icon="document"
-        message="No documents yet"
-        description="Generated Doc Studio files and uploaded matter documents will appear here."
-      ></lex-empty>
-    `;
-    return;
-  }
-
-  elements.libraryList.innerHTML = `
-    <lex-table
-      id="docStudioLibraryTable"
-      columns="filename,file_type,matter,is_template,created_at,updated_at"
-      labels="Filename,File Type,Matter,Template,Created,Edited"
-      searchable
-      filterable
-      column-filters
-      compact
-      limit="25"
-      sort-by="updated_at"
-      sort-dir="desc"
-      empty-text="No saved documents"
-    ></lex-table>
-  `;
-  const table = elements.libraryList.querySelector('#docStudioLibraryTable');
-  if (!table || typeof table.setData !== 'function') {
-    return;
-  }
-  table.setData(items);
-  table.setCellRenderers({
-    filename: (value, row) => {
-      const subtitle = row._source?.subtitle || row._source?.document_type || row.file_type || '';
-      return `
-        <button type="button" class="library-table-title" data-open-library-item="${escapeHtml(row.id)}">
-          <strong>${escapeHtml(value)}</strong>
-          ${subtitle ? `<span>${escapeHtml(subtitle)}</span>` : ''}
-        </button>
-      `;
-    },
-    file_type: value => `<span class="doc-library-badge">${escapeHtml(value || 'Document')}</span>`,
-    is_template: value => `<span class="doc-library-badge ${String(value).toLowerCase() === 'yes' ? 'is-template' : ''}">${escapeHtml(value || 'No')}</span>`
+function fetchLibraryJson(path) {
+  return apiFetch(path).then(response => {
+    if (!response.ok) {
+      const error = new Error(`Request failed with ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
   });
+}
 
-  // Make the entire row clickable, not just the filename button. lex-table
-  // emits row-click for any non-control click in the row; route through the
-  // shared openLibraryItem dispatcher so storage files open the file viewer
-  // and presentations open in-place in Doc Studio.
-  if (!table.__rowClickWired) {
-    table.addEventListener('row-click', (event) => {
-      const rowId = event.detail && event.detail.id;
-      if (rowId) openLibraryItem(rowId);
-    });
-    table.__rowClickWired = true;
+function ensureLibraryController() {
+  if (libraryController || !window.DocStudioLibraryTable || !elements.libraryList) {
+    return libraryController;
+  }
+  libraryController = window.DocStudioLibraryTable.createController({
+    ids: {
+      search: 'docStudioLibrarySearch',
+      sort: 'docStudioLibrarySort',
+      order: 'docStudioLibrarySortOrder',
+      source: 'docStudioLibrarySource',
+      count: 'docStudioLibraryCount',
+      sectionTitle: 'docStudioLibrarySectionTitle',
+      sectionCount: 'docStudioLibrarySectionCount',
+      storedTable: 'docStudioStoredTable',
+      studioTable: 'docStudioLibraryTable'
+    },
+    fetchJson: fetchLibraryJson,
+    defaultSource: 'studio',
+    linkPrefix: '../',
+    onOpen: row => {
+      openLibraryItem(row).catch(error => setStatus(error.message));
+    },
+    onPresentations: presentations => {
+      state.presentations = presentations;
+    },
+    onError: message => {
+      setStatus(`Library loaded with limited sources (${message || 'request failed'}).`);
+    }
+  });
+  return libraryController;
+}
+
+// Called on every render; the tables keep their own state, so this only
+// makes sure the controller is wired.
+function renderLibrary() {
+  const controller = ensureLibraryController();
+  if (controller) {
+    controller.start();
   }
 }
 
-async function openLibraryItem(itemId) {
-  const item = libraryItems().find(entry => entry.id === itemId);
-  if (!item) return;
-  if (item._kind === 'storage') {
-    const params = new URLSearchParams({ id: item._fileId });
-    if (item._matterId) {
-      params.set('matter_id', item._matterId);
+// row: a DocStudioLibraryTable row (storage file or presentation).
+async function openLibraryItem(row) {
+  if (!row) return;
+  if (row._kind === 'storage') {
+    const params = new URLSearchParams({ id: row._fileId });
+    if (row._matterId) {
+      params.set('matter_id', row._matterId);
     }
     window.location.href = `../file-viewer.html?${params.toString()}`;
     return;
@@ -2038,47 +2015,19 @@ async function openLibraryItem(itemId) {
   if (!confirmUnsavedDocumentChanges()) {
     return;
   }
-  replaceClientUrl(`/doc-studio/?id=${encodeURIComponent(item._presentationId)}`);
-  state.presentationId = item._presentationId;
+  replaceClientUrl(`/doc-studio/?id=${encodeURIComponent(row._presentationId)}`);
+  state.presentationId = row._presentationId;
   await loadPresentationFromUrl();
   render();
 }
 
 async function loadLibrary() {
-  const errors = [];
-  try {
-    const response = await apiFetch('/api/v1/deck-studio/presentations?limit=100');
-    if (!response.ok) {
-      throw new Error(`Request failed with ${response.status}`);
-    }
-
-    const payload = await response.json();
-    state.presentations = Array.isArray(payload.presentations) ? payload.presentations : [];
-  } catch (error) {
-    errors.push(`Doc Studio files: ${error.message}`);
+  const controller = ensureLibraryController();
+  if (!controller) {
+    return;
   }
-
-  try {
-    const response = await apiFetch('/api/v1/storage/library/files?page_size=200&sort_by=updated_at&sort_order=desc');
-    if (!response.ok) {
-      throw new Error(`Request failed with ${response.status}`);
-    }
-
-    const payload = await response.json();
-    state.libraryDocuments = Array.isArray(payload.documents)
-      ? payload.documents
-      : Array.isArray(payload.files)
-        ? payload.files
-        : [];
-  } catch (error) {
-    state.libraryDocuments = [];
-    errors.push(`stored documents: ${error.message}`);
-  }
-
-  renderLibrary();
-  if (errors.length) {
-    setStatus(`Library loaded with limited sources (${errors.join('; ')}).`);
-  }
+  await customElements.whenDefined('lex-table');
+  await controller.reload();
 }
 
 async function loadCapabilities() {
@@ -3695,20 +3644,15 @@ elements.templateGallery.addEventListener('click', event => {
   applyTemplateToSelectedSlide(button.dataset.templateId);
 });
 elements.libraryList.addEventListener('click', async event => {
-  const libraryItemButton = event.target.closest('[data-open-library-item]');
   const openButton = event.target.closest('[data-open-presentation]');
   const duplicateButton = event.target.closest('[data-duplicate-presentation]');
   const renameButton = event.target.closest('[data-rename-presentation]');
   const deleteButton = event.target.closest('[data-delete-presentation]');
-  if (!libraryItemButton && !openButton && !duplicateButton && !renameButton && !deleteButton) {
+  if (!openButton && !duplicateButton && !renameButton && !deleteButton) {
     return;
   }
 
   try {
-    if (libraryItemButton) {
-      await openLibraryItem(libraryItemButton.dataset.openLibraryItem);
-      return;
-    }
     if (openButton && !confirmUnsavedDocumentChanges()) {
       return;
     }

@@ -29,7 +29,7 @@ describe('Library (drive.html) list column filters', () => {
     expect(drive).toContain("params.append('created_after', range.after)");
     expect(drive).toContain("params.append('min_documents'");
     expect(drive).toContain("params.append('max_documents'");
-    expect(drive).toContain('rows = filterNoteRows(rows)');
+    expect(drive).toContain('pageOfRows(filterNoteRows(rows)');
     expect(drive).toContain('storageState.columnFilters = query.filters || {}');
   });
 });

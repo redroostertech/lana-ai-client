@@ -75,6 +75,8 @@
         'js/services/document-create-modal.js',
         'js/workspace-switcher.js',
         'js/workspace-billable-hours.js',
+        'js/shared/library-column-filters.js',
+        'js/shared/workspace-details-tables.js',
         'js/workspace-details.js'
       ],
       stylesheets: [
@@ -257,6 +259,7 @@
         'js/lex/components/form/lex-select.js',
         'js/lex/components/data/lex-table.js',
         'js/shared/library-column-filters.js',
+        'js/shared/list-query-params.js',
         // Brainchild scope: shared mapper + promote builder + scope controller
         'js/shared/document-library-mapper.js',
         'js/shared/brainchild-promote-builder.js',
@@ -468,6 +471,12 @@
       title: 'Library',
       activeNav: 'insights-library',
       scripts: [
+        'js/lex/components/foundation/lex-badge.js',
+        'js/lex/components/foundation/lex-modal.js',
+        'js/lex/components/form/lex-input.js',
+        'js/lex/components/form/lex-select.js',
+        'js/shared/library-column-filters.js',
+        'js/shared/metric-tables.js',
         'js/admin/dashboard-catalog.js',
         'js/admin/dashboard-library.js'
       ],

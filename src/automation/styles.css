@@ -2348,89 +2348,6 @@ button:disabled {
   white-space: nowrap;
 }
 
-.automation-table-loading {
-  display: grid;
-  gap: 12px;
-}
-
-.automation-table-loading__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.automation-table-loading__search,
-.automation-table-loading__count,
-.automation-table-loading__cell {
-  display: block;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--lex-bg-tertiary, #eceae7);
-  color: transparent;
-  position: relative;
-}
-
-.automation-table-loading__search {
-  width: min(280px, 42vw);
-  height: 34px;
-}
-
-.automation-table-loading__count {
-  width: 72px;
-  height: 14px;
-}
-
-.automation-table-loading__table {
-  overflow: hidden;
-  border: 1px solid var(--lex-border-subtle, #e5e7eb);
-  border-radius: 8px;
-  background: var(--lex-bg-primary, #fff);
-}
-
-.automation-table-loading__header,
-.automation-table-loading__row {
-  display: grid;
-  grid-template-columns: minmax(180px, 1.6fr) repeat(7, minmax(92px, 1fr));
-  gap: 12px;
-  align-items: center;
-  padding: 12px 14px;
-}
-
-.automation-table-loading__header {
-  border-bottom: 1px solid var(--lex-border-subtle, #e5e7eb);
-  color: var(--lex-text-tertiary, #8a8178);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.automation-table-loading__row + .automation-table-loading__row {
-  border-top: 1px solid var(--lex-border-subtle, #f0efed);
-}
-
-.automation-table-loading__cell {
-  height: 14px;
-}
-
-.automation-table-loading__search::after,
-.automation-table-loading__count::after,
-.automation-table-loading__cell::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
-  animation: library-loading-shimmer 1.35s ease-in-out infinite;
-}
-
-@keyframes library-loading-shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
-
 .choice-card,
 .connector-card,
 .checklist-card {
@@ -4759,3 +4676,131 @@ details[open].ld-step-raw > summary::before {
   font-size: 0.72rem;
   opacity: 0.6;
 }
+
+/* ── Server-paged tables (docs/TABLE-STANDARD.md) ───────────────────────── */
+/* Library "Live Automations", Run History "Triggered Runs", Approvals
+   "Approval Queue". Fixed layout so long text truncates; the name column
+   takes the remaining width and wraps between words. */
+.automation-table-section {
+  margin-bottom: 24px;
+}
+
+.automation-table table {
+  table-layout: fixed;
+}
+
+.automation-table td {
+  overflow: hidden;
+}
+
+.automation-table th {
+  white-space: nowrap;
+}
+
+.automation-cell-name {
+  color: var(--lex-text-primary);
+  display: block;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+.automation-cell-secondary {
+  color: var(--lex-text-secondary);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-cell-text,
+.automation-cell-time {
+  color: var(--lex-text-primary);
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-cell-time {
+  color: var(--lex-text-secondary);
+  font-size: 12px;
+}
+
+.automation-cell-muted {
+  color: var(--lex-text-tertiary, var(--lex-text-secondary));
+  display: block;
+  font-size: 12px;
+}
+
+/* Matter links: same treatment as My Tasks' and Document Library's workspace links */
+.automation-matter-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--lex-accent, #3b5bdb);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.automation-matter-link > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-matter-link:hover {
+  color: var(--lex-accent-strong, var(--lex-accent, #2f47b3));
+}
+
+.automation-matter-link:focus-visible {
+  border-radius: var(--lex-radius-sm, 4px);
+  box-shadow: var(--lex-focus-ring);
+  outline: none;
+}
+
+/* Narrow windows scroll sideways instead of squeezing the name column. */
+#libraryAutomationsTable table { min-width: 1420px; }
+#automationRunsTable table { min-width: 1400px; }
+#automationApprovalsTable table { min-width: 1260px; }
+
+/* Library: Name, Category, Type, Scope, Visibility, State, Last run, Created, Updated */
+#libraryAutomationsTable th:nth-child(2) { width: 140px; }
+#libraryAutomationsTable th:nth-child(3) { width: 120px; }
+#libraryAutomationsTable th:nth-child(4) { width: 15%; }
+#libraryAutomationsTable th:nth-child(5) { width: 112px; }
+#libraryAutomationsTable th:nth-child(6) { width: 100px; }
+#libraryAutomationsTable th:nth-child(7) { width: 128px; }
+#libraryAutomationsTable th:nth-child(8) { width: 176px; }
+#libraryAutomationsTable th:nth-child(9) { width: 128px; }
+
+/* Run History: Automation, Scope, Matter, Trigger, Started, Created, Status, Duration */
+#automationRunsTable th:nth-child(2) { width: 120px; }
+#automationRunsTable th:nth-child(3) { width: 16%; }
+#automationRunsTable th:nth-child(4) { width: 150px; }
+#automationRunsTable th:nth-child(5) { width: 176px; }
+#automationRunsTable th:nth-child(6) { width: 176px; }
+#automationRunsTable th:nth-child(7) { width: 150px; }
+#automationRunsTable th:nth-child(8) { width: 112px; }
+
+/* Approvals: Title, Source, Type, Priority, Matter, Created, Expires */
+#automationApprovalsTable th:nth-child(2) { width: 150px; }
+#automationApprovalsTable th:nth-child(3) { width: 150px; }
+#automationApprovalsTable th:nth-child(4) { width: 104px; }
+#automationApprovalsTable th:nth-child(5) { width: 16%; }
+#automationApprovalsTable th:nth-child(6) { width: 176px; }
+#automationApprovalsTable th:nth-child(7) { width: 176px; }

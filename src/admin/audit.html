@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -102,53 +103,51 @@
         </lex-card>
       </div>
 
-      <!-- Audit Logs Table + Filters + Pagination -->
-      <lex-card padding="none">
-
-        <!-- Filters -->
-        <div style="padding:1rem 1.5rem;" class="flex flex-wrap gap-4 items-end">
+      <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+      <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter audit logs">
+        <div class="flex items-center gap-4 flex-wrap">
           <div class="flex-1 min-w-[200px]">
-            <lex-select
-              id="eventTypeFilter"
-              label="Event Type"
-              placeholder="All Event Types"
-              options='[]'
-            ></lex-select>
+            <lex-input id="auditSearch" placeholder="Search audit logs..." clearable="true" leading-icon="search"></lex-input>
           </div>
-          <div class="flex-1 min-w-[150px]">
-            <lex-input
-              id="fromDate"
-              type="date"
-              label="From Date"
-            ></lex-input>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+            <lex-select id="auditSort" options='[{"value":"created_at","label":"Created"}]' value="created_at"></lex-select>
           </div>
-          <div class="flex-1 min-w-[150px]">
-            <lex-input
-              id="toDate"
-              type="date"
-              label="To Date"
-            ></lex-input>
+          <lex-btn id="auditSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Category:</label>
+            <lex-select id="auditCategoryFilter" options='[{"value":"all","label":"All"},{"value":"security","label":"Security events"},{"value":"user","label":"User actions"},{"value":"system","label":"System events"},{"value":"other","label":"Other events"}]' value="all"></lex-select>
           </div>
-          <div class="flex gap-2" style="padding-bottom:2px;">
-            <lex-btn id="applyFiltersBtn" variant="primary" size="md">Apply</lex-btn>
-            <lex-btn id="clearFiltersBtn" variant="secondary" size="md">Clear</lex-btn>
-          </div>
+          <div id="auditCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+        </div>
+      </div>
+
+      <section aria-labelledby="auditHeading">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="auditHeading" class="admin-table-section-title text-lg font-semibold">All Events</h2>
+          <span id="auditSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
         </div>
 
         <lex-table
           id="auditTable"
-          columns="timestamp,event_type,user_email,ip_address"
-          labels="Timestamp,Event Type,User,IP Address"
-          empty-text="No audit logs found"
+          class="admin-table lex-table--card"
+          column-filters
+          server-paging
+          columns="event_type,user_email,ip_address,created_at"
+          labels="Event,User,IP address,Created"
+          sortable-columns="created_at"
+          sort-by="created_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No audit events yet"
+          aria-label="Audit logs"
         ></lex-table>
-
-        <!-- Pagination -->
-        <div id="paginationRow" class="flex items-center justify-between" style="padding:0.75rem 1.5rem;">
-          <span id="paginationInfo" class="text-xs lex-text-tertiary"></span>
-          <div id="paginationControls" class="flex gap-2"></div>
-        </div>
-
-      </lex-card>
+      </section>
 
     </main>
 
@@ -177,8 +176,8 @@
     >
       <div id="auditDrawerContent">
         <lex-stack direction="vertical" gap="sm" style="margin-bottom:1.5rem;">
-          <lex-kv id="auditKvEventType" label="Event Type"></lex-kv>
-          <lex-kv id="auditKvTimestamp" label="Timestamp"></lex-kv>
+          <lex-kv id="auditKvEventType" label="Event"></lex-kv>
+          <lex-kv id="auditKvTimestamp" label="Created"></lex-kv>
           <lex-kv id="auditKvUser"      label="User"></lex-kv>
           <lex-kv id="auditKvIP"        label="IP Address"></lex-kv>
         </lex-stack>
@@ -272,6 +271,8 @@
   <script src="../js/admin/admin-switcher.js"></script>
 
   <!-- Page controller -->
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/admin-audit.js"></script>
 
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

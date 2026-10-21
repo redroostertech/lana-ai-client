@@ -1,0 +1,143 @@
+/* Admin list tables (docs/TABLE-STANDARD.md): cell styles shared by the
+   admin pages, then per-table column widths by id. */
+
+.admin-table-toolbar-label {
+  color: var(--lex-text-secondary);
+}
+
+.admin-table-section-title {
+  color: var(--lex-text-primary);
+}
+
+/* Fixed layout: long values truncate instead of widening the table. */
+.admin-table table {
+  table-layout: fixed;
+}
+
+.admin-table td {
+  overflow: hidden;
+}
+
+.admin-table th {
+  white-space: nowrap;
+}
+
+/* Primary name column: semibold, wraps between words. */
+.admin-table-name {
+  color: var(--lex-text-primary);
+  display: block;
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+.admin-table-sub {
+  color: var(--lex-text-tertiary);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-table-muted,
+.admin-table-time,
+.admin-table-text {
+  color: var(--lex-text-secondary);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-table-text {
+  color: var(--lex-text-primary);
+  font-size: 13px;
+}
+
+.admin-table-time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Workspace link: same treatment as My Tasks and the Document Library. */
+.admin-table-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--lex-accent, #3b5bdb);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.admin-table-link > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-table-link:hover {
+  color: var(--lex-accent-strong, var(--lex-accent, #2f47b3));
+}
+
+.admin-table-link:focus-visible {
+  border-radius: var(--lex-radius-sm, 4px);
+  box-shadow: var(--lex-focus-ring);
+  outline: none;
+}
+
+/* Users: Name, Email, Username, Role, Status, Created */
+#usersTable table { min-width: 980px; }
+#usersTable th:nth-child(2) { width: 24%; }
+#usersTable th:nth-child(3) { width: 14%; }
+#usersTable th:nth-child(4) { width: 140px; }
+#usersTable th:nth-child(5) { width: 120px; }
+#usersTable th:nth-child(6) { width: 176px; }
+
+/* Sessions: User, Device, IP address, Created, Last activity, Expires, Status */
+#sessionsTable table { min-width: 1080px; }
+#sessionsTable th:nth-child(2) { width: 170px; }
+#sessionsTable th:nth-child(3) { width: 140px; }
+#sessionsTable th:nth-child(4) { width: 176px; }
+#sessionsTable th:nth-child(5) { width: 150px; }
+#sessionsTable th:nth-child(6) { width: 176px; }
+#sessionsTable th:nth-child(7) { width: 110px; }
+
+/* Audit: Event, User, IP address, Created */
+#auditTable table { min-width: 860px; }
+#auditTable th:nth-child(2) { width: 30%; }
+#auditTable th:nth-child(3) { width: 150px; }
+#auditTable th:nth-child(4) { width: 176px; }
+
+/* Traces: Message, Route, Status, Duration, LLM calls, Created */
+#tracesTable table { min-width: 1000px; }
+#tracesTable th:nth-child(2) { width: 150px; }
+#tracesTable th:nth-child(3) { width: 120px; }
+#tracesTable th:nth-child(4) { width: 110px; }
+#tracesTable th:nth-child(5) { width: 110px; }
+#tracesTable th:nth-child(6) { width: 176px; }
+
+/* User details sessions: Device, IP address, Created, Last activity, Expires */
+#userSessionsTable table { min-width: 860px; }
+#userSessionsTable th:nth-child(2) { width: 150px; }
+#userSessionsTable th:nth-child(3) { width: 176px; }
+#userSessionsTable th:nth-child(4) { width: 150px; }
+#userSessionsTable th:nth-child(5) { width: 176px; }
+
+/* Data Visualization: columns change with the view, so every column gets a
+   floor and the table scrolls sideways instead of squeezing. */
+#dataVizTable table { min-width: 1100px; }
+#dataVizTable th { min-width: 120px; }
+#dataVizTable th:first-child { min-width: 200px; }
