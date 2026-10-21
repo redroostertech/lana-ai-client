@@ -380,7 +380,32 @@
     _first(opts) { return this._step(opts, -1, 1); }
     _last(opts) { return this._step(opts, opts.length, -1); }
 
+    // While open, Escape anywhere closes just this menu. Capture phase on
+    // window runs before an enclosing modal/drawer's document listener, and
+    // stopping it there keeps that overlay open. (A mouse-opened menu
+    // re-renders, so focus may sit on <body> where no menu listener runs.)
+    _watchEscape(on) {
+      if (on && !this._escapeWatcher) {
+        this._escapeWatcher = (e) => {
+          if (e.key !== 'Escape' || !this._open) return;
+          e.preventDefault();
+          e.stopPropagation();
+          this._close(true);
+        };
+        window.addEventListener('keydown', this._escapeWatcher, true);
+      } else if (!on && this._escapeWatcher) {
+        window.removeEventListener('keydown', this._escapeWatcher, true);
+        this._escapeWatcher = null;
+      }
+    }
+
+    disconnected() {
+      if (super.disconnected) super.disconnected();
+      this._watchEscape(false);
+    }
+
     _close(returnFocus) {
+      this._watchEscape(false);
       this._open = false;
       this._focusedIdx = -1;
       this._focusItems = false;
@@ -389,6 +414,7 @@
     }
 
     _openMenu(focusFirst) {
+      this._watchEscape(true);
       this._open = true;
       this._searchTerm = '';
       const opts = this._getFiltered();
