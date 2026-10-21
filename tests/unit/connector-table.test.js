@@ -76,7 +76,8 @@ describe('LanaConnectorTable header filters', () => {
 
   test('every labelled column has a filter', () => {
     T.COLUMNS.forEach((col, i) => {
-      if (T.LABELS[i]) expect(options[col]).toBeDefined();
+      // The Actions column is labelled but never filters.
+      if (T.LABELS[i] && col !== 'actions') expect(options[col]).toBeDefined();
     });
     expect(options.name).toEqual({ text: true, placeholder: 'Name contains...' });
   });
@@ -162,7 +163,7 @@ describe('LanaConnectorTable markup', () => {
     expect(html).toContain('class="connector-table lex-table--card"');
     expect(html).toContain(' column-filters');
     expect(html).toContain('columns="pin,name,category,auth_type,scope,status,version,created_at,actions"');
-    expect(html).toContain('labels=",Name,Category,Auth,Scope,Status,Version,Created,"');
+    expect(html).toContain('labels=",Name,Category,Auth,Scope,Status,Version,Created,Actions"');
     expect(html).toContain('sort-by="created_at" sort-dir="desc"');
     expect(html).toContain('limit="20"');
     expect(html).toContain('search-keys="name,vendor,description,category,auth_type"');

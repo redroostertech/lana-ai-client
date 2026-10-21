@@ -192,7 +192,7 @@
       { key: 'created_at', label: 'Created', kind: 'created' },
       { key: 'synced_at', label: 'Synced', kind: 'relative', width: '130px' },
       {
-        key: 'actions', label: '', kind: 'actions', width: '150px',
+        key: 'actions', label: 'Actions', kind: 'actions', width: '150px',
         render: function (_v, row) {
           if (!k) return '';
           return '<span class="rtk-actions">' + k.actionButton('inspect', row.id, 'Inspect') + k.actionButton('flag', row.id, 'Flag') + '</span>';
@@ -250,7 +250,7 @@
       { key: 'matter', label: 'Matter', kind: 'matter', matterKey: 'matter_id', width: '18%' },
       { key: 'last_synced_at', label: 'Last synced', kind: 'relative', width: '130px' },
       {
-        key: 'actions', label: '', kind: 'actions', width: '130px',
+        key: 'actions', label: 'Actions', kind: 'actions', width: '130px',
         render: function (_v, row) { return k ? k.actionButton('assign-group', row.id, 'Assign group') : ''; }
       }
     ];

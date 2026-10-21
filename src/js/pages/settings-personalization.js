@@ -646,7 +646,7 @@
           'id="sv2-memory-table" ' +
           'class="sv2-memory-table" ' +
           'columns="memory,scope,updated,actions" ' +
-          'labels="Memory,Scope,Updated," ' +
+          'labels="Memory,Scope,Updated,Actions" ' +
           'empty-text="No active memories yet" ' +
           'sort-by="updated" ' +
           'sort-dir="desc" ' +

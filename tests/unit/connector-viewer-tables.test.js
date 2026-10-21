@@ -95,7 +95,8 @@ describe('connector-viewer-tables: synced data', () => {
   test('columns: checkbox and actions unlabelled; sortable list matches the API', () => {
     const selected = new Set(['r1']);
     const columns = viewer.dataColumns({ isSelected: (id) => selected.has(id), allFiltered: () => false, isOpen: (id) => id === 'r1' });
-    expect(columns.filter((c) => !c.label).map((c) => c.key)).toEqual(['select', 'actions']);
+    expect(columns.filter((c) => !c.label).map((c) => c.key)).toEqual(['select']);
+    expect(columns.find((c) => c.key === 'actions').label).toBe('Actions');
     expect(columns.find((c) => c.key === 'created_at')).toMatchObject({ label: 'Created', kind: 'created' });
     const spec = { id: 'connectorDataTable', columns, sortableColumns: viewer.DATA_SORTABLE };
     expect(kit.sortOptionsFor(spec).map((o) => o.value).sort()).toEqual(viewer.DATA_SORTABLE.split(',').sort());

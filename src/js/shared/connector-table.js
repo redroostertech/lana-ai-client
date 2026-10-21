@@ -30,9 +30,9 @@
 
   var DASH = '—';
 
-  // Pin and Actions have blank labels, so they take no header filter.
+  // Pin has a blank label and Actions is the row-actions column: neither filters.
   var COLUMNS = ['pin', 'name', 'category', 'auth_type', 'scope', 'status', 'version', 'created_at', 'actions'];
-  var LABELS = ['', 'Name', 'Category', 'Auth', 'Scope', 'Status', 'Version', 'Created', ''];
+  var LABELS = ['', 'Name', 'Category', 'Auth', 'Scope', 'Status', 'Version', 'Created', 'Actions'];
   var SORTABLE_COLUMNS = ['name', 'category', 'auth_type', 'scope', 'status', 'version', 'created_at'];
   var SEARCH_KEYS = ['name', 'vendor', 'description', 'category', 'auth_type'];
   var SORT_OPTIONS = [
@@ -208,13 +208,6 @@
     return '<time class="connector-table-time" datetime="' + esc(value) + '" title="' + esc(text) + '">' + esc(text) + '</time>';
   }
 
-  function logoCell(row) {
-    var initial = esc(String(row.name || '?').charAt(0).toUpperCase());
-    if (!row.logo_url) return '<span class="connector-table-logo" aria-hidden="true">' + initial + '</span>';
-    return '<span class="connector-table-logo" aria-hidden="true"><img src="' + esc(row.logo_url) + '" alt="" ' +
-      'onerror="this.parentNode.textContent=\'' + initial + '\'"></span>';
-  }
-
   /**
    * Cell renderers. config: { statuses, actionsCell(row) -> html }
    */
@@ -231,7 +224,7 @@
       },
       name: function (value, row) {
         var name = value || 'Unknown connector';
-        return '<div class="connector-table-name-cell">' + logoCell(row || {}) +
+        return '<div class="connector-table-name-cell">' +
           '<span class="connector-table-name-text"><span class="connector-table-name" title="' + esc(name) + '">' + esc(name) + '</span>' +
           (row && row.vendor ? '<span class="connector-table-sub" title="' + esc(row.vendor) + '">' + esc(row.vendor) + '</span>' : '') +
           '</span></div>';

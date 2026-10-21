@@ -44,7 +44,8 @@
      table.restoreQuery({ search, sortBy, sortDir, filters, page, limit })  // set without fetching
      table.resetQuery()               // default sort, no search/filters, page 1, without fetching
    search-keys="name,email" limits client-side search to those columns.
-   Columns with a blank label (select, pin, actions) get no header filter.
+   Columns with a blank label (select, pin) get no header filter. The row-actions
+   column uses the key "actions" and the label "Actions": it never filters or sorts.
 
    Events: row-click, sort-change, selection-change, bulk-action, lex-filter-change,
            lex-query-change (server paging)
@@ -518,6 +519,8 @@
     }
 
     _isSortable(col) {
+      // The row-actions column (key "actions", labelled "Actions") never sorts.
+      if (col === 'actions') return false;
       if (this.sortableColumns === undefined || this.sortableColumns === null) return true;
       return String(this.sortableColumns).split(',').map(c => c.trim()).filter(Boolean).includes(col);
     }
@@ -565,6 +568,8 @@
 
     _hasColumnFilter(col) {
       if (!this.columnFilters) return false;
+      // The row-actions column (key "actions", labelled "Actions") never filters.
+      if (col === 'actions') return false;
       // Columns without a header label (select, pin, actions) take no filter.
       if (this.labels) {
         const index = this._getColumns().indexOf(col);
