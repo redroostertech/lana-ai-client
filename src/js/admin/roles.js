@@ -508,6 +508,26 @@
       if (e.detail && !e.detail.valid) return; // respect lex-form validation
       handleFormSubmit(e.detail);
     });
+
+    // Save sits in the modal footer, outside lex-form.
+    var saveBtn = document.getElementById('saveRoleBtn');
+    if (saveBtn) saveBtn.addEventListener('click', function () { _requestFormSubmit(form); });
+  }
+
+  /**
+   * The modal's Save button lives in the lex-modal footer (footer-content),
+   * outside lex-form, so lex-form's submit-button delegation never sees the
+   * click. Re-emit lex-submit with the same detail lex-form produces so the
+   * existing submit handler runs unchanged.
+   */
+  function _requestFormSubmit(form) {
+    if (!form || typeof form.getValues !== 'function') return;
+    var result = (form.novalidate || typeof form.validate !== 'function')
+      ? { valid: true, errors: [] }
+      : form.validate();
+    form.dispatchEvent(new CustomEvent('lex-submit', {
+      detail: { values: form.getValues(), valid: result.valid, errors: result.errors }
+    }));
   }
 
   function handleFormSubmit(detail) {

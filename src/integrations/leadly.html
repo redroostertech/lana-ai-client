@@ -328,6 +328,7 @@
   <script src="../js/lex/components/foundation/lex-toast.js"></script>
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
@@ -1788,7 +1789,7 @@
 
         // Confirm with user
         const entityLabel = entityType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-        if (!confirm(`Import ${dataArray.length} ${entityLabel} record(s) into database?`)) {
+        if (!(await Lex.Modal.confirmAsync('Import records', `Import ${dataArray.length} ${entityLabel} record(s) into database?`, { confirmText: 'Import' }))) {
           return;
         }
 
@@ -3178,7 +3179,7 @@
 
     // Cancel a job
     async function cancelJob(jobId, isUpload = false) {
-      if (!confirm('Are you sure you want to cancel this job?')) {
+      if (!(await Lex.Modal.confirmAsync('Cancel job', 'Are you sure you want to cancel this job?', { confirmText: 'Cancel job', cancelText: 'Keep running', variant: 'danger' }))) {
         return;
       }
 

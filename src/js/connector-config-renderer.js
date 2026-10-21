@@ -436,11 +436,11 @@ function attachFieldHandlers(schema, currentConfig) {
  * Open directory browser modal
  */
 async function openDirectoryBrowser(config) {
-  return new Promise((resolve) => {
-    // This will be implemented to use the existing directory browser modal
-    // For now, return a placeholder
-    const path = prompt('Enter directory path:');
-    resolve(path);
+  // This will be implemented to use the existing directory browser modal.
+  // For now, ask for the path; resolves null when cancelled.
+  return window.Lex.Modal.prompt('Choose Directory', {
+    label: 'Directory path',
+    confirmText: 'Use path'
   });
 }
 
@@ -472,7 +472,7 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
 
     if (!stateResult.success) {
       console.error('Failed to create OAuth state:', stateResult.error);
-      alert(`Failed to initiate OAuth: ${stateResult.error}`);
+      await window.Lex.Modal.alertAsync('OAuth Failed', `Failed to initiate OAuth: ${stateResult.error}`);
       return null;
     }
 
@@ -511,7 +511,7 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
     if (!backendUrl) {
       const msg = 'OAuth flow cannot start: no backend URL is configured. Sign in again to set the saved server.';
       console.error(msg);
-      alert(msg);
+      await window.Lex.Modal.alertAsync('OAuth Unavailable', msg);
       return null;
     }
 
@@ -613,7 +613,7 @@ async function initiateOAuthFlow(provider, connectorId = null, matterId = null) 
 
   } catch (error) {
     console.error('OAuth flow error:', error);
-    alert(`OAuth authentication failed: ${error.message}`);
+    await window.Lex.Modal.alertAsync('OAuth Failed', `OAuth authentication failed: ${error.message}`);
     return null;
   }
 }

@@ -1513,9 +1513,14 @@
     return normalizeBackReferrer(state.referrerPage) || fallbackBackReferrer();
   }
 
-  function navigateBack() {
+  async function navigateBack() {
     if (state.metadataChanged) {
-      if (!confirm('You have unsaved changes. Leave anyway?')) return;
+      var leave = await Lex.Modal.confirmAsync('Unsaved changes', 'You have unsaved changes. Leave anyway?', {
+        confirmText: 'Leave',
+        cancelText: 'Stay',
+        variant: 'danger'
+      });
+      if (!leave) return;
     }
     var target = targetBackRoute();
     if (target) {
@@ -3084,19 +3089,15 @@
         'This removes the released document from the active workspace versions. The immutable release record remains for audit, and the viewer will roll back to the previous version or original document.' +
       '</p>' +
     '</div>';
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      Lex.Modal.open({
-        heading: 'Delete Version',
-        size: 'md',
-        content: content,
-        confirmText: 'Delete Version',
-        cancelText: 'Cancel',
-        variant: 'danger',
-        onConfirm: run
-      });
-    } else if (window.confirm('Delete ' + label + '?')) {
-      run();
-    }
+    Lex.Modal.open({
+      heading: 'Delete Version',
+      size: 'md',
+      content: content,
+      confirmText: 'Delete Version',
+      cancelText: 'Cancel',
+      variant: 'danger',
+      onConfirm: run
+    });
   }
 
   async function acceptBaselineRevisionsForReviewMode() {
@@ -3226,26 +3227,15 @@
         notify((error && error.message) || 'Failed to revert review change', 'error');
       });
     };
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      Lex.Modal.open({
-        heading: title,
-        size: 'sm',
-        content: reviewRevertConfirmationContent(change, section),
-        confirmText: confirmText,
-        cancelText: 'Cancel',
-        variant: section === 'released' ? 'default' : 'danger',
-        onConfirm: run
-      });
-      return;
-    }
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm(title, reviewChangePreviewText(change), run, {
-        confirmText: confirmText,
-        variant: section === 'released' ? 'default' : 'danger'
-      });
-      return;
-    }
-    if (window.confirm(title + '?\n\n' + reviewChangePreviewText(change))) run();
+    Lex.Modal.open({
+      heading: title,
+      size: 'sm',
+      content: reviewRevertConfirmationContent(change, section),
+      confirmText: confirmText,
+      cancelText: 'Cancel',
+      variant: section === 'released' ? 'default' : 'danger',
+      onConfirm: run
+    });
   }
 
   function confirmReviewHistoryChangeEdit(index) {
@@ -4455,21 +4445,14 @@
     };
 
     var details = releaseConfirmationDetails();
-    var message = releaseConfirmationMessage();
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.open === 'function') {
-      Lex.Modal.open({
-        heading: 'Release Version',
-        size: 'md',
-        content: releaseConfirmationContent(details),
-        confirmText: 'Release Version',
-        cancelText: 'Cancel',
-        onConfirm: run
-      });
-    } else if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm('Release Version', message, run, { confirmText: 'Release Version' });
-    } else if (window.confirm(message)) {
-      run();
-    }
+    Lex.Modal.open({
+      heading: 'Release Version',
+      size: 'md',
+      content: releaseConfirmationContent(details),
+      confirmText: 'Release Version',
+      cancelText: 'Cancel',
+      onConfirm: run
+    });
   }
 
   function findBannerActionTarget(event) {
@@ -5195,11 +5178,7 @@
     };
 
     var msg = 'Permanently delete "' + name + '"? The file, its embeddings, and related metadata will be removed. This cannot be undone.';
-    if (typeof Lex !== 'undefined' && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm('Delete File', msg, run);
-    } else if (window.confirm(msg)) {
-      run();
-    }
+    Lex.Modal.confirm('Delete File', msg, run);
   }
 
   async function convertCurrentPdfToDocx() {

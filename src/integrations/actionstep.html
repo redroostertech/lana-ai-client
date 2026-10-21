@@ -1098,7 +1098,7 @@
           if (files.length > 0 && files[0].name.toLowerCase().endsWith('.zip')) {
             handleFileUpload(files[0]);
           } else {
-            alert('Please select a ZIP file');
+            Toast.error('Please select a ZIP file');
           }
         });
 

@@ -46,19 +46,21 @@ const MatterPickerModal = {
     contentHtml += '<div style="display:flex;align-items:center;justify-content:center;padding:32px 0"><lex-spinner></lex-spinner></div>';
     contentHtml += '</div>';
 
-    // Footer
-    contentHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid var(--lex-border-subtle,rgba(0,0,0,0.06))">';
-    contentHtml += '<p class="npm-footer-hint" style="font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);line-height:1.5">';
-    contentHtml += 'Select a matter.';
-    contentHtml += '</p>';
-    contentHtml += '<lex-btn id="newProjectCreateBtn" variant="primary" size="sm">+ Create Matter</lex-btn>';
-    contentHtml += '</div>';
+    // Footer (lex-modal footer-content): hint on the left, create on the right.
+    var footerHtml = '';
+    footerHtml += '<p class="npm-footer-hint" style="margin:0 auto 0 0;font-size:var(--lex-body-sm-size,0.8125rem);color:var(--lex-text-secondary);line-height:1.5">';
+    footerHtml += 'Select a matter.';
+    footerHtml += '</p>';
+    footerHtml += '<lex-btn id="newProjectCreateBtn" variant="primary" size="sm">+ Create Matter</lex-btn>';
 
-    // Create <lex-modal>
+    // Create <lex-modal>. footerContent is read on first render, so it is set
+    // before the element is attached.
     var modal = document.createElement('lex-modal');
     modal.heading = 'Select Matter';
     modal.size = 'lg';
     modal.hideActions = true;
+    modal.backLabel = 'Go back';
+    modal.footerContent = footerHtml;
     modal.innerHTML = contentHtml;
 
     document.body.appendChild(modal);
@@ -81,6 +83,11 @@ const MatterPickerModal = {
         this.createNewMatter();
       });
     }
+
+    // The header back chevron (picker mode) dismisses the picker.
+    modal.addEventListener('lex-back', () => {
+      this.close();
+    });
 
     // Wire close event — reset search on close
     modal.addEventListener('lex-close', () => {
@@ -148,18 +155,13 @@ const MatterPickerModal = {
 
     // Picker-mode chrome: when the modal is reused as a generic matter
     // picker (onSelect callback), the user is in a sub-flow under another
-    // modal. Surface that with a back-chevron leading the title, hide the
-    // default X close button, and tag the modal so CSS can adjust. Default
-    // "Select Matter" flow keeps the standard chrome.
+    // modal. Surface that with lex-modal's back chevron leading the title and
+    // hide the default X close button. Default "Select Matter" flow keeps the
+    // standard chrome.
     var isPickerMode = !!this._onSelect;
+    this.modal.backButton = isPickerMode;
     this.modal.classList.toggle('npm-picker-mode', isPickerMode);
-    // Inject the back-chevron once; reuse on subsequent opens.
-    if (isPickerMode) {
-      // lex-modal's header isn't rendered until the modal opens for the
-      // first time. Defer injection until after .open=true triggers render.
-      // (init() guarantees this.modal exists but not its shadow children.)
-      setTimeout(this._ensurePickerChrome.bind(this), 0);
-    }
+    if (isPickerMode) MatterPickerModal._injectPickerStyles();
 
     this.modal.open = true;
     this.isOpen = true;
@@ -401,81 +403,19 @@ const MatterPickerModal = {
 
   // ── Picker-mode chrome (back chevron, no X) ─────────────────────────────
 
-  /**
-   * In picker mode, inject a back-chevron button into the modal header and
-   * hide the default X close button. Idempotent — safe to call multiple
-   * times on the same modal instance.
-   *
-   * lex-modal renders its header lazily on first open, so this is called
-   * from a `setTimeout(0)` after toggling `.open = true`.
-   */
-  _ensurePickerChrome() {
-    if (!this.modal) return;
-    // lex-modal renders its content inside its own shadow / light DOM. The
-    // header is a direct child once rendered.
-    var header = this.modal.querySelector('.lex-modal-header');
-    if (!header) return;
-
-    // Hide the default close button via CSS (the `npm-picker-mode` class
-    // on the modal element gates the rule injected in _injectPickerStyles).
-    MatterPickerModal._injectPickerStyles();
-
-    // Already injected? Just make sure it's visible.
-    var existing = header.querySelector('.npm-back-btn');
-    if (existing) return;
-
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'npm-back-btn';
-    btn.setAttribute('aria-label', 'Go back');
-    btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
-    btn.addEventListener('click', function () {
-      MatterPickerModal.close();
-    });
-    // Insert as the FIRST child of the header so it leads the title.
-    header.insertBefore(btn, header.firstChild);
-  },
-
   _stylesInjected: false,
 
+  /**
+   * The back chevron is lex-modal's own `backButton`. lex-modal has no option
+   * to hide its X close button, so picker mode keeps this one rule until the
+   * component grows one (e.g. a `hide-close` attribute).
+   */
   _injectPickerStyles() {
     if (MatterPickerModal._stylesInjected) return;
     MatterPickerModal._stylesInjected = true;
     var style = document.createElement('style');
     style.setAttribute('data-source', 'matter-picker-modal');
-    style.textContent = [
-      // Hide the default X close button in picker mode — the chevron is the
-      // only dismissal affordance.
-      'lex-modal.npm-picker-mode .lex-modal-close { display: none !important; }',
-      // lex-modal's default header is flex with justify-content:space-between
-      // so the X-close sits on the right edge. With the X hidden, that
-      // pushes the title away from our injected back-chevron. Group them
-      // tight on the left in picker mode.
-      'lex-modal.npm-picker-mode .lex-modal-header {',
-      '  justify-content: flex-start !important;',
-      '  gap: 8px;',
-      '}',
-      'lex-modal.npm-picker-mode .lex-modal-title {',
-      '  flex: 0 1 auto;',
-      '  margin-right: auto;',
-      '}',
-      '.npm-back-btn {',
-      '  display: inline-flex; align-items: center; justify-content: center;',
-      '  width: 32px; height: 32px;',
-      '  background: transparent; border: none; padding: 0;',
-      '  margin: 0 4px 0 -6px;',  // pull slightly left to align with the modal edge
-      '  color: var(--lex-text-secondary, #555);',
-      '  border-radius: var(--lex-radius-md, 8px);',
-      '  cursor: pointer;',
-      '  transition: background 0.15s, color 0.15s;',
-      '  flex-shrink: 0;',
-      '}',
-      '.npm-back-btn:hover, .npm-back-btn:focus-visible {',
-      '  background: var(--lex-bg-secondary, rgba(0,0,0,0.05));',
-      '  color: var(--lex-text-primary);',
-      '  outline: none;',
-      '}',
-    ].join('\n');
+    style.textContent = 'lex-modal.npm-picker-mode .lex-modal-close { display: none !important; }';
     document.head.appendChild(style);
   },
 

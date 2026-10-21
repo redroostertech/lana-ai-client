@@ -2070,8 +2070,13 @@
       });
   }
 
-  function cancelTask(state) {
-    if (!confirm('Cancel this task? This cannot be undone.')) return;
+  async function cancelTask(state) {
+    var confirmed = await window.Lex.Modal.confirmAsync('Cancel task', 'Cancel this task? This cannot be undone.', {
+      variant: 'danger',
+      confirmText: 'Cancel task',
+      cancelText: 'Keep task'
+    });
+    if (!confirmed || state.destroyed) return;
 
     var cancelBtn = el('atdCancelBtn');
     if (cancelBtn) cancelBtn.setAttribute('disabled', '');

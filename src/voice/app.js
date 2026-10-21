@@ -772,16 +772,12 @@ function showSettingInfo(settingKey) {
   const info = VOICE_SETTING_INFO[settingKey];
   if (!info) return;
   const content = `<p class="voice-setting-modal-text">${escapeHtml(info.body)}</p>`;
-  if (window.Lex?.Modal?.open) {
-    window.Lex.Modal.open({
-      heading: info.title,
-      content,
-      size: 'md',
-      hideActions: true
-    });
-    return;
-  }
-  window.alert(`${info.title}\n\n${info.body}`);
+  window.Lex.Modal.open({
+    heading: info.title,
+    content,
+    size: 'md',
+    hideActions: true
+  });
 }
 
 async function showVoicePreview() {
@@ -827,16 +823,12 @@ async function showVoicePreview() {
       <p class="voice-preview-modal-note">${escapeHtml(playbackMessage)}</p>
     </div>
   `;
-  if (window.Lex?.Modal?.open) {
-    window.Lex.Modal.open({
-      heading: 'Test Voice',
-      content,
-      size: 'md',
-      hideActions: true
-    });
-    return;
-  }
-  window.alert(`Test Voice\n\n${previewText}`);
+  window.Lex.Modal.open({
+    heading: 'Test Voice',
+    content,
+    size: 'md',
+    hideActions: true
+  });
 }
 
 async function synthesizeAgentSpeech(text, voice) {
@@ -1256,7 +1248,7 @@ async function saveAgent() {
 async function deleteAgent() {
   const agent = selectedAgent();
   if (!agent) return;
-  if (!window.confirm(`Delete ${agent.name}?`)) return;
+  if (!(await window.Lex.Modal.confirmAsync('Delete agent', `Delete ${agent.name}?`, { confirmText: 'Delete', variant: 'danger' }))) return;
   try {
     if (!String(agent.id || '').startsWith('local-')) {
       await request(`${API_ROOT}/${encodeURIComponent(agent.id)}`, { method: 'DELETE' });

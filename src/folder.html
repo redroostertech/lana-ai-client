@@ -151,8 +151,10 @@
          ══════════════════════════════════════════════════════════════════ -->
 
     <!-- New Folder Modal -->
-    <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true">
+    <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true"
+      footer-content='<lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn><lex-btn type="button" variant="primary" id="createFolderSubmitBtn" onclick="document.getElementById(&#39;newFolderForm&#39;).requestSubmit()">Create</lex-btn>'>
       <form id="newFolderForm">
+        <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
         <lex-input
           id="folderNameInput"
           label="Folder Name"
@@ -165,15 +167,12 @@
           </svg>
           Creates a subfolder within the current matter.
         </p>
-        <div class="flex items-center justify-end gap-3 mt-4">
-          <lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn>
-          <lex-btn type="submit" variant="primary">Create</lex-btn>
-        </div>
       </form>
     </lex-modal>
 
     <!-- Document Metadata Modal -->
-    <lex-modal id="documentMetadataModal" heading="Document Details" size="lg" hide-actions="true">
+    <lex-modal id="documentMetadataModal" heading="Document Details" size="lg" hide-actions="true"
+      footer-content='<lex-btn id="cancelMetadataUpload" variant="secondary">Cancel</lex-btn><lex-btn id="confirmMetadataUpload" variant="primary"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Upload Document</lex-btn>'>
       <div class="space-y-4">
         <div class="rounded-lg p-3 border" style="background-color: var(--lex-bg-secondary); border-color: var(--lex-border-default)">
           <p class="text-sm" style="color: var(--lex-text-secondary)">
@@ -220,19 +219,11 @@
           show-count="true"
         ></lex-textarea>
       </div>
-      <div slot="footer">
-        <lex-btn id="cancelMetadataUpload" variant="secondary">Cancel</lex-btn>
-        <lex-btn id="confirmMetadataUpload" variant="primary">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-          </svg>
-          Upload Document
-        </lex-btn>
-      </div>
     </lex-modal>
 
     <!-- Single File Upload Modal -->
-    <lex-modal id="uploadSingleFileModal" heading="Upload Document" size="md" hide-actions="true">
+    <lex-modal id="uploadSingleFileModal" heading="Upload Document" size="md" hide-actions="true"
+      footer-content='<lex-btn id="cancelSingleUploadBtnFooter" variant="secondary">Cancel</lex-btn><lex-btn id="confirmSingleUploadBtn" variant="primary"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Upload Document</lex-btn>'>
       <div class="space-y-4">
         <div class="mb-5 p-3 rounded-lg" style="background-color: var(--lex-bg-secondary)">
           <div class="flex items-start gap-3">
@@ -284,19 +275,11 @@
           </div>
         </div>
       </div>
-      <div slot="footer">
-        <lex-btn id="cancelSingleUploadBtnFooter" variant="secondary">Cancel</lex-btn>
-        <lex-btn id="confirmSingleUploadBtn" variant="primary">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-          </svg>
-          Upload Document
-        </lex-btn>
-      </div>
     </lex-modal>
 
     <!-- Bulk Upload Grid Modal -->
-    <lex-modal id="bulkUploadModal" heading="Bulk Upload Documents" size="xl" hide-actions="true">
+    <lex-modal id="bulkUploadModal" heading="Bulk Upload Documents" size="xl" hide-actions="true"
+      footer-content='<lex-btn id="cancelBulkUploadBtn" variant="secondary">Cancel</lex-btn><lex-btn id="confirmBulkUploadBtn" variant="primary"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Upload Documents</lex-btn>'>
       <div class="space-y-4">
         <p class="text-sm" style="color: var(--lex-text-secondary)"><span id="bulkFileCount">0</span> files selected - Configure hints for each file</p>
         <!-- Apply to All Controls -->
@@ -337,15 +320,6 @@
             <tbody id="bulkUploadGridBody" class="bg-white divide-y" style="border-color: var(--lex-border-default)"></tbody>
           </table>
         </div>
-      </div>
-      <div slot="footer">
-        <lex-btn id="cancelBulkUploadBtn" variant="secondary">Cancel</lex-btn>
-        <lex-btn id="confirmBulkUploadBtn" variant="primary">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-          </svg>
-          Upload Documents
-        </lex-btn>
       </div>
     </lex-modal>
 

@@ -70,7 +70,7 @@ class RelevanceLabeling {
 
     } catch (error) {
       console.error('Failed to load query:', error);
-      alert('Failed to load unlabeled query. Please try again.');
+      Lex.Toast.error('Failed to load unlabeled query. Please try again.');
     }
   }
 
@@ -202,7 +202,7 @@ class RelevanceLabeling {
     try {
       // Validate that we have labels
       if (this.labels.size === 0) {
-        alert('No labels to save');
+        Lex.Toast.warning('No labels to save');
         return;
       }
 
@@ -244,7 +244,7 @@ class RelevanceLabeling {
 
     } catch (error) {
       console.error('Failed to save labels:', error);
-      alert('Failed to save labels. Please try again.');
+      Lex.Toast.error('Failed to save labels. Please try again.');
     }
   }
 

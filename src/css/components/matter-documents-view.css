@@ -426,16 +426,6 @@
   padding-top: 1rem;
 }
 
-/* Component-owned Rename modal footer button row (injected into <body>).
-   Right-aligned to match the New Folder modal footer. */
-.mdv-rename-actions {
-  align-items: center;
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-  margin-top: 1rem;
-}
-
 /* ----------------------------------------------------------------------
    Controls bar: filter chips (left) + batch select/delete (right).
    ---------------------------------------------------------------------- */

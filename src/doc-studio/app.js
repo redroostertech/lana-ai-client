@@ -125,7 +125,7 @@ function replaceClientUrl(path) {
 }
 
 async function openDocStudioLibrary() {
-  if (state.view !== 'library' && !confirmUnsavedDocumentChanges()) {
+  if (state.view !== 'library' && !(await confirmUnsavedDocumentChanges())) {
     return;
   }
   setDocumentEditorMode(false);
@@ -343,11 +343,15 @@ function formatLastSaved(value) {
   return `Last saved ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 }
 
-function confirmUnsavedDocumentChanges() {
+async function confirmUnsavedDocumentChanges() {
   if (!state.documentDirty) {
     return true;
   }
-  return window.confirm('Continue with unsaved document changes? Save first if you want them persisted.');
+  return window.Lex.Modal.confirmAsync(
+    'Unsaved changes',
+    'Continue with unsaved document changes? Save first if you want them persisted.',
+    { confirmText: 'Continue' }
+  );
 }
 
 function cloneDocumentModel() {
@@ -2012,7 +2016,7 @@ async function openLibraryItem(row) {
     window.location.href = `../file-viewer.html?${params.toString()}`;
     return;
   }
-  if (!confirmUnsavedDocumentChanges()) {
+  if (!(await confirmUnsavedDocumentChanges())) {
     return;
   }
   replaceClientUrl(`/doc-studio/?id=${encodeURIComponent(row._presentationId)}`);
@@ -2094,7 +2098,11 @@ async function duplicatePresentation(id) {
 
 async function renamePresentation(id) {
   const current = state.presentations.find(presentation => presentation.id === id);
-  const title = window.prompt('Rename file', current?.title || 'Untitled file');
+  const title = await window.Lex.Modal.prompt('Rename file', {
+    label: 'File name',
+    value: current?.title || 'Untitled file',
+    confirmText: 'Rename'
+  });
   if (!title || !title.trim()) {
     return null;
   }
@@ -2122,7 +2130,7 @@ async function renamePresentation(id) {
 async function deletePresentation(id) {
   const current = state.presentations.find(presentation => presentation.id === id);
   const title = current?.title || 'this file';
-  if (!window.confirm(`Delete "${title}"? This removes the saved file and generated exports.`)) {
+  if (!(await window.Lex.Modal.confirmAsync('Delete file', `Delete "${title}"? This removes the saved file and generated exports.`, { confirmText: 'Delete', variant: 'danger' }))) {
     return null;
   }
 
@@ -2405,8 +2413,12 @@ async function shareCurrentPresentation() {
       await navigator.clipboard.writeText(url);
       setStatus(`Viewer link copied: ${url}`);
     } else {
-      window.prompt('Presentation viewer link', url);
       setStatus('Viewer link ready.');
+      await window.Lex.Modal.prompt('Presentation viewer link', {
+        label: 'Copy this link to share the presentation',
+        value: url,
+        confirmText: 'Done'
+      });
     }
     window.open(url, '_blank', 'noopener,noreferrer');
   } catch (error) {
@@ -2735,14 +2747,14 @@ function addDocumentParty() {
   render();
 }
 
-function deleteDocumentParty(index) {
+async function deleteDocumentParty(index) {
   const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
   const parties = documentModel ? ensureDocumentParties(documentModel) : [];
   if (!documentModel || !parties[index]) {
     return;
   }
   const label = parties[index].name || parties[index].role || `party ${index + 1}`;
-  if (!window.confirm(`Delete ${label}? This also removes the matching signature block.`)) {
+  if (!(await window.Lex.Modal.confirmAsync('Delete party', `Delete ${label}? This also removes the matching signature block.`, { confirmText: 'Delete', variant: 'danger' }))) {
     return;
   }
   parties.splice(index, 1);
@@ -2765,13 +2777,13 @@ function addDocumentSection() {
   render();
 }
 
-function deleteDocumentSection(index) {
+async function deleteDocumentSection(index) {
   const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
   const sections = documentModel ? ensureDocumentSections(documentModel) : [];
   if (!documentModel || !sections[index]) {
     return;
   }
-  if (!window.confirm(`Delete section "${sections[index].heading || index + 1}"?`)) {
+  if (!(await window.Lex.Modal.confirmAsync('Delete section', `Delete section "${sections[index].heading || index + 1}"?`, { confirmText: 'Delete', variant: 'danger' }))) {
     return;
   }
   sections.splice(index, 1);
@@ -2779,7 +2791,7 @@ function deleteDocumentSection(index) {
   render();
 }
 
-function deleteDocumentMetaField(field) {
+async function deleteDocumentMetaField(field) {
   const labels = {
     effective_date: 'Effective date',
     jurisdiction: 'Governing law'
@@ -2788,7 +2800,7 @@ function deleteDocumentMetaField(field) {
   if (!documentModel || !labels[field]) {
     return;
   }
-  if (!window.confirm(`Remove ${labels[field]} from this document layout?`)) {
+  if (!(await window.Lex.Modal.confirmAsync('Remove field', `Remove ${labels[field]} from this document layout?`, { confirmText: 'Remove', variant: 'danger' }))) {
     return;
   }
   const hidden = hiddenDocumentFields(documentModel);
@@ -2809,13 +2821,13 @@ function addDocumentReviewNote() {
   render();
 }
 
-function deleteDocumentReviewNote(index) {
+async function deleteDocumentReviewNote(index) {
   const documentModel = state.deck.document && typeof state.deck.document === 'object' ? state.deck.document : null;
   const notes = documentModel ? ensureDocumentReviewNotes(documentModel) : [];
   if (!documentModel || index < 0 || index >= notes.length) {
     return;
   }
-  if (!window.confirm('Delete this review note?')) {
+  if (!(await window.Lex.Modal.confirmAsync('Delete review note', 'Delete this review note?', { confirmText: 'Delete', variant: 'danger' }))) {
     return;
   }
   notes.splice(index, 1);
@@ -2882,7 +2894,7 @@ async function deleteDocumentComment(commentIdOrIndex) {
   if (!documentModel || index < 0 || index >= comments.length) {
     return;
   }
-  if (!window.confirm('Delete this comment?')) {
+  if (!(await window.Lex.Modal.confirmAsync('Delete comment', 'Delete this comment?', { confirmText: 'Delete', variant: 'danger' }))) {
     return;
   }
   comments.splice(index, 1);
@@ -3151,7 +3163,7 @@ async function critiqueCurrentDeck({ polish = false } = {}) {
 }
 
 async function generateDeck() {
-  if (!confirmUnsavedDocumentChanges()) {
+  if (!(await confirmUnsavedDocumentChanges())) {
     return;
   }
   const prompt = elements.prompt.value.trim();
@@ -3653,7 +3665,7 @@ elements.libraryList.addEventListener('click', async event => {
   }
 
   try {
-    if (openButton && !confirmUnsavedDocumentChanges()) {
+    if (openButton && !(await confirmUnsavedDocumentChanges())) {
       return;
     }
     if (duplicateButton) {
@@ -3822,7 +3834,7 @@ elements.docView.addEventListener('click', async event => {
     }
 
     if (deletePartyButton) {
-      deleteDocumentParty(Number(deletePartyButton.dataset.docDeleteParty));
+      await deleteDocumentParty(Number(deletePartyButton.dataset.docDeleteParty));
       return;
     }
 
@@ -3832,12 +3844,12 @@ elements.docView.addEventListener('click', async event => {
     }
 
     if (deleteSectionButton) {
-      deleteDocumentSection(Number(deleteSectionButton.dataset.docDeleteSection));
+      await deleteDocumentSection(Number(deleteSectionButton.dataset.docDeleteSection));
       return;
     }
 
     if (deleteMetaButton) {
-      deleteDocumentMetaField(deleteMetaButton.dataset.docDeleteMeta);
+      await deleteDocumentMetaField(deleteMetaButton.dataset.docDeleteMeta);
       return;
     }
 
@@ -3847,7 +3859,7 @@ elements.docView.addEventListener('click', async event => {
     }
 
     if (deleteReviewNoteButton) {
-      deleteDocumentReviewNote(Number(deleteReviewNoteButton.dataset.docDeleteReviewNote));
+      await deleteDocumentReviewNote(Number(deleteReviewNoteButton.dataset.docDeleteReviewNote));
       return;
     }
 
@@ -3941,8 +3953,8 @@ elements.docView.addEventListener('click', async event => {
   }
 });
 elements.tabs.forEach(tab => {
-  tab.addEventListener('click', () => {
-    if (tab.dataset.view !== state.view && !confirmUnsavedDocumentChanges()) {
+  tab.addEventListener('click', async () => {
+    if (tab.dataset.view !== state.view && !(await confirmUnsavedDocumentChanges())) {
       return;
     }
     state.view = tab.dataset.view;

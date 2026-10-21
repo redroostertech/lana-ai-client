@@ -468,11 +468,11 @@
       }
       // Success: the personal copy remains in the vault (COPY semantics).
       toast('success', 'Note promoted to your organization. Your copy stays in Brainchild.');
-      // Close the owning modal the way Lex itself does (emits lex-close, which
-      // the open() handler wires to modal.remove()).
+      // Close the owning modal through Lex.Modal.open's close lifecycle
+      // (exit animation, then removal).
       var modal = button && button.closest ? button.closest('lex-modal') : null;
-      if (modal && typeof modal.emit === 'function') {
-        modal.emit('lex-close');
+      if (modal && typeof modal.removeAfterClose === 'function') {
+        modal.removeAfterClose();
       } else if (modal && modal.remove) {
         modal.remove();
       }
@@ -487,19 +487,16 @@
     }
   }
 
-  // Write into the lex-modal's body slot rather than replacing the host element.
-  // After Lex.Modal.open() the component has already rendered its chrome
-  // (overlay/backdrop/panel/header/close button) into light DOM; reassigning
-  // modal.innerHTML would wipe that chrome (and render() will not rebuild it
-  // because _rendered is already true). Targeting the body keeps the modal a
-  // real modal — positioning, backdrop, scroll-lock, and the close (X) button.
-  // Guarded for null because the body may not be present on the first microtask.
+  // Write into this preview's own content root (passed to Lex.Modal.open as
+  // content) rather than the host element or the component's internal body.
+  // Reassigning modal.innerHTML would wipe the chrome lex-modal already
+  // rendered (render() does not rebuild it), and the body markup is the
+  // component's private structure.
+  var PREVIEW_ROOT_SELECTOR = '[data-bc-preview-root]';
   function setModalBody(modal, html) {
     if (!modal) return;
-    var body = modal.querySelector('.lex-modal-body slot-content') ||
-      modal.querySelector('.lex-modal-body') ||
-      modal;
-    body.innerHTML = html;
+    var root = modal.querySelector(PREVIEW_ROOT_SELECTOR);
+    if (root) root.innerHTML = html;
   }
 
   async function openNotePreview(row) {
@@ -509,7 +506,7 @@
 
     var modal = window.Lex.Modal.open({
       heading: row.name || 'Note',
-      content: '<div class="bc-preview"><p class="bc-preview-meta">Loading…</p></div>',
+      content: '<div data-bc-preview-root><div class="bc-preview"><p class="bc-preview-meta">Loading…</p></div></div>',
       size: 'lg',
       hideActions: true
     });

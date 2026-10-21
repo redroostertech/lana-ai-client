@@ -54,7 +54,7 @@
 }
 
 /* Per-file Rename and Delete use the MatterDocumentsView component-owned
-   modal / confirm dialogs (see .mdv-rename-actions below); folder.js no longer
+   lex-modal and Lex.Modal confirm dialogs; folder.js no longer
    renders its own per-file delete modal. */
 
 /* ----------------------------------------------------------------------

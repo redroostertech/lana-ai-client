@@ -255,8 +255,10 @@
          ══════════════════════════════════════════════════════════════════ -->
 
     <!-- New Folder Modal -->
-    <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true">
+    <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true"
+      footer-content='<lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn><lex-btn type="button" variant="primary" id="createFolderSubmitBtn" onclick="document.getElementById(&#39;newFolderForm&#39;).requestSubmit()">Create</lex-btn>'>
       <form id="newFolderForm">
+        <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
         <lex-input
           id="folderNameInput"
           label="Folder Name"
@@ -269,10 +271,6 @@
           </svg>
           Creating a folder will also create a new workspace. To edit workspace details, visit the <a href="/workspaces.html" class="underline" style="color: var(--lex-text-accent)">Workspaces page</a>.
         </p>
-        <div class="flex items-center justify-end gap-3 mt-4">
-          <lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn>
-          <lex-btn type="submit" variant="primary">Create</lex-btn>
-        </div>
       </form>
     </lex-modal>
 
@@ -317,7 +315,8 @@
     </lex-modal>
 
     <!-- Delete Matter Confirmation Modal -->
-    <lex-modal id="deleteMatterConfirmModal" heading="Delete Folder" size="md" variant="danger" hide-actions="true">
+    <lex-modal id="deleteMatterConfirmModal" heading="Delete Folder" size="md" variant="danger" hide-actions="true"
+      footer-content='<lex-btn onclick="closeDeleteMatterConfirmModal()" variant="secondary">Cancel</lex-btn><lex-btn id="confirmDeleteMatterBtn" onclick="confirmDeleteMatter()" variant="danger">Delete Folder</lex-btn>'>
       <div>
         <div class="flex items-start gap-3 mb-4">
           <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -336,10 +335,6 @@
             </ul>
             <p class="text-sm font-medium mt-3" style="color: var(--lex-status-danger-text)">This action cannot be undone.</p>
           </div>
-        </div>
-        <div class="flex gap-3 mt-6">
-          <lex-btn onclick="closeDeleteMatterConfirmModal()" variant="secondary" style="flex: 1">Cancel</lex-btn>
-          <lex-btn id="confirmDeleteMatterBtn" onclick="confirmDeleteMatter()" variant="danger" style="flex: 1">Delete Folder</lex-btn>
         </div>
       </div>
     </lex-modal>

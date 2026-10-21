@@ -832,11 +832,7 @@
   }
 
   function confirmDelete(title, message, onConfirm) {
-    if (window.Lex && Lex.Modal && typeof Lex.Modal.confirm === 'function') {
-      Lex.Modal.confirm(title, message, onConfirm, { variant: 'danger', confirmText: 'Delete' });
-      return;
-    }
-    if (window.confirm(message)) onConfirm();
+    Lex.Modal.confirm(title, message, onConfirm, { variant: 'danger', confirmText: 'Delete' });
   }
 
   function startCommentEdit(comment) {

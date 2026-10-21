@@ -121,6 +121,7 @@
         size="full"
         hide-actions
         close-on-overlay
+        header-actions="<div class=&quot;my-task-header-actions&quot; data-task-actions-wrap></div>"
       >
         <div id="myTaskDetailsContent"></div>
       </lex-modal>
@@ -132,7 +133,7 @@
       size="md"
       hide-actions
       data-hoist
-    >
+      footer-content="<lex-btn id=&quot;myTaskCloseoutSkipBtn&quot; variant=&quot;secondary&quot; size=&quot;md&quot;>Skip</lex-btn><lex-btn id=&quot;myTaskCloseoutSaveBtn&quot; variant=&quot;primary&quot; size=&quot;md&quot;>Complete Task</lex-btn>">
       <div class="p-5 space-y-4">
         <div>
           <p class="text-sm font-medium" style="color: var(--lex-text-primary)">Completion notes</p>
@@ -142,10 +143,6 @@
         <lex-textarea id="myTaskCloseoutWentWell" label="What went well?" rows="2" placeholder="Wins or useful signals..."></lex-textarea>
         <lex-textarea id="myTaskCloseoutCouldImprove" label="What could be better?" rows="2" placeholder="Risks, misses, or improvements..."></lex-textarea>
         <lex-textarea id="myTaskCloseoutActionItems" label="Action items" rows="2" placeholder="One follow-up per line..."></lex-textarea>
-        <div class="my-task-modal-actions">
-          <lex-btn id="myTaskCloseoutSkipBtn" variant="secondary" size="md">Skip</lex-btn>
-          <lex-btn id="myTaskCloseoutSaveBtn" variant="primary" size="md">Complete Task</lex-btn>
-        </div>
       </div>
     </lex-modal>
 
@@ -155,7 +152,7 @@
       size="lg"
       hide-actions
       data-hoist
-    >
+      footer-content="<lex-btn id=&quot;myTaskCancelBtn&quot; variant=&quot;secondary&quot; size=&quot;md&quot;>Cancel</lex-btn><lex-btn id=&quot;myTaskSaveBtn&quot; variant=&quot;primary&quot; size=&quot;md&quot;>Create Task</lex-btn>">
       <lex-form id="myTaskCreateForm">
         <div class="my-task-form-grid">
           <lex-input
@@ -236,11 +233,6 @@
           rows="4"
           auto-resize
         ></lex-textarea>
-
-        <div class="my-task-modal-actions">
-          <lex-btn id="myTaskCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="myTaskSaveBtn" variant="primary" size="md" type="submit">Create Task</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
 
@@ -250,7 +242,7 @@
       size="lg"
       hide-actions
       data-hoist
-    >
+      footer-content="<lex-btn id=&quot;myTaskPlanCancelBtn&quot; variant=&quot;secondary&quot; size=&quot;md&quot;>Cancel</lex-btn><lex-btn id=&quot;myTaskPlanSaveBtn&quot; variant=&quot;primary&quot; size=&quot;md&quot;>Create &amp;amp; Edit Items</lex-btn>">
       <lex-form id="myTaskPlanCreateForm">
         <div class="my-task-form-grid">
           <lex-input
@@ -292,11 +284,6 @@
           After creating the plan, you'll be taken to the editor to add items
           and assignees.
         </p>
-
-        <div class="my-task-modal-actions">
-          <lex-btn id="myTaskPlanCancelBtn" variant="secondary" size="md">Cancel</lex-btn>
-          <lex-btn id="myTaskPlanSaveBtn" variant="primary" size="md" type="submit">Create &amp; Edit Items</lex-btn>
-        </div>
       </lex-form>
     </lex-modal>
   </template>

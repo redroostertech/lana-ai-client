@@ -268,14 +268,6 @@
   overflow-wrap: anywhere;
 }
 
-.my-task-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--lex-spacing-sm, 0.5rem);
-  padding-top: var(--lex-spacing-md, 0.75rem);
-  border-top: 1px solid var(--lex-border-subtle);
-}
-
 #myTaskDescription {
   margin-bottom: var(--lex-spacing-md, 0.75rem);
 }

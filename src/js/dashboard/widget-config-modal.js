@@ -216,7 +216,7 @@ const WidgetConfigModal = (function() {
     var titleRaw = modalElement.querySelector('#widgetTitleInput').value.trim();
 
     if (!widgetType) {
-      alert('Please select a widget type.');
+      Lex.Modal.alertAsync('Widget type required', 'Please select a widget type.');
       return;
     }
 
@@ -275,7 +275,7 @@ const WidgetConfigModal = (function() {
       }
     } catch (err) {
       console.error('[WidgetConfigModal] Failed to save widget:', err);
-      alert('Failed to add widget. Please try again.');
+      Lex.Modal.alertAsync('Could not add widget', 'Failed to add widget. Please try again.');
     } finally {
       if (saveBtn) {
         saveBtn.disabled = false;

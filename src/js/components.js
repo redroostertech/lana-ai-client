@@ -48,95 +48,43 @@ const Toast = {
 };
 
 // Modal Component
+// Legacy facade over Lex.Modal (docs/TABLE-STANDARD.md section 11). Keeps the
+// original signatures: show({ title, content, onConfirm, onCancel,
+// confirmText, cancelText, type }) returns the dialog element, and string
+// content is trusted HTML exactly as before. Pages that call it must load
+// lex.core.js and components/foundation/lex-modal.js.
 const Modal = {
+  _variant(type) {
+    return ['danger', 'success', 'info'].indexOf(type) >= 0 ? type : 'default';
+  },
+
   show(options) {
     const { title, content, onConfirm, onCancel, confirmText = 'Confirm', cancelText = 'Cancel', type = 'default' } = options;
+    let body = content;
+    if (typeof content === 'string') body = `<p class="lex-modal-body-text">${content}</p>`;
+    else if (!(window.Node && content instanceof window.Node)) body = '';
 
-    // Icon based on type
-    const iconMap = {
-      danger: `
-        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-        </svg>
-      `,
-      success: `
-        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-      `,
-      info: `
-        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-      `,
-      default: `
-        <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-      `
-    };
-
-    const iconBgMap = {
-      danger: 'bg-red-100',
-      success: 'bg-green-100',
-      info: 'bg-blue-100',
-      default: 'bg-gray-100'
-    };
-
-    const overlay = document.createElement('div');
-    overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-    overlay.innerHTML = `
-      <div class="bg-white rounded-xl shadow-2xl max-w-md w-full transform transition-all animate-fade-in-up">
-        <div class="p-6">
-          <div class="flex items-start gap-4">
-            <div class="flex-shrink-0 w-12 h-12 ${iconBgMap[type] || iconBgMap.default} rounded-full flex items-center justify-center">
-              ${iconMap[type] || iconMap.default}
-            </div>
-            <div class="flex-1 min-w-0">
-              <h3 class="text-xl font-semibold text-gray-900 mb-2">${title}</h3>
-              <div class="text-gray-600 text-sm leading-relaxed">
-                ${typeof content === 'string' ? `<p>${content}</p>` : ''}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="px-6 pb-6 flex justify-end gap-3">
-          <button class="btn-cancel px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300">${cancelText}</button>
-          <button class="btn-confirm px-5 py-2.5 text-sm font-medium text-white ${
-            type === 'danger' ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500' :
-            type === 'success' ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' :
-            type === 'primary' ? 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500' :
-            'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500'
-          } rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-sm">${confirmText}</button>
-        </div>
-      </div>
-    `;
-
-    const contentDiv = overlay.querySelector('.text-gray-600');
-    if (typeof content !== 'string' && contentDiv) {
-      contentDiv.innerHTML = '';
-      contentDiv.appendChild(content);
-    }
-
-    overlay.querySelector('.btn-cancel').onclick = () => {
-      overlay.remove();
+    let settled = false;
+    const modal = window.Lex.Modal.open({
+      heading: title,
+      content: body,
+      variant: this._variant(type),
+      confirmText,
+      cancelText,
+      hideActions: false,
+      onConfirm: () => {
+        settled = true;
+        onConfirm?.();
+      }
+    });
+    const cancel = () => {
+      if (settled) return;
+      settled = true;
       onCancel?.();
     };
-
-    overlay.querySelector('.btn-confirm').onclick = () => {
-      overlay.remove();
-      onConfirm?.();
-    };
-
-    overlay.onclick = (e) => {
-      if (e.target === overlay) {
-        overlay.remove();
-        onCancel?.();
-      }
-    };
-
-    document.body.appendChild(overlay);
-    return overlay;
+    modal.addEventListener('lex-cancel', cancel);
+    modal.addEventListener('lex-close', cancel);
+    return modal;
   },
 
   confirm(title, message, onConfirm, confirmText = 'Delete', type = 'danger') {

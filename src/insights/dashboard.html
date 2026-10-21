@@ -27,6 +27,7 @@
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
@@ -3746,7 +3747,7 @@
     // Export to PDF
     function exportToPDF() {
       if (!currentModuleData) {
-        alert('No data to export. Please execute a module first.');
+        Lex.Modal.alertAsync('Nothing to export', 'No data to export. Please execute a module first.');
         return;
       }
 
@@ -3798,7 +3799,7 @@
     // Export to CSV
     function exportToCSV() {
       if (!currentModuleData) {
-        alert('No data to export. Please execute a module first.');
+        Lex.Modal.alertAsync('Nothing to export', 'No data to export. Please execute a module first.');
         return;
       }
 
@@ -4053,7 +4054,11 @@
 
     // Delete data override
     async function deleteOverride(overrideId) {
-      if (!confirm('Are you sure you want to delete this override?')) {
+      const confirmed = await Lex.Modal.confirmAsync('Delete override', 'Are you sure you want to delete this override?', {
+        confirmText: 'Delete',
+        variant: 'danger'
+      });
+      if (!confirmed) {
         return;
       }
 

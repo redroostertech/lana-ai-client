@@ -347,14 +347,10 @@
 
     // Invoke the injected confirm dialog. The default (this client library's
     // Lex.Modal.confirm) takes (title, message, onConfirm, options) where
-    // options = { confirmText, variant }. We pass that options object. Falls
-    // back to window.confirm when no confirm function is available.
+    // options = { confirmText, variant }. We pass that options object.
     function doConfirm(title, message, onConfirm, confirmText, variant) {
-      if (confirmFn) {
-        confirmFn(title, message, onConfirm, { confirmText: confirmText, variant: variant });
-      } else if (window.confirm(message)) {
-        onConfirm();
-      }
+      var confirmDialog = confirmFn || window.Lex.Modal.confirm;
+      confirmDialog(title, message, onConfirm, { confirmText: confirmText, variant: variant });
     }
 
     function fileName(file) {
@@ -1208,7 +1204,9 @@
 
     async function requestLegalReview(fileId) {
       try {
-        var proceed = window.confirm('Request Lana legal review for this generated document?');
+        var proceed = await window.Lex.Modal.confirmAsync('Request Legal Review', 'Request Lana legal review for this generated document?', {
+          confirmText: 'Request review'
+        });
         if (!proceed) return;
         await docStudioRequest('POST', '/api/v1/deck-studio/matter-documents/' + encodeURIComponent(fileId) + '/legal-review', {
           notes: 'Review requested from the matter Documents view.'
@@ -1222,7 +1220,12 @@
 
     async function requestSignatures(fileId) {
       try {
-        var signerText = window.prompt('Enter signer names or emails separated by commas. Leave blank to create a signature request without named signers.', '');
+        var signerText = await window.Lex.Modal.prompt('Request Signatures', {
+          message: 'Leave blank to create a signature request without named signers.',
+          label: 'Signer names or emails, separated by commas',
+          value: '',
+          confirmText: 'Request signatures'
+        });
         if (signerText === null) return;
         var signers = signerText.split(',')
           .map(function (v) { return v.trim(); })
@@ -1468,18 +1471,19 @@
       var existing = document.getElementById(MODAL_ID);
       if (existing) return existing;
 
-      var wrapper = document.createElement('div');
-      wrapper.innerHTML =
-        '<lex-modal id="' + MODAL_ID + '" heading="Rename File" size="md" hide-actions="true">' +
-          '<form id="' + FORM_ID + '">' +
-            '<lex-input id="' + INPUT_ID + '" label="File Name" placeholder="Enter file name" required="true"></lex-input>' +
-            '<div class="mdv-rename-actions">' +
-              '<lex-btn type="button" variant="secondary" id="' + CANCEL_ID + '">Cancel</lex-btn>' +
-              '<lex-btn type="submit" variant="primary" id="' + SAVE_ID + '">Save</lex-btn>' +
-            '</div>' +
-          '</form>' +
-        '</lex-modal>';
-      var modal = wrapper.firstChild;
+      // The Save/Cancel buttons live in the modal's own footer (footer-content);
+      // the form still submits on Enter, and Save is wired to the same handler.
+      var modal = document.createElement('lex-modal');
+      modal.id = MODAL_ID;
+      modal.setAttribute('heading', 'Rename File');
+      modal.setAttribute('size', 'md');
+      modal.setAttribute('footer-content',
+        '<lex-btn type="button" variant="secondary" id="' + CANCEL_ID + '">Cancel</lex-btn>' +
+        '<lex-btn type="button" variant="primary" id="' + SAVE_ID + '">Save</lex-btn>');
+      modal.innerHTML =
+        '<form id="' + FORM_ID + '">' +
+          '<lex-input id="' + INPUT_ID + '" label="File Name" placeholder="Enter file name" required="true"></lex-input>' +
+        '</form>';
       document.body.appendChild(modal);
       return modal;
     }
@@ -1506,7 +1510,14 @@
           if (modal._mdvOnSubmit) modal._mdvOnSubmit();
         });
       }
-      var cancelBtn = document.getElementById(CANCEL_ID);
+      var saveBtn = modal.querySelector('#' + SAVE_ID);
+      if (saveBtn && !saveBtn._mdvBound) {
+        saveBtn._mdvBound = true;
+        saveBtn.addEventListener('click', function () {
+          if (modal._mdvOnSubmit) modal._mdvOnSubmit();
+        });
+      }
+      var cancelBtn = modal.querySelector('#' + CANCEL_ID);
       if (cancelBtn && !cancelBtn._mdvBound) {
         cancelBtn._mdvBound = true;
         cancelBtn.addEventListener('click', function () {

@@ -268,14 +268,6 @@
   font-weight: var(--lex-weight-semibold, 600);
 }
 
-.task-plan-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--lex-spacing-sm, 0.5rem);
-  padding-top: var(--lex-spacing-md, 0.75rem);
-  border-top: 1px solid var(--lex-border-subtle);
-}
-
 .task-plans-unavailable {
   margin-top: var(--lex-spacing-lg, 1.5rem);
 }

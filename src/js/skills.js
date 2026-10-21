@@ -2192,11 +2192,15 @@
 
         // Wire detach buttons
         container.querySelectorAll('.ld-detach-btn').forEach(function(btn) {
-          btn.addEventListener('click', function(e) {
+          btn.addEventListener('click', async function(e) {
             e.stopPropagation();
             var matterId = btn.dataset.matterId;
             if (!matterId) return;
-            if (!confirm('Detach this skill from the matter?')) return;
+            var confirmed = await Lex.Modal.confirmAsync('Detach Skill', 'Detach this skill from the matter?', {
+              confirmText: 'Detach',
+              variant: 'danger'
+            });
+            if (!confirmed) return;
             detachSkillFromMatter(matterId, skillId, function() {
               loadSkillMatterAttachments(skillId);
               showToast('Skill detached from matter', 'success');

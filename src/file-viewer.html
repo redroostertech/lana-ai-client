@@ -366,7 +366,8 @@
     </div>
 
     <!-- DOCX Template Generation Modal -->
-    <lex-modal id="fvDocxModal" heading="Generate Document from Template" size="full" hide-actions close-on-overlay>
+    <lex-modal id="fvDocxModal" heading="Generate Document from Template" size="full" close-on-overlay
+      footer-content='<lex-btn type="button" id="fvDocxCancelBtn" variant="secondary">Cancel</lex-btn><lex-btn type="button" id="fvDocxGenerateBtn" variant="primary" disabled>Generate Document</lex-btn>'>
       <div class="flex flex-col h-full">
         <!-- Two-column body -->
         <div class="flex-1 flex overflow-hidden">
@@ -440,11 +441,6 @@
 
         </div>
 
-        <!-- Pinned footer -->
-        <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
-          <lex-btn type="button" id="fvDocxCancelBtn" variant="secondary">Cancel</lex-btn>
-          <lex-btn type="button" id="fvDocxGenerateBtn" variant="primary" disabled>Generate Document</lex-btn>
-        </div>
       </div>
     </lex-modal>
 

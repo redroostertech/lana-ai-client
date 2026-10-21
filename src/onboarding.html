@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Setup - Lana AI</title>
     <link rel="stylesheet" href="css/tailwind-output.css">
+    <link rel="stylesheet" href="css/lex-tokens.css">
   <script src="js/tailwind-loader.js"></script>
   <script src="js/error-reporter.js"></script>
     <script src="js/config.js"></script>
@@ -14,6 +15,8 @@
     <script src="js/api.js"></script>
     <script src="js/utils/rename-conversation.js"></script>
   <script src="js/components.js"></script>
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -259,7 +262,7 @@
             const code = getCode();
 
             if (code.length !== 6) {
-                alert('Please enter a 6-digit code');
+                Lex.Modal.alertAsync('Verification code', 'Please enter a 6-digit code');
                 return;
             }
 
@@ -278,7 +281,7 @@
 
                 goToStep(2);
             } catch (error) {
-                alert(error.message || 'Invalid verification code');
+                Lex.Modal.alertAsync('Verification failed', error.message || 'Invalid verification code');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Verify Device';
@@ -335,7 +338,7 @@
 
                 goToStep(3);
             } catch (error) {
-                alert(error.message || 'Failed to complete setup');
+                Lex.Modal.alertAsync('Setup failed', error.message || 'Failed to complete setup');
             }
         }
 
