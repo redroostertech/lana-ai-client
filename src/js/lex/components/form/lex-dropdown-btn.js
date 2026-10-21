@@ -7,6 +7,33 @@
        options='[{"value":"edit","label":"Edit","icon":"edit"},{"value":"delete","label":"Delete","icon":"trash-2"}]'>
      </lex-dropdown-btn>
 
+   Icon-only trigger at the right edge (e.g. a header account menu):
+     <lex-dropdown-btn icon="settings" icon-only aria-label="Account menu"
+       align="end" variant="ghost"
+       options='[{"label":"Settings","href":"settings-v2.html","icon":"settings"},
+                 {"divider":true},
+                 {"value":"logout","label":"Log out","icon":"log-out","variant":"danger"}]'>
+     </lex-dropdown-btn>
+
+   Attributes:
+     button-label   trigger text (default "Actions"); the accessible name of an
+                    icon-only trigger when there is no aria-label
+     icon           Lex.Icons name shown before the label
+     icon-only      show only the icon (no label, no chevron); set aria-label
+     align          start (default) | end — which trigger edge the menu lines up with
+     variant        primary | secondary (default) | ghost
+     searchable, disabled
+
+   Items: { value, label, icon?, description?, href?, target?, variant?: 'danger',
+            danger?: true, disabled?: true } or { divider: true } separators.
+     href renders the item as a link (javascript: URLs are dropped); clicking
+     it still emits lex-select and then follows the link.
+
+   Keyboard: ArrowDown/Enter/Space on the trigger opens and focuses the first
+   item; ArrowUp/ArrowDown/Home/End move; Enter/Space activates; Escape closes
+   and returns focus to the trigger; Tab closes. ARIA: menu / menuitem /
+   separator, aria-haspopup, aria-expanded, aria-controls.
+
    Events: lex-select { value, label, item }
 */
 
@@ -88,6 +115,51 @@
 
       .lex-ddbtn-dropdown--open {
         display: block;
+      }
+
+      .lex-ddbtn-dropdown--end {
+        left: auto;
+        right: 0;
+      }
+
+      .lex-ddbtn-trigger--icon-only {
+        padding: 0.5rem;
+      }
+
+      .lex-ddbtn-trigger-icon,
+      .lex-ddbtn-trigger-icon svg {
+        display: inline-flex;
+        width: 16px;
+        height: 16px;
+      }
+
+      a.lex-ddbtn-item {
+        text-decoration: none;
+      }
+
+      .lex-ddbtn-item:focus {
+        outline: none;
+        background: var(--lex-select-option-hover, var(--lex-bg-secondary));
+      }
+
+      .lex-ddbtn-item--danger,
+      .lex-ddbtn-item--danger .lex-ddbtn-item-icon {
+        color: var(--lex-color-danger-600, var(--lex-color-danger-500));
+      }
+
+      .lex-ddbtn-item--disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .lex-ddbtn-item--disabled:hover {
+        background: transparent;
+      }
+
+      .lex-ddbtn-separator {
+        height: 1px;
+        margin: 4px 0;
+        background: var(--lex-border-subtle, rgba(0,0,0,0.06));
       }
 
       .lex-ddbtn-search {
@@ -175,6 +247,25 @@
     return '';
   }
 
+  let _ddbtnIdCounter = 0;
+
+  function isDivider(item) {
+    return !!item && (item.divider === true || item.separator === true);
+  }
+
+  function isActionable(item) {
+    return !!item && !isDivider(item) && !item.disabled;
+  }
+
+  // href for a link item, or '' when it is missing or a script URL.
+  function safeHref(href) {
+    const text = String(href == null ? '' : href).trim();
+    if (!text) return '';
+    const compact = text.toLowerCase().split(' ').join('');
+    if (compact.startsWith('javascript:') || compact.startsWith('vbscript:') || compact.startsWith('data:')) return '';
+    return text;
+  }
+
   class LexDropdownBtn extends LexElement {
     static get properties() {
       return {
@@ -182,7 +273,10 @@
         searchable:  { type: Boolean, default: false },
         variant:     { type: String, default: 'secondary' },
         buttonLabel: { type: String, default: 'Actions' },
-        disabled:    { type: Boolean, default: false }
+        disabled:    { type: Boolean, default: false },
+        icon:        { type: String, default: '' },      // Lex.Icons name on the trigger
+        iconOnly:    { type: Boolean, default: false },  // icon-only trigger (set aria-label)
+        align:       { type: String, default: 'start' }  // start | end
       };
     }
 
@@ -191,6 +285,10 @@
       this._open = false;
       this._searchTerm = '';
       this._focusedIdx = -1;
+      // When true, updated() moves DOM focus to the focused item (keyboard use).
+      this._focusItems = false;
+      this._focusTrigger = false;
+      this._menuId = 'lex-ddbtn-menu-' + (++_ddbtnIdCounter);
     }
 
     render() {
@@ -203,13 +301,23 @@
 
       const filtered = this._getFiltered();
       const ariaExpanded = this._open ? 'true' : 'false';
+      const iconOnly = !!this.iconOnly;
+      const hostLabel = this.getAttribute('aria-label');
+      const ariaLabel = iconOnly ? (hostLabel || this.buttonLabel || '') : (hostLabel || '');
+      const ariaLabelAttr = ariaLabel ? ` aria-label="${this.escapeHtml(ariaLabel)}"` : '';
+      const triggerIcon = this.icon ? getIcon(this.icon) : '';
+      const iconOnlyCls = iconOnly ? ' lex-ddbtn-trigger--icon-only' : '';
 
-      let html = `<button type="button" class="lex-ddbtn-trigger${openCls}" style="${cssVars}" ${disabledAttr} data-action="toggle" aria-haspopup="menu" aria-expanded="${ariaExpanded}">`;
-      html += this.escapeHtml(this.buttonLabel);
-      html += CHEVRON_SVG;
+      let html = `<button type="button" class="lex-ddbtn-trigger${openCls}${iconOnlyCls}" style="${cssVars}" ${disabledAttr} data-action="toggle" aria-haspopup="menu" aria-expanded="${ariaExpanded}" aria-controls="${this._menuId}"${ariaLabelAttr}>`;
+      if (triggerIcon) html += `<span class="lex-ddbtn-trigger-icon" aria-hidden="true">${triggerIcon}</span>`;
+      if (!iconOnly) {
+        html += this.escapeHtml(this.buttonLabel);
+        html += CHEVRON_SVG;
+      }
       html += `</button>`;
 
-      html += `<div class="lex-ddbtn-dropdown${this._open ? ' lex-ddbtn-dropdown--open' : ''}" role="menu">`;
+      const endCls = this.align === 'end' ? ' lex-ddbtn-dropdown--end' : '';
+      html += `<div class="lex-ddbtn-dropdown${this._open ? ' lex-ddbtn-dropdown--open' : ''}${endCls}" role="menu" id="${this._menuId}"${ariaLabel || this.buttonLabel ? ` aria-label="${this.escapeHtml(ariaLabel || this.buttonLabel)}"` : ''}>`;
 
       if (this.searchable) {
         html += `<div class="lex-ddbtn-search"><input type="text" placeholder="Search..." value="${this.escapeHtml(this._searchTerm)}" /></div>`;
@@ -219,13 +327,31 @@
         html += `<div class="lex-ddbtn-empty">No items found</div>`;
       } else {
         filtered.forEach((item, idx) => {
-          const focusedCls = idx === this._focusedIdx ? ' lex-ddbtn-item--focused' : '';
+          if (isDivider(item)) {
+            html += `<div class="lex-ddbtn-separator" role="separator"></div>`;
+            return;
+          }
+          let cls = 'lex-ddbtn-item';
+          if (idx === this._focusedIdx) cls += ' lex-ddbtn-item--focused';
+          if (item.variant === 'danger' || item.danger === true) cls += ' lex-ddbtn-item--danger';
+          if (item.disabled) cls += ' lex-ddbtn-item--disabled';
           const iconHtml = item.icon ? `<span class="lex-ddbtn-item-icon" aria-hidden="true">${getIcon(item.icon)}</span>` : '';
-          html += `<div class="lex-ddbtn-item${focusedCls}" data-value="${this.escapeHtml(item.value)}" data-idx="${idx}" role="menuitem" tabindex="-1">`;
+          const value = item.value === null || item.value === undefined ? '' : String(item.value);
+          const label = item.label === null || item.label === undefined ? value : item.label;
+          const common = `class="${cls}" data-value="${this.escapeHtml(value)}" data-idx="${idx}" role="menuitem" tabindex="-1"${item.disabled ? ' aria-disabled="true" data-disabled="true"' : ''}`;
+          const href = item.disabled ? '' : safeHref(item.href);
+          if (href) {
+            const target = item.target ? ` target="${this.escapeHtml(item.target)}"` : '';
+            const rel = item.target === '_blank' ? ' rel="noopener noreferrer"' : '';
+            html += `<a ${common} href="${this.escapeHtml(href)}"${target}${rel}>`;
+          } else {
+            html += `<div ${common}>`;
+          }
           html += iconHtml;
-          html += `<div><div>${this.escapeHtml(item.label)}</div>`;
+          html += `<div><div>${this.escapeHtml(label)}</div>`;
           if (item.description) html += `<div class="lex-ddbtn-item-desc">${this.escapeHtml(item.description)}</div>`;
-          html += `</div></div>`;
+          html += `</div>`;
+          html += href ? `</a>` : `</div>`;
         });
       }
 
@@ -234,35 +360,145 @@
     }
 
     _getFiltered() {
-      const opts = this.options || [];
+      const opts = (Array.isArray(this.options) ? this.options : []).filter((o) => o !== null && o !== undefined);
       if (!this._searchTerm) return opts;
       const term = this._searchTerm.toLowerCase();
-      return opts.filter(o => o.label.toLowerCase().includes(term));
+      return opts.filter(o => !isDivider(o) && String(o.label == null ? '' : o.label).toLowerCase().includes(term));
+    }
+
+    // Next actionable index from `from` in direction dir; stays put at the ends.
+    _step(opts, from, dir) {
+      let idx = from;
+      for (let i = 0; i < opts.length; i++) {
+        idx += dir;
+        if (idx < 0 || idx >= opts.length) return from;
+        if (isActionable(opts[idx])) return idx;
+      }
+      return from;
+    }
+
+    _first(opts) { return this._step(opts, -1, 1); }
+    _last(opts) { return this._step(opts, opts.length, -1); }
+
+    _close(returnFocus) {
+      this._open = false;
+      this._focusedIdx = -1;
+      this._focusItems = false;
+      this._focusTrigger = !!returnFocus;
+      this._scheduleUpdate();
+    }
+
+    _openMenu(focusFirst) {
+      this._open = true;
+      this._searchTerm = '';
+      const opts = this._getFiltered();
+      this._focusedIdx = focusFirst ? this._first(opts) : -1;
+      this._focusItems = !!focusFirst && !this.searchable;
+      this._scheduleUpdate();
+      if (this.searchable) {
+        queueMicrotask(() => {
+          const si = this.querySelector('.lex-ddbtn-search input');
+          if (si) si.focus();
+        });
+      }
     }
 
     updated() {
+      // Keyboard focus follows re-renders (the markup is replaced each update).
+      if (this._open && this._focusItems && this._focusedIdx >= 0) {
+        const el = this.querySelector(`.lex-ddbtn-item[data-idx="${this._focusedIdx}"]`);
+        if (el) el.focus();
+      } else if (this._focusTrigger) {
+        this._focusTrigger = false;
+        const t = this.querySelector('[data-action="toggle"]');
+        if (t) t.focus();
+      }
+
       // Toggle
       this.delegate('click', '[data-action="toggle"]', () => {
         if (this.disabled) return;
-        this._open = !this._open;
-        this._searchTerm = '';
-        this._focusedIdx = -1;
-        this._scheduleUpdate();
-        if (this._open && this.searchable) {
-          queueMicrotask(() => {
-            const si = this.querySelector('.lex-ddbtn-search input');
-            if (si) si.focus();
-          });
-        }
+        if (this._open) this._close(false);
+        else this._openMenu(false);
       });
+
+      // Trigger keyboard: open and focus the first item.
+      const trigger = this.querySelector('[data-action="toggle"]');
+      if (trigger) {
+        this.listen(trigger, 'keydown', (e) => {
+          if (this.disabled) return;
+          if ((e.key === 'Enter' || e.key === ' ') && this._open) {
+            e.preventDefault();
+            this._close(true);
+          } else if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this._openMenu(true);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this._openMenu(true);
+            this._focusedIdx = this._last(this._getFiltered());
+          } else if (e.key === 'Escape' && this._open) {
+            // Close only the menu, not an enclosing modal or drawer.
+            e.preventDefault();
+            e.stopPropagation();
+            this._close(true);
+          }
+        });
+      }
+
+      // Menu keyboard (items hold DOM focus).
+      const menu = this.querySelector('.lex-ddbtn-dropdown');
+      if (menu) {
+        this.listen(menu, 'keydown', (e) => {
+          if (!e.target || !e.target.classList || !e.target.classList.contains('lex-ddbtn-item')) return;
+          const opts = this._getFiltered();
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this._focusedIdx = this._focusedIdx < 0 ? this._first(opts) : this._step(opts, this._focusedIdx, 1);
+            this._focusItems = true;
+            this._scheduleUpdate();
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this._focusedIdx = this._focusedIdx < 0 ? this._last(opts) : this._step(opts, this._focusedIdx, -1);
+            this._focusItems = true;
+            this._scheduleUpdate();
+          } else if (e.key === 'Home') {
+            e.preventDefault();
+            this._focusedIdx = this._first(opts);
+            this._focusItems = true;
+            this._scheduleUpdate();
+          } else if (e.key === 'End') {
+            e.preventDefault();
+            this._focusedIdx = this._last(opts);
+            this._focusItems = true;
+            this._scheduleUpdate();
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.target.click();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            this._close(true);
+          } else if (e.key === 'Tab') {
+            this._close(false);
+          }
+        });
+      }
 
       // Item click
       this.delegate('click', '.lex-ddbtn-item', (e, target) => {
+        if (target.dataset.disabled === 'true') {
+          e.preventDefault();
+          return;
+        }
         const val = target.dataset.value;
-        const items = this.options || [];
-        const item = items.find(o => o.value === val);
-        this._open = false;
-        this._scheduleUpdate();
+        const filtered = this._getFiltered();
+        const idx = Number(target.dataset.idx);
+        let item = Number.isInteger(idx) ? filtered[idx] : undefined;
+        if (!item || isDivider(item)) {
+          item = (this.options || []).find(o => o && !isDivider(o) && String(o.value) === val);
+        }
+        const returnFocus = this._focusItems;
+        this._close(returnFocus);
         this.emit('lex-select', { value: val, label: item ? item.label : val, item });
       });
 
@@ -281,24 +517,27 @@
 
         this.listen(searchInput, 'keydown', (e) => {
           const opts = this._getFiltered();
-          if (e.key === 'ArrowDown') { e.preventDefault(); this._focusedIdx = Math.min(this._focusedIdx + 1, opts.length - 1); this._scheduleUpdate(); queueMicrotask(() => { const si = this.querySelector('.lex-ddbtn-search input'); if (si) si.focus(); }); }
-          else if (e.key === 'ArrowUp') { e.preventDefault(); this._focusedIdx = Math.max(this._focusedIdx - 1, 0); this._scheduleUpdate(); queueMicrotask(() => { const si = this.querySelector('.lex-ddbtn-search input'); if (si) si.focus(); }); }
+          if (e.key === 'ArrowDown') { e.preventDefault(); this._focusedIdx = this._focusedIdx < 0 ? this._first(opts) : this._step(opts, this._focusedIdx, 1); this._scheduleUpdate(); queueMicrotask(() => { const si = this.querySelector('.lex-ddbtn-search input'); if (si) si.focus(); }); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); this._focusedIdx = this._focusedIdx < 0 ? this._first(opts) : this._step(opts, this._focusedIdx, -1); this._scheduleUpdate(); queueMicrotask(() => { const si = this.querySelector('.lex-ddbtn-search input'); if (si) si.focus(); }); }
           else if (e.key === 'Enter' && this._focusedIdx >= 0) { e.preventDefault(); const el = this.querySelector(`[data-idx="${this._focusedIdx}"]`); if (el) el.click(); }
-          else if (e.key === 'Escape') { this._open = false; this._scheduleUpdate(); }
+          else if (e.key === 'Escape') { e.preventDefault(); this._close(true); }
         });
       }
 
       // Close on outside click
       if (this._open) {
+        let active = true;
         const closeHandler = (e) => {
           if (!this.contains(e.target)) {
-            this._open = false;
-            this._scheduleUpdate();
             document.removeEventListener('mousedown', closeHandler);
+            this._close(false);
           }
         };
-        setTimeout(() => document.addEventListener('mousedown', closeHandler), 0);
-        this._eventCleanups.push(() => document.removeEventListener('mousedown', closeHandler));
+        setTimeout(() => { if (active) document.addEventListener('mousedown', closeHandler); }, 0);
+        this._eventCleanups.push(() => {
+          active = false;
+          document.removeEventListener('mousedown', closeHandler);
+        });
       }
     }
   }

@@ -14,6 +14,9 @@
    Sides: left | right (default)
    Widths: sm (320px) | md (420px) | lg (560px) | xl (720px) | full
    Events: lex-close
+   flush: no body padding (tables, lists, editors edge to edge);
+   Lex.Drawer.open({ ..., flush: true }). drawer.contentRoot is the element the
+   body content lives in.
 */
 
 // Pure helper (no DOM dependency), exported for unit tests. Builds the footer
@@ -174,6 +177,10 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         padding: 20px;
       }
 
+      .lex-drawer-panel.lex-drawer-panel--flush > .lex-drawer-body {
+        padding: 0;
+      }
+
       /* ── Footer ──────────────────────────────────────── */
 
       .lex-drawer-footer {
@@ -311,7 +318,8 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
         confirmText: { type: String, default: 'Save' },
         cancelText:  { type: String, default: 'Cancel' },
         buttons:     { type: Array, default: null },
-        closeOnOverlay: { type: Boolean, default: true }
+        closeOnOverlay: { type: Boolean, default: true },
+        flush:       { type: Boolean, default: false }   // no body padding
       };
     }
 
@@ -342,7 +350,7 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       this._rendered = true;
 
       const sideCls = this.side === 'left' ? 'lex-drawer-overlay--left' : 'lex-drawer-overlay--right';
-      const widthCls = `lex-drawer-panel--${this.width || 'md'}`;
+      const widthCls = `lex-drawer-panel--${this.width || 'md'}${this.flush ? ' lex-drawer-panel--flush' : ''}`;
 
       // aria-labelledby points to the heading element when a heading is provided.
       const labelledBy = this.heading ? ` aria-labelledby="${this._titleId}"` : '';
@@ -414,6 +422,11 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
           subEl.textContent = this.subtitle;
           subEl.style.display = this.subtitle ? '' : 'none';
         }
+      }
+
+      if (changedProps && changedProps.has('flush')) {
+        const panel = this.querySelector('.lex-drawer-panel');
+        if (panel) panel.classList.toggle('lex-drawer-panel--flush', !!this.flush);
       }
 
       const slotContent = this.querySelector('.lex-drawer-body slot-content');
@@ -618,6 +631,7 @@ if (typeof window !== 'undefined' && window.Lex) (function () {
       drawer.width = options.width || 'md';
       drawer.showFooter = options.showFooter || false;
       drawer.closeOnOverlay = options.closeOnOverlay !== undefined ? options.closeOnOverlay : true;
+      if (options.flush !== undefined) drawer.flush = !!options.flush;
 
       if (options.showFooter) {
         drawer.confirmText = options.confirmText || 'Save';

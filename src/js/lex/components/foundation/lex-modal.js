@@ -21,6 +21,17 @@
    Footer: footer-content="<html>" (first render), children with data-slot="footer"
    (moved into the footer), or modal.setFooterContent(html) later.
    modal.setHeaderActions(html); hide-close removes the header close button.
+
+   Layout attributes:
+     flush               no body padding (tables, lists, editors edge to edge)
+     width="720px"       any CSS length; overrides the size max-width
+     close-on-escape="false"  Escape no longer closes (default true)
+     palette             command-palette layout: top-aligned (12vh), no header,
+                         flush body, 640px wide unless width is set, no built-in
+                         confirm/cancel. Focus trap and Escape still apply;
+                         heading (if any) becomes the dialog's aria-label.
+   modal.contentRoot is the element the body content lives in.
+   Lex.Modal.open({ ..., hideClose, closeOnEscape, flush, width, palette })
 */
 
 (function () {
@@ -215,6 +226,23 @@
         padding: 24px;
       }
 
+      /* Flush body: content runs edge to edge */
+      .lex-modal-panel.lex-modal-panel--flush > .lex-modal-body {
+        padding: 0;
+      }
+
+      /* ── Palette (command palette) ───────────────────── */
+
+      .lex-modal-overlay--palette {
+        align-items: flex-start;
+        padding-top: 12vh;
+      }
+
+      .lex-modal-panel.lex-modal-panel--palette {
+        max-width: 640px;
+        max-height: calc(88vh - 32px);
+      }
+
       .lex-modal-close[hidden] {
         display: none !important;
       }
@@ -397,7 +425,11 @@
         backLabel:   { type: String, default: 'Back' },
         headerActions: { type: String, default: '' },
         footerContent: { type: String, default: '' },
-        hideClose:   { type: Boolean, default: false }   // no header close button (pickers with their own Done/Cancel)
+        hideClose:   { type: Boolean, default: false },  // no header close button (pickers with their own Done/Cancel)
+        closeOnEscape: { type: Boolean, default: true },  // close-on-escape="false" keeps Escape from closing
+        flush:       { type: Boolean, default: false },  // no body padding
+        width:       { type: String, default: '' },      // CSS length; overrides the size max-width
+        palette:     { type: Boolean, default: false }   // command-palette layout (set before first render)
       };
     }
 
@@ -431,9 +463,13 @@
       if (this._rendered) return null;
       this._rendered = true;
 
-      const isFull = this.size === 'full';
-      const overlayCls = `lex-modal-overlay${isFull ? ' lex-modal-overlay--full' : ''}`;
-      const panelCls = `lex-modal-panel lex-modal-panel--${this.size || 'md'}`;
+      const palette = !!this.palette;
+      const isFull = this.size === 'full' && !palette;
+      const sizeCls = palette && this.size === 'full' ? 'md' : (this.size || 'md');
+      const overlayCls = `lex-modal-overlay${isFull ? ' lex-modal-overlay--full' : ''}${palette ? ' lex-modal-overlay--palette' : ''}`;
+      const panelCls = `lex-modal-panel lex-modal-panel--${sizeCls}${palette ? ' lex-modal-panel--palette' : ''}${(this.flush || palette) ? ' lex-modal-panel--flush' : ''}`;
+      const widthCss = LexModal._safeLength(this.width);
+      const panelStyle = widthCss ? ` style="max-width:${widthCss}"` : '';
 
       // Confirm button variant class
       const btnVariantMap = {
@@ -445,15 +481,17 @@
       const confirmBtnCls = btnVariantMap[this.variant] || btnVariantMap.default;
 
       // aria-labelledby points to the heading element when a heading is provided.
-      const labelledBy = this.heading ? ` aria-labelledby="${this._titleId}"` : '';
+      // A palette has no header, so its heading names the dialog directly.
+      const labelledBy = !this.heading ? ''
+        : (palette ? ` aria-label="${this.escapeHtml(this.heading)}"` : ` aria-labelledby="${this._titleId}"`);
 
       // Always render the full structure; starts hidden.
       let html = `<div class="${overlayCls}" style="display:none">`;
       html += `<div class="lex-modal-backdrop" data-action="overlay"></div>`;
-      html += `<div class="${panelCls}" role="dialog" aria-modal="true"${labelledBy}>`;
+      html += `<div class="${panelCls}" role="dialog" aria-modal="true"${labelledBy}${panelStyle}>`;
 
-      // Header
-      if (this.heading) {
+      // Header (a palette never has one)
+      if (this.heading && !palette) {
         html += `<div class="lex-modal-header">`;
         html += `<div class="lex-modal-title-group">`;
         html += `<button type="button" class="lex-modal-back" data-action="back" aria-label="${this.escapeHtml(this.backLabel || 'Back')}"${this.backButton ? '' : ' hidden'}>${BACK_SVG}</button>`;
@@ -472,7 +510,7 @@
       // Footer / Actions
       if (this.footerContent) {
         html += `<div class="lex-modal-footer">${this.footerContent}</div>`;
-      } else if (!this.hideActions) {
+      } else if (!this.hideActions && !palette) {
         html += `<div class="lex-modal-footer">`;
         if (this.cancelText) {
           html += `<button type="button" class="lex-modal-btn lex-modal-btn--cancel" data-action="cancel">${this.escapeHtml(this.cancelText)}</button>`;
@@ -505,12 +543,23 @@
         const titleEl = this.querySelector('.lex-modal-title');
         if (titleEl) titleEl.textContent = this.heading;
         const panel = this.querySelector('.lex-modal-panel');
-        if (panel) {
+        if (panel && this.palette) {
+          if (this.heading) panel.setAttribute('aria-label', this.heading);
+          else panel.removeAttribute('aria-label');
+        } else if (panel) {
           if (this.heading) {
             panel.setAttribute('aria-labelledby', this._titleId);
           } else {
             panel.removeAttribute('aria-labelledby');
           }
+        }
+      }
+
+      if (changedProps && (changedProps.has('flush') || changedProps.has('width'))) {
+        const panel = this.querySelector('.lex-modal-panel');
+        if (panel) {
+          panel.classList.toggle('lex-modal-panel--flush', !!(this.flush || this.palette));
+          panel.style.maxWidth = LexModal._safeLength(this.width);
         }
       }
 
@@ -644,7 +693,7 @@
 
       // ESC key to close
       const escHandler = (e) => {
-        if (e.key === 'Escape' && this.open) {
+        if (e.key === 'Escape' && this.open && this.closeOnEscape !== false) {
           this.emit('lex-close');
           this.open = false;
         }
@@ -700,6 +749,24 @@
         header.insertBefore(actions, close || null);
       }
       actions.innerHTML = html || '';
+    }
+
+    // The element the body content lives in (inside .lex-modal-body). Use it
+    // instead of querying the modal's internal markup.
+    get contentRoot() {
+      return this.querySelector('.lex-modal-body > slot-content[data-lex-modal-content]') || this.querySelector('.lex-modal-body');
+    }
+
+    // A CSS length for the panel width, or '' when the value could break out
+    // of the style attribute.
+    static _safeLength(value) {
+      const text = String(value == null ? '' : value).trim();
+      if (!text) return '';
+      const forbidden = [';', '{', '}', '<', '>', '"', "'", '\\'];
+      for (const ch of forbidden) {
+        if (text.indexOf(ch) !== -1) return '';
+      }
+      return text;
     }
 
     // Call from a lex-confirm listener to keep the modal open this time.
@@ -848,6 +915,11 @@
       modal.backLabel = options.backLabel || 'Back';
       modal.headerActions = options.headerActions || '';
       modal.footerContent = options.footerContent || '';
+      if (options.hideClose !== undefined) modal.hideClose = !!options.hideClose;
+      if (options.closeOnEscape !== undefined) modal.closeOnEscape = options.closeOnEscape !== false;
+      if (options.flush !== undefined) modal.flush = !!options.flush;
+      if (options.width) modal.width = String(options.width);
+      if (options.palette !== undefined) modal.palette = !!options.palette;
 
       if (options.content) {
         if (typeof options.content === 'string') {

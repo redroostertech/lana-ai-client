@@ -100,6 +100,11 @@ defineLex('my-component', MyComponent);
 - `this.listen(el, event, handler)` — auto-cleaned event listener
 - `this.delegate(event, selector, handler)` — event delegation
 - `this._scheduleUpdate()` — trigger re-render via `queueMicrotask`
+- `Lex.LexElement.cloneContent(node)` — deep-copy authored content; Lex descendants that already rendered are copied from their source children, not their rendered markup
+
+**Properties set before upgrade are kept.** `el.options = [...]` on a `<lex-*>` whose script has not loaded yet (or `document.createElement` before the definition) is captured in the constructor and re-applied once the accessor exists; it wins over the matching attribute, as it would after upgrade.
+
+**Slotted children survive any script load order.** A component captures its children with `cloneContent`, so a `<lex-btn>` inside a `<lex-modal>`/`<lex-drawer>` footer renders one `<button>` even when `lex-btn.js` loads first (it used to render a button inside a button).
 
 ---
 
@@ -239,16 +244,19 @@ Lex.state.onAuthChange(callback); // subscribe
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `label` | String | — | Button text |
-| `variant` | String | `'primary'` | `primary`, `secondary`, `danger`, `ghost`, `link` |
+| `label` | String | `''` | Button text when the element has no children (`<lex-btn label="Save">` or `btn.label = 'Save'`). Children win when present. Escaped. |
+| `variant` | String | `'primary'` | `primary`, `secondary`, `danger`, `success`, `warning`, `info`, `ghost` |
 | `size` | String | `'md'` | `sm`, `md`, `lg` |
-| `icon` | String | — | Lucide icon name (left position) |
-| `iconRight` | String | — | Icon on right side |
-| `iconOnly` | Boolean | `false` | Icon-only circular button |
+| `leadingIcon` | String | `''` | Lex.Icons (Lucide) name before the text (`leading-icon`) |
+| `trailingIcon` | String | `''` | Icon after the text (`trailing-icon`) |
+| `icon` | Boolean | `false` | Icon-only (square padding) |
+| `badge` | Number | `0` | Notification bubble (`>99` shows `99+`) |
 | `loading` | Boolean | `false` | Shows spinner, disables click |
 | `disabled` | Boolean | `false` | Disabled state |
 | `type` | String | `'button'` | `button`, `submit`, `reset` |
-| `href` | String | — | If set, renders as `<a>` tag |
+| `form` | String | `''` | id of a `<form>` or `<lex-form>` this button submits from outside it |
+
+There is no `href`; for navigation use a link or `Lex.Nav.go()` in a click handler.
 
 **Events:** Standard click (no custom events).
 
@@ -298,13 +306,24 @@ Lex.state.onAuthChange(callback); // subscribe
 | `variant` | String | `'default'` | `default`, `danger` |
 | `hideActions` | Boolean | `false` | Hide footer buttons |
 | `closeOnOverlay` | Boolean | `true` | Close when clicking backdrop |
+| `hideClose` | Boolean | `false` | No header close button (`hide-close`) |
+| `closeOnEscape` | Boolean | `true` | `close-on-escape="false"` stops Escape from closing |
+| `flush` | Boolean | `false` | No body padding (tables, lists, editors edge to edge) |
+| `width` | String | `''` | Any CSS length (`720px`, `60rem`, `90vw`); overrides the `size` max-width |
+| `palette` | Boolean | `false` | Command-palette layout: top-aligned at 12vh, no header, flush body, 640px wide unless `width` is set, no built-in confirm/cancel. Focus trap and Escape still apply; `heading` becomes the dialog's `aria-label`. Set before the first render. |
+
+**Instance API:** `modal.contentRoot` (the element body content lives in; use it instead of querying `.lex-modal-body`), `setFooterContent(html)`, `setHeaderActions(html)`, `keepOpen()`.
 
 **Events:** `lex-confirm`, `lex-cancel`, `lex-close`
 
 **Static API:**
 ```javascript
-Lex.Modal.confirm({ heading: 'Delete?', body: '...', variant: 'danger' })
-  .then(confirmed => { if (confirmed) { ... } });
+if (await Lex.Modal.confirmAsync('Delete?', 'This cannot be undone.', { variant: 'danger' })) { ... }
+const modal = Lex.Modal.open({
+  heading, content, size, hideActions, footerContent,
+  hideClose: true, closeOnEscape: false, flush: true, width: '720px'
+});
+const palette = Lex.Modal.open({ heading: 'Command palette', palette: true, content: paletteEl });
 ```
 
 **Rules:**
@@ -323,10 +342,11 @@ Lex.Modal.confirm({ heading: 'Delete?', body: '...', variant: 'danger' })
 | `heading` | String | — | Drawer title |
 | `open` | Boolean | `false` | Controls visibility |
 | `side` | String | `'right'` | `left`, `right` |
-| `width` | String | `'400px'` | Panel width |
+| `width` | String | `'md'` | `sm` (320px), `md` (420px), `lg`, `xl`, `full` |
 | `confirmText` | String | `'Save'` | Footer confirm button |
 | `cancelText` | String | `'Cancel'` | Footer cancel button |
 | `showFooter` | Boolean | `false` | Show footer with actions |
+| `flush` | Boolean | `false` | No body padding; also `Lex.Drawer.open({ flush: true })` |
 
 **Events:** `lex-confirm`, `lex-cancel`, `lex-close`
 
@@ -489,13 +509,24 @@ All form components use the `withFormField` mixin, providing: `name`, `label`, `
 
 | Own Property | Type | Default | Description |
 |-------------|------|---------|-------------|
-| `options` | Array | `[]` | `[{ value, label, icon?, disabled? }]` or `['string']` |
+| `options` | Array | `[]` | `[{ value, label, description?, group?, disabled? }]`, `['string']`, or `{ divider: true }` separators |
 | `multiple` | Boolean | `false` | Multi-select mode |
 | `searchable` | Boolean | `false` | Filterable dropdown |
-| `placeholder` | String | — | Placeholder text |
+| `placeholder` | String | `'Select...'` | Placeholder text |
 | `clearable` | Boolean | `false` | Allow clearing selection |
+| `visibleLimit` | Number | `0` | Show only the first N options until the user searches (`visible-limit`) |
 
-**Events:** `lex-change { name, value }`
+**Events:** `lex-change { name, value }` — `value` is a string, or an array under `multiple`.
+
+**Behaviour:**
+- Option values are compared as strings: `{ value: 2 }` works, and `select.value` reads back `'2'`.
+- `{ disabled: true }` options and `{ divider: true }` separators cannot be chosen; arrow keys skip them.
+- Single: a `value` that matches no option shows the placeholder (the value is kept, so options loaded later still select it).
+- `multiple`: `select.value` is an array of strings; the setter takes an array, a JSON array string or a comma-separated string.
+- `.options` / `.value` assigned before the element upgrades are kept.
+- `select.focus()` focuses the trigger. Inside a native `<form>`, the form's `reset` restores the value the select had when it first connected.
+- Option, clear and pill-remove clicks call `preventDefault`, so a lex-select inside a `<label>` does not reopen.
+- Keyboard (non-searchable): ArrowDown/Enter/Space opens; ArrowUp/ArrowDown move; Enter/Space selects; Escape closes.
 
 ### `<lex-toggle>`
 
@@ -581,10 +612,27 @@ Button that opens a dropdown action menu (not a value selector).
 
 | Own Property | Type | Default | Description |
 |-------------|------|---------|-------------|
-| `label` | String | — | Button label |
-| `items` | Array | `[]` | `[{ value, label, icon?, variant? }]` |
+| `buttonLabel` | String | `'Actions'` | Trigger text (`button-label`); the accessible name of an icon-only trigger when there is no `aria-label` |
+| `options` | Array | `[]` | Items (below) |
+| `variant` | String | `'secondary'` | `primary`, `secondary`, `ghost` |
+| `icon` | String | `''` | Lex.Icons name shown on the trigger |
+| `iconOnly` | Boolean | `false` | Icon-only trigger (`icon-only`): no text, no chevron. Give the element an `aria-label`. |
+| `align` | String | `'start'` | `end` lines the menu up with the trigger's right edge (header menus at the right edge) |
+| `searchable` | Boolean | `false` | Search box in the menu |
+| `disabled` | Boolean | `false` | Disabled trigger |
 
-**Events:** `item-click { value, label }`
+**Items:** `{ value, label, icon?, description?, href?, target?, variant?: 'danger', danger?: true, disabled?: true }`, or `{ divider: true }` for a separator. `href` renders the item as a link (`javascript:`/`data:` URLs are dropped); clicking it emits `lex-select` and then follows the link.
+
+**Events:** `lex-select { value, label, item }` (`value` is the string form)
+
+**Keyboard and ARIA:** ArrowDown/Enter/Space on the trigger opens and focuses the first item; ArrowUp/ArrowDown/Home/End move (skipping separators and disabled items); Enter/Space activates; Escape closes and returns focus to the trigger (without closing an enclosing modal); Tab closes. Roles `menu` / `menuitem` / `separator`; trigger carries `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`.
+
+```html
+<lex-dropdown-btn icon="settings" icon-only aria-label="Account menu" align="end" variant="ghost"
+  options='[{"label":"Settings","href":"settings-v2.html","icon":"settings"},{"divider":true},
+            {"value":"logout","label":"Log out","icon":"log-out","variant":"danger"}]'>
+</lex-dropdown-btn>
+```
 
 ### `<lex-form>`
 
@@ -598,10 +646,13 @@ Form container that orchestrates validation and value collection.
 
 ```javascript
 const form = document.querySelector('lex-form');
-form.getValues();    // { name: 'value', ... }
-form.validate();     // { valid, errors: [{name, message}] }
-form.reset();        // Clear validation, reset values
+form.getValues();      // { name: 'value', ... }
+form.validate();       // { valid, errors: [{name, message}] }
+form.reset();          // Clear validation, reset values
+form.requestSubmit();  // Validate and emit lex-submit, as a submit click does
 ```
+
+**Submitting from outside** (e.g. a modal footer): give the lex-form an `id` and point a submit button at it — `<lex-btn type="submit" form="editUserForm">Save</lex-btn>`. A submit button inside a lex-form whose `form` names a different form is left to that form. lex-form does not wrap a native `<form>`; there is no browser submission.
 
 ### Form Decision Guide
 

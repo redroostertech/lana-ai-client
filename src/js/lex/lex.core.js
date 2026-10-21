@@ -46,6 +46,21 @@
 
       // Initialize properties with defaults and define getters/setters
       const props = this.constructor.properties;
+      // Upgrade-property pattern: a property assigned to the element before
+      // its definition loaded (el.options = [...] on a not-yet-upgraded tag)
+      // lives as an own data property. defineProperty below would silently
+      // replace it, so capture it first and re-apply it after the accessor
+      // exists. Raw values stay on _upgradedProps so subclasses with custom
+      // accessors (lex-select `value`) can re-apply them uncoerced.
+      let upgraded = null;
+      for (const name of Object.keys(props)) {
+        if (Object.prototype.hasOwnProperty.call(this, name)) {
+          if (!upgraded) upgraded = {};
+          upgraded[name] = this[name];
+          delete this[name];
+        }
+      }
+      this._upgradedProps = upgraded;
       for (const [name, config] of Object.entries(props)) {
         const def = config.default !== undefined
           ? (typeof config.default === 'object' ? JSON.parse(JSON.stringify(config.default)) : config.default)
@@ -68,6 +83,14 @@
           configurable: true
         });
       }
+
+      if (upgraded) {
+        for (const name of Object.keys(upgraded)) {
+          const old = this._props[name];
+          this._props[name] = LexElement._coerce(upgraded[name], props[name].type);
+          this._changedProps.set(name, old);
+        }
+      }
     }
 
     // -----------------------------------------------------------------------
@@ -84,6 +107,12 @@
       if (oldVal === newVal) return;
       const propName = LexElement._attrToProp(attr);
       const config = this.constructor.properties[propName];
+      // During upgrade, a property assigned before the definition loaded
+      // wins over its attribute (see _upgradedProps in the constructor).
+      if (config && !this._initialized && this._upgradedProps &&
+          Object.prototype.hasOwnProperty.call(this._upgradedProps, propName)) {
+        return;
+      }
       if (config) {
         // Avoid re-reflecting when we set the attribute ourselves
         this._props[propName] = LexElement._coerce(newVal, config.type);
@@ -104,10 +133,20 @@
         for (const [name, config] of Object.entries(props)) {
           if (config.attribute !== false) {
             const attrName = LexElement._propToAttr(name);
-            if (this.hasAttribute(attrName)) {
+            // A property assigned before upgrade wins over the attribute,
+            // the same as it would after upgrade.
+            const assigned = this._upgradedProps && Object.prototype.hasOwnProperty.call(this._upgradedProps, name);
+            if (!assigned && this.hasAttribute(attrName)) {
               this._props[name] = LexElement._coerce(this.getAttribute(attrName), config.type);
             }
           }
+        }
+        if (this._upgradedProps) {
+          for (const name of Object.keys(this._upgradedProps)) {
+            const config = props[name];
+            if (config && config.reflect) this._reflectToAttribute(name, this._props[name]);
+          }
+          this._upgradedProps = null;
         }
         this._initialized = true;
         this._performUpdate();
@@ -172,13 +211,22 @@
     // Content preservation (no Shadow DOM slot alternative)
     // -----------------------------------------------------------------------
 
+    // Children are copied with LexElement.cloneContent, which rebuilds any
+    // Lex child that already upgraded and rendered from its own source
+    // children. A plain deep clone would copy that child's rendered markup as
+    // if it were authored content, and the copy would render it again: a
+    // <lex-btn> inside a <lex-modal> footer became <button><button> whenever
+    // lex-btn.js loaded before lex-modal.js. _pristineChildren keeps the
+    // captured source even after a subclass nulls _originalChildren (modal,
+    // drawer) so this element can itself be copied faithfully later.
     _captureContent() {
       if (this.childNodes.length > 0) {
         this._originalChildren = [];
         for (const node of this.childNodes) {
-          this._originalChildren.push(node.cloneNode(true));
+          this._originalChildren.push(LexElement.cloneContent(node));
         }
       }
+      this._pristineChildren = this._originalChildren ? this._originalChildren.slice() : [];
     }
 
     _restoreContent() {
@@ -186,9 +234,30 @@
       if (slot && this._originalChildren) {
         slot.innerHTML = '';
         for (const node of this._originalChildren) {
-          slot.appendChild(node.cloneNode(true));
+          slot.appendChild(LexElement.cloneContent(node));
         }
       }
+    }
+
+    /**
+     * Deep-copy a node as authored: Lex descendants that already rendered are
+     * copied from their source children, not their rendered markup.
+     * @param {Node} node
+     * @returns {Node}
+     */
+    static cloneContent(node) {
+      if (!node || node.nodeType !== 1 || node.localName === 'template') {
+        return node ? node.cloneNode(true) : node;
+      }
+      const copy = node.cloneNode(false);
+      let source = node.childNodes;
+      if (node instanceof LexElement && node._initialized) {
+        source = node._originalChildren || node._pristineChildren || [];
+      }
+      for (const child of Array.from(source)) {
+        copy.appendChild(LexElement.cloneContent(child));
+      }
+      return copy;
     }
 
     // -----------------------------------------------------------------------

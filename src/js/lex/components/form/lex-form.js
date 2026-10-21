@@ -8,12 +8,18 @@
        <lex-btn type="submit" variant="primary">Submit</lex-btn>
      </lex-form>
 
-   Methods:
-     getValues()  → { email: '...', notes: '...' }
-     validate()   → { valid: true/false, errors: [{name, message}] }
-     reset()      → resets all child form fields
+   Submitting from outside (e.g. a modal footer): give the lex-form an id and
+   point a submit button at it:
+     <lex-form id="editUserForm">...</lex-form>
+     <lex-btn type="submit" form="editUserForm">Save</lex-btn>
 
-   Events: lex-submit { values, valid }
+   Methods:
+     getValues()     → { email: '...', notes: '...' }
+     validate()      → { valid: true/false, errors: [{name, message}] }
+     reset()         → resets all child form fields
+     requestSubmit() → validates and emits lex-submit, as a submit click does
+
+   Events: lex-submit { values, valid, errors }
 */
 
 (function () {
@@ -33,11 +39,25 @@
       return null;
     }
 
-    connected() {
-      super.connected();
+    // Listeners are wired in updated() (not connected()) because every update
+    // clears the listener list; updated() runs after each one.
+    updated() {
+      // Submit-type button clicks inside the form. A button whose form
+      // attribute names a different form belongs to that form instead.
+      this.delegate('click', 'lex-btn[type="submit"], button[type="submit"]', (e, target) => {
+        const owner = target.getAttribute('form');
+        if (owner && owner !== this.id) return;
+        e.preventDefault();
+        this._handleSubmit();
+      });
 
-      // Listen for submit-type button clicks
-      this.delegate('click', 'lex-btn[type="submit"], button[type="submit"]', (e) => {
+      // Submit buttons outside the form that point at it: form="<this id>".
+      this.listen(document, 'click', (e) => {
+        if (!this.id || !e.target || typeof e.target.closest !== 'function') return;
+        const target = e.target.closest('lex-btn[type="submit"], button[type="submit"]');
+        if (!target || this.contains(target)) return;
+        if (target.getAttribute('form') !== this.id) return;
+        if (target.disabled || target.hasAttribute('disabled')) return;
         e.preventDefault();
         this._handleSubmit();
       });
@@ -49,6 +69,11 @@
           this._handleSubmit();
         }
       });
+    }
+
+    /** Validate and emit lex-submit, exactly as a submit button click does. */
+    requestSubmit() {
+      this._handleSubmit();
     }
 
     _handleSubmit() {
