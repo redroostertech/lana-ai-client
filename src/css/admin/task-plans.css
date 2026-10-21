@@ -7,42 +7,22 @@
   justify-content: flex-end;
 }
 
+/* Task plans table (docs/TABLE-STANDARD.md section 8):
+   Plan, Status, Type, Workspace, Items, Assigned to, Created, Last edited */
 .task-plans-workspace {
-  display: grid;
-  grid-template-columns: minmax(18rem, 0.85fr) minmax(0, 1.15fr);
-  gap: var(--lex-spacing-lg, 1.5rem);
   margin-top: var(--lex-spacing-lg, 1.5rem);
-  align-items: start;
 }
 
-.task-plans-list {
-  display: grid;
-  gap: var(--lex-spacing-sm, 0.5rem);
-}
+#taskPlansTable table { min-width: 1180px; }
+#taskPlansTable th { white-space: nowrap; }
+#taskPlansTable th:nth-child(2) { width: 120px; }
+#taskPlansTable th:nth-child(3) { width: 130px; }
+#taskPlansTable th:nth-child(4) { width: 15%; }
+#taskPlansTable th:nth-child(5) { width: 90px; }
+#taskPlansTable th:nth-child(6) { width: 15%; }
+#taskPlansTable th:nth-child(7) { width: 176px; }
+#taskPlansTable th:nth-child(8) { width: 150px; }
 
-.task-plan-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--lex-spacing-sm, 0.5rem);
-  width: 100%;
-  padding: var(--lex-spacing-md, 0.75rem);
-  border: 1px solid var(--lex-border-default);
-  border-radius: var(--lex-radius-md, 0.5rem);
-  background: var(--lex-bg-primary);
-  color: var(--lex-text-primary);
-  text-align: left;
-  cursor: pointer;
-}
-
-.task-plan-row:hover,
-.task-plan-row:focus-visible,
-.task-plan-row.is-selected {
-  border-color: var(--lex-bg-accent);
-  box-shadow: 0 0 0 1px var(--lex-bg-accent);
-  outline: none;
-}
-
-.task-plan-row__title,
 .task-plan-detail__title {
   margin: 0;
   font-size: var(--lex-body-base-size, 1rem);
@@ -51,17 +31,12 @@
   overflow-wrap: anywhere;
 }
 
-.task-plan-row__meta,
 .task-plan-detail__meta,
 .task-plan-detail__description,
 .task-plan-item__meta {
   color: var(--lex-text-secondary);
   font-size: var(--lex-body-sm-size, 0.875rem);
   line-height: 1.5;
-}
-
-.task-plan-row__meta {
-  margin-top: var(--lex-spacing-xs, 0.25rem);
 }
 
 .task-plan-detail {
@@ -315,7 +290,6 @@
 }
 
 @media (max-width: 900px) {
-  .task-plans-workspace,
   .task-plan-form-grid {
     grid-template-columns: 1fr;
   }

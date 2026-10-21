@@ -2,360 +2,114 @@
 //
 // View-only: this page browses recordings owned by the current organization
 // and links into a per-recording detail page. No capture/upload UI.
+//
+// One server-paged lex-table (docs/TABLE-STANDARD.md). GET /api/v1/recordings
+// pages with limit/offset and filters by status; the other column filters are
+// sent under the standard names so they apply once the API reads them.
+//
+// @requires api.js                    - window.api
+// @requires lex.utils.js              - Lex.Utils.formatDateTime, humanizeLabel
+// @requires lex-table.js              - server-paged table
+// @requires admin-table-kit.js        - AdminTableKit toolbar + query helpers
+// @requires library-column-filters.js - date ranges + workspace list
 
 (function () {
   'use strict';
 
-  var PAGE_SIZE = 50;
+  var TABLE_ID = 'recordingsTable';
+
+  // Statuses GET /api/v1/recordings accepts in ?status= (comma-separated).
+  var RECORDING_STATUSES = ['ready', 'transcribing', 'uploading', 'pending', 'failed', 'archived'];
 
   var STATUS_BADGE_COLOR = {
-    ready: 'success',
-    transcribing: 'warning',
-    uploading: 'warning',
-    pending: 'neutral',
-    failed: 'danger',
-    archived: 'neutral'
+    ready: 'green',
+    transcribing: 'yellow',
+    uploading: 'yellow',
+    pending: 'gray',
+    failed: 'red',
+    archived: 'gray'
   };
 
-  var STATUS_LABEL = {
-    ready: 'Ready',
-    transcribing: 'Transcribing',
-    uploading: 'Uploading',
-    pending: 'Pending',
-    failed: 'Failed',
-    archived: 'Archived'
-  };
+  var SCOPE_OPTIONS = [
+    { value: 'private', label: 'Private' },
+    { value: 'organization', label: 'Organization' },
+    { value: 'matter', label: 'Matter' }
+  ];
 
-  var SCOPE_LABEL = {
-    private: 'Private',
-    organization: 'Organization',
-    matter: 'Matter'
-  };
+  var SCOPE_LABEL = { private: 'Private', organization: 'Organization', matter: 'Matter' };
 
-  // Cache of matter UUID → { matter_id, name } so we can render friendly
-  // labels once we discover a row references a matter we have not seen yet.
-  var matterCache = {};
-  var matterFetchPromise = null;
+  // Duration ranges: min inclusive, max exclusive (milliseconds).
+  var MINUTE_MS = 60 * 1000;
+  var DURATION_RANGES = [
+    { value: 'under5', label: 'Under 5 minutes', max: 5 * MINUTE_MS },
+    { value: '5to30', label: '5 to 30 minutes', min: 5 * MINUTE_MS, max: 30 * MINUTE_MS },
+    { value: '30to60', label: '30 to 60 minutes', min: 30 * MINUTE_MS, max: 60 * MINUTE_MS },
+    { value: 'over60', label: 'Over 1 hour', min: 60 * MINUTE_MS }
+  ];
 
   var state = {
-    statusFilter: 'all',
-    scopeFilter: '',
-    offset: 0,
-    limit: PAGE_SIZE,
-    total: 0,
-    recordings: [],
-    loading: false
+    searchTerm: '',
+    toolbar: null,
+    gen: 0,
+    workspaces: {}   // matter uuid -> { name, matter_id }
   };
 
-  var els = {};
-
-  function init() {
-    els = {
-      list: document.getElementById('recordingsList'),
-      state: document.getElementById('recordingsState'),
-      count: document.getElementById('recordingsCount'),
-      statusFilter: document.getElementById('recordingsStatusFilter'),
-      scopeFilter: document.getElementById('recordingsScopeFilter'),
-      refresh: document.getElementById('recordingsRefresh'),
-      prev: document.getElementById('recordingsPrev'),
-      next: document.getElementById('recordingsNext')
-    };
-
-    if (els.statusFilter) els.statusFilter.value = state.statusFilter;
-    if (els.scopeFilter) els.scopeFilter.value = state.scopeFilter;
-
-    bindEvents();
-    primeMatterCache();
-    loadRecordings();
+  function kit() {
+    return window.AdminTableKit;
   }
 
-  function bindEvents() {
-    if (els.statusFilter) {
-      els.statusFilter.addEventListener('lex-change', function (e) {
-        // Status filtering moved to the server in Task #18 — the API supports
-        // ?status=ready and comma-separated lists. We re-fetch instead of
-        // filtering client-side so pagination totals stay accurate.
-        state.statusFilter = (e.detail && e.detail.value) || 'all';
-        state.offset = 0;
-        loadRecordings();
-      });
-    }
-    if (els.scopeFilter) {
-      els.scopeFilter.addEventListener('lex-change', function (e) {
-        state.scopeFilter = (e.detail && e.detail.value) || '';
-        state.offset = 0;
-        loadRecordings();
-      });
-    }
-    if (els.refresh) {
-      els.refresh.addEventListener('click', function () {
-        els.refresh.loading = true;
-        loadRecordings().finally(function () {
-          setTimeout(function () { els.refresh.loading = false; }, 200);
-        });
-      });
-    }
-    if (els.prev) {
-      els.prev.addEventListener('click', function () {
-        if (state.offset <= 0) return;
-        state.offset = Math.max(0, state.offset - state.limit);
-        loadRecordings();
-      });
-    }
-    if (els.next) {
-      els.next.addEventListener('click', function () {
-        if (state.offset + state.limit >= state.total) return;
-        state.offset += state.limit;
-        loadRecordings();
-      });
-    }
+  function table() {
+    return document.getElementById(TABLE_ID);
   }
 
-  function primeMatterCache() {
-    if (matterFetchPromise) return matterFetchPromise;
-    if (!window.api || typeof api.getMatters !== 'function' || !api.isAuthenticated()) {
-      return Promise.resolve();
+  // -------------------------------------------------------------------------
+  // Pure table logic
+  // -------------------------------------------------------------------------
+
+  /**
+   * GET /api/v1/recordings params for a lex-table server query.
+   * @param {Object} query  - { page, limit, sortBy, sortDir, filters }
+   * @param {string} search - toolbar search
+   * @param {Date} [now]
+   * @returns {URLSearchParams}
+   */
+  function toApiParams(query, search, now) {
+    var k = kit();
+    var q = query || {};
+    var filters = q.filters || {};
+    var params = new URLSearchParams();
+    var paging = k.pageOffset(q);
+    params.set('limit', String(Math.min(paging.limit, 200)));
+    params.set('offset', String(paging.offset));
+    params.set('sort_by', 'created_at');
+    params.set('sort_order', q.sortDir === 'asc' ? 'asc' : 'desc');
+    if (search) params.set('search', search);
+
+    var title = k.firstFilterValue(filters, 'title');
+    if (title) params.set('title', title);
+    var statuses = k.filterValues(filters.status);
+    if (statuses.length) params.set('status', statuses.join(','));
+    var scopes = k.filterValues(filters.visibility);
+    if (scopes.length) params.set('visibility', scopes.join(','));
+    var matters = k.filterValues(filters.matter_id);
+    if (matters.length) params.set('matter_id', matters.join(','));
+    var owners = k.filterValues(filters.owner_id);
+    if (owners.length) params.set('owner_id', owners.join(','));
+
+    var range = durationRange(k.firstFilterValue(filters, 'duration_ms'));
+    if (range && range.min !== undefined) params.set('min_duration_ms', String(range.min));
+    if (range && range.max !== undefined) params.set('max_duration_ms', String(range.max));
+
+    k.setRange(params, filters, 'created_at', 'created_after', 'created_before', now);
+    return params;
+  }
+
+  function durationRange(value) {
+    for (var i = 0; i < DURATION_RANGES.length; i++) {
+      if (DURATION_RANGES[i].value === value) return DURATION_RANGES[i];
     }
-    // One-shot fetch: pull a generous page so per-row matter lookups stay
-    // client-side. Matter names rarely change during a session.
-    matterFetchPromise = api.getMatters(1, 200, {})
-      .then(function (result) {
-        var matters = (result && (result.matters || result.data || [])) || [];
-        matters.forEach(function (m) {
-          if (m && m.id) {
-            matterCache[m.id] = {
-              matter_id: m.matter_id || '',
-              name: m.matter_name || m.name || m.title || ''
-            };
-          }
-        });
-      })
-      .catch(function (err) {
-        console.warn('[Recordings] Failed to prime matter cache', err && err.message ? err.message : err);
-      });
-    return matterFetchPromise;
+    return null;
   }
-
-  function loadRecordings() {
-    if (state.loading) return Promise.resolve();
-    if (!window.api || !api.isAuthenticated()) return Promise.resolve();
-
-    state.loading = true;
-    renderLoading();
-
-    var path = '/api/v1/recordings?limit=' + state.limit + '&offset=' + state.offset;
-    // Server-side status filter (Task #18). 'all' is the sentinel for "no
-    // filter" and is omitted so the server returns every status.
-    if (state.statusFilter && state.statusFilter !== 'all') {
-      path += '&status=' + encodeURIComponent(state.statusFilter);
-    }
-
-    return api.get(path)
-      .then(function (result) {
-        var rows = (result && result.data) || [];
-        var pagination = (result && result.pagination) || {};
-        state.recordings = rows;
-        state.total = typeof pagination.total === 'number' ? pagination.total : rows.length;
-        // Ensure any matter UUIDs referenced get a friendly lookup;
-        // primeMatterCache is in-flight or done, but we may have new matters.
-        return ensureMatterNamesFor(rows);
-      })
-      .then(function () {
-        render();
-      })
-      .catch(function (err) {
-        console.error('[Recordings] Failed to load recordings:', err && err.message ? err.message : err);
-        renderError();
-      })
-      .finally(function () {
-        state.loading = false;
-      });
-  }
-
-  function ensureMatterNamesFor(rows) {
-    var missing = [];
-    rows.forEach(function (row) {
-      if (row && row.visibility === 'matter' && row.matter_id && !matterCache[row.matter_id]) {
-        missing.push(row.matter_id);
-      }
-    });
-    if (missing.length === 0) return Promise.resolve();
-    if (typeof api.getMatter !== 'function') return Promise.resolve();
-
-    // Per-row resolver as a fallback for matters not present in the priming
-    // page. We swallow individual failures so one bad row doesn't sink render.
-    var unique = {};
-    missing.forEach(function (id) { unique[id] = true; });
-    var lookups = Object.keys(unique).map(function (id) {
-      return api.getMatter(id, {})
-        .then(function (res) {
-          var m = res && (res.matter || res.data || res);
-          if (m && m.id) {
-            matterCache[m.id] = {
-              matter_id: m.matter_id || '',
-              name: m.matter_name || m.name || m.title || ''
-            };
-          }
-        })
-        .catch(function () { /* silent */ });
-    });
-    return Promise.all(lookups);
-  }
-
-  function applyClientFilters(rows) {
-    // Status filtering is server-side now (Task #18); we keep the scope
-    // filter local because the server endpoint does not yet expose a scope
-    // query param — if/when it does, this can shrink to a passthrough.
-    return rows.filter(function (row) {
-      if (state.scopeFilter && row.visibility !== state.scopeFilter) return false;
-      return true;
-    });
-  }
-
-  function renderLoading() {
-    if (els.state) {
-      els.state.hidden = false;
-      els.state.innerHTML = '<lex-spinner size="md" label="Loading recordings"></lex-spinner>';
-    }
-    if (els.list) els.list.innerHTML = '';
-    if (els.count) els.count.textContent = 'Loading recordings...';
-    if (els.prev) els.prev.hidden = true;
-    if (els.next) els.next.hidden = true;
-  }
-
-  function renderError() {
-    if (!els.state) return;
-    els.state.hidden = false;
-    els.state.innerHTML = [
-      '<lex-empty icon="alert-circle" message="Failed to load recordings" description="Refresh to try again."></lex-empty>'
-    ].join('');
-    if (els.count) els.count.textContent = '';
-    if (els.list) els.list.innerHTML = '';
-    if (els.prev) els.prev.hidden = true;
-    if (els.next) els.next.hidden = true;
-  }
-
-  function render() {
-    if (!els.list || !els.state || !els.count) return;
-
-    var visible = applyClientFilters(state.recordings);
-
-    if (state.recordings.length === 0) {
-      els.list.innerHTML = '';
-      els.state.hidden = false;
-      els.state.innerHTML = '<lex-empty icon="inbox" message="No recordings yet" description="Capture a meeting in PAC to see it here."></lex-empty>';
-      els.count.textContent = '';
-      if (els.prev) els.prev.hidden = true;
-      if (els.next) els.next.hidden = true;
-      return;
-    }
-
-    if (visible.length === 0) {
-      els.list.innerHTML = '';
-      els.state.hidden = false;
-      els.state.innerHTML = '<lex-empty icon="filter" message="No recordings match these filters" description="Adjust the status or scope filter above."></lex-empty>';
-    } else {
-      els.state.hidden = true;
-      els.list.innerHTML = visible.map(renderRow).join('');
-      attachRowHandlers();
-    }
-
-    var rangeStart = state.total === 0 ? 0 : state.offset + 1;
-    var rangeEnd = Math.min(state.offset + state.recordings.length, state.total);
-    els.count.textContent = 'Showing ' + rangeStart + '–' + rangeEnd + ' of ' + state.total;
-
-    if (els.prev) {
-      els.prev.hidden = state.total <= state.limit;
-      els.prev.disabled = state.offset <= 0;
-    }
-    if (els.next) {
-      els.next.hidden = state.total <= state.limit;
-      els.next.disabled = state.offset + state.limit >= state.total;
-    }
-  }
-
-  function renderRow(row) {
-    var status = row.status || 'pending';
-    var badgeColor = STATUS_BADGE_COLOR[status] || 'neutral';
-    var statusLabel = STATUS_LABEL[status] || status;
-
-    var title = recordingTitle(row);
-    var scopeChip = renderScopeChip(row);
-    var duration = formatDuration(row.duration_ms);
-    var when = formatWhen(row.created_at);
-    var whenAbsolute = formatAbsolute(row.created_at);
-    // Real owner name comes from the backend's LEFT JOIN on `users` (Task #18).
-    // Falls back to email or a short user-id label when the owner is missing.
-    var owner = ownerLabel(row);
-    var secondary = owner ? (when + ' · ' + owner) : when;
-
-    return [
-      '<button type="button" class="recordings-item" data-recording-id="' + escapeHtml(row.id) + '">',
-      '  <div class="recordings-item__primary">',
-      '    <span class="recordings-item__title">' + escapeHtml(title) + '</span>',
-      '    <span class="recordings-item__meta">',
-      '      <lex-badge label="' + escapeHtml(statusLabel) + '" color="' + escapeHtml(badgeColor) + '" size="sm" dot></lex-badge>',
-      scopeChip,
-      duration ? '      <span class="recordings-item__chip recordings-item__chip--neutral">' + escapeHtml(duration) + '</span>' : '',
-      '    </span>',
-      '  </div>',
-      '  <div class="recordings-item__secondary" title="' + escapeHtml(whenAbsolute) + '">' + escapeHtml(secondary) + '</div>',
-      '</button>'
-    ].join('');
-  }
-
-  function ownerLabel(row) {
-    if (!row) return '';
-    if (row.owner_name) return String(row.owner_name);
-    if (row.owner_email) return String(row.owner_email);
-    if (row.owner_id) {
-      var id = String(row.owner_id);
-      return 'User ' + id.substring(0, 8);
-    }
-    return '';
-  }
-
-  function renderScopeChip(row) {
-    var visibility = row.visibility || 'private';
-    var label = SCOPE_LABEL[visibility] || visibility;
-    var modifier = visibility === 'matter' ? 'matter' : (visibility === 'organization' ? 'org' : 'private');
-
-    if (visibility === 'matter' && row.matter_id) {
-      var resolved = matterCache[row.matter_id];
-      if (resolved) {
-        var pieces = [];
-        if (resolved.name) pieces.push(resolved.name);
-        if (resolved.matter_id) pieces.push('(' + resolved.matter_id + ')');
-        if (pieces.length > 0) {
-          label = pieces.join(' ');
-        }
-      }
-    }
-
-    return '<span class="recordings-item__chip recordings-item__chip--' + escapeHtml(modifier) + '">'
-      + escapeHtml(label) + '</span>';
-  }
-
-  function attachRowHandlers() {
-    if (!els.list) return;
-    var buttons = els.list.querySelectorAll('[data-recording-id]');
-    for (var i = 0; i < buttons.length; i++) {
-      buttons[i].addEventListener('click', function () {
-        var id = this.getAttribute('data-recording-id');
-        if (!id) return;
-        var href = 'recording-detail.html?id=' + encodeURIComponent(id);
-        if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
-          window.Lex.Nav.go(href);
-        } else {
-          window.location.href = href;
-        }
-      });
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
 
   function recordingTitle(row) {
     var meta = (row && row.metadata) || {};
@@ -365,6 +119,35 @@
     var id = row && row.id ? String(row.id) : '';
     var short = id ? id.substring(0, 8) : '';
     return short ? 'Recording ' + short : 'Recording';
+  }
+
+  function ownerLabel(row) {
+    if (!row) return '';
+    if (row.owner_name) return String(row.owner_name);
+    if (row.owner_email) return String(row.owner_email);
+    if (row.owner_id) return 'User ' + String(row.owner_id).substring(0, 8);
+    return '';
+  }
+
+  /**
+   * One row per recording: raw values, the record as _raw.
+   * @param {Object} r
+   * @returns {Object}
+   */
+  function mapRecording(r) {
+    var row = r || {};
+    var duration = Number(row.duration_ms);
+    return {
+      id: String(row.id || ''),
+      title: recordingTitle(row),
+      status: String(row.status || 'pending').toLowerCase(),
+      visibility: String(row.visibility || 'private').toLowerCase(),
+      matter_id: String(row.matter_id || ''),
+      owner_id: String(row.owner_id || ''),
+      duration_ms: Number.isFinite(duration) && duration > 0 ? duration : null,
+      created_at: row.created_at || '',
+      _raw: row
+    };
   }
 
   function formatDuration(ms) {
@@ -381,31 +164,180 @@
     return pad(minutes) + ':' + pad(seconds);
   }
 
-  function formatWhen(dateString) {
-    if (!dateString) return '';
-    var date = new Date(dateString);
-    var diffMs = LanaTime.millisecondsSince(date.getTime());
-    if (!Number.isFinite(diffMs) || diffMs < 0) {
-      return formatAbsolute(dateString);
-    }
-    return LanaTime.timeAgo(dateString, { maxDays: 7 }) || formatAbsolute(dateString);
+  function text(value, cls) {
+    var k = kit();
+    if (!value) return k.muted('');
+    return '<span class="' + (cls || 'recordings-cell-text') + '" title="' + k.esc(value) + '">' + k.esc(value) + '</span>';
   }
 
-  function formatAbsolute(dateString) {
-    if (!dateString) return '';
-    if (window.Lex && window.Lex.Utils && typeof window.Lex.Utils.formatDateTime === 'function') {
-      return window.Lex.Utils.formatDateTime(dateString) || '';
-    }
-    var date = new Date(dateString);
-    if (isNaN(date.getTime())) return '';
-    return date.toLocaleString();
+  function cellRenderers(workspaces) {
+    var k = kit();
+    var names = workspaces || state.workspaces;
+    return {
+      title: function (val) {
+        return '<span class="recordings-cell-name" title="' + k.esc(val) + '">' + k.esc(val || 'Recording') + '</span>';
+      },
+      status: function (val) {
+        return k.badge(Lex.Utils.humanizeLabel(val), STATUS_BADGE_COLOR[val] || 'gray');
+      },
+      visibility: function (val) {
+        return text(SCOPE_LABEL[val] || Lex.Utils.humanizeLabel(val));
+      },
+      matter_id: function (val) {
+        if (!val) return k.muted('');
+        var label = (names[val] && names[val].name) || 'Open workspace';
+        return '<button type="button" class="recordings-workspace-link" data-matter-id="' + k.esc(val) + '" title="Open ' + k.esc(label) + '">' +
+          '<span>' + k.esc(label) + '</span></button>';
+      },
+      owner_id: function (val, row) { return text(ownerLabel(row._raw)); },
+      duration_ms: function (val) { return text(formatDuration(val), 'recordings-cell-time'); },
+      created_at: function (val) {
+        if (!val) return k.muted('');
+        var full = Lex.Utils.formatDateTime(val);
+        return '<time class="recordings-cell-time" datetime="' + k.esc(val) + '" title="' + k.esc(full) + '">' + k.esc(full) + '</time>';
+      }
+    };
   }
 
-  function escapeHtml(value) {
-    var div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+  /**
+   * Header filters for every column.
+   * @param {Array} workspaceOptions - [{ value: matter uuid, label }]
+   * @param {Array} ownerOptions     - [{ value: user id, label }]
+   */
+  function filterOptions(workspaceOptions, ownerOptions) {
+    var k = kit();
+    var map = {
+      title: { text: true, placeholder: 'Title contains...' },
+      status: { options: k.labelOptions(RECORDING_STATUSES) },
+      visibility: { options: SCOPE_OPTIONS },
+      duration_ms: { single: true, options: DURATION_RANGES.map(function (r) { return { value: r.value, label: r.label }; }) },
+      created_at: k.dateRangeFilter()
+    };
+    if (workspaceOptions && workspaceOptions.length) map.matter_id = { options: workspaceOptions };
+    if (ownerOptions && ownerOptions.length) map.owner_id = { options: ownerOptions };
+    return map;
   }
+
+  // -------------------------------------------------------------------------
+  // Page wiring
+  // -------------------------------------------------------------------------
+
+  function init() {
+    var target = table();
+    if (!target) return;
+
+    var refresh = document.getElementById('recordingsRefresh');
+    if (refresh) {
+      refresh.addEventListener('click', function () {
+        if (table() === target) target.requestServerQuery();
+      });
+    }
+
+    kit().whenTableReady().then(function () {
+      if (table() !== target) return;
+      target.setCellRenderers(cellRenderers());
+      target.setColumnFilterOptions(filterOptions([], []));
+      state.toolbar = kit().bindToolbar({
+        table: target,
+        searchId: 'recordingsSearch',
+        sortId: 'recordingsSort',
+        orderId: 'recordingsSortOrder',
+        filterId: 'recordingsStatusFilter',
+        filterKey: 'status',
+        countIds: ['recordingsCount', 'recordingsSectionCount'],
+        noun: ['recording', 'recordings'],
+        onSearch: function (term) {
+          state.searchTerm = term;
+          target.requestServerQuery({ resetPage: true });
+        }
+      });
+      target.addEventListener('lex-query-change', function (e) {
+        if (e.target !== target) return;
+        loadRecordings(e.detail);
+      });
+      target.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row && row.id) openRecording(row.id);
+      });
+      loadFilterSources(target);
+      target.requestServerQuery({ resetPage: true });
+    });
+  }
+
+  function openRecording(id) {
+    if (window.Lex && window.Lex.Nav && typeof window.Lex.Nav.go === 'function') {
+      window.Lex.Nav.go('recording-detail.html', { params: { id: id } });
+    } else {
+      window.location.href = 'recording-detail.html?id=' + encodeURIComponent(id);
+    }
+  }
+
+  function userOptions(res) {
+    var users = Array.isArray(res) ? res : ((res && (res.data || res.users)) || []);
+    return users.map(function (u) {
+      var name = ((u.first_name || '') + ' ' + (u.last_name || '')).trim();
+      return { value: String(u.id || ''), label: String(u.full_name || u.fullName || name || u.email || u.id) };
+    }).filter(function (o) { return o.value; });
+  }
+
+  // Workspace names (link labels + filter) and owners (filter).
+  function loadFilterSources(target) {
+    var shared = window.LanaLibraryColumnFilters;
+    var workspaces = shared ? shared.loadWorkspaces(api) : Promise.resolve([]);
+    var users = api.get('/api/v1/users?limit=100').then(userOptions).catch(function () { return []; });
+    Promise.all([workspaces, users]).then(function (results) {
+      if (table() !== target) return;
+      var names = {};
+      (results[0] || []).forEach(function (m) {
+        if (m && m.id) names[m.id] = { name: m.name || m.matter_name || m.matter_id || '', matter_id: m.matter_id || '' };
+      });
+      state.workspaces = names;
+      target.setCellRenderers(cellRenderers(names));
+      target.setColumnFilterOptions(filterOptions(shared ? shared.workspaceOptions(results[0], 'id') : [], results[1]));
+    });
+  }
+
+  function loadRecordings(query) {
+    var gen = ++state.gen;
+    var target = table();
+    if (!target) return;
+    if (!window.api || !api.isAuthenticated()) return;
+    query = query || target.serverQuery;
+    var filters = query.filters || {};
+    var filtered = Boolean(state.searchTerm || Object.keys(filters).length);
+    if (state.toolbar) state.toolbar.syncFilter(filters);
+
+    api.get('/api/v1/recordings?' + toApiParams(query, state.searchTerm).toString())
+      .then(function (result) {
+        if (gen !== state.gen) return;
+        var rows = (result && result.data) || [];
+        var pagination = (result && result.pagination) || {};
+        target.emptyText = filtered
+          ? 'No matching recordings. Try a different search or clear the filters.'
+          : 'No recordings yet. Capture a meeting in PAC to see it here.';
+        target.setServerData(rows.map(mapRecording), {
+          page: query.page,
+          limit: query.limit,
+          total: typeof pagination.total === 'number' ? pagination.total : rows.length
+        });
+      })
+      .catch(function (err) {
+        if (gen !== state.gen) return;
+        console.error('[Recordings] Failed to load recordings:', err && err.message ? err.message : err);
+        if (state.toolbar) state.toolbar.setCount(null);
+        target.setServerError('Recordings could not be loaded. Check your connection and try again.');
+      });
+  }
+
+  // Pure table logic, exposed for unit tests.
+  window.RecordingsTable = {
+    toApiParams: toApiParams,
+    mapRecording: mapRecording,
+    cellRenderers: cellRenderers,
+    filterOptions: filterOptions,
+    formatDuration: formatDuration,
+    DURATION_RANGES: DURATION_RANGES
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

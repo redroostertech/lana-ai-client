@@ -508,3 +508,82 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
+
+/* ─── Approval inbox table (docs/TABLE-STANDARD.md) ──────────────────
+   Approval, Source, Priority, Status, Requested by, Assigned to,
+   Workspace, Expires, Created */
+
+#aprTable table { min-width: 1240px; table-layout: fixed; }
+#aprTable th { white-space: nowrap; }
+#aprTable td { overflow: hidden; }
+#aprTable th:nth-child(2) { width: 150px; }
+#aprTable th:nth-child(3) { width: 104px; }
+#aprTable th:nth-child(4) { width: 112px; }
+#aprTable th:nth-child(5) { width: 140px; }
+#aprTable th:nth-child(6) { width: 140px; }
+#aprTable th:nth-child(7) { width: 16%; }
+#aprTable th:nth-child(8) { width: 150px; }
+#aprTable th:nth-child(9) { width: 176px; }
+
+.apr-cell-name {
+  color: var(--lex-text-primary);
+  display: block;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+.apr-cell-text,
+.apr-cell-time {
+  color: var(--lex-text-secondary);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apr-cell-time { font-variant-numeric: tabular-nums; }
+
+#aprTable .admin-table-muted {
+  color: var(--lex-text-secondary);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Workspace link: same treatment as My Tasks and the Document Library. */
+.apr-workspace-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--lex-accent, #3b5bdb);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.apr-workspace-link > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apr-workspace-link:focus-visible {
+  border-radius: var(--lex-radius-sm, 4px);
+  box-shadow: var(--lex-focus-ring);
+  outline: none;
+}

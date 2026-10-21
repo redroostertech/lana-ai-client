@@ -10,7 +10,9 @@
    @requires api.js          — window.api (api.get / api.post)
    @requires lex.utils.js    — Lex.Utils.escapeHtml, Lex.Utils.timeAgo, Lex.Utils.formatDateTime
    @requires lex-toast.js    — Lex.Toast.success / .error / .warning
-   @requires lex-pagination  — <lex-pagination> component
+   @requires lex-table.js    — server-paged inbox table
+   @requires admin-table-kit.js — AdminTableKit toolbar + query helpers
+   @requires library-column-filters.js — date ranges + workspace list
 */
 
 (function () {
@@ -105,7 +107,14 @@
     chat:             'Chat',
     skill:            'Skill',
     manual:           'Manual',
-    privilege_review: 'Privilege Review'
+    privilege_review: 'Privilege review',
+    // Source types GET /api/v1/approvals stores and filters on.
+    agentic_task:                'Agentic task',
+    agentic_snapshot:            'Agentic snapshot',
+    workflow_execution:          'Workflow execution',
+    automation_execution:        'Automation execution',
+    document_edit_batch_release: 'Document release',
+    standalone:                  'Standalone'
   };
 
   function sourceTypeLabel(sourceType) {
@@ -193,24 +202,6 @@
   // ===========================================================================
 
   /**
-   * Load approval requests with optional filters.
-   * @param {Object} filters — { status, priority, source_type, search, page, limit }
-   * @returns {Promise}
-   */
-  function loadApprovals(filters) {
-    var params = [];
-    if (filters.status)      params.push('status='      + encodeURIComponent(filters.status));
-    if (filters.priority)    params.push('priority='    + encodeURIComponent(filters.priority));
-    if (filters.source_type) params.push('source_type=' + encodeURIComponent(filters.source_type));
-    if (filters.search)      params.push('search='      + encodeURIComponent(filters.search));
-    if (filters.page)        params.push('page='        + encodeURIComponent(filters.page));
-    if (filters.limit)       params.push('limit='       + encodeURIComponent(filters.limit));
-
-    var qs = params.length > 0 ? '?' + params.join('&') : '';
-    return api.get('/api/v1/approvals' + qs);
-  }
-
-  /**
    * Load approvals assigned to the current user (inbox view).
    * @returns {Promise}
    */
@@ -292,140 +283,340 @@
   }
 
   // ===========================================================================
-  // INBOX PAGE logic
+  // INBOX PAGE logic — server-paged lex-table (docs/TABLE-STANDARD.md)
   // ===========================================================================
 
+  var INBOX_TABLE_ID = 'aprTable';
+
+  // Values GET /api/v1/approvals accepts (approvals.validators.js).
+  var APPROVAL_STATUSES = ['pending', 'approved', 'rejected', 'expired', 'cancelled'];
+  var APPROVAL_PRIORITIES = ['urgent', 'high', 'normal', 'low'];
+  var APPROVAL_SOURCE_TYPES = [
+    'agentic_task', 'agentic_snapshot', 'workflow_execution',
+    'automation_execution', 'document_edit_batch_release', 'standalone'
+  ];
+
+  var STATUS_COLORS   = { pending: 'yellow', approved: 'green', rejected: 'red', expired: 'gray', cancelled: 'gray' };
+  var PRIORITY_COLORS = { urgent: 'red', high: 'yellow', normal: 'blue', low: 'gray' };
+
+  // Table column -> /api/v1/approvals sort_by (its allow-list).
+  var SORT_BY_COLUMN = { created_at: 'created_at', priority: 'priority', expires_at: 'expires_at' };
+
+  // Expires column ranges: bounds on expires_at relative to now.
+  var EXPIRES_RANGE_OPTIONS = [
+    { value: 'past', label: 'Already expired' },
+    { value: '1h', label: 'Within 1 hour' },
+    { value: '24h', label: 'Within 24 hours' },
+    { value: 'later', label: 'Later than 24 hours' }
+  ];
+
+  var HOUR_MS = 60 * 60 * 1000;
+
   var _inbox = {
-    currentPage:    1,
-    pageSize:       20,
-    statusFilter:   'pending',
-    priorityFilter: '',
-    sourceFilter:   '',
-    searchTerm:     '',
-    searchDebounce: null,
-    totalItems:     0
+    searchTerm: '',
+    toolbar:    null,
+    gen:        0,
+    workspaces: {},   // matter uuid -> workspace name (link labels)
+    users:      []
   };
 
+  function _kit() {
+    return window.AdminTableKit;
+  }
+
+  /**
+   * expires_after / expires_before for an Expires range option.
+   * @param {string} value
+   * @param {Date} [now]
+   * @returns {{ after: string, before: string }}
+   */
+  function expiresRangeBounds(value, now) {
+    var t = (now && typeof now.getTime === 'function' ? now : new Date(LanaTime.nowMs())).getTime();
+    var iso = function (ms) { return new Date(ms).toISOString(); };
+    switch (value) {
+      case 'past':  return { after: '', before: iso(t) };
+      case '1h':    return { after: iso(t), before: iso(t + HOUR_MS) };
+      case '24h':   return { after: iso(t), before: iso(t + 24 * HOUR_MS) };
+      case 'later': return { after: iso(t + 24 * HOUR_MS), before: '' };
+      default:      return { after: '', before: '' };
+    }
+  }
+
+  /**
+   * The /api/v1/approvals query for a lex-table server query.
+   * The API pages with limit/offset and takes one status, priority and
+   * source type each (the header filters for those are single-choice).
+   * Filters it does not read yet (title contains, Created and Expires ranges,
+   * requester) go under the standard names so they apply once it does.
+   * @param {Object} query  - { page, limit, sortBy, sortDir, filters }
+   * @param {string} search - toolbar search
+   * @param {Date} [now]
+   * @returns {URLSearchParams}
+   */
+  function inboxApiParams(query, search, now) {
+    var kit = _kit();
+    var q = query || {};
+    var filters = q.filters || {};
+    var params = new URLSearchParams();
+    var paging = kit.pageOffset(q);
+    params.set('limit', String(Math.min(paging.limit, 100)));
+    params.set('offset', String(paging.offset));
+    params.set('sort_by', SORT_BY_COLUMN[q.sortBy] || 'created_at');
+    params.set('sort_order', q.sortDir === 'asc' ? 'asc' : 'desc');
+    if (search) params.set('search', search);
+
+    var title = kit.firstFilterValue(filters, 'title');
+    if (title) params.set('title', title);
+    var single = { status: 'status', priority: 'priority', source_type: 'source_type',
+      matter_id: 'matter_id', assigned_to: 'assigned_to', requested_by: 'requested_by' };
+    Object.keys(single).forEach(function (col) {
+      var value = kit.firstFilterValue(filters, col);
+      if (value) params.set(single[col], value);
+    });
+
+    var expires = expiresRangeBounds(kit.firstFilterValue(filters, 'expires_at'), now);
+    if (expires.after) params.set('expires_after', expires.after);
+    if (expires.before) params.set('expires_before', expires.before);
+    kit.setRange(params, filters, 'created_at', 'created_after', 'created_before', now);
+    return params;
+  }
+
+  function _personName(first, last, email) {
+    var name = (String(first || '').trim() + ' ' + String(last || '').trim()).trim();
+    return name || String(email || '');
+  }
+
+  /**
+   * One row per approval: raw values, the record as _raw.
+   * @param {Object} a
+   * @returns {Object}
+   */
+  function mapApproval(a) {
+    var item = a || {};
+    return {
+      id:           String(item.id || ''),
+      title:        String(item.title || ''),
+      source_type:  String(item.source_type || item.sourceType || '').toLowerCase(),
+      priority:     String(item.priority || 'normal').toLowerCase(),
+      status:       String(item.status || 'pending').toLowerCase(),
+      requested_by: String(item.requested_by || ''),
+      assigned_to:  String(item.assigned_to || ''),
+      matter_id:    String(item.matter_id || ''),
+      expires_at:   item.expires_at || item.expiresAt || '',
+      created_at:   item.created_at || item.createdAt || '',
+      _raw:         item
+    };
+  }
+
+  function _requesterName(raw) {
+    return String(raw.requester_name || raw.requesterName ||
+      _personName(raw.requested_by_first_name, raw.requested_by_last_name, raw.requested_by_email) || '');
+  }
+
+  function _assigneeName(raw) {
+    return String(raw.assigned_to_name || raw.assignedToName ||
+      _personName(raw.assigned_to_first_name, raw.assigned_to_last_name, raw.assigned_to_email) || '');
+  }
+
+  function _text(value, title) {
+    var kit = _kit();
+    if (!value) return kit.muted('');
+    return '<span class="apr-cell-text" title="' + kit.esc(title || value) + '">' + kit.esc(value) + '</span>';
+  }
+
+  function inboxCellRenderers(workspaces) {
+    var kit = _kit();
+    var names = workspaces || _inbox.workspaces;
+    return {
+      title: function (val) {
+        var name = val || 'Untitled approval';
+        return '<span class="apr-cell-name" title="' + kit.esc(name) + '">' + kit.esc(name) + '</span>';
+      },
+      source_type: function (val) {
+        return val ? _text(sourceTypeLabel(val) || Lex.Utils.humanizeLabel(val)) : kit.muted('');
+      },
+      priority: function (val) {
+        return kit.badge(Lex.Utils.humanizeLabel(val), PRIORITY_COLORS[val] || 'gray');
+      },
+      status: function (val) {
+        return kit.badge(Lex.Utils.humanizeLabel(val), STATUS_COLORS[val] || 'gray');
+      },
+      requested_by: function (val, row) { return _text(_requesterName(row._raw)); },
+      assigned_to: function (val, row) {
+        var name = _assigneeName(row._raw);
+        return name ? _text(name) : kit.muted('Unassigned');
+      },
+      matter_id: function (val) {
+        if (!val) return kit.muted('');
+        return '<button type="button" class="apr-workspace-link" data-matter-id="' + kit.esc(val) + '">' +
+          '<span>' + kit.esc(names[val] || 'Open workspace') + '</span></button>';
+      },
+      expires_at: function (val, row) {
+        if (!val) return kit.muted('');
+        var timer = formatTimeRemaining(val, row.status);
+        var full = fmtDateTime(val);
+        if (timer.text) {
+          return '<time class="apr-cell-time apr-item-timer ' + kit.esc(timer.urgencyClass) + '" datetime="' + kit.esc(val) + '" title="' + kit.esc(full) + '">' + kit.esc(timer.text) + '</time>';
+        }
+        return '<time class="apr-cell-time" datetime="' + kit.esc(val) + '" title="' + kit.esc(full) + '">' + kit.esc(full) + '</time>';
+      },
+      created_at: function (val) {
+        if (!val) return kit.muted('');
+        var text = fmtDateTime(val);
+        return '<time class="apr-cell-time" datetime="' + kit.esc(val) + '" title="' + kit.esc(text) + '">' + kit.esc(text) + '</time>';
+      }
+    };
+  }
+
+  function _sourceOptions() {
+    return APPROVAL_SOURCE_TYPES.map(function (value) {
+      return { value: value, label: sourceTypeLabel(value) || Lex.Utils.humanizeLabel(value) };
+    });
+  }
+
+  /**
+   * Header filters for every column. Status, priority and source take one
+   * value each because the API filters on one.
+   * @param {Array} workspaceOptions - [{ value: matter uuid, label }]
+   * @param {Array} userOptions      - [{ value: user id, label }]
+   */
+  function inboxFilterOptions(workspaceOptions, userOptions) {
+    var kit = _kit();
+    var map = {
+      title:       { text: true, placeholder: 'Title contains...' },
+      source_type: { single: true, options: _sourceOptions() },
+      priority:    { single: true, options: kit.labelOptions(APPROVAL_PRIORITIES) },
+      status:      { single: true, options: kit.labelOptions(APPROVAL_STATUSES) },
+      expires_at:  { single: true, options: EXPIRES_RANGE_OPTIONS },
+      created_at:  kit.dateRangeFilter()
+    };
+    if (userOptions && userOptions.length) {
+      map.requested_by = { single: true, options: userOptions };
+      map.assigned_to = { single: true, options: userOptions };
+    }
+    if (workspaceOptions && workspaceOptions.length) map.matter_id = { single: true, options: workspaceOptions };
+    return map;
+  }
+
+  function _inboxTable() {
+    return el(INBOX_TABLE_ID);
+  }
+
   function initInboxPage() {
+    var table = _inboxTable();
+    if (!table) return;
     _fetchStats();
-    _bindInboxEvents();
-    _fetchApprovals();
+    _bindStats();
+
+    _kit().whenTableReady().then(function () {
+      if (_inboxTable() !== table) return;
+      table.setCellRenderers(inboxCellRenderers());
+      table.setColumnFilterOptions(inboxFilterOptions([], []));
+      _inbox.toolbar = _kit().bindToolbar({
+        table: table,
+        searchId: 'aprSearch',
+        sortId: 'aprSort',
+        orderId: 'aprSortOrder',
+        filterId: 'aprStatusFilter',
+        filterKey: 'status',
+        countIds: ['aprCount', 'aprSectionCount'],
+        noun: ['approval', 'approvals'],
+        onSearch: function (term) {
+          _inbox.searchTerm = term;
+          table.requestServerQuery({ resetPage: true });
+        }
+      });
+      table.addEventListener('lex-query-change', function (e) {
+        if (e.target !== table) return;
+        _fetchApprovals(e.detail);
+      });
+      table.addEventListener('lex-filter-change', function (e) {
+        if (e.target !== table) return;
+        _syncStatHighlight(_kit().firstFilterValue(e.detail && e.detail.filters, 'status'));
+      });
+      table.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row && row.id) _openApproval(row.id);
+      });
+      _loadFilterSources(table);
+
+      // Pending first, as before: the filter lives in the table's own state,
+      // so Clear filters resets it. Setting it emits the first query.
+      void table.serverQuery;
+      table.addFilter('status', 'in', ['pending']);
+    });
   }
 
-  function _bindInboxEvents() {
-    // Status segmented control
-    var statusFilter = el('aprStatusFilter');
-    if (statusFilter) {
-      statusFilter.addEventListener('lex-change', function (e) {
-        _inbox.statusFilter  = e.detail.value || '';
-        _inbox.currentPage   = 1;
-        _syncStatHighlight();
-        _fetchApprovals();
-      });
+  function _openApproval(id) {
+    if (!id) return;
+    if (window.Lex && Lex.Nav && typeof Lex.Nav.go === 'function') {
+      Lex.Nav.go('approval-detail.html', { params: { id: id } });
+      return;
     }
+    window.location.href = 'approval-detail.html?id=' + encodeURIComponent(id);
+  }
 
-    // Priority filter
-    var priorityFilter = el('aprPriorityFilter');
-    if (priorityFilter) {
-      priorityFilter.addEventListener('lex-change', function (e) {
-        _inbox.priorityFilter = e.detail.value || '';
-        _inbox.currentPage    = 1;
-        _fetchApprovals();
-      });
-    }
+  function _userOptions(res) {
+    var users = Array.isArray(res) ? res : ((res && (res.data || res.users)) || []);
+    return users.map(function (u) {
+      var label = u.full_name || u.fullName || _personName(u.first_name, u.last_name, u.email) || u.id;
+      return { value: String(u.id || ''), label: String(label) };
+    }).filter(function (o) { return o.value; });
+  }
 
-    // Source filter
-    var sourceFilter = el('aprSourceFilter');
-    if (sourceFilter) {
-      sourceFilter.addEventListener('lex-change', function (e) {
-        _inbox.sourceFilter = e.detail.value || '';
-        _inbox.currentPage  = 1;
-        _fetchApprovals();
-      });
-    }
+  // Workspace names (link labels + filter) and users (requester/assignee filters).
+  function _loadFilterSources(table) {
+    var shared = window.LanaLibraryColumnFilters;
+    var workspaces = shared ? shared.loadWorkspaces(api) : Promise.resolve([]);
+    var users = api.get('/api/v1/users?limit=100').then(_userOptions).catch(function () { return []; });
+    Promise.all([workspaces, users]).then(function (results) {
+      if (_inboxTable() !== table) return;
+      var options = shared ? shared.workspaceOptions(results[0], 'id') : [];
+      var names = {};
+      options.forEach(function (o) { names[o.value] = o.label; });
+      _inbox.workspaces = names;
+      _inbox.users = results[1];
+      table.setCellRenderers(inboxCellRenderers(names));
+      table.setColumnFilterOptions(inboxFilterOptions(options, results[1]));
+    });
+  }
 
-    // Search input (debounced 350ms)
-    var searchInput = el('aprSearch');
-    if (searchInput) {
-      searchInput.addEventListener('input', function () {
-        clearTimeout(_inbox.searchDebounce);
-        _inbox.searchDebounce = setTimeout(function () {
-          _inbox.searchTerm  = searchInput.value.trim();
-          _inbox.currentPage = 1;
-          _fetchApprovals();
-        }, 350);
-      });
-
-      searchInput.addEventListener('focus', function () {
-        this.style.borderColor = 'var(--lex-input-border-focus)';
-        this.style.boxShadow   = '0 0 0 3px color-mix(in srgb, var(--lex-input-border-focus) 20%, transparent)';
-      });
-
-      searchInput.addEventListener('blur', function () {
-        this.style.borderColor = 'var(--lex-border-default)';
-        this.style.boxShadow   = 'none';
-      });
-    }
-
-    // Stats bar clicks — set status filter
+  function _bindStats() {
+    // Stat tiles set the Status filter (same state as the toolbar select).
     var statsBar = el('aprStats');
-    if (statsBar) {
-      statsBar.addEventListener('click', function (e) {
-        var stat = e.target.closest('.apr-stat');
-        if (!stat) return;
-
-        var status = stat.dataset.status || '';
-        _inbox.statusFilter  = status;
-        _inbox.currentPage   = 1;
-
-        // Update segmented control to match
-        var seg = el('aprStatusFilter');
-        if (seg) seg.value = status;
-
-        _syncStatHighlight();
-        _fetchApprovals();
-      });
-    }
-
-    // Pagination
-    var pag = el('aprPagination');
-    if (pag) {
-      pag.addEventListener('page-change', function (e) {
-        _inbox.currentPage = e.detail.page;
-        _fetchApprovals();
-      });
-    }
+    if (!statsBar) return;
+    statsBar.addEventListener('click', function (e) {
+      var stat = e.target.closest('.apr-stat');
+      var table = _inboxTable();
+      if (!stat || !table) return;
+      var status = stat.dataset.status || '';
+      if (status) table.addFilter('status', 'in', [status]);
+      else table.removeFilter('status');
+    });
   }
 
-  function _syncStatHighlight() {
+  function _syncStatHighlight(status) {
     var stats = document.querySelectorAll('.apr-stat');
     for (var i = 0; i < stats.length; i++) {
-      var stat   = stats[i];
-      var status = stat.dataset.status || '';
-      if (status === _inbox.statusFilter) {
-        stat.classList.add('active');
-      } else {
-        stat.classList.remove('active');
-      }
+      var stat = stats[i];
+      if ((stat.dataset.status || '') === (status || '')) stat.classList.add('active');
+      else stat.classList.remove('active');
     }
   }
 
   function _fetchStats() {
     loadStats().then(function (res) {
-      var data = (res && res.data) || res || {};
+      // GET /approvals/stats answers { stats: { pending_count, ..., total_count } }.
+      var data = (res && (res.stats || res.data)) || res || {};
       var byStatus = data.by_status || data.byStatus || {};
-
-      var total     = data.total     || 0;
-      var pending   = byStatus.pending   || 0;
-      var approved  = byStatus.approved  || 0;
-      var rejected  = byStatus.rejected  || 0;
-      var expired   = byStatus.expired   || 0;
-
-      _setStatCount('aprCountAll',      total);
-      _setStatCount('aprCountPending',  pending);
-      _setStatCount('aprCountApproved', approved);
-      _setStatCount('aprCountRejected', rejected);
-      _setStatCount('aprCountExpired',  expired);
+      var count = function (key) {
+        return Number(data[key + '_count'] !== undefined ? data[key + '_count'] : byStatus[key]) || 0;
+      };
+      _setStatCount('aprCountAll',      Number(data.total_count !== undefined ? data.total_count : data.total) || 0);
+      _setStatCount('aprCountPending',  count('pending'));
+      _setStatCount('aprCountApproved', count('approved'));
+      _setStatCount('aprCountRejected', count('rejected'));
+      _setStatCount('aprCountExpired',  count('expired'));
     }).catch(function () {
       // Stats are non-critical — fail silently
     });
@@ -436,121 +627,48 @@
     if (elem) elem.textContent = String(count);
   }
 
-  function _fetchApprovals() {
-    // Show loading, hide others
-    show('aprLoading');
-    hide('aprCard');
-    hide('aprPagination');
-    hide('aprEmpty');
+  /**
+   * Answer the table's lex-query-change with one page of approvals.
+   * @param {Object} query
+   */
+  function _fetchApprovals(query) {
+    var gen = ++_inbox.gen;
+    var table = _inboxTable();
+    if (!table) return;
+    query = query || table.serverQuery;
+    var filters = query.filters || {};
+    var filtered = Boolean(_inbox.searchTerm || Object.keys(filters).length);
+    if (_inbox.toolbar) _inbox.toolbar.syncFilter(filters);
 
-    loadApprovals({
-      status:      _inbox.statusFilter,
-      priority:    _inbox.priorityFilter,
-      source_type: _inbox.sourceFilter,
-      search:      _inbox.searchTerm,
-      page:        _inbox.currentPage,
-      limit:       _inbox.pageSize
-    }).then(function (res) {
-      var items      = (res && res.data) || [];
-      var pagination = (res && res.pagination) || {};
-      var total      = pagination.total || items.length || 0;
-      var totalPages = pagination.total_pages || pagination.totalPages || Math.ceil(total / _inbox.pageSize) || 1;
-
-      _inbox.totalItems = total;
-
-      hide('aprLoading');
-
-      if (!items || items.length === 0) {
-        show('aprEmpty');
-        return;
-      }
-
-      _renderInboxList(items);
-
-      // Update pagination
-      var pag = el('aprPagination');
-      if (pag) {
-        pag.setAttribute('page',        String(_inbox.currentPage));
-        pag.setAttribute('total-pages', String(totalPages));
-        pag.setAttribute('total',       String(total));
-        pag.setAttribute('limit',       String(_inbox.pageSize));
-        show(pag);
-      }
-
-      show('aprCard');
-    }).catch(function (err) {
-      hide('aprLoading');
-      Lex.Toast.error('Failed to load approvals: ' + (err && err.message ? err.message : 'Unknown error'));
-      show('aprEmpty');
-    });
-  }
-
-  function _renderInboxList(items) {
-    var list = el('aprList');
-    if (!list) return;
-
-    var html = '';
-    for (var i = 0; i < items.length; i++) {
-      html += _renderInboxItem(items[i]);
-    }
-    list.innerHTML = html;
-
-    // Bind click handlers to each item
-    var rows = list.querySelectorAll('.apr-item');
-    for (var j = 0; j < rows.length; j++) {
-      (function (row) {
-        row.addEventListener('click', function () {
-          var id = row.dataset.id;
-          if (id) {
-            window.location.href = 'approval-detail.html?id=' + encodeURIComponent(id);
-          }
+    api.get('/api/v1/approvals?' + inboxApiParams(query, _inbox.searchTerm).toString())
+      .then(function (res) {
+        if (gen !== _inbox.gen) return;
+        var items = (res && (res.approvals || res.data)) || [];
+        var pagination = (res && res.pagination) || {};
+        table.emptyText = _kit().emptyText(filtered, 'approvals');
+        table.setServerData(items.map(mapApproval), {
+          page: query.page,
+          limit: query.limit,
+          total: pagination.total !== undefined ? pagination.total : items.length
         });
-      })(rows[j]);
-    }
+      })
+      .catch(function (err) {
+        if (gen !== _inbox.gen) return;
+        console.error('[approvals] list error:', err);
+        if (_inbox.toolbar) _inbox.toolbar.setCount(null);
+        table.setServerError((err && err.message) || 'Approvals could not be loaded. Check your connection and try again.');
+      });
   }
 
-  function _renderInboxItem(item) {
-    var id          = escHtml(String(item.id || ''));
-    var title       = escHtml(String(item.title || 'Untitled Approval'));
-    var priority    = String(item.priority || 'normal').toLowerCase();
-    var status      = String(item.status   || 'pending').toLowerCase();
-    var sourceType  = String(item.source_type || item.sourceType || '').toLowerCase();
-    var requester   = escHtml(String(item.requester_name || item.requesterName || 'Unknown'));
-    var assignedTo  = escHtml(String(item.assigned_to_name || item.assignedToName || 'Unassigned'));
-    var createdAt   = item.created_at || item.createdAt || '';
-    var expiresAt   = item.expires_at || item.expiresAt || '';
-
-    var timer       = formatTimeRemaining(expiresAt, status);
-
-    var timerHtml = '';
-    if (timer.text) {
-      timerHtml = '<span class="apr-item-timer ' + escHtml(timer.urgencyClass) + '">' + escHtml(timer.text) + '</span>';
-    }
-
-    var metaHtml = [
-      sourceBadge(sourceType),
-      priorityBadge(priority),
-      statusBadge(status),
-      '<span>Requested by <strong>' + requester + '</strong></span>',
-      '<span class="apr-item-meta-dot">&middot;</span>',
-      '<span>Assigned to <strong>' + assignedTo + '</strong></span>',
-      '<span class="apr-item-meta-dot">&middot;</span>',
-      '<span>' + escHtml(formatDate(createdAt)) + '</span>'
-    ].join('');
-
-    return [
-      '<div class="apr-item" data-id="' + id + '" data-priority="' + escHtml(priority) + '" role="button" tabindex="0">',
-        '<div class="apr-item-body">',
-          '<div class="apr-item-title">' + title + '</div>',
-          '<div class="apr-item-meta">' + metaHtml + '</div>',
-        '</div>',
-        timerHtml,
-        '<div class="apr-item-chevron">',
-          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>',
-        '</div>',
-      '</div>'
-    ].join('');
-  }
+  // Pure table logic, exposed for unit tests.
+  window.ApprovalsTable = {
+    inboxApiParams: inboxApiParams,
+    expiresRangeBounds: expiresRangeBounds,
+    mapApproval: mapApproval,
+    cellRenderers: inboxCellRenderers,
+    filterOptions: inboxFilterOptions,
+    SORT_BY_COLUMN: SORT_BY_COLUMN
+  };
 
   // ===========================================================================
   // DETAIL PAGE logic

@@ -1,120 +1,76 @@
 /* recordings.css — list + detail styling for the Recordings section */
 
 .recordings-page {
-  max-width: 1040px;
-  margin: 0 auto;
   padding: 24px 24px 48px;
 }
 
-.recordings-page__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 8px 0 20px;
-  border-bottom: 1px solid var(--lex-border-subtle);
-}
+/* Recordings table (docs/TABLE-STANDARD.md):
+   Recording, Status, Scope, Workspace, Owner, Duration, Created */
+#recordingsTable table { min-width: 1000px; table-layout: fixed; }
+#recordingsTable th { white-space: nowrap; }
+#recordingsTable td { overflow: hidden; }
+#recordingsTable th:nth-child(2) { width: 130px; }
+#recordingsTable th:nth-child(3) { width: 130px; }
+#recordingsTable th:nth-child(4) { width: 20%; }
+#recordingsTable th:nth-child(5) { width: 150px; }
+#recordingsTable th:nth-child(6) { width: 104px; }
+#recordingsTable th:nth-child(7) { width: 176px; }
 
-.recordings-page__title {
-  margin: 0;
+.recordings-cell-name {
   color: var(--lex-text-primary);
-  font-size: 1.375rem;
+  display: block;
+  font-size: 13px;
   font-weight: var(--lex-weight-semibold, 600);
-  line-height: 1.25;
+  line-height: 1.4;
+  overflow-wrap: break-word;
 }
 
-.recordings-page__meta {
-  margin-top: 4px;
+.recordings-cell-text,
+.recordings-cell-time,
+#recordingsTable .admin-table-muted {
   color: var(--lex-text-secondary);
-  font-size: var(--lex-body-sm-size, 0.875rem);
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.recordings-page__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
+.recordings-cell-time { font-variant-numeric: tabular-nums; }
 
-.recordings-page__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 0;
-  flex-wrap: wrap;
-}
-
-.recordings-page__filters {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.recordings-page__filters lex-select {
-  width: 220px;
-}
-
-.recordings-page__count {
-  color: var(--lex-text-tertiary);
-  font-size: var(--lex-body-sm-size, 0.875rem);
-}
-
-.recordings-page__state {
-  padding: 32px 0;
-}
-
-.recordings-list {
-  border-top: 1px solid var(--lex-border-subtle);
-}
-
-.recordings-item {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  padding: 16px 12px;
+/* Workspace link: same treatment as My Tasks and the Document Library. */
+.recordings-workspace-link {
+  appearance: none;
+  background: none;
   border: 0;
-  border-bottom: 1px solid var(--lex-border-subtle);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
+  color: var(--lex-accent, #3b5bdb);
   cursor: pointer;
+  display: block;
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--lex-weight-semibold, 600);
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.recordings-item:hover,
-.recordings-item:focus-visible {
-  background: var(--lex-bg-secondary);
+.recordings-workspace-link > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recordings-workspace-link:focus-visible {
+  border-radius: var(--lex-radius-sm, 4px);
+  box-shadow: var(--lex-focus-ring);
   outline: none;
 }
 
-.recordings-item__primary {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  flex: 1;
-}
-
-.recordings-item__title {
-  color: var(--lex-text-primary);
-  font-size: var(--lex-body-base-size, 1rem);
-  font-weight: var(--lex-weight-semibold, 600);
-  line-height: 1.35;
-  word-break: break-word;
-}
-
-.recordings-item__meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
+/* Scope chips (the recording detail page). */
 .recordings-item__chip {
   display: inline-flex;
   align-items: center;
@@ -144,20 +100,6 @@
 .recordings-item__chip--neutral {
   background: var(--lex-bg-tertiary);
   color: var(--lex-text-secondary);
-}
-
-.recordings-item__secondary {
-  flex: 0 0 auto;
-  color: var(--lex-text-tertiary);
-  font-size: var(--lex-body-sm-size, 0.875rem);
-  padding-top: 2px;
-}
-
-.recordings-page__footer {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  padding: 20px 0 0;
 }
 
 .recordings-noscript {

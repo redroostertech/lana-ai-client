@@ -38,6 +38,8 @@
     _editingRoleId = null;
     _rolesGen = 0;
     _permsGen = 0;
+    _searchTerm = '';
+    _filterCount = 0;
 
     _wireTabEvents();
     _wireModalEvents();
@@ -93,144 +95,219 @@
   // Load & render roles
   // =========================================================================
 
+  // Roles per organization are a small set; GET /api/v1/rbac/roles defaults
+  // to limit=50 and returns no total, so ask for the whole set and keep the
+  // table client-side (docs/TABLE-STANDARD.md, section 4).
+  var ROLES_FETCH_LIMIT = 500;
+
+  var ROLE_STATUSES = ['active', 'inactive'];
+  var STATUS_COLORS = { active: 'green', inactive: 'gray' };
+
+  // Count ranges for the Permissions and Users columns (min inclusive, max exclusive).
+  var PERMISSION_RANGES = [
+    { value: '0-1', label: 'None', min: 0, max: 1 },
+    { value: '1-10', label: '1 to 9', min: 1, max: 10 },
+    { value: '10-25', label: '10 to 24', min: 10, max: 25 },
+    { value: '25-', label: '25 or more', min: 25, max: Infinity }
+  ];
+  var USER_RANGES = [
+    { value: '0-1', label: 'None', min: 0, max: 1 },
+    { value: '1-5', label: '1 to 4', min: 1, max: 5 },
+    { value: '5-20', label: '5 to 19', min: 5, max: 20 },
+    { value: '20-', label: '20 or more', min: 20, max: Infinity }
+  ];
+
+  var _toolbar = null;
+  var _searchTerm = '';
+  var _filterCount = 0;
+
+  function inRange(ranges, cell, value) {
+    var range = null;
+    for (var i = 0; i < ranges.length; i++) {
+      if (ranges[i].value === value) range = ranges[i];
+    }
+    if (!range) return true;
+    var n = Number(cell) || 0;
+    return n >= range.min && n < range.max;
+  }
+
+  /** Level badge colour: higher levels carry more privilege. */
+  function levelColor(level) {
+    var n = Number(level) || 0;
+    if (n >= 90) return 'red';
+    if (n >= 50) return 'purple';
+    if (n >= 20) return 'blue';
+    return 'gray';
+  }
+
+  /**
+   * One table row per role: raw values, the record as _raw.
+   * @param {Object} role
+   * @returns {Object}
+   */
+  function mapRole(role) {
+    var r = role || {};
+    var permissions = Array.isArray(r.permissions) ? r.permissions.length : Number(r.permission_count) || 0;
+    return {
+      id: String(r.id || ''),
+      name: String(r.display_name || r.name || ''),
+      description: String(r.description || ''),
+      level: Number(r.level) || 1,
+      permissions: permissions,
+      users: Number(r.user_count) || 0,
+      status: r.is_active === false ? 'inactive' : 'active',
+      created_at: r.created_at || '',
+      actions: '',
+      _raw: r
+    };
+  }
+
+  function cellRenderers(isAdmin) {
+    var kit = window.AdminTableKit;
+    return {
+      name: function (val, row) { return kit.nameCell(val, row.description || 'No description'); },
+      level: function (val) { return kit.badge('Level ' + val, levelColor(val)); },
+      permissions: function (val) { return '<span class="admin-table-text">' + kit.esc(kit.countText(val, 'permission')) + '</span>'; },
+      users: function (val) { return '<span class="admin-table-text">' + kit.esc(kit.countText(val, 'user')) + '</span>'; },
+      status: function (val) { return kit.badge(Lex.Utils.humanizeLabel(val), STATUS_COLORS[val] || 'gray'); },
+      created_at: function (val) { return kit.timeCell(val); },
+      actions: function (val, row) {
+        if (!isAdmin) return '';
+        var id = kit.esc(row.id);
+        var name = kit.esc(row.name);
+        var html = '<div class="roles-row-actions">' +
+          '<lex-btn size="sm" variant="secondary" data-action="edit-role" data-role-id="' + id + '" aria-label="Edit ' + name + '">Edit</lex-btn>';
+        if (!row._raw || !row._raw.is_system) {
+          html += '<lex-btn size="sm" variant="danger" data-action="delete-role" data-role-id="' + id + '" aria-label="Delete ' + name + '">Delete</lex-btn>';
+        }
+        return html + '</div>';
+      }
+    };
+  }
+
+  /**
+   * Header filters for every data column. Levels come from the loaded roles.
+   * @param {Array} rows - mapped rows
+   */
+  function filterOptions(rows) {
+    var kit = window.AdminTableKit;
+    var ranges = window.LanaLibraryColumnFilters;
+    var levels = [];
+    (rows || []).forEach(function (row) {
+      if (levels.indexOf(row.level) === -1) levels.push(row.level);
+    });
+    levels.sort(function (a, b) { return b - a; });
+    var created = kit.dateRangeFilter();
+    created.match = function (cell, values) { return ranges ? ranges.inEditedRange(cell, values[0]) : true; };
+    return {
+      name: { text: true, placeholder: 'Name contains...' },
+      level: { options: levels.map(function (l) { return { value: String(l), label: 'Level ' + l }; }) },
+      permissions: {
+        single: true,
+        options: PERMISSION_RANGES.map(function (r) { return { value: r.value, label: r.label }; }),
+        match: function (cell, values) { return inRange(PERMISSION_RANGES, cell, values[0]); }
+      },
+      users: {
+        single: true,
+        options: USER_RANGES.map(function (r) { return { value: r.value, label: r.label }; }),
+        match: function (cell, values) { return inRange(USER_RANGES, cell, values[0]); }
+      },
+      status: { options: kit.labelOptions(ROLE_STATUSES) },
+      created_at: created
+    };
+  }
+
+  function _table() {
+    return document.getElementById('rolesTable');
+  }
+
+  function _filteredCount(table) {
+    if (Array.isArray(table.filteredRows)) return table.filteredRows.length;
+    return null;
+  }
+
+  function _syncEmptyText(table) {
+    table.emptyText = window.AdminTableKit.emptyText(Boolean(_searchTerm || _filterCount), 'roles');
+  }
+
+  function _initTable() {
+    var table = _table();
+    if (!table) return Promise.resolve(null);
+    return window.AdminTableKit.whenTableReady().then(function () {
+      if (_table() !== table) return null;
+      if (table._rolesWired) return table;
+      table._rolesWired = true;
+      table.setCellRenderers(cellRenderers(Lex.Auth.isAdmin()));
+      table.setColumnFilterOptions(filterOptions([]));
+      _toolbar = window.AdminTableKit.bindToolbar({
+        table: table,
+        searchId: 'rolesSearch',
+        sortId: 'rolesSort',
+        orderId: 'rolesSortOrder',
+        filterId: 'rolesStatusFilter',
+        filterKey: 'status',
+        countIds: ['rolesCount', 'rolesSectionCount'],
+        noun: ['role', 'roles'],
+        onSearch: function (term) {
+          _searchTerm = term;
+          if (table.dataSource) table.dataSource.setSearch(term);
+        }
+      });
+      table.addEventListener('lex-filter-change', function (e) {
+        if (e.target !== table) return;
+        _filterCount = Object.keys((e.detail && e.detail.filters) || {}).length;
+        _syncEmptyText(table);
+        var n = _filteredCount(table);
+        if (n !== null && _toolbar) _toolbar.setCount(n);
+      });
+      table.addEventListener('row-click', function (e) {
+        var row = e.detail && e.detail.row;
+        if (row && row.id) viewRole(row.id);
+      });
+      // Row actions (lex-table's row-click ignores buttons).
+      table.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('[data-action][data-role-id]') : null;
+        if (!btn) return;
+        e.stopPropagation();
+        var roleId = btn.getAttribute('data-role-id');
+        if (btn.getAttribute('data-action') === 'edit-role') openEditModal(roleId);
+        else if (btn.getAttribute('data-action') === 'delete-role') deleteRole(roleId, btn);
+      });
+      return table;
+    });
+  }
+
   function loadRoles() {
     var gen = ++_rolesGen;
-    var grid = document.getElementById('rolesGrid');
-    var emptyEl = document.getElementById('rolesEmpty');
-    if (!grid) return;
-
-    // Show shimmer while loading
-    Lex.Redact.on(grid);
-
-    api.getRoles()
-      .then(function (result) {
-        if (gen !== _rolesGen) return; // stale — navigated away
-        _roles = (result && result.roles) ? result.roles : [];
-        Lex.Redact.off(grid);
-        renderRoleCards(_roles);
-      })
-      .catch(function (err) {
-        if (gen !== _rolesGen) return;
-        Lex.Redact.off(grid);
-        if (emptyEl) emptyEl.classList.remove('hidden');
-        Lex.Toast.error('Failed to load roles');
-        console.error('[roles] loadRoles error:', err);
-      });
+    return _initTable().then(function (table) {
+      if (!table || gen !== _rolesGen) return;
+      return api.get('/api/v1/rbac/roles?limit=' + ROLES_FETCH_LIMIT)
+        .then(function (result) {
+          if (gen !== _rolesGen) return; // stale — navigated away
+          _roles = (result && result.roles) ? result.roles : [];
+          renderRoles(_roles);
+        })
+        .catch(function (err) {
+          if (gen !== _rolesGen) return;
+          console.error('[roles] loadRoles error:', err);
+          if (_toolbar) _toolbar.setCount(null);
+          var message = 'Roles could not be loaded. Check your connection and try again.';
+          if (typeof table.setError === 'function') table.setError(message);
+          else { table.emptyText = message; table.setData([]); }
+        });
+    });
   }
 
-  function renderRoleCards(roles) {
-    var grid = document.getElementById('rolesGrid');
-    var emptyEl = document.getElementById('rolesEmpty');
-    if (!grid) return;
-
-    if (!roles || roles.length === 0) {
-      grid.innerHTML = '';
-      if (emptyEl) emptyEl.classList.remove('hidden');
-      return;
-    }
-
-    if (emptyEl) emptyEl.classList.add('hidden');
-
-    // SVG for vertical dots (more) icon
-    var moreIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
-
-    var isAdmin = Lex.Auth.isAdmin();
-    var html = '';
-    for (var i = 0; i < roles.length; i++) {
-      var role = roles[i];
-      var roleId = Lex.Utils.escapeHtml(String(role.id || ''));
-      var roleName = Lex.Utils.escapeHtml(String(role.name || ''));
-      var roleDesc = Lex.Utils.escapeHtml(String(role.description || 'No description'));
-      var roleLevel = Lex.Utils.escapeHtml(String(role.level || 1));
-      var permCount = role.permissions ? role.permissions.length : (role.permission_count || 0);
-
-      html += '<div class="role-card" data-role-id="' + roleId + '" style="background:var(--lex-bg-primary);border-radius:var(--lex-radius-lg,0.75rem);border:1px solid var(--lex-border-default);padding:1.5rem;cursor:pointer;transition:box-shadow 0.15s;position:relative;">';
-      html += '  <div class="flex items-start justify-between mb-4">';
-      html += '    <div class="flex-1 min-w-0">';
-      html += '      <h3 class="text-lg font-semibold truncate" style="color: var(--lex-text-primary)">' + roleName + '</h3>';
-      html += '      <p class="text-sm mt-1 line-clamp-2" style="color: var(--lex-text-secondary)">' + roleDesc + '</p>';
-      html += '    </div>';
-      html += '    <span class="ml-3 flex-shrink-0 px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded">Level ' + roleLevel + '</span>';
-      html += '  </div>';
-      html += '  <div class="flex items-center justify-between text-sm">';
-      html += '    <span style="color: var(--lex-text-secondary)">' + permCount + ' permission' + (permCount === 1 ? '' : 's') + '</span>';
-
-      if (isAdmin) {
-        html += '    <div style="position:relative;">';
-        html += '      <button class="role-more-btn" data-role-id="' + roleId + '" title="More options" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;background:none;cursor:pointer;border-radius:var(--lex-radius-md,0.375rem);color:var(--lex-text-tertiary);transition:background 0.15s,color 0.15s;">';
-        html += '        ' + moreIcon;
-        html += '      </button>';
-        html += '      <div class="role-dropdown" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;min-width:140px;background:var(--lex-bg-primary);border:1px solid var(--lex-border-default);border-radius:var(--lex-radius-md,0.375rem);box-shadow:var(--lex-shadow-lg);z-index:10;overflow:hidden;">';
-        html += '        <button class="role-dropdown-item" data-action="edit-role" data-role-id="' + roleId + '" style="display:flex;align-items:center;gap:0.5rem;width:100%;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.8125rem;color:var(--lex-text-primary);text-align:left;transition:background 0.15s;">Edit</button>';
-        if (!role.is_system) {
-          html += '        <button class="role-dropdown-item" data-action="delete-role" data-role-id="' + roleId + '" style="display:flex;align-items:center;gap:0.5rem;width:100%;padding:0.5rem 0.75rem;border:none;background:none;cursor:pointer;font-size:0.8125rem;color:var(--lex-text-danger,#dc2626);text-align:left;transition:background 0.15s;">Delete</button>';
-        }
-        html += '      </div>';
-        html += '    </div>';
-      }
-
-      html += '  </div>';
-      html += '</div>';
-    }
-
-    grid.innerHTML = html;
-
-    // Re-wire delegated click handler. Remove first to prevent stacking
-    // on repeated loadRoles() calls (e.g. after create/delete).
-    grid.removeEventListener('click', _handleGridClick);
-    grid.addEventListener('click', _handleGridClick);
-  }
-
-  /** Close all open role dropdowns */
-  function _closeAllDropdowns() {
-    var openDropdowns = document.querySelectorAll('.role-dropdown');
-    for (var i = 0; i < openDropdowns.length; i++) {
-      openDropdowns[i].style.display = 'none';
-    }
-  }
-
-  // Close dropdowns on outside click
-  document.addEventListener('click', function (e) {
-    if (!e.target.closest('.role-more-btn') && !e.target.closest('.role-dropdown')) {
-      _closeAllDropdowns();
-    }
-  });
-
-  function _handleGridClick(e) {
-    var target = e.target;
-
-    // --- More button: toggle dropdown ---
-    var moreBtn = target.closest('.role-more-btn');
-    if (moreBtn) {
-      e.stopPropagation();
-      var dropdown = moreBtn.nextElementSibling;
-      if (!dropdown) return;
-      var isOpen = dropdown.style.display !== 'none';
-      _closeAllDropdowns();
-      if (!isOpen) dropdown.style.display = '';
-      return;
-    }
-
-    // --- Dropdown item: edit or delete ---
-    var dropdownItem = target.closest('.role-dropdown-item');
-    if (dropdownItem) {
-      e.stopPropagation();
-      _closeAllDropdowns();
-      var action = dropdownItem.getAttribute('data-action');
-      var roleId = dropdownItem.getAttribute('data-role-id');
-      if (action === 'edit-role') {
-        openEditModal(roleId);
-      } else if (action === 'delete-role') {
-        deleteRole(roleId, dropdownItem);
-      }
-      return;
-    }
-
-    // --- Card click: view role ---
-    var card = target.closest('.role-card');
-    if (card) {
-      var cardRoleId = card.getAttribute('data-role-id');
-      if (cardRoleId) viewRole(cardRoleId);
+  function renderRoles(roles) {
+    var table = _table();
+    if (!table) return;
+    var rows = (roles || []).map(mapRole);
+    table.setColumnFilterOptions(filterOptions(rows));
+    _syncEmptyText(table);
+    table.setData(rows);
+    if (_toolbar) {
+      var n = _filteredCount(table);
+      _toolbar.setCount(n !== null ? n : rows.length);
     }
   }
 
@@ -590,14 +667,9 @@
       }
     }
 
-    Lex.Modal.confirm({
-      heading: 'Delete Role',
-      body: 'Are you sure you want to delete ' + roleName + '? This action cannot be undone.',
-      variant: 'danger',
-      confirmText: 'Delete'
-    }).then(function (confirmed) {
-      if (!confirmed) return;
-
+    // Lex.Modal.confirm(title, messageHtml, onConfirm, options): the message is HTML.
+    var message = 'Are you sure you want to delete ' + Lex.Utils.escapeHtml(roleName) + '? This action cannot be undone.';
+    Lex.Modal.confirm('Delete Role', message, function () {
       api.deleteRole(roleId)
         .then(function () {
           Lex.Toast.success('Role deleted');
@@ -607,7 +679,7 @@
           Lex.Toast.error(err && err.message ? err.message : 'Failed to delete role');
           console.error('[roles] deleteRole error:', err);
         });
-    });
+    }, { variant: 'danger', confirmText: 'Delete' });
   }
 
   // =========================================================================
@@ -644,6 +716,15 @@
   // =========================================================================
   // Boot
   // =========================================================================
+
+  // Pure table logic, exposed for unit tests.
+  window.RolesTable = {
+    mapRole: mapRole,
+    cellRenderers: cellRenderers,
+    filterOptions: filterOptions,
+    levelColor: levelColor,
+    ROLES_FETCH_LIMIT: ROLES_FETCH_LIMIT
+  };
 
   init();
 

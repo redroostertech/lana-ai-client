@@ -31,19 +31,18 @@
 
     <main>
 
-      <!-- Page header -->
-      <div class="apr-header">
-        <div class="apr-header-title">Approval Inbox</div>
-        <div class="apr-header-subtitle">Review and act on pending approval requests</div>
-      </div>
+      <lex-banner
+        heading="Approval Inbox"
+        subtitle="Review and act on pending approval requests"
+      ></lex-banner>
 
       <!-- Stats bar (clickable to filter by status) -->
-      <div class="apr-stats" id="aprStats">
-        <div class="apr-stat active" data-status="" id="aprStatAll">
+      <div class="apr-stats mt-4" id="aprStats">
+        <div class="apr-stat" data-status="" id="aprStatAll">
           <div class="apr-stat-value" id="aprCountAll">—</div>
           <div class="apr-stat-label">All</div>
         </div>
-        <div class="apr-stat" data-status="pending" id="aprStatPending">
+        <div class="apr-stat active" data-status="pending" id="aprStatPending">
           <div class="apr-stat-value" id="aprCountPending">—</div>
           <div class="apr-stat-label">Pending</div>
         </div>
@@ -61,62 +60,51 @@
         </div>
       </div>
 
-      <!-- Filter bar -->
-      <div class="apr-filters">
-        <lex-segmented
-          id="aprStatusFilter"
-          value="pending"
-          options='[{"value":"pending","label":"Pending"},{"value":"approved","label":"Approved"},{"value":"rejected","label":"Rejected"},{"value":"expired","label":"Expired"},{"value":"","label":"All"}]'
-        ></lex-segmented>
-
-        <lex-select
-          id="aprPriorityFilter"
-          placeholder="All priorities"
-          size="sm"
-          options='[{"value":"","label":"All priorities"},{"value":"urgent","label":"Urgent"},{"value":"high","label":"High"},{"value":"normal","label":"Normal"},{"value":"low","label":"Low"}]'
-          style="width:160px;"
-        ></lex-select>
-
-        <lex-select
-          id="aprSourceFilter"
-          placeholder="All sources"
-          size="sm"
-          options='[{"value":"","label":"All sources"},{"value":"workflow","label":"Workflow"},{"value":"chat","label":"Chat"},{"value":"skill","label":"Skill"},{"value":"manual","label":"Manual"}]'
-          style="width:160px;"
-        ></lex-select>
-
-        <div style="flex:1;"></div>
-
-        <input
-          type="text"
-          id="aprSearch"
-          placeholder="Search approvals..."
-          style="width:220px;padding:6px 12px;border:1px solid var(--lex-border-default);border-radius:6px;font-size:13px;outline:none;background:var(--lex-bg-primary);color:var(--lex-text-primary);"
-        >
+      <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+      <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter approvals">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="aprSearch" placeholder="Search approvals..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+            <lex-select id="aprSort" options='[{"value":"created_at","label":"Created"},{"value":"priority","label":"Priority"},{"value":"expires_at","label":"Expires"}]' value="created_at"></lex-select>
+          </div>
+          <lex-btn id="aprSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
+            <lex-select id="aprStatusFilter" options='[{"value":"all","label":"All"},{"value":"pending","label":"Pending"},{"value":"approved","label":"Approved"},{"value":"rejected","label":"Rejected"},{"value":"expired","label":"Expired"},{"value":"cancelled","label":"Cancelled"}]' value="pending"></lex-select>
+          </div>
+          <div id="aprCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
+        </div>
       </div>
 
-      <!-- Loading skeleton -->
-      <div id="aprLoading">
-        <lex-card padding="compact">
-          <lex-action-card title="Loading..." description="..." priority="high" aria-hidden="true"></lex-action-card>
-          <lex-action-card title="Loading..." description="..." priority="medium" aria-hidden="true"></lex-action-card>
-          <lex-action-card title="Loading..." description="..." priority="medium" aria-hidden="true"></lex-action-card>
-          <lex-action-card title="Loading..." description="..." priority="low" aria-hidden="true"></lex-action-card>
-        </lex-card>
-      </div>
+      <section aria-labelledby="aprHeading">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="aprHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">Approval Requests</h2>
+          <span id="aprSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
+        </div>
 
-      <!-- Approval list -->
-      <lex-card id="aprCard" padding="none" class="hidden">
-        <div id="aprList"></div>
-      </lex-card>
-
-      <!-- Pagination -->
-      <lex-pagination id="aprPagination" class="hidden" page="1" total-pages="1" total="0" limit="20"></lex-pagination>
-
-      <!-- Empty state -->
-      <div id="aprEmpty" class="hidden">
-        <lex-empty icon="inbox" message="No approvals found" description="Nothing matches the current filters"></lex-empty>
-      </div>
+        <lex-table
+          id="aprTable"
+          class="apr-table lex-table--card"
+          column-filters
+          server-paging
+          columns="title,source_type,priority,status,requested_by,assigned_to,matter_id,expires_at,created_at"
+          labels="Approval,Source,Priority,Status,Requested by,Assigned to,Workspace,Expires,Created"
+          sortable-columns="priority,expires_at,created_at"
+          sort-by="created_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="id"
+          empty-text="No approvals yet"
+          aria-label="Approval requests"
+        ></lex-table>
+      </section>
 
     </main>
 
@@ -162,6 +150,7 @@
   <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
   <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>
@@ -170,16 +159,18 @@
   <script src="js/lex/components/layout/lex-app.js"></script>
 
   <!-- Page-specific Lex components -->
-  <script src="js/lex/components/foundation/lex-action-card.js"></script>
+  <script src="js/lex/components/foundation/lex-banner.js"></script>
   <script src="js/lex/components/foundation/lex-badge.js"></script>
   <script src="js/lex/components/foundation/lex-card.js"></script>
   <script src="js/lex/components/foundation/lex-modal.js"></script>
-  <script src="js/lex/components/data/lex-pagination.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
 
   <!-- Inject page content -->
   <script src="js/lex/lex-page-init.js"></script>
 
   <!-- Page controller (MUST be last before auth-guard) -->
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/admin/admin-table-kit.js"></script>
   <script src="js/approvals.js"></script>
 
   <!-- PAC bridge consent handler (Lex modal for token requests) -->

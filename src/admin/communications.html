@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/admin/admin-tables.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="../css/lex-chat.css">
@@ -26,6 +27,31 @@
 
   <template id="page-content">
     <main>
+      <style>
+        /* Provider instances: Name, Provider, Channel, Status, Readiness, Credentials, Created, actions */
+        #commProvidersTable table { min-width: 1120px; }
+        #commProvidersTable th { white-space: nowrap; }
+        #commProvidersTable th:nth-child(2) { width: 140px; }
+        #commProvidersTable th:nth-child(3) { width: 100px; }
+        #commProvidersTable th:nth-child(4) { width: 120px; }
+        #commProvidersTable th:nth-child(5) { width: 130px; }
+        #commProvidersTable th:nth-child(6) { width: 140px; }
+        #commProvidersTable th:nth-child(7) { width: 176px; }
+        #commProvidersTable th:nth-child(8) { width: 230px; }
+        /* Routes: Name, Provider, Channel, Direction, Status, Readiness, Priority, Identity, Created, actions */
+        #commRoutesTable table { min-width: 1280px; }
+        #commRoutesTable th { white-space: nowrap; }
+        #commRoutesTable th:nth-child(2) { width: 15%; }
+        #commRoutesTable th:nth-child(3) { width: 100px; }
+        #commRoutesTable th:nth-child(4) { width: 130px; }
+        #commRoutesTable th:nth-child(5) { width: 110px; }
+        #commRoutesTable th:nth-child(6) { width: 130px; }
+        #commRoutesTable th:nth-child(7) { width: 100px; }
+        #commRoutesTable th:nth-child(8) { width: 13%; }
+        #commRoutesTable th:nth-child(9) { width: 176px; }
+        #commRoutesTable th:nth-child(10) { width: 90px; }
+        .comm-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+      </style>
       <lex-banner
         variant="light"
         heading="Communications"
@@ -95,28 +121,10 @@
         <lex-card heading="Provider setup controls" subtitle="Create or edit non-destructive provider configuration.">
           <form id="providerForm" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <label class="block">
-                <span class="block text-sm font-medium lex-text-primary mb-2">Edit existing</span>
-                <select id="providerEditSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
-                  <option value="">Create new provider</option>
-                </select>
-              </label>
-              <label class="block">
-                <span class="block text-sm font-medium lex-text-primary mb-2">Provider account</span>
-                <select id="providerKeySelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
-              </label>
-              <label class="block">
-                <span class="block text-sm font-medium lex-text-primary mb-2">Channel</span>
-                <select id="providerChannelSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
-              </label>
-              <label class="block">
-                <span class="block text-sm font-medium lex-text-primary mb-2">Status</span>
-                <select id="providerStatusSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="disabled">Disabled</option>
-                </select>
-              </label>
+              <lex-select id="providerEditSelect" label="Edit existing" placeholder="Create new provider" options='[{"value":"","label":"Create new provider"}]' value=""></lex-select>
+              <lex-select id="providerKeySelect" label="Provider account"></lex-select>
+              <lex-select id="providerChannelSelect" label="Channel"></lex-select>
+              <lex-select id="providerStatusSelect" label="Status" options='[{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"},{"value":"disabled","label":"Disabled"}]' value="active"></lex-select>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <label class="block md:col-span-2">
@@ -145,40 +153,57 @@
           <div id="providerActionStatus" class="mt-3 text-sm lex-text-secondary"></div>
         </lex-card>
 
-        <lex-card heading="Provider instances" subtitle="Existing communications provider instances, if the endpoint is available.">
-          <div id="providerInstancesStatus" class="mb-3 text-sm lex-text-secondary">Loading provider instances...</div>
-          <div id="providerInstancesList" class="space-y-3"></div>
-        </lex-card>
+        <section aria-labelledby="commProvidersHeading">
+          <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter provider instances">
+            <div class="flex items-center gap-4 flex-wrap">
+              <div class="flex-1 min-w-[200px]">
+                <lex-input id="commProvidersSearch" placeholder="Search provider instances..." clearable="true" leading-icon="search"></lex-input>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+                <lex-select id="commProvidersSort" options='[{"value":"created_at","label":"Created"},{"value":"name","label":"Name"},{"value":"provider_key","label":"Provider"},{"value":"channel","label":"Channel"},{"value":"status","label":"Status"},{"value":"readiness","label":"Readiness"}]' value="created_at"></lex-select>
+              </div>
+              <lex-btn id="commProvidersSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                </svg>
+              </lex-btn>
+              <div class="flex items-center gap-2">
+                <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Status:</label>
+                <lex-select id="commProvidersMainFilter" options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"},{"value":"disabled","label":"Disabled"}]' value="all"></lex-select>
+              </div>
+              <div id="commProvidersCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 id="commProvidersHeading" class="admin-table-section-title text-lg font-semibold">Provider instances</h2>
+            <span id="commProvidersSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+          </div>
+          <p id="providerInstancesStatus" class="mb-3 text-sm lex-text-secondary">Loading provider instances...</p>
+          <lex-table
+            id="commProvidersTable"
+            class="admin-table lex-table--card"
+            column-filters
+            columns="name,provider_key,channel,status,readiness,auth_owner,created_at,actions"
+            labels="Name,Provider,Channel,Status,Readiness,Credentials,Created, "
+            sortable-columns="name,provider_key,channel,status,readiness,auth_owner,created_at"
+            search-keys="name,provider_key,channel,id"
+            sort-by="created_at"
+            sort-dir="desc"
+            limit="20"
+            id-key="id"
+            empty-text="No provider instances yet"
+            aria-label="Provider instances"
+          ></lex-table>
+        </section>
 
         <lex-card heading="Route setup controls" subtitle="Create or edit enabled outbound routes. No delete controls are exposed.">
           <form id="routeForm" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <label class="block">
-                <span class="block text-sm font-medium lex-text-primary mb-2">Edit existing</span>
-                <select id="routeEditSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
-                  <option value="">Create new route</option>
-                </select>
-              </label>
-              <label class="block">
-                <span class="block text-sm font-medium lex-text-primary mb-2">Provider</span>
-                <select id="routeProviderSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
-              </label>
-              <label class="block">
-                <span class="block text-sm font-medium lex-text-primary mb-2">Channel</span>
-                <select id="routeChannelSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
-                  <option value="email">Email</option>
-                  <option value="sms">SMS</option>
-                  <option value="voice">Voice</option>
-                </select>
-              </label>
-              <label class="block">
-                <span class="block text-sm font-medium lex-text-primary mb-2">Direction</span>
-                <select id="routeDirectionSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
-                  <option value="outbound">Outbound</option>
-                  <option value="bidirectional">Bidirectional</option>
-                  <option value="inbound">Inbound</option>
-                </select>
-              </label>
+              <lex-select id="routeEditSelect" label="Edit existing" placeholder="Create new route" options='[{"value":"","label":"Create new route"}]' value=""></lex-select>
+              <lex-select id="routeProviderSelect" label="Provider"></lex-select>
+              <lex-select id="routeChannelSelect" label="Channel" options='[{"value":"email","label":"Email"},{"value":"sms","label":"SMS"},{"value":"voice","label":"Voice"}]' value="email"></lex-select>
+              <lex-select id="routeDirectionSelect" label="Direction" options='[{"value":"outbound","label":"Outbound"},{"value":"bidirectional","label":"Bidirectional"},{"value":"inbound","label":"Inbound"}]' value="outbound"></lex-select>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
               <label class="block">
@@ -205,10 +230,49 @@
           <div id="routeActionStatus" class="mt-3 text-sm lex-text-secondary"></div>
         </lex-card>
 
-        <lex-card heading="Routes" subtitle="Existing communications routes, if the endpoint is available.">
-          <div id="routesStatus" class="mb-3 text-sm lex-text-secondary">Loading routes...</div>
-          <div id="routesList" class="space-y-3"></div>
-        </lex-card>
+        <section aria-labelledby="commRoutesHeading">
+          <div class="bg-white rounded-lg shadow-sm border mb-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter routes">
+            <div class="flex items-center gap-4 flex-wrap">
+              <div class="flex-1 min-w-[200px]">
+                <lex-input id="commRoutesSearch" placeholder="Search routes..." clearable="true" leading-icon="search"></lex-input>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Sort by:</label>
+                <lex-select id="commRoutesSort" options='[{"value":"created_at","label":"Created"},{"value":"name","label":"Name"},{"value":"provider","label":"Provider"},{"value":"channel","label":"Channel"},{"value":"direction","label":"Direction"},{"value":"enabled","label":"Status"},{"value":"readiness","label":"Readiness"},{"value":"priority","label":"Priority"},{"value":"identity","label":"Identity"}]' value="created_at"></lex-select>
+              </div>
+              <lex-btn id="commRoutesSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+                </svg>
+              </lex-btn>
+              <div class="flex items-center gap-2">
+                <label class="admin-table-toolbar-label text-sm whitespace-nowrap">Channel:</label>
+                <lex-select id="commRoutesMainFilter" options='[{"value":"all","label":"All"},{"value":"email","label":"Email"},{"value":"sms","label":"SMS"},{"value":"voice","label":"Voice"}]' value="all"></lex-select>
+              </div>
+              <div id="commRoutesCount" class="admin-table-toolbar-label text-sm whitespace-nowrap"></div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 id="commRoutesHeading" class="admin-table-section-title text-lg font-semibold">Routes</h2>
+            <span id="commRoutesSectionCount" class="admin-table-toolbar-label text-sm" aria-live="polite"></span>
+          </div>
+          <p id="routesStatus" class="mb-3 text-sm lex-text-secondary">Loading routes...</p>
+          <lex-table
+            id="commRoutesTable"
+            class="admin-table lex-table--card"
+            column-filters
+            columns="name,provider,channel,direction,enabled,readiness,priority,identity,created_at,actions"
+            labels="Name,Provider,Channel,Direction,Status,Readiness,Priority,Identity,Created, "
+            sortable-columns="name,provider,channel,direction,enabled,readiness,priority,identity,created_at"
+            search-keys="name,route_key,provider_name,identity"
+            sort-by="created_at"
+            sort-dir="desc"
+            limit="20"
+            id-key="id"
+            empty-text="No routes yet"
+            aria-label="Routes"
+          ></lex-table>
+        </section>
 
         <lex-card heading="Test-send preview">
           <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -223,10 +287,7 @@
           </div>
           <form id="testSendPreviewForm" class="mt-4 space-y-4">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <label class="block">
-                <span class="block text-sm font-medium lex-text-primary mb-2">Route</span>
-                <select id="testRouteSelect" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
-              </label>
+              <lex-select id="testRouteSelect" label="Route"></lex-select>
               <label class="block">
                 <span class="block text-sm font-medium lex-text-primary mb-2">Recipient</span>
                 <input id="testRecipientInput" type="text" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="person@example.com or +15555550100">
@@ -306,9 +367,13 @@
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
 
   <script src="../js/lex/lex-page-init.js"></script>
   <script src="../js/admin/admin-switcher.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../js/admin/admin-table-kit.js"></script>
   <script src="../js/admin/admin-communications.js"></script>
   <script src="../js/auth-guard.js"></script>
   <lex-lana-dock page-scope="dashboard" context-type="full_chat" placeholder="Ask LANA anything..." thread-title="LANA Chat"></lex-lana-dock>

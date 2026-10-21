@@ -62,6 +62,43 @@
   <script src="js/lex/lex.auth.js"></script>
   <script src="js/lex/lex-nav.js"></script>
 
+  <!-- Lex components for the toolbar and the list view (docs/TABLE-STANDARD.md) -->
+  <link rel="stylesheet" href="css/admin/admin-tables.css">
+  <style>
+    /* Matters list: Name, Client, Matter ID, Status, Type, Created, Last edited, Actions */
+    #mattersListTable table { min-width: 1180px; }
+    #mattersListTable th { white-space: nowrap; }
+    #mattersListTable th:nth-child(1) { width: 44px; }  /* row select */
+    #mattersListTable th:nth-child(3) { width: 16%; }   /* Client (after the select column) */
+    #mattersListTable th:nth-child(4) { width: 150px; } /* Matter ID */
+    #mattersListTable th:nth-child(5) { width: 110px; } /* Status */
+    #mattersListTable th:nth-child(6) { width: 130px; } /* Type */
+    #mattersListTable th:nth-child(7) { width: 176px; } /* Created */
+    #mattersListTable th:nth-child(8) { width: 140px; } /* Last edited */
+    #mattersListTable th:nth-child(9) { width: 196px; } /* Actions */
+    .matters-list-actions { display: flex; gap: 6px; white-space: nowrap; }
+    .matters-list-action {
+      appearance: none; background: none; border: 1px solid var(--lex-border-default);
+      border-radius: var(--lex-radius-sm, 4px); color: var(--lex-text-secondary);
+      cursor: pointer; font: inherit; font-size: 12px; padding: 2px 8px;
+    }
+    .matters-list-action:hover { color: var(--lex-text-primary); background: var(--lex-bg-secondary, #F5F5F0); }
+    .matters-list-action--danger { color: var(--lex-status-error, #b42318); }
+    .matters-list-action:focus-visible { box-shadow: var(--lex-focus-ring); outline: none; }
+  </style>
+  <script src="js/lex/components/foundation/lex-btn.js"></script>
+  <script src="js/lex/components/foundation/lex-badge.js"></script>
+  <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/foundation/lex-spinner.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
+  <script src="js/lex/components/form/lex-input.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
+  <script src="js/lex/components/data/lex-table.js"></script>
+  <script src="js/shared/library-column-filters.js"></script>
+  <script src="js/shared/list-query-params.js"></script>
+  <script src="js/admin/admin-table-kit.js"></script>
+  <script src="js/pages/matters-list-table.js"></script>
+
   <!-- Drawflow Library for Visual Workflow Builder -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css">
   <script src="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.js"></script>
@@ -244,54 +281,57 @@
         </div>
       </div>
 
-      <!-- Header Actions -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <!-- Left: Search -->
-        <div class="flex-1 max-w-md">
-          <div class="relative">
-            <input type="text" id="searchInput" placeholder="Search matters..."
-              class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+      <!-- Search / Sort / Filter toolbar (docs/TABLE-STANDARD.md) -->
+      <div class="bg-white rounded-lg shadow-sm border mb-4 mt-4 p-4" style="border-color: var(--lex-border-default)" role="search" aria-label="Search and filter matters">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-[200px]">
+            <lex-input id="searchInput" placeholder="Search matters..." clearable="true" leading-icon="search"></lex-input>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Sort by:</label>
+            <lex-select id="mattersSort" options='[{"value":"created_at","label":"Created"},{"value":"updated_at","label":"Last edited"},{"value":"name","label":"Name"},{"value":"status","label":"Status"},{"value":"matter_type","label":"Type"}]' value="created_at"></lex-select>
+          </div>
+          <lex-btn id="mattersSortOrder" variant="ghost" icon="true" title="Toggle sort order" data-order="desc">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
             </svg>
+          </lex-btn>
+          <div class="flex items-center gap-2">
+            <label class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)">Status:</label>
+            <lex-select id="statusFilter" options='[{"value":"all","label":"All"},{"value":"active","label":"Active"},{"value":"inactive","label":"Inactive"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"},{"value":"shared","label":"Shared with me"}]' value="all"></lex-select>
           </div>
-        </div>
+          <div id="mattersCount" class="text-sm whitespace-nowrap" style="color: var(--lex-text-secondary)"></div>
 
-        <!-- Right: Selection Controls + Filters + Actions -->
-        <div class="flex items-center gap-3 flex-wrap">
-          <!-- Select All Checkbox -->
-          <div class="flex items-center border-r border-gray-300 pr-3">
-            <input type="checkbox" id="selectAllMatters" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-            <label for="selectAllMatters" class="ml-2 text-sm text-gray-700 whitespace-nowrap">Select All</label>
+          <!-- Grid view selection (the list view selects through the table) -->
+          <div id="gridSelectionControls" class="flex items-center gap-3">
+            <div class="flex items-center">
+              <input type="checkbox" id="selectAllMatters" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+              <label for="selectAllMatters" class="ml-2 text-sm text-gray-700 whitespace-nowrap">Select All</label>
+            </div>
+            <div id="bulkActions" class="hidden flex items-center gap-2">
+              <span id="selectedCount" class="text-sm font-medium text-gray-700 whitespace-nowrap">0 selected</span>
+              <button id="bulkDeleteBtn" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                Delete Selected
+              </button>
+              <button id="clearSelectionBtn" class="text-xs text-gray-600 hover:text-gray-800 underline">Clear</button>
+            </div>
           </div>
 
-          <!-- Bulk Actions (shown when items selected) -->
-          <div id="bulkActions" class="hidden flex items-center gap-2 border-r border-gray-300 pr-3">
-            <span id="selectedCount" class="text-sm font-medium text-gray-700 whitespace-nowrap">0 selected</span>
-            <button id="bulkDeleteBtn" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          <div class="flex items-center gap-1 ml-auto" style="border-left: 1px solid var(--lex-border-default); padding-left: 12px;">
+            <lex-btn id="gridViewBtn" variant="ghost" icon="true" title="Grid View" aria-label="Grid view">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
               </svg>
-              Delete Selected
-            </button>
-            <button id="clearSelectionBtn" class="text-xs text-gray-600 hover:text-gray-800 underline">Clear</button>
+            </lex-btn>
+            <lex-btn id="listViewBtn" variant="primary" icon="true" title="List View" aria-label="List view">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+              </svg>
+            </lex-btn>
           </div>
-
-          <!-- Status Filter -->
-          <select id="statusFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-            <option value="archived">Archived</option>
-            <option value="shared">Shared with Me</option>
-          </select>
-
-          <!-- Matter Type Filter -->
-          <select id="matterTypeFilter" class="select-standard inline-block w-auto pl-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">All Types</option>
-            <option value="matter">Client Matters Only</option>
-            <option value="workspace">Workspaces Only</option>
-          </select>
 
           <!-- New Matter Button -->
           <button id="createMatterBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
@@ -371,12 +411,45 @@
         </div>
       </div>
 
-      <!-- Matters Grid -->
+      <!-- Pinned matters above the list (list view, page 1) -->
+      <div id="listPinnedSection" class="hidden mb-6">
+        <div id="listPinnedCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      </div>
+
+      <!-- Matters Grid View: the table's current page as cards -->
       <div id="mattersGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <!-- Matters will be loaded here -->
       </div>
 
-      <!-- Pagination -->
+      <!-- Matters List View: server-paged; the table owns paging, sort and
+           column filters, and the page answers its lex-query-change. -->
+      <section id="mattersListSection" class="hidden" aria-labelledby="mattersListHeading">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="mattersListHeading" class="text-lg font-semibold" style="color: var(--lex-text-primary)">All Matters</h2>
+          <span id="mattersSectionCount" class="text-sm" style="color: var(--lex-text-secondary)" aria-live="polite"></span>
+        </div>
+        <lex-table
+          id="mattersListTable"
+          class="admin-table matters-list-table lex-table--card"
+          server-paging
+          column-filters
+          selectable
+          columns="name,client_name,matter_id,status,matter_type,created_at,updated_at,actions"
+          labels="Name,Client,Matter ID,Status,Type,Created,Last edited,Actions"
+          sortable-columns="name,status,matter_type,created_at,updated_at"
+          sort-by="created_at"
+          sort-dir="desc"
+          limit="20"
+          id-key="matter_id"
+          empty-text="No matters yet"
+          empty-action-label="New Matter"
+          aria-label="Matters"
+          bulk-actions='[{"label":"Delete","action":"delete","variant":"danger"}]'
+        ></lex-table>
+      </section>
+
+      <!-- Grid view pager: the grid shows the table's current page. Hidden in
+           list view, where the table's own pager is the only pager. -->
       <div id="pagination" class="mt-8 flex justify-center"></div>
     </main>
   </div>
@@ -1508,11 +1581,82 @@
       };
     }
 
-    // Load matters
-    async function loadMatters() {
+    // Confirmation through lex-modal (never window.confirm): resolves true
+    // when the user confirms, false when they cancel or close it.
+    function confirmAction(title, message, options) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const settle = (value) => { if (!settled) { settled = true; resolve(value); } };
+        const modal = Lex.Modal.confirm(title, escapeHtml(message), () => settle(true), options || {});
+        modal.addEventListener('lex-cancel', () => settle(false));
+        modal.addEventListener('lex-close', () => settle(false));
+      });
+    }
+
+    // ── Matters list (docs/TABLE-STANDARD.md) ─────────────────────────────
+    //
+    // The list view is a server-paged lex-table (#mattersListTable): it owns
+    // the page, sort and column filters and asks for data with
+    // lex-query-change. The grid view shows the same page as cards, with
+    // #pagination as its pager. Pure table logic: js/pages/matters-list-table.js.
+
+    const MATTERS_TABLE_ID = 'mattersListTable';
+    const VIEW_STORAGE_KEY = 'lana.matters.viewMode';
+    let viewMode = 'list';
+    let searchTerm = '';
+    let loadSequence = 0;
+    let lastLoadPromise = Promise.resolve();
+    let lastPagination = { page: 1, limit: 20, total: 0, total_pages: 1 };
+    let loadingMorePinned = false;
+    let mattersToolbar = null;
+
+    try {
+      const storedView = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (storedView === 'grid' || storedView === 'list') viewMode = storedView;
+    } catch (e) { /* storage unavailable: keep the default */ }
+
+    function mattersTable() {
+      return document.getElementById(MATTERS_TABLE_ID);
+    }
+
+    function currentFilters() {
+      const table = mattersTable();
+      return (table && table.serverQuery && table.serverQuery.filters) || {};
+    }
+
+    // Load matters: asks the table for its current query, which comes back as
+    // lex-query-change and lands in fetchMattersPage. Pass { resetPage: true }
+    // after the search or a filter changes. Resolves when that page arrives.
+    function loadMatters(options) {
+      // The first call can come before the table is defined and wired.
+      return mattersTableReady.then(() => {
+        const table = mattersTable();
+        if (!table || typeof table.requestServerQuery !== 'function') return undefined;
+        table.requestServerQuery({ resetPage: !!(options && options.resetPage) });
+        return lastLoadPromise;
+      });
+    }
+    window.loadMatters = loadMatters;
+
+    function fetchMattersPage(query) {
+      lastLoadPromise = doFetchMattersPage(query || {});
+      return lastLoadPromise;
+    }
+
+    // One page from /api/v1/matters (pinned matters excluded) plus the pinned
+    // matters on page 1. Stale answers are dropped.
+    async function doFetchMattersPage(query) {
+      const sequence = ++loadSequence;
       const grid = document.getElementById('mattersGrid');
       const loading = document.getElementById('mattersLoading');
-      const pagination = document.getElementById('pagination');
+      const table = mattersTable();
+      const filters = query.filters || {};
+      const listTable = window.MattersListTable;
+      currentPage = Number(query.page) || 1;
+      // A new query starts the pinned list over; "Show more" keeps adding.
+      if (!loadingMorePinned) pinnedPage = 1;
+      loadingMorePinned = false;
+      if (mattersToolbar) mattersToolbar.syncFilter(filters);
 
       // Track page view on initial load (use one-time flag to prevent race conditions)
       if (!hasTrackedPageView && window.analytics) {
@@ -1520,181 +1664,67 @@
         hasTrackedPageView = true;
       }
 
-      // Show loading state
-      loading.classList.remove('hidden');
-      grid.classList.add('hidden');
-      pagination.innerHTML = '';
-      
       try {
-        const search = document.getElementById('searchInput').value;
-        const statusFilterValue = document.getElementById('statusFilter').value;
-        const matterTypeFilterValue = document.getElementById('matterTypeFilter').value;
+        // org_admin sees all matters, others see only their own.
+        const context = { search: searchTerm, includeAll: isOrgAdmin() };
+        const params = listTable.toApiParams(query, context);
+        const pinnedFilters = listTable.pinnedFilters(query, context);
 
-        // Handle "shared" filter separately
-        let filters = { search };
-        if (statusFilterValue === 'shared') {
-          filters.shared_only = true;
-        } else if (statusFilterValue) {
-          filters.status = statusFilterValue;
-        }
-
-        // Add matter type filter if selected
-        if (matterTypeFilterValue) {
-          filters.matter_type = matterTypeFilterValue;
-        }
-
-        // org_admin sees all matters, others see only their own (unless filtering for shared)
-        const includeAll = isOrgAdmin() && statusFilterValue !== 'shared';
-        filters.include_all = includeAll;
-
-        // Fetch pinned and unpinned matters separately in parallel
         const [pinnedResult, unpinnedResult] = await Promise.all([
-          // Fetch pinned matters with pagination (only on page 1 of unpinned matters)
-          currentPage === 1 ? api.getPinnedMatters(pinnedPage, pinnedPageSize, filters) : Promise.resolve({ matters: allPinnedMatters, total: totalPinnedCount }),
-          // Fetch unpinned matters with pagination and exclude_pinned flag
-          api.getMatters(currentPage, pageSize, { ...filters, exclude_pinned: true })
+          currentPage === 1 ? api.getPinnedMatters(pinnedPage, pinnedPageSize, pinnedFilters) : Promise.resolve({ matters: allPinnedMatters, total: totalPinnedCount }),
+          api.get('/api/v1/matters?' + params.toString())
         ]);
+        if (sequence !== loadSequence) return;
 
-        const pinnedMatters = pinnedResult.matters || [];
+        // The pinned endpoint may not filter by type or hide archived rows.
+        const typeValue = pinnedFilters.matter_type || '';
+        const pinnedMatters = (pinnedResult.matters || []).filter(m => {
+          if (!m) return false;
+          if (typeValue && m.matter_type !== typeValue) return false;
+          return pinnedFilters.status === 'archived' || m.status !== 'archived';
+        });
         const unpinnedMatters = unpinnedResult.matters || [];
 
-        // Store pinned matters info for "Show More" functionality
         if (currentPage === 1) {
-          if (pinnedPage === 1) {
-            allPinnedMatters = pinnedMatters;
-          } else {
-            allPinnedMatters = [...allPinnedMatters, ...pinnedMatters];
-          }
-          totalPinnedCount = pinnedResult.total || pinnedMatters.length;
+          allPinnedMatters = pinnedPage === 1 ? pinnedMatters : [...allPinnedMatters, ...pinnedMatters];
+          totalPinnedCount = typeValue ? allPinnedMatters.length : (pinnedResult.total || pinnedMatters.length);
         }
+
+        // Pinned matters, newest pin first (null-safe).
+        allPinnedMatters.sort((a, b) => {
+          const parsedATime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
+          const parsedBTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+          const aTime = Number.isFinite(parsedATime) ? parsedATime : 0;
+          const bTime = Number.isFinite(parsedBTime) ? parsedBTime : 0;
+          return bTime - aTime;
+        });
 
         // Combine for currentMatters (for select all functionality)
         matters = [...allPinnedMatters, ...unpinnedMatters];
         currentMatters = matters;
 
-        console.log('[Matters] Pinned matters loaded:', pinnedMatters.length);
-        console.log('[Matters] Total pinned matters:', totalPinnedCount);
-        console.log('[Matters] Currently showing pinned:', allPinnedMatters.length);
-        console.log('[Matters] Unpinned matters:', unpinnedMatters.length);
-        console.log('[Matters] Total on page:', matters.length);
+        const total = Number(unpinnedResult.total !== undefined ? unpinnedResult.total
+          : (unpinnedResult.pagination && unpinnedResult.pagination.total)) || 0;
+        const limit = Number(params.get('page_size')) || 20;
+        lastPagination = { page: currentPage, limit: limit, total: total, total_pages: Math.max(1, Math.ceil(total / limit)) };
 
-        // Hide loading, show grid
         loading.classList.add('hidden');
-        grid.classList.remove('hidden');
-
-        // Check if there are NO matters at all (both pinned and unpinned)
-        if (allPinnedMatters.length === 0 && unpinnedMatters.length === 0 && currentPage === 1) {
-          grid.innerHTML = `
-            <div class="col-span-full py-16">
-              <div class="max-w-md mx-auto text-center">
-                <div class="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg class="w-12 h-12 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
-                  </svg>
-                </div>
-                <h3 class="text-xl font-semibold text-gray-900 mb-2">No matters yet</h3>
-                <p class="text-gray-500 mb-6">Get started by creating your first matter to organize your documents and collaborate with your team.</p>
-                <button onclick="document.getElementById('createMatterBtn').click()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-lg shadow-indigo-200">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                  </svg>
-                  Create your first matter
-                </button>
-              </div>
-            </div>
-          `;
-          return;
+        const filtered = Boolean(searchTerm || Object.keys(filters).length);
+        if (table) {
+          const empty = listTable.emptyText(filtered);
+          table.emptyText = empty.text;
+          table.emptyActionLabel = empty.actionLabel;
+          table.setServerData(unpinnedMatters.map(listTable.mapMatter), lastPagination);
         }
-
-        // Sort pinned matters by pinned_at (most recent first)
-        // Security: Handle null/undefined pinned_at to prevent crashes
-        pinnedMatters.sort((a, b) => {
-          const parsedATime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
-          const parsedBTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
-          const aTime = Number.isFinite(parsedATime) ? parsedATime : 0;
-          const bTime = Number.isFinite(parsedBTime) ? parsedBTime : 0;
-          return bTime - aTime; // Most recent first
-        });
-
-        // Render matters with grouping
-        let html = '';
-
-        // Pinned Matters Section (only show on page 1)
-        if (allPinnedMatters.length > 0 && currentPage === 1) {
-          console.log('[Matters] Rendering pinned matters section');
-          // Dynamic heading based on filter
-          let pinnedHeading = 'Pinned Matters';
-          if (matterTypeFilterValue === 'matter') {
-            pinnedHeading = 'Pinned Client Matters';
-          } else if (matterTypeFilterValue === 'workspace') {
-            pinnedHeading = 'Pinned Workspaces';
-          }
-          html += `
-            <div class="col-span-full">
-              <div class="flex items-center gap-2 mb-4">
-                <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
-                </svg>
-                <h2 class="text-lg font-semibold text-gray-900">${pinnedHeading}</h2>
-                <span class="text-sm text-gray-500">(${totalPinnedCount > allPinnedMatters.length ? `Showing ${formatNumber(allPinnedMatters.length)} of ${formatNumber(totalPinnedCount)}` : formatNumber(allPinnedMatters.length)})</span>
-              </div>
-            </div>
-          `;
-          html += allPinnedMatters.map(matter => renderMatterCard(matter)).join('');
-
-          // Show "Show More" button if there are more pinned matters to load
-          if (allPinnedMatters.length < totalPinnedCount) {
-            html += `
-              <div class="col-span-full">
-                <button
-                  id="showMorePinnedBtn"
-                  class="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2"
-                  onclick="loadMorePinnedMatters()"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
-                  Show More Pinned Matters
-                </button>
-              </div>
-            `;
-          }
-        }
-
-        // All Matters Section
-        if (unpinnedMatters.length > 0) {
-          const totalUnpinned = unpinnedResult.total || 0;
-          // Dynamic heading based on filter
-          let sectionHeading = 'All Matters';
-          if (matterTypeFilterValue === 'matter') {
-            sectionHeading = 'Client Matters';
-          } else if (matterTypeFilterValue === 'workspace') {
-            sectionHeading = 'Workspaces';
-          }
-          html += `
-            <div class="col-span-full ${allPinnedMatters.length > 0 && currentPage === 1 ? 'mt-8' : ''}">
-              <div class="flex items-center gap-2 mb-4">
-                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
-                </svg>
-                <h2 class="text-lg font-semibold text-gray-900">${sectionHeading}</h2>
-                <span class="text-sm text-gray-500">(${formatNumber(totalUnpinned)})</span>
-              </div>
-            </div>
-          `;
-          html += unpinnedMatters.map(matter => renderMatterCard(matter)).join('');
-        }
-
-        grid.innerHTML = html;
-
-        // Update pagination (based on unpinned matters only)
-        const total = unpinnedResult.total || 0;
-        const totalPages = Math.ceil(total / pageSize);
-        updatePagination(totalPages);
+        grid.innerHTML = renderMattersGrid(unpinnedMatters, total, filtered);
+        renderPinnedAboveList();
+        renderMattersView();
       } catch (error) {
-        // Hide loading, show grid with error state
+        if (sequence !== loadSequence) return;
+        console.error('[Matters] Failed to load matters:', error);
         loading.classList.add('hidden');
-        grid.classList.remove('hidden');
+        if (mattersToolbar) mattersToolbar.setCount(null);
+        if (table) table.setServerError('Matters could not be loaded. Check your connection and try again.');
         grid.innerHTML = `
           <div class="col-span-full py-16">
             <div class="max-w-md mx-auto text-center">
@@ -1714,66 +1744,162 @@
             </div>
           </div>
         `;
+        lastPagination = { page: 1, limit: 20, total: 0, total_pages: 1 };
+        renderMattersView();
         Toast.error('Failed to load matters');
       }
     }
 
-    async function loadMorePinnedMatters() {
-      console.log('[Matters] Loading more pinned matters');
+    function sectionHeading(prefix) {
+      const typeValue = (window.LanaListQueryParams && window.LanaListQueryParams.filterValues(currentFilters().matter_type)[0]) || '';
+      if (typeValue === 'matter') return prefix + 'Client Matters';
+      if (typeValue === 'workspace') return prefix + 'Workspaces';
+      return prefix + 'Matters';
+    }
 
-      try {
-        const btn = document.getElementById('showMorePinnedBtn');
-        if (btn) {
-          btn.disabled = true;
-          btn.innerHTML = `
-            <svg class="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    function pinnedSectionHtml() {
+      if (allPinnedMatters.length === 0 || currentPage !== 1) return '';
+      let html = `
+        <div class="col-span-full">
+          <div class="flex items-center gap-2 mb-4">
+            <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M16 12V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/>
             </svg>
-            Loading...
+            <h2 class="text-lg font-semibold text-gray-900">${sectionHeading('Pinned ')}</h2>
+            <span class="text-sm text-gray-500">(${totalPinnedCount > allPinnedMatters.length ? `Showing ${formatNumber(allPinnedMatters.length)} of ${formatNumber(totalPinnedCount)}` : formatNumber(allPinnedMatters.length)})</span>
+          </div>
+        </div>
+      `;
+      html += allPinnedMatters.map(matter => renderMatterCard(matter)).join('');
+      if (allPinnedMatters.length < totalPinnedCount) {
+        html += `
+          <div class="col-span-full">
+            <button
+              class="show-more-pinned-btn w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2"
+              onclick="loadMorePinnedMatters()"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+              Show More Pinned Matters
+            </button>
+          </div>
+        `;
+      }
+      return html;
+    }
+
+    // Grid view: pinned cards (page 1) and the current page as cards.
+    function renderMattersGrid(unpinnedMatters, total, filtered) {
+      if (allPinnedMatters.length === 0 && unpinnedMatters.length === 0 && currentPage === 1) {
+        if (filtered) {
+          return `
+            <div class="col-span-full py-16">
+              <div class="max-w-md mx-auto text-center">
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">No matching matters</h3>
+                <p class="text-gray-500 mb-6">Try a different search or clear the filters.</p>
+              </div>
+            </div>
           `;
         }
+        return `
+          <div class="col-span-full py-16">
+            <div class="max-w-md mx-auto text-center">
+              <div class="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg class="w-12 h-12 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                </svg>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-900 mb-2">No matters yet</h3>
+              <p class="text-gray-500 mb-6">Get started by creating your first matter to organize your documents and collaborate with your team.</p>
+              <button onclick="document.getElementById('createMatterBtn').click()" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-lg shadow-indigo-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Create your first matter
+              </button>
+            </div>
+          </div>
+        `;
+      }
 
-        // Increment pinned page
-        pinnedPage++;
+      let html = pinnedSectionHtml();
+      if (unpinnedMatters.length > 0) {
+        html += `
+          <div class="col-span-full ${allPinnedMatters.length > 0 && currentPage === 1 ? 'mt-8' : ''}">
+            <div class="flex items-center gap-2 mb-4">
+              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+              </svg>
+              <h2 class="text-lg font-semibold text-gray-900">${sectionHeading('All ').replace('All Client Matters', 'Client Matters').replace('All Workspaces', 'Workspaces')}</h2>
+              <span class="text-sm text-gray-500">(${formatNumber(total)})</span>
+            </div>
+          </div>
+        `;
+        html += unpinnedMatters.map(matter => renderMatterCard(matter)).join('');
+      }
+      return html;
+    }
 
-        // Build filters
-        const filters = {};
-        const searchValue = searchInput.value.trim();
-        if (searchValue) filters.search = searchValue;
-        const statusValue = statusFilter.value;
-        if (statusValue) filters.status = statusValue;
-        const sourceValue = sourceFilter.value;
-        if (sourceValue) filters.source_filter = sourceValue;
+    // List view: the pinned cards sit above the table on page 1 (the table
+    // lists unpinned matters only).
+    function renderPinnedAboveList() {
+      const cards = document.getElementById('listPinnedCards');
+      if (cards) cards.innerHTML = pinnedSectionHtml();
+    }
 
-        // Fetch next batch of pinned matters by re-rendering
-        // loadMatters() will handle fetching the next page and accumulating
+    // Show the active view; the hidden one keeps its content.
+    function renderMattersView() {
+      const grid = document.getElementById('mattersGrid');
+      const listSection = document.getElementById('mattersListSection');
+      const pinnedSection = document.getElementById('listPinnedSection');
+      const gridControls = document.getElementById('gridSelectionControls');
+      const isGrid = viewMode === 'grid';
+      if (grid) grid.classList.toggle('hidden', !isGrid);
+      if (listSection) listSection.classList.toggle('hidden', isGrid);
+      if (pinnedSection) pinnedSection.classList.toggle('hidden', isGrid || allPinnedMatters.length === 0 || currentPage !== 1);
+      // The list view selects through the table's own checkboxes.
+      if (gridControls) gridControls.classList.toggle('hidden', !isGrid);
+      updatePagination(isGrid ? lastPagination.total_pages : 0);
+    }
+
+    function switchView(mode) {
+      viewMode = mode === 'grid' ? 'grid' : 'list';
+      try { window.localStorage.setItem(VIEW_STORAGE_KEY, viewMode); } catch (e) { /* ignore */ }
+      const gridBtn = document.getElementById('gridViewBtn');
+      const listBtn = document.getElementById('listViewBtn');
+      if (gridBtn) gridBtn.variant = viewMode === 'grid' ? 'primary' : 'ghost';
+      if (listBtn) listBtn.variant = viewMode === 'list' ? 'primary' : 'ghost';
+      // Selections made in one view don't carry into the other.
+      selectedMatters.clear();
+      updateSelectionUI();
+      const table = mattersTable();
+      if (table && typeof table.deselectAll === 'function') table.deselectAll();
+      renderMattersView();
+    }
+
+    async function loadMorePinnedMatters() {
+      const btn = document.querySelector('#mattersGrid .show-more-pinned-btn, #listPinnedCards .show-more-pinned-btn');
+      if (btn) btn.disabled = true;
+      pinnedPage++;
+      loadingMorePinned = true;
+      try {
         await loadMatters();
-
       } catch (error) {
         console.error('[Matters] Failed to load more pinned matters:', error);
         Toast.error('Failed to load more pinned matters');
-
-        // Decrement page back if failed
         pinnedPage--;
-
-        // Re-enable button
-        const btn = document.getElementById('showMorePinnedBtn');
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = `
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-            Show More Pinned Matters
-          `;
-        }
+        loadingMorePinned = false;
+        if (btn) btn.disabled = false;
       }
     }
+    window.loadMorePinnedMatters = loadMorePinnedMatters;
 
+    // Grid view pager (hidden in list view, where the table pages).
     function updatePagination(totalPages) {
       const pagination = document.getElementById('pagination');
-      if (totalPages <= 1) {
+      if (!pagination) return;
+      if (!totalPages || totalPages <= 1) {
         pagination.innerHTML = '';
         return;
       }
@@ -1788,70 +1914,98 @@
     }
 
     window.goToPage = function(page) {
-      currentPage = page;
-      loadMatters();
+      const table = mattersTable();
+      if (table && table.dataSource) table.dataSource.goToPage(page);
     }
 
-    // Search and filter
-    document.getElementById('searchInput').addEventListener('input', debounce(() => {
-      const searchQuery = document.getElementById('searchInput').value;
-
-      // Track matter searched event (truncate query to 200 chars for analytics)
-      if (searchQuery && window.analytics) {
-        const truncatedQuery = searchQuery.length > 200 ? searchQuery.substring(0, 200) : searchQuery;
-        window.analytics.trackEvent('matter.searched', 'matter', null, {
-          matter_id: null, // Search is global, not matter-specific
-          query: truncatedQuery,
-          query_length: searchQuery.length,
-          truncated: searchQuery.length > 200
+    // Table + toolbar wiring
+    function initMattersTable() {
+      const table = mattersTable();
+      if (!table || !window.AdminTableKit || !window.MattersListTable) return Promise.resolve();
+      return window.AdminTableKit.whenTableReady().then(() => {
+        if (mattersTable() !== table) return;
+        // Renderers and filter options before the first page lands.
+        table.setCellRenderers(window.MattersListTable.cellRenderers());
+        table.setColumnFilterOptions(window.MattersListTable.filterOptions());
+        mattersToolbar = window.AdminTableKit.bindToolbar({
+          table: table,
+          searchId: 'searchInput',
+          sortId: 'mattersSort',
+          orderId: 'mattersSortOrder',
+          filterId: 'statusFilter',
+          filterKey: 'status',
+          countIds: ['mattersCount', 'mattersSectionCount'],
+          noun: ['matter', 'matters'],
+          onSearch: function (term) {
+            searchTerm = term;
+            // Track matter searched event (truncate query to 200 chars for analytics)
+            if (term && window.analytics) {
+              window.analytics.trackEvent('matter.searched', 'matter', null, {
+                matter_id: null,
+                query: term.length > 200 ? term.substring(0, 200) : term,
+                query_length: term.length,
+                truncated: term.length > 200
+              });
+            }
+            table.requestServerQuery({ resetPage: true });
+          }
         });
-      }
 
-      currentPage = 1;
-      pinnedPage = 1;
-      allPinnedMatters = [];
-      totalPinnedCount = 0;
-      loadMatters();
-    }, 300));
-
-    document.getElementById('statusFilter').addEventListener('change', () => {
-      const filterValue = document.getElementById('statusFilter').value;
-
-      // Track matter filtered event
-      if (window.analytics) {
-        window.analytics.trackEvent('matter.filtered', 'matter', null, {
-          matter_id: null, // Filter is global, not matter-specific
-          filter_type: 'status',
-          filter_value: filterValue
+        table.addEventListener('lex-query-change', (e) => {
+          if (e.target !== table) return;
+          fetchMattersPage(e.detail);
         });
-      }
 
-      currentPage = 1;
-      pinnedPage = 1;
-      allPinnedMatters = [];
-      totalPinnedCount = 0;
-      loadMatters();
-    });
-
-    document.getElementById('matterTypeFilter').addEventListener('change', () => {
-      const filterValue = document.getElementById('matterTypeFilter').value;
-
-      // Track matter type filtered event
-      if (window.analytics) {
-        window.analytics.trackEvent('matter.filtered', 'matter', null, {
-          matter_id: null,
-          filter_type: 'matter_type',
-          filter_value: filterValue
+        const statusSelect = document.getElementById('statusFilter');
+        if (statusSelect) statusSelect.addEventListener('lex-change', (e) => {
+          if (window.analytics) {
+            window.analytics.trackEvent('matter.filtered', 'matter', null, {
+              matter_id: null,
+              filter_type: 'status',
+              filter_value: String((e.detail && e.detail.value) || '')
+            });
+          }
         });
-      }
 
-      currentPage = 1;
-      pinnedPage = 1;
-      allPinnedMatters = [];
-      totalPinnedCount = 0;
-      loadMatters();
-    });
+        table.addEventListener('row-click', (e) => {
+          const row = e.detail && e.detail.row;
+          if (row && row.matter_id) viewMatter(row.matter_id);
+        });
 
+        // Row actions: lex-table's row-click skips buttons, so they are delegated.
+        table.addEventListener('click', (e) => {
+          const button = e.target && e.target.closest ? e.target.closest('.matters-list-action') : null;
+          if (!button) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const id = button.getAttribute('data-row-matter-id');
+          const action = button.getAttribute('data-action');
+          if (action === 'pin') togglePin(id, button.getAttribute('data-source') || 'lana', button.getAttribute('data-pinned') === 'true');
+          else if (action === 'edit') editMatter(id);
+          else if (action === 'delete') deleteMatter(id);
+        });
+
+        table.addEventListener('empty-action', () => {
+          const b = document.getElementById('createMatterBtn');
+          if (b) b.click();
+        });
+
+        table.addEventListener('bulk-action', (e) => {
+          const action = e.detail && e.detail.action;
+          if (action !== 'delete' || !e.detail.items) return;
+          const ids = e.detail.items.map(m => m.matter_id).filter(Boolean);
+          if (ids.length) confirmBulkDeleteMatters(ids, () => table.deselectAll());
+        });
+      });
+    }
+
+    const _gridViewBtn = document.getElementById('gridViewBtn');
+    const _listViewBtn = document.getElementById('listViewBtn');
+    if (_gridViewBtn) _gridViewBtn.addEventListener('click', () => switchView('grid'));
+    if (_listViewBtn) _listViewBtn.addEventListener('click', () => switchView('list'));
+    if (_gridViewBtn) _gridViewBtn.variant = viewMode === 'grid' ? 'primary' : 'ghost';
+    if (_listViewBtn) _listViewBtn.variant = viewMode === 'list' ? 'primary' : 'ghost';
+    const mattersTableReady = initMattersTable();
     // Modal
     const modal = document.getElementById('matterModal');
     const form = document.getElementById('matterForm');
@@ -6860,7 +7014,8 @@
 
     // Unlink a contact from the current matter
     window.unlinkContactFromMatter = async function(contactId, matterId) {
-      if (!confirm('Unlink this contact from the matter? The contact will still exist in the system.')) {
+      const confirmed = await confirmAction('Unlink Contact', 'Unlink this contact from the matter? The contact will still exist in the system.', { confirmText: 'Unlink', variant: 'danger' });
+      if (!confirmed) {
         return;
       }
 
@@ -8604,7 +8759,8 @@
 
     // Delete Task
     window.deleteTask = async function(taskId) {
-      if (!confirm('Are you sure you want to delete this task?')) {
+      const confirmed = await confirmAction('Delete Task', 'Are you sure you want to delete this task?', { confirmText: 'Delete', variant: 'danger' });
+      if (!confirmed) {
         return;
       }
 
@@ -8746,7 +8902,8 @@
 
     // Pin/Unpin matter
     window.togglePin = async function(matterId, source = 'lana', isPinned) {
-      const button = document.querySelector(`.pin-button[data-matter-id="${matterId}"]`);
+      const button = document.querySelector(`.pin-button[data-matter-id="${matterId}"]`) ||
+        document.querySelector(`.matters-list-action[data-action="pin"][data-row-matter-id="${matterId}"]`);
       if (!button) return;
 
       // Prevent concurrent requests for same matter (race condition fix)
@@ -8971,10 +9128,13 @@
       updateSelectionUI();
     });
 
-    // Bulk delete
-    document.getElementById('bulkDeleteBtn').addEventListener('click', async () => {
-      const count = selectedMatters.size;
-      const matterIds = Array.from(selectedMatters);
+    // Bulk delete: the grid's "Delete Selected" and the list table's bulk action.
+    document.getElementById('bulkDeleteBtn').addEventListener('click', () => {
+      confirmBulkDeleteMatters(Array.from(selectedMatters));
+    });
+
+    function confirmBulkDeleteMatters(matterIds, afterDelete) {
+      const count = matterIds.length;
 
       Modal.confirm(
         'Delete Multiple Matters',
@@ -9003,6 +9163,7 @@
             // Clear selection and reload
             selectedMatters.clear();
             updateSelectionUI();
+            if (typeof afterDelete === 'function') afterDelete();
             closeDrawer();
             loadMatters();
           } catch (error) {
@@ -9017,7 +9178,7 @@
           }
         }
       );
-    });
+    }
 
     // Share modal
     async function showShareModal(matterId) {
