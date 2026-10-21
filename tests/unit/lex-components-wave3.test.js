@@ -289,14 +289,20 @@ describe('lex-modal layout options', () => {
   });
 
   test('close-on-escape defaults to true and the attribute turns it off', async () => {
-    const window = boot(['modal'], '<lex-modal id="a" heading="A" open></lex-modal><lex-modal id="b" heading="B" close-on-escape="false" open></lex-modal>');
-    await tick(window);
-    const a = window.document.getElementById('a');
-    const b = window.document.getElementById('b');
-    key(window, window.document, 'Escape');
-    await tick(window);
-    expect(a.open).toBeFalsy();
-    expect(b.open).toBe(true);
+    const plain = boot(['modal'], '<lex-modal id="a" heading="A" open></lex-modal>');
+    await tick(plain);
+    key(plain, plain.document, 'Escape');
+    await tick(plain);
+    expect(plain.document.getElementById('a').open).toBeFalsy();
+
+    // Escape belongs to the topmost overlay: one that ignores Escape also
+    // keeps the overlays beneath it open.
+    const stacked = boot(['modal'], '<lex-modal id="a" heading="A" open></lex-modal><lex-modal id="b" heading="B" close-on-escape="false" open></lex-modal>');
+    await tick(stacked);
+    key(stacked, stacked.document, 'Escape');
+    await tick(stacked);
+    expect(stacked.document.getElementById('b').open).toBe(true);
+    expect(stacked.document.getElementById('a').open).toBe(true);
   });
 
   test('width rejects values that would escape the style attribute', async () => {
