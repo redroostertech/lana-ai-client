@@ -157,8 +157,12 @@
     return '<span class="document-library-cell-muted" title="' + escHtml(value || '') + '">' + escHtml(value || '\u2014') + '</span>';
   }
 
+  function humanize(value) {
+    return window.Lex && Lex.Utils && Lex.Utils.humanizeLabel ? Lex.Utils.humanizeLabel(value) : String(value || '');
+  }
+
   function templateTypeLabel(row) {
-    return row.documentTypeLabel || row.documentType || row.category || '';
+    return humanize(row.documentTypeLabel || row.documentType || row.category || '');
   }
 
   // Variables for fill templates; a document set shows how many documents it holds.
@@ -693,7 +697,7 @@
       var rows = (response && (response.document_types || (response.data && response.data.document_types))) || [];
       return rows.map(function (row) {
         var value = String(row && row.value !== undefined ? row.value : row);
-        return { value: value, label: value ? value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ') : value };
+        return { value: value, label: humanize(value) };
       }).filter(function (o) { return o.value; });
     } catch (_error) {
       return [];
