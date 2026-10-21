@@ -630,8 +630,13 @@ describe('Library dates use the shared date utils', () => {
     for (const page of ['insights/dashboard.html', 'insights/module-execution.html']) {
       const html = read(page);
       expect(html).not.toContain('${new Date(lead.source_created_at).toLocaleDateString()}');
-      expect(html).toContain('Lex.Utils.formatDateTime(opp.source_created_at)');
+      // The drill-down tables come from insights-tables.js: rows keep the raw
+      // source_created_at and the record-table kit's Created cell formats it.
+      expect(html).toContain('js/insights-tables.js');
+      expect(html).not.toContain('toLocaleString()');
     }
+    expect(read('insights/js/insights-tables.js')).toContain("created_at: opp.source_created_at || ''");
+    expect(read('insights/js/record-table-kit.js')).toContain("formatted('formatDateTime', value)");
   });
 
     test('the date column is called Created everywhere', () => {

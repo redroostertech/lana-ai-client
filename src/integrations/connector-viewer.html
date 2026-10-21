@@ -250,6 +250,11 @@
         top: 1.5rem;
       }
     }
+    /* The open record / log row in the lex-tables (marker rendered in a cell). */
+    #connectorDataTable tr:has([data-rtk-selected]) td,
+    #connectorLogsTable tr:has([data-rtk-selected]) td {
+      background: #eff6ff;
+    }
   </style>
   <link rel="stylesheet" href="../css/lex-chat.css">
 </head>
@@ -386,7 +391,7 @@
                     <div class="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <div class="connector-label">Data Filters</div>
-                        <div class="mt-2 text-sm text-gray-500">Use broad search plus field rules to narrow synced connector data the way analytics tools do.</div>
+                        <div class="mt-2 text-sm text-gray-500">Add field rules (payload paths such as data.email) to narrow synced connector data the way analytics tools do.</div>
                       </div>
                       <div class="flex flex-wrap gap-2">
                         <button type="button" onclick="addDataRule()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
@@ -396,38 +401,7 @@
                     </div>
 
                     <div class="mt-5 space-y-5">
-                      <label class="block">
-                        <div class="mb-2 text-sm font-medium text-gray-900">Search Everything</div>
-                        <input id="dataSearchInput" type="search" placeholder="Search IDs, names, emails, payload text..." class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                      </label>
-
-                      <label class="block">
-                        <div class="mb-2 text-sm font-medium text-gray-900">Entity Type</div>
-                        <select id="entityTypeFilter" onchange="refreshDataPreview()" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                          <option value="">All entity types</option>
-                        </select>
-                      </label>
-
-                      <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-1">
-                        <label class="block">
-                          <div class="mb-2 text-sm font-medium text-gray-900">Sort By</div>
-                          <select id="dataSortBy" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                            <option value="synced_at">Last Synced</option>
-                            <option value="source_created_at">Source Created</option>
-                            <option value="source_updated_at">Source Updated</option>
-                            <option value="entity_type">Entity Type</option>
-                            <option value="external_id">External ID</option>
-                            <option value="annotation_count">Annotations</option>
-                          </select>
-                        </label>
-                        <label class="block">
-                          <div class="mb-2 text-sm font-medium text-gray-900">Direction</div>
-                          <select id="dataSortDir" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                            <option value="desc">Descending</option>
-                            <option value="asc">Ascending</option>
-                          </select>
-                        </label>
-                      </div>
+                      <div class="text-xs text-gray-500">Search, sort, entity type and the column filters live on the Synced Data table. Field rules here narrow it further.</div>
 
                       <div id="dataRulesContainer" class="space-y-3"></div>
 
@@ -436,7 +410,7 @@
                           Clear
                         </button>
                         <button type="button" onclick="applyDataFilters()" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                          Apply Filters
+                          Apply Rules
                         </button>
                       </div>
                     </div>
@@ -481,7 +455,6 @@
                     </div>
                   </div>
 
-                  <div id="dataGroupsPanel" class="rounded-2xl border border-gray-200 p-5"></div>
                 </aside>
 
                 <div class="output-main space-y-6">
@@ -498,9 +471,13 @@
                     </div>
                   </div>
 
-                  <div id="dataPreviewTable" class="overflow-x-auto rounded-2xl border border-gray-200"></div>
+                  <div id="dataPreviewTable"></div>
 
-                  <div id="dataPreviewPagination" class="hidden flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 p-4"></div>
+                  <div id="dataGroupsPanel" class="rounded-2xl border border-gray-200 p-5">
+                    <div class="connector-label">Grouped Collections</div>
+                    <div class="mt-2 mb-4 text-sm text-gray-500">Assign collections such as sheets or entity groups to matters without hand-editing records one by one.</div>
+                    <div id="dataGroupsMount"></div>
+                  </div>
                 </div>
               </div>
               <div id="recordDetailBackdrop" class="hidden fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]" onclick="closeRecordDetail()"></div>
@@ -515,8 +492,8 @@
                 </button>
               </div>
 
-              <div id="logsMeta" class="text-sm text-gray-500"></div>
-              <div id="logsTable" class="overflow-x-auto rounded-2xl border border-gray-200"></div>
+              <div id="logsMeta" class="hidden text-sm text-gray-500"></div>
+              <div id="logsTable"></div>
 
               <div id="logDetailBackdrop" class="hidden fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]" onclick="closeLogDetail()"></div>
               <div id="logDetailPanel" class="hidden fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white shadow-2xl"></div>
@@ -560,6 +537,9 @@
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/components/layout/lex-sidebar.js"></script>
   <script src="../js/lex/components/layout/lex-topbar.js"></script>
   <script src="../js/lex/components/layout/lex-conversation-item.js"></script>
@@ -567,6 +547,10 @@
   <script src="../js/lex/components/layout/lex-app.js"></script>
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/lex-page-init.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../insights/js/record-table-kit.js"></script>
+  <script src="js/integration-tables.js"></script>
+  <script src="js/connector-viewer-tables.js"></script>
 
   <script>
     const urlParams = new URLSearchParams(window.location.search);
@@ -581,8 +565,6 @@
       summary: null,
       configResponse: null,
       dataPreview: null,
-      dataPreviewOffset: 0,
-      dataPreviewLimit: 25,
       dataGroups: null,
       logs: null,
       matterOptions: [],
@@ -3562,19 +3544,33 @@
       renderDataRuleBuilder();
     }
 
-    function getCurrentDataFilters() {
+    function getSubmittableDataRules() {
       syncDataRulesFromDom();
-      const submittable = state.dataRules.filter((rule) => {
+      return state.dataRules.filter((rule) => {
         if (!rule.field || rule.field === '__data_path__') return false;
         if (isValuelessOperator(rule.operator)) return true;
         return String(rule.value || '') !== '';
       });
+    }
+
+    // The Synced Data table's current query (toolbar search, sort, entity and
+    // column filters) plus the sidebar's field rules, in the shape the data,
+    // groups and bulk endpoints take. Bulk actions on "all filtered" send this,
+    // so they act on exactly the rows the table shows.
+    function getCurrentDataFilters() {
+      const table = dataTableController && dataTableController.table;
+      const query = table && table.dataSource
+        ? table.dataSource.query
+        : { sortBy: 'synced_at', sortDir: 'desc', filters: {} };
+      const params = window.LanaConnectorViewerTables.dataParams(query, { rules: getSubmittableDataRules() });
+      let filters = [];
+      try { filters = JSON.parse(params.get('filters') || '[]'); } catch (_error) { filters = []; }
       return {
-        q: document.getElementById('dataSearchInput')?.value.trim() || '',
-        entity_type: document.getElementById('entityTypeFilter')?.value || '',
-        sort_by: document.getElementById('dataSortBy')?.value || 'synced_at',
-        sort_dir: document.getElementById('dataSortDir')?.value || 'desc',
-        filters: submittable
+        q: params.get('q') || '',
+        entity_type: params.get('entity_type') || '',
+        sort_by: params.get('sort_by') || 'synced_at',
+        sort_dir: params.get('sort_dir') || 'desc',
+        filters
       };
     }
 
@@ -5185,67 +5181,55 @@
         showPageAlert('Could not derive a filter key for this relationship.', 'error');
         return;
       }
-      const entitySelect = document.getElementById('entityTypeFilter');
-      if (entitySelect) entitySelect.value = childEntityType;
-      const searchInput = document.getElementById('dataSearchInput');
-      if (searchInput) searchInput.value = matchValue;
+      setDataQuery({ entityType: childEntityType, search: matchValue });
       closeRecordDetail();
       applyDataFilters();
       showPageAlert(`Filtered to ${rel.label} for ${parent.external_id || parent.entity_type}. Refine the search if unrelated rows appear.`, 'info');
     }
 
-    function renderDataGroups() {
-      const node = document.getElementById('dataGroupsPanel');
-      if (!node) return;
-      const groups = state.dataGroups && Array.isArray(state.dataGroups.groups) ? state.dataGroups.groups : [];
+    // Grouped collections: a client-side lex-table of every group the
+    // groups endpoint returns for the current filter (no cap). A group is an
+    // aggregate, so it has Last synced rather than a Created time.
+    let groupsTableReady = null;
 
-      if (!groups.length) {
-        node.innerHTML = `
-          <div class="connector-label">Grouped Collections</div>
-          <div class="mt-3 text-sm text-gray-500">No group breakdown is available for the current filter yet.</div>
-        `;
-        return;
+    function ensureGroupsTable() {
+      if (!groupsTableReady) {
+        const CVT = window.LanaConnectorViewerTables;
+        groupsTableReady = window.LanaRecordTableKit.mount(document.getElementById('dataGroupsMount'), {
+          id: 'connectorGroupsTable',
+          title: 'Groups',
+          noun: ['group', 'groups'],
+          ariaLabel: 'Grouped collections',
+          light: true,
+          searchPlaceholder: 'Search groups...',
+          emptyText: 'No group breakdown is available for the current filter yet.',
+          sortBy: 'last_synced_at',
+          sortDir: 'desc',
+          minWidth: 980,
+          columns: CVT.groupColumns()
+        }, {
+          rows: [],
+          onAction: (action, row) => {
+            if (action !== 'assign-group' || !row || !row._raw) return;
+            const group = row._raw;
+            assignGroupToMatter(
+              encodeURIComponent(group.group_type || ''),
+              encodeURIComponent(group.spreadsheet_id || ''),
+              encodeURIComponent(group.sheet_name || ''),
+              encodeURIComponent(group.entity_type || '')
+            );
+          }
+        });
       }
+      return groupsTableReady;
+    }
 
-      node.innerHTML = `
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div class="connector-label">Grouped Collections</div>
-            <div class="mt-2 text-sm text-gray-500">Assign collections such as sheets or entity groups to matters without hand-editing records one by one.</div>
-          </div>
-        </div>
-        <div class="mt-4 overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Group</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Type</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Rows</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Assigned</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 bg-white">
-              ${groups.slice(0, 12).map((group) => `
-                <tr>
-                  <td class="px-4 py-3 align-top">
-                    <div class="font-semibold text-gray-900">${escapeHtml(group.label || group.sheet_name || titleCase(group.entity_type))}</div>
-                    <div class="mt-1 text-xs text-gray-500">${escapeHtml(group.group_key)}</div>
-                  </td>
-                  <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(group.group_type)}</td>
-                  <td class="px-4 py-3 align-top text-gray-700">${formatNumber(group.row_count)}</td>
-                  <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(group.assigned_matter_name || 'Unassigned')}</td>
-                  <td class="px-4 py-3 align-top">
-                    <button type="button" onclick="assignGroupToMatter('${encodeURIComponent(group.group_type || '')}', '${encodeURIComponent(group.spreadsheet_id || '')}', '${encodeURIComponent(group.sheet_name || '')}', '${encodeURIComponent(group.entity_type || '')}')" class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-                      Assign Group
-                    </button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
+    function renderDataGroups() {
+      if (!document.getElementById('dataGroupsMount')) return;
+      const groups = state.dataGroups && Array.isArray(state.dataGroups.groups) ? state.dataGroups.groups : [];
+      ensureGroupsTable().then((controller) => {
+        controller.setRows(groups.map(window.LanaConnectorViewerTables.groupRow));
+      });
     }
 
     function getValueByPath(obj, path) {
@@ -5746,27 +5730,19 @@
       // intentionally do NOT auto-open record detail because the row may
       // not be loaded yet.
       try {
-        const entitySelect = document.getElementById('entityTypeFilter');
-        if (entitySelect) {
-          // Only set if the option exists — otherwise leave the current filter
-          // alone so we don't put the select into an invalid state.
-          const hasOption = Array.from(entitySelect.options).some((opt) => opt.value === entityType);
-          if (hasOption) {
-            entitySelect.value = entityType;
-          }
-        }
-        const searchInput = document.getElementById('dataSearchInput')
-          || document.getElementById('dataPreviewSearchInput');
-        if (searchInput) {
-          searchInput.value = externalId;
-        }
+        // Only switch the entity filter when that entity type exists, so the
+        // filter never points at a value it does not offer.
+        const knownEntities = Object.keys((state.summary && state.summary.stats && state.summary.stats.entities) || {});
+        setDataQuery({
+          entityType: knownEntities.includes(entityType) ? entityType : undefined,
+          search: externalId
+        });
         if (state) {
-          state.dataPreviewOffset = 0;
           state.selectedRecordId = '';
           state.selectedRecord = null;
         }
         if (typeof refreshDataPreview === 'function') {
-          refreshDataPreview();
+          refreshDataPreview({ resetPage: true }).catch((error) => console.warn('filterDataPreviewToRecord failed', error));
         }
       } catch (err) {
         // Non-fatal: panel still rendered, jump just failed silently.
@@ -5779,17 +5755,13 @@
     // as filterToLinkedRecords (which goes the child direction).
     async function openParentRecord(parentEntityType, parentExternalId, parentRowId) {
       if (!parentEntityType || !parentExternalId) return;
-      const entitySelect = document.getElementById('entityTypeFilter');
-      if (entitySelect) entitySelect.value = parentEntityType;
-      const searchInput = document.getElementById('dataSearchInput');
-      if (searchInput) searchInput.value = String(parentExternalId);
+      setDataQuery({ entityType: parentEntityType, search: String(parentExternalId) });
       closeRecordDetail();
-      state.dataPreviewOffset = 0;
       state.selectedDataIds = [];
       state.selectedRowsById = {};
       state.selectionMode = 'manual';
       try {
-        await refreshDataPreview();
+        await refreshDataPreview({ resetPage: true });
         const rows = state.dataPreview && Array.isArray(state.dataPreview.data) ? state.dataPreview.data : [];
         const targetRow = (parentRowId && rows.find((r) => r.id === parentRowId))
           || rows.find((r) => String(r.external_id) === String(parentExternalId));
@@ -5928,180 +5900,226 @@
       renderDataPreview();
     }
 
-    function renderDataPreviewPagination(node, info) {
-      if (!node) return;
-      const { limit, offset, total, hasMore } = info;
-      if (!total || total <= limit) {
-        node.classList.add('hidden');
-        node.classList.remove('flex');
-        node.innerHTML = '';
-        return;
-      }
-      const totalPages = Math.max(1, Math.ceil(total / limit));
-      const currentPage = Math.floor(offset / limit) + 1;
-      const isFirst = offset <= 0;
-      const isLast = !hasMore;
-      const btnBase = 'rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50';
-      const btnDisabled = 'rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-300 cursor-not-allowed';
+    // ── Synced data table (server-paged lex-table; docs/TABLE-STANDARD.md) ──
+    // The table owns search, sort, entity/column filters and paging; the
+    // sidebar keeps the field-rule builder. Every load goes through
+    // loadDataPage, which keeps state.dataPreview in step for the selection,
+    // bulk actions and record detail.
+    let dataTableController = null;
+    let dataTableReady = null;
+    let dataLoadSequence = 0;
+    let dataLoadWaiters = [];
+    let lastDataSelectionSignature = null;
 
-      node.classList.remove('hidden');
-      node.classList.add('flex');
-      node.innerHTML = `
-        <div class="text-sm text-gray-600">Page <span class="font-semibold text-gray-900">${formatNumber(currentPage)}</span> of <span class="font-semibold text-gray-900">${formatNumber(totalPages)}</span></div>
-        <div class="flex flex-wrap items-center gap-2">
-          <button type="button" onclick="goToDataPage('first')" ${isFirst ? 'disabled' : ''} class="${isFirst ? btnDisabled : btnBase}">First</button>
-          <button type="button" onclick="goToDataPage('prev')" ${isFirst ? 'disabled' : ''} class="${isFirst ? btnDisabled : btnBase}">Previous</button>
-          <button type="button" onclick="goToDataPage('next')" ${isLast ? 'disabled' : ''} class="${isLast ? btnDisabled : btnBase}">Next</button>
-          <button type="button" onclick="goToDataPage('last')" ${isLast ? 'disabled' : ''} class="${isLast ? btnDisabled : btnBase}">Last</button>
-        </div>
-      `;
+    function dataTableSpec() {
+      const CVT = window.LanaConnectorViewerTables;
+      return {
+        id: 'connectorDataTable',
+        title: 'Records',
+        noun: ['record', 'records'],
+        ariaLabel: 'Synced connector data',
+        serverPaging: true,
+        searchPlaceholder: 'Search IDs, names, emails, payload text...',
+        emptyText: 'No records to preview.',
+        filteredEmptyText: 'No matching records. Try a different search or clear the filters.',
+        sortBy: 'synced_at',
+        sortDir: 'desc',
+        sortableColumns: CVT.DATA_SORTABLE,
+        minWidth: 1120,
+        mainFilter: { key: 'entity_type', label: 'Entity', options: currentEntityOptions() },
+        columns: CVT.dataColumns({
+          isSelected: (id) => state.selectedDataIds.includes(id),
+          allFiltered: () => state.selectionMode === 'all-filtered',
+          isOpen: (id) => state.selectedRecordId === id
+        })
+      };
     }
 
-    function renderDataPreview() {
-      const meta = document.getElementById('dataPreviewMeta');
-      const container = document.getElementById('dataPreviewTable');
-      const paginationNode = document.getElementById('dataPreviewPagination');
-      const response = state.dataPreview;
-      const rows = response && Array.isArray(response.data) ? response.data : [];
-      const pagination = response && response.pagination ? response.pagination : null;
+    function currentEntityKeys() {
+      return Object.keys((state.summary && state.summary.stats && state.summary.stats.entities) || {});
+    }
 
-      if (!rows.length) {
+    function currentEntityOptions() {
+      return window.LanaConnectorViewerTables.entityOptions(currentEntityKeys());
+    }
+
+    // Entity and matter lists change after the summary / matters load.
+    function updateDataFilterOptions() {
+      if (!dataTableController) return;
+      const CVT = window.LanaConnectorViewerTables;
+      dataTableController.table.setColumnFilterOptions(CVT.dataServerFilters(currentEntityKeys(), state.matterOptions));
+      const select = document.getElementById(dataTableController.ids.filter);
+      if (select) {
+        const current = select.value || 'all';
+        select.options = [{ value: 'all', label: 'All' }].concat(currentEntityOptions());
+        select.value = current;
+      }
+    }
+
+    function ensureDataTable() {
+      if (!dataTableReady) {
+        const CVT = window.LanaConnectorViewerTables;
+        dataTableReady = window.LanaRecordTableKit.mount(document.getElementById('dataPreviewTable'), dataTableSpec(), {
+          load: loadDataPage,
+          serverFilters: CVT.dataServerFilters(currentEntityKeys(), state.matterOptions),
+          errorText: 'Connector data could not be loaded. Check your connection and try again.',
+          onRowClick: (row) => openRecordDetail(row.id),
+          onAction: (action, row) => {
+            if (action === 'inspect') openRecordDetail(row.id);
+            else if (action === 'flag') shortlistSingleRecord(row.id);
+          }
+        }).then((controller) => {
+          dataTableController = controller;
+          // Row checkboxes (lex-table's row-click ignores inputs).
+          controller.table.addEventListener('change', (event) => {
+            const box = event.target && event.target.closest ? event.target.closest('[data-select-row]') : null;
+            if (box) toggleDataSelection(box.getAttribute('data-select-row'), box.checked);
+          });
+          return controller;
+        });
+      }
+      return dataTableReady;
+    }
+
+    function settleDataWaiters(error) {
+      const waiters = dataLoadWaiters;
+      dataLoadWaiters = [];
+      waiters.forEach((resolve) => resolve(error || null));
+    }
+
+    async function loadDataPage(query) {
+      const seq = ++dataLoadSequence;
+      const CVT = window.LanaConnectorViewerTables;
+      const params = CVT.dataParams(query, { rules: getSubmittableDataRules() });
+      // A selection belongs to the filter it was made under (as the old
+      // Apply Filters did): a new search/filter starts a new selection.
+      const signature = CVT.selectionSignature(params);
+      if (lastDataSelectionSignature !== null && signature !== lastDataSelectionSignature) {
         state.selectedDataIds = [];
         state.selectedRowsById = {};
         state.selectionMode = 'manual';
-        renderBulkActionSummary();
-        renderSelectionToolbar();
-        renderRecordDetail();
-        meta.textContent = 'No connector data found for this filter.';
-        container.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">No records to preview.</div>';
-        if (paginationNode) {
-          paginationNode.classList.add('hidden');
-          paginationNode.classList.remove('flex');
-          paginationNode.innerHTML = '';
+      }
+      lastDataSelectionSignature = signature;
+      try {
+        const response = await api.get(`${connectorApi('/data')}?${params.toString()}`);
+        if (seq !== dataLoadSequence) return { rows: [], pagination: {} };
+        state.dataPreview = response;
+        const rows = response && Array.isArray(response.data) ? response.data : [];
+        const pagination = window.LanaIntegrationTables.offsetPagination(response && response.pagination, query, rows.length);
+        // Hand rows back first, then refresh the selection / detail panels.
+        setTimeout(() => {
+          renderDataPreview();
+          settleDataWaiters(null);
+        }, 0);
+        return { rows: rows.map(CVT.dataRow), pagination };
+      } catch (error) {
+        if (seq === dataLoadSequence) settleDataWaiters(error);
+        throw error;
+      }
+    }
+
+    // Set the table's search and entity filter without fetching (jumps from
+    // record detail); the caller reloads from page 1.
+    function setDataQuery(changes) {
+      const table = dataTableController && dataTableController.table;
+      if (!table) return;
+      const query = table.dataSource ? table.dataSource.query : {};
+      const filters = Object.assign({}, query.filters || {});
+      if (changes.entityType !== undefined) {
+        if (changes.entityType) filters.entity_type = { operator: 'in', value: [changes.entityType] };
+        else delete filters.entity_type;
+      }
+      const search = changes.search !== undefined ? String(changes.search) : (query.search || '');
+      table.restoreQuery({ search, sortBy: query.sortBy, sortDir: query.sortDir, filters, limit: query.limit, page: 1 });
+      const searchNode = document.getElementById(dataTableController.ids.search);
+      if (searchNode) searchNode.value = search;
+      const filterNode = document.getElementById(dataTableController.ids.filter);
+      if (filterNode && changes.entityType !== undefined) filterNode.value = changes.entityType || 'all';
+    }
+
+    // Re-render the table's cells (checkboxes, open-row marker) and the
+    // selection, bulk-action and detail panels from state.dataPreview.
+    function renderDataPreview() {
+      const meta = document.getElementById('dataPreviewMeta');
+      const response = state.dataPreview;
+      const rows = response && Array.isArray(response.data) ? response.data : [];
+
+      if (!rows.length) {
+        if (response) {
+          state.selectedDataIds = [];
+          state.selectedRowsById = {};
+          state.selectionMode = 'manual';
         }
-        return;
-      }
-
-      if (state.selectedRecordId) {
-        state.selectedRecord = rows.find((row) => row.id === state.selectedRecordId) || state.selectedRecord;
-      }
-
-      if (pagination) {
-        const limit = pagination.limit || state.dataPreviewLimit || rows.length;
-        const offset = pagination.offset || 0;
-        const total = pagination.total || 0;
-        const start = total === 0 ? 0 : offset + 1;
-        const end = offset + rows.length;
-        meta.textContent = `Showing ${formatNumber(start)}–${formatNumber(end)} of ${formatNumber(total)} records`;
-        renderDataPreviewPagination(paginationNode, { limit, offset, total, hasMore: Boolean(pagination.has_more) });
+        if (meta) meta.textContent = response ? 'No connector data found for this filter.' : '';
       } else {
-        meta.textContent = `Showing ${rows.length} records`;
-        if (paginationNode) {
-          paginationNode.classList.add('hidden');
-          paginationNode.classList.remove('flex');
-          paginationNode.innerHTML = '';
+        if (state.selectedRecordId) {
+          state.selectedRecord = rows.find((row) => row.id === state.selectedRecordId) || state.selectedRecord;
         }
+        if (meta) meta.textContent = '';
       }
 
-      const allFiltered = state.selectionMode === 'all-filtered';
-      const headerChecked = allFiltered || (state.selectedDataIds.length > 0 && state.selectedDataIds.length === rows.length);
-
-      container.innerHTML = `
-        <table class="min-w-full divide-y divide-gray-200 text-sm">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">
-                <input type="checkbox" ${headerChecked ? 'checked' : ''} onchange="toggleAllDataSelection(this.checked)">
-              </th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Entity</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">External ID</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Matter</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Health</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Synced</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            ${rows.map((row) => `
-              <tr class="${state.selectedRecordId === row.id ? 'bg-blue-50' : ''}">
-                <td class="px-4 py-3 align-top">
-                  <input type="checkbox" ${(allFiltered || state.selectedDataIds.includes(row.id)) ? 'checked' : ''} onchange="toggleDataSelection('${escapeHtml(row.id)}', this.checked)">
-                </td>
-                <td class="px-4 py-3 align-top">
-                  <div class="font-semibold text-gray-900">${escapeHtml(titleCase(row.entity_type || 'record'))}</div>
-                </td>
-                <td class="px-4 py-3 align-top connector-mono text-gray-700">${escapeHtml(row.external_id || '')}</td>
-                <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(row.matter_name || 'Unassigned')}</td>
-                <td class="px-4 py-3 align-top">
-                  <div class="flex flex-wrap gap-2">
-                    ${row.has_corrections ? getBadgeHtml('Corrections', 'badge-yellow') : ''}
-                    ${row.has_flags ? getBadgeHtml(row.flag_count > 1 ? `Flagged ×${row.flag_count}` : 'Flagged', 'badge-amber') : ''}
-                    ${(!row.has_corrections && !row.has_flags) ? getBadgeHtml('Clean', 'badge-green') : ''}
-                    ${row.annotation_count ? getBadgeHtml(`${row.annotation_count} note${row.annotation_count === 1 ? '' : 's'}`, 'badge-slate') : ''}
-                  </div>
-                </td>
-                <td class="px-4 py-3 align-top text-gray-600">${escapeHtml(formatDateTime(row.synced_at))}</td>
-                <td class="px-4 py-3 align-top">
-                  <div class="flex flex-wrap gap-2">
-                    <button type="button" onclick="openRecordDetail('${escapeHtml(row.id)}')" class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">Inspect</button>
-                    <button type="button" onclick="shortlistSingleRecord('${escapeHtml(row.id)}')" class="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50">Flag</button>
-                  </div>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+      if (dataTableController) {
+        dataTableController.table.setCellRenderers(window.LanaRecordTableKit.renderersFor(dataTableSpec()));
+      }
 
       renderBulkActionSummary();
       renderSelectionToolbar();
       renderRecordDetail();
-      scheduleCascadePanelRefresh();
+      if (rows.length) scheduleCascadePanelRefresh();
+    }
+
+    // ── Sync logs table (client-side: every page of .../logs) ──
+    let logsTableReady = null;
+    let logsRowsSource = null;
+
+    function ensureLogsTable() {
+      if (!logsTableReady) {
+        logsTableReady = window.LanaRecordTableKit.mount(document.getElementById('logsTable'), {
+          id: 'connectorLogsTable',
+          title: 'Sync logs',
+          noun: ['log', 'logs'],
+          ariaLabel: 'Sync logs',
+          searchPlaceholder: 'Search logs...',
+          emptyText: 'No execution logs yet.',
+          sortBy: 'created_at',
+          sortDir: 'desc',
+          minWidth: 1040,
+          columns: window.LanaConnectorViewerTables.logColumns({ isOpen: (id) => state.selectedLogId === id })
+        }, {
+          rows: [],
+          onRowClick: (row) => openLogDetail(row.id)
+        });
+      }
+      return logsTableReady;
     }
 
     function renderLogs() {
       const meta = document.getElementById('logsMeta');
-      const container = document.getElementById('logsTable');
       const response = state.logs;
       const rows = response && Array.isArray(response.logs) ? response.logs : [];
-      const pagination = response && response.pagination ? response.pagination : null;
+      const total = response && response.pagination ? Number(response.pagination.total) || rows.length : rows.length;
 
-      if (!rows.length) {
-        meta.textContent = 'No sync logs recorded yet.';
-        container.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">No execution logs yet.</div>';
-        renderLogDetail();
-        return;
+      if (meta) {
+        const truncated = Boolean(response && response.truncated);
+        meta.textContent = truncated
+          ? `Showing the latest ${formatNumber(rows.length)} of ${formatNumber(total)} logs.`
+          : '';
+        meta.classList.toggle('hidden', !truncated);
       }
 
-      meta.textContent = pagination
-        ? `Showing ${rows.length} of ${formatNumber(pagination.total)} logs`
-        : `Showing ${rows.length} logs`;
-
-      container.innerHTML = `
-        <table class="min-w-full divide-y divide-gray-200 text-sm">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Started</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Records</th>
-              <th class="px-4 py-3 text-left font-semibold text-gray-600">Error</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            ${rows.map((row) => `
-              <tr class="cursor-pointer hover:bg-gray-50 ${state.selectedLogId === row.id ? 'bg-blue-50' : ''}" onclick="openLogDetail('${escapeHtml(row.id)}')">
-                <td class="px-4 py-3 align-top text-gray-700">${escapeHtml(formatDateTime(row.started_at))}</td>
-                <td class="px-4 py-3 align-top">${renderLogStatus(row.status)}</td>
-                <td class="px-4 py-3 align-top text-gray-700">
-                  Processed ${formatNumber(row.records && row.records.processed)}<br>
-                  Failed ${formatNumber(row.records && row.records.failed)}
-                </td>
-                <td class="px-4 py-3 align-top text-gray-600">${escapeHtml(row.error_message || '')}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+      if (document.getElementById('logsTable')) {
+        ensureLogsTable().then((controller) => {
+          if (logsRowsSource !== rows) {
+            logsRowsSource = rows;
+            controller.setRows(rows.map(window.LanaIntegrationTables.syncLogRow));
+          } else {
+            // Same rows: only the open-row marker changed.
+            controller.table.setCellRenderers(window.LanaRecordTableKit.renderersFor({
+              columns: window.LanaConnectorViewerTables.logColumns({ isOpen: (id) => state.selectedLogId === id })
+            }));
+          }
+        });
+      }
 
       renderLogDetail();
     }
@@ -6429,19 +6447,9 @@
       return `${(b / (1024 * 1024)).toFixed(2)} MB`;
     }
 
+    // Entity choices for the Synced Data table's Entity filter and column.
     function renderEntityFilterOptions() {
-      const select = document.getElementById('entityTypeFilter');
-      const entities = (state.summary && state.summary.stats && state.summary.stats.entities) || {};
-      const currentValue = select.value;
-      const options = ['<option value="">All entity types</option>']
-        .concat(Object.keys(entities).sort().map((entityType) => (
-          `<option value="${escapeHtml(entityType)}">${escapeHtml(entityType)}</option>`
-        )));
-
-      select.innerHTML = options.join('');
-      if ([...select.options].some((option) => option.value === currentValue)) {
-        select.value = currentValue;
-      }
+      updateDataFilterOptions();
     }
 
     function switchTab(tabName) {
@@ -6612,6 +6620,7 @@
       }
       renderMatterDropdownHint();
       updateAssignSelectedButton();
+      updateDataFilterOptions();
     }
 
     async function refreshDataGroups() {
@@ -6625,26 +6634,32 @@
       renderDataGroups();
     }
 
-    async function refreshDataPreview() {
+    // Reload the Synced Data table (same page unless resetPage) and resolve
+    // once state.dataPreview holds the answer; rejects when the load fails.
+    async function refreshDataPreview(options = {}) {
       if (!state.sourceId) return;
 
-      const filters = getCurrentDataFilters();
-      const limit = state.dataPreviewLimit || 25;
-      const offset = Math.max(0, state.dataPreviewOffset || 0);
-      const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-      if (filters.entity_type) query.set('entity_type', filters.entity_type);
-      if (filters.q) query.set('q', filters.q);
-      if (filters.sort_by) query.set('sort_by', filters.sort_by);
-      if (filters.sort_dir) query.set('sort_dir', filters.sort_dir);
-      if (filters.filters.length) query.set('filters', JSON.stringify(filters.filters));
-      state.dataPreview = await api.get(`${connectorApi('/data')}?${query.toString()}`);
-      renderDataPreview();
+      const firstLoad = !dataTableReady;
+      const settled = new Promise((resolve) => dataLoadWaiters.push(resolve));
+      const controller = await ensureDataTable();
+      // The first mount already asked for page 1.
+      if (!firstLoad) {
+        if (options.resetPage) controller.reloadFromFirstPage();
+        else controller.reload();
+      }
+      const error = await settled;
+      if (error) throw error;
       await refreshDataGroups();
     }
 
+    // The logs endpoint pages but cannot sort or filter, so the table loads
+    // every page (up to LOG_MAX_PAGES x LOG_PAGE_SIZE) and says when it stops.
     async function refreshLogs() {
       if (!state.sourceId) return;
-      state.logs = await api.get(`${connectorApi('/logs')}?limit=25`);
+      const result = await window.LanaConnectorViewerTables.loadAllLogs(
+        (limit, offset) => api.get(`${connectorApi('/logs')}?limit=${limit}&offset=${offset}`)
+      );
+      state.logs = { logs: result.logs, pagination: { total: result.total }, truncated: result.truncated };
       renderLogs();
     }
 
@@ -7164,54 +7179,30 @@
     }
 
     function applyDataFilters() {
-      state.dataPreviewOffset = 0;
       state.selectedDataIds = [];
       state.selectedRowsById = {};
       state.selectionMode = 'manual';
-      refreshDataPreview().catch((error) => {
+      refreshDataPreview({ resetPage: true }).catch((error) => {
         console.error('[Connector Viewer] Failed to apply data filters', error);
         showPageAlert(error.message || 'Failed to apply filters.', 'error');
       });
     }
 
-    function goToDataPage(direction) {
-      const pagination = state.dataPreview && state.dataPreview.pagination;
-      if (!pagination) return;
-      const limit = pagination.limit || state.dataPreviewLimit || 25;
-      const total = pagination.total || 0;
-      const current = state.dataPreviewOffset || 0;
-      let next = current;
-
-      if (direction === 'next') {
-        next = current + limit;
-      } else if (direction === 'prev') {
-        next = current - limit;
-      } else if (direction === 'first') {
-        next = 0;
-      } else if (direction === 'last') {
-        next = Math.max(0, Math.floor(Math.max(0, total - 1) / limit) * limit);
-      }
-
-      next = Math.max(0, Math.min(next, Math.max(0, total - 1)));
-      if (next === current) return;
-
-      state.dataPreviewOffset = next;
-      refreshDataPreview().catch((error) => {
-        console.error('[Connector Viewer] Failed to change data page', error);
-        showPageAlert(error.message || 'Failed to load page.', 'error');
-      });
-    }
-
+    // Clears the field rules and the table's search, sort and filters.
     function clearDataFilters() {
       state.dataRules = [];
-      const searchNode = document.getElementById('dataSearchInput');
-      const entityNode = document.getElementById('entityTypeFilter');
-      const sortByNode = document.getElementById('dataSortBy');
-      const sortDirNode = document.getElementById('dataSortDir');
-      if (searchNode) searchNode.value = '';
-      if (entityNode) entityNode.value = '';
-      if (sortByNode) sortByNode.value = 'synced_at';
-      if (sortDirNode) sortDirNode.value = 'desc';
+      if (dataTableController) {
+        const ids = dataTableController.ids;
+        dataTableController.table.resetQuery();
+        const searchNode = document.getElementById(ids.search);
+        const filterNode = document.getElementById(ids.filter);
+        const sortNode = document.getElementById(ids.sort);
+        const orderNode = document.getElementById(ids.order);
+        if (searchNode) searchNode.value = '';
+        if (filterNode) filterNode.value = 'all';
+        if (sortNode) sortNode.value = 'synced_at';
+        if (orderNode) orderNode.dataset.order = 'desc';
+      }
       renderDataRuleBuilder();
       applyDataFilters();
     }
@@ -7944,7 +7935,6 @@
     window.onDataRuleFieldChange = onDataRuleFieldChange;
     window.applyDataFilters = applyDataFilters;
     window.clearDataFilters = clearDataFilters;
-    window.goToDataPage = goToDataPage;
     window.toggleDataSelection = toggleDataSelection;
     window.toggleAllDataSelection = toggleAllDataSelection;
     window.selectPageRows = selectPageRows;

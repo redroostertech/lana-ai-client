@@ -15,6 +15,20 @@
   <script src="../js/components.js"></script>
   <script src="../js/menu.js"></script>
   <script src="../js/connectors.js"></script>
+  <script src="../js/lex/lex.core.js"></script>
+  <script src="../js/lex/lex.icons.js"></script>
+  <script src="../js/lex/lex.data.js"></script>
+  <script src="../js/lex/lex.forms.js"></script>
+  <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/components/foundation/lex-btn.js"></script>
+  <script src="../js/lex/components/foundation/lex-badge.js"></script>
+  <script src="../js/lex/components/foundation/lex-empty.js"></script>
+  <script src="../js/lex/components/form/lex-input.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
+  <script src="../js/lex/components/data/lex-table.js"></script>
+  <script src="../js/shared/library-column-filters.js"></script>
+  <script src="../insights/js/record-table-kit.js"></script>
+  <script src="js/integration-tables.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Sidebar -->
@@ -425,32 +439,21 @@
         const result = await Connectors.getFieldMappings(connectorId);
         const mappings = result.mappings || [];
 
-        if (mappings.length === 0) {
-          table.innerHTML = '<p class="text-gray-500">No field mappings configured</p>';
-        } else {
-          table.innerHTML = `
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source Field</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target Field</th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Enabled</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${mappings.map(m => `
-                  <tr>
-                    <td class="px-4 py-3 text-sm text-gray-900">${m.source}</td>
-                    <td class="px-4 py-3 text-sm text-gray-900">${m.target}</td>
-                    <td class="px-4 py-3 text-center">
-                      <input type="checkbox" ${m.enabled ? 'checked' : ''} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          `;
-        }
+        // Client-side lex-table (docs/TABLE-STANDARD.md); a mapping has no
+        // creation time, so there is no Created column.
+        await window.LanaRecordTableKit.mount(table, {
+          id: 'fieldMappingsTable',
+          title: 'Mapped fields',
+          noun: ['field', 'fields'],
+          ariaLabel: 'Field mappings',
+          light: true,
+          searchPlaceholder: 'Search fields...',
+          emptyText: 'No field mappings configured',
+          sortBy: 'source',
+          sortDir: 'asc',
+          minWidth: 560,
+          columns: window.LanaIntegrationTables.FIELD_MAPPING_COLUMNS
+        }, { rows: mappings.map(window.LanaIntegrationTables.fieldMappingRow) });
 
         section.classList.remove('hidden');
         section.scrollIntoView({ behavior: 'smooth' });
