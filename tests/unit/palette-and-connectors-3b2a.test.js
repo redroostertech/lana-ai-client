@@ -149,7 +149,9 @@ describe('data-connectors dashboard modal', () => {
   const html = read('data-connectors.html');
 
   test('is a full-size flush lex-modal with no hand-built overlay', () => {
-    expect(html).toMatch(/<lex-modal id="connectorDashboardModal"[^>]*size="full"[^>]*flush[^>]*hide-actions/);
+    expect(html).toMatch(/<lex-modal id="connectorDashboardModal"[^>]*size="full"[^>]*flush[^>]*hide-actions[^>]*hide-close/);
+    // No modal header: the embedded connector page has its own header and Back.
+    expect(html).not.toMatch(/<lex-modal id="connectorDashboardModal"[^>]*heading=/);
     expect(html).not.toMatch(/dc-fullscreen-modal/);
     expect(html).toMatch(/<iframe id="connectorDashboardFrame"/);
   });
@@ -173,7 +175,7 @@ describe('data-connectors dashboard modal', () => {
     return window;
   }
 
-  test('open sets the frame and heading; close and lex-close unload the frame', async () => {
+  test('open sets the frame with no modal header; close and lex-close unload the frame', async () => {
     const window = load();
     const doc = window.document;
     const modal = doc.getElementById('connectorDashboardModal');
@@ -186,7 +188,9 @@ describe('data-connectors dashboard modal', () => {
     const frame = doc.getElementById('connectorDashboardFrame');
     expect(modal.contentRoot.contains(frame)).toBe(true);
     expect(modal.open).toBe(true);
-    expect(modal.heading).toBe('Leadly');
+    expect(modal.heading).toBeFalsy();
+    expect(modal.getAttribute('aria-label')).toBe('Leadly');
+    expect(modal.querySelector('.lex-modal-header').hasAttribute('data-empty')).toBe(true);
     expect(frame.getAttribute('src')).toMatch(/^integrations\/connector-viewer\.html\?/);
 
     window.closeConnectorDashboardModal();

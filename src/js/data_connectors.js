@@ -709,7 +709,8 @@
     var frame = document.getElementById('connectorDashboardFrame');
     if (!frame) return;
 
-    modal.heading = connectorName || 'Connector Dashboard';
+    // No modal header: the embedded page has its own header and Back button.
+    modal.setAttribute('aria-label', connectorName || 'Connector dashboard');
     frame.src = url;
     modal.open = true;
   }

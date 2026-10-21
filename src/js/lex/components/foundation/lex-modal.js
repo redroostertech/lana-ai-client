@@ -230,6 +230,17 @@
       .lex-modal-panel.lex-modal-panel--flush > .lex-modal-body {
         padding: 0;
       }
+      /* Full + flush: content can fill the whole body (e.g. an embedded page) */
+      .lex-modal-panel--full.lex-modal-panel--flush > .lex-modal-body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .lex-modal-panel--full.lex-modal-panel--flush > .lex-modal-body > slot-content[data-lex-modal-content] {
+        display: flex !important;
+        flex: 1 1 auto;
+        flex-direction: column;
+      }
 
       /* ── Palette (command palette) ───────────────────── */
 
