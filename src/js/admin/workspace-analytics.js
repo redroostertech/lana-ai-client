@@ -40,8 +40,8 @@
     // Attach the change listener exactly once.
     if (!matterPickerListenerAttached) {
       matterPickerListenerAttached = true;
-      picker.addEventListener('change', function () {
-        var matterId = this.value;
+      picker.addEventListener('lex-change', function (event) {
+        var matterId = event.detail ? String(event.detail.value || '') : '';
         currentMatterId = matterId;
         if (matterId) {
           loadWorkspaceAnalytics(matterId);
@@ -56,12 +56,13 @@
     api.get('/api/v1/matters?limit=100&sort=updated_at&order=desc')
       .then(function (response) {
         var matters = (response && response.data) || (response && response.matters) || [];
+        // lex-select: the empty option stays first as the placeholder.
+        var options = [{ value: '', label: 'Choose a matter...' }];
         matters.forEach(function (m) {
-          var opt = document.createElement('option');
-          opt.value = m.id || m.matter_id || '';
-          opt.textContent = m.name || m.matter_number || String(opt.value);
-          picker.appendChild(opt);
+          var value = String(m.id || m.matter_id || '');
+          options.push({ value: value, label: m.name || m.matter_number || value });
         });
+        picker.options = options;
         // Indicate truncation when the limit was reached
         if (matters.length >= 100) {
           var hint = el('matterPickerTruncationHint');

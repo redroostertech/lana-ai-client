@@ -74,7 +74,7 @@
 
     // Category filter
     if (categoryFilter) {
-      categoryFilter.addEventListener('change', handleCategoryChange);
+      categoryFilter.addEventListener('lex-change', handleCategoryChange);
     }
 
     // View toggle
@@ -547,7 +547,7 @@
    * Handle category filter change
    */
   function handleCategoryChange(e) {
-    selectedCategory = e.target.value;
+    selectedCategory = e.detail.value;
     filterSkills();
   }
 

@@ -39,27 +39,15 @@
           </div>
         </div>
 
-        <label class="field">
+        <div class="field">
           <span>Format</span>
-          <select id="mode">
-            <option value="presentation">Presentation</option>
-            <option value="document">Document</option>
-            <option value="webpage">Webpage</option>
-          </select>
-        </label>
+          <lex-select id="mode" options='[{"value":"presentation","label":"Presentation"},{"value":"document","label":"Document"},{"value":"webpage","label":"Webpage"}]' value="presentation"></lex-select>
+        </div>
 
-        <label class="field">
+        <div class="field">
           <span>Document type</span>
-          <select id="documentType">
-            <option value="nda">NDA</option>
-            <option value="mutual_nda">Mutual NDA</option>
-            <option value="unilateral_nda">Unilateral NDA</option>
-            <option value="msa">Master Services Agreement</option>
-            <option value="sow">Statement of Work</option>
-            <option value="settlement_agreement">Settlement Agreement</option>
-            <option value="contract_summary">Contract Summary</option>
-          </select>
-        </label>
+          <lex-select id="documentType" options='[{"value":"nda","label":"NDA"},{"value":"mutual_nda","label":"Mutual NDA"},{"value":"unilateral_nda","label":"Unilateral NDA"},{"value":"msa","label":"Master Services Agreement"},{"value":"sow","label":"Statement of Work"},{"value":"settlement_agreement","label":"Settlement Agreement"},{"value":"contract_summary","label":"Contract Summary"}]' value="nda"></lex-select>
+        </div>
 
         <label class="field">
           <span>Audience</span>
@@ -71,19 +59,10 @@
           <input id="tone" value="clear, concise, polished">
         </label>
 
-        <label class="field">
+        <div class="field">
           <span>Style</span>
-          <select id="style">
-            <option value="editorial">Editorial</option>
-            <option value="executive">Executive</option>
-            <option value="noir">Noir</option>
-            <option value="atelier">Atelier</option>
-            <option value="modern">Modern</option>
-            <option value="signal">Signal</option>
-            <option value="luxe">Luxe</option>
-            <option value="blueprint">Blueprint</option>
-          </select>
-        </label>
+          <lex-select id="style" options='[{"value":"editorial","label":"Editorial"},{"value":"executive","label":"Executive"},{"value":"noir","label":"Noir"},{"value":"atelier","label":"Atelier"},{"value":"modern","label":"Modern"},{"value":"signal","label":"Signal"},{"value":"luxe","label":"Luxe"},{"value":"blueprint","label":"Blueprint"}]' value="editorial"></lex-select>
+        </div>
 
         <label class="field">
           <span>Title</span>
@@ -115,10 +94,10 @@
             <strong>Brand kits</strong>
             <button id="saveBrandKitBtn" type="button">Save kit</button>
           </div>
-          <label class="field">
+          <div class="field">
             <span>Saved kit</span>
-            <select id="brandKitSelect"></select>
-          </label>
+            <lex-select id="brandKitSelect" options='[]' value=""></lex-select>
+          </div>
           <label class="field">
             <span>Kit name</span>
             <input id="brandKitName" value="Current file">
@@ -131,56 +110,26 @@
             <span>Text mark</span>
             <input id="brandTextMark" maxlength="24" placeholder="Lana">
           </label>
-          <label class="field">
+          <div class="field">
             <span>Font</span>
-            <select id="brandFontFamily">
-              <option value="inter">Inter / system</option>
-              <option value="aptos">Aptos / UI sans</option>
-              <option value="serif">Editorial serif</option>
-              <option value="mono">Technical mono</option>
-            </select>
-          </label>
-          <label class="field">
+            <lex-select id="brandFontFamily" options='[{"value":"inter","label":"Inter / system"},{"value":"aptos","label":"Aptos / UI sans"},{"value":"serif","label":"Editorial serif"},{"value":"mono","label":"Technical mono"}]' value="inter"></lex-select>
+          </div>
+          <div class="field">
             <span>Icons</span>
-            <select id="brandIconMode">
-              <option value="restrained">Restrained</option>
-              <option value="balanced">Balanced</option>
-              <option value="minimal">Minimal</option>
-            </select>
-          </label>
-          <label class="field">
+            <lex-select id="brandIconMode" options='[{"value":"restrained","label":"Restrained"},{"value":"balanced","label":"Balanced"},{"value":"minimal","label":"Minimal"}]' value="restrained"></lex-select>
+          </div>
+          <div class="field">
             <span>Images</span>
-            <select id="brandImageStyle">
-              <option value="editorial">Editorial</option>
-              <option value="product">Product</option>
-              <option value="abstract">Abstract</option>
-              <option value="documentary">Documentary</option>
-              <option value="diagrammatic">Diagrammatic</option>
-              <option value="illustration">Illustration</option>
-              <option value="data">Data-informed</option>
-            </select>
-          </label>
-          <label class="field">
+            <lex-select id="brandImageStyle" options='[{"value":"editorial","label":"Editorial"},{"value":"product","label":"Product"},{"value":"abstract","label":"Abstract"},{"value":"documentary","label":"Documentary"},{"value":"diagrammatic","label":"Diagrammatic"},{"value":"illustration","label":"Illustration"},{"value":"data","label":"Data-informed"}]' value="editorial"></lex-select>
+          </div>
+          <div class="field">
             <span>Density</span>
-            <select id="brandDensity">
-              <option value="standard">Standard</option>
-              <option value="dense">Dense</option>
-              <option value="spacious">Spacious</option>
-            </select>
-          </label>
-          <label class="field">
+            <lex-select id="brandDensity" options='[{"value":"standard","label":"Standard"},{"value":"dense","label":"Dense"},{"value":"spacious","label":"Spacious"}]' value="standard"></lex-select>
+          </div>
+          <div class="field">
             <span>Composition</span>
-            <select id="brandComposition">
-              <option value="magazine">Magazine</option>
-              <option value="boardroom">Boardroom</option>
-              <option value="cinematic">Cinematic</option>
-              <option value="gallery">Gallery</option>
-              <option value="product">Product</option>
-              <option value="briefing">Briefing</option>
-              <option value="luxury">Luxury</option>
-              <option value="systems">Systems</option>
-            </select>
-          </label>
+            <lex-select id="brandComposition" options='[{"value":"magazine","label":"Magazine"},{"value":"boardroom","label":"Boardroom"},{"value":"cinematic","label":"Cinematic"},{"value":"gallery","label":"Gallery"},{"value":"product","label":"Product"},{"value":"briefing","label":"Briefing"},{"value":"luxury","label":"Luxury"},{"value":"systems","label":"Systems"}]' value="magazine"></lex-select>
+          </div>
         </section>
 
         <label class="field">
@@ -268,21 +217,21 @@
         <div id="editorTools" class="editor-tools">
           <div class="slide-browser">
             <button id="prevSlideBtn" type="button" aria-label="Previous slide">‹</button>
-            <label class="mini-field">
+            <div class="mini-field">
               <span>Slide</span>
-              <select id="slidePicker"></select>
-            </label>
+              <lex-select id="slidePicker" options='[]' value=""></lex-select>
+            </div>
             <button id="nextSlideBtn" type="button" aria-label="Next slide">›</button>
           </div>
           <div class="slide-browser">
-            <label class="mini-field">
+            <div class="mini-field">
               <span>Layout</span>
-              <select id="slideLayout"></select>
-            </label>
-            <label class="mini-field">
+              <lex-select id="slideLayout" options='[]' value=""></lex-select>
+            </div>
+            <div class="mini-field">
               <span>Slide style</span>
-              <select id="slideStyle"></select>
-            </label>
+              <lex-select id="slideStyle" options='[]' value=""></lex-select>
+            </div>
           </div>
           <div class="slide-browser">
             <button id="addSlideBtn" type="button">Add</button>

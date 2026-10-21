@@ -508,11 +508,20 @@
   };
 
   /**
-   * Build event type <option> groups for the trigger select
+   * Build grouped event type options ({ value, label, group }) for the
+   * trigger lex-select
    */
   function buildEventOptions() {
-    if (window.LanaEventCatalog && typeof window.LanaEventCatalog.buildSelectOptions === 'function') {
-      return window.LanaEventCatalog.buildSelectOptions();
+    var catalog = window.LanaEventCatalog;
+    if (catalog && Array.isArray(catalog.categories) && typeof catalog.getEventMeta === 'function') {
+      var catalogOptions = [];
+      catalog.categories.forEach(function(group) {
+        (group.events || []).forEach(function(eventType) {
+          var meta = catalog.getEventMeta(eventType) || {};
+          catalogOptions.push({ value: eventType, label: meta.friendly_name || eventType, group: group.label });
+        });
+      });
+      return catalogOptions;
     }
 
     var groups = {
@@ -555,18 +564,37 @@
       'Schedule Events': ['schedule.minutes','schedule.hourly','schedule.daily','schedule.weekly','schedule.monthly']
     };
 
-    var html = '';
+    var options = [];
     var groupNames = Object.keys(groups);
     for (var g = 0; g < groupNames.length; g++) {
-      var groupName = groupNames[g];
-      var events = groups[groupName];
-      html += '<optgroup label="' + groupName + '">';
+      var events = groups[groupNames[g]];
       for (var i = 0; i < events.length; i++) {
-        html += '<option value="' + events[i] + '">' + events[i] + '</option>';
+        options.push({ value: events[i], label: events[i], group: groupNames[g] });
       }
-      html += '</optgroup>';
     }
-    return html;
+    return options;
+  }
+
+  function escapeAttr(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /**
+   * lex-select markup for the step builder. Option values stay strings; the
+   * value defaults to the first option, as a native select did.
+   */
+  function stepSelectHtml(attrs, options, value) {
+    var selected = value !== undefined ? value : (options.length ? options[0].value : '');
+    return '<lex-select ' + attrs + ' size="sm" options="' + escapeAttr(JSON.stringify(options)) + '" value="' + escapeAttr(selected) + '"></lex-select>';
+  }
+
+  function stepSelects(container) {
+    return container ? container.querySelectorAll('lex-select') : [];
   }
 
   function renderEventSummaryHtml(selectedEvent) {
@@ -841,15 +869,15 @@
       + '<svg class="w-5 h-5 text-white step-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>'
       + '</div>'
       + '<div class="flex-1">'
-      + '<select class="step-type-selector bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-gray-900 text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:border-purple-500" data-step-id="' + stepId + '">'
-      + '<option value="trigger">Trigger</option>'
-      + '<option value="condition">Condition</option>'
-      + '<option value="ai-action">AI Action</option>'
-      + '<option value="database">Database</option>'
-      + '<option value="notification">Notification</option>'
-      + '<option value="integration">Integration</option>'
-      + '<option value="transform">Transform</option>'
-      + '</select>'
+      + stepSelectHtml('class="step-type-selector" data-step-id="' + stepId + '" aria-label="Step type"', [
+        { value: 'trigger', label: 'Trigger' },
+        { value: 'condition', label: 'Condition' },
+        { value: 'ai-action', label: 'AI Action' },
+        { value: 'database', label: 'Database' },
+        { value: 'notification', label: 'Notification' },
+        { value: 'integration', label: 'Integration' },
+        { value: 'transform', label: 'Transform' }
+      ])
       + '<code class="block mt-1 text-xs font-mono text-gray-500">step_' + (stepIndex + 1) + '.*</code>'
       + '</div></div>'
       + '<button class="remove-step-btn text-gray-400 hover:text-red-600 transition-colors" data-step-id="' + stepId + '">'
@@ -882,8 +910,8 @@
     if (stepEl) {
       var typeSelect = stepEl.querySelector('.step-type-selector');
       if (typeSelect) {
-        typeSelect.addEventListener('change', function() {
-          updateStepType(stepId, this.value);
+        typeSelect.addEventListener('lex-change', function(e) {
+          updateStepType(stepId, e.detail.value);
         });
       }
       var removeBtn = stepEl.querySelector('.remove-step-btn');
@@ -983,9 +1011,7 @@
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Event Type</label>'
         + '<div class="flex flex-wrap items-center gap-2">'
-        + '<select id="event-type-select-' + stepId + '" class="event-type-select flex-1 min-w-[220px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" data-step-id="' + stepId + '">'
-        + buildEventOptions()
-        + '</select>'
+        + stepSelectHtml('id="event-type-select-' + stepId + '" class="event-type-select flex-1 min-w-[220px]" data-step-id="' + stepId + '" searchable aria-label="Event type"', buildEventOptions())
         + '<button type="button" class="px-3 py-2 text-xs font-semibold rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100" data-event-browser-open-step="' + stepId + '">Browse Events</button>'
         + '</div>'
         + '<div id="event-description-' + stepId + '" class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">'
@@ -997,29 +1023,32 @@
         + '<input type="text" placeholder="e.g., trigger.data.fileType" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
         + '</div><div class="grid grid-cols-2 gap-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Operator</label>'
-        + '<select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="equals">equals</option>'
-        + '<option value="contains">contains</option>'
-        + '<option value="greater_than">greater than</option>'
-        + '<option value="less_than">less than</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="condition-operator-select w-full" aria-label="Operator"', [
+          { value: 'equals', label: 'Equals' },
+          { value: 'contains', label: 'Contains' },
+          { value: 'greater_than', label: 'Greater than' },
+          { value: 'less_than', label: 'Less than' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Value</label>'
         + '<input type="text" placeholder="e.g., .pdf" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
         + '</div></div></div>';
     } else if (type === 'ai-action') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">AI Task</label>'
-        + '<select class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="summarize">Summarize Document</option>'
-        + '<option value="extract">Extract Key Information</option>'
-        + '<option value="classify">Classify Content</option>'
-        + '<option value="generate">Generate Text</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="ai-task-select w-full" aria-label="AI task"', [
+          { value: 'summarize', label: 'Summarize Document' },
+          { value: 'extract', label: 'Extract Key Information' },
+          { value: 'classify', label: 'Classify Content' },
+          { value: 'generate', label: 'Generate Text' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">AI Instructions Mode</label>'
-        + '<select class="ai-prompt-mode-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="default">Use Default AI Instructions</option>'
-        + '<option value="custom">Use Custom System Prompt</option>'
-        + '</select></div><div class="ai-system-prompt-field hidden">'
+        + stepSelectHtml('class="ai-prompt-mode-select w-full" aria-label="AI instructions mode"', [
+          { value: 'default', label: 'Use Default AI Instructions' },
+          { value: 'custom', label: 'Use Custom System Prompt' }
+        ])
+        + '</div><div class="ai-system-prompt-field hidden">'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">System Prompt</label>'
         + '<textarea rows="3" placeholder="You are a concise estate deadline specialist..." class="ai-system-prompt-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>'
         + '</div><div>'
@@ -1029,39 +1058,31 @@
     } else if (type === 'database') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Operation</label>'
-        + '<select class="db-operation-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="insert">Insert Record</option>'
-        + '<option value="query">Query Records</option>'
-        + '<option value="update">Update Record</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="db-operation-select w-full" aria-label="Operation"', [
+          { value: 'insert', label: 'Insert Record' },
+          { value: 'query', label: 'Query Records' },
+          { value: 'update', label: 'Update Record' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Table</label>'
-        + '<select class="db-table-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<optgroup label="Document Tables">'
-        + '<option value="documents">Documents</option>'
-        + '<option value="document_chunks">Document Chunks</option>'
-        + '<option value="document_metadata">Document Metadata</option>'
-        + '</optgroup>'
-        + '<optgroup label="Matter Tables">'
-        + '<option value="client_matters">Client Matters</option>'
-        + '<option value="matter_contacts">Matter Contacts</option>'
-        + '<option value="matter_documents">Matter Documents</option>'
-        + '<option value="matter_notes">Matter Notes</option>'
-        + '</optgroup>'
-        + '<optgroup label="Workflow Tables">'
-        + '<option value="workflows">Workflows</option>'
-        + '<option value="workflow_executions">Workflow Executions</option>'
-        + '<option value="workflow_steps">Workflow Steps</option>'
-        + '</optgroup>'
-        + '<optgroup label="Integration Tables">'
-        + '<option value="connector_data">Connector Data</option>'
-        + '<option value="integration_sources">Integration Sources</option>'
-        + '</optgroup>'
-        + '<optgroup label="Skill Tables">'
-        + '<option value="custom_skills">Custom Skills</option>'
-        + '<option value="skill_executions">Skill Executions</option>'
-        + '<option value="skill_artifacts">Skill Artifacts</option>'
-        + '</optgroup>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="db-table-select w-full" searchable aria-label="Table"', [
+          { value: 'documents', label: 'Documents', group: 'Document Tables' },
+          { value: 'document_chunks', label: 'Document Chunks', group: 'Document Tables' },
+          { value: 'document_metadata', label: 'Document Metadata', group: 'Document Tables' },
+          { value: 'client_matters', label: 'Client Matters', group: 'Matter Tables' },
+          { value: 'matter_contacts', label: 'Matter Contacts', group: 'Matter Tables' },
+          { value: 'matter_documents', label: 'Matter Documents', group: 'Matter Tables' },
+          { value: 'matter_notes', label: 'Matter Notes', group: 'Matter Tables' },
+          { value: 'workflows', label: 'Workflows', group: 'Workflow Tables' },
+          { value: 'workflow_executions', label: 'Workflow Executions', group: 'Workflow Tables' },
+          { value: 'workflow_steps', label: 'Workflow Steps', group: 'Workflow Tables' },
+          { value: 'connector_data', label: 'Connector Data', group: 'Integration Tables' },
+          { value: 'integration_sources', label: 'Integration Sources', group: 'Integration Tables' },
+          { value: 'custom_skills', label: 'Custom Skills', group: 'Skill Tables' },
+          { value: 'skill_executions', label: 'Skill Executions', group: 'Skill Tables' },
+          { value: 'skill_artifacts', label: 'Skill Artifacts', group: 'Skill Tables' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Data (JSON)</label>'
         + '<textarea rows="4" class="db-data-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm font-mono resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder=\'{"title": "Example", "content": "{{trigger.data.value}}"}\'></textarea>'
         + '<p class="mt-1 text-xs text-gray-500">Use <code>{{trigger.*}}</code> template variables for dynamic values. Fields like organization_id, matter_id, and created_by are auto-injected.</p>'
@@ -1069,11 +1090,12 @@
     } else if (type === 'notification') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Notification Type</label>'
-        + '<select class="notification-type-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="create_task">Create Task</option>'
-        + '<option value="send_notification">Send In-App Notification</option>'
-        + '<option value="log_activity">Log Activity</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="notification-type-select w-full" aria-label="Notification type"', [
+          { value: 'create_task', label: 'Create Task' },
+          { value: 'send_notification', label: 'Send In-App Notification' },
+          { value: 'log_activity', label: 'Log Activity' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Title / Subject</label>'
         + '<input type="text" class="notification-title-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="e.g., Review overdue invoices">'
         + '</div><div>'
@@ -1084,11 +1106,12 @@
     } else if (type === 'integration') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Action Type</label>'
-        + '<select class="integration-action-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="update_crm">Update CRM</option>'
-        + '<option value="webhook">Webhook</option>'
-        + '<option value="connector_execute">Connector Action</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="integration-action-select w-full" aria-label="Action type"', [
+          { value: 'update_crm', label: 'Update CRM' },
+          { value: 'webhook', label: 'Webhook' },
+          { value: 'connector_execute', label: 'Connector Action' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Configuration</label>'
         + '<textarea rows="3" class="integration-data-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm font-mono resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder=\'{"endpoint": "/api/v1/...", "data": {}}\'></textarea>'
         + '<p class="mt-1 text-xs text-gray-500">JSON config for connector parameters. Supports <code>{{variable}}</code> syntax.</p>'
@@ -1096,12 +1119,13 @@
     } else if (type === 'transform') {
       configHtml = '<div class="space-y-3"><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Operation</label>'
-        + '<select class="transform-operation-select w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">'
-        + '<option value="map">Map Fields</option>'
-        + '<option value="filter">Filter Data</option>'
-        + '<option value="merge">Merge Objects</option>'
-        + '<option value="split">Split String</option>'
-        + '</select></div><div>'
+        + stepSelectHtml('class="transform-operation-select w-full" aria-label="Operation"', [
+          { value: 'map', label: 'Map Fields' },
+          { value: 'filter', label: 'Filter Data' },
+          { value: 'merge', label: 'Merge Objects' },
+          { value: 'split', label: 'Split String' }
+        ])
+        + '</div><div>'
         + '<label class="block text-xs font-medium text-gray-700 mb-1.5">Configuration</label>'
         + '<textarea rows="3" class="transform-data-input w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 text-sm font-mono resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder=\'{"field": "{{trigger.data.value}}"}\'></textarea>'
         + '<p class="mt-1 text-xs text-gray-500">JSON config for this operation. Supports <code>{{variable}}</code> syntax.</p>'
@@ -1114,7 +1138,7 @@
     if (type === 'trigger') {
       var eventSelect = document.getElementById('event-type-select-' + stepId);
       if (eventSelect) {
-        eventSelect.addEventListener('change', function() {
+        eventSelect.addEventListener('lex-change', function() {
           updateEventDescription(stepId);
         });
       }
@@ -1128,8 +1152,11 @@
     }
 
     // Attach live-sync listeners for all form elements in this step
-    var allSelects = configContainer.querySelectorAll('select');
-    var allInputs = configContainer.querySelectorAll('input');
+    var allSelects = stepSelects(configContainer);
+    // The lex-select search box is an <input> too; leave it out.
+    var allInputs = Array.prototype.filter.call(configContainer.querySelectorAll('input'), function(input) {
+      return !input.closest('lex-select');
+    });
     var allTextareas = configContainer.querySelectorAll('textarea');
 
     var syncHandler = function() {
@@ -1151,11 +1178,11 @@
     };
     if (type === 'ai-action' && promptModeSelect) {
       updateAiPromptModeVisibility();
-      promptModeSelect.addEventListener('change', updateAiPromptModeVisibility);
+      promptModeSelect.addEventListener('lex-change', updateAiPromptModeVisibility);
     }
 
     for (var si = 0; si < allSelects.length; si++) {
-      allSelects[si].addEventListener('change', syncHandler);
+      allSelects[si].addEventListener('lex-change', syncHandler);
     }
     for (var ii = 0; ii < allInputs.length; ii++) {
       allInputs[ii].addEventListener('input', syncHandler);
@@ -1202,7 +1229,7 @@
         if (descEl) {
           descEl.innerHTML = renderEventSummaryHtml(eventType);
         }
-        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        selectEl.dispatchEvent(new CustomEvent('lex-change', { bubbles: true, detail: { name: selectEl.name || '', value: eventType } }));
       }
     });
   }
@@ -1310,12 +1337,12 @@
       }
     } else if (stepType === 'condition') {
       var inputs = container.querySelectorAll('input[type="text"]');
-      var selects = container.querySelectorAll('select');
+      var selects = stepSelects(container);
       if (inputs.length >= 1) config.field = inputs[0].value;
       if (selects.length >= 1) config.operator = selects[0].value;
       if (inputs.length >= 2) config.value = inputs[1].value;
     } else if (stepType === 'ai-action') {
-      var aiSelects = container.querySelectorAll('select');
+      var aiSelects = stepSelects(container);
       var textareas = container.querySelectorAll('textarea');
       if (aiSelects.length >= 1) config.task = aiSelects[0].value;
       if (aiSelects.length >= 2) config.prompt_mode = aiSelects[1].value;
@@ -1489,12 +1516,12 @@
       }
     } else if (stepType === 'condition') {
       var inputs = container.querySelectorAll('input[type="text"]');
-      var selects = container.querySelectorAll('select');
+      var selects = stepSelects(container);
       if (inputs.length >= 1 && configData.field !== undefined) inputs[0].value = configData.field;
       if (selects.length >= 1 && configData.operator) selects[0].value = configData.operator;
       if (inputs.length >= 2 && configData.value !== undefined) inputs[1].value = configData.value;
     } else if (stepType === 'ai-action') {
-      var aiSelects = container.querySelectorAll('select');
+      var aiSelects = stepSelects(container);
       var textareas = container.querySelectorAll('textarea');
       var taskVal = configData.task || '';
       var promptModeVal = configData.prompt_mode || (configData.system_prompt ? 'custom' : 'default');

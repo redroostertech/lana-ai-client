@@ -218,7 +218,7 @@ h1 {
   font-size: 12px;
 }
 
-.field span {
+.field > span {
   color: #46504c;
   font-size: 12px;
   font-weight: 700;
@@ -418,7 +418,7 @@ textarea:focus {
   min-width: 0;
 }
 
-.mini-field span {
+.mini-field > span {
   color: var(--muted);
   font-size: 10px;
   font-weight: 800;
@@ -868,8 +868,8 @@ textarea:focus {
   font-weight: 800;
 }
 
-.bullet-icon-row select {
-  padding: 6px 8px;
+.bullet-icon-row lex-select {
+  min-width: 0;
 }
 
 .bullet-icon-row small {
@@ -1761,7 +1761,7 @@ body[data-deck-style="noir"] .view-tabs {
 body[data-deck-style="noir"] .brand-block p,
 body[data-deck-style="noir"] .status,
 body[data-deck-style="noir"] #deckSubtitle,
-body[data-deck-style="noir"] .field span,
+body[data-deck-style="noir"] .field > span,
 body[data-deck-style="noir"] .check-field {
   color: var(--deck-muted);
 }

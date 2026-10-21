@@ -322,23 +322,12 @@
 
             <!-- Category Filter -->
             <div class="w-full md:w-48">
-              <select id="categoryFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="">All Categories</option>
-                <option value="crm">CRM</option>
-                <option value="case">Case Management</option>
-                <option value="documents">Documents</option>
-                <option value="communications">Communications</option>
-                <option value="financial">Financial</option>
-              </select>
+              <lex-select id="categoryFilter" placeholder="All categories" options='[{"value":"","label":"All categories"},{"value":"crm","label":"CRM"},{"value":"case","label":"Case management"},{"value":"documents","label":"Documents"},{"value":"communications","label":"Communications"},{"value":"financial","label":"Financial"}]' value=""></lex-select>
             </div>
 
             <!-- Auth Type Filter -->
             <div class="w-full md:w-48">
-              <select id="authTypeFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="">All Auth Types</option>
-                <option value="oauth2">OAuth 2.0</option>
-                <option value="api_key">API Key</option>
-              </select>
+              <lex-select id="authTypeFilter" placeholder="All auth types" options='[{"value":"","label":"All auth types"},{"value":"oauth2","label":"OAuth 2.0"},{"value":"api_key","label":"API key"}]' value=""></lex-select>
             </div>
           </div>
 
@@ -1639,8 +1628,8 @@
       });
 
       // Immediate filter on dropdown change
-      categoryFilter.addEventListener('change', filterAvailableConnectors);
-      authTypeFilter.addEventListener('change', filterAvailableConnectors);
+      categoryFilter.addEventListener('lex-change', filterAvailableConnectors);
+      authTypeFilter.addEventListener('lex-change', filterAvailableConnectors);
     }
 
     // Initialize search and filters
@@ -2318,6 +2307,7 @@
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-drawer.js"></script>
+  <script src="../js/lex/components/form/lex-select.js"></script>
 
   <!-- LANA dock (IDE-style docked chat panel) -->
   <script src="../js/lex/chat/lex-chat.format.js"></script>

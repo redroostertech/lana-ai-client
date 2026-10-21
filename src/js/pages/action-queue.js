@@ -1171,13 +1171,9 @@
 
     var modalContent =
       '<div style="margin-bottom:12px;">' +
-        '<label style="display:block;font-size:var(--lex-form-font-size,0.8125rem);font-weight:var(--lex-weight-medium,500);color:var(--lex-text-primary);margin-bottom:6px;">Task Priority</label>' +
-        '<select id="aqAssignPriority" style="width:100%;padding:8px 12px;font-family:inherit;font-size:var(--lex-form-font-size,0.8125rem);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.12));border-radius:var(--lex-input-radius,6px);background:var(--lex-bg-primary);color:var(--lex-text-primary);outline:none;">' +
-          '<option value="urgent"' + (defaultPriority === 'urgent' ? ' selected' : '') + '>Urgent</option>' +
-          '<option value="high"' + (defaultPriority === 'high' ? ' selected' : '') + '>High</option>' +
-          '<option value="medium"' + (defaultPriority === 'medium' ? ' selected' : '') + '>Medium</option>' +
-          '<option value="low"' + (defaultPriority === 'low' ? ' selected' : '') + '>Low</option>' +
-        '</select>' +
+        '<lex-select id="aqAssignPriority" label="Task priority"' +
+          ' options=\'[{"value":"urgent","label":"Urgent"},{"value":"high","label":"High"},{"value":"medium","label":"Medium"},{"value":"low","label":"Low"}]\'' +
+          ' value="' + (['urgent', 'high', 'medium', 'low'].indexOf(defaultPriority) !== -1 ? defaultPriority : 'medium') + '"></lex-select>' +
         '<p style="font-size:0.6875rem;color:var(--lex-text-tertiary);margin-top:6px;">Higher priority tasks are executed sooner. Urgent and High start immediately.</p>' +
       '</div>';
 
@@ -1242,11 +1238,8 @@
         '<textarea id="aqRejectReason" rows="3" maxlength="500" placeholder="Why is this not relevant?" style="width:100%;padding:8px 12px;font-family:inherit;font-size:var(--lex-form-font-size,0.8125rem);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.12));border-radius:var(--lex-input-radius,6px);background:var(--lex-bg-primary);color:var(--lex-text-primary);resize:vertical;outline:none;"></textarea>' +
       '</div>' +
       '<div>' +
-        '<label style="display:block;font-size:var(--lex-form-font-size,0.8125rem);font-weight:var(--lex-weight-medium,500);color:var(--lex-text-primary);margin-bottom:6px;">Suppress for</label>' +
-        '<select id="aqRejectDays" style="padding:8px 12px;font-family:inherit;font-size:var(--lex-form-font-size,0.8125rem);border:1px solid var(--lex-border-subtle,rgba(0,0,0,0.12));border-radius:var(--lex-input-radius,6px);background:var(--lex-bg-primary);color:var(--lex-text-primary);outline:none;">' +
-          '<option value="45">45 days</option>' +
-          '<option value="60">60 days</option>' +
-        '</select>' +
+        '<lex-select id="aqRejectDays" label="Suppress for"' +
+          ' options=\'[{"value":"45","label":"45 days"},{"value":"60","label":"60 days"}]\' value="45"></lex-select>' +
       '</div>';
 
     var modal = Lex.Modal.open({

@@ -73,7 +73,8 @@ button:focus {
   outline-offset: 2px;
 }
 
-label {
+label,
+.automation-field {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1259,7 +1260,8 @@ button:disabled {
   gap: 10px;
 }
 
-.automations-settings-panel label {
+.automations-settings-panel label,
+.automations-settings-panel .automation-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1267,7 +1269,8 @@ button:disabled {
   color: var(--black-500);
 }
 
-.automations-settings-panel label span {
+.automations-settings-panel label span,
+.automations-settings-panel .automation-field > span {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -1277,11 +1280,6 @@ button:disabled {
   font-size: 0.75rem;
   color: var(--black-500);
   line-height: 1.4;
-}
-
-.automations-settings-panel label > select[size] {
-  height: auto;
-  padding: 4px;
 }
 
 .automations-builder-matter-search {

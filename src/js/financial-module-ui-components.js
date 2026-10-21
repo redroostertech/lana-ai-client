@@ -6,6 +6,26 @@
  * @description Reusable UI components following LANA's vanilla JavaScript + Tailwind CSS architecture
  */
 
+/**
+ * lex-select `options` attribute value: [{ value, label }] with string values,
+ * escaped for a double-quoted HTML attribute.
+ * @param {Array<{value: *, label: string}>} options
+ * @returns {string}
+ */
+function lexSelectOptionsAttr(options) {
+  return JSON.stringify(options.map(option => ({ value: String(option.value), label: String(option.label) })))
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function lexSelectValueAttr(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;');
+}
+
 // ==============================================================================
 // TASK 1: PAGINATION UI COMPONENT
 // ==============================================================================
@@ -44,11 +64,7 @@ class PaginationComponent {
         <!-- Left: Page size selector -->
         <div class="flex items-center space-x-2">
           <span class="text-sm text-gray-700">Show</span>
-          <select id="pageSize" class="border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
-            ${this.pageSizeOptions.map(size => `
-              <option value="${size}" ${size === this.pageSize ? 'selected' : ''}>${size}</option>
-            `).join('')}
-          </select>
+          <lex-select id="pageSize" size="sm" options="${lexSelectOptionsAttr(this.pageSizeOptions.map(size => ({ value: size, label: String(size) })))}" value="${lexSelectValueAttr(this.pageSize)}"></lex-select>
           <span class="text-sm text-gray-700">items per page</span>
         </div>
 
@@ -232,8 +248,8 @@ class PaginationComponent {
     });
 
     // Page size selector
-    this.container.querySelector('#pageSize')?.addEventListener('change', (e) => {
-      this.changePageSize(e.target.value);
+    this.container.querySelector('#pageSize')?.addEventListener('lex-change', (e) => {
+      this.changePageSize(e.detail.value);
     });
   }
 
@@ -540,15 +556,7 @@ class SortComponent {
     this.container.innerHTML = `
       <div class="flex items-center space-x-2">
         <label for="sortSelect" class="text-sm font-medium text-gray-700">Sort by:</label>
-        <select id="sortSelect" class="block border-gray-300 rounded-md text-sm min-w-[200px] focus:ring-blue-500 focus:border-blue-500">
-          ${this.sortOptions.map(option => {
-            const value = `${option.field}:${option.direction}`;
-            const selected = this.currentSort &&
-                           this.currentSort.field === option.field &&
-                           this.currentSort.direction === option.direction;
-            return `<option value="${value}" ${selected ? 'selected' : ''}>${option.label}</option>`;
-          }).join('')}
-        </select>
+        <lex-select id="sortSelect" class="min-w-[200px]" size="sm" options="${lexSelectOptionsAttr(this.sortOptions.map(option => ({ value: `${option.field}:${option.direction}`, label: option.label })))}" value="${lexSelectValueAttr(this.currentSort ? `${this.currentSort.field}:${this.currentSort.direction}` : (this.sortOptions[0] ? `${this.sortOptions[0].field}:${this.sortOptions[0].direction}` : ''))}"></lex-select>
       </div>
     `;
   }
@@ -569,8 +577,8 @@ class SortComponent {
    * Attach event listeners to sort dropdown
    */
   attachEventListeners() {
-    this.container.querySelector('#sortSelect')?.addEventListener('change', (e) => {
-      const [field, direction] = e.target.value.split(':');
+    this.container.querySelector('#sortSelect')?.addEventListener('lex-change', (e) => {
+      const [field, direction] = String(e.detail.value || '').split(':');
       const sortOption = this.sortOptions.find(opt =>
         opt.field === field && opt.direction === direction
       );

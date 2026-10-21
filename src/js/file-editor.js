@@ -27,6 +27,7 @@
     'button',
     'input',
     'select',
+    'lex-select',
     'textarea'
   ].join(',');
   var DOC_UI_TEXT_ARTIFACT_PATTERN = /\s*\d?ReplaceDeleteInsert afterBIULinkFieldsApplyCancelAsk LANAAcceptReject\s*/g;
@@ -86,6 +87,20 @@
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;');
+  }
+
+  // lex-select markup: options are { value, label } with string values. The
+  // value falls back to the first option, as a native select did.
+  function lexSelectHtml(attrs, options, value) {
+    var values = options.map(function (option) { return option.value; });
+    var selected = values.indexOf(value) !== -1 ? value : (values.length ? values[0] : '');
+    return '<lex-select ' + attrs + ' options="' + esc(JSON.stringify(options)) + '" value="' + esc(selected) + '"></lex-select>';
+  }
+
+  function lexSelectHasOption(select, value) {
+    return Boolean(select && Array.isArray(select.options) && select.options.some(function (option) {
+      return option.value === value;
+    }));
   }
 
   function documentDisplayFilename(file) {
@@ -3955,14 +3970,14 @@
       '</section>';
     var editHtml =
       '<section class="office-file-info-fields office-file-info-edit">' +
-      '<label><span>Document Type</span><select id="officeMetaDocType">' +
-      '<option value="contract"' + (docType === 'contract' ? ' selected' : '') + '>Contract</option>' +
-      '<option value="affidavit"' + (docType === 'affidavit' ? ' selected' : '') + '>Affidavit</option>' +
-      '<option value="pleading"' + (docType === 'pleading' ? ' selected' : '') + '>Pleading</option>' +
-      '<option value="spreadsheet"' + (docType === 'spreadsheet' ? ' selected' : '') + '>Spreadsheet</option>' +
-      '<option value="presentation"' + (docType === 'presentation' ? ' selected' : '') + '>Presentation</option>' +
-      '<option value="other"' + (docType === 'other' ? ' selected' : '') + '>Other</option>' +
-      '</select></label>' +
+      lexSelectHtml('id="officeMetaDocType" label="Document Type"', [
+        { value: 'contract', label: 'Contract' },
+        { value: 'affidavit', label: 'Affidavit' },
+        { value: 'pleading', label: 'Pleading' },
+        { value: 'spreadsheet', label: 'Spreadsheet' },
+        { value: 'presentation', label: 'Presentation' },
+        { value: 'other', label: 'Other' }
+      ], docType) +
       '<label><span>Tags</span><input id="officeMetaTags" type="text" value="' + esc(metadata.tags || '') + '" placeholder="contract, nda, review"></label>' +
       '<label><span>Notes</span><textarea id="officeMetaNotes" rows="5" placeholder="Add file notes">' + esc(metadata.notes || '') + '</textarea></label>' +
       '<div class="office-file-info-actions"><button type="button" data-action="set-file-info-mode" data-file-info-mode="view">Cancel</button>' +
@@ -4862,12 +4877,20 @@
         '<button type="button" data-command="undo" data-format="undo" title="Undo" disabled aria-disabled="true">' + toolbarIcon('undo-2', 'Undo') + '</button>' +
         '<button type="button" data-command="redo" data-format="redo" title="Redo" disabled aria-disabled="true">' + toolbarIcon('redo-2', 'Redo') + '</button>') +
       toolbarGroup('Style',
-        '<select class="office-format-select" data-command="formatBlock" aria-label="Paragraph style"' + embedBlockedAttrs + '>' +
-        '<option value="p">Normal</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="h4">Heading 4</option><option value="h5">Heading 5</option><option value="h6">Heading 6</option><option value="subheading">Subheading</option><option value="blockquote">Quote</option><option value="pre">Code</option><option value="caption">Caption</option><option value="footnote">Footnote</option></select>' +
-        '<select class="office-format-select" data-command="fontName" aria-label="Font family"' + embedBlockedAttrs + '>' +
-        '<option value="Arial">Arial</option><option value="Georgia">Georgia</option><option value="Times New Roman">Times</option><option value="Courier New">Mono</option></select>' +
-        '<select class="office-format-select office-format-select-narrow" data-command="fontSize" aria-label="Font size"' + embedBlockedAttrs + '>' +
-        '<option value="2">Small</option><option value="3" selected>Body</option><option value="4">Large</option><option value="5">Title</option><option value="6">Hero</option></select>') +
+        lexSelectHtml('class="office-format-select" data-command="formatBlock" size="sm" aria-label="Paragraph style"' + embedBlockedAttrs, [
+          { value: 'p', label: 'Normal' }, { value: 'h1', label: 'Heading 1' }, { value: 'h2', label: 'Heading 2' },
+          { value: 'h3', label: 'Heading 3' }, { value: 'h4', label: 'Heading 4' }, { value: 'h5', label: 'Heading 5' },
+          { value: 'h6', label: 'Heading 6' }, { value: 'subheading', label: 'Subheading' }, { value: 'blockquote', label: 'Quote' },
+          { value: 'pre', label: 'Code' }, { value: 'caption', label: 'Caption' }, { value: 'footnote', label: 'Footnote' }
+        ], 'p') +
+        lexSelectHtml('class="office-format-select" data-command="fontName" size="sm" aria-label="Font family"' + embedBlockedAttrs, [
+          { value: 'Arial', label: 'Arial' }, { value: 'Georgia', label: 'Georgia' },
+          { value: 'Times New Roman', label: 'Times' }, { value: 'Courier New', label: 'Mono' }
+        ], 'Arial') +
+        lexSelectHtml('class="office-format-select office-format-select-narrow" data-command="fontSize" size="sm" aria-label="Font size"' + embedBlockedAttrs, [
+          { value: '2', label: 'Small' }, { value: '3', label: 'Body' }, { value: '4', label: 'Large' },
+          { value: '5', label: 'Title' }, { value: '6', label: 'Hero' }
+        ], '3')) +
       toolbarGroup('Marks',
         '<button type="button" data-command="bold" title="Bold">B</button>' +
         '<button type="button" data-command="italic" title="Italic">I</button>' +
@@ -6307,7 +6330,7 @@
             node.setAttribute('aria-pressed', active ? 'true' : 'false');
           });
         });
-        var styleSelect = document.querySelector('.office-doc-toolbar select[data-command="formatBlock"]');
+        var styleSelect = document.querySelector('.office-doc-toolbar lex-select[data-command="formatBlock"]');
         if (styleSelect && embedState.style !== 'mixed') {
           var styleValues = {
             Heading1: 'h1', Heading2: 'h2', Heading3: 'h3', Heading4: 'h4', Heading5: 'h5', Heading6: 'h6',
@@ -6339,27 +6362,27 @@
       }
     });
 
-    var blockSelect = document.querySelector('.office-doc-toolbar select[data-command="formatBlock"]');
+    var blockSelect = document.querySelector('.office-doc-toolbar lex-select[data-command="formatBlock"]');
     if (blockSelect) {
       var blocks = selectedDocBlocks();
       var normalized = blocks.length ? officeParagraphStyleForBlock(blocks[0]) : queryCommandValue('formatBlock');
       if (normalized.indexOf('heading') === 0) normalized = 'h' + normalized.replace(/[^0-9]/g, '');
       if (normalized === 'div' || normalized === '') normalized = 'p';
-      if (blockSelect.querySelector('option[value="' + normalized + '"]')) blockSelect.value = normalized;
+      if (lexSelectHasOption(blockSelect, normalized)) blockSelect.value = normalized;
     }
-    var fontSelect = document.querySelector('.office-doc-toolbar select[data-command="fontName"]');
-    if (fontSelect) {
+    var fontSelect = document.querySelector('.office-doc-toolbar lex-select[data-command="fontName"]');
+    if (fontSelect && Array.isArray(fontSelect.options)) {
       var font = queryCommandValue('fontName');
       for (var f = 0; f < fontSelect.options.length; f += 1) {
-        if (fontSelect.options[f].value.toLowerCase() === font) {
+        if (String(fontSelect.options[f].value).toLowerCase() === font) {
           fontSelect.value = fontSelect.options[f].value;
           break;
         }
       }
     }
-    var sizeSelect = document.querySelector('.office-doc-toolbar select[data-command="fontSize"]');
+    var sizeSelect = document.querySelector('.office-doc-toolbar lex-select[data-command="fontSize"]');
     var size = queryCommandValue('fontSize');
-    if (sizeSelect && sizeSelect.querySelector('option[value="' + size + '"]')) sizeSelect.value = size;
+    if (lexSelectHasOption(sizeSelect, size)) sizeSelect.value = size;
   }
 
   function updateSelectionToolbar() {
@@ -7160,13 +7183,16 @@
       }).filter(function (row) {
         return row.id && row.id !== currentMatter;
       });
-      select.innerHTML = '<option value="">Choose a workspace</option>' + rows.map(function (row) {
-        return '<option value="' + esc(row.id) + '">' + esc(row.name) + '</option>';
-      }).join('');
+      select.options = [{ value: '', label: 'Choose a workspace' }].concat(rows.map(function (row) {
+        return { value: row.id, label: row.name };
+      }));
+      select.placeholder = rows.length ? 'Choose a workspace' : 'No other active workspaces';
+      select.value = '';
       select.disabled = rows.length === 0;
-      if (!rows.length) select.innerHTML = '<option value="">No other active workspaces</option>';
     } catch (error) {
-      select.innerHTML = '<option value="">Workspaces unavailable</option>';
+      select.options = [];
+      select.placeholder = 'Workspaces unavailable';
+      select.value = '';
       select.disabled = true;
     }
   }
@@ -7201,11 +7227,15 @@
       Lex.Modal.open({
         heading: 'Share Document',
         size: 'sm',
-        content: '<div class="office-signer-form"><label for="officeShareTargetType">Share with</label>' +
-          '<select id="officeShareTargetType" class="office-format-select"><option value="user">Person</option><option value="workspace">Workspace</option></select>' +
+        content: '<div class="office-signer-form">' +
+          lexSelectHtml('id="officeShareTargetType" label="Share with"', [
+            { value: 'user', label: 'Person' }, { value: 'workspace', label: 'Workspace' }
+          ], 'user') +
           '<div id="officeShareUserFields"><label for="officeShareUserQuery">User name or email</label><input id="officeShareUserQuery" type="search" autocomplete="off" placeholder="person@example.com"></div>' +
-          '<div id="officeShareWorkspaceFields" hidden><label for="officeShareWorkspace">Workspace</label><select id="officeShareWorkspace" class="office-format-select" disabled><option value="">Loading workspaces...</option></select></div>' +
-          '<label for="officeSharePermission">Permission</label><select id="officeSharePermission" class="office-format-select"><option value="read">Can view</option><option value="write">Can edit</option></select></div>',
+          '<div id="officeShareWorkspaceFields" hidden><lex-select id="officeShareWorkspace" label="Workspace" searchable disabled placeholder="Loading workspaces..." options="[]" value=""></lex-select></div>' +
+          lexSelectHtml('id="officeSharePermission" label="Permission"', [
+            { value: 'read', label: 'Can view' }, { value: 'write', label: 'Can edit' }
+          ], 'read') + '</div>',
         confirmText: 'Grant access',
         cancelText: 'Cancel',
         onConfirm: submit
@@ -7214,7 +7244,7 @@
         var input = el('officeShareUserQuery');
         if (input) input.focus();
         var type = el('officeShareTargetType');
-        if (type) type.addEventListener('change', syncShareTargetFields);
+        if (type) type.addEventListener('lex-change', syncShareTargetFields);
         loadShareWorkspaceOptions(file);
       }, 0);
       return;
@@ -8052,10 +8082,18 @@
         return;
       }
       var commandTarget = event.target.closest('[data-command]');
-      if (commandTarget && commandTarget.matches('select, input[type="color"]')) {
+      if (commandTarget && commandTarget.matches('input[type="color"]')) {
         applyDocumentCommand(commandTarget);
         syncDocumentToolbarState();
       }
+    });
+
+    // Paragraph style, font and size are lex-selects: they report lex-change.
+    document.addEventListener('lex-change', function (event) {
+      var commandTarget = event.target && event.target.closest ? event.target.closest('lex-select[data-command]') : null;
+      if (!commandTarget) return;
+      applyDocumentCommand(commandTarget);
+      syncDocumentToolbarState();
     });
 
     document.addEventListener('focusin', function (event) {
@@ -8071,7 +8109,7 @@
 
     document.addEventListener('click', function (event) {
       var commandTarget = event.target.closest('[data-command]');
-      if (!commandTarget || commandTarget.matches('select, input[type="color"]')) return;
+      if (!commandTarget || commandTarget.matches('lex-select, input[type="color"]')) return;
       applyDocumentCommand(commandTarget);
       syncDocumentToolbarState();
       updateSelectionToolbar();
@@ -8106,6 +8144,11 @@
             try { embedToolbarSelectionRanges = embed.selectionRanges(); } catch (_) { embedToolbarSelectionRanges = null; }
             if (embedCommandTarget.matches('button')) event.preventDefault();
           }
+          // Opening a toolbar lex-select or clicking one of its options must
+          // not move the caret: its trigger and option rows are ordinary
+          // elements, so a mousedown there would collapse the selection the
+          // command is about to format.
+          if (embedCommandTarget.matches('lex-select')) event.preventDefault();
         }
       }
       if (event.target && event.target.closest && event.target.closest('[data-action="insert-template-variable"]')) {
