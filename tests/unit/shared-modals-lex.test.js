@@ -63,7 +63,9 @@ describe('WidgetConfigModal', () => {
     expect(modal.tagName).toBe('LEX-MODAL');
     expect(modal.open).toBe(true);
     expect(modal.heading).toBe('Add Widget');
-    expect(modal.querySelector('#widgetTypeSelect option[value="chart"]')).not.toBeNull();
+    const typeSelect = modal.querySelector('#widgetTypeSelect');
+    expect(typeSelect.tagName).toBe('LEX-SELECT');
+    expect(typeSelect.options.map((o) => o.value)).toContain('chart');
     const footer = modal.querySelector('.lex-modal-footer');
     expect(footer.querySelector('#saveWidgetBtn')).not.toBeNull();
     expect(footer.querySelector('#cancelWidgetBtn')).not.toBeNull();
