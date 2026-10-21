@@ -654,12 +654,15 @@ Sortable, searchable, filterable, paginated data table with selection and bulk a
 | `sortBy` | String | — | Default sort column |
 | `sortDir` | String | `'asc'` | Default sort direction |
 | `compact` | Boolean | `false` | Reduced padding |
-| `columnFilters` | Boolean | `false` | Per-column filter dropdowns (off when `serverPaging`) |
+| `columnFilters` | Boolean | `false` | Per-column filter dropdowns. Server-paged tables show one only on columns given `setColumnFilterOptions`; blank-label columns never get one |
+| `searchKeys` | String | all columns | Comma-separated columns the client-side search looks in |
 | `sortableColumns` | String | all | Comma-separated keys whose headers sort; empty = none |
 | `emptyText` | String | `'No data found'` | Empty state message |
 | `bulkActions` | Array | `[]` | `[{ label, action, variant?, icon? }]` |
 
 Plus `withDataSource` properties: `endpoint`, `limit`, `autoFetch`, `searchable`, `filterable`, `selectable`, `linkedTo`, `idKey`, `serverPaging`.
+
+**State API (use instead of private `dataSource._*` fields):** `table.setError(message)` (error state in either mode), `table.searchText`, `table.filteredRows` (client: all matching rows across pages), `table.restoreQuery({ search, sortBy, sortDir, filters, page, limit })` and `table.resetQuery()` (both set state without fetching).
 
 **Events:** `row-click`, `sort-change`, `selection-change`, `bulk-action`, `lex-filter-change`, `lex-data-loaded`, `lex-query-change` (server paging)
 

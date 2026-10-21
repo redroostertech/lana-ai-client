@@ -306,3 +306,59 @@ describe('lex-table page-supplied column filters', () => {
     expect(table._renderColFilterDropdown('created_at')).toContain('data-col-check="recent" checked');
   });
 });
+
+describe('lex-table state API', () => {
+  function clientTable(window, props = {}) {
+    const table = new window['lex-table']();
+    Object.assign(table, { limit: 2, columns: 'name,email,status', columnFilters: true }, props);
+    table.setData([
+      { id: 1, name: 'Ann', email: 'ann@x.io', status: 'Open' },
+      { id: 2, name: 'Bob', email: 'bob@y.io', status: 'Closed' },
+      { id: 3, name: 'Cy', email: 'cy@x.io', status: 'Open' }
+    ]);
+    return table;
+  }
+
+  test('filteredRows returns every matching row across pages; searchText reads the search', () => {
+    const window = loadLex();
+    const table = clientTable(window);
+    table.dataSource.setSearch('x.io');
+    expect(table.searchText).toBe('x.io');
+    expect(table.filteredRows.map((r) => r.id)).toEqual([1, 3]);
+  });
+
+  test('search-keys limits client-side search to the listed columns', () => {
+    const window = loadLex();
+    const table = clientTable(window, { searchKeys: 'name' });
+    table.dataSource.setSearch('x.io');
+    expect(table.filteredRows).toEqual([]);
+  });
+
+  test('restoreQuery sets search, sort, filters and page without a request; resetQuery clears them', () => {
+    const window = loadLex();
+    const table = serverTable(window, { sortBy: 'updated_at', sortDir: 'desc' });
+    const before = table.events.filter((e) => e.name === 'lex-query-change').length;
+    table.restoreQuery({ search: 'q', sortBy: 'name', sortDir: 'asc', filters: { name: { operator: 'contains', value: 'a' } }, page: 3 });
+    expect(table.events.filter((e) => e.name === 'lex-query-change').length).toBe(before);
+    expect(table.serverQuery).toMatchObject({ page: 3, sortBy: 'name', sortDir: 'asc', search: 'q', filters: { name: { operator: 'contains', value: 'a' } } });
+    table.resetQuery();
+    expect(table.serverQuery).toMatchObject({ page: 1, search: '', filters: {} });
+  });
+
+  test('setError shows the error state on a client-side table without switching to server mode', () => {
+    const window = loadLex();
+    const table = clientTable(window);
+    table.setError('Skills could not be loaded.');
+    expect(table.dataSource._serverMode).toBe(false);
+    expect(table.render()).toContain('Skills could not be loaded.');
+  });
+
+  test('blank-label columns get no header filter', () => {
+    const window = loadLex();
+    const table = clientTable(window, { columns: 'pin,name,actions', labels: ',Name,' });
+    const html = table.render();
+    expect(html).toContain('data-col-filter="name"');
+    expect(html).not.toContain('data-col-filter="pin"');
+    expect(html).not.toContain('data-col-filter="actions"');
+  });
+});
