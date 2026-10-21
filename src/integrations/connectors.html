@@ -2029,8 +2029,9 @@
 
     // Escape, backdrop click and the close button belong to the lex-modal;
     // reset the selected file the same way Cancel does.
-    document.getElementById('importConnectorModal').addEventListener('lex-close', () => {
-      clearConnectorFile();
+    // (delegated: this script runs before the modal element is parsed)
+    document.addEventListener('lex-close', (event) => {
+      if (event.target && event.target.id === 'importConnectorModal') clearConnectorFile();
     });
   </script>
 
