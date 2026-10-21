@@ -10,6 +10,9 @@
    Imperative Usage:
      Lex.Modal.confirm('Delete Matter', 'Are you sure?', () => { ... });
      Lex.Modal.alert('Success', 'Matter created successfully.');
+     if (await Lex.Modal.confirmAsync('Delete', 'Delete this matter?', { variant: 'danger' })) { ... }
+     await Lex.Modal.alertAsync('Saved', 'Your changes were saved.');
+     const name = await Lex.Modal.prompt('Rename', { label: 'Name', value: current });  // null on cancel
      Lex.Modal.open({ heading: 'Edit', content: '<form>...</form>', size: 'full' });
 
    Sizes: sm | md | lg | xl | full
@@ -590,6 +593,9 @@
 
       this.delegate('click', '[data-action="confirm"]', () => {
         this.emit('lex-confirm');
+        // A lex-confirm listener can call keepOpen() to stay open (e.g. a
+        // required field is empty).
+        if (this._keepOpenOnce) { this._keepOpenOnce = false; return; }
         this.open = false;
       });
 
@@ -636,6 +642,11 @@
       });
     }
 
+    // Call from a lex-confirm listener to keep the modal open this time.
+    keepOpen() {
+      this._keepOpenOnce = true;
+    }
+
     // --- Static API ---
 
     static confirm(title, message, onConfirm, options = {}) {
@@ -664,6 +675,100 @@
         ...options,
         confirmText: options.confirmText || 'OK',
         cancelText: null
+      });
+    }
+
+    // --- Promise API (replaces window.confirm / alert / prompt) ---
+    // These escape the message by default: pass plain text, or opts.html = true
+    // for trusted markup. (confirm/alert above keep taking raw HTML.)
+
+    static _escapeText(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    /** Resolves true on confirm, false on cancel, close or overlay click. */
+    static confirmAsync(title, message, options = {}) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const settle = (value) => { if (!settled) { settled = true; resolve(value); } };
+        const body = options.html ? message : LexModal._escapeText(message);
+        const modal = LexModal.confirm(title, body, () => settle(true), options);
+        modal.addEventListener('lex-cancel', () => settle(false));
+        modal.addEventListener('lex-close', () => settle(false));
+      });
+    }
+
+    /** Resolves once the alert is dismissed in any way. */
+    static alertAsync(title, message, options = {}) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const settle = () => { if (!settled) { settled = true; resolve(); } };
+        const body = options.html ? message : LexModal._escapeText(message);
+        const modal = LexModal.alert(title, body, options);
+        modal.addEventListener('lex-confirm', settle);
+        modal.addEventListener('lex-cancel', settle);
+        modal.addEventListener('lex-close', settle);
+      });
+    }
+
+    /**
+     * Ask for one line of text. Resolves the trimmed value on confirm, null on
+     * cancel or close. opts: label, value, placeholder, confirmText, cancelText,
+     * required (confirm stays put while empty), message (text above the field).
+     */
+    static prompt(title, options = {}) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const esc = LexModal._escapeText;
+        const modal = document.createElement('lex-modal');
+        modal.heading = title;
+        modal.size = options.size || 'sm';
+        modal.confirmText = options.confirmText || 'OK';
+        modal.cancelText = options.cancelText || 'Cancel';
+        const useLexInput = !!(window.customElements && window.customElements.get('lex-input'));
+        const field = useLexInput
+          ? `<lex-input data-lex-prompt-input label="${esc(options.label || '')}" value="${esc(options.value || '')}" placeholder="${esc(options.placeholder || '')}"></lex-input>`
+          : `<label class="lex-modal-body-text">${esc(options.label || '')}<input data-lex-prompt-input type="text" value="${esc(options.value || '')}" placeholder="${esc(options.placeholder || '')}" style="display:block;width:100%;margin-top:6px"></label>`;
+        modal.innerHTML = (options.message ? `<p class="lex-modal-body-text">${esc(options.message)}</p>` : '') + field;
+        const readValue = () => {
+          const input = modal.querySelector('[data-lex-prompt-input]');
+          return String(input && input.value != null ? input.value : '').trim();
+        };
+        const finish = (value) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+          removeAfterClose(modal);
+        };
+        modal.addEventListener('lex-confirm', (event) => {
+          const value = readValue();
+          if (options.required && !value) {
+            modal.keepOpen();
+            return;
+          }
+          finish(value);
+        });
+        modal.addEventListener('lex-cancel', () => finish(null));
+        modal.addEventListener('lex-close', () => finish(null));
+        modal.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' && event.target && event.target.closest && event.target.closest('[data-lex-prompt-input]')) {
+            event.preventDefault();
+            const value = readValue();
+            if (options.required && !value) return;
+            modal.open = false;
+            finish(value);
+          }
+        });
+        modal.open = true;
+        document.body.appendChild(modal);
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(() => {
+            const input = modal.querySelector('[data-lex-prompt-input]');
+            if (input && typeof input.focus === 'function') input.focus();
+          });
+        }
       });
     }
 

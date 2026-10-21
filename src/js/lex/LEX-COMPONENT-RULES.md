@@ -662,7 +662,7 @@ Sortable, searchable, filterable, paginated data table with selection and bulk a
 
 Plus `withDataSource` properties: `endpoint`, `limit`, `autoFetch`, `searchable`, `filterable`, `selectable`, `linkedTo`, `idKey`, `serverPaging`.
 
-**State API (use instead of private `dataSource._*` fields):** `table.setError(message)` (error state in either mode), `table.searchText`, `table.filteredRows` (client: all matching rows across pages), `table.restoreQuery({ search, sortBy, sortDir, filters, page, limit })` and `table.resetQuery()` (both set state without fetching).
+**State API (use instead of private `dataSource._*` fields):** `table.setError(message)` (error state in either mode), `table.setSearch(term)`, `table.searchText`, `table.pagination`, `table.filteredRows` (client: all matching rows across pages), `table.restoreQuery({ search, sortBy, sortDir, filters, page, limit })` and `table.resetQuery()` (both set state without fetching).
 
 **Events:** `row-click`, `sort-change`, `selection-change`, `bulk-action`, `lex-filter-change`, `lex-data-loaded`, `lex-query-change` (server paging)
 

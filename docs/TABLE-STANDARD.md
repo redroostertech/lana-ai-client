@@ -192,6 +192,10 @@ A list API behind a server table must support:
   - No hand-built dropdown or popover menus.
   - Option labels follow the capital-first-letter rule.
 - **Dialogs:** use `lex-modal`, with its own title, close button and footer slot.
+  - Instead of `window.confirm`, use `await Lex.Modal.confirmAsync(title, text, opts)`, which returns true or false.
+  - Instead of `window.alert`, use `await Lex.Modal.alertAsync(title, text)`.
+  - Instead of `window.prompt`, use `await Lex.Modal.prompt(title, { label, value, required })`, which returns a string, or null if cancelled.
+  - These three escape their text: pass plain text. The older `Lex.Modal.confirm/alert` take raw HTML.
 - **Side panels:** use `lex-drawer`, with its own header, close button and footer.
 - **No hand-built overlays.** That means no custom backdrop divs, `fixed inset-0` modals, or slide-overs. Never use `window.alert`, `confirm` or `prompt`; use `lex-modal` or a toast instead.
 - **A lex-table row click** opens the record's `lex-drawer` or detail page. It never opens a hand-built panel.

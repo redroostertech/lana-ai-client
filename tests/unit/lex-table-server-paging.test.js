@@ -362,3 +362,28 @@ describe('lex-table state API', () => {
     expect(html).not.toContain('data-col-filter="actions"');
   });
 });
+
+describe('lex-table public paging and search', () => {
+  test('setSearch filters a client table; pagination reports what it shows; setData keeps the chosen page size', () => {
+    const window = loadLex();
+    const table = new window['lex-table']();
+    Object.assign(table, { limit: 20, columns: 'name' });
+    const rows = Array.from({ length: 30 }, (_, i) => ({ id: i, name: i % 2 ? 'odd ' + i : 'even ' + i }));
+    table.setData(rows);
+    expect(table.pagination).toMatchObject({ page: 1, limit: 20, total: 30, totalPages: 2 });
+    table.setSearch('odd');
+    expect(table.searchText).toBe('odd');
+    expect(table.pagination.total).toBe(15);
+    table.dataSource.setLimit(50);
+    table.setData(rows);
+    expect(table.pagination.limit).toBe(50);
+  });
+
+  test('setSearch on a server table asks the page for page 1 with the term', () => {
+    const window = loadLex();
+    const table = serverTable(window);
+    table.dataSource._pagination.page = 4;
+    table.setSearch('nightly');
+    expect(lastEvent(table, 'lex-query-change').detail).toMatchObject({ page: 1, search: 'nightly' });
+  });
+});
