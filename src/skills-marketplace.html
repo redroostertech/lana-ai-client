@@ -123,32 +123,17 @@
   </div>
 
   <!-- Skill Details Modal -->
-  <div id="skill-details-modal" class="modal hidden">
-    <div class="modal-overlay"></div>
-    <div class="modal-content max-w-3xl">
-      <div class="modal-header">
-        <h3 class="text-xl font-semibold text-gray-900">Skill Details</h3>
-        <button class="modal-close">&times;</button>
-      </div>
-      <div id="skill-details-body" class="modal-body">
+  <lex-modal id="skill-details-modal" heading="Skill Details" size="lg">
+      <div id="skill-details-body">
         <!-- Populated by JS -->
       </div>
-      <div class="modal-footer">
-        <button id="modal-cancel-btn" class="btn-secondary">Close</button>
-        <button id="modal-install-btn" class="btn-primary">Install to Matter</button>
-      </div>
-    </div>
-  </div>
+      <button data-slot="footer" id="modal-cancel-btn" class="btn-secondary">Close</button>
+      <button data-slot="footer" id="modal-install-btn" class="btn-primary">Install to Matter</button>
+  </lex-modal>
 
   <!-- Matter Selector Modal -->
-  <div id="matter-selector-modal" class="modal hidden">
-    <div class="modal-overlay"></div>
-    <div class="modal-content max-w-2xl">
-      <div class="modal-header">
-        <h3 class="text-xl font-semibold text-gray-900">Install Skill to Matter</h3>
-        <button class="modal-close">&times;</button>
-      </div>
-      <div class="modal-body">
+  <lex-modal id="matter-selector-modal" heading="Install Skill to Matter" size="md">
+      <div>
         <p class="text-sm text-gray-600 mb-4">Select one or more matters to install this skill:</p>
         <div class="relative mb-4">
           <input
@@ -165,22 +150,13 @@
           <!-- Populated by JS -->
         </div>
       </div>
-      <div class="modal-footer">
-        <button id="matter-modal-cancel-btn" class="btn-secondary">Cancel</button>
-        <button id="matter-modal-install-btn" class="btn-primary">Install</button>
-      </div>
-    </div>
-  </div>
+      <button data-slot="footer" id="matter-modal-cancel-btn" class="btn-secondary">Cancel</button>
+      <button data-slot="footer" id="matter-modal-install-btn" class="btn-primary">Install</button>
+  </lex-modal>
 
   <!-- Skill Import Modal -->
-  <div id="skill-import-modal" class="modal hidden">
-    <div class="modal-overlay"></div>
-    <div class="modal-content max-w-2xl">
-      <div class="modal-header">
-        <h3 class="text-xl font-semibold text-gray-900">Import Skill Package</h3>
-        <button class="modal-close" id="skill-import-modal-close">&times;</button>
-      </div>
-      <div class="modal-body">
+  <lex-modal id="skill-import-modal" heading="Import Skill Package" size="md">
+      <div>
 
         <!-- Info notice -->
         <div class="rounded-lg p-4 mb-5 flex gap-3" style="background:#eff6ff;border:1px solid #bfdbfe">
@@ -223,16 +199,15 @@
         <div id="skill-import-result" class="hidden mb-4"></div>
 
       </div>
-      <div class="modal-footer">
-        <button id="skill-import-cancel-btn" class="btn-secondary">Cancel</button>
-        <button id="skill-import-confirm-btn" class="btn-primary" disabled>Import Skill</button>
-      </div>
-    </div>
-  </div>
+      <button data-slot="footer" id="skill-import-cancel-btn" class="btn-secondary">Cancel</button>
+      <button data-slot="footer" id="skill-import-confirm-btn" class="btn-primary" disabled>Import Skill</button>
+  </lex-modal>
 
   <!-- Toast Notification Container -->
   <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
   <script src="js/lana-one-terminology.js"></script>
+  <script src="js/lex/lex.core.js"></script>
+  <script src="js/lex/components/foundation/lex-modal.js"></script>
 </body>
 </html>

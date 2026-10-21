@@ -5403,7 +5403,11 @@
     var viewPanel = document.getElementById('metaViewMode');
     var editPanel = document.getElementById('metaEditMode');
     var footer = document.getElementById('metaActionsFooter');
-    var footerShell = footer && footer.closest ? footer.closest('.lex-drawer-footer') : null;
+    var drawer = footer && footer.closest ? footer.closest('lex-drawer') : null;
+    var setFooterVisible = function (visible) {
+      footer.classList.toggle('hidden', !visible);
+      if (drawer && typeof drawer.setFooterVisible === 'function') drawer.setFooterVisible(visible);
+    };
 
     if (toggle && toggle.value !== mode) {
       toggle.value = mode;
@@ -5412,13 +5416,11 @@
     if (mode === 'view') {
       viewPanel.classList.remove('hidden');
       editPanel.classList.add('hidden');
-      footer.classList.add('hidden');
-      if (footerShell) footerShell.classList.add('hidden');
+      setFooterVisible(false);
     } else {
       viewPanel.classList.add('hidden');
       editPanel.classList.remove('hidden');
-      footer.classList.remove('hidden');
-      if (footerShell) footerShell.classList.remove('hidden');
+      setFooterVisible(true);
     }
   }
 

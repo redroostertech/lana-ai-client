@@ -23,11 +23,8 @@
   ></lex-app>
 
   <div id="automation-modals">
-    <div id="template-modal" class="template-modal hidden" role="dialog" aria-modal="true" aria-labelledby="template-modal-title">
-      <div class="template-modal-overlay" data-template-modal-overlay></div>
-      <div class="template-modal-panel">
-        <button class="template-modal-close" type="button" aria-label="Close template details" data-template-modal-close>&times;</button>
-        <h2 id="template-modal-title"></h2>
+    <lex-modal id="template-modal" heading="Automation Template" size="lg" class="automation-modal">
+      <div class="automation-modal-body">
         <p id="template-modal-description" class="template-modal-description"></p>
 
         <div class="template-modal-recommended">
@@ -44,16 +41,12 @@
           <h3>How It Works</h3>
           <ol id="template-modal-steps" class="template-modal-steps"></ol>
         </div>
-
-        <button id="template-modal-try" class="btn btn-primary btn-full template-modal-cta" type="button" data-template-try>Try It</button>
       </div>
-    </div>
+      <lex-btn data-slot="footer" id="template-modal-try" variant="primary" size="md" data-template-try>Try It</lex-btn>
+    </lex-modal>
 
-    <div id="check-data-modal" class="template-modal hidden" role="dialog" aria-modal="true" aria-labelledby="check-data-modal-title">
-      <div class="template-modal-overlay" data-check-data-modal-overlay></div>
-      <div class="template-modal-panel">
-        <button class="template-modal-close" type="button" aria-label="Close check data details" data-check-data-modal-close>&times;</button>
-        <h2 id="check-data-modal-title">Check Data Readiness</h2>
+    <lex-modal id="check-data-modal" heading="Check Data Readiness" size="lg" class="automation-modal">
+      <div class="automation-modal-body">
         <p id="check-data-modal-description" class="template-modal-description"></p>
 
         <div class="template-modal-section">
@@ -65,16 +58,12 @@
           <h3>Why This Matters</h3>
           <ol id="check-data-modal-steps" class="template-modal-steps"></ol>
         </div>
-
-        <button id="check-data-modal-go" class="btn btn-primary btn-full template-modal-cta" type="button" data-check-data-go>Go to Connectors</button>
       </div>
-    </div>
+      <lex-btn data-slot="footer" id="check-data-modal-go" variant="primary" size="md" data-check-data-go>Go to Connectors</lex-btn>
+    </lex-modal>
 
-    <div id="connector-import-modal" class="template-modal hidden" role="dialog" aria-modal="true" aria-labelledby="connector-import-modal-title">
-      <div class="template-modal-overlay" data-connector-import-overlay></div>
-      <div class="template-modal-panel connector-import-panel">
-        <button class="template-modal-close" type="button" aria-label="Close connector import" data-connector-import-close>&times;</button>
-        <h2 id="connector-import-modal-title">Import Connector</h2>
+    <lex-modal id="connector-import-modal" heading="Import Connector" size="md" class="automation-modal">
+      <div class="automation-modal-body">
         <p class="template-modal-description">
           Upload a ZIP package containing <code>manifest.json</code>, <code>connector.json</code>, and optional UI assets.
           The backend validates the manifest, hook code, and UI files before installing.
@@ -103,19 +92,13 @@
         </div>
 
         <p id="connector-import-status" class="muted"></p>
-
-        <div class="template-modal-actions">
-          <lex-btn variant="secondary" size="md" data-connector-action="import-close">Cancel</lex-btn>
-          <lex-btn id="connector-import-submit" variant="primary" size="md" data-connector-action="import-submit" disabled>Upload Connector</lex-btn>
-        </div>
       </div>
-    </div>
+      <lex-btn data-slot="footer" variant="secondary" size="md" data-connector-action="import-close">Cancel</lex-btn>
+      <lex-btn data-slot="footer" id="connector-import-submit" variant="primary" size="md" data-connector-action="import-submit" disabled>Upload Connector</lex-btn>
+    </lex-modal>
 
-    <div id="connector-add-instance-modal" class="template-modal hidden" role="dialog" aria-modal="true" aria-labelledby="connector-add-instance-title">
-      <div class="template-modal-overlay" data-add-instance-overlay></div>
-      <div class="template-modal-panel connector-add-instance-panel">
-        <button class="template-modal-close" type="button" aria-label="Close add instance" data-add-instance-close>&times;</button>
-        <h2 id="connector-add-instance-title">Add <span id="connector-add-instance-connector-name">Connector</span> Instance</h2>
+    <lex-modal id="connector-add-instance-modal" heading="Add Connector Instance" size="md" class="automation-modal connector-add-instance-panel">
+      <div class="automation-modal-body">
         <p class="template-modal-description">
           Create an additional configuration of this connector. Each instance runs independently
           and can point at a different account, database, or location.
@@ -139,26 +122,16 @@
 
           <p id="connector-add-instance-error" class="form-error hidden"></p>
         </form>
-
-        <div class="template-modal-actions">
-          <lex-btn variant="secondary" size="md" data-connector-action="add-instance-close">Cancel</lex-btn>
-          <lex-btn id="connector-add-instance-submit" variant="primary" size="md" data-connector-action="add-instance-submit">Create Instance</lex-btn>
-        </div>
       </div>
-    </div>
+      <lex-btn data-slot="footer" variant="secondary" size="md" data-connector-action="add-instance-close">Cancel</lex-btn>
+      <lex-btn data-slot="footer" id="connector-add-instance-submit" type="submit" form="connector-add-instance-form" variant="primary" size="md">Create Instance</lex-btn>
+    </lex-modal>
 
-    <div id="connector-confirm-modal" class="template-modal hidden" role="dialog" aria-modal="true" aria-labelledby="connector-confirm-title">
-      <div class="template-modal-overlay" data-connector-confirm-overlay></div>
-      <div class="template-modal-panel connector-confirm-panel">
-        <button class="template-modal-close" type="button" aria-label="Close confirmation" data-connector-confirm-close>&times;</button>
-        <h2 id="connector-confirm-title">Confirm Action</h2>
-        <p id="connector-confirm-message" class="template-modal-description"></p>
-        <div class="template-modal-actions">
-          <lex-btn id="connector-confirm-cancel" variant="secondary" size="md" data-connector-action="confirm-cancel">Cancel</lex-btn>
-          <lex-btn id="connector-confirm-submit" variant="primary" size="md" data-connector-action="confirm-submit">Confirm</lex-btn>
-        </div>
-      </div>
-    </div>
+    <lex-modal id="connector-confirm-modal" heading="Confirm Action" size="md" class="automation-modal">
+      <p id="connector-confirm-message" class="template-modal-description"></p>
+      <lex-btn data-slot="footer" id="connector-confirm-cancel" variant="secondary" size="md" data-connector-action="confirm-cancel">Cancel</lex-btn>
+      <lex-btn data-slot="footer" id="connector-confirm-submit" variant="primary" size="md" data-connector-action="confirm-submit">Confirm</lex-btn>
+    </lex-modal>
 
   </div>
 
@@ -177,6 +150,8 @@
   <script src="../js/lex/lex.forms.js"></script>
   <script src="../js/lex/lex.state.js"></script>
   <script src="../js/lex/lex-nav.js"></script>
+  <!-- lex-modal before lex-btn: the modal clones its children on upgrade, so footer lex-btns must still be un-upgraded -->
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-card.js"></script>
   <script src="../js/lex/components/foundation/lex-action-card.js"></script>
@@ -185,7 +160,6 @@
   <script src="../js/lex/components/foundation/lex-breadcrumb.js"></script>
   <script src="../js/lex/components/foundation/lex-banner.js"></script>
   <script src="../js/lex/components/foundation/lex-drawer.js"></script>
-  <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>

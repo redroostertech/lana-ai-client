@@ -454,25 +454,35 @@ class ApiClient {
     this.token = null;
     this.user = null;
 
-    // Create modal overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-    overlay.id = 'sessionExpiredModal';
+    // Show the notice in a lex-modal. Pages without lex-modal.js (a few
+    // standalone legacy pages) skip the notice and redirect straight away
+    // rather than drawing a hand-built overlay.
+    const LexModal = window.Lex && window.Lex.Modal;
+    if (!LexModal || typeof LexModal.open !== 'function'
+        || (window.customElements && !window.customElements.get('lex-modal'))) {
+      window.location.href = getLoginPath();
+      return;
+    }
 
-    overlay.innerHTML = `
-      <div class="bg-white rounded-xl shadow-xl p-8 max-w-md mx-4 text-center">
-        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-          </svg>
+    const modal = LexModal.open({
+      heading: 'Session Expired',
+      size: 'sm',
+      closeOnOverlay: false,
+      content: `
+        <div class="text-center">
+          <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+          </div>
+          <p class="text-gray-600 mb-4">Your session has expired. Redirecting to login...</p>
+          <div class="text-3xl font-bold text-indigo-600" id="sessionCountdown">3</div>
         </div>
-        <h3 class="text-xl font-semibold text-gray-900 mb-2">Session Expired</h3>
-        <p class="text-gray-600 mb-4">Your session has expired. Redirecting to login...</p>
-        <div class="text-3xl font-bold text-indigo-600" id="sessionCountdown">3</div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
+      `
+    });
+    modal.id = 'sessionExpiredModal';
+    // The redirect happens regardless; there is nothing to dismiss to.
+    modal.hideClose = true;
 
     // Countdown and redirect
     let countdown = 3;

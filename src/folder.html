@@ -152,9 +152,8 @@
 
     <!-- New Folder Modal -->
     <lex-modal id="newFolderModal" heading="Create New Folder" size="md" hide-actions="true"
-      footer-content='<lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn><lex-btn type="button" variant="primary" id="createFolderSubmitBtn" onclick="document.getElementById(&#39;newFolderForm&#39;).requestSubmit()">Create</lex-btn>'>
+      footer-content='<lex-btn type="button" variant="secondary" id="cancelNewFolderBtn">Cancel</lex-btn><lex-btn type="submit" form="newFolderForm" variant="primary" id="createFolderSubmitBtn">Create</lex-btn>'>
       <form id="newFolderForm">
-        <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
         <lex-input
           id="folderNameInput"
           label="Folder Name"

@@ -1392,7 +1392,7 @@ function renderMatterAttachmentsSection(context) {
 function renderAttachMatterModal(context) {
   const ld = context.state.libraryDetail;
   const modal = ld.attachMatterModal || {};
-  if (!modal.open) return '';
+  if (!modal.open) return null;
 
   const matters = modal.matters || [];
   const query = modal.query || '';
@@ -1422,10 +1422,10 @@ function renderAttachMatterModal(context) {
       }).join('')
       : '<div class="muted">No matters found.</div>';
 
-  return `
-    <div class="ld-delete-modal-overlay" data-ld-attach-matter-overlay style="z-index:200;">
-      <div class="ld-delete-modal-panel" role="dialog" aria-modal="true" style="min-width:380px;max-width:560px;">
-        <h3>Attach to Matter</h3>
+  return {
+    heading: 'Attach to Matter',
+    size: 'md',
+    body: `
         <p class="muted">Select an active matter to attach this automation to.</p>
         <input
           type="search"
@@ -1438,12 +1438,9 @@ function renderAttachMatterModal(context) {
         <div class="ld-attach-matter-list" style="max-height:300px;overflow-y:auto;margin:8px 0;">
           ${mattorRows}
         </div>
-        <div class="row-actions" style="margin-top:16px;justify-content:flex-end;">
-          <lex-btn variant="secondary" size="sm" data-ld-attach-matter-cancel>Cancel</lex-btn>
-        </div>
-      </div>
-    </div>
-  `;
+    `,
+    footer: '<lex-btn variant="secondary" size="sm" data-ld-attach-matter-cancel>Cancel</lex-btn>'
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1453,27 +1450,26 @@ function renderAttachMatterModal(context) {
 function renderEditOverridesModal(context) {
   const ld = context.state.libraryDetail;
   const modal = ld.editOverridesModal || {};
-  if (!modal.open) return '';
+  if (!modal.open) return null;
 
   const raw = modal.overridesJson || '{}';
 
-  return `
-    <div class="ld-delete-modal-overlay" data-ld-overrides-overlay style="z-index:210;">
-      <div class="ld-delete-modal-panel" role="dialog" aria-modal="true" style="min-width:420px;">
-        <h3>Edit Config Overrides</h3>
+  return {
+    heading: 'Edit Config Overrides',
+    size: 'md',
+    body: `
         <p class="muted">Override automation config for this matter attachment. Must be valid JSON.</p>
         <textarea
           style="width:100%;min-height:160px;font-family:monospace;font-size:0.85rem;padding:8px;border:1px solid #ccc;border-radius:4px;margin:8px 0;"
           data-ld-overrides-textarea
         >${escapeHtml(raw)}</textarea>
-        <div class="row-actions" style="margin-top:16px;justify-content:flex-end;">
+    `,
+    footer: `
           <lex-btn variant="secondary" size="sm" data-ld-overrides-cancel>Cancel</lex-btn>
           <lex-btn variant="primary" size="sm" data-ld-overrides-save
             data-ld-overrides-matter="${escapeAttribute(modal.matterId || '')}">Save</lex-btn>
-        </div>
-      </div>
-    </div>
-  `;
+    `
+  };
 }
 
 function renderSettingsTab(context, automation) {
@@ -1529,18 +1525,15 @@ function renderSettingsTab(context, automation) {
 // ---------------------------------------------------------------------------
 
 function renderDeleteModal(automation) {
-  return `
-    <div class="ld-delete-modal-overlay" data-ld-delete-cancel>
-      <div class="ld-delete-modal-panel" role="dialog" aria-modal="true">
-        <h3>Delete this automation?</h3>
-        <p>Deleting <strong>${escapeHtml(automation.automation_name || 'this automation')}</strong> is permanent and cannot be undone. All run history will remain in the database but the automation will no longer execute.</p>
-        <div class="row-actions" style="margin-top:16px; justify-content:flex-end;">
+  return {
+    heading: 'Delete this automation?',
+    size: 'sm',
+    body: `<p class="muted">Deleting <strong>${escapeHtml(automation.automation_name || 'this automation')}</strong> is permanent and cannot be undone. All run history will remain in the database but the automation will no longer execute.</p>`,
+    footer: `
           <lex-btn variant="secondary" size="sm" data-ld-delete-cancel>Cancel</lex-btn>
           <lex-btn variant="danger" size="sm" data-ld-delete-confirm>Delete Permanently</lex-btn>
-        </div>
-      </div>
-    </div>
-  `;
+    `
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1548,7 +1541,7 @@ function renderDeleteModal(automation) {
 // ---------------------------------------------------------------------------
 
 function renderArtifactModal(artifact, modalView = 'default') {
-  if (!artifact) return '';
+  if (!artifact) return null;
   const payload = getArtifactDataPayload(artifact);
   const isTestRunReport = (artifact.artifact_type || artifact.type) === 'test_run_report';
   const isRedlineArtifact = (artifact.artifact_type || artifact.type) === 'document_redline';
@@ -1588,44 +1581,6 @@ function renderArtifactModal(artifact, modalView = 'default') {
     ? `
       <div class="ld-redline-modal-shell" data-ld-redline-modal>
         <style>
-          .ld-artifact-modal-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 4000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            background: rgba(15, 23, 42, 0.48);
-            backdrop-filter: blur(4px);
-          }
-          .ld-artifact-modal-panel {
-            width: min(760px, calc(100vw - 48px));
-            max-height: calc(100vh - 48px);
-            overflow: auto;
-            border-radius: 18px;
-            background: #fff;
-            box-shadow: 0 20px 60px rgba(15, 23, 42, 0.24);
-            padding: 20px 22px;
-          }
-          .ld-artifact-modal-panel--fullscreen {
-            width: min(96vw, 1760px);
-            height: min(94vh, 1320px);
-            max-height: none;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-          }
-          .ld-artifact-modal-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-          }
-          .ld-artifact-modal-header h3 {
-            margin: 0;
-            font-size: 1.1rem;
-          }
           .ld-artifact-modal-meta {
             display: flex;
             align-items: center;
@@ -1813,13 +1768,11 @@ function renderArtifactModal(artifact, modalView = 'default') {
         `
         : `<pre class="ld-artifact-modal-body">${escapeHtml(preview)}</pre>`;
 
-  return `
-    <div class="ld-artifact-modal-overlay" data-ld-artifact-modal-overlay>
-      <div class="ld-artifact-modal-panel${isRedlineArtifact && hasInlineHtml ? ' ld-artifact-modal-panel--fullscreen' : ''}" role="dialog" aria-modal="true">
-        <div class="ld-artifact-modal-header">
-          <h3>${escapeHtml(artifact.artifact_name || artifact.name || 'Artifact')}</h3>
-          <lex-btn variant="ghost" size="sm" data-ld-artifact-modal-close>Close</lex-btn>
-        </div>
+  return {
+    heading: artifact.artifact_name || artifact.name || 'Artifact',
+    // A redline with inline HTML needs the document pane and index side by side.
+    size: isRedlineArtifact && hasInlineHtml ? 'full' : 'lg',
+    body: `
       <div class="ld-artifact-modal-meta">
           ${badge(formatLabel(artifact.artifact_type || artifact.type || 'output'))}
           <span class="muted">${escapeHtml(timeAgo(artifact.created_at))}</span>
@@ -1846,9 +1799,9 @@ function renderArtifactModal(artifact, modalView = 'default') {
           </div>
         ` : ''}
         ${body}
-      </div>
-    </div>
-  `;
+    `,
+    footer: '<lex-btn variant="ghost" size="sm" data-ld-artifact-modal-close>Close</lex-btn>'
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1862,6 +1815,7 @@ export function renderLibraryDetail(context) {
   if (!container) return;
 
   if (!ld || !ld.automationId) {
+    syncLibraryDetailModals(context, {});
     container.innerHTML = surface({
       title: 'Automation Not Found',
       body: `
@@ -1877,6 +1831,7 @@ export function renderLibraryDetail(context) {
   const automation = ld.automation;
 
   if (!automation) {
+    syncLibraryDetailModals(context, {});
     container.innerHTML = `
       <div class="connector-detail-shell">
         <header class="connector-detail-header">
@@ -1967,12 +1922,105 @@ export function renderLibraryDetail(context) {
         ${tabContent}
       </div>
 
-      ${showDeleteModal ? renderDeleteModal(automation) : ''}
-      ${showArtifactModal ? renderArtifactModal(ld.modalArtifact, ld.artifactModalView || 'redline') : ''}
-      ${renderAttachMatterModal(context)}
-      ${renderEditOverridesModal(context)}
     </div>
   `;
+
+  syncLibraryDetailModals(context, {
+    delete: showDeleteModal ? renderDeleteModal(automation) : null,
+    artifact: showArtifactModal ? renderArtifactModal(ld.modalArtifact, ld.artifactModalView || 'redline') : null,
+    attachMatter: renderAttachMatterModal(context),
+    editOverrides: renderEditOverridesModal(context)
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Dialogs: one lex-modal per dialog, kept outside #view-content so a view
+// re-render refreshes its content instead of re-creating (and re-animating)
+// it. Header close, Escape and the backdrop emit lex-close, which clears the
+// matching state and re-renders.
+// ---------------------------------------------------------------------------
+
+const LD_MODAL_DISMISS = {
+  delete: (ld) => { ld.deleteModalOpen = false; },
+  artifact: (ld) => {
+    ld.artifactModalOpen = false;
+    ld.modalArtifact = null;
+    ld.artifactModalView = 'redline';
+  },
+  attachMatter: (ld) => { ld.attachMatterModal = null; },
+  editOverrides: (ld) => { ld.editOverridesModal = null; }
+};
+
+const ldModals = new Map();
+
+// Keep typing focus in a field whose markup is replaced on refresh (the
+// attach-matter search re-renders the list on every keystroke).
+function focusKey(el) {
+  if (!el || !el.attributes) return null;
+  for (const attr of el.attributes) {
+    if (attr.name.startsWith('data-ld-')) return attr.name;
+  }
+  return null;
+}
+
+function setLdModalContent(modal, spec) {
+  const host = modal.querySelector('[data-ld-modal-content]');
+  if (!host) return;
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  const key = active && host.contains(active) ? focusKey(active) : null;
+  const selection = key && typeof active.selectionStart === 'number'
+    ? [active.selectionStart, active.selectionEnd]
+    : null;
+  host.innerHTML = spec.body || '';
+  if (key) {
+    const next = host.querySelector(`[${key}]`);
+    if (next && typeof next.focus === 'function') {
+      next.focus();
+      if (selection && typeof next.setSelectionRange === 'function') {
+        try { next.setSelectionRange(selection[0], selection[1]); } catch (_error) { /* type without selection */ }
+      }
+    }
+  }
+}
+
+export function syncLibraryDetailModals(context, specs = {}) {
+  const Modal = typeof window !== 'undefined' && window.Lex ? window.Lex.Modal : null;
+  for (const key of Object.keys(LD_MODAL_DISMISS)) {
+    const spec = specs[key] || null;
+    let modal = ldModals.get(key);
+
+    if (modal && (!spec || !modal.isConnected || modal.dataset.ldModalSize !== spec.size)) {
+      ldModals.delete(key);
+      modal.__ldClosedBySync = true;
+      if (typeof modal.removeAfterClose === 'function') modal.removeAfterClose();
+      else modal.remove();
+      modal = null;
+    }
+    if (!spec || !Modal) continue;
+
+    if (!modal) {
+      modal = Modal.open({
+        heading: spec.heading,
+        size: spec.size,
+        content: '<div data-ld-modal-content></div>'
+      });
+      modal.dataset.ldModal = key;
+      modal.dataset.ldModalSize = spec.size || '';
+      modal.addEventListener('lex-close', () => {
+        if (modal.__ldClosedBySync) return;
+        ldModals.delete(key);
+        const ld = context.state.libraryDetail;
+        if (ld) LD_MODAL_DISMISS[key](ld);
+        context.renderCurrentView();
+      });
+      ldModals.set(key, modal);
+    } else if (modal.heading !== spec.heading) {
+      modal.heading = spec.heading;
+    }
+
+    setLdModalContent(modal, spec);
+    modal.setFooterContent(spec.footer || '');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2327,7 +2375,7 @@ export async function handleLibraryDetailClick(context, event) {
   }
 
   // Artifact modal close
-  if (event.target.matches('[data-ld-artifact-modal-overlay]') || event.target.closest('[data-ld-artifact-modal-close]')) {
+  if (event.target.closest('[data-ld-artifact-modal-close]')) {
     ld.artifactModalOpen = false;
     ld.modalArtifact = null;
     ld.artifactModalView = 'redline';
@@ -2381,9 +2429,8 @@ export async function handleLibraryDetailClick(context, event) {
     return true;
   }
 
-  // Cancel attach modal — Cancel button or backdrop click (matches() only fires on direct overlay target)
-  if (event.target.closest('[data-ld-attach-matter-cancel]') ||
-      (event.target.matches && event.target.matches('[data-ld-attach-matter-overlay]'))) {
+  // Cancel attach modal (header close / Escape / backdrop go through lex-close)
+  if (event.target.closest('[data-ld-attach-matter-cancel]')) {
     ld.attachMatterModal = null;
     context.renderCurrentView();
     return true;
@@ -2441,9 +2488,8 @@ export async function handleLibraryDetailClick(context, event) {
     return true;
   }
 
-  // Cancel edit overrides — Cancel button or backdrop click
-  if (event.target.closest('[data-ld-overrides-cancel]') ||
-      (event.target.matches && event.target.matches('[data-ld-overrides-overlay]'))) {
+  // Cancel edit overrides (header close / Escape / backdrop go through lex-close)
+  if (event.target.closest('[data-ld-overrides-cancel]')) {
     ld.editOverridesModal = null;
     context.renderCurrentView();
     return true;

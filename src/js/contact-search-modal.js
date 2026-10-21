@@ -2,6 +2,7 @@
  * Contact Search Modal
  * Search for existing contacts across the organization and link them to a matter.
  * Supports role selection when linking via a custom styled dropdown.
+ * Rendered in a lex-modal (requires lex-modal.js on the page).
  */
 
 const ContactSearchModal = {
@@ -18,6 +19,11 @@ const ContactSearchModal = {
    * Initialize the modal (call once on page load)
    */
   init() {
+    if (this.modal) return true;
+    // lex-modal.js may load after this script; open() retries init.
+    if (!(window.customElements && window.customElements.get('lex-modal'))) {
+      return false;
+    }
     if (!document.getElementById('contactSearchModal')) {
       this.createModal();
     }
@@ -34,47 +40,33 @@ const ContactSearchModal = {
    * Create the modal HTML
    */
   createModal() {
-    const modalHTML = `
-      <div id="contactSearchModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50" onclick="if(event.target === this) ContactSearchModal.close()">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onclick="event.stopPropagation()">
-          <!-- Modal Header -->
-          <div class="flex items-center justify-between p-6 border-b border-gray-200">
-            <div>
-              <h2 class="text-xl font-semibold text-gray-900">Link Existing Contact</h2>
-              <p class="text-sm text-gray-500 mt-0.5">Search contacts in your organization</p>
-            </div>
-            <button onclick="ContactSearchModal.close()" class="text-gray-400 hover:text-gray-600 transition-colors">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </button>
-          </div>
-
-          <!-- Search Input -->
-          <div class="p-6 border-b border-gray-200">
-            <div class="relative">
-              <input
-                type="text"
-                id="contactSearchInput"
-                placeholder="Search by name, email, or company..."
-                class="w-full pl-10 pr-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                autocomplete="off"
-              >
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-              </svg>
-            </div>
-          </div>
-
-          <!-- Search Results -->
-          <div id="contactSearchResults" class="flex-1 overflow-y-auto p-6">
-            <p class="text-gray-500 text-sm text-center py-8">Type at least 2 characters to search...</p>
-          </div>
-        </div>
+    // lex-modal supplies the title, close button, backdrop, Escape and focus
+    // trap. Content is set before the element connects so the component
+    // captures it once.
+    const modal = document.createElement('lex-modal');
+    modal.id = 'contactSearchModal';
+    modal.setAttribute('heading', 'Link Existing Contact');
+    modal.setAttribute('size', 'lg');
+    modal.setAttribute('hide-actions', '');
+    modal.innerHTML = `
+      <p class="text-sm text-gray-500 -mt-2 mb-4">Search contacts in your organization</p>
+      <div class="relative mb-4">
+        <input
+          type="text"
+          id="contactSearchInput"
+          placeholder="Search by name, email, or company..."
+          class="w-full pl-10 pr-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          autocomplete="off"
+        >
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+      </div>
+      <div id="contactSearchResults">
+        <p class="text-gray-500 text-sm text-center py-8">Type at least 2 characters to search...</p>
       </div>
     `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    document.body.appendChild(modal);
   },
 
   /**
@@ -100,11 +92,8 @@ const ContactSearchModal = {
       }, 300);
     });
 
-    this.searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        this.close();
-      }
-    });
+    // The modal's close button, backdrop and Escape close it; reset state.
+    this.modal.addEventListener('lex-close', () => this.close());
 
     // Close role dropdowns when clicking outside
     document.addEventListener('click', (e) => {
@@ -119,12 +108,14 @@ const ContactSearchModal = {
    * @param {string} matterId - The matter to link contacts to
    */
   async open(matterId) {
-    if (!this.modal) this.init();
+    if (!this.modal && !this.init()) {
+      console.warn('[ContactSearchModal] lex-modal is not loaded on this page');
+      return;
+    }
 
     this.currentMatterId = matterId;
     this.selectedRoles = {};
-    this.modal.classList.remove('hidden');
-    this.modal.classList.add('flex');
+    this.modal.open = true;
     this.isOpen = true;
 
     // Load roles if not cached
@@ -147,8 +138,7 @@ const ContactSearchModal = {
   close() {
     if (!this.modal) return;
 
-    this.modal.classList.add('hidden');
-    this.modal.classList.remove('flex');
+    if (this.modal.open) this.modal.open = false;
     this.isOpen = false;
     this.selectedRoles = {};
 

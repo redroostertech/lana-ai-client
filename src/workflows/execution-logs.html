@@ -179,7 +179,9 @@
   </div>
 
   <!-- Log Details Modal -->
-  <lex-modal id="logModal" heading="Execution details" size="lg" footer-content='<button type="button" class="lex-modal-btn lex-modal-btn--cancel" data-log-action="close">Close</button><button type="button" class="lex-modal-btn lex-modal-btn--confirm" data-log-action="retry">Retry execution</button>'>
+  <lex-modal id="logModal" heading="Execution details" size="lg">
+    <lex-btn data-slot="footer" variant="secondary" data-log-action="close">Close</lex-btn>
+    <lex-btn data-slot="footer" variant="primary" data-log-action="retry">Retry execution</lex-btn>
     <div>
       <p id="logWorkflow" class="text-sm text-gray-500 mb-4">-</p>
       <div class="grid grid-cols-2 gap-4 mb-6">
@@ -230,11 +232,12 @@
   <script src="../js/lex/lex.forms.js"></script>
   <script src="../js/lex/lex.state.js"></script>
   <script src="../js/lex/lex.utils.js"></script>
+  <!-- lex-modal before lex-btn: the modal clones its children on upgrade, so footer lex-btns must still be un-upgraded -->
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
-  <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>

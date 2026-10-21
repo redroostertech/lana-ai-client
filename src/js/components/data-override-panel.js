@@ -1,7 +1,7 @@
 /**
  * DataOverridePanel - Reusable ES6 component for managing metric data overrides
  *
- * This component provides a slide-out panel interface for:
+ * This component provides a lex-drawer side panel for:
  * - Viewing current metric targets/values
  * - Creating manual overrides for specific time periods
  * - Viewing and managing existing overrides
@@ -86,7 +86,6 @@ export class DataOverridePanel {
     this.currentPeriod = null;
 
     // DOM references (will be set when panel is initialized)
-    this.overlay = null;
     this.panel = null;
     this.form = null;
 
@@ -127,26 +126,27 @@ export class DataOverridePanel {
    * @private
    */
   _ensureDOMElements() {
-    // Check if elements already exist
-    if (document.getElementById('dataOverrideOverlay')) {
+    // Reuse a drawer an earlier instance (or the page) already mounted.
+    const existing = document.getElementById('dataOverridePanel');
+    if (existing && existing.tagName === 'LEX-DRAWER') {
       this._cacheElements();
       return;
     }
+    // Replace legacy hand-built overlay/panel markup if a page still ships it.
+    if (existing) existing.remove();
+    const legacyOverlay = document.getElementById('dataOverrideOverlay');
+    if (legacyOverlay) legacyOverlay.remove();
 
-    // Create overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'dataOverrideOverlay';
-    overlay.className = 'fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity';
-    document.body.appendChild(overlay);
+    // lex-drawer supplies the header, close button, backdrop, Escape, focus
+    // trap and scroll lock; the Save/Cancel buttons sit in its footer slot.
+    const drawer = document.createElement('lex-drawer');
+    drawer.id = 'dataOverridePanel';
+    drawer.setAttribute('heading', 'Override Target Value');
+    drawer.setAttribute('width', 'md');
+    drawer.innerHTML = this._getPanelHTML();
+    document.body.appendChild(drawer);
 
-    // Create panel
-    const panel = document.createElement('div');
-    panel.id = 'dataOverridePanel';
-    panel.className = 'fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col';
-    panel.innerHTML = this._getPanelHTML();
-    document.body.appendChild(panel);
-
-    // Cache element references
+    // Cache element references (after the drawer has rendered its content)
     this._cacheElements();
   }
 
@@ -155,7 +155,6 @@ export class DataOverridePanel {
    * @private
    */
   _cacheElements() {
-    this.overlay = document.getElementById('dataOverrideOverlay');
     this.panel = document.getElementById('dataOverridePanel');
     this.form = document.getElementById('overrideForm');
 
@@ -175,11 +174,9 @@ export class DataOverridePanel {
       moduleKey: document.getElementById('overrideModuleKey'),
       metricKey: document.getElementById('overrideMetricKey'),
       saveBtn: document.getElementById('saveOverrideBtn'),
-      saveBtnText: document.getElementById('saveOverrideBtnText'),
-      saveBtnSpinner: document.getElementById('saveOverrideBtnSpinner'),
+      cancelBtn: document.getElementById('cancelOverrideBtn'),
       existingSection: document.getElementById('existingOverridesSection'),
-      existingList: document.getElementById('existingOverridesList'),
-      closeBtn: document.getElementById('closeDataOverridePanel')
+      existingList: document.getElementById('existingOverridesList')
     };
   }
 
@@ -188,14 +185,14 @@ export class DataOverridePanel {
    * @private
    */
   _bindEvents() {
-    // Close panel when clicking overlay
-    if (this.overlay) {
-      this.overlay.addEventListener('click', () => this.close());
+    // The drawer's close button, backdrop and Escape emit lex-close; clear
+    // the panel state the same way the Cancel button does.
+    if (this.panel) {
+      this.panel.addEventListener('lex-close', () => this._resetState());
     }
 
-    // Close button
-    if (this.elements.closeBtn) {
-      this.elements.closeBtn.addEventListener('click', () => this.close());
+    if (this.elements.cancelBtn) {
+      this.elements.cancelBtn.addEventListener('click', () => this.close());
     }
 
     // Form submission
@@ -211,16 +208,7 @@ export class DataOverridePanel {
    */
   _getPanelHTML() {
     return `
-      <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gray-900">Override Target Value</h2>
-        <button id="closeDataOverridePanel" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto p-6">
+      <div>
         <!-- Metric Info -->
         <div class="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
           <h3 id="overrideMetricName" class="font-semibold text-gray-900 mb-1"></h3>
@@ -276,27 +264,6 @@ export class DataOverridePanel {
           <input type="hidden" id="overrideModuleKey">
           <input type="hidden" id="overrideMetricKey">
 
-          <!-- Action Buttons -->
-          <div class="flex gap-3 pt-4">
-            <button
-              type="submit"
-              id="saveOverrideBtn"
-              class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              <span id="saveOverrideBtnText">Save Override</span>
-              <svg id="saveOverrideBtnSpinner" class="hidden animate-spin inline-block w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </button>
-            <button
-              type="button"
-              id="cancelOverrideBtn"
-              class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
         </form>
 
         <!-- Existing Overrides -->
@@ -307,6 +274,9 @@ export class DataOverridePanel {
           </div>
         </div>
       </div>
+
+      <lex-btn data-slot="footer" id="cancelOverrideBtn" variant="secondary">Cancel</lex-btn>
+      <lex-btn data-slot="footer" id="saveOverrideBtn" type="submit" form="overrideForm" variant="primary">Save Override</lex-btn>
     `;
   }
 
@@ -383,26 +353,23 @@ export class DataOverridePanel {
     // Load existing overrides for this metric
     this._loadExistingOverrides(periodData.moduleKey, metricKey, periodData.periodStart, periodData.periodEnd);
 
-    // Show panel with animation
-    this.overlay.classList.remove('hidden');
-    this.panel.classList.remove('translate-x-full');
-
-    // Prevent body scroll
-    document.body.style.overflow = 'hidden';
+    // Show the drawer (it locks body scroll and traps focus)
+    this.panel.open = true;
   }
 
   /**
    * Close the data override panel
    */
   close() {
-    // Hide panel with animation
-    this.panel.classList.add('translate-x-full');
-    this.overlay.classList.add('hidden');
+    if (this.panel) this.panel.open = false;
+    this._resetState();
+  }
 
-    // Restore body scroll
-    document.body.style.overflow = '';
-
-    // Clear state
+  /**
+   * Clear per-open state
+   * @private
+   */
+  _resetState() {
     this.currentMetric = null;
     this.currentPeriod = null;
   }
@@ -608,14 +575,8 @@ export class DataOverridePanel {
    * @param {boolean} isLoading - Loading state
    */
   _setLoadingState(isLoading) {
-    this.elements.saveBtn.disabled = isLoading;
-    this.elements.saveBtnText.textContent = isLoading ? 'Saving...' : 'Save Override';
-
-    if (isLoading) {
-      this.elements.saveBtnSpinner.classList.remove('hidden');
-    } else {
-      this.elements.saveBtnSpinner.classList.add('hidden');
-    }
+    // lex-btn shows its spinner and disables itself while loading
+    if (this.elements.saveBtn) this.elements.saveBtn.loading = isLoading;
   }
 
   /**

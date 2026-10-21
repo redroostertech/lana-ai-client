@@ -201,11 +201,11 @@
   <script src="../js/lex/lex.forms.js"></script>
   <script src="../js/lex/lex.state.js"></script>
   <script src="../js/lex/lex.utils.js"></script>
+  <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/foundation/lex-btn.js"></script>
   <script src="../js/lex/components/foundation/lex-badge.js"></script>
   <script src="../js/lex/components/foundation/lex-empty.js"></script>
   <script src="../js/lex/components/foundation/lex-spinner.js"></script>
-  <script src="../js/lex/components/foundation/lex-modal.js"></script>
   <script src="../js/lex/components/data/lex-table.js"></script>
   <script src="../js/lex/components/form/lex-select.js"></script>
   <script src="../js/lex/components/form/lex-input.js"></script>
@@ -371,9 +371,14 @@
       return true;
     }
 
-    // lex-modal closes itself on confirm; reopen when the name is missing.
-    createModal.addEventListener('lex-confirm', async () => {
-      if (!(await createAudience())) createModal.open = true;
+    // Stay open (keepOpen) while the required name is missing.
+    createModal.addEventListener('lex-confirm', () => {
+      if (!document.getElementById('audienceName').value.trim()) {
+        Toast.error('Please enter an audience name');
+        createModal.keepOpen();
+        return;
+      }
+      createAudience();
     });
 
     function showLoadingStates() {

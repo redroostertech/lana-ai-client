@@ -33,7 +33,6 @@ const UserPickerModal = {
 
   _onSelect: null,
   _renderOverrides: null,
-  _stylesInjected: false,
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
@@ -63,9 +62,8 @@ const UserPickerModal = {
     modal.hideActions = true;
     modal.backButton = true;
     modal.backLabel = 'Go back';
-    modal.classList.add('upm-picker-mode');
+    modal.hideClose = true;
     modal.innerHTML = contentHtml;
-    this._injectPickerStyles();
 
     document.body.appendChild(modal);
 
@@ -240,21 +238,6 @@ const UserPickerModal = {
     this.close();
   },
 
-  // ── Picker chrome ───────────────────────────────────────────────────────
-
-  /**
-   * The back chevron is lex-modal's own `backButton`. lex-modal has no option
-   * to hide its X close button, so picker mode keeps this one rule until the
-   * component grows one (e.g. a `hide-close` attribute).
-   */
-  _injectPickerStyles() {
-    if (this._stylesInjected) return;
-    this._stylesInjected = true;
-    var style = document.createElement('style');
-    style.setAttribute('data-source', 'user-picker-modal');
-    style.textContent = 'lex-modal.upm-picker-mode .lex-modal-close { display: none !important; }';
-    document.head.appendChild(style);
-  },
 
   // ── Component lazy-loading ───────────────────────────────────────────────
 

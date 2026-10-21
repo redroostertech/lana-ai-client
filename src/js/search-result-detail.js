@@ -208,33 +208,31 @@
 
   function closeEditor() {
     var existing = document.getElementById('searchResultEditor');
-    if (existing) existing.remove();
+    if (!existing) return;
+    // Lex.Modal.open() elements expose removeAfterClose (exit animation, then
+    // removal); fall back to a plain removal otherwise.
+    existing.removeAttribute('id');
+    if (typeof existing.removeAfterClose === 'function') existing.removeAfterClose();
+    else existing.remove();
   }
 
   function openEditor(result) {
     closeEditor();
     var editable = editorJsonForResult(result);
-    var html = '<div id="searchResultEditor" class="search-result-editor-backdrop" role="dialog" aria-modal="true" aria-label="Edit search result object">' +
-      '<section class="search-result-editor">' +
-      '<header class="search-result-editor-header"><h2 class="search-result-editor-title">Edit Object JSON</h2></header>' +
-      '<div class="search-result-editor-body">' +
-      '<textarea class="search-result-editor-textarea" spellcheck="false" data-search-result-editor-textarea>' + escapeHtml(JSON.stringify(editable, null, 2)) + '</textarea>' +
-      '<div class="search-result-editor-status" data-search-result-editor-status></div>' +
-      '</div>' +
-      '<footer class="search-result-editor-footer">' +
-      '<button type="button" class="search-result-action" data-search-result-editor-close>Cancel</button>' +
-      '<button type="button" class="search-result-action" data-search-result-editor-save data-primary="true">Save Shadow Update</button>' +
-      '</footer>' +
-      '</section>' +
-      '</div>';
-    document.body.insertAdjacentHTML('beforeend', html);
-    document.querySelector('[data-search-result-editor-close]').addEventListener('click', closeEditor);
-    document.getElementById('searchResultEditor').addEventListener('mousedown', function (event) {
-      if (event.target.id === 'searchResultEditor') closeEditor();
+    var modal = window.Lex.Modal.open({
+      heading: 'Edit Object JSON',
+      size: 'xl',
+      content: '<textarea class="search-result-editor-textarea" spellcheck="false" aria-label="Object JSON" data-search-result-editor-textarea>' + escapeHtml(JSON.stringify(editable, null, 2)) + '</textarea>' +
+        '<div class="search-result-editor-status" data-search-result-editor-status></div>',
+      footerContent: '<lex-btn variant="secondary" data-search-result-editor-close>Cancel</lex-btn>' +
+        '<lex-btn variant="primary" data-search-result-editor-save>Save Shadow Update</lex-btn>'
     });
-    document.querySelector('[data-search-result-editor-save]').addEventListener('click', function () {
+    modal.id = 'searchResultEditor';
+    modal.querySelector('[data-search-result-editor-close]').addEventListener('click', closeEditor);
+    modal.querySelector('[data-search-result-editor-save]').addEventListener('click', function () {
       saveShadowUpdate(result);
     });
+    return modal;
   }
 
   async function saveShadowUpdate(result) {

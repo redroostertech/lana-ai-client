@@ -31,7 +31,8 @@ function modals(html) {
 }
 
 describe.each(PAGES)('%s lex-modal usage', (page) => {
-  const html = fs.readFileSync(path.join(SRC, page), 'utf8');
+  // Drop comments: "MODALS - using <lex-modal> web component" is not a modal.
+  const html = fs.readFileSync(path.join(SRC, page), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
   const list = modals(html);
 
   test('parses at least one modal', () => {
@@ -52,13 +53,16 @@ describe.each(PAGES)('%s lex-modal usage', (page) => {
 
   test('every footer submit targets a form that exists in the modal body', () => {
     list.forEach((m) => {
-      const re = /getElementById\(&#39;([\w-]+)&#39;\)\.requestSubmit\(\)/g;
+      // Footer submits are <lex-btn type="submit" form="id">: the native
+      // form owner gives click-to-submit and Enter-to-submit, so there is no
+      // requestSubmit() helper and no hidden submit button in the form.
+      const re = /<lex-btn[^>]*type="submit" form="([\w-]+)"/g;
       let match;
       while ((match = re.exec(m.attrs))) {
         expect(m.body).toContain(`<form id="${match[1]}"`);
-        // A hidden submit button keeps Enter-to-submit inside the form.
-        expect(m.body).toMatch(/<button type="submit" hidden/);
       }
+      expect(m.attrs).not.toMatch(/requestSubmit\(\)/);
+      expect(m.body).not.toMatch(/<button type="submit" hidden/);
     });
   });
 });

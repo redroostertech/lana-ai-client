@@ -18,70 +18,21 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #${ROOT_ID} {
-        position: fixed;
-        inset: 0;
-        z-index: 90;
-        display: none;
-      }
-
-      #${ROOT_ID}.open {
-        display: block;
-      }
-
-      #${ROOT_ID} .event-browser-backdrop {
-        position: absolute;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(6px);
-      }
-
-      #${ROOT_ID} .event-browser-panel {
-        position: absolute;
-        inset: 18px;
-        background: var(--lex-bg-primary, #fff);
-        border-radius: 24px;
-        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.2);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
-
-      #${ROOT_ID} .event-browser-header {
-        padding: 20px 24px;
-        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-      }
-
-      #${ROOT_ID} .event-browser-header h2 {
-        margin: 0;
-        font-size: 1.125rem;
-        font-weight: 700;
-        color: #0f172a;
-      }
-
-      #${ROOT_ID} .event-browser-header p {
-        margin: 4px 0 0;
+      #${ROOT_ID} .event-browser-intro {
+        margin: 0 0 12px;
         font-size: 0.875rem;
         color: #64748b;
       }
 
-      #${ROOT_ID} .event-browser-close {
-        width: 40px;
-        height: 40px;
-        border: 0;
-        border-radius: 999px;
-        background: #f1f5f9;
-        color: #0f172a;
-        font-size: 1.25rem;
-        cursor: pointer;
+      #${ROOT_ID} .event-browser-content {
+        display: flex;
+        flex-direction: column;
+        height: calc(100dvh - 140px);
+        min-height: 360px;
       }
 
       #${ROOT_ID} .event-browser-search {
-        padding: 0 24px 16px;
+        padding: 0 0 16px;
       }
 
       #${ROOT_ID} .event-browser-search input {
@@ -319,43 +270,45 @@
     document.head.appendChild(style);
   }
 
-  function ensureRoot() {
-    let root = document.getElementById(ROOT_ID);
-    if (root) return root;
+  // A fresh full-size <lex-modal> per open: it owns the backdrop, header,
+  // close button, Escape, focus trap and scroll lock, and is removed on close.
+  function createRoot() {
+    const existing = document.getElementById(ROOT_ID);
+    if (existing) dismissRoot(existing);
 
-    root = document.createElement('div');
-    root.id = ROOT_ID;
-    root.innerHTML = `
-      <div class="event-browser-backdrop" data-event-browser-close="true"></div>
-      <div class="event-browser-panel" role="dialog" aria-modal="true" aria-labelledby="lana-event-browser-title">
-        <div class="event-browser-header">
-          <div>
-            <h2 id="lana-event-browser-title">Browse Events</h2>
-            <p>Search by name, key, category, or use case. Pick the event that matches the workflow stage.</p>
+    const root = window.Lex.Modal.open({
+      heading: 'Browse Events',
+      size: 'full',
+      content: `
+        <div class="event-browser-content">
+          <p class="event-browser-intro">Search by name, key, category, or use case. Pick the event that matches the workflow stage.</p>
+          <div class="event-browser-search">
+            <input type="search" data-event-browser-search aria-label="Search events" placeholder="Search events, categories, or examples...">
           </div>
-          <button type="button" class="event-browser-close" data-event-browser-close="true" aria-label="Close event browser">&times;</button>
+          <div class="event-browser-body">
+            <aside class="event-browser-sidebar">
+              <h3>Categories</h3>
+              <div data-event-browser-categories></div>
+            </aside>
+            <section class="event-browser-list">
+              <div data-event-browser-results></div>
+            </section>
+            <aside class="event-browser-detail">
+              <h3>Event details</h3>
+              <div data-event-browser-detail></div>
+            </aside>
+          </div>
         </div>
-        <div class="event-browser-search">
-          <input type="search" data-event-browser-search placeholder="Search events, categories, or examples...">
-        </div>
-        <div class="event-browser-body">
-          <aside class="event-browser-sidebar">
-            <h3>Categories</h3>
-            <div data-event-browser-categories></div>
-          </aside>
-          <section class="event-browser-list">
-            <div data-event-browser-results></div>
-          </section>
-          <aside class="event-browser-detail">
-            <h3>Event details</h3>
-            <div data-event-browser-detail></div>
-          </aside>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(root);
+      `
+    });
+    root.id = ROOT_ID;
     return root;
+  }
+
+  function dismissRoot(root) {
+    root.removeAttribute('id');
+    if (typeof root.removeAfterClose === 'function') root.removeAfterClose();
+    else root.remove();
   }
 
   function bindRootEvents(root) {
@@ -490,13 +443,17 @@
   }
 
   function open(options = {}) {
-    ensureStyles();
-    const root = ensureRoot();
     const catalog = window.LanaEventCatalog;
     if (!catalog) {
       console.warn('[LanaEventBrowser] Missing LanaEventCatalog');
       return;
     }
+    if (!window.Lex || !window.Lex.Modal) {
+      console.warn('[LanaEventBrowser] Missing Lex.Modal (load lex-modal.js)');
+      return;
+    }
+    ensureStyles();
+    const root = createRoot();
 
     const state = {
       query: options.query || '',
@@ -571,13 +528,16 @@
     }
 
     sync();
-    root.classList.add('open');
 
-    const firstButton = root.querySelector('[data-event-browser-search]');
-    if (firstButton) firstButton.focus();
+    // lex-modal focuses its first focusable (the header close button) on a
+    // microtask; the search field should win, as before.
+    setTimeout(() => {
+      const firstField = root.querySelector('[data-event-browser-search]');
+      if (firstField && root.isConnected) firstField.focus();
+    }, 0);
 
     function close() {
-      root.classList.remove('open');
+      if (root.isConnected) dismissRoot(root);
     }
 
     root._closeEventBrowser = close;

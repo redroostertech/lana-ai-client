@@ -387,27 +387,14 @@ class ConflictDetection {
    * Show detailed conflict information in a modal
    */
   showConflictDetails() {
-    // Create modal HTML
-    const modalHtml = `
-      <div id="conflictDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-            <h3 class="text-lg font-semibold text-gray-900">Conflict Details</h3>
-            <button onclick="conflictDetection.closeConflictDetails()" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-          </div>
-          <div class="p-6">
-            ${this.renderDetailedConflicts()}
-          </div>
-        </div>
-      </div>
-    `;
-
-    // Append to body
-    const modalContainer = document.createElement('div');
-    modalContainer.innerHTML = modalHtml;
-    document.body.appendChild(modalContainer.firstElementChild);
+    this.closeConflictDetails();
+    const modal = window.Lex.Modal.open({
+      heading: 'Conflict Details',
+      size: 'xl',
+      content: this.renderDetailedConflicts()
+    });
+    modal.id = 'conflictDetailsModal';
+    return modal;
   }
 
   /**
@@ -415,7 +402,12 @@ class ConflictDetection {
    */
   closeConflictDetails() {
     const modal = document.getElementById('conflictDetailsModal');
-    if (modal) {
+    if (!modal) return;
+    // Drop the id now so a reopen during the exit animation finds no stale copy.
+    modal.removeAttribute('id');
+    if (typeof modal.removeAfterClose === 'function') {
+      modal.removeAfterClose();
+    } else {
       modal.remove();
     }
   }
