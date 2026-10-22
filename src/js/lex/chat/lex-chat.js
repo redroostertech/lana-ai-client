@@ -1309,9 +1309,13 @@
     }
 
     /**
-     * Search documents the user can add. A saved thread asks the server for
-     * its candidates; a new one, which the server does not know yet, searches
-     * the library.
+     * Search documents the user can add, scoped like the chat:
+     * - saved workspace thread: the server's candidates for it (that
+     *   workspace plus what it inherits, access-checked);
+     * - new workspace thread: library files in that workspace (its matter, or
+     *   the one the host will create it in, see _newThreadWorkspace);
+     * - no workspace: the whole library. Chef's candidates for an unscoped
+     *   thread are only files uploaded into it, which the composer cannot do.
      * Resolves to [{ id, filename, name, meta }].
      */
     async searchDocuments(query, opts = {}) {
@@ -1322,12 +1326,31 @@
       if (this._isThreadSaved()) {
         const data = await new Chat.ConversationsApiClient(api)
           .getDocumentCandidates(this.conversationId, { search: text, limit });
-        const rows = (data && (data.document_candidates || data.files || data.candidates)) || [];
-        return rows.map(toDocumentResult);
+        if (data && (data.matter_id || data.matterId)) {
+          const rows = data.document_candidates || data.files || data.candidates || [];
+          return rows.map(toDocumentResult);
+        }
+        return this._searchLibrary(text, limit, null);
       }
+      return this._searchLibrary(text, limit, this._newThreadWorkspace());
+    }
+
+    // The workspace a new thread will be created in: its own matter, else
+    // whatever a host answers on lex-chat-document-scope (the dock fills in
+    // the workspace page the user is on, the same matter it adds on create).
+    _newThreadWorkspace() {
+      if (this.matterId) return this.matterId;
+      const detail = { matterId: null };
+      this.dispatchEvent(new CustomEvent('lex-chat-document-scope', { detail, bubbles: true, composed: true }));
+      return detail.matterId || null;
+    }
+
+    async _searchLibrary(text, limit, workspaceId) {
       const params = new URLSearchParams({ page: '1', page_size: String(limit), sort_by: 'updated_at', sort_order: 'desc' });
       if (text) params.set('search', text);
-      const data = await api.get('/api/v1/storage/library/files?' + params.toString());
+      // Accepts the workspace's code or UUID.
+      if (workspaceId) params.set('workspaces', workspaceId);
+      const data = await global.api.get('/api/v1/storage/library/files?' + params.toString());
       const rows = (data && (data.files || data.documents || (data.data && (data.data.files || data.data.documents)))) || [];
       return rows.map(toDocumentResult);
     }

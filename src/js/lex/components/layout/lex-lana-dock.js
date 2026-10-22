@@ -1082,6 +1082,13 @@
 
     _bindPageContextSend(panel) {
       var self = this;
+      // A new chat's document search covers the workspace it will be
+      // created in, which is the page's (see the before-send hook below).
+      panel.addEventListener('lex-chat-document-scope', function (event) {
+        var ctx = self._pageContext;
+        var detail = event.detail || {};
+        if (ctx && ctx.matterId && !detail.matterId) detail.matterId = ctx.matterId;
+      });
       panel.addEventListener('lex-lana-before-send', function (event) {
         var ctx = self._pageContext;
         if (!ctx) return;
