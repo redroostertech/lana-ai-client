@@ -195,40 +195,10 @@ describe('LANA dock/panel conversation API routing', () => {
     }));
   });
 
-  test('panel document search uses canonical conversation document candidates domain API', async () => {
-    const api = {
-      getConversationDocumentCandidates: jest.fn(() => Promise.resolve({
-        document_candidates: [{ id: 'doc-1', filename: 'evidence.pdf' }]
-      }))
-    };
-    const { context, Component } = loadComponent(
-      'src/js/lex/components/chat/lex-lana-panel.js',
-      api,
-      'lex-lana-panel'
-    );
-    context.Lex.Chat.ConversationsApiClient = class {
-      constructor(apiClient) {
-        this.api = apiClient;
-      }
-
-      getDocumentCandidates(conversationId, options) {
-        return this.api.getConversationDocumentCandidates(conversationId, options);
-      }
-    };
-    const panel = new Component();
-    panel._chatEl = { conversationId: 'conversation-1' };
-    const composer = { setDocumentResults: jest.fn() };
-
-    panel._searchDocuments('evidence', composer);
-    await Promise.resolve();
-
-    expect(api.getConversationDocumentCandidates).toHaveBeenCalledWith('conversation-1', {
-      search: 'evidence',
-      limit: 10
-    });
-    expect(composer.setDocumentResults).toHaveBeenCalledWith([
-      { id: 'doc-1', filename: 'evidence.pdf' }
-    ]);
+  test('panel leaves composer document search and Manage chat documents to lex-chat', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, '../../src/js/lex/components/chat/lex-lana-panel.js'), 'utf8');
+    expect(source).not.toContain("'lex-composer-document-search'");
+    expect(source).not.toContain('ChatFileDrawer');
   });
 
   test('panel prefillPrompt writes composer draft without sending', () => {
