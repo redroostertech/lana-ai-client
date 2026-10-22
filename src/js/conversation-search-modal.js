@@ -145,7 +145,7 @@ const ConversationSearchModal = {
         sortBy: 'last_activity',
         sortOrder: 'desc'
       });
-      const conversations = this.normalizeConversations(response);
+      const conversations = await this.withWorkspaceNames(this.normalizeConversations(response));
 
       if (conversations.length === 0) {
         this.renderEmpty('No recent conversations');
@@ -170,7 +170,9 @@ const ConversationSearchModal = {
         offset: 0,
         search: query
       });
-      const conversations = this.normalizeConversations(response);
+      const conversations = await this.withWorkspaceNames(this.normalizeConversations(response));
+      // A newer keystroke already replaced this search.
+      if (this.searchInput.value.trim() !== query) return;
 
       if (conversations.length === 0) {
         this.renderEmpty('No conversations found');
@@ -203,6 +205,20 @@ const ConversationSearchModal = {
     `;
     const html = conversations.map(conv => this.renderResultItem(conv, '')).join('');
     this.resultsContainer.innerHTML = header + html;
+  },
+
+  /**
+   * Conversation rows carry the workspace code, not its name; fill names in
+   * with the dock's shared lookup when it is loaded.
+   */
+  async withWorkspaceNames(conversations) {
+    const chat = window.Lex && window.Lex.Chat;
+    if (!chat || typeof chat.resolveWorkspaceNames !== 'function') return conversations;
+    const ids = conversations.filter(c => c && c.matter_id && !c.matter_name).map(c => c.matter_id);
+    if (ids.length) await chat.resolveWorkspaceNames(ids);
+    return conversations.map(c => (c && c.matter_id && !c.matter_name)
+      ? { ...c, matter_name: chat.workspaceName(c.matter_id) }
+      : c);
   },
 
   normalizeConversations(response) {
@@ -268,6 +284,9 @@ const ConversationSearchModal = {
     const escapedThreadId = String(threadId).replace(/'/g, "\\'");
     const escapedMatterId = String(matterId).replace(/'/g, "\\'");
 
+    this._selection = this._selection || new Map();
+    this._selection.set(String(threadId), { title, matterName });
+
     return `
       <div class="p-4 hover:bg-gray-50 rounded-lg cursor-pointer border border-gray-200 mb-3 transition-colors"
            onclick="ConversationSearchModal.selectConversation('${escapedThreadId}', '${escapedMatterId}')">
@@ -288,8 +307,20 @@ const ConversationSearchModal = {
    */
   selectConversation(threadId, matterId = '') {
     this.close();
+    const hints = (this._selection && this._selection.get(String(threadId))) || {};
 
     try {
+      const liveDock = window.Lex
+        && window.Lex.LanaDock
+        && typeof window.Lex.LanaDock.get === 'function'
+        && window.Lex.LanaDock.get();
+      if (liveDock && typeof liveDock.openConversation === 'function') {
+        liveDock.openConversation(threadId, matterId || null, {
+          title: hints.title || '',
+          matterName: hints.matterName || ''
+        });
+        return;
+      }
       if (typeof NavigationHelpers !== 'undefined'
           && typeof NavigationHelpers.navigateToConversation === 'function') {
         NavigationHelpers.navigateToConversation(threadId, matterId);
@@ -318,7 +349,8 @@ const ConversationSearchModal = {
 
     const escapedText = this.escapeHtml(text);
     const escapedQuery = this.escapeHtml(query);
-    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    const pattern = escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${pattern})`, 'gi');
 
     return escapedText.replace(regex, '<mark class="bg-yellow-200 font-medium">$1</mark>');
   },
@@ -363,7 +395,7 @@ const ConversationSearchModal = {
    */
   formatTimestamp(dateString) {
     if (!dateString) return '';
-    return LanaTime.timeAgo(dateString, { maxDays: 7 }) || formatDateLong(dateString, { month: 'short' });
+    return LanaTime.timeAgo(dateString, { maxDays: 7 }) || window.Lex.Utils.formatDate(dateString);
   },
 
   /**

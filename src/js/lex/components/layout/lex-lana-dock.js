@@ -47,6 +47,33 @@
   var LexElement = Lex.LexElement;
   var defineLex = Lex.defineLex;
 
+  // '<base>/js/' from this script's own URL, for loading page scripts the
+  // dock needs on demand (pages sit at different depths).
+  var DOCK_SCRIPT_SRC = (document.currentScript && document.currentScript.src) || '';
+  function jsBase() {
+    var idx = DOCK_SCRIPT_SRC.indexOf('/js/');
+    return idx === -1 ? 'js/' : DOCK_SCRIPT_SRC.slice(0, idx + 4);
+  }
+
+  // The conversation search modal is not on every page; load it on first use.
+  var conversationSearchLoad = null;
+  function loadConversationSearch() {
+    if (window.ConversationSearchModal) return Promise.resolve(window.ConversationSearchModal);
+    if (!conversationSearchLoad) {
+      conversationSearchLoad = new Promise(function (resolve, reject) {
+        var script = document.createElement('script');
+        script.src = jsBase() + 'conversation-search-modal.js';
+        script.onload = function () { resolve(window.ConversationSearchModal || null); };
+        script.onerror = function () {
+          conversationSearchLoad = null;
+          reject(new Error('Conversation search could not be loaded'));
+        };
+        document.head.appendChild(script);
+      });
+    }
+    return conversationSearchLoad;
+  }
+
   var COLLAPSED_KEY = 'lana:lanaDock:collapsed';
   var WIDTH_KEY = 'lana:lanaDock:width';
   var ACTIVE_CONVERSATION_KEY = 'lana:lanaDock:activeConversation';
@@ -1080,8 +1107,24 @@
       }
     }
 
+    /**
+     * Search chats (the Recents search button). Picking a result opens it in
+     * the dock through openConversation, which also highlights it in Recents.
+     */
+    openChatSearch() {
+      return loadConversationSearch().then(function (modal) {
+        if (modal && typeof modal.open === 'function') return modal.open();
+      }).catch(function (err) {
+        console.error('[lex-lana-dock] ' + err.message);
+        if (Lex.Toast && typeof Lex.Toast.error === 'function') Lex.Toast.error('Chat search is unavailable on this page.');
+      });
+    }
+
     _bindPageContextSend(panel) {
       var self = this;
+      panel.addEventListener('lex-thread-search', function () {
+        self.openChatSearch();
+      });
       // A new chat's document search covers the workspace it will be
       // created in, which is the page's (see the before-send hook below).
       panel.addEventListener('lex-chat-document-scope', function (event) {
