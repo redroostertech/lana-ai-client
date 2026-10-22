@@ -12,6 +12,10 @@
    Events emitted:
      lex-thread-select  { thread }   — User clicked a thread
      lex-thread-create  { threadType } — User clicked "New Thread"
+     lex-thread-search  {}           — User clicked Search chats (recents)
+
+   Scoped chats show their workspace name under the title, looked up by
+   Lex.Chat.resolveWorkspaceNames(ids) (shared, cached per page).
    ========================================================================== */
 
 (function (global) {
@@ -25,6 +29,40 @@
       return api.getConversations(opts || {});
     }
     return Promise.reject(new Error('canonical conversation API not available'));
+  }
+
+  // Conversation rows carry the workspace code (scope.matterId) but not its
+  // name. One lookup per batch of new codes, cached for the page; codes with no
+  // visible workspace (deleted, no access) cache as '' and show nothing.
+  var workspaceNames = new Map();
+
+  function resolveWorkspaceNames(ids) {
+    var wanted = [];
+    (ids || []).forEach(function (id) {
+      id = String(id || '').trim();
+      if (id && !workspaceNames.has(id) && wanted.indexOf(id) === -1) wanted.push(id);
+    });
+    if (!wanted.length || typeof api === 'undefined' || typeof api.get !== 'function') {
+      return Promise.resolve(workspaceNames);
+    }
+    var query = '/api/v1/storage/matters?limit=200&matter_ids=' + encodeURIComponent(wanted.slice(0, 200).join(','));
+    return api.get(query).then(function (response) {
+      var rows = (response && (response.matters || response.data || response.items)) || [];
+      rows.forEach(function (row) {
+        var name = String(row.name || row.matter_name || row.title || '').trim();
+        if (!name) return;
+        if (row.matter_id) workspaceNames.set(String(row.matter_id), name);
+        if (row.id) workspaceNames.set(String(row.id), name);
+      });
+      wanted.forEach(function (id) { if (!workspaceNames.has(id)) workspaceNames.set(id, ''); });
+      return workspaceNames;
+    }).catch(function () {
+      return workspaceNames;
+    });
+  }
+
+  function workspaceName(id) {
+    return workspaceNames.get(String(id || '')) || '';
   }
 
   class LexChatThreads extends LexElement {
@@ -131,8 +169,10 @@
       var chevronSvg = '<svg class="lct-chevron' + (this.collapsed ? '' : ' open') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
 
       var plusSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>';
+      var searchSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
       var newBtn = this.recents
-        ? '<button class="lct-newchat-btn" data-new-thread title="New chat" aria-label="New chat">' + plusSvg + '</button>'
+        ? '<button class="lct-newchat-btn" data-search-threads title="Search chats" aria-label="Search chats">' + searchSvg + '</button>'
+          + '<button class="lct-newchat-btn" data-new-thread title="New chat" aria-label="New chat">' + plusSvg + '</button>'
         : '<button class="lct-new-btn" data-new-thread>+ New</button>';
       var headerHtml = '<div class="lct-header' + (this.recents ? ' recents' : '') + '" data-toggle>'
         + '<span class="lct-title">' + this.escapeHtml(this.heading || 'Threads') + '</span>'
@@ -192,8 +232,8 @@
       // of going through a re-render: a rebuilt list can't animate, and the
       // soft-close transition (max-height + fade) needs the same nodes.
       this.delegate('click', '[data-toggle]', function (e) {
-        // Don't toggle if clicking the new-thread button
-        if (e.target.closest('[data-new-thread]')) return;
+        // Don't toggle if clicking the new-thread or search button
+        if (e.target.closest('[data-new-thread]') || e.target.closest('[data-search-threads]')) return;
         this._userToggledCollapsed = true;
         var next = !this.collapsed;
         this._props.collapsed = next;
@@ -208,6 +248,12 @@
       this.delegate('click', '[data-new-thread]', function (e) {
         e.stopPropagation();
         this.emit('lex-thread-create', { threadType: 'ad_hoc' });
+      });
+
+      // Search chats (recents): the host opens the conversation search
+      this.delegate('click', '[data-search-threads]', function (e) {
+        e.stopPropagation();
+        this.emit('lex-thread-search', {});
       });
 
       // Delete thread button
@@ -321,6 +367,7 @@
         if (this._threads.length === 0 && !this._userToggledCollapsed) {
           this.collapsed = true;
         }
+        this._fillWorkspaceNames();
       } catch (err) {
         console.warn('[lex-chat-threads] Failed to load threads:', err);
         this._threads = [];
@@ -355,6 +402,7 @@
       // Prepend (most recent first)
       this._threads.unshift(thread);
       this._scheduleUpdate();
+      this._fillWorkspaceNames();
     }
 
     /**
@@ -376,6 +424,23 @@
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
+
+    // Show the workspace name under each scoped chat's title.
+    _fillWorkspaceNames() {
+      var self = this;
+      var missing = this._threads.filter(function (t) { return t.matter_id && !t.subtitle; });
+      if (!missing.length) return Promise.resolve();
+      return resolveWorkspaceNames(missing.map(function (t) { return t.matter_id; })).then(function () {
+        var changed = false;
+        self._threads.forEach(function (t) {
+          if (t.matter_id && !t.subtitle && workspaceName(t.matter_id)) {
+            t.subtitle = workspaceName(t.matter_id);
+            changed = true;
+          }
+        });
+        if (changed) self._scheduleUpdate();
+      });
+    }
 
     _findThread(threadId) {
       for (var i = 0; i < this._threads.length; i++) {
@@ -447,5 +512,9 @@
   }
 
   customElements.define('lex-chat-threads', LexChatThreads);
+
+  global.Lex.Chat = global.Lex.Chat || {};
+  global.Lex.Chat.resolveWorkspaceNames = resolveWorkspaceNames;
+  global.Lex.Chat.workspaceName = workspaceName;
 
 })(typeof window !== 'undefined' ? window : this);
