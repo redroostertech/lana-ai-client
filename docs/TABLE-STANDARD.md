@@ -268,6 +268,7 @@ A list API behind a server table must support:
 - Matters: the LANA dock covers the header user menu at about 1400px wide. This existed before this work.
 - Skills: switch from `/api/v1/skills` (chef no longer mounts it) to `GET /automations`.
 - Deck Studio: org-scoped library (chef commit 825ca5c83), with a backfill of existing decks, which stay hidden until it runs.
+- Chat documents (chef API layering): `conversation-document-candidates.service.js` runs raw SQL for the conversation-upload path of `GET /conversations/:id/document-candidates`. Move it into a repository. The matter path caps at 200 rows and filters and pages in memory, so search and count belong in `file.repository`. Since client 3a2e7ef, unscoped threads search the library instead of calling this endpoint.
 
 ## 15. Inventory and migration order (2026-10-21)
 
