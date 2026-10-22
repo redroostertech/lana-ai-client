@@ -1788,3 +1788,11 @@ button.file-viewer-review-release:focus-visible {
   color: var(--lex-danger, #dc2626);
   text-decoration: underline;
 }
+
+/* Read-only highlight of a passage cited in chat (plain DOCX/text preview). */
+mark.file-viewer-citation-mark {
+  background: var(--lex-color-warning-100, #fef3c7);
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--lex-color-warning-500, #f59e0b);
+}

@@ -191,6 +191,7 @@
       if (meta.timestamp) msg.timestamp = meta.timestamp;
       if (meta.citations) msg.citations = meta.citations;
       if (meta.references) msg.references = meta.references;
+      if (meta.coverageSummary) msg.coverageSummary = meta.coverageSummary;
       if (meta.artifacts) msg.artifacts = meta.artifacts;
       if (meta.attachments) msg.attachments = meta.attachments;
       if (meta.recovery) msg.recovery = meta.recovery;
@@ -324,6 +325,7 @@
         if (m.timestamp) msg.timestamp = m.timestamp;
         if (m.citations) msg.citations = m.citations;
         if (m.references) msg.references = m.references;
+        if (m.coverageSummary) msg.coverageSummary = m.coverageSummary;
         if (m.artifacts) msg.artifacts = m.artifacts;
         if (m.attachments) msg.attachments = m.attachments;
         if (m.duration != null) msg.duration = m.duration;

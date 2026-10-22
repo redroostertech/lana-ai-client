@@ -12,6 +12,34 @@
   const Chat = global.Lex.Chat || {};
   if (!LexElement) { console.error('[lex-chat] LexElement not loaded'); return; }
 
+  // Server-authored "what I checked" line saved with a message, if any.
+  function persistedCoverageSummary(message) {
+    const m = message || {};
+    const meta = m.metadata && typeof m.metadata === 'object' ? m.metadata : {};
+    const value = m.coverage_summary || m.coverageSummary || meta.coverage_summary || meta.coverageSummary;
+    return typeof value === 'string' && value.trim() ? value : undefined;
+  }
+
+  // The page the user is on, as a file-viewer back referrer
+  // (e.g. 'workspace-details.html?id=...'). The SPA shell keeps the real
+  // route in history.state.path; standalone pages use the location.
+  function currentRouteForReferrer() {
+    const state = global.history && global.history.state;
+    if (state && typeof state.path === 'string' && state.path) {
+      return state.path.charAt(0) === '/' ? state.path.substring(1) : state.path;
+    }
+    const loc = global.location || {};
+    const pathname = String(loc.pathname || '');
+    const markers = ['/public_html/', '/src/'];
+    let route = '';
+    for (let i = 0; i < markers.length && !route; i++) {
+      const idx = pathname.lastIndexOf(markers[i]);
+      if (idx !== -1) route = pathname.substring(idx + markers[i].length);
+    }
+    if (!route) route = pathname.substring(pathname.lastIndexOf('/') + 1);
+    return route ? route + String(loc.search || '') : '';
+  }
+
   // ---------------------------------------------------------------------------
   // Tool-name humanizer
   // ---------------------------------------------------------------------------
@@ -1145,6 +1173,7 @@
                 timestamp: m.timestamp || m.created_at,
                 citations: m.citations && m.citations.length > 0 ? m.citations : undefined,
                 references: m.references && m.references.length > 0 ? m.references : undefined,
+                coverageSummary: persistedCoverageSummary(m),
                 artifacts: m.artifacts && m.artifacts.length > 0 ? m.artifacts : undefined,
                 attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
                 duration: m.duration || null,
@@ -2049,30 +2078,45 @@
         return;
       }
 
-      const page = detail.page || 1;
-
-      try {
-        const apiClient = global.api;
-        if (!apiClient || typeof apiClient.get !== 'function') {
-          throw new Error('API client not available');
-        }
-
-        const resp = await fetch(
-          apiClient.baseUrl + '/api/v1/storage/files/' + encodeURIComponent(docId) + '/download',
-          { headers: { 'Authorization': 'Bearer ' + (apiClient.token || localStorage.getItem('token') || '') } }
-        );
-
-        if (!resp.ok) throw new Error('Download failed: ' + resp.status);
-
-        const blob = await resp.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl + '#page=' + page, '_blank');
-
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-      } catch (err) {
-        console.error('[lex-chat] Citation document open failed:', err);
+      // Documents open in the in-app file viewer at the cited page with the
+      // quoted passage highlighted. A blob window cannot render PDFs (the
+      // Chromium PDF plugin is off in child windows), and the system browser
+      // is never used for workspace documents.
+      const Nav = global.Lex && global.Lex.Nav;
+      const Evidence = Chat.Evidence;
+      if (!Nav || typeof Nav.go !== 'function' || !Evidence) {
         this._showSystemMessage('Could not open document. Please try again.');
+        return;
       }
+      const nav = Evidence.buildCitationViewerNavigation({
+        documentId: docId,
+        citation: detail.citation || null,
+        page: detail.page,
+        referrer: currentRouteForReferrer()
+      });
+      this._handOffConversationToDock();
+      Nav.go(nav.path, { params: nav.params, context: nav.context });
+    }
+
+    /**
+     * The file viewer is a full page load. Queue this conversation for the
+     * viewer's LANA dock (the same one-shot hand-off NavigationHelpers uses)
+     * so the chat the user clicked from is open beside the document.
+     */
+    _handOffConversationToDock() {
+      const threadId = this.conversationId;
+      if (!threadId) return;
+      const action = { type: 'conversation', threadId, matterId: this.matterId || null };
+      const helpers = global.NavigationHelpers;
+      if (helpers && typeof helpers.queueLanaDockAction === 'function') {
+        helpers.queueLanaDockAction(action);
+        return;
+      }
+      try {
+        if (global.sessionStorage) {
+          global.sessionStorage.setItem('lana_dock_pending_action', JSON.stringify(Object.assign({ createdAt: Date.now() }, action)));
+        }
+      } catch (_) { /* storage unavailable: the dock still restores its active conversation */ }
     }
 
     _openReference(reference) {
@@ -2369,6 +2413,7 @@
               timestamp: m.timestamp,
               citations: m.citations,
               references: m.references,
+              coverageSummary: persistedCoverageSummary(m),
               artifacts: m.artifacts,
               duration: m.duration || null,
               tokenCount: m.tokenCount || null

@@ -655,7 +655,8 @@ describe('file-viewer review UX foundation', () => {
     expect(pageJs).toContain("state.reviewTab = tab === 'releases' || tab === 'comments' || tab === 'insights' ? tab : 'changes';");
     expect(pageJs).toContain('function renderReviewComments()');
     expect(pageJs).toContain('LanaDocumentReview.releasedReviewThreads(state.releaseChangeGroups)');
-    expect(pageJs).toContain('editor.setAnnotations(LanaDocumentReview.embedAnnotationsFrom(reviewAnnotationThreads()));');
+    expect(pageJs).toContain('var annotations = LanaDocumentReview.embedAnnotationsFrom(reviewAnnotationThreads()) || [];');
+    expect(pageJs).toContain('editor.setAnnotations(annotations);');
     expect(pageJs).toContain("editor.on('annotation-selected', function (detail) {");
     expect(pageJs).toContain('locateReviewAnnotation(card.getAttribute(\'data-review-annotation-id\'))');
     // Saving from the viewer keeps the persisted threads whole instead of flattening them to text.

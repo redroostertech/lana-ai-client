@@ -1416,7 +1416,7 @@
 
     async _fetchMentions(prefix) {
       // Token + base URL come from the global api client used elsewhere
-      // in the chat surface (see lex-chat.js _openCitationDocument). If
+      // in the chat surface (the global api client from api.js). If
       // it's not configured, silently bail — the autocomplete simply
       // shows "No matches".
       const apiClient = (typeof window !== 'undefined') ? window.api : null;
