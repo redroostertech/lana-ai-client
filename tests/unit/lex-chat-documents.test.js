@@ -195,9 +195,10 @@ describe('chat documents on a saved thread', () => {
 });
 
 describe('document search', () => {
-  test('a saved thread asks the conversation for candidates', async () => {
+  test('a saved workspace thread asks the conversation for candidates', async () => {
     const api = {
       getConversationDocumentCandidates: jest.fn(async () => ({
+        matter_id: 'MATT-1',
         document_candidates: [{ id: 'doc-1', filename: 'Lease.pdf' }]
       })),
       get: jest.fn()
@@ -211,6 +212,43 @@ describe('document search', () => {
     expect(api.getConversationDocumentCandidates).toHaveBeenCalledWith('conversation-1', { search: 'lease', limit: 10 });
     expect(api.get).not.toHaveBeenCalled();
     expect(results).toEqual([{ id: 'doc-1', filename: 'Lease.pdf', name: 'Lease.pdf', meta: '' }]);
+  });
+
+  test('a saved thread outside a workspace searches the whole library', async () => {
+    const api = {
+      getConversationDocumentCandidates: jest.fn(async () => ({ matter_id: null, document_candidates: [] })),
+      get: jest.fn(async () => ({ files: [{ id: 'doc-3', filename: 'Memo.docx' }] }))
+    };
+    const { chat } = loadChat(api);
+    chat._props.conversationId = 'conversation-1';
+    chat._conversationRegistered = true;
+
+    const results = await chat.searchDocuments('memo', { limit: 10 });
+
+    const url = api.get.mock.calls[0][0];
+    expect(url).toMatch(/^\/api\/v1\/storage\/library\/files\?/);
+    expect(url).not.toContain('workspaces=');
+    expect(results.map((r) => r.id)).toEqual(['doc-3']);
+  });
+
+  test('a new workspace thread searches only that workspace', async () => {
+    const api = { get: jest.fn(async () => ({ files: [] })) };
+    const { chat } = loadChat(api);
+    chat.matterId = 'MATT-54239';
+
+    await chat.searchDocuments('lease', { limit: 10 });
+
+    expect(api.get.mock.calls[0][0]).toContain('workspaces=MATT-54239');
+  });
+
+  test('a new chat on a workspace page searches the workspace the host names', async () => {
+    const api = { get: jest.fn(async () => ({ files: [] })) };
+    const { chat } = loadChat(api);
+    chat.addEventListener('lex-chat-document-scope', (e) => { e.detail.matterId = 'MATT-54239'; });
+
+    await chat.searchDocuments('', { limit: 10 });
+
+    expect(api.get.mock.calls[0][0]).toContain('workspaces=MATT-54239');
   });
 
   test('a new thread searches the document library', async () => {
@@ -227,6 +265,7 @@ describe('document search', () => {
     expect(url).toMatch(/^\/api\/v1\/storage\/library\/files\?/);
     expect(url).toContain('search=brief');
     expect(url).toContain('page_size=20');
+    expect(url).not.toContain('workspaces=');
     expect(results).toEqual([{ id: 'doc-2', filename: 'Brief.docx', name: 'Brief.docx', meta: 'Smith v. Jones' }]);
   });
 
