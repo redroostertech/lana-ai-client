@@ -2078,13 +2078,15 @@
         return;
       }
 
-      // Documents open in the in-app file viewer at the cited page with the
-      // quoted passage highlighted. A blob window cannot render PDFs (the
-      // Chromium PDF plugin is off in child windows), and the system browser
-      // is never used for workspace documents.
+      // Documents open in a modal over the current page, hosting the file
+      // viewer in its embedded mode at the cited page with the quoted passage
+      // highlighted. The page underneath and the chat dock stay as they are.
+      // Never a new window: a blob child window cannot render PDFs, and the
+      // system browser is never used for workspace documents.
       const Nav = global.Lex && global.Lex.Nav;
+      const Modal = global.Lex && global.Lex.Modal;
       const Evidence = Chat.Evidence;
-      if (!Nav || typeof Nav.go !== 'function' || !Evidence) {
+      if (!Nav || typeof Nav.href !== 'function' || !Modal || typeof Modal.open !== 'function' || !Evidence) {
         this._showSystemMessage('Could not open document. Please try again.');
         return;
       }
@@ -2094,12 +2096,81 @@
         page: detail.page,
         referrer: currentRouteForReferrer()
       });
-      this._handOffConversationToDock();
-      Nav.go(nav.path, { params: nav.params, context: nav.context });
+      const citation = detail.citation || {};
+      const label = (typeof Chat.documentCitationDisplayName === 'function' && Chat.documentCitationDisplayName(citation))
+        || citation.label || citation.filename || detail.filename || 'Document';
+      this._openCitationViewerModal(nav, label);
     }
 
     /**
-     * The file viewer is a full page load. Queue this conversation for the
+     * The citation viewer modal: lex-modal (X, Escape, backdrop close, focus
+     * trap, focus returned to the clicked source) around an iframe of
+     * file-viewer.html?chrome=embedded. "Open full view" goes to the page.
+     */
+    _openCitationViewerModal(nav, label) {
+      const Nav = global.Lex.Nav;
+      const doc = global.document;
+      const trigger = doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null;
+
+      const frame = doc.createElement('iframe');
+      frame.className = 'lex-chat-source-viewer-frame';
+      frame.title = 'Document viewer: ' + label;
+      // Part of the modal's focus trap cycle.
+      frame.setAttribute('tabindex', '0');
+      frame.src = Nav.href(nav.path, Object.assign({}, nav.params, { chrome: 'embedded' }));
+
+      const escapeAttr = (value) => (ChatFormat && ChatFormat.escapeHtml ? ChatFormat.escapeHtml(String(value)) : String(value));
+      const modal = global.Lex.Modal.open({
+        heading: label,
+        content: frame,
+        size: 'xl',
+        width: 'calc(100vw - 64px)',
+        flush: true,
+        closeOnOverlay: true,
+        headerActions: '<lex-btn variant="secondary" size="sm" data-citation-open-full aria-label="Open ' + escapeAttr(label) + ' in the full file viewer">Open full view</lex-btn>'
+      });
+      if (modal && modal.classList) modal.classList.add('lex-chat-source-modal');
+      // lex-modal copies its content when it upgrades: use the live frame.
+      const liveFrame = (modal && typeof modal.querySelector === 'function'
+        && modal.querySelector('iframe.lex-chat-source-viewer-frame')) || frame;
+
+      let closed = false;
+      const onMessage = (event) => {
+        const data = event && event.data;
+        if (!data || event.source !== liveFrame.contentWindow) return;
+        if (data.type === 'lex-embedded-back' || data.type === 'lex-embedded-close') close();
+      };
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        global.removeEventListener('message', onMessage);
+        liveFrame.src = 'about:blank';
+        if (trigger && trigger.isConnected !== false && typeof trigger.focus === 'function') {
+          setTimeout(() => trigger.focus(), 0);
+        }
+      };
+      const close = () => {
+        cleanup();
+        if (modal && typeof modal.removeAfterClose === 'function') modal.removeAfterClose();
+      };
+      global.addEventListener('message', onMessage);
+      if (modal && typeof modal.addEventListener === 'function') {
+        // X, Escape and backdrop clicks all emit lex-close.
+        modal.addEventListener('lex-close', cleanup);
+        modal.addEventListener('click', (event) => {
+          const target = event.target && event.target.closest ? event.target.closest('[data-citation-open-full]') : null;
+          if (!target) return;
+          event.preventDefault();
+          close();
+          this._handOffConversationToDock();
+          Nav.go(nav.path, { params: nav.params, context: nav.context });
+        });
+      }
+      return modal;
+    }
+
+    /**
+     * "Open full view" is a full page load. Queue this conversation for the
      * viewer's LANA dock (the same one-shot hand-off NavigationHelpers uses)
      * so the chat the user clicked from is open beside the document.
      */

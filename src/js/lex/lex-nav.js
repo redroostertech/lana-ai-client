@@ -7,6 +7,7 @@
 
    Public API:
      Lex.Nav.go(path, options?)       — navigate to a page
+     Lex.Nav.href(path, params?)      - page URL relative to this document (no navigation)
      Lex.Nav.consume()                — get + clear pending nav context
      Lex.Nav.peek()                   — read context without clearing
      Lex.Nav.getParams()              — current URL query params
@@ -551,12 +552,29 @@
     global.history.replaceState(newState, '');
   }
 
+  /**
+   * A page URL relative to the current document, with params, without
+   * navigating. For hosting an app page inside the current one (for example
+   * an iframe in a modal) where Lex.Nav.go would leave the page.
+   *   Lex.Nav.href('file-viewer.html', { id: 'doc-1' }) -> 'file-viewer.html?id=doc-1'
+   * @param {string} path
+   * @param {Object} [params]
+   * @returns {string}
+   */
+  function href(path, params) {
+    var normalized = normalizePath(path);
+    if (!normalized) return '';
+    var parts = splitPathAndQuery(normalized);
+    return rootRelativeUrl(buildUrl(parts.pathname, params || null, parts.search));
+  }
+
   // =========================================================================
   // Public API
   // =========================================================================
 
   global.Lex.Nav = {
     go:           go,
+    href:         href,
     consume:      consume,
     peek:         peek,
     getParams:    getParams,

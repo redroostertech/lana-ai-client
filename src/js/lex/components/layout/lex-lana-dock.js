@@ -571,6 +571,14 @@
     }
 
     connected() {
+      // A page hosted inside another page's modal (data-lex-chrome="embedded",
+      // e.g. the file viewer in a chat source modal) never mounts its own
+      // dock: the host's dock is already on screen, and a second one would
+      // consume the host's queued actions and restore conversations.
+      if (document.documentElement && document.documentElement.getAttribute('data-lex-chrome') === 'embedded') {
+        if (this.parentNode) this.parentNode.removeChild(this);
+        return;
+      }
       injectStyles();
       this._collapsed = this._readStoredCollapsed();
       this._initResizeWidth();

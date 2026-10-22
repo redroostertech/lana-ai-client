@@ -21,6 +21,7 @@
   var api = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.FileViewerCitationFocus = api;
+  if (typeof window !== 'undefined' && root === window) api.bootEmbeddedChrome(window);
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
@@ -232,7 +233,45 @@
     return first;
   }
 
+  // -------------------------------------------------------------------------
+  // Embedded chrome: the viewer hosted in a chat source modal's iframe
+  // (file-viewer.html?...&chrome=embedded). The host page keeps its own
+  // shell and dock, so this page hides its header, sidebar, banner and
+  // breadcrumb, never mounts a LANA dock, and asks the host to close on
+  // Escape (key events inside an iframe never reach the host's modal).
+  // -------------------------------------------------------------------------
+
+  function isEmbeddedChrome(params, win) {
+    return Boolean(params && typeof params.get === 'function' && params.get('chrome') === 'embedded' &&
+      win && win.parent && win.parent !== win);
+  }
+
+  function enterEmbeddedChrome(doc, win) {
+    if (!doc || !doc.documentElement) return false;
+    doc.documentElement.setAttribute('data-lex-chrome', 'embedded');
+    var app = doc.querySelector('lex-app');
+    if (app) app.setAttribute('chrome', 'embedded');
+    doc.addEventListener('keydown', function (event) {
+      if (!event || event.key !== 'Escape' || event.defaultPrevented) return;
+      // An overlay inside the viewer closes first.
+      if (doc.querySelector('lex-modal[open], lex-drawer[open]')) return;
+      try { win.parent.postMessage({ type: 'lex-embedded-close' }, '*'); } catch (_) { /* host gone */ }
+    });
+    return true;
+  }
+
+  /** Run once at script load, before the shell and dock scripts mount. */
+  function bootEmbeddedChrome(win) {
+    if (!win || !win.document || !win.location) return false;
+    var params = new URLSearchParams(win.location.search || '');
+    if (!isEmbeddedChrome(params, win)) return false;
+    return enterEmbeddedChrome(win.document, win);
+  }
+
   return {
+    isEmbeddedChrome: isEmbeddedChrome,
+    enterEmbeddedChrome: enterEmbeddedChrome,
+    bootEmbeddedChrome: bootEmbeddedChrome,
     MARK_CLASS: MARK_CLASS,
     fromParams: fromParams,
     findQuote: findQuote,

@@ -1796,3 +1796,20 @@ mark.file-viewer-citation-mark {
   border-radius: 2px;
   box-shadow: 0 0 0 1px var(--lex-color-warning-500, #f59e0b);
 }
+
+/* Embedded chrome: the viewer inside a chat source modal's iframe
+   (file-viewer.html?chrome=embedded). The host modal provides the title,
+   close button and "Open full view"; only the document area shows here. */
+html[data-lex-chrome="embedded"] lex-sidebar,
+html[data-lex-chrome="embedded"] lex-header,
+html[data-lex-chrome="embedded"] lex-lana-dock,
+html[data-lex-chrome="embedded"] #viewerHeader,
+html[data-lex-chrome="embedded"] #viewerBreadcrumb,
+html[data-lex-chrome="embedded"] #viewerFormatNotice {
+  display: none !important;
+}
+
+html[data-lex-chrome="embedded"] lex-body {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}

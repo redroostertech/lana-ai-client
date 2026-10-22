@@ -181,25 +181,6 @@ describe('source snippet', () => {
 });
 
 describe('opening a document source', () => {
-  test('navigates to the in-app file viewer with page, quote and chunk instead of a blob window', async () => {
-    const { context, chat } = harness();
-    chat._props.conversationId = 'conv-1';
-    chat._props.matterId = 'matter-1';
-    const citation = { ...doc1, chunk_index: 7 };
-    await chat._openCitationSource({ documentId: 'doc-1', page: 4, citation });
-
-    expect(context.Lex.Nav.go).toHaveBeenCalledWith('file-viewer.html', {
-      params: { id: 'doc-1', page: 4, quote: doc1.quote, chunk: 7 },
-      context: { referrer: 'workspace-details.html?id=matter-1' }
-    });
-    expect(context.open).not.toHaveBeenCalled();
-    expect(context.fetch).not.toHaveBeenCalled();
-    // The viewer's dock reopens the same conversation.
-    const [key, raw] = context.sessionStorage.setItem.mock.calls[0];
-    expect(key).toBe('lana_dock_pending_action');
-    expect(JSON.parse(raw)).toEqual(expect.objectContaining({ type: 'conversation', threadId: 'conv-1', matterId: 'matter-1' }));
-  });
-
   test('without an explicit quote passes the excerpt, and omits an unknown page', () => {
     const { context } = harness();
     const nav = context.Lex.Chat.Evidence.buildCitationViewerNavigation({

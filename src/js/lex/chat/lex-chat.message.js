@@ -361,6 +361,32 @@
         text-decoration: underline;
       }
 
+      /* Citation viewer modal: the file viewer (embedded mode) in an iframe,
+         near full viewport with margins. */
+      lex-modal.lex-chat-source-modal .lex-modal-panel {
+        height: calc(100vh - 48px);
+        height: calc(100dvh - 48px);
+      }
+      lex-modal.lex-chat-source-modal .lex-modal-panel > .lex-modal-body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 0;
+      }
+      lex-modal.lex-chat-source-modal slot-content[data-lex-modal-content] {
+        display: flex !important;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .lex-chat-source-viewer-frame {
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: 0;
+        border: 0;
+        background: var(--lex-bg-secondary);
+      }
+
       /* Artifacts section */
       .lex-chat-artifacts-section {
         margin-top: 8px;
