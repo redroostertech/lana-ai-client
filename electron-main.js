@@ -839,7 +839,10 @@ function createWindow(serverUrl = null) {
       sandbox: false, // Disable sandbox to allow file:// navigation
       webSecurity: false, // Disable for file:// protocol to work with absolute paths
       allowRunningInsecureContent: false,
-      experimentalFeatures: false
+      experimentalFeatures: false,
+      // Chromium's built-in PDF viewer: the file viewer's fallback PDF iframe
+      // (editor service unavailable, opened at #page=N) renders blank without it.
+      plugins: true
     },
     show: false // Don't show until ready (prevents flash of white screen)
   });
@@ -929,7 +932,10 @@ function createLoginWindow() {
       preload: path.join(__dirname, 'electron-preload.js'),
       additionalArguments: [BRAND_ARG],
       sandbox: false,
-      webSecurity: false
+      webSecurity: false,
+      // The login page navigates this same window into the app, file viewer
+      // included, so it needs the built-in PDF viewer too (see createWindow).
+      plugins: true
     },
     show: false,
     resizable: true,
