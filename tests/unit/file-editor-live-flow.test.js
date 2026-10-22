@@ -24,7 +24,8 @@ describe('File Editor live document boundary', () => {
     expect(html).toContain('<lex-lana-dock');
     expect(html).toContain('page-scope="file-editor"');
     expect(html).toContain('context-type="document_chat"');
-    expect(html).toContain('default-tool="document_chat"');
+    // Documents are not a composer tool; the dock's context type scopes it.
+    expect(html).not.toContain('default-tool="document_chat"');
     expect(editor).toContain('function officeConversationMatterId(file)');
     expect(editor).toContain('matterId: officeConversationMatterId(file) || null');
     expect(chatComposer).toContain("'tracked_change'");
