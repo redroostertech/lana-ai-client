@@ -1133,10 +1133,15 @@
 
     // Show/hide workspace selector based on matter type
     function updateWorkspaceSelectorVisibility() {
-      const matterTypeRadio = document.querySelector('input[name="matterType"]:checked');
+      const matterType = document.getElementById('matterType').value;
       const workspaceSelectorSection = document.getElementById('workspaceSelectorSection');
+      document.querySelectorAll('#matterTypeDiagram [data-matter-type]').forEach(panel => {
+        const selected = panel.dataset.matterType === matterType;
+        panel.classList.toggle('is-selected', selected);
+        panel.setAttribute('aria-pressed', String(selected));
+      });
 
-      if (matterTypeRadio && matterTypeRadio.value === 'matter') {
+      if (matterType === 'matter') {
         // Show workspace selector for Client Matters
         workspaceSelectorSection.classList.remove('hidden');
       } else {
@@ -1147,9 +1152,12 @@
       }
     }
 
-    // Add event listeners for matter type radio buttons
-    document.querySelectorAll('input[name="matterType"]').forEach(radio => {
-      radio.addEventListener('change', updateWorkspaceSelectorVisibility);
+    // Matter type is chosen by clicking a panel in the type diagram
+    document.querySelectorAll('#matterTypeDiagram [data-matter-type]').forEach(panel => {
+      panel.addEventListener('click', () => {
+        document.getElementById('matterType').value = panel.dataset.matterType;
+        updateWorkspaceSelectorVisibility();
+      });
     });
 
     // Load org users for sharing
@@ -1298,10 +1306,11 @@
 
     var _createMatterBtn = document.getElementById('createMatterBtn');
     if (_createMatterBtn) _createMatterBtn.addEventListener('click', () => {
-      document.getElementById('matterModal').heading = 'Create Matter';
+      document.getElementById('matterModal').heading = 'Create Workspace';
       document.getElementById('matterId').value = '';
       document.getElementById('matterIdDisplay').classList.add('hidden');
       document.getElementById('shareWithSection').classList.remove('hidden');
+      document.getElementById('matterEditOnlyFields').classList.add('hidden');
       form.reset();
       // Reset Lex components (not affected by native form.reset())
       ['matterName', 'clientName', 'matterDescription'].forEach(id => {
@@ -1314,12 +1323,7 @@
 
       // Enable matter type selection and reset to workspace default
       document.getElementById('matterTypeSection').classList.remove('hidden');
-      document.querySelectorAll('input[name="matterType"]').forEach(radio => {
-        radio.disabled = false;
-        if (radio.value === 'workspace') {
-          radio.checked = true;
-        }
-      });
+      document.getElementById('matterType').value = 'workspace';
 
       // Update workspace selector visibility based on default selection (workspace)
       updateWorkspaceSelectorVisibility();
@@ -1489,6 +1493,7 @@
 
         // Hide matter type section when editing (type is immutable)
         document.getElementById('matterTypeSection').classList.add('hidden');
+        document.getElementById('matterEditOnlyFields').classList.remove('hidden');
 
         // Show workspace selector for editing if matter is a client matter
         if (matter.matter_type === 'matter') {
@@ -2004,7 +2009,6 @@
       }
 
       const matterId = document.getElementById('matterId').value;
-      const matterTypeRadio = document.querySelector('input[name="matterType"]:checked');
       const data = {
         client_name: document.getElementById('clientName').value,
         name: document.getElementById('matterName').value,
@@ -2015,8 +2019,8 @@
       };
 
       // Add matter_type only when creating (not when updating)
-      if (!matterId && matterTypeRadio) {
-        data.matter_type = matterTypeRadio.value;
+      if (!matterId) {
+        data.matter_type = document.getElementById('matterType').value;
       }
 
       try {

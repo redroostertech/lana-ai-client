@@ -284,6 +284,38 @@
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
       }
+
+      /* ── Compact mode ───────────────────────────────────── */
+      /* Sized from the topbar itself, not the window, so open side panels
+         count. Back keeps only its arrow; Refresh keeps only its icon (the
+         label stays readable by screen readers). */
+
+      lex-topbar {
+        container: lex-topbar / inline-size;
+      }
+
+      @container lex-topbar (max-width: 699px) {
+        .lex-topbar-back {
+          padding: 5px 7px;
+        }
+
+        .lex-topbar-back-label {
+          display: none;
+        }
+
+        .lex-topbar-refresh .lex-btn-inner {
+          padding: 0.375rem !important;
+        }
+
+        .lex-topbar-refresh slot-content {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+          clip: rect(0 0 0 0);
+          white-space: nowrap;
+        }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -412,7 +444,7 @@
       html += `<div class="lex-topbar-right">`;
 
       // Refresh button (always present)
-      html += `<lex-btn data-action="refresh" variant="primary" leading-icon="refresh-cw" size="sm">Refresh</lex-btn>`;
+      html += `<lex-btn data-action="refresh" class="lex-topbar-refresh" variant="primary" leading-icon="refresh-cw" size="sm" title="Refresh">Refresh</lex-btn>`;
 
       if (this.showNotifications) {
         const count = this.notificationCount;

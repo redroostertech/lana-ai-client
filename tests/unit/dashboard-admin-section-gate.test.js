@@ -32,13 +32,16 @@ describe('dashboard admin section gate', () => {
     expect(source).toContain('var canViewStatus  = Lex.Auth.canViewSystemStatus;');
   });
 
-  test('hides the stat tile row and the Activity Overview card', () => {
+  test('hides the admin stat tiles and the Activity Overview card', () => {
     const gate = source.slice(
       source.indexOf('function applyAdminSectionGate()'),
       source.indexOf('function heartbeatAppEnabled()')
     );
 
-    expect(gate).toContain("hide('ccZoneE')");
+    expect(gate).toContain("['team', 'docs', 'storage'].forEach");
+    // The Workspaces tile is visible to everyone, so the row itself stays.
+    expect(gate).not.toContain("hide('ccZoneE')");
+    expect(gate).not.toContain("'workspaces'");
     expect(gate).toContain("hide('userProductivityWidget')");
     // The metric detail panel only opens from a Zone E tile, so it goes too.
     expect(gate).toContain("hide('ccDetailPanel')");
@@ -66,9 +69,8 @@ describe('dashboard admin section gate', () => {
     expect(source).toContain('showAdminSections ? loadActivityForUser(null) : Promise.resolve()');
   });
 
-  test('still runs renderZoneE, which supplies the Zone A matters count', () => {
-    // Zone E's container is hidden but its fetch must survive: zoneResults[1]
-    // is read for the matters pill.
+  test('still runs renderZoneE, which supplies the Workspaces tile count', () => {
+    // Non-admins still see the Workspaces tile, so the fetch must always run.
     expect(source).toContain('renderZoneE(),              // 1 — pipeline stats');
     expect(source).not.toMatch(/showAdminSections \? renderZoneE\(\)/);
   });

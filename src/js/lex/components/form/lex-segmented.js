@@ -10,8 +10,16 @@
        options='[{"value":"grid","label":"Grid","icon":"grid"},{"value":"list","label":"List","icon":"list"}]'>
      </lex-segmented>
 
+     <lex-segmented collapsible options='[...]'></lex-segmented>
+
    Sizes: sm | md | lg
    Events: lex-change { name, value }
+
+   collapsible: when the segments do not fit the element's width, show a
+   <lex-select> with the same options instead. The element is sized by its
+   layout, not its content, so the page must give it a width (block, or a
+   flex item with a basis). Needs lex-select.js on the page; without it the
+   segments stay and scroll horizontally.
 */
 
 (function () {
@@ -129,6 +137,33 @@
       .lex-seg-container--dark .lex-seg-item--selected {
         color: var(--lex-color-white);
       }
+
+      /* ── Collapsible ───────────────────────────────────── */
+
+      lex-segmented[collapsible] {
+        container-type: inline-size;
+        min-width: 0;
+      }
+
+      lex-segmented[collapsible] .lex-seg-container {
+        max-width: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .lex-seg-select,
+      lex-segmented[data-compact] .lex-seg-container {
+        display: none;
+      }
+
+      lex-segmented[data-compact] .lex-seg-select {
+        display: block;
+      }
+
+      /* The placeholder is a real option here (e.g. "All"), not a prompt */
+      .lex-seg-select .lex-select-placeholder {
+        color: var(--lex-text-primary);
+      }
     `;
     document.head.appendChild(style);
   }
@@ -144,8 +179,9 @@
     static get properties() {
       return {
         ...super.properties,
-        options: { type: Array, default: [] },
-        theme:   { type: String, default: 'light' }
+        options:     { type: Array, default: [] },
+        theme:       { type: String, default: 'light' },
+        collapsible: { type: Boolean, default: false }
       };
     }
 
@@ -170,6 +206,18 @@
 
       html += `</div>`;
 
+      if (this.collapsible) {
+        const selectOptions = options.map(opt => ({ value: opt.value, label: opt.label }));
+        // lex-select treats "" as no selection, so an option like
+        // {value:"", label:"All"} shows through the placeholder instead
+        const emptyOpt = options.find(opt => opt.value === '');
+        const placeholder = emptyOpt ? emptyOpt.label : 'Select...';
+        html += `<lex-select class="lex-seg-select" variant="outlined" size="${sz === 'lg' ? 'md' : sz}"`
+          + ` placeholder="${this.escapeHtml(placeholder)}"`
+          + ` options="${this.escapeHtml(JSON.stringify(selectOptions))}"`
+          + ` value="${this.escapeHtml(this.value || '')}"></lex-select>`;
+      }
+
       if (this.label || this.error || this.help) {
         return this._renderFieldWrapper(html);
       }
@@ -191,8 +239,64 @@
             el.classList.toggle('lex-seg-item--selected', el.dataset.value === val);
           });
           this._positionIndicator();
+          const select = this.querySelector('.lex-seg-select');
+          if (select) select.value = val;
         }
       });
+
+      if (this.collapsible) {
+        const select = this.querySelector('.lex-seg-select');
+        if (select) {
+          select.addEventListener('lex-change', (e) => {
+            // Re-emit from the host so pages only see one lex-change
+            e.stopPropagation();
+            const val = select.value;
+            if (val === this.value) return;
+            this._props.value = val;
+            this.querySelectorAll('.lex-seg-item').forEach(el => {
+              el.classList.toggle('lex-seg-item--selected', el.dataset.value === val);
+            });
+            this._emitChange(val);
+          });
+        }
+        this._checkFit();
+      }
+    }
+
+    connected() {
+      super.connected();
+      if (!this.collapsible || this._resizeObserver) return;
+      this._resizeObserver = new ResizeObserver(() => this._checkFit());
+      this._resizeObserver.observe(this);
+      // lex-select may load after this element; re-check once it exists
+      customElements.whenDefined('lex-select').then(() => this._checkFit());
+    }
+
+    disconnected() {
+      super.disconnected();
+      if (this._resizeObserver) {
+        this._resizeObserver.disconnect();
+        this._resizeObserver = null;
+      }
+    }
+
+    /**
+     * Collapsible mode: show the dropdown when the segments are wider than
+     * the element. The element's width does not depend on its content
+     * (inline-size containment), so the segments can be measured in place
+     * without a feedback loop. Runs synchronously, so there is no flicker.
+     */
+    _checkFit() {
+      if (!this.collapsible || !customElements.get('lex-select')) return;
+      const container = this.querySelector('.lex-seg-container');
+      if (!container) return;
+      this.removeAttribute('data-compact');
+      const fits = container.scrollWidth <= this.clientWidth;
+      if (!fits) {
+        this.setAttribute('data-compact', '');
+      } else {
+        this._positionIndicator();
+      }
     }
 
     _positionIndicator() {

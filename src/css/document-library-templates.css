@@ -23,8 +23,26 @@
   margin: 16px 0 12px;
 }
 
-.dst-filters-spacer {
-  flex: 1;
+/* Fills the row; collapses to a dropdown when its options do not fit */
+.dst-filters lex-segmented {
+  flex: 1 1 0;
+}
+
+/* Narrow page column (container from .document-library): stack the row */
+@container doc-library (max-width: 600px) {
+  .dst-filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dst-filters lex-segmented {
+    flex: none;
+  }
+
+  .dst-search {
+    box-sizing: border-box;
+    width: 100%;
+  }
 }
 
 .dst-filter-label {

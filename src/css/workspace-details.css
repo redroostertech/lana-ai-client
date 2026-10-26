@@ -1,0 +1,60 @@
+/* Workspace / matter details page (workspace-details.html) */
+
+/* Tab bar: full tabs when there is room, a dropdown when the content column is
+   narrow. Sized from the bar itself so open sidebars and the Ask LANA panel
+   are accounted for. */
+.matter-tabbar {
+  container-type: inline-size;
+}
+
+.matter-tabbar__tabs {
+  min-width: 0;
+}
+
+.matter-tabbar__select {
+  display: none;
+}
+
+@container (max-width: 719px) {
+  .matter-tabbar__tabs {
+    display: none;
+  }
+
+  .matter-tabbar__select {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 0;
+  }
+}
+
+/* Tab panels: content inside each tab sizes from this column, not the window */
+.matter-tab-panels {
+  container: matter-panel / inline-size;
+}
+
+/* Discussions: comment composer */
+.comment-composer #commentInput {
+  box-sizing: border-box;
+  height: auto;
+  min-height: 76px;
+  overflow-wrap: anywhere;
+}
+
+@container matter-panel (max-width: 479px) {
+  .comment-composer__avatar {
+    display: none;
+  }
+
+  .comment-composer__actions > button {
+    flex: 1 1 0;
+  }
+}
+
+/* Documents: put New Document under the title and subtitle when narrow */
+@container matter-panel (max-width: 559px) {
+  .workspace-docs-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}

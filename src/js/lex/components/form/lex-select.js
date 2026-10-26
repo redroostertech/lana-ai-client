@@ -10,6 +10,9 @@
        options='[{"value":"a","label":"Alpha"},{"value":"b","label":"Beta"},{"value":"c","label":"Gamma"}]'>
      </lex-select>
 
+   variant="outlined": white bordered trigger, for a dropdown that replaces
+   tabs or a segmented control on narrow layouts.
+
    Events: lex-change { name, value: string | Array }
 */
 
@@ -70,6 +73,24 @@
       .lex-select-trigger:disabled {
         opacity: var(--lex-input-disabled-opacity);
         cursor: not-allowed;
+      }
+
+      /* Outlined: a white, bordered trigger that reads clearly as a dropdown
+         when it stands in for other navigation (tabs, segmented controls). */
+      lex-select[variant="outlined"] .lex-select-trigger,
+      lex-select[variant="outlined"] .lex-select-trigger:focus,
+      lex-select[variant="outlined"] .lex-select-trigger--open {
+        background: var(--lex-bg-primary);
+        border: 1px solid var(--lex-border-strong);
+      }
+
+      lex-select[variant="outlined"] .lex-select-trigger {
+        box-shadow: var(--lex-shadow-sm);
+      }
+
+      lex-select[variant="outlined"] .lex-select-trigger:hover:not(:disabled) {
+        background: var(--lex-bg-primary);
+        border-color: var(--lex-border-accent);
       }
 
       /* Size variants */
