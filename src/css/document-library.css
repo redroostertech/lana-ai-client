@@ -2,6 +2,7 @@
 
 .document-library {
   box-sizing: border-box;
+  container: doc-library / inline-size;
   display: block;
   margin: 0;
   max-width: none;
@@ -172,6 +173,22 @@
   white-space: nowrap;
 }
 
+/* Content rules size from the page column, not the window, so open side
+   panels count. Padding on .document-library itself stays on @media because a
+   container cannot query itself. */
+@container doc-library (max-width: 820px) {
+  .document-library-columns,
+  .document-library-file {
+    gap: 12px;
+    grid-template-columns: 40px minmax(0, 1fr) 145px 18px;
+  }
+
+  .document-library-columns > :nth-child(3),
+  .document-library-file-workspace {
+    display: none;
+  }
+}
+
 /* Below these widths the table scrolls sideways instead of squeezing the
    name column to nothing. */
 #documentLibraryTable table { min-width: 920px; }
@@ -196,6 +213,42 @@
 @media (max-width: 768px) {
   .document-library {
     padding: 1rem;
+  }
+}
+
+@container doc-library (max-width: 600px) {
+  .document-library-section-heading {
+    align-items: flex-start;
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .document-library-columns {
+    display: none;
+  }
+
+  .document-library-file {
+    align-items: start;
+    gap: 10px 12px;
+    grid-template-columns: 40px minmax(0, 1fr) 16px;
+    min-height: 88px;
+    padding: 14px 16px;
+  }
+
+  .document-library-file-time {
+    grid-column: 2;
+    white-space: normal;
+  }
+
+  .document-library-file-arrow {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    opacity: 1;
+    transform: none;
+  }
+
+  .document-library-file-icon {
+    grid-row: 1 / span 2;
   }
 }
 

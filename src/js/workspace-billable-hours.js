@@ -134,7 +134,7 @@
     var container = document.getElementById('bhSummaryCard');
     if (!container) return;
 
-    container.innerHTML = '<div class="animate-pulse" style="grid-column:1/-1;"><div class="cc-skeleton" style="height:3rem;width:100%;"></div></div>';
+    container.innerHTML = '<div class="animate-pulse bh-stats__full"><div class="cc-skeleton bh-skeleton"></div></div>';
 
     var url = '/api/v1/billable-hours/summary?matter_id=' + encodeURIComponent(matter.matter_id);
     if (_dateFrom) url += '&date_from=' + encodeURIComponent(_dateFrom);
@@ -147,7 +147,7 @@
         container.innerHTML = _buildSummaryCards(data);
       })
       .catch(function () {
-        container.innerHTML = '<div style="color:var(--lex-text-muted);font-size:0.8rem;grid-column:1/-1;">Unable to load summary</div>';
+        container.innerHTML = '<div class="bh-stats__full bh-muted">Unable to load summary</div>';
       });
   }
 
@@ -164,10 +164,9 @@
     var html = '';
     for (var i = 0; i < cards.length; i++) {
       var c = cards[i];
-      var valueColor = c.highlight ? 'var(--lex-color-amber-600,#d97706)' : 'var(--lex-text-primary)';
-      html += '<div style="background:var(--lex-bg-muted,#f9fafb);border-radius:0.5rem;padding:0.75rem 1rem;">';
-      html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;letter-spacing:0.05em;">' + Lex.Utils.escapeHtml(c.label) + '</div>';
-      html += '<div style="font-size:1.25rem;font-weight:700;color:' + valueColor + ';">' + Lex.Utils.escapeHtml(String(c.value)) + Lex.Utils.escapeHtml(c.suffix) + '</div>';
+      html += '<div class="bh-stat">';
+      html += '<div class="bh-stat__label">' + Lex.Utils.escapeHtml(c.label) + '</div>';
+      html += '<div class="bh-stat__value' + (c.highlight ? ' bh-stat__value--highlight' : '') + '">' + Lex.Utils.escapeHtml(String(c.value)) + Lex.Utils.escapeHtml(c.suffix) + '</div>';
       html += '</div>';
     }
     return html;

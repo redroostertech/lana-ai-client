@@ -260,14 +260,32 @@
 
 
 /* ==========================================================================
-   5. Zone E — Pipeline Intelligence (3 columns)
+   5. Zone E — Pipeline Intelligence (4 columns)
    ========================================================================== */
 
 .cc-pipeline {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
   margin-bottom: 1.25rem;
+}
+
+/* LANA One hides the Team Members tile */
+.cc-pipeline--three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Size the row from the content column, not the window: the app sidebars
+   take a large share of the window, so a viewport query fires too late. */
+.cc-main {
+  container-type: inline-size;
+}
+
+@container (max-width: 799px) {
+  .cc-pipeline,
+  .cc-pipeline--three {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 
@@ -451,7 +469,20 @@
   min-width: 0;
 }
 
-@media (min-width: 1024px) {
+/* Sized from the Activity Overview card itself, not the window: with the app
+   sidebars open the card can be narrow on a wide window. */
+#userProductivityWidget {
+  container: cc-activity / inline-size;
+}
+
+@container cc-activity (max-width: 559px) {
+  #userProductivityWidget .cc-section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@container cc-activity (min-width: 640px) {
   .cc-activity-split {
     flex-direction: row;
     gap: 0;
@@ -587,19 +618,10 @@
    13. Responsive breakpoints
    ========================================================================== */
 
-@media (max-width: 1023px) {
+/* Two-card rows stack when the content column (not the window) is narrow */
+@container (max-width: 899px) {
   .cc-action-row,
   .cc-signals-row {
-    grid-template-columns: 1fr;
-  }
-
-  .cc-pipeline {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 639px) {
-  .cc-pipeline {
     grid-template-columns: 1fr;
   }
 }

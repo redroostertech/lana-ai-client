@@ -1,0 +1,339 @@
+/* Billable Hours tab on the matter page (rendered by js/workspace-billable-hours.js).
+   Layout sizes from the tab panel column (container "matter-panel" in
+   workspace-details.css), so open side panels are accounted for. */
+
+/* ── Summary stats ──────────────────────────────────────────── */
+
+.bh-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.bh-stats__full {
+  grid-column: 1 / -1;
+}
+
+.bh-stat {
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: 0.5rem;
+  min-width: 0;
+  padding: 0.75rem 1rem;
+}
+
+.bh-stat__label {
+  color: var(--lex-text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.bh-stat__value {
+  color: var(--lex-text-primary);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.bh-stat__value--highlight {
+  color: var(--lex-color-amber-600, #d97706);
+}
+
+.bh-skeleton {
+  height: 2.5rem;
+  width: 100%;
+}
+
+.bh-muted {
+  color: var(--lex-text-muted);
+  font-size: 0.8rem;
+}
+
+/* ── Date filters + bulk actions ────────────────────────────── */
+
+.bh-filters-bar {
+  margin-bottom: 1.25rem;
+}
+
+.bh-filters {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.bh-filters__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bh-filters__field > span {
+  color: var(--lex-text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.bh-date {
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: 0.375rem;
+  box-sizing: border-box;
+  color: var(--lex-text-primary);
+  font: inherit;
+  font-size: 0.8125rem;
+  min-height: 34px;
+  padding: 0.25rem 0.5rem;
+}
+
+.bh-bulk {
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* ── Time entries ───────────────────────────────────────────── */
+
+.bh-entries__header {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.bh-entries__title {
+  color: var(--lex-text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.bh-entries__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.bh-entries {
+  border: 1px solid var(--lex-border-default, #e5e7eb);
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bh-entries__select-all {
+  align-items: center;
+  background: var(--lex-bg-muted, #f9fafb);
+  border-bottom: 1px solid var(--lex-border-default, #e5e7eb);
+  color: var(--lex-text-muted);
+  display: flex;
+  font-size: 0.7rem;
+  font-weight: 600;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  text-transform: uppercase;
+}
+
+.bh-entries__empty {
+  color: var(--lex-text-muted);
+  font-size: 0.875rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.bh-pagination {
+  margin-top: 0.5rem;
+}
+
+.bh-entry-row {
+  align-items: center;
+  background: var(--lex-bg-primary);
+  cursor: pointer;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  transition: background 0.15s;
+}
+
+.bh-entry-row--alt {
+  background: var(--lex-bg-muted, #f9fafb);
+}
+
+.bh-entry-row:hover {
+  background: var(--lex-bg-accent-subtle, #eff6ff);
+}
+
+.bh-entry-check {
+  cursor: pointer;
+  flex-shrink: 0;
+  width: 1rem;
+}
+
+.bh-entry-hours {
+  background: var(--lex-bg-accent-subtle, #eff6ff);
+  border-radius: 0.375rem;
+  color: var(--lex-color-blue-700, #1d4ed8);
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  min-width: 3.5rem;
+  padding: 0.25rem 0.5rem;
+  text-align: center;
+}
+
+.bh-entry-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.bh-entry-desc {
+  color: var(--lex-text-primary);
+  font-size: 0.8125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bh-entry-meta {
+  color: var(--lex-text-muted);
+  font-size: 0.7rem;
+}
+
+.bh-entry-badges {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.bh-entry-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.25rem;
+}
+
+.bh-badge,
+.bh-overlap-badge {
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  white-space: nowrap;
+}
+
+.bh-badge--status-draft     { background: var(--lex-color-amber-50, #fffbeb);  color: var(--lex-color-amber-700, #b45309); }
+.bh-badge--status-submitted { background: var(--lex-color-blue-50, #eff6ff);   color: var(--lex-color-blue-700, #1d4ed8); }
+.bh-badge--status-approved  { background: var(--lex-color-green-50, #f0fdf4);  color: var(--lex-color-green-700, #15803d); }
+.bh-badge--status-invoiced  { background: var(--lex-color-purple-50, #faf5ff); color: var(--lex-color-purple-700, #7e22ce); }
+
+.bh-badge--source-activity  { background: var(--lex-bg-muted, #f3f4f6);        color: var(--lex-text-muted, #6b7280); }
+.bh-badge--source-manual    { background: var(--lex-color-blue-50, #eff6ff);   color: var(--lex-color-blue-700, #1d4ed8); }
+.bh-badge--source-imported  { background: var(--lex-color-purple-50, #faf5ff); color: var(--lex-color-purple-700, #7e22ce); }
+
+.bh-overlap-badge {
+  background: var(--lex-color-amber-50, #fffbeb);
+  border: 1px solid var(--lex-color-amber-200, #fde68a);
+  color: var(--lex-color-amber-700, #b45309);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.bh-approve-btn,
+.bh-reject-btn {
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+}
+
+.bh-approve-btn {
+  background: var(--lex-color-green-50, #f0fdf4);
+  border: 1px solid var(--lex-color-green-200, #bbf7d0);
+  color: var(--lex-color-green-700, #15803d);
+}
+
+.bh-reject-btn {
+  background: var(--lex-color-red-50, #fef2f2);
+  border: 1px solid var(--lex-color-red-200, #fecaca);
+  color: var(--lex-color-red-700, #b91c1c);
+}
+
+.bh-overlap-panel {
+  background: var(--lex-color-amber-50, #fffbeb);
+  border-bottom: 1px solid var(--lex-color-amber-200, #fde68a);
+  padding: 0.75rem 1rem 0.875rem 3rem;
+}
+
+/* ── Medium: 3 stats per row ────────────────────────────────── */
+
+@container matter-panel (max-width: 1099px) {
+  .bh-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ── Narrow: 2 stats per row, stacked filters and rows ──────── */
+
+@container matter-panel (max-width: 559px) {
+  .bh-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bh-filters__field {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .bh-date {
+    width: 100%;
+  }
+
+  .bh-filters__apply {
+    flex: 1 1 100%;
+  }
+
+  .bh-bulk {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .bh-entries__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  /* Row: [check] [hours] [description], with badges and actions below the description */
+  .bh-entry-row {
+    align-items: start;
+    display: grid;
+    gap: 0.375rem 0.75rem;
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .bh-entry-check { grid-column: 1; grid-row: 1; }
+  .bh-entry-hours { grid-column: 2; grid-row: 1; }
+
+  .bh-entry-main,
+  .bh-entry-badges,
+  .bh-entry-actions {
+    grid-column: 3;
+  }
+
+  .bh-entry-desc {
+    white-space: normal;
+  }
+
+  .bh-overlap-panel {
+    padding-left: 1rem;
+  }
+}

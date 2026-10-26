@@ -7,7 +7,7 @@
 
 ## Table of Contents
 
-1. [Architecture Overview](#1-architecture-overview)
+1. [Architecture Overview](#1-architecture-overview) (includes Responsive Layout)
 2. [Core APIs](#2-core-apis)
 3. [Foundation Components](#3-foundation-components)
 4. [Form Components](#4-form-components)
@@ -105,6 +105,38 @@ defineLex('my-component', MyComponent);
 **Properties set before upgrade are kept.** `el.options = [...]` on a `<lex-*>` whose script has not loaded yet (or `document.createElement` before the definition) is captured in the constructor and re-applied once the accessor exists; it wins over the matching attribute, as it would after upgrade.
 
 **Slotted children survive any script load order.** A component captures its children with `cloneContent`, so a `<lex-btn>` inside a `<lex-modal>`/`<lex-drawer>` footer renders one `<button>` even when `lex-btn.js` loads first (it used to render a button inside a button).
+
+### Responsive Layout: Size From the Component, Not the Window
+
+The content column is often much narrower than the window: the sidebar, the
+Ask LANA panel and other docks all take space. A `@media` query only knows the
+window width, so it keeps a wide layout while the component itself is squeezed.
+
+- **Content components** (banners, cards, metric rows, tab bars, page grids) use
+  **container queries**. Make the host element the container and query it:
+
+  ```css
+  lex-banner {
+    container: lex-banner / inline-size;
+  }
+
+  @container lex-banner (max-width: 559px) {
+    .lex-banner { flex-direction: column; align-items: flex-start; }
+  }
+  ```
+
+- **Shell components** that lay out the window itself (`lex-app`, `lex-sidebar`,
+  `lex-lana-dock`) keep `@media` queries.
+- **Pick the right container.** An unnamed `@container` matches the nearest
+  ancestor container. Name the container when a component sits inside another
+  container and must not react to it.
+- **Collapse, do not squeeze.** When there is no room: stack side-by-side regions
+  (`lex-banner`), drop labels to icons and keep the label for screen readers
+  (`lex-topbar`), or swap a tab bar for a dropdown.
+- **Flex children that hold wide content need `min-width: 0`**, or they force the
+  whole page wider than the window.
+- **Check two widths** before shipping: the narrowest realistic content column
+  (about 360px, sidebar and Ask LANA panel open) and a wide one.
 
 ---
 

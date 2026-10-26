@@ -37,7 +37,7 @@
        by the browser until cloned into the live DOM. Zero double-rendering. -->
   <template id="page-content">
 
-    <main>
+    <main class="cc-main">
 
       <!-- ================================================================
            Zone A — Morning Orientation Bar (full width)
@@ -50,18 +50,15 @@
         subtitle=""
         lana
         lana-context-type="full_chat"
-      >
-        <lex-btn id="ccZoneAMatters" variant="secondary">
-          <span id="ccZoneAMattersCount">-</span> active matters
-        </lex-btn>
-      </lex-banner>
+      ></lex-banner>
 
 
       <!-- ================================================================
-           Zone E — Pipeline Intelligence (3 equal columns)
+           Zone E — Pipeline Intelligence (4 equal columns, 2x2 on small screens)
            ================================================================ -->
       <div class="cc-pipeline" id="ccZoneE">
         <lex-metric data-metric-key="team" label="Team Members" value="-" status="blue"></lex-metric>
+        <lex-metric data-metric-key="workspaces" label="Workspaces" value="-" status="blue"></lex-metric>
         <lex-metric data-metric-key="docs" label="Total Documents" value="-" status="blue"></lex-metric>
         <lex-metric data-metric-key="storage" label="Storage Used" value="-" status="blue"></lex-metric>
       </div>

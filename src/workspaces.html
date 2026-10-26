@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/components/document-metadata.css">
   <link rel="stylesheet" href="css/matter-notes.css">
   <link rel="stylesheet" href="css/workspaces-list.css">
+  <link rel="stylesheet" href="css/matter-type-diagram.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css">
   <link rel="stylesheet" href="css/tailwind-output.css">
   <link rel="stylesheet" href="css/companion-bridge-consent.css">
@@ -200,92 +201,120 @@
     </main>
 
     <!-- Matter Modal -->
-    <lex-modal id="matterModal" heading="Create Matter" size="full" hide-actions
+    <lex-modal id="matterModal" heading="Create Workspace" size="full" hide-actions
       footer-content='<lex-btn type="button" id="cancelMatterBtn" variant="secondary">Cancel</lex-btn><lex-btn type="submit" form="matterForm" id="saveMatterBtn" variant="primary">Save Matter</lex-btn>'>
         <form id="matterForm" class="max-w-2xl mx-auto px-6 py-8 space-y-6">
           <input type="hidden" id="matterId">
-          <div id="matterIdDisplay" class="hidden">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Matter ID</label>
-            <div class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 font-mono text-sm truncate" id="matterIdValue"></div>
-          </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <lex-input id="matterName" label="Matter Name" required></lex-input>
-            <lex-input id="clientName" label="Client Name"></lex-input>
-          </div>
-
-          <div id="matterTypeSection">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Matter Type <span class="text-red-500">*</span></label>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <label class="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:lex-border-accent hover:lex-bg-accent-muted transition-colors">
-                <input type="radio" name="matterType" value="matter" class="mt-1 h-4 w-4 lex-text-accent lex-ring-focus">
-                <div class="flex-1">
-                  <div class="flex items-center gap-2">
-                    <span class="font-semibold text-gray-900">Client Matter</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Billable</span>
-                  </div>
-                  <p class="text-sm text-gray-600 mt-1">Individual client case with isolated data. Included in analytics, billing reports, and practice area metrics.</p>
-                </div>
-              </label>
-
-              <label class="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:lex-border-accent hover:lex-bg-accent-muted transition-colors">
-                <input type="radio" name="matterType" value="workspace" class="mt-1 h-4 w-4 lex-text-accent lex-ring-focus" checked>
-                <div class="flex-1">
-                  <div class="flex items-center gap-2">
-                    <span class="font-semibold text-gray-900">Workspace</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium lex-bg-accent-soft lex-text-accent">Collaborative</span>
-                  </div>
-                  <p class="text-sm text-gray-600 mt-1">Collaborative container that can link multiple matters, upload shared documents, and enable AI reasoning across connected data sources. Excluded from billing analytics.</p>
-                </div>
-              </label>
+          <section class="space-y-6">
+            <div>
+              <h4 class="text-base font-semibold text-gray-900">Details</h4>
+              <p class="text-xs text-gray-500 mt-1">What this is and how it is organized.</p>
             </div>
-            <div class="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
-              <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-              </svg>
-              <p class="text-xs text-amber-800">
-                <strong>Important:</strong> Once created, this type cannot be changed. Choose carefully.
+
+            <div id="matterIdDisplay" class="hidden">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Matter ID</label>
+              <div class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 font-mono text-sm truncate" id="matterIdValue"></div>
+            </div>
+
+            <lex-input id="matterName" label="Name" required></lex-input>
+
+            <lex-textarea id="matterDescription" label="Description" rows="4" placeholder="What is this about? Include the parties, goals, and any context LANA should know."></lex-textarea>
+
+            <div id="matterTypeSection">
+              <label class="block text-sm font-medium text-gray-700">Type <span class="text-red-500">*</span></label>
+              <input type="hidden" id="matterType" value="workspace">
+
+              <div class="mt-diagram" id="matterTypeDiagram">
+                <button type="button" class="mt-diagram__panel" data-matter-type="workspace">
+                  <span class="mt-diagram__title">Workspace</span>
+                  <span class="mt-diagram__canvas" aria-hidden="true">
+                    <span class="mt-box mt-box--outer">
+                      <span class="mt-chip mt-chip--wide">Shared documents</span>
+                      <span class="mt-row mt-row--linked">
+                        <span class="mt-chip">Matter</span>
+                        <span class="mt-chip">Matter</span>
+                        <span class="mt-chip">Matter</span>
+                      </span>
+                    </span>
+                  </span>
+                  <span class="mt-diagram__facts">
+                    <span>Groups many matters</span>
+                    <span>Shared documents across them</span>
+                    <span>AI reasons across all connected data</span>
+                    <span>Not counted in billing analytics</span>
+                  </span>
+                </button>
+
+                <button type="button" class="mt-diagram__panel" data-matter-type="matter">
+                  <span class="mt-diagram__title">Matter</span>
+                  <span class="mt-diagram__canvas" aria-hidden="true">
+                    <span class="mt-box mt-box--outer">
+                      <span class="mt-row">
+                        <span class="mt-chip">Client</span>
+                        <span class="mt-chip">Documents</span>
+                      </span>
+                      <span class="mt-tag">Isolated data</span>
+                    </span>
+                    <span class="mt-optional-link">Can link to a workspace</span>
+                  </span>
+                  <span class="mt-diagram__facts">
+                    <span>One client case</span>
+                    <span>Data stays with this matter</span>
+                    <span>Optionally linked to a workspace</span>
+                    <span>Counted in billing and practice metrics</span>
+                  </span>
+                </button>
+              </div>
+
+              <p class="text-xs text-amber-700 mt-2"><strong>Important:</strong> Once created, this type cannot be changed.</p>
+            </div>
+
+            <div id="workspaceSelectorSection" class="hidden">
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Link to Workspace <span class="text-gray-400">(Optional)</span>
+              </label>
+              <lex-select id="workspaceSelector" options='[{"value":"","label":"No workspace (standalone matter)"}]' placeholder="No workspace (standalone matter)"></lex-select>
+              <p class="text-xs text-gray-500 mt-1">
+                Linking to a workspace allows this matter to access documents from the workspace and other linked matters (read-only).
               </p>
             </div>
-          </div>
 
-          <div id="workspaceSelectorSection" class="hidden">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Link to Workspace <span class="text-gray-400">(Optional)</span>
-            </label>
-            <lex-select id="workspaceSelector" options='[{"value":"","label":"No workspace (standalone matter)"}]' placeholder="No workspace (standalone matter)"></lex-select>
-            <p class="text-xs text-gray-500 mt-1">
-              Linking to a workspace allows this matter to access documents from the workspace and other linked matters (read-only).
-            </p>
-          </div>
+            <!-- Edit-only fields: client name is added after creation, status defaults to active -->
+            <div id="matterEditOnlyFields" class="hidden space-y-6">
+              <lex-input id="clientName" label="Client Name"></lex-input>
+              <lex-select id="matterStatus" label="Status"
+                options='[{"value":"active","label":"Active"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'>
+              </lex-select>
+            </div>
+          </section>
 
-          <lex-textarea id="matterDescription" label="Description" rows="4" placeholder="Brief description of the matter..."></lex-textarea>
+          <section class="space-y-6 pt-6 border-t border-gray-200">
+            <div>
+              <h4 class="text-base font-semibold text-gray-900">Access</h4>
+              <p class="text-xs text-gray-500 mt-1">Who can see and work on this.</p>
+            </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <lex-select id="matterVisibility" label="Visibility"
               options='[{"value":"private","label":"Private - Only shared users can access"},{"value":"organization","label":"Organization - All org members can view"}]'>
             </lex-select>
 
-            <lex-select id="matterStatus" label="Status"
-              options='[{"value":"active","label":"Active"},{"value":"closed","label":"Closed"},{"value":"archived","label":"Archived"}]'>
-            </lex-select>
-          </div>
-
-          <div id="shareWithSection">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Share with Team Members</label>
-            <div class="border border-gray-200 rounded-lg">
-              <div class="p-3 border-b border-gray-200">
-                  <lex-input id="userSearchInput" placeholder="Search users to add..." leading-icon="search" size="sm"></lex-input>
-                <div id="userSearchResults" class="hidden mt-2 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg"></div>
-              </div>
-              <div class="p-3">
-                <div id="selectedUsersList" class="space-y-2">
-                  <p class="text-sm text-gray-500 italic" id="noUsersSelected">No users selected. Start typing to search and add team members.</p>
+            <div id="shareWithSection">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Share with Team Members</label>
+              <div class="border border-gray-200 rounded-lg">
+                <div class="p-3 border-b border-gray-200">
+                    <lex-input id="userSearchInput" placeholder="Search users to add..." leading-icon="search" size="sm"></lex-input>
+                  <div id="userSearchResults" class="hidden mt-2 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg"></div>
+                </div>
+                <div class="p-3">
+                  <div id="selectedUsersList" class="space-y-2">
+                    <p class="text-sm text-gray-500 italic" id="noUsersSelected">No users selected. Start typing to search and add team members.</p>
+                  </div>
                 </div>
               </div>
+              <p class="text-xs text-amber-700 mt-2">Selected users will have read and write access to this matter.</p>
             </div>
-            <p class="text-xs text-gray-500 mt-1">Selected users will have read and write access to this matter.</p>
-          </div>
+          </section>
 
           <div id="conflictDetectionContainer"></div>
 
@@ -485,15 +514,9 @@
         function byId(id) { return document.getElementById(id); }
         function fullRow(el) { var g = el && el.closest ? el.closest('.grid') : null; if (g) g.classList.remove('md:grid-cols-2'); }
         // Main "Create Workspace" (matter) modal.
-        var clientName = byId('clientName'); fullRow(clientName); hideEl(clientName);
-        var clientType = document.querySelector('#matterForm input[name="matterType"][value="matter"]');
-        if (clientType) {
-          hideEl(clientType.closest('label'));
-          var tg = clientType.closest('.grid'); if (tg) tg.classList.remove('md:grid-cols-2');
-        }
-        var wsType = document.querySelector('#matterForm input[name="matterType"][value="workspace"]');
-        if (wsType) wsType.checked = true;
-        hideEl(document.querySelector('#matterTypeSection .bg-amber-50'));
+        hideEl(byId('clientName'));
+        // Only the Workspace type exists here; the hidden #matterType input already defaults to it.
+        hideEl(byId('matterTypeSection'));
         hideEl(byId('shareWithSection'));
         // "Create matter in workspace" modal.
         var wsClientName = byId('workspaceClientName'); fullRow(wsClientName); hideEl(wsClientName);

@@ -202,9 +202,9 @@
    * LANA One edition gate for the Zone E pipeline metric tiles.
    *
    * Single-tenant LANA One has exactly one user, so the "Team Members" metric
-   * (Zone E tile index 0, data-metric-key="team") is meaningless; hide that
-   * specific tile and reflow the 3-column pipeline grid to 2 columns so the two
-   * remaining tiles (Total Documents, Storage Used) lay out correctly.
+   * (data-metric-key="team") is meaningless; hide that specific tile and reflow
+   * the 4-column pipeline grid to 3 columns so the remaining tiles (Workspaces,
+   * Total Documents, Storage Used) lay out correctly.
    *
    * Purely edition-gated via the canonical electronAPI.getConfig() pattern: in
    * the browser / org edition there is no window.electronAPI (or isLanaOne is
@@ -222,26 +222,25 @@
       if (!zoneE) return;
       var teamTile = zoneE.querySelector('lex-metric[data-metric-key="team"]');
       if (teamTile) hide(teamTile);
-      // Reflow the 3-col pipeline grid to 2 cols now that a tile is hidden, so
-      // the remaining two tiles fill the row instead of leaving an empty column.
-      zoneE.style.gridTemplateColumns = 'repeat(2, 1fr)';
+      // Reflow the 4-col pipeline grid to 3 cols now that a tile is hidden, so
+      // the remaining tiles fill the row instead of leaving an empty column.
+      zoneE.classList.add('cc-pipeline--three');
     }).catch(function () { /* inert on any failure; org edition stays untouched */ });
   }
 
   /**
    * Admin-only dashboard sections.
    *
-   * Zone E's three tiles (Team Members, Total Documents, Storage Used) are fed by
+   * Zone E's Team Members, Total Documents and Storage Used tiles are fed by
    * org-stats and /admin/health/storage, and the Activity Overview card reports
    * organization-wide activity. All of it sits behind the API's permission
    * middleware, so a non-admin previously got the containers rendered with "-"
-   * placeholders that never resolved. Hide the sections outright for anyone who
-   * is not an org or system admin.
+   * placeholders that never resolved. Hide them outright for anyone who is not
+   * an org or system admin.
    *
-   * Zone E is hidden as a whole rather than tile-by-tile because every tile in it
-   * comes from an admin-gated source. Hiding uses the same 'hidden' class as the
-   * rest of the dashboard (display:none), so the containers leave the grid
-   * entirely and the CSS lets the remaining cards take the full width.
+   * The Workspaces tile stays: non-admins get its count from the matters list.
+   * Hiding uses the same 'hidden' class as the rest of the dashboard
+   * (display:none), so hidden tiles and cards leave the grid entirely.
    *
    * @returns {boolean} true when the viewer is an admin and the sections stay.
    */
@@ -249,8 +248,14 @@
     var isAdmin = canViewStatus();
     if (isAdmin) return true;
 
-    hide('ccZoneE');
-    // The expandable metric panel only ever opens from a Zone E tile.
+    var zoneE = el('ccZoneE');
+    if (zoneE) {
+      ['team', 'docs', 'storage'].forEach(function (key) {
+        var tile = zoneE.querySelector('lex-metric[data-metric-key="' + key + '"]');
+        if (tile) hide(tile);
+      });
+    }
+    // The expandable metric panel only ever opens from an admin tile.
     hide('ccDetailPanel');
     hide('userProductivityWidget');
     return false;
@@ -355,38 +360,6 @@
 
     banner.heading = 'Good ' + greetingPart(now) + ', ' + firstName;
     banner.subtitle = formatTodayDate(now);
-  }
-
-  /**
-   * Update Zone A matters button once stats are loaded.
-   * When matters > 0: shows "X active matters" → navigates to matters page.
-   * When matters = 0: shows "Create a new matter" → navigates to create flow.
-   * @param {number|string} matterCount - Visible matters count (compact-formatted string or number)
-   */
-  function updateZoneAPills(matterCount) {
-    var mattersBtn = el('ccZoneAMatters');
-    if (!mattersBtn) return;
-
-    var count = parseInt(String(matterCount), 10);
-    var hasMatters = !isNaN(count) && count > 0;
-
-    // Set variant first; this may queue a re-render via lex-btn's
-    // _scheduleUpdate (microtask). lex-btn restores _originalChildren on
-    // every re-render, so any synchronous mutation of slot children
-    // (textContent, display:none) gets clobbered. Defer the content swap
-    // with Promise.resolve().then() so it lands AFTER the variant re-render.
-    mattersBtn.variant = hasMatters ? 'secondary' : 'primary';
-
-    Promise.resolve().then(function () {
-      var slot = mattersBtn.querySelector('slot-content') || mattersBtn;
-      if (hasMatters) {
-        slot.innerHTML = '<span id="ccZoneAMattersCount">' +
-          Utils.escapeHtml(String(matterCount)) +
-          '</span> active matters';
-      } else {
-        slot.innerHTML = 'Create a new matter';
-      }
-    });
   }
 
   // =========================================================================
@@ -1724,9 +1697,8 @@
   // =========================================================================
 
   /**
-   * Render the three pipeline intelligence stat cards.
-   * Populates: team members, documents, storage.
-   * Active Matters count is shown in the Zone A banner button instead.
+   * Render the four pipeline intelligence stat cards.
+   * Populates: team members, workspaces (active matters), documents, storage.
    * @returns {Promise<{matters: number|string}>}
    */
   async function renderZoneE() {
@@ -1801,17 +1773,20 @@
       }
     }
 
-    // Update 3 lex-metric cards in-place (Active Matters moved to banner)
-    var metrics = zoneEl.querySelectorAll('lex-metric');
-    var data = [
-      { label: 'Team Members',    value: usersCount,   status: 'blue' },
-      { label: 'Total Documents', value: docsCount,    status: 'blue' },
-      { label: 'Storage Used',    value: storageStr,   status: 'blue' }
-    ];
-    for (var m = 0; m < metrics.length && m < data.length; m++) {
-      metrics[m].label  = data[m].label;
-      metrics[m].value  = data[m].value;
-      metrics[m].status = data[m].status;
+    // Update the lex-metric cards in-place, matched by data-metric-key
+    var data = {
+      team:       { label: 'Team Members',    value: usersCount,   status: 'blue' },
+      workspaces: { label: 'Workspaces',      value: mattersCount, status: 'blue' },
+      docs:       { label: 'Total Documents', value: docsCount,    status: 'blue' },
+      storage:    { label: 'Storage Used',    value: storageStr,   status: 'blue' }
+    };
+    var metrics = zoneEl.querySelectorAll('lex-metric[data-metric-key]');
+    for (var m = 0; m < metrics.length; m++) {
+      var d = data[metrics[m].getAttribute('data-metric-key')];
+      if (!d) continue;
+      metrics[m].label  = d.label;
+      metrics[m].value  = d.value;
+      metrics[m].status = d.status;
     }
 
     publishDashboardLanaContext({
@@ -3013,8 +2988,7 @@
     renderZoneA();
 
     // Hide admin-only sections before the fan-out so they never flash empty.
-    // renderZoneE still runs even when its container is hidden: it is the source
-    // of the matters count used by the Zone A pill below.
+    // renderZoneE always runs: the Workspaces tile is visible to everyone.
     var showAdminSections = applyAdminSectionGate();
 
     // ── 4. Fan-out: all zones load in parallel ────────────────────────────
@@ -3029,13 +3003,6 @@
       renderZoneD(),              // 5 — Lana Tasks status
       loadBillableHours()         // 6 — billable hours today
     ]);
-
-    // ── 5. Update Zone A matters button once we have the count ─────────────
-    var mattersCount = '-';
-    if (zoneResults[1].status === 'fulfilled' && zoneResults[1].value) {
-      mattersCount = zoneResults[1].value.matters || '-';
-    }
-    updateZoneAPills(mattersCount);
 
     // ── 6. Wire up Zone A/C/F event handlers ──────────────────────────────
     wireEvents();
@@ -3275,23 +3242,6 @@
    */
   function wireEvents() {
 
-    // Zone A — Matters button (navigates to matters or create-matter flow)
-    var mattersBtn = el('ccZoneAMatters');
-    if (mattersBtn) {
-      mattersBtn.addEventListener('click', function () {
-        var countEl = el('ccZoneAMattersCount');
-        var count   = countEl ? parseInt(countEl.textContent, 10) : 0;
-        if (!isNaN(count) && count > 0) {
-          Lex.Nav.go('workspaces.html');
-        } else {
-          Lex.Nav.go('workspaces.html', {
-            params:  { action: 'create' },
-            context: { action: 'create' }
-          });
-        }
-      });
-    }
-
     // Refresh activity feed button — uses Lex.Redact for in-page skeleton shimmer
     var refreshBtn = el('refreshActivityFeedBtn');
     if (refreshBtn) {
@@ -3376,6 +3326,19 @@
       zoneE.addEventListener('click', function (e) {
         var metric = e.target.closest('lex-metric[data-metric-key]');
         if (!metric) return;
+        // Workspaces has no detail panel: go to the list, or the create flow when empty
+        if (metric.getAttribute('data-metric-key') === 'workspaces') {
+          var count = parseInt(String(metric.value).replace(/,/g, ''), 10);
+          if (!isNaN(count) && count > 0) {
+            Lex.Nav.go('workspaces.html');
+          } else {
+            Lex.Nav.go('workspaces.html', {
+              params:  { action: 'create' },
+              context: { action: 'create' }
+            });
+          }
+          return;
+        }
         toggleDetailPanel(metric.getAttribute('data-metric-key'));
       });
     }
