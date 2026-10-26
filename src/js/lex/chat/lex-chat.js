@@ -1978,26 +1978,16 @@
         return;
       }
 
-      const page = detail.page || 1;
+      const requestedPage = Number(detail.page);
+      const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
       try {
-        const apiClient = global.api;
-        if (!apiClient || typeof apiClient.get !== 'function') {
-          throw new Error('API client not available');
+        if (!global.Lex.Nav || typeof global.Lex.Nav.go !== 'function') {
+          throw new Error('File viewer navigation not available');
         }
-
-        const resp = await fetch(
-          apiClient.baseUrl + '/api/v1/storage/files/' + encodeURIComponent(docId) + '/download',
-          { headers: { 'Authorization': 'Bearer ' + (apiClient.token || localStorage.getItem('token') || '') } }
-        );
-
-        if (!resp.ok) throw new Error('Download failed: ' + resp.status);
-
-        const blob = await resp.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl + '#page=' + page, '_blank');
-
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+        // The viewer loads canonical metadata and enforces authenticated access.
+        // A raw blob popup does not reliably initialize Electron's PDF viewer.
+        await global.Lex.Nav.go('file-viewer.html', { params: { id: docId, page } });
       } catch (err) {
         console.error('[lex-chat] Citation document open failed:', err);
         this._showSystemMessage('Could not open document. Please try again.');

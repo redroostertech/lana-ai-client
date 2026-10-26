@@ -27,6 +27,7 @@
 
   var state = {
     fileId: null,
+    citationPage: 1,
     currentFile: null,
     referrerPage: null,
     matterReturnRoute: '',
@@ -4848,7 +4849,7 @@
     var blob = new Blob([arrayBuffer], { type: file.content_type || 'application/pdf' });
     var objectUrl = URL.createObjectURL(blob);
     var iframe = document.getElementById('viewerIframe');
-    iframe.src = objectUrl;
+    iframe.src = objectUrl + '#page=' + state.citationPage;
     iframe.classList.remove('hidden');
     hideLoading();
   }
@@ -5874,6 +5875,8 @@
     // Read file ID from URL params
     var params = Lex.Nav.getParams();
     state.fileId = params.get('id');
+    var requestedPage = Number(params.get('page'));
+    state.citationPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
     state.explicitVersionView = params.get('version_view') === '1';
 
     // Read referrer context

@@ -92,7 +92,7 @@
     'drive.html':                             { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string' },
     'error.html':                             { message: 'string', code: 'string', ref: 'string' },
     'faq.html':                               { section: 'string' },
-    'file-viewer.html':                       { id: 'string', matter_id: 'string' },
+    'file-viewer.html':                       { id: 'string', matter_id: 'string', page: 'number' },
     'file-editor.html':                       { id: 'string', matter_id: 'string' },
     'folder.html':                            { matter_id: 'string', matter_name: 'string', folder_id: 'string', tab: 'string' },
     'help.html':                              { section: 'string' },

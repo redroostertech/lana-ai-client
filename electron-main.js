@@ -456,7 +456,7 @@ const DEEP_LINK_CLIENT_ROUTES = Object.freeze({
   'drive.html': ['matter_id', 'matter_name', 'folder_id', 'tab'],
   'faq.html': ['section'],
   'file-editor.html': ['id', 'matter_id'],
-  'file-viewer.html': ['id', 'matter_id'],
+  'file-viewer.html': ['id', 'matter_id', 'page'],
   'folder.html': ['matter_id', 'matter_name', 'folder_id', 'tab'],
   'help.html': ['section'],
   'insights/dashboard.html': ['matter_id', 'module', 'tab'],
