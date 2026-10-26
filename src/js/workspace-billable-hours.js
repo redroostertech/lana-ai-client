@@ -62,13 +62,13 @@
     var container = document.getElementById('bhFiltersBar');
     if (!container) return;
 
-    container.innerHTML = '<div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">' +
-      '<label style="font-size:0.75rem;color:var(--lex-text-muted);font-weight:600;">From</label>' +
-      '<input type="date" id="bhDateFrom" value="' + Lex.Utils.escapeHtml(_dateFrom) + '" style="padding:0.25rem 0.5rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;">' +
-      '<label style="font-size:0.75rem;color:var(--lex-text-muted);font-weight:600;">To</label>' +
-      '<input type="date" id="bhDateTo" value="' + Lex.Utils.escapeHtml(_dateTo) + '" style="padding:0.25rem 0.5rem;border:1px solid var(--lex-border-default,#e5e7eb);border-radius:0.375rem;font-size:0.8125rem;">' +
-      '<lex-btn id="bhFilterApplyBtn" variant="outline" size="sm">Apply</lex-btn>' +
-      '<div id="bhBulkActions" style="display:none;margin-left:auto;gap:0.5rem;">' +
+    container.innerHTML = '<div class="bh-filters">' +
+      '<label class="bh-filters__field"><span>From</span>' +
+      '<input type="date" id="bhDateFrom" class="bh-date" value="' + Lex.Utils.escapeHtml(_dateFrom) + '"></label>' +
+      '<label class="bh-filters__field"><span>To</span>' +
+      '<input type="date" id="bhDateTo" class="bh-date" value="' + Lex.Utils.escapeHtml(_dateTo) + '"></label>' +
+      '<lex-btn id="bhFilterApplyBtn" class="bh-filters__apply" variant="outline" size="sm">Apply</lex-btn>' +
+      '<div id="bhBulkActions" class="bh-bulk" style="display:none;">' +
         '<lex-btn id="bhBulkApproveBtn" variant="primary" size="sm">Approve Selected</lex-btn>' +
         '<lex-btn id="bhBulkRejectBtn" variant="danger" size="sm">Reject Selected</lex-btn>' +
       '</div>' +
@@ -103,7 +103,7 @@
     var container = document.getElementById('bhSummaryCard');
     if (!container) return;
 
-    container.innerHTML = '<div class="animate-pulse" style="grid-column:1/-1;"><div class="cc-skeleton" style="height:3rem;width:100%;"></div></div>';
+    container.innerHTML = '<div class="animate-pulse bh-stats__full"><div class="cc-skeleton bh-skeleton"></div></div>';
 
     var url = '/api/v1/billable-hours/summary?matter_id=' + encodeURIComponent(matter.matter_id);
     if (_dateFrom) url += '&date_from=' + encodeURIComponent(_dateFrom);
@@ -116,7 +116,7 @@
         container.innerHTML = _buildSummaryCards(data);
       })
       .catch(function () {
-        container.innerHTML = '<div style="color:var(--lex-text-muted);font-size:0.8rem;grid-column:1/-1;">Unable to load summary</div>';
+        container.innerHTML = '<div class="bh-stats__full bh-muted">Unable to load summary</div>';
       });
   }
 
@@ -133,10 +133,9 @@
     var html = '';
     for (var i = 0; i < cards.length; i++) {
       var c = cards[i];
-      var valueColor = c.highlight ? 'var(--lex-color-amber-600,#d97706)' : 'var(--lex-text-primary)';
-      html += '<div style="background:var(--lex-bg-muted,#f9fafb);border-radius:0.5rem;padding:0.75rem 1rem;">';
-      html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;letter-spacing:0.05em;">' + Lex.Utils.escapeHtml(c.label) + '</div>';
-      html += '<div style="font-size:1.25rem;font-weight:700;color:' + valueColor + ';">' + Lex.Utils.escapeHtml(String(c.value)) + Lex.Utils.escapeHtml(c.suffix) + '</div>';
+      html += '<div class="bh-stat">';
+      html += '<div class="bh-stat__label">' + Lex.Utils.escapeHtml(c.label) + '</div>';
+      html += '<div class="bh-stat__value' + (c.highlight ? ' bh-stat__value--highlight' : '') + '">' + Lex.Utils.escapeHtml(String(c.value)) + Lex.Utils.escapeHtml(c.suffix) + '</div>';
       html += '</div>';
     }
     return html;
@@ -200,8 +199,8 @@
     // Header row with select-all
     var hasDrafts = entries.some(function (e) { return e.status === 'draft'; });
     if (hasDrafts) {
-      html += '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 1rem;background:var(--lex-bg-muted,#f9fafb);border-bottom:1px solid var(--lex-border-default,#e5e7eb);font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;">';
-      html += '<input type="checkbox" id="bhSelectAll" style="cursor:pointer;">';
+      html += '<div class="bh-entries__select-all">';
+      html += '<input type="checkbox" id="bhSelectAll">';
       html += '<span>Select all drafts</span>';
       html += '</div>';
     }
@@ -210,37 +209,38 @@
       var e = entries[i];
       var hours = ((e.duration_minutes || 0) / 60).toFixed(1);
       var date = e.start_time ? Lex.Utils.formatDateTime(e.start_time, { dateOnly: true }) : '-';
-      var statusColor = _getStatusColor(e.status);
+      var status = e.status || 'draft';
       var description = e.description || 'No description';
       if (description.length > 120) description = description.substring(0, 117) + '...';
 
-      var bgStyle = i % 2 === 1 ? 'background:var(--lex-bg-muted,#f9fafb);' : '';
       var isChecked = !!_selectedIds[e.id];
 
-      html += '<div class="bh-entry-row" data-entry-id="' + Lex.Utils.escapeHtml(e.id) + '" style="' + bgStyle + 'display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background=\'var(--lex-bg-accent-subtle,#eff6ff)\'" onmouseout="this.style.background=\'' + (i % 2 === 1 ? 'var(--lex-bg-muted,#f9fafb)' : '') + '\'">';
+      html += '<div class="bh-entry-row' + (i % 2 === 1 ? ' bh-entry-row--alt' : '') + '" data-entry-id="' + Lex.Utils.escapeHtml(e.id) + '">';
 
-      // Checkbox for drafts
+      // Checkbox for drafts (empty cell keeps columns aligned)
       if (e.status === 'draft') {
-        html += '<input type="checkbox" class="bh-entry-checkbox" data-id="' + Lex.Utils.escapeHtml(e.id) + '" ' + (isChecked ? 'checked' : '') + ' style="cursor:pointer;" onclick="event.stopPropagation();">';
+        html += '<input type="checkbox" class="bh-entry-check bh-entry-checkbox" data-id="' + Lex.Utils.escapeHtml(e.id) + '" ' + (isChecked ? 'checked' : '') + ' onclick="event.stopPropagation();">';
       } else if (hasDrafts) {
-        html += '<div style="width:1rem;"></div>';
+        html += '<div class="bh-entry-check"></div>';
       }
 
       // Hours badge
-      html += '<div style="min-width:3.5rem;text-align:center;padding:0.25rem 0.5rem;background:var(--lex-bg-accent-subtle,#eff6ff);border-radius:0.375rem;font-size:0.875rem;font-weight:700;color:var(--lex-color-blue-700,#1d4ed8);">' + hours + 'h</div>';
+      html += '<div class="bh-entry-hours">' + hours + 'h</div>';
 
       // Description + date
-      html += '<div style="flex:1;min-width:0;">';
-      html += '<div style="font-size:0.8125rem;color:var(--lex-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + Lex.Utils.escapeHtml(description) + '</div>';
-      html += '<div style="font-size:0.7rem;color:var(--lex-text-muted);">' + Lex.Utils.escapeHtml(date) + ' - ' + Lex.Utils.escapeHtml(e.activity_type || 'general') + '</div>';
+      html += '<div class="bh-entry-main">';
+      html += '<div class="bh-entry-desc">' + Lex.Utils.escapeHtml(description) + '</div>';
+      html += '<div class="bh-entry-meta">' + Lex.Utils.escapeHtml(date) + ' - ' + Lex.Utils.escapeHtml(e.activity_type || 'general') + '</div>';
       html += '</div>';
+
+      html += '<div class="bh-entry-badges">';
 
       // Source badge (Auto / Manual / Imported) — surfaces the row's
       // origin so users can tell auto-tracked time from manually entered
       // time at a glance.
       var sourceBadge = _getSourceBadge(e.source);
       if (sourceBadge) {
-        html += '<div title="' + Lex.Utils.escapeHtml(sourceBadge.title) + '" style="flex-shrink:0;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.65rem;font-weight:600;background:' + sourceBadge.bg + ';color:' + sourceBadge.text + ';">' + Lex.Utils.escapeHtml(sourceBadge.label) + '</div>';
+        html += '<div title="' + Lex.Utils.escapeHtml(sourceBadge.title) + '" class="bh-badge bh-badge--source-' + Lex.Utils.escapeHtml(e.source) + '">' + Lex.Utils.escapeHtml(sourceBadge.label) + '</div>';
       }
 
       // Overlap warning — flagged when this entry overlaps another on the
@@ -250,17 +250,18 @@
       var overlaps = Array.isArray(e.has_overlap_with) ? e.has_overlap_with : [];
       if (overlaps.length > 0) {
         var overlapTitle = 'Overlaps ' + overlaps.length + ' other ' + (overlaps.length === 1 ? 'entry' : 'entries') + ' — click to resolve';
-        html += '<button type="button" class="bh-overlap-badge" data-id="' + Lex.Utils.escapeHtml(e.id) + '" title="' + Lex.Utils.escapeHtml(overlapTitle) + '" style="flex-shrink:0;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.65rem;font-weight:600;background:var(--lex-color-amber-50,#fffbeb);color:var(--lex-color-amber-700,#b45309);border:1px solid var(--lex-color-amber-200,#fde68a);cursor:pointer;font-family:inherit;">⚠ Overlap</button>';
+        html += '<button type="button" class="bh-overlap-badge" data-id="' + Lex.Utils.escapeHtml(e.id) + '" title="' + Lex.Utils.escapeHtml(overlapTitle) + '">⚠ Overlap</button>';
       }
 
       // Status badge
-      html += '<div style="flex-shrink:0;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.7rem;font-weight:600;background:' + statusColor.bg + ';color:' + statusColor.text + ';">' + Lex.Utils.escapeHtml(e.status || 'draft') + '</div>';
+      html += '<div class="bh-badge bh-badge--status-' + Lex.Utils.escapeHtml(status) + '">' + Lex.Utils.escapeHtml(status) + '</div>';
+      html += '</div>';
 
       // Action buttons for drafts
       if (e.status === 'draft') {
-        html += '<div style="display:flex;gap:0.25rem;flex-shrink:0;">';
-        html += '<button class="bh-approve-btn" data-id="' + Lex.Utils.escapeHtml(e.id) + '" style="padding:0.25rem 0.5rem;font-size:0.7rem;font-weight:600;background:var(--lex-color-green-50,#f0fdf4);color:var(--lex-color-green-700,#15803d);border:1px solid var(--lex-color-green-200,#bbf7d0);border-radius:0.25rem;cursor:pointer;">Approve</button>';
-        html += '<button class="bh-reject-btn" data-id="' + Lex.Utils.escapeHtml(e.id) + '" style="padding:0.25rem 0.5rem;font-size:0.7rem;font-weight:600;background:var(--lex-color-red-50,#fef2f2);color:var(--lex-color-red-700,#b91c1c);border:1px solid var(--lex-color-red-200,#fecaca);border-radius:0.25rem;cursor:pointer;">Reject</button>';
+        html += '<div class="bh-entry-actions">';
+        html += '<button class="bh-approve-btn" data-id="' + Lex.Utils.escapeHtml(e.id) + '">Approve</button>';
+        html += '<button class="bh-reject-btn" data-id="' + Lex.Utils.escapeHtml(e.id) + '">Reject</button>';
         html += '</div>';
       }
 
@@ -270,7 +271,7 @@
       // ⚠ Overlap badge on this row. Rendered as a sibling of the row so
       // the row's hover/striping styles aren't disturbed.
       if (overlaps.length > 0) {
-        html += '<div class="bh-overlap-panel" data-for-id="' + Lex.Utils.escapeHtml(e.id) + '" style="display:none;padding:0.75rem 1rem 0.875rem 3rem;background:var(--lex-color-amber-50,#fffbeb);border-bottom:1px solid var(--lex-color-amber-200,#fde68a);"></div>';
+        html += '<div class="bh-overlap-panel" data-for-id="' + Lex.Utils.escapeHtml(e.id) + '" style="display:none;"></div>';
       }
     }
     return html;
@@ -537,16 +538,6 @@
   function cssEscape(s) {
     if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(s);
     return String(s).replace(/[^a-zA-Z0-9_-]/g, function (c) { return '\\' + c; });
-  }
-
-  function _getStatusColor(status) {
-    var map = {
-      draft: { bg: 'var(--lex-color-amber-50,#fffbeb)', text: 'var(--lex-color-amber-700,#b45309)' },
-      submitted: { bg: 'var(--lex-color-blue-50,#eff6ff)', text: 'var(--lex-color-blue-700,#1d4ed8)' },
-      approved: { bg: 'var(--lex-color-green-50,#f0fdf4)', text: 'var(--lex-color-green-700,#15803d)' },
-      invoiced: { bg: 'var(--lex-color-purple-50,#faf5ff)', text: 'var(--lex-color-purple-700,#7e22ce)' }
-    };
-    return map[status] || map.draft;
   }
 
   // Source-of-row badge: 'activity' rows came from the incremental writer,

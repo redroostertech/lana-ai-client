@@ -50,12 +50,11 @@
         <span class="dst-filter-label" id="dstKindFilterLabel">Template type</span>
         <lex-segmented
           id="dstKindFilter"
+          collapsible
           aria-labelledby="dstKindFilterLabel"
           value=""
           options='[{"value":"","label":"All"},{"value":"fill","label":"Documents"},{"value":"compose","label":"Document sets"},{"value":"render","label":"Layouts"}]'
         ></lex-segmented>
-
-        <div class="dst-filters-spacer"></div>
 
         <label class="dst-orgwide" title="Include organization-wide templates when a workspace is selected">
           <input type="checkbox" id="dstOrgWideToggle" checked>
@@ -138,6 +137,7 @@
   <script src="js/lex/components/foundation/lex-btn.js"></script>
   <script src="js/app-catalog.js"></script>
   <script src="js/lex/components/foundation/lex-empty.js"></script>
+  <script src="js/lex/components/form/lex-select.js"></script>
   <script src="js/lex/components/form/lex-segmented.js"></script>
   <script src="js/lex/components/layout/lex-sidebar.js"></script>
   <script src="js/lex/components/layout/lex-topbar.js"></script>

@@ -1,11 +1,23 @@
 /* Workspace Summary tab — Jira-style overview (workspace-details.html)
    Rendered by renderSummaryTab() in js/workspace-details.js */
 
+/* Four tiles across, or 2x2 when the summary panel is narrow (sized from
+   the panel, not the window, so the app sidebars are accounted for). */
+.wsum-kpis-wrap {
+  container-type: inline-size;
+}
+
 .wsum-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+@container (max-width: 799px) {
+  .wsum-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .wsum-kpi {
@@ -328,6 +340,13 @@
 }
 
 @media (max-width: 900px) {
+  .wsum-masonry {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* On the matter page, follow the tab panel width so open side panels count */
+@container matter-panel (max-width: 799px) {
   .wsum-masonry {
     grid-template-columns: 1fr;
   }

@@ -2,6 +2,8 @@
 
 Operator runbook for building, publishing, promoting, and verifying releases of the LANA desktop client (Electron app, repo `redroostertech/lana-ai-client`).
 
+Planned security work for the 3.1.0 initiative: [Organization and server identity binding](plans/3.1.0-organization-server-identity-scope.md). This scope defines the proposed release gate and coordinated Core/control-plane work; implementation and the corresponding desktop release version are pending.
+
 ## 1. Run locally
 
 Install dependencies, then start the app in dev mode:

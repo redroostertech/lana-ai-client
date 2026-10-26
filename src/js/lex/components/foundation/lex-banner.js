@@ -480,6 +480,36 @@
       .lex-banner-meta slot-content {
         display: contents;
       }
+
+      /* ── Responsive ─────────────────────────────────── */
+      /* Sized from the banner itself, not the window, so open side panels
+         count. When narrow, the actions drop below the heading instead of
+         squeezing the text into a thin column. */
+
+      lex-banner {
+        container: lex-banner / inline-size;
+      }
+
+      @container lex-banner (max-width: 559px) {
+        .lex-banner:not(.lex-banner--center) {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .lex-banner-main {
+          width: 100%;
+        }
+
+        .lex-banner-actions {
+          flex-wrap: wrap;
+        }
+
+        /* Actions now sit on the left, so open the menu rightward */
+        .lex-banner-overflow-menu {
+          left: 0;
+          right: auto;
+        }
+      }
     `;
     document.head.appendChild(style);
   }

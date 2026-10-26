@@ -738,6 +738,18 @@
         var tab = e.detail && e.detail.tab;
         if (tab) switchMatterTab(tab);
       });
+
+      // Dropdown shown in place of the tabs on narrow layouts
+      var tabSelect = document.getElementById('tabSelect');
+      if (tabSelect) {
+        var tabDefs = JSON.parse(tabBar.getAttribute('tabs') || '[]');
+        tabSelect.options = tabDefs.map(function (t) { return { value: t.id, label: t.label }; });
+        tabSelect.value = tabBar.getAttribute('active') || 'summary';
+        tabSelect.addEventListener('lex-change', function (e) {
+          var tab = (e.detail && e.detail.value) || tabSelect.value;
+          if (tab) switchMatterTab(tab);
+        });
+      }
     }
 
     // Card action delegation — single listener handles ALL lex-card action buttons
@@ -791,6 +803,10 @@
     var tabBar = document.getElementById('tabBar');
     if (tabBar && tabBar.getAttribute('active') !== tab) {
       tabBar.setAttribute('active', tab);
+    }
+    var tabSelect = document.getElementById('tabSelect');
+    if (tabSelect && tabSelect.value !== tab) {
+      tabSelect.value = tab;
     }
 
     tabs.forEach(function (t) {
@@ -1816,12 +1832,12 @@
 
     // ── Markup ──
     var kpiHtml =
-      '<div class="wsum-kpis">' +
+      '<div class="wsum-kpis-wrap"><div class="wsum-kpis">' +
         wsumKpiTile('Completed', completed7d, completed7d ? 'green' : 'gray', 'in the last 7 days') +
         wsumKpiTile('Updated', updated7d, updated7d ? 'blue' : 'gray', 'in the last 7 days') +
         wsumKpiTile('Created', created7d, created7d ? 'blue' : 'gray', 'in the last 7 days') +
         wsumKpiTile('Due soon', dueSoon.length, dueSoon.length ? 'yellow' : 'gray', 'in the next 7 days') +
-      '</div>';
+      '</div></div>';
 
     var chipsHtml = '<div class="wsum-insights">' + chips.map(function (c) {
       return '<span class="wsum-chip wsum-chip--' + c.cls + '">' + escapeHtml(c.text) + '</span>';
@@ -2375,7 +2391,7 @@
     if (documents.length === 0 && orphanedFiles.length === 0) {
       container.innerHTML =
         '<div class="workspace-documents-panel space-y-4">' +
-          '<div class="flex items-center justify-between gap-4 mb-4">' +
+          '<div class="workspace-docs-header flex items-center justify-between gap-4 mb-4">' +
             '<div>' +
               '<h4 class="text-sm font-semibold text-gray-900">Workspace documents</h4>' +
               '<p class="text-xs text-gray-500 mt-0.5">Upload source files and review generated work product for this workspace.</p>' +
@@ -2408,7 +2424,7 @@
     // per-row / batch / orphan / workflow action via the injected api.
     container.innerHTML =
       '<div class="workspace-documents-panel space-y-4">' +
-        '<div class="flex items-center justify-between gap-4">' +
+        '<div class="workspace-docs-header flex items-center justify-between gap-4">' +
           '<div>' +
             '<h4 class="text-sm font-semibold text-gray-900">Workspace documents</h4>' +
             '<p class="text-xs text-gray-500 mt-0.5">Manage uploaded files, templates, and generated work product.</p>' +
@@ -4067,12 +4083,12 @@
 
     content.innerHTML =
       '<div class="space-y-4">' +
-        '<div class="bg-white rounded-lg border border-gray-200 p-4">' +
+        '<div class="comment-composer bg-white rounded-lg border border-gray-200 p-4">' +
           '<div class="flex items-start gap-3">' +
-            '<div class="w-10 h-10 lex-bg-accent-soft lex-text-accent rounded-full flex items-center justify-center flex-shrink-0 font-semibold">' +
+            '<div class="comment-composer__avatar w-10 h-10 lex-bg-accent-soft lex-text-accent rounded-full flex items-center justify-center flex-shrink-0 font-semibold">' +
               userInitials +
             '</div>' +
-            '<div class="flex-1 relative">' +
+            '<div class="comment-composer__body flex-1 min-w-0 relative">' +
               '<div id="commentInput" contenteditable="true" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 lex-ring-focus lex-border-focus min-h-[76px] text-sm outline-none" data-placeholder="Add a comment... (type @ to mention teammates, # to reference documents)"></div>' +
               '<div id="mentionDropdown" class="hidden absolute z-50 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 max-h-48 overflow-y-auto">' +
                 '<div id="mentionList" class="py-1"></div>' +
@@ -4080,9 +4096,9 @@
               '<div id="documentDropdown" class="hidden absolute z-50 mt-1 w-80 bg-white rounded-lg shadow-lg border border-gray-200 max-h-64 overflow-y-auto">' +
                 '<div id="documentList" class="py-1"></div>' +
               '</div>' +
-              '<div class="mt-3 flex justify-end gap-2">' +
-                '<button id="cancelComment" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>' +
-                '<button id="postComment" class="px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg text-sm font-medium">Post Comment</button>' +
+              '<div class="comment-composer__actions mt-3 flex justify-end gap-2">' +
+                '<button id="cancelComment" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 whitespace-nowrap">Cancel</button>' +
+                '<button id="postComment" class="px-4 py-2 lex-bg-accent hover:lex-bg-accent text-white rounded-lg text-sm font-medium whitespace-nowrap">Post Comment</button>' +
               '</div>' +
             '</div>' +
           '</div>' +

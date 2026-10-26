@@ -1,0 +1,171 @@
+/* Matter Type Diagram
+   Side-by-side comparison of Workspace vs Client Matter shown under the
+   Matter Type dropdown in the Create Matter modal (workspaces.html). */
+
+.mt-diagram {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .mt-diagram {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mt-diagram__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  text-align: left;
+  background: var(--lex-bg-primary);
+  border: 1px solid var(--lex-border-default);
+  border-radius: var(--lex-radius-lg, 10px);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.mt-diagram__panel:hover {
+  opacity: 0.85;
+}
+
+.mt-diagram__panel:focus-visible {
+  outline: 2px solid var(--lex-border-focus);
+  outline-offset: 2px;
+}
+
+.mt-diagram__panel.is-selected {
+  opacity: 1;
+  border-color: var(--lex-border-accent);
+  background: var(--lex-bg-accent-soft);
+}
+
+.mt-diagram__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lex-text-primary);
+}
+
+/* Diagram canvas */
+
+.mt-diagram__canvas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 132px;
+  justify-content: center;
+}
+
+.mt-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mt-box--outer {
+  position: relative;
+  width: 100%;
+  gap: 0;
+  padding: 10px;
+  border: 1.5px solid var(--lex-border-strong);
+  border-radius: var(--lex-radius-md, 8px);
+  background: var(--lex-bg-primary);
+}
+
+.mt-diagram__panel.is-selected .mt-box--outer {
+  border-color: var(--lex-border-accent);
+}
+
+.mt-row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.mt-chip {
+  flex: 1 1 0;
+  max-width: 88px;
+  padding: 5px 6px;
+  font-size: 0.6875rem;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--lex-text-primary);
+  background: var(--lex-bg-tertiary);
+  border-radius: var(--lex-radius-sm, 6px);
+}
+
+.mt-chip--wide {
+  flex: none;
+  width: 100%;
+  max-width: none;
+}
+
+/* Connector lines from the shared documents bar down to each matter */
+.mt-row--linked {
+  margin-top: 12px;
+}
+
+.mt-row--linked .mt-chip {
+  position: relative;
+}
+
+.mt-row--linked .mt-chip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  height: 12px;
+  border-left: 1.5px solid var(--lex-border-strong);
+}
+
+.mt-tag {
+  margin-top: 8px;
+  padding: 2px 8px;
+  font-size: 0.625rem;
+  color: var(--lex-text-secondary);
+  border: 1px dashed var(--lex-border-strong);
+  border-radius: var(--lex-radius-full, 999px);
+}
+
+.mt-optional-link {
+  position: relative;
+  padding-top: 14px;
+  font-size: 0.625rem;
+  color: var(--lex-text-tertiary);
+}
+
+.mt-optional-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 12px;
+  border-left: 1.5px dashed var(--lex-border-strong);
+}
+
+/* Fact list */
+
+.mt-diagram__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--lex-text-secondary);
+}
+
+.mt-diagram__facts span::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  margin: 0 8px 2px 0;
+  border-radius: 50%;
+  background: var(--lex-text-tertiary);
+  vertical-align: middle;
+}
