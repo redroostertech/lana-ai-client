@@ -84,9 +84,13 @@
     return head.replace(/[\s.,;:]+$/, '') + '...';
   }
 
+  // A page is a whole number of one or more, written as nothing else: "3" is
+  // page three, "3#anything" and 1.5 are not pages and are dropped, so the
+  // viewer opens at page one instead of trusting a malformed value (c851ce7).
   function positiveInt(value) {
-    const n = typeof value === 'number' ? value : parseInt(String(value == null ? '' : value), 10);
-    return Number.isFinite(n) && n >= 1 ? Math.floor(n) : null;
+    if (value === null || value === undefined || value === '') return null;
+    const n = typeof value === 'number' ? value : Number(String(value).trim());
+    return Number.isSafeInteger(n) && n >= 1 ? n : null;
   }
 
   function nonNegativeInt(value) {

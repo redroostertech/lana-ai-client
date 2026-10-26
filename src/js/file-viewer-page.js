@@ -27,6 +27,7 @@
 
   var state = {
     fileId: null,
+    citationPage: 1,
     currentFile: null,
     referrerPage: null,
     matterReturnRoute: '',
@@ -6029,6 +6030,8 @@
     // Read file ID from URL params
     var params = Lex.Nav.getParams();
     state.fileId = params.get('id');
+    var requestedPage = Number(params.get('page'));
+    state.citationPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
     state.explicitVersionView = params.get('version_view') === '1';
     state.citationFocus = window.FileViewerCitationFocus
       ? window.FileViewerCitationFocus.fromParams(params)
