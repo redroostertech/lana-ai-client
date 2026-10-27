@@ -1,0 +1,26 @@
+/* Admin landing pages (admin/index.html, admin/analytics.html): grid of
+   lex-action-card links. Column count follows the page column, not the
+   window, so the app sidebar and Ask LANA panel are accounted for. */
+
+.admin-card-page {
+  container: admin-page / inline-size;
+}
+
+.admin-card-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1.5rem;
+}
+
+@container admin-page (max-width: 899px) {
+  .admin-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container admin-page (max-width: 479px) {
+  .admin-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

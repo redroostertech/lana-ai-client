@@ -1417,7 +1417,9 @@
     var items = [
       { value: 'task', label: 'New Task', description: 'Create a single task on a matter' }
     ];
-    if (canCreateTaskPlans()) {
+    // Task Plans ship in 3.2.0 (LanaConfig.ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED)
+    var taskPlansEnabled = !!(window.LanaConfig && window.LanaConfig.ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED === true);
+    if (taskPlansEnabled && canCreateTaskPlans()) {
       items.push({ value: 'task-plan', label: 'New Task Plan', description: 'Draft a checklist that publishes to tasks' });
     }
     menu.setAttribute('options', JSON.stringify(items));

@@ -126,8 +126,6 @@
         'js/lex/components/form/lex-select.js',
         'js/lex/components/foundation/lex-empty.js',
         'js/lex/components/data/lex-table.js',
-        'js/lex/components/form/lex-segmented.js',
-        'js/lex/components/data/lex-pagination.js',
         'js/services/document-create-modal.js',
         'js/shared/library-column-filters.js',
         'js/document-library.js',
@@ -176,8 +174,6 @@
         'js/lex/components/form/lex-input.js',
         'js/lex/components/form/lex-select.js',
         'js/lex/components/data/lex-table.js',
-        'js/lex/components/form/lex-segmented.js',
-        'js/lex/components/data/lex-pagination.js',
         'js/shared/document-studio-templates-mapper.js',
         'js/document-studio-api.js',
         'js/services/document-create-modal.js',
@@ -403,7 +399,9 @@
       scripts: [
         'js/utils/event-display-names.js'
       ],
-      stylesheets: []
+      stylesheets: [
+        'css/admin/audit.css'
+      ]
     },
 
     'admin/sessions.html': {
@@ -477,7 +475,8 @@
         'js/admin/analytics-index.js'
       ],
       stylesheets: [
-        'css/admin/insights-dashboard.css'
+        'css/admin/insights-dashboard.css',
+        'css/admin/admin-card-grid.css'
       ]
     },
 

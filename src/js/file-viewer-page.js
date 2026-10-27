@@ -4492,7 +4492,9 @@
     var button = document.getElementById('openDocStudioBtn');
     if (!button) return;
     var url = docStudioDocumentUrl(file);
-    button.classList.toggle('hidden', !url);
+    // Doc Studio ships in 3.1.0 (LanaConfig.TEMPLATES_AND_STUDIO_ENABLED)
+    var studioEnabled = !!(window.LanaConfig && window.LanaConfig.TEMPLATES_AND_STUDIO_ENABLED === true);
+    button.classList.toggle('hidden', !url || !studioEnabled);
   }
 
   function openCurrentFileInDocStudio() {
@@ -5839,7 +5841,9 @@
 
     var templateBtn = document.getElementById('viewerTemplateBtn');
     var generateBtn = document.getElementById('viewerGenerateBtn');
-    if (!isTemplateable) {
+    // Template actions are hidden until 3.1.0 (LanaConfig.TEMPLATES_AND_STUDIO_ENABLED)
+    var templatesEnabled = !!(window.LanaConfig && window.LanaConfig.TEMPLATES_AND_STUDIO_ENABLED === true);
+    if (!isTemplateable || !templatesEnabled) {
       if (templateBtn) templateBtn.classList.add('hidden');
       if (generateBtn) generateBtn.classList.add('hidden');
       return;

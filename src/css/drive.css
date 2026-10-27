@@ -239,3 +239,10 @@
   text-underline-offset: 2px;
   white-space: nowrap;
 }
+
+/* Doc Studio ships in 3.1.0: folder.js sets this attribute while
+   LanaConfig.TEMPLATES_AND_STUDIO_ENABLED is off. Hides the "Create with Doc
+   Studio" item in the banner, Actions and empty-state create menus. */
+html[data-hide-doc-studio] [role="menuitem"][data-value="doc-studio"] {
+  display: none;
+}

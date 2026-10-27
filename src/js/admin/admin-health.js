@@ -279,7 +279,7 @@
       card.setAttribute('variant', 'flat');
 
       var headerRow  = document.createElement('div');
-      headerRow.className = 'flex items-center justify-between mb-3';
+      headerRow.className = 'health-service-head flex items-center justify-between mb-3';
 
       var nameSpan = document.createElement('span');
       nameSpan.className = 'font-medium text-sm lex-text-primary';
@@ -295,7 +295,7 @@
       card.appendChild(headerRow);
 
       var detail = document.createElement('div');
-      detail.className = 'space-y-1';
+      detail.className = 'health-service-detail space-y-1';
 
       if (service.type) {
         var kv1 = document.createElement('lex-kv');

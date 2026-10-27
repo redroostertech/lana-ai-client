@@ -89,6 +89,11 @@
     var sourceVersion = useTemplate && state.sourceTemplate.version
       ? 'Current reusable version: ' + esc(state.sourceTemplate.version) + '. The latest released version available when you create the document will be used.'
       : 'The latest released version will be used, or the original baseline when the template has not been released yet.';
+    // The Document / Template choice stays in the form (Document checked) but
+    // is hidden until 3.1.0 (LanaConfig.TEMPLATES_AND_STUDIO_ENABLED). The
+    // Template Library's own "New Template" preset still shows it.
+    var showTypeChoice = presetTemplate ||
+      !!(global.LanaConfig && global.LanaConfig.TEMPLATES_AND_STUDIO_ENABLED === true);
     var typeSection = useTemplate
       ? '<div class="doc-create-field">' +
           '<span class="doc-create-label">Source template</span>' +
@@ -97,7 +102,7 @@
             '<span class="doc-create-source-template-scope">' + sourceVersion + ' A new, independent document will be created. The template will not be changed.</span>' +
           '</div>' +
         '</div>'
-      : '<div class="doc-create-field">' +
+      : '<div class="doc-create-field"' + (showTypeChoice ? '' : ' hidden') + '>' +
           '<span class="doc-create-label">Type</span>' +
           '<div class="doc-create-choice" role="radiogroup" aria-label="Document type">' +
             '<label><input type="radio" name="docCreateType" value="document"' + (presetTemplate ? '' : ' checked') + '><span>Document</span></label>' +

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/admin/admin-switcher.css">
   <link rel="stylesheet" href="../css/admin/admin-tables.css">
+  <link rel="stylesheet" href="../css/admin/audit.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -32,7 +33,7 @@
   <!-- Page content as inert <template> -->
   <template id="page-content">
 
-    <main class="p-4 lg:p-8">
+    <main class="audit-page p-4 lg:p-8">
 
       <!-- Page header -->
       <lex-banner
@@ -46,7 +47,7 @@
       <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"Audit Logs"}]'></lex-breadcrumb>
 
       <!-- Statistics Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div class="audit-stats">
         <lex-card id="statCardAll" class="cursor-pointer" compact>
           <div class="flex items-center gap-2 mb-1">
             <span class="text-sm font-medium lex-text-secondary">Total Events</span>

@@ -75,6 +75,12 @@ const UserRoles = {
 // The backend recognizes system_admin/admin (plus org_admin variants); gate on the
 // full set so a plain `admin` role isn't locked out. Mirrors ADMIN_ROLE_NAMES in
 // sidebar-footer-hydrate.js.
+// Task Plans, Run Books and Communications ship in 3.2.0
+// (LanaConfig.ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED).
+function adminRelease32Enabled() {
+  return !!(window.LanaConfig && window.LanaConfig.ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED === true);
+}
+
 const ADMIN_ROLES = [
   UserRoles.SYSTEM_ADMIN,
   UserRoles.ORG_ADMIN,
@@ -218,15 +224,16 @@ const MenuConfig = {
           { id: 'admin-roles', label: 'Roles', href: '/admin/roles.html', icon: 'roles' },
           { id: 'admin-organizations', label: 'Organizations', href: '/admin/organizations.html', icon: 'organizations' },
           { id: 'admin-matters', label: 'Matters', href: '/matters.html', icon: 'matters' },
-          { id: 'admin-task-plans', label: 'Task Plans', href: '/admin/task-plans.html', icon: 'tasks' },
-          { id: 'admin-run-books', label: 'Run Books', href: '/admin/run-books.html', icon: 'document', requiredRoles: ADMIN_ROLES },
+          { id: 'admin-task-plans', label: 'Task Plans', href: '/admin/task-plans.html', icon: 'tasks', customVisibility: adminRelease32Enabled },
+          { id: 'admin-run-books', label: 'Run Books', href: '/admin/run-books.html', icon: 'document', requiredRoles: ADMIN_ROLES, customVisibility: adminRelease32Enabled },
           {
             id: 'admin-communications',
             label: 'Communications',
             href: '/admin/communications.html',
             icon: 'chat',
             badge: { text: 'Coming soon', class: 'bg-amber-100 text-amber-800' },
-            requiredRoles: ADMIN_ROLES
+            requiredRoles: ADMIN_ROLES,
+            customVisibility: adminRelease32Enabled
           },
           { id: 'admin-sessions', label: 'Sessions', href: '/admin/sessions.html', icon: 'sessions' },
           { id: 'admin-audit', label: 'Audit Logs', href: '/admin/audit.html', icon: 'audit' },

@@ -1898,6 +1898,10 @@
       } else {
         items = items.map((item) => this._normalizeAppItem(item)).filter(Boolean);
       }
+      // Doc Studio ships in 3.1.0 (LanaConfig.TEMPLATES_AND_STUDIO_ENABLED)
+      if (!(window.LanaConfig && window.LanaConfig.TEMPLATES_AND_STUDIO_ENABLED === true)) {
+        items = items.filter((item) => item.id !== 'doc-studio');
+      }
       return items.map((item) => ({
         id: item.id,
         label: item.label,

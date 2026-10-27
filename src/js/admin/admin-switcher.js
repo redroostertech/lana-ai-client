@@ -87,7 +87,15 @@
     return !!(window.Lex && Lex.Auth && Lex.Auth.hasRole && Lex.Auth.hasRole(roleName));
   }
 
+  // Task Plans, Run Books and Communications ship in 3.2.0
+  // (LanaConfig.ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED).
+  var RELEASE_32_PAGES = ['admin/task-plans.html', 'admin/run-books.html', 'admin/communications.html'];
+
   function canViewPage(page) {
+    if (RELEASE_32_PAGES.indexOf(page.value) !== -1 &&
+        !(window.LanaConfig && window.LanaConfig.ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED === true)) {
+      return false;
+    }
     if (!page.allowedRoles || page.allowedRoles.length === 0) return true;
     return page.allowedRoles.some(hasRole);
   }

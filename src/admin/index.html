@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
+  <link rel="stylesheet" href="../css/admin/admin-card-grid.css">
   <script src="../js/tailwind-loader.js"></script>
 
   <link rel="stylesheet" href="../css/lex-chat.css">
@@ -33,7 +34,7 @@
        by the browser until cloned into the live DOM. Zero double-rendering. -->
   <template id="page-content">
 
-    <main>
+    <main class="admin-card-page">
 
       <!-- Page header -->
       <lex-banner
@@ -45,7 +46,7 @@
       ></lex-banner>
 
       <!-- Admin navigation cards grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style="margin-top:1.5rem;">
+      <div class="admin-card-grid">
 
         <lex-action-card
           title="Users"
@@ -73,6 +74,7 @@
           description="Create, review, and publish task/checklist plans"
           tag="Workflow"
           data-href="admin/task-plans.html"
+          data-release="3.2.0"
         ></lex-action-card>
 
         <lex-action-card
@@ -80,6 +82,7 @@
           description="Package your organization's own processes so LANA can use them as evidence"
           tag="Knowledge"
           data-href="admin/run-books.html"
+          data-release="3.2.0"
           data-admin-roles="system_admin,org_admin,organization_admin"
         ></lex-action-card>
 
@@ -88,6 +91,7 @@
           description="Manage communication channels and messaging settings"
           tag="Coming soon"
           data-href="admin/communications.html"
+          data-release="3.2.0"
           data-admin-roles="system_admin,org_admin,organization_admin"
         ></lex-action-card>
 

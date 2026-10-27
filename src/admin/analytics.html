@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../css/admin/insights-dashboard.css">
+  <link rel="stylesheet" href="../css/admin/admin-card-grid.css">
   <script src="../js/tailwind-loader.js"></script>
   <link rel="stylesheet" href="../css/lex-chat.css">
 </head>
@@ -30,7 +31,7 @@
   <!-- Page content as inert <template> -->
   <template id="page-content">
 
-    <main>
+    <main class="admin-card-page">
 
       <!-- Page header -->
       <lex-banner
@@ -81,7 +82,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="admin-card-grid">
 
           <lex-action-card
             title="Firm Reporting"

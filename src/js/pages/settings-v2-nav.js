@@ -13,6 +13,9 @@
  *   - Keep LANA-ONE-only sections fail-closed unless its edition flag is true.
  *   - Update location.hash when the user picks a section, and react to
  *     back/forward hash changes.
+ *   - Mirror the rail into the #sv2-nav-select dropdown (shown instead of the
+ *     rail when the settings area is narrow): its options are the rail items
+ *     that are currently shown, and both stay on the same section.
  *
  * This only toggles the panel-level `.is-active` class. Section-level
  * visibility (personalization reveal, Electron-only VPN / connected apps,
@@ -75,6 +78,31 @@
   function tabEl(id)   { return document.getElementById('sv2-tab-' + id); }
   function panelEl(id) { return document.getElementById('sv2-panel-' + id); }
 
+  function tabLabel(id) {
+    var tab = tabEl(id);
+    var el = tab && (tab.querySelector('.sv2-nav-label') || tab);
+    return el ? el.textContent.trim() : id;
+  }
+
+  // Rebuild the dropdown from the rail items that are shown, then select the
+  // active section. Setting .value does not fire lex-change, so no loop.
+  function syncSelect(activeId) {
+    var select = document.getElementById('sv2-nav-select');
+    if (!select) return;
+    var available = enabledSections();
+    var options = [];
+    for (var i = 0; i < available.length; i++) {
+      options.push({ value: available[i].id, label: tabLabel(available[i].id) });
+    }
+    select.options = options;
+    if (select.value !== activeId) select.value = activeId;
+  }
+
+  function onSelectChange(e) {
+    var id = (e.detail && e.detail.value) || e.currentTarget.value;
+    if (id) activate(id, { updateHash: true });
+  }
+
   function injectIcons() {
     if (!window.Lex || !window.Lex.Icons) return;
     for (var i = 0; i < SECTIONS.length; i++) {
@@ -103,6 +131,8 @@
         tab.setAttribute('tabindex', isActive ? '0' : '-1');
       }
     }
+
+    syncSelect(target);
 
     if (opts && opts.updateHash && ('#' + target) !== window.location.hash) {
       // replaceState keeps the section switch out of the browser history stack.
@@ -184,6 +214,9 @@
       tab.addEventListener('click', onTabClick);
       tab.addEventListener('keydown', onTabKeydown);
     }
+
+    var select = document.getElementById('sv2-nav-select');
+    if (select) select.addEventListener('lex-change', onSelectChange);
 
     window.addEventListener('hashchange', onHashChange);
     window.addEventListener('settings-v2-section-visibility-changed', function () {

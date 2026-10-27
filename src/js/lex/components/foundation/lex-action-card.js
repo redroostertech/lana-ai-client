@@ -35,6 +35,25 @@
     style.textContent = `
       lex-action-card {
         display: block;
+        /* Sized from the card itself so narrow grids (open side panels)
+           can move the tag and arrow under the description. */
+        container: lex-acard / inline-size;
+      }
+
+      @container lex-acard (max-width: 359px) {
+        .lex-acard {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .lex-acard-main {
+          width: 100%;
+        }
+
+        .lex-acard-meta {
+          margin-left: 0;
+        }
       }
 
       .lex-acard {

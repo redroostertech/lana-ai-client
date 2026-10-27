@@ -1,0 +1,94 @@
+/* Software Updates admin page (src/admin/updates.html).
+   Layout is sized from the content column (container queries), not the
+   window, so an open sidebar or Ask LANA panel counts. */
+
+.updates-page {
+  container: updates-page / inline-size;
+}
+
+/* Version + release notes: one column until the content column has room
+   for two. minmax(0, 1fr) keeps a card's min-content from widening the
+   grid past the column. */
+.updates-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+@container updates-page (min-width: 880px) {
+  .updates-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Cards with info grids and action rows size their contents from the card. */
+.updates-card {
+  container: updates-card / inline-size;
+}
+
+.updates-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@container updates-card (max-width: 299px) {
+  .updates-info-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Action rows: buttons first, help text beside them when it fits, otherwise
+   wrapped below at full width. Buttons wrap too when the row is narrow.
+   The row lives inside lex-card's flex footer, so it must be allowed to
+   shrink (min-width: 0) and take the footer's width. */
+.updates-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.updates-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.updates-actions__hint {
+  flex: 1 1 16rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.updates-actions__hint:empty {
+  display: none;
+}
+
+/* Progress row: the message wraps instead of pushing the card wider. */
+.updates-progress-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.updates-progress-row > span {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Long unbroken strings (URLs, hashes) in release notes wrap or scroll. */
+.release-notes {
+  overflow-wrap: anywhere;
+}
+
+.release-notes pre {
+  max-width: 100%;
+  overflow-x: auto;
+}

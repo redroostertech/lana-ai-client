@@ -37,6 +37,12 @@
     for (var i = 0; i < cards.length; i++) {
       cards[i].hidden = !canViewRoleGatedCard(cards[i]);
     }
+    // Task Plans, Run Books and Communications ship in 3.2.0
+    // (LanaConfig.ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED).
+    if (!(window.LanaConfig && window.LanaConfig.ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED === true)) {
+      var release32 = document.querySelectorAll('lex-action-card[data-release="3.2.0"]');
+      for (var j = 0; j < release32.length; j++) release32[j].hidden = true;
+    }
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────

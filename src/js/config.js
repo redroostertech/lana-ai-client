@@ -248,5 +248,36 @@ window.LanaConfig = {
    * Development mode flag
    * Set to true for local development
    */
-  DEVELOPMENT_MODE: true
+  DEVELOPMENT_MODE: true,
+
+  /**
+   * Templates and Document Studio (Library > Templates and Library > Studio
+   * nav items, and the "Use as Template" / "Unmark Template" / "Generate"
+   * file actions). Hidden, not removed, until the 3.1.0 rollout: flip to
+   * true to show them again. Pages without this config read it as off.
+   *
+   * Plan for 3.1.0: test Document Studio and templates end to end, then set
+   * this to true and ship both to everyone. Once they are live, remove this
+   * flag and the checks that read it (lex-app.js Library nav, lex-sidebar.js
+   * app launcher, matter-documents-view.js file menu, chip and badge,
+   * file-viewer-page.js overflow menu, document-create-modal.js type choice,
+   * folder.js plus its drive.css rule for the create menus) so the code goes
+   * back to always showing them. The Template Library
+   * page, Document Studio and all their code are still in place and do not
+   * need to be rebuilt.
+   */
+  TEMPLATES_AND_STUDIO_ENABLED: false,
+
+  /**
+   * Admin Task Plans, Run Books and Communications (admin sidebar menu,
+   * admin page switcher, Administration home cards, and My Tasks "New Task
+   * Plan"). Hidden, not removed, until the 3.2.0 rollout: flip to true to
+   * show them again. Pages without this config read it as off.
+   *
+   * Plan for 3.2.0: test all three end to end, set this to true, then
+   * remove the flag and the checks that read it (menu.js admin items,
+   * admin-switcher.js, admin-index.js, my-tasks.js) so they always show.
+   * The pages and their code are still in place.
+   */
+  ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED: false
 };

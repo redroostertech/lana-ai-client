@@ -48,6 +48,10 @@
 
      <div class="sv2-layout">
 
+      <!-- Section dropdown shown in place of the rail when the settings area
+           is narrow. Options are built from the rail by settings-v2-nav.js. -->
+      <lex-select id="sv2-nav-select" class="sv2-nav-select" variant="outlined" aria-label="Settings section"></lex-select>
+
       <!-- In-page section navigation (left rail).
            Icons are injected from Lex.Icons by settings-v2-nav.js. -->
       <nav class="sv2-nav" role="tablist" aria-orientation="vertical" aria-label="Settings sections">
@@ -276,9 +280,9 @@
               placeholder="Select your time zone..."
               searchable="true">
             </lex-select>
-            <lex-stack direction="horizontal" gap="3" align="center">
+            <lex-stack class="sv2-tz-row" direction="horizontal" gap="3" align="center">
               <lex-btn id="sv2-tz-detect-btn" variant="ghost" size="sm">Detect</lex-btn>
-              <lex-text id="sv2-tz-current" variant="tertiary" size="body-sm"></lex-text>
+              <lex-text id="sv2-tz-current" class="sv2-tz-current" variant="tertiary" size="body-sm"></lex-text>
             </lex-stack>
           </lex-stack>
         </lex-card>

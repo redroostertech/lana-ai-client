@@ -1,0 +1,24 @@
+/* Audit Logs page (admin/audit.html). Stat cards size from the page column,
+   not the window, so the app sidebar and Ask LANA panel are accounted for. */
+
+.audit-page {
+  container: audit-page / inline-size;
+}
+
+.audit-stats {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 1.5rem;
+}
+
+/* Narrow: Total Events across the top, the four categories in a 2 by 2 grid */
+@container audit-page (max-width: 899px) {
+  .audit-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .audit-stats > #statCardAll {
+    grid-column: 1 / -1;
+  }
+}

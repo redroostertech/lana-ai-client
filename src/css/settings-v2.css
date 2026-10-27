@@ -7,7 +7,10 @@
 
 /* ── Page Root ────────────────────────────────────────────────────── */
 
+/* The settings area is the container for the rail/dropdown swap, so open
+   sidebars and the Ask LANA panel are accounted for (not the window). */
 .sv2-page {
+  container: sv2-page / inline-size;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - var(--lex-topbar-height, 64px));
@@ -112,8 +115,14 @@
 }
 
 .sv2-panels {
+  container: sv2-panels / inline-size;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* Section dropdown: hidden while the rail fits. */
+.sv2-nav-select {
+  display: none;
 }
 
 .sv2-panel {
@@ -124,25 +133,23 @@
   display: block;
 }
 
-@media (max-width: 720px) {
+/* Narrow settings area (rail 240px + 32px gap no longer leaves room for the
+   cards): swap the rail for the dropdown above the content. */
+@container sv2-page (max-width: 759px) {
   .sv2-layout {
     flex-direction: column;
+    align-items: stretch;
     gap: 16px;
   }
   .sv2-nav {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    flex-basis: auto;
-    width: 100%;
-    position: static;
-    overflow-x: auto;
+    display: none;
   }
-  .sv2-nav-item {
-    width: auto;
-    white-space: nowrap;
+  .sv2-nav-select {
+    display: block;
+    width: 100%;
   }
   .sv2-panels {
-    max-width: 100%;
+    width: 100%;
   }
 }
 
@@ -152,6 +159,35 @@
 .sv2-hidden {
   display: none !important;
 }
+
+/* ── Time Zone ───────────────────────────────────────────────────── */
+
+/* settings-v2.js writes the status with textContent, which replaces the
+   lex-text inner markup, so the text style is set here. */
+.sv2-tz-current {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  color: var(--lex-text-tertiary);
+  font-size: var(--lex-body-sm-size);
+  line-height: var(--lex-body-sm-height);
+  overflow-wrap: anywhere;
+}
+
+/* Narrow: Detect above the status line instead of side by side.
+   lex-stack sets its flex layout as inline styles on the host. */
+@container sv2-panels (max-width: 559px) {
+  .sv2-tz-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.25rem !important;
+  }
+
+  .sv2-tz-current {
+    width: 100%;
+  }
+}
+
 
 /* ── Preferences ─────────────────────────────────────────────────── */
 
@@ -364,8 +400,11 @@
   gap: 16px;
 }
 
-@media (max-width: 540px) {
-  .sv2-kv-grid {
+/* Card-level rules below query the panel column (.sv2-panels), so they
+   follow the space the cards actually get, not the window. */
+@container sv2-panels (max-width: 479px) {
+  .sv2-kv-grid,
+  .sv2-vpn-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1215,7 +1254,7 @@
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 540px) {
+@container sv2-panels (max-width: 559px) {
   .sv2-capability-heading {
     flex-direction: column;
   }
@@ -1242,17 +1281,33 @@
     flex-direction: column;
   }
 
-  .sv2-memory-header,
+  .sv2-memory-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* lex-stack sets its flex layout as inline styles on the host. */
+  .sv2-sessions-summary {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .sv2-memory-header lex-btn,
+  .sv2-sessions-summary lex-btn {
+    align-self: flex-start;
+  }
+}
+
+/* Modals are hoisted to <body> and sized from the window, so these stay on
+   @media. */
+@media (max-width: 540px) {
   .sv2-memory-modal-toolbar,
-  .sv2-sessions-summary,
   .sv2-sessions-modal-toolbar {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .sv2-memory-header lex-btn,
   .sv2-memory-modal-toolbar lex-btn,
-  .sv2-sessions-summary lex-btn,
   .sv2-sessions-modal-toolbar lex-btn {
     width: 100%;
   }
@@ -1263,7 +1318,7 @@
   }
 }
 
-@media (max-width: 540px) {
+@container sv2-panels (max-width: 479px) {
   .sv2-usage-metrics {
     grid-template-columns: 1fr;
   }
@@ -1426,7 +1481,7 @@
   flex: 0 0 92px;
 }
 
-@media (max-width: 620px) {
+@container sv2-panels (max-width: 599px) {
   .sv2-connection-row {
     align-items: flex-start;
     flex-direction: column;

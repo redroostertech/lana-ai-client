@@ -562,8 +562,10 @@
         items.push(menuItem('retry', 'refresh-cw', 'Retry Ingestion'));
       }
 
-      // Template generate / mark / unmark.
-      if (enableTemplateToggle && isDocxOrPdf(file) && !readOnly && isReady) {
+      // Template generate / mark / unmark. Hidden until 3.1.0
+      // (LanaConfig.TEMPLATES_AND_STUDIO_ENABLED).
+      var templatesEnabled = !!(window.LanaConfig && window.LanaConfig.TEMPLATES_AND_STUDIO_ENABLED === true);
+      if (templatesEnabled && enableTemplateToggle && isDocxOrPdf(file) && !readOnly && isReady) {
         if (file.is_template) {
           items.push(menuItem('template-generate', 'file-text', 'Generate'));
           items.push(menuItem('template-unmark', 'file', 'Unmark Template'));
@@ -614,7 +616,9 @@
     }
 
     function templateBadgeHtml(file) {
-      return (enableTemplates && file.is_template)
+      // Template badge ships in 3.1.0 (LanaConfig.TEMPLATES_AND_STUDIO_ENABLED)
+      return (enableTemplates && file.is_template &&
+              window.LanaConfig && window.LanaConfig.TEMPLATES_AND_STUDIO_ENABLED === true)
         ? '<span class="mdv-template-badge">Template</span>'
         : '';
     }
@@ -848,7 +852,9 @@
       if (enableTemplates || enableArtifacts) {
         filtersHtml =
           filterChip('all', 'All ' + allCount) +
-          (templateCount > 0 ? filterChip('template', 'Templates ' + templateCount) : '') +
+          // Templates chip ships in 3.1.0 (LanaConfig.TEMPLATES_AND_STUDIO_ENABLED)
+          (templateCount > 0 && window.LanaConfig && window.LanaConfig.TEMPLATES_AND_STUDIO_ENABLED === true
+            ? filterChip('template', 'Templates ' + templateCount) : '') +
           (documentCount > 0 ? filterChip('document', 'Documents ' + documentCount) : '') +
           (artifactCount > 0 ? filterChip('artifact', 'Artifacts ' + artifactCount) : '');
       }

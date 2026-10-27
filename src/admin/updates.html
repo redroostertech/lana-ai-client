@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/admin/updates.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -31,7 +32,7 @@
   <!-- Page content as inert <template> -->
   <template id="page-content">
 
-    <main class="p-4 lg:p-8">
+    <main class="updates-page p-4 lg:p-8">
 
       <!-- Page header -->
       <lex-banner
@@ -68,10 +69,10 @@
       </div>
 
       <!-- Version + status -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="updates-overview">
 
-        <lex-card id="versionCard" heading="Deployment Version">
-          <div class="grid grid-cols-2 gap-3">
+        <lex-card id="versionCard" class="updates-card" heading="Deployment Version">
+          <div class="updates-info-grid">
             <lex-kv id="kvCurrentVersion" label="Current Version" value="--"></lex-kv>
             <lex-kv id="kvLatestVersion"  label="Latest Version"  value="--"></lex-kv>
             <lex-kv id="kvUpdateStatus"   label="Status"          value="--"></lex-kv>
@@ -79,9 +80,11 @@
           </div>
 
           <!-- Action row -->
-          <div class="mt-6 flex items-center gap-3" data-slot="footer">
-            <lex-btn id="applyBtn" variant="success" leading-icon="download" disabled>Apply Update</lex-btn>
-            <span id="applyHint" class="text-xs lex-text-secondary"></span>
+          <div class="updates-actions mt-6" data-slot="footer">
+            <div class="updates-actions__buttons">
+              <lex-btn id="applyBtn" variant="success" leading-icon="download" disabled>Apply Update</lex-btn>
+            </div>
+            <span id="applyHint" class="updates-actions__hint text-xs lex-text-secondary"></span>
           </div>
         </lex-card>
 
@@ -101,7 +104,7 @@
 
       <!-- Update progress / result (shown by JS during + after an apply) -->
       <lex-card id="progressCard" heading="Update Progress" class="hidden mb-6">
-        <div class="flex items-center gap-3">
+        <div class="updates-progress-row">
           <lex-spinner id="progressSpinner" size="sm" class="hidden"></lex-spinner>
           <div id="progressBadge"></div>
           <span id="progressMessage" class="text-sm lex-text-primary">--</span>
@@ -109,9 +112,11 @@
       </lex-card>
 
       <!-- Refresh -->
-      <div class="flex items-center gap-3">
-        <lex-btn id="refreshBtn" variant="secondary" leading-icon="refresh-cw">Refresh</lex-btn>
-        <span id="lastUpdatedText" class="text-xs lex-text-secondary"></span>
+      <div class="updates-actions">
+        <div class="updates-actions__buttons">
+          <lex-btn id="refreshBtn" variant="secondary" leading-icon="refresh-cw">Refresh</lex-btn>
+        </div>
+        <span id="lastUpdatedText" class="updates-actions__hint text-xs lex-text-secondary"></span>
       </div>
 
       </div><!-- /backendSection -->
@@ -121,17 +126,19 @@
 
         <!-- Client app self-update (desktop app only — revealed by JS when the
              Electron updates IPC is present) -->
-        <lex-card id="clientAppCard" heading="Client App (this computer)" class="hidden mb-6">
-          <div class="grid grid-cols-2 gap-3">
+        <lex-card id="clientAppCard" heading="Client App (this computer)" class="updates-card hidden mb-6">
+          <div class="updates-info-grid">
             <lex-kv id="kvAppCurrentVersion" label="Installed Version" value="--"></lex-kv>
             <lex-kv id="kvAppLatestVersion"  label="Latest Version"    value="--"></lex-kv>
             <lex-kv id="kvAppUpdateStatus"   label="Status"            value="--"></lex-kv>
             <lex-kv id="kvAppChannel"        label="Channel"           value="--"></lex-kv>
           </div>
-          <div class="mt-6 flex items-center gap-3" data-slot="footer">
-            <lex-btn id="checkAppUpdateBtn" variant="secondary" leading-icon="refresh-cw">Check for Updates</lex-btn>
-            <lex-btn id="installAppUpdateBtn" variant="success" leading-icon="download" disabled>Download &amp; Install</lex-btn>
-            <span id="appUpdateHint" class="text-xs lex-text-secondary"></span>
+          <div class="updates-actions mt-6" data-slot="footer">
+            <div class="updates-actions__buttons">
+              <lex-btn id="checkAppUpdateBtn" variant="secondary" leading-icon="refresh-cw">Check for Updates</lex-btn>
+              <lex-btn id="installAppUpdateBtn" variant="success" leading-icon="download" disabled>Download &amp; Install</lex-btn>
+            </div>
+            <span id="appUpdateHint" class="updates-actions__hint text-xs lex-text-secondary"></span>
           </div>
         </lex-card>
 

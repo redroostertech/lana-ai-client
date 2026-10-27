@@ -974,7 +974,11 @@
               { id: 'document-library', label: 'Documents', href: 'document-library.html' },
               { id: 'library-templates', label: 'Templates', href: 'document-library-templates.html' },
               { id: 'library-document-studio', label: 'Studio', isButton: true, onClick: 'openDocStudioFromMenu' }
-            ] }
+            ].filter(function (item) {
+              // Templates and Studio ship in 3.1.0 (LanaConfig.TEMPLATES_AND_STUDIO_ENABLED)
+              if (item.id !== 'library-templates' && item.id !== 'library-document-studio') return true;
+              return !!(window.LanaConfig && window.LanaConfig.TEMPLATES_AND_STUDIO_ENABLED === true);
+            }) }
           ];
 
       const sections = [

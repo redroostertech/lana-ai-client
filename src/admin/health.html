@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/admin/admin-switcher.css">
+  <link rel="stylesheet" href="../css/admin/health.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <script src="../js/tailwind-loader.js"></script>
 
@@ -31,7 +32,7 @@
   <!-- Page content as inert <template> -->
   <template id="page-content">
 
-    <main class="p-4 lg:p-8">
+    <main class="health-page p-4 lg:p-8">
 
       <!-- Page header -->
       <lex-banner
@@ -48,13 +49,12 @@
       <lex-breadcrumb items='[{"label":"Administration","href":"admin/index.html"},{"label":"System Health"}]'></lex-breadcrumb>
 
       <!-- Service Cards Grid -->
-      <style>#serviceCardsGrid > lex-card { height: 100%; }</style>
-      <div id="serviceCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div id="serviceCardsGrid" class="health-service-grid grid gap-4 mb-6">
         <!-- Injected by admin-health.js: one lex-card per service -->
       </div>
 
       <!-- Row 1: System Metrics | Process Metrics | CPU Information -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div class="health-metrics-grid grid gap-6 mb-6">
 
         <!-- System Metrics -->
         <lex-card id="systemMetricsCard" heading="System Metrics">
@@ -66,7 +66,7 @@
             <lex-progress-bar id="memoryBar" value="0" color="info" size="sm"></lex-progress-bar>
             <p id="memoryDetail" class="text-xs lex-text-tertiary mt-1">-- MB / -- MB</p>
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="health-kv-grid grid gap-3">
             <lex-kv id="sysKvPlatform"     label="Platform"     value="--"></lex-kv>
             <lex-kv id="sysKvArch"         label="Architecture" value="--"></lex-kv>
             <lex-kv id="sysKvHostname"     label="Hostname"     value="--"></lex-kv>
@@ -76,7 +76,7 @@
 
         <!-- Process Metrics -->
         <lex-card id="processMetricsCard" heading="Process Metrics">
-          <div class="grid grid-cols-2 gap-3">
+          <div class="health-kv-grid grid gap-3">
             <lex-kv id="procKvPid"        label="PID"             value="--"></lex-kv>
             <lex-kv id="procKvUptime"     label="Process Uptime"  value="--"></lex-kv>
             <lex-kv id="procKvHeapUsed"   label="Heap Used"       value="--"></lex-kv>
@@ -88,8 +88,8 @@
 
         <!-- CPU Information -->
         <lex-card id="cpuInfoCard" heading="CPU Information">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="col-span-2">
+          <div class="health-kv-grid grid gap-3">
+            <div class="health-kv-span">
               <lex-kv id="cpuKvModel"   label="CPU Model"   value="--"></lex-kv>
             </div>
             <lex-kv id="cpuKvCores"    label="Cores"       value="--"></lex-kv>
@@ -102,11 +102,11 @@
       </div>
 
       <!-- Row 2: Database Metrics | Storage Information -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="health-pair-grid grid gap-6 mb-6">
 
         <!-- Database Metrics -->
         <lex-card id="databaseMetricsCard" heading="Database Metrics">
-          <div class="grid grid-cols-2 gap-3">
+          <div class="health-kv-grid grid gap-3">
             <lex-kv id="dbKvActiveConn"      label="Active Connections"       value="--"></lex-kv>
             <lex-kv id="dbKvCacheHit"        label="Cache Hit Ratio"          value="--"></lex-kv>
             <lex-kv id="dbKvTxCommitted"     label="Transactions Committed"   value="--"></lex-kv>
@@ -116,7 +116,7 @@
 
         <!-- Storage Information -->
         <lex-card id="storageInfoCard" heading="Storage Information">
-          <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="health-kv-grid grid gap-3 mb-4">
             <lex-kv id="stgKvTotal"      label="Total Storage"    value="--"></lex-kv>
             <lex-kv id="stgKvUsed"       label="Used Storage"     value="--"></lex-kv>
             <lex-kv id="stgKvAvailable"  label="Available"        value="--"></lex-kv>
@@ -134,14 +134,14 @@
       </div>
 
       <!-- Row 3: Connector Sync Failures | LLM Token Usage -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div class="health-pair-grid grid gap-6 mb-8">
 
         <!-- Connector DLQ -->
         <lex-card id="dlqCard" heading="Connector Sync Failures">
           <div class="flex items-center justify-between mb-4">
             <div id="dlqStatusBadge"></div>
           </div>
-          <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="health-kv-grid grid gap-3 mb-4">
             <lex-kv id="dlqKvPending"     label="Pending Retry"       value="--"></lex-kv>
             <lex-kv id="dlqKvRetrying"    label="Currently Retrying"  value="--"></lex-kv>
             <lex-kv id="dlqKvFailed"      label="Permanently Failed"  value="--"></lex-kv>
@@ -155,14 +155,14 @@
             </div>
             <lex-progress-bar id="dlqBar" value="0" color="success" size="sm"></lex-progress-bar>
             <!-- Legend pills — rendered by JS -->
-            <div id="dlqLegend" class="flex gap-2 mt-2"></div>
+            <div id="dlqLegend" class="flex flex-wrap gap-2 mt-2"></div>
           </div>
         </lex-card>
 
         <!-- LLM Token Usage -->
         <lex-card id="tokenUsageCard" heading="LLM Token Usage">
           <lex-tabs id="tokenPeriodTabs" active="7days"></lex-tabs>
-          <div class="grid grid-cols-2 gap-3 mt-4">
+          <div class="health-kv-grid grid gap-3 mt-4">
             <lex-kv id="tkKvTotal"       label="Total Tokens"          value="--"></lex-kv>
             <lex-kv id="tkKvInput"       label="Input Tokens"          value="--"></lex-kv>
             <lex-kv id="tkKvOutput"      label="Output Tokens"         value="--"></lex-kv>
@@ -177,7 +177,7 @@
       <!-- Energy Consumption — full width -->
       <lex-card id="energyCard" heading="Energy Consumption">
         <!-- Card header-right: period selector + status badge -->
-        <div class="flex items-center justify-between mb-6">
+        <div class="health-energy-header flex items-center justify-between mb-6">
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                  style="background:var(--lex-color-success-600)">
@@ -199,7 +199,7 @@
         </div>
 
         <!-- Energy metric cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="health-energy-grid grid gap-4 mb-6">
 
           <!-- Energy Consumed -->
           <div class="rounded-lg p-4 border" style="background:var(--lex-bg-primary);border-color:var(--lex-border-subtle);">

@@ -1057,7 +1057,7 @@
     if (action === 'upload') {
       triggerFolderFilePicker();
     } else if (action === 'doc-studio') {
-      openDocStudioCreate();
+      if (docStudioEnabled()) openDocStudioCreate();
     } else if (action === 'new-folder') {
       showNewFolderModal();
     }
@@ -1249,7 +1249,16 @@
    * Initializes state, parses URL params, redirects if no matter_id,
    * exposes globals, wires events, and loads initial content.
    */
+  // Doc Studio ships in 3.1.0 (LanaConfig.TEMPLATES_AND_STUDIO_ENABLED). The
+  // "Create with Doc Studio" item lives in static menu options that lex-banner
+  // re-clones, so it is hidden with CSS keyed on this root attribute
+  // (drive.css, loaded on both direct and routed visits) rather than by editing the options.
+  function docStudioEnabled() {
+    return !!(window.LanaConfig && window.LanaConfig.TEMPLATES_AND_STUDIO_ENABLED === true);
+  }
+
   function onEnter() {
+    document.documentElement.toggleAttribute('data-hide-doc-studio', !docStudioEnabled());
     resetState();
 
     var urlParams = new URLSearchParams(window.location.search);
