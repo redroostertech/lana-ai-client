@@ -27,7 +27,7 @@
   ></lex-app>
 
   <template id="page-content">
-  <main style="display:flex;flex-direction:column;height:100%">
+  <main class="file-viewer-main" style="display:flex;flex-direction:column;height:100%">
 
     <!-- Header bar -->
     <div id="viewerHeader" class="file-viewer-header">
@@ -87,8 +87,8 @@
       items='[{"label":"Loading..."}]'
     ></lex-breadcrumb>
 
-    <!-- Two-column content area -->
-    <div class="flex-1 flex overflow-hidden">
+    <!-- Two-column content area (stacks when narrow, see file-viewer.css) -->
+    <div class="file-viewer-body flex-1 flex overflow-hidden">
 
       <!-- Left: File Content Area -->
       <!-- Left column: a static notice row above the scrolling content pane,
@@ -187,6 +187,7 @@
         <div class="file-viewer-review-tabs">
           <lex-segmented
             id="reviewTabs"
+            collapsible
             value="changes"
             size="sm"
             options='[{"value":"changes","label":"History"},{"value":"releases","label":"Versions"},{"value":"comments","label":"Comments"},{"value":"insights","label":"Insights"}]'>

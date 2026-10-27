@@ -1788,3 +1788,52 @@ button.file-viewer-review-release:focus-visible {
   color: var(--lex-danger, #dc2626);
   text-decoration: underline;
 }
+
+/* ==========================================================================
+   Responsive: sized from the content area, not the window, so the app
+   sidebar and Ask LANA panel are accounted for.
+   ========================================================================== */
+
+/* The container is the page <main>, not .file-viewer-body: a container
+   cannot query itself, and .file-viewer-body is what changes direction. */
+.file-viewer-main {
+  container: fv-body / inline-size;
+}
+
+/* Too narrow for document + 320px review rail side by side: stack them and
+   let the whole area scroll, keeping the document a usable height. */
+@container fv-body (max-width: 819px) {
+  .file-viewer-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .file-viewer-content-column {
+    flex: 0 0 auto;
+    min-height: 70vh;
+  }
+
+  .file-viewer-review-rail {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    overflow: visible;
+  }
+
+  .file-viewer-review-body {
+    overflow-y: visible;
+  }
+}
+
+/* Read-only / conversion notice: put the action under the message */
+@container fv-body (max-width: 559px) {
+  .file-viewer-format-notice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .file-viewer-format-notice__action {
+    align-self: flex-start;
+  }
+}
