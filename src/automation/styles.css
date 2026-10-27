@@ -4630,3 +4630,106 @@ details[open].ld-step-raw > summary::before {
 #automationApprovalsTable th:nth-child(5) { width: 16%; }
 #automationApprovalsTable th:nth-child(6) { width: 176px; }
 #automationApprovalsTable th:nth-child(7) { width: 176px; }
+
+/* ── Builder: sized from the content column ──────────────────────────
+   Container queries, not @media, so the app sidebar and Ask LANA panel
+   are accounted for. The side panel (step config, diagnostics) moves
+   under the main column, then forms, trigger picker and step cards
+   stack as the column narrows. */
+
+.automations-builder-shell {
+  container: automation-builder / inline-size;
+}
+
+.builder-trigger-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.builder-trigger-picker__select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.builder-trigger-picker lex-btn {
+  flex: 0 0 auto;
+}
+
+@container automation-builder (max-width: 959px) {
+  .automations-builder-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overdue-reminder-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overdue-reminder-editor {
+    position: static;
+  }
+}
+
+@container automation-builder (max-width: 719px) {
+  .automations-builder-shell .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .builder-trigger-picker {
+    flex-wrap: wrap;
+  }
+
+  .builder-trigger-picker__select {
+    flex-basis: 100%;
+  }
+
+  .automations-builder-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .overdue-bucket-grid,
+  .overdue-matrix-head,
+  .overdue-matrix-row,
+  .overdue-matrix-row__cells {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Step cards: Configure and Remove drop under the step text. */
+  .automation-step-card {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .automation-step-copy {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .automation-step-copy code,
+  .automation-step-summary {
+    overflow-wrap: anywhere;
+  }
+
+  .automation-step-badge {
+    top: 18px;
+    transform: none;
+  }
+}
+
+@container automation-builder (max-width: 479px) {
+  .automations-intent-card,
+  .build-with-lana-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .automations-intent-icon {
+    display: none;
+  }
+
+  .build-with-lana-icon {
+    width: 36px;
+    height: 36px;
+  }
+}

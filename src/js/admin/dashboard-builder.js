@@ -108,6 +108,24 @@
       );
     });
     container.innerHTML = buttons.join('');
+    renderTypeSelect();
+  }
+
+  // Dropdown twin of the filter list, shown when the column is narrow.
+  // Options are only reassigned when they change so a search keystroke or
+  // card click does not close an open dropdown.
+  function renderTypeSelect() {
+    var select = el('dashboardBuilderTypeSelect');
+    if (!select) return;
+    var options = [{ value: 'all', label: 'All Types (' + metrics.length + ')' }].concat(groups().map(function (group) {
+      return { value: group.key, label: group.label + ' (' + group.count + ')' };
+    }));
+    var signature = JSON.stringify(options);
+    if (select.dataset.optionsSignature !== signature) {
+      select.dataset.optionsSignature = signature;
+      select.options = options;
+    }
+    if (select.value !== activeType) select.value = activeType;
   }
 
   function renderSelectedCount() {
@@ -521,6 +539,12 @@
     });
 
     el('dashboardBuilderMetricSearch').addEventListener('input', renderMetrics);
+    el('dashboardBuilderTypeSelect').addEventListener('lex-change', function (event) {
+      var value = (event.detail && event.detail.value) || 'all';
+      if (value === activeType) return;
+      activeType = value;
+      renderMetrics();
+    });
     el('dashboardBuilderName').addEventListener('input', updateWizardState);
     el('dashboardBuilderDescription').addEventListener('input', updateWizardState);
     el('dashboardBuilderType').addEventListener('lex-change', function () {

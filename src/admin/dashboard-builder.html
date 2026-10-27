@@ -24,7 +24,7 @@
   ></lex-app>
 
   <template id="page-content">
-    <main>
+    <main class="dash-builder-page">
       <lex-banner
         id="dashboardBuilderBanner"
         variant="light"
@@ -126,6 +126,8 @@
                   </span>
                   <input id="dashboardBuilderMetricSearch" type="search" placeholder="Search metrics..." autocomplete="off">
                 </div>
+                <!-- Shown instead of the filter list when the column is narrow -->
+                <lex-select id="dashboardBuilderTypeSelect" class="dash-browser__type-select" name="dashboardBuilderTypeSelect" variant="outlined" placeholder="Search types..." searchable></lex-select>
                 <div id="dashboardBuilderTypeFilters" class="dash-browser__filters"></div>
               </aside>
               <div class="dash-browser__content">

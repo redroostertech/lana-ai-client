@@ -651,6 +651,25 @@
     });
 
     container.innerHTML = buttons.join('');
+    renderTypeSelect(groups, total);
+  }
+
+  // Dropdown twin of the filter list, shown when the column is narrow.
+  // Options are only reassigned when they change so a search keystroke
+  // does not close an open dropdown.
+  function renderTypeSelect(groups, total) {
+    var select = el('dashboardTypeSelect');
+    if (!select) return;
+
+    var options = [{ value: 'all', label: 'All Types (' + total + ')' }].concat(groups.map(function (group) {
+      return { value: group.key, label: group.label + ' (' + group.metrics.length + ')' };
+    }));
+    var signature = JSON.stringify(options);
+    if (select.dataset.optionsSignature !== signature) {
+      select.dataset.optionsSignature = signature;
+      select.options = options;
+    }
+    if (select.value !== activeTypeFilter) select.value = activeTypeFilter;
   }
 
   function detailRow(label, value) {
@@ -1073,6 +1092,16 @@
         renderMetrics(allDashboardMetrics, currentSummary, currentDashboardType);
       }
     });
+
+    var typeSelect = el('dashboardTypeSelect');
+    if (typeSelect) {
+      typeSelect.addEventListener('lex-change', function (event) {
+        var value = (event.detail && event.detail.value) || 'all';
+        if (value === activeTypeFilter) return;
+        activeTypeFilter = value;
+        renderMetrics(allDashboardMetrics, currentSummary, currentDashboardType);
+      });
+    }
 
     function handleSearchEvent(event) {
       if (event.target && event.target.id === 'dashboardMetricSearch') {

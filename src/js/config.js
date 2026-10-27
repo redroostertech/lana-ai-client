@@ -279,5 +279,18 @@ window.LanaConfig = {
    * admin-switcher.js, admin-index.js, my-tasks.js) so they always show.
    * The pages and their code are still in place.
    */
-  ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED: false
+  ADMIN_PLANS_RUNBOOKS_COMMS_ENABLED: false,
+
+  /**
+   * Top Movers section in the LanaInsights sidebar (metric movement list
+   * under the Dashboard, Library, Firm Reporting and Billable Hours nav).
+   * Hidden, not removed, until the 3.2.0 rollout of the dynamic analytics
+   * and LanaInsights menu. While off, the sidebar also skips the top
+   * movers API call. Pages without this config read it as off.
+   *
+   * Plan for 3.2.0: fold Top Movers into the dynamic analytics menu, set
+   * this to true, then remove the flag and its two checks in lex-app.js
+   * (_buildSidebarSections and _loadTopMoversForSidebar).
+   */
+  INSIGHTS_TOP_MOVERS_ENABLED: false
 };

@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../css/lex-tokens.css">
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/admin/admin-tables.css">
+  <link rel="stylesheet" href="../css/admin/billable-hours.css">
   <link rel="stylesheet" href="../css/tailwind-output.css">
   <link rel="stylesheet" href="../css/lex-chat.css">
   <script src="../js/tailwind-loader.js"></script>
@@ -26,7 +27,7 @@
 
   <template id="page-content">
 
-    <main>
+    <main class="bh-admin-page">
 
       <style>
         /* Billable hours tables (docs/TABLE-STANDARD.md section 8) */
@@ -89,7 +90,7 @@
       </div>
 
       <!-- Summary Metrics -->
-      <div id="bhAdminSummary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;"></div>
+      <div id="bhAdminSummary" class="bh-admin-stats"></div>
 
       <!-- Period Selector -->
       <div id="bhAdminPeriod" style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.5rem;flex-wrap:wrap;">

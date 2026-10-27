@@ -990,13 +990,16 @@
       ];
 
       if (appContext === 'insights') {
-        sections.push({
-          id: 'top-movers',
-          title: 'Top Movers',
-          items: this._topMoverItems.length > 0
-            ? this._topMoverItems
-            : [{ id: 'top-movers-empty', label: 'No movement yet', icon: 'bar-chart-2', href: '#' }]
-        });
+        // Hidden until 3.2.0 (LanaConfig.INSIGHTS_TOP_MOVERS_ENABLED).
+        if (this._topMoversEnabled()) {
+          sections.push({
+            id: 'top-movers',
+            title: 'Top Movers',
+            items: this._topMoverItems.length > 0
+              ? this._topMoverItems
+              : [{ id: 'top-movers-empty', label: 'No movement yet', icon: 'bar-chart-2', href: '#' }]
+          });
+        }
       } else {
         sections.push({
           id: 'task-recents',
@@ -1045,8 +1048,12 @@
       return { signal: controller.signal };
     }
 
+    _topMoversEnabled() {
+      return !!(window.LanaConfig && window.LanaConfig.INSIGHTS_TOP_MOVERS_ENABLED === true);
+    }
+
     async _loadTopMoversForSidebar() {
-      if (this._topMoversLoaded || !window.api || typeof window.api.getTopMovingMetrics !== 'function') return;
+      if (!this._topMoversEnabled() || this._topMoversLoaded || !window.api || typeof window.api.getTopMovingMetrics !== 'function') return;
       this._topMoversLoaded = true;
 
       try {

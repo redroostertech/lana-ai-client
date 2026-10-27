@@ -70,44 +70,28 @@
         crumbs='[{"label":"Analytics","href":"admin/analytics.html"},{"label":"Firm Reporting"}]'
       ></lex-breadcrumb>
 
-      <!-- Two-column layout: Module Sidebar + Main Content -->
-      <div id="reportingLayout" style="display:grid;grid-template-columns:260px 1fr;gap:1.5rem;align-items:start;">
-
-        <!-- ── Module Sidebar ──────────────────────────────────────── -->
-        <div id="moduleSidebarColumn">
-
-          <lex-card id="externalLinksCard" padding="compact">
-
-            <!-- Module Search + List -->
-            <p class="lex-overline lex-text-secondary" style="margin-bottom:0.5rem;">Report Modules</p>
-            <lex-input
-              id="moduleSearchInput"
-              placeholder="Search modules..."
-              leading-icon="search"
-              size="sm"
-              style="margin-bottom:0.75rem;"
-            ></lex-input>
-
-            <div id="moduleMenu" style="display:flex;flex-direction:column;gap:0.25rem;">
-              <div class="lex-body-sm lex-text-secondary" style="padding:0.75rem;text-align:center;">Loading modules...</div>
-            </div>
-
-            <lex-empty
-              id="moduleSearchEmpty"
-              message="No modules found"
-              description="Try a different search term"
-              icon="search"
-              style="display:none;"
-            ></lex-empty>
-          </lex-card>
-
-        </div>
+      <!-- Report picker sits in the controls card; results stack below -->
+      <div id="reportingLayout" class="reporting-layout">
 
         <!-- ── Main Content Column ────────────────────────────────── -->
         <div id="reportingMainColumn" style="display:flex;flex-direction:column;gap:1.5rem;min-width:0;overflow-x:hidden;">
 
           <!-- Controls Card -->
           <lex-card id="controlsCard">
+            <!-- Report picker: searchable dropdown of report modules and imported reports -->
+            <div class="reporting-module-picker">
+              <lex-select
+                id="reportModuleSelect"
+                class="reporting-module-picker__select"
+                label="Report"
+                name="reportModuleSelect"
+                variant="outlined"
+                placeholder="Loading reports..."
+                searchable
+              ></lex-select>
+              <lex-btn id="deleteImportedReportBtn" class="reporting-module-picker__delete" variant="ghost" size="sm" hidden>Delete report</lex-btn>
+            </div>
+
             <!-- Period Presets -->
             <div style="margin-bottom:1rem;">
               <p class="lex-label lex-text-secondary" style="margin-bottom:0.5rem;">Quick Select Period</p>
@@ -123,7 +107,7 @@
             </div>
 
             <!-- Date Range Row -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
+            <div class="reporting-period-fields">
               <lex-input id="periodStart" label="Start Date" type="date" name="periodStart"></lex-input>
               <lex-input id="periodEnd" label="End Date" type="date" name="periodEnd"></lex-input>
               <lex-select
@@ -164,7 +148,7 @@
           <lex-empty
             id="reportingPlaceholder"
             message="Select a report module"
-            description="Choose a module from the sidebar, set your date range, and click Run Report"
+            description="Choose a report above, set your date range, and click Run Report"
             icon="chart"
           ></lex-empty>
 

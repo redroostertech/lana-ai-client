@@ -164,22 +164,22 @@
         var utilization = d.total_hours > 0 ? Math.round(d.billable_hours / d.total_hours * 100) : 0;
 
         var cards = [
-          { label: 'Total Hours', value: (d.total_hours || 0).toFixed(1) + 'h', color: '' },
-          { label: 'Billable Hours', value: (d.billable_hours || 0).toFixed(1) + 'h', color: '' },
-          { label: 'Billable Amount', value: '$' + _formatMoney(d.billable_amount || 0), color: '' },
-          { label: 'Utilization', value: utilization + '%', color: utilization >= 70 ? 'var(--lex-color-green-600,#16a34a)' : 'var(--lex-color-amber-600,#d97706)' },
-          { label: 'Attorneys', value: d.users_active || 0, color: '' },
-          { label: 'Matters Worked', value: d.matters_worked || 0, color: '' },
-          { label: 'Pending Approval', value: (d.by_status && d.by_status.submitted) || 0, color: 'var(--lex-color-amber-600,#d97706)' },
-          { label: 'Approved', value: (d.by_status && d.by_status.approved) || 0, color: 'var(--lex-color-green-600,#16a34a)' }
+          { label: 'Total Hours', value: (d.total_hours || 0).toFixed(1) + 'h', tone: '' },
+          { label: 'Billable Hours', value: (d.billable_hours || 0).toFixed(1) + 'h', tone: '' },
+          { label: 'Billable Amount', value: '$' + _formatMoney(d.billable_amount || 0), tone: '' },
+          { label: 'Utilization', value: utilization + '%', tone: utilization >= 70 ? 'good' : 'warn' },
+          { label: 'Attorneys', value: d.users_active || 0, tone: '' },
+          { label: 'Matters Worked', value: d.matters_worked || 0, tone: '' },
+          { label: 'Pending Approval', value: (d.by_status && d.by_status.submitted) || 0, tone: 'warn' },
+          { label: 'Approved', value: (d.by_status && d.by_status.approved) || 0, tone: 'good' }
         ];
 
         var html = '';
         for (var i = 0; i < cards.length; i++) {
           var c = cards[i];
-          html += '<div style="background:var(--lex-bg-muted,#f9fafb);border-radius:0.5rem;padding:0.75rem 1rem;">';
-          html += '<div style="font-size:0.7rem;font-weight:600;color:var(--lex-text-muted);text-transform:uppercase;letter-spacing:0.05em;">' + _escapeHtml(c.label) + '</div>';
-          html += '<div style="font-size:1.25rem;font-weight:700;' + (c.color ? 'color:' + c.color + ';' : '') + '">' + c.value + '</div>';
+          html += '<div class="bh-admin-stat">';
+          html += '<div class="bh-admin-stat__label">' + _escapeHtml(c.label) + '</div>';
+          html += '<div class="bh-admin-stat__value' + (c.tone ? ' bh-admin-stat__value--' + c.tone : '') + '">' + c.value + '</div>';
           html += '</div>';
         }
         container.innerHTML = html;

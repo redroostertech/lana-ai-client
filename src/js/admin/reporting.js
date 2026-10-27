@@ -1323,8 +1323,6 @@
   // ==========================================================================
 
   async function loadModules() {
-    var moduleMenu = document.getElementById('moduleMenu');
-
     try {
       var response = await api.get('/api/v1/modules');
 
@@ -1336,244 +1334,114 @@
         });
       }
 
-      if (!allModules.length) {
-        if (moduleMenu) moduleMenu.innerHTML = '<div class="lex-body-sm lex-text-secondary" style="padding:0.75rem;text-align:center;">No modules available</div>';
-        return;
-      }
-
-      // Group by category
-      var modulesByCategory = {};
-      allModules.forEach(function (module) {
-        var cat = module.category || 'other';
-        if (!modulesByCategory[cat]) modulesByCategory[cat] = [];
-        modulesByCategory[cat].push(module);
-      });
-
-      // Build sidebar menu
-      if (moduleMenu) moduleMenu.innerHTML = '';
-      var categoryKeys = Object.keys(modulesByCategory).sort();
-
-      categoryKeys.forEach(function (category, index) {
-        var modules = modulesByCategory[category];
-        var categorySection = document.createElement('div');
-        categorySection.style.marginBottom = '0.25rem';
-        categorySection.dataset.categorySection = category;
-
-        if (index > 0) {
-          categorySection.style.borderTop = '1px solid var(--lex-border-default)';
-          categorySection.style.paddingTop = '0.75rem';
-          categorySection.style.marginTop = '0.75rem';
-        }
-
-        // Category header (collapsible)
-        var categoryHeader = document.createElement('button');
-        categoryHeader.className = 'w-full';
-        categoryHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:0.375rem 0.5rem;border-radius:var(--lex-radius-md);cursor:pointer;background:none;border:none;width:100%;';
-        categoryHeader.dataset.category = category;
-
-        var categoryName = document.createElement('span');
-        categoryName.className = 'lex-overline lex-text-secondary';
-        categoryName.textContent = moduleCategories[category] || category;
-        categoryHeader.appendChild(categoryName);
-
-        var chevron = document.createElement('svg');
-        chevron.setAttribute('width', '14');
-        chevron.setAttribute('height', '14');
-        chevron.setAttribute('fill', 'none');
-        chevron.setAttribute('stroke', 'currentColor');
-        chevron.setAttribute('stroke-width', '2');
-        chevron.setAttribute('viewBox', '0 0 24 24');
-        chevron.style.transition = 'transform 0.2s ease';
-        chevron.style.color = 'var(--lex-text-tertiary)';
-        chevron.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>';
-        categoryHeader.appendChild(chevron);
-        categorySection.appendChild(categoryHeader);
-
-        // Module items container
-        var moduleContainer = document.createElement('div');
-        moduleContainer.style.cssText = 'display:flex;flex-direction:column;gap:0.125rem;margin-top:0.25rem;';
-        moduleContainer.dataset.categoryModules = category;
-
-        modules.forEach(function (module) {
-          var btn = document.createElement('button');
-          btn.style.cssText = [
-            'display:block;width:100%;text-align:left;padding:0.375rem 0.5rem;',
-            'border-radius:var(--lex-radius-md);border:none;background:none;cursor:pointer;',
-            'transition:var(--lex-transition-fast);'
-          ].join('');
-          btn.dataset.moduleKey = module.moduleKey;
-          btn.dataset.category = category;
-          btn.dataset.moduleName = module.name.toLowerCase();
-          btn.dataset.moduleDescription = (module.description || '').toLowerCase();
-
-          if (module.available) {
-            btn.style.color = 'var(--lex-text-primary)';
-          } else {
-            btn.style.color = 'var(--lex-text-disabled)';
-            btn.style.cursor = 'not-allowed';
-            btn.disabled = true;
-          }
-
-          var nameEl = document.createElement('div');
-          nameEl.className = 'lex-label-sm';
-          nameEl.textContent = module.name;
-          btn.appendChild(nameEl);
-
-          if (!module.available) {
-            var note = document.createElement('div');
-            note.className = 'lex-body-xs lex-text-tertiary';
-            note.style.marginTop = '0.125rem';
-            note.textContent = 'Requires connectors';
-            btn.appendChild(note);
-          } else {
-            btn.addEventListener('click', function () {
-              // Deselect any imported report
-              selectedImportedReportId = null;
-              // Clear all selections (modules + imported reports)
-              moduleMenu.querySelectorAll('button[data-module-key], button[data-report-id]').forEach(function (b) {
-                b.style.background = 'none';
-                b.style.color = 'var(--lex-text-primary)';
-              });
-              // Apply active state
-              btn.style.background = 'var(--lex-bg-accent-soft)';
-              btn.style.color = 'var(--lex-text-accent)';
-              // Track selection
-              selectedModuleKey = module.moduleKey;
-              showCustomizeButton();
-              // Update missing entities for this module
-              updateMissingEntitiesForModule(module.moduleKey);
-            });
-          }
-
-          moduleContainer.appendChild(btn);
-        });
-
-        categorySection.appendChild(moduleContainer);
-
-        // Collapse / expand on header click
-        categoryHeader.addEventListener('click', function () {
-          var collapsed = moduleContainer.style.display === 'none';
-          if (collapsed) {
-            moduleContainer.style.display = 'flex';
-            chevron.style.transform = 'rotate(0deg)';
-          } else {
-            moduleContainer.style.display = 'none';
-            chevron.style.transform = 'rotate(-90deg)';
-          }
-        });
-
-        if (moduleMenu) moduleMenu.appendChild(categorySection);
-      });
-
       // Auto-select first available module
       var firstAvailable = allModules.find(function (m) { return m.available; });
-      if (firstAvailable && moduleMenu) {
-        selectedModuleKey = firstAvailable.moduleKey;
-        showCustomizeButton();
-        var firstBtn = moduleMenu.querySelector('button[data-module-key="' + firstAvailable.moduleKey + '"]');
-        if (firstBtn) {
-          firstBtn.style.background = 'var(--lex-bg-accent-soft)';
-          firstBtn.style.color = 'var(--lex-text-accent)';
-        }
-        updateMissingEntitiesForModule(firstAvailable.moduleKey);
+      if (firstAvailable && !selectedImportedReportId) {
+        selectModule(firstAvailable.moduleKey);
       }
+      renderReportSelect();
 
     } catch (error) {
       console.error('[Reporting] Failed to load modules:', error);
-      if (moduleMenu) {
-        moduleMenu.innerHTML = '<div class="lex-body-sm" style="color:var(--lex-status-danger);padding:0.75rem;text-align:center;">Failed to load modules. Please refresh.</div>';
-      }
+      var select = document.getElementById('reportModuleSelect');
+      if (select) select.placeholder = 'Failed to load reports. Please refresh.';
     }
   }
 
   // ==========================================================================
-  // Module Search
+  // Report Picker (searchable dropdown of modules + imported reports)
   // ==========================================================================
 
-  function initModuleSearch() {
-    var searchInput = document.getElementById('moduleSearchInput');
-    var moduleMenu = document.getElementById('moduleMenu');
-    var emptyEl = document.getElementById('moduleSearchEmpty');
-
-    if (!searchInput) return;
-
-    // lex-input fires 'lex-input' event
-    searchInput.addEventListener('lex-input', function (e) {
-      var query = (e.detail && e.detail.value !== undefined) ? e.detail.value.toLowerCase().trim() : '';
-      filterModules(query, moduleMenu, emptyEl);
-    });
-
-    // Also catch native input from the inner input element
-    searchInput.addEventListener('input', function (e) {
-      var query = (e.target.value || '').toLowerCase().trim();
-      filterModules(query, moduleMenu, emptyEl);
-    });
+  function currentReportSelectValue() {
+    if (selectedImportedReportId) return 'report:' + selectedImportedReportId;
+    if (selectedModuleKey) return 'module:' + selectedModuleKey;
+    return '';
   }
 
-  function filterModules(searchQuery, moduleMenu, emptyEl) {
-    if (!moduleMenu) return;
+  function renderReportSelect() {
+    var select = document.getElementById('reportModuleSelect');
+    if (!select) return;
 
-    var moduleItems = moduleMenu.querySelectorAll('button[data-module-key], button[data-report-id]');
-    var categorySections = moduleMenu.querySelectorAll('[data-category-section]');
+    var options = [];
 
-    if (!searchQuery) {
-      moduleItems.forEach(function (item) { item.style.display = ''; });
-      categorySections.forEach(function (s) { s.style.display = ''; });
-      if (emptyEl) emptyEl.style.display = 'none';
-      return;
+    var modulesByCategory = {};
+    allModules.forEach(function (module) {
+      var cat = module.category || 'other';
+      if (!modulesByCategory[cat]) modulesByCategory[cat] = [];
+      modulesByCategory[cat].push(module);
+    });
+    Object.keys(modulesByCategory).sort().forEach(function (category) {
+      modulesByCategory[category].forEach(function (module) {
+        options.push({
+          value: 'module:' + module.moduleKey,
+          label: module.name,
+          description: module.available ? '' : 'Requires connectors',
+          group: moduleCategories[category] || category,
+          disabled: !module.available
+        });
+      });
+    });
+
+    var reportsByCategory = {};
+    importedReports.forEach(function (report) {
+      var cat = report.category || 'other';
+      if (!reportsByCategory[cat]) reportsByCategory[cat] = [];
+      reportsByCategory[cat].push(report);
+    });
+    Object.keys(reportsByCategory).sort().forEach(function (cat) {
+      reportsByCategory[cat].forEach(function (report) {
+        options.push({ value: 'report:' + report.report_id, label: report.name, group: 'Imported' });
+      });
+    });
+
+    select.placeholder = options.length ? 'Select a report...' : 'No reports available';
+    select.options = options;
+    select.value = currentReportSelectValue();
+    syncDeleteReportButton();
+  }
+
+  function selectModule(moduleKey) {
+    selectedImportedReportId = null;
+    selectedModuleKey = moduleKey;
+    showCustomizeButton();
+    updateMissingEntitiesForModule(moduleKey);
+    syncDeleteReportButton();
+  }
+
+  // Imported (non-template) reports can be deleted; the button sits next to
+  // the dropdown and only shows while one of them is selected.
+  function syncDeleteReportButton() {
+    var btn = document.getElementById('deleteImportedReportBtn');
+    if (!btn) return;
+    var report = selectedImportedReportId && importedReports.find(function (r) {
+      return r.report_id === selectedImportedReportId;
+    });
+    btn.hidden = !report || !!report.is_template;
+  }
+
+  function initReportSelect() {
+    var select = document.getElementById('reportModuleSelect');
+    if (select && !select.dataset.bound) {
+      select.dataset.bound = 'true';
+      select.addEventListener('lex-change', function (e) {
+        var value = (e.detail && e.detail.value) || '';
+        if (value === currentReportSelectValue()) return;
+        if (value.indexOf('module:') === 0) {
+          selectModule(value.slice('module:'.length));
+        } else if (value.indexOf('report:') === 0) {
+          selectImportedReport(value.slice('report:'.length));
+        }
+      });
     }
 
-    var searchWords = searchQuery.split(/\s+/).filter(function (w) { return w.length > 0; });
-    var visibleCount = 0;
-    var visibleCategories = {};
-    var hasNameMatches = false;
-    var matchResults = [];
-
-    moduleItems.forEach(function (item) {
-      var moduleName = item.dataset.moduleName || '';
-      var moduleDesc = item.dataset.moduleDescription || '';
-      var category = item.dataset.category || '';
-
-      var nameWords = moduleName.split(/[\s&-]+/).filter(function (w) { return w.length > 0; });
-      var descWords = moduleDesc.split(/[\s&-]+/).filter(function (w) { return w.length > 0; });
-
-      var nameContainsAll = searchWords.every(function (sw) {
-        return nameWords.some(function (nw) { return nw.indexOf(sw) !== -1; });
+    var deleteBtn = document.getElementById('deleteImportedReportBtn');
+    if (deleteBtn && !deleteBtn.dataset.bound) {
+      deleteBtn.dataset.bound = 'true';
+      deleteBtn.addEventListener('click', function () {
+        var report = importedReports.find(function (r) { return r.report_id === selectedImportedReportId; });
+        if (report) deleteImportedReport(report.report_id, report.name);
       });
-      var nameStartsWith = moduleName.indexOf(searchQuery) === 0;
-      var descMatch = searchQuery.length >= 3 && searchWords.every(function (sw) {
-        return descWords.some(function (dw) { return dw.indexOf(sw) !== -1; });
-      });
-
-      var nameMatch = nameContainsAll || nameStartsWith;
-      if (nameMatch) hasNameMatches = true;
-
-      matchResults.push({ item: item, category: category, nameMatch: nameMatch, descriptionMatch: descMatch });
-    });
-
-    matchResults.forEach(function (r) {
-      var shouldShow = hasNameMatches ? r.nameMatch : (r.nameMatch || r.descriptionMatch);
-      if (shouldShow) {
-        r.item.style.display = '';
-        visibleCategories[r.category] = true;
-        visibleCount++;
-      } else {
-        r.item.style.display = 'none';
-      }
-    });
-
-    categorySections.forEach(function (section) {
-      var cat = section.dataset.categorySection;
-      if (visibleCategories[cat]) {
-        section.style.display = '';
-        var container = section.querySelector('[data-category-modules]');
-        if (container) container.style.display = 'flex';
-      } else {
-        section.style.display = 'none';
-      }
-    });
-
-    if (emptyEl) emptyEl.style.display = visibleCount === 0 ? 'block' : 'none';
+    }
   }
 
   // ==========================================================================
@@ -2931,13 +2799,6 @@
   var pendingImportFile = null;
 
   async function loadImportedReports() {
-    var moduleMenu = document.getElementById('moduleMenu');
-    if (!moduleMenu) return;
-
-    // Remove any existing imported reports section
-    var existing = moduleMenu.querySelector('[data-category-section="imported"]');
-    if (existing) existing.remove();
-
     try {
       var response = await api.get('/api/v1/reporting/reports', {
         limit: 100,
@@ -2948,142 +2809,19 @@
       });
 
       importedReports = (response.data || response.reports || []);
-
-      if (!importedReports.length) return;
-
-      // Group imported reports by category
-      var reportsByCategory = {};
-      importedReports.forEach(function (report) {
-        var cat = report.category || 'other';
-        if (!reportsByCategory[cat]) reportsByCategory[cat] = [];
-        reportsByCategory[cat].push(report);
-      });
-
-      // Build a single "Imported" category section
-      var categorySection = document.createElement('div');
-      categorySection.style.marginBottom = '0.25rem';
-      categorySection.dataset.categorySection = 'imported';
-      categorySection.style.borderTop = '1px solid var(--lex-border-default)';
-      categorySection.style.paddingTop = '0.75rem';
-      categorySection.style.marginTop = '0.75rem';
-
-      // Category header (collapsible)
-      var categoryHeader = document.createElement('button');
-      categoryHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:0.375rem 0.5rem;border-radius:var(--lex-radius-md);cursor:pointer;background:none;border:none;width:100%;';
-
-      var categoryName = document.createElement('span');
-      categoryName.className = 'lex-overline lex-text-secondary';
-      categoryName.textContent = 'Imported';
-      categoryHeader.appendChild(categoryName);
-
-      var chevron = document.createElement('svg');
-      chevron.setAttribute('width', '14');
-      chevron.setAttribute('height', '14');
-      chevron.setAttribute('fill', 'none');
-      chevron.setAttribute('stroke', 'currentColor');
-      chevron.setAttribute('stroke-width', '2');
-      chevron.setAttribute('viewBox', '0 0 24 24');
-      chevron.style.transition = 'transform 0.2s ease';
-      chevron.style.color = 'var(--lex-text-tertiary)';
-      chevron.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>';
-      categoryHeader.appendChild(chevron);
-      categorySection.appendChild(categoryHeader);
-
-      // Report items container
-      var reportContainer = document.createElement('div');
-      reportContainer.style.cssText = 'display:flex;flex-direction:column;gap:0.125rem;margin-top:0.25rem;';
-      reportContainer.dataset.categoryModules = 'imported';
-
-      // Sort categories, then render each report
-      var catKeys = Object.keys(reportsByCategory).sort();
-      catKeys.forEach(function (cat) {
-        reportsByCategory[cat].forEach(function (report) {
-          var btn = document.createElement('button');
-          btn.style.cssText = [
-            'display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;padding:0.375rem 0.5rem;',
-            'border-radius:var(--lex-radius-md);border:none;background:none;cursor:pointer;',
-            'transition:var(--lex-transition-fast);color:var(--lex-text-primary);'
-          ].join('');
-          btn.dataset.reportId = report.report_id;
-          btn.dataset.category = 'imported';
-          btn.dataset.moduleName = report.name.toLowerCase();
-          btn.dataset.moduleDescription = (report.description || '').toLowerCase();
-
-          var textWrap = document.createElement('div');
-          textWrap.style.cssText = 'flex:1;min-width:0;';
-
-          var nameEl = document.createElement('div');
-          nameEl.className = 'lex-label-sm';
-          nameEl.textContent = report.name;
-          textWrap.appendChild(nameEl);
-
-          btn.appendChild(textWrap);
-
-          // Delete button (only for non-templates)
-          if (!report.is_template) {
-            var deleteBtn = document.createElement('button');
-            deleteBtn.style.cssText = 'flex-shrink:0;background:none;border:none;cursor:pointer;padding:0.25rem;color:var(--lex-text-tertiary);display:none;';
-            deleteBtn.title = 'Delete report';
-            deleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
-            deleteBtn.addEventListener('click', function (e) {
-              e.stopPropagation();
-              deleteImportedReport(report.report_id, report.name);
-            });
-            btn.appendChild(deleteBtn);
-
-            // Show delete on hover
-            btn.addEventListener('mouseenter', function () { deleteBtn.style.display = ''; });
-            btn.addEventListener('mouseleave', function () { deleteBtn.style.display = 'none'; });
-          }
-
-          btn.addEventListener('click', function () {
-            selectImportedReport(report.report_id);
-          });
-
-          reportContainer.appendChild(btn);
-        });
-      });
-
-      categorySection.appendChild(reportContainer);
-
-      // Collapse / expand
-      categoryHeader.addEventListener('click', function () {
-        var collapsed = reportContainer.style.display === 'none';
-        if (collapsed) {
-          reportContainer.style.display = 'flex';
-          chevron.style.transform = 'rotate(0deg)';
-        } else {
-          reportContainer.style.display = 'none';
-          chevron.style.transform = 'rotate(-90deg)';
-        }
-      });
-
-      moduleMenu.appendChild(categorySection);
-
     } catch (error) {
       console.error('[Reporting] Failed to load imported reports:', error);
     }
+    renderReportSelect();
   }
 
   function selectImportedReport(reportId) {
     selectedImportedReportId = reportId;
     selectedModuleKey = null;
 
-    // Clear all selections in the sidebar (both modules and imported reports)
-    var moduleMenu = document.getElementById('moduleMenu');
-    if (moduleMenu) {
-      moduleMenu.querySelectorAll('button[data-module-key], button[data-report-id]').forEach(function (b) {
-        b.style.background = 'none';
-        b.style.color = 'var(--lex-text-primary)';
-      });
-
-      // Highlight the selected imported report
-      var selected = moduleMenu.querySelector('button[data-report-id="' + reportId + '"]');
-      if (selected) {
-        selected.style.background = 'var(--lex-bg-accent-soft)';
-        selected.style.color = 'var(--lex-text-accent)';
-      }
-    }
+    var select = document.getElementById('reportModuleSelect');
+    if (select && select.value !== 'report:' + reportId) select.value = 'report:' + reportId;
+    syncDeleteReportButton();
 
     var report = importedReports.find(function (r) { return r.report_id === reportId; });
     if (report) {
@@ -3771,7 +3509,7 @@
   function init() {
     loadModules();
     loadImportedReports();
-    initModuleSearch();
+    initReportSelect();
     initPeriodControls();
     initImportControls();
     initCustomizePanel();

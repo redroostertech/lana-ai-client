@@ -1392,8 +1392,8 @@ export function renderBuilder(context) {
                 <div class="automation-field">
                   <span>Trigger</span>
                   <div class="stack-sm">
-                    <div class="flex items-center gap-2">
-                      ${builderSelect('class="flex-1" id="builder-trigger" data-builder-field="triggerEvent"', triggerOptions.map((eventType) => ({ value: eventType, label: eventType })), context.state.builder.triggerEvent)}
+                    <div class="builder-trigger-picker">
+                      ${builderSelect('class="builder-trigger-picker__select" id="builder-trigger" data-builder-field="triggerEvent"', triggerOptions.map((eventType) => ({ value: eventType, label: eventType })), context.state.builder.triggerEvent)}
                       <lex-btn
                         variant="secondary"
                         size="sm"

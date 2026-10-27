@@ -180,11 +180,104 @@
 .insights-dashboard-card__meta {
   margin-top: 1rem;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.375rem;
   font-size: 0.75rem;
   color: var(--lex-text-tertiary, #9ca3af);
+}
+
+.insights-dashboard-card__meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  border-radius: 999px;
+  padding: 0 0.625rem;
+  background: var(--lex-bg-muted, #f3f4f6);
+  color: var(--lex-text-secondary, #6b7280);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.insights-dashboard-card__meta .insights-dashboard-skeleton {
+  display: block;
+  min-height: 0;
+  padding: 0;
+  background: var(--lex-bg-tertiary, #eceae7);
+}
+
+.insights-dashboard-card__title,
+.insights-dashboard-card__description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.insights-dashboard-card__title {
+  -webkit-line-clamp: 2;
+}
+
+.insights-dashboard-card__description {
+  -webkit-line-clamp: 3;
+}
+
+/* Dashboard cards size from the page column (container "admin-page" in
+   admin-card-grid.css), so the sidebar and Ask LANA panel are accounted
+   for. Three across when wide; when narrow each card becomes a full-width
+   row with its tags on the right, then under the text when narrower. */
+@container admin-page (max-width: 899px) {
+  .insights-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .insights-dashboard-card {
+    min-height: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .insights-dashboard-card > div:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .insights-dashboard-card__description {
+    -webkit-line-clamp: 2;
+  }
+
+  .insights-dashboard-card__meta {
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: flex-end;
+    margin-top: 0;
+  }
+
+  .insights-dashboard-card--loading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .insights-dashboard-card--loading .insights-dashboard-card__meta {
+    flex-direction: row;
+    margin-top: 1rem;
+  }
+}
+
+@container admin-page (max-width: 519px) {
+  .insights-dashboard-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .insights-dashboard-card__meta {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 0.875rem;
+  }
 }
 
 .insights-empty-row {
@@ -1587,6 +1680,158 @@
   padding-top: 0.25rem;
 }
 
+/* ── Dashboard detail and builder: sized from the page column ────────
+   Container queries, not @media, so the app sidebar and Ask LANA panel
+   are accounted for. "dash-detail" is the column holding the metric
+   browser (detail content, or the builder's Metrics step) and
+   "dash-cards" the metric card column next to (or under) the Types rail. */
+
+.dash-detail-content,
+.dash-builder__step[data-builder-step="metrics"] {
+  container: dash-detail / inline-size;
+}
+
+.dash-detail-content .dash-browser__content,
+.dash-builder__step[data-builder-step="metrics"] .dash-browser__content {
+  container: dash-cards / inline-size;
+}
+
+/* Builder: the step list moves above the steps as a 3-across strip,
+   then the step heading and state badge stack when narrower. */
+.dash-builder-page {
+  container: dash-builder-page / inline-size;
+}
+
+@container dash-builder-page (max-width: 819px) {
+  .dash-builder {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dash-builder__steps {
+    position: static;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dash-builder__step-indicator {
+    min-width: 0;
+  }
+
+  .dash-builder__step-indicator strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@container dash-builder-page (max-width: 479px) {
+  .dash-builder__steps {
+    gap: 0.375rem;
+  }
+
+  .dash-builder__step-indicator {
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem 0.25rem;
+    text-align: center;
+  }
+
+  .dash-builder__step-indicator strong {
+    font-size: 0.75rem;
+    max-width: 100%;
+  }
+
+  .dash-builder__step-heading {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .dash-builder__selected {
+    padding: 0.75rem;
+  }
+}
+
+.dash-browser__type-select {
+  display: none;
+  margin-top: 0.75rem;
+}
+
+@container dash-detail (max-width: 819px) {
+  .dash-browser {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dash-browser__rail {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 0.75rem;
+  }
+
+  .dash-browser__rail-title {
+    grid-column: 1 / -1;
+  }
+
+  .dash-browser__filters {
+    display: none;
+  }
+
+  .dash-browser__type-select {
+    display: block;
+  }
+
+  .dash-browser__type-select .lex-field {
+    margin: 0;
+  }
+
+  .dash-browser__search input {
+    height: 2.5rem;
+  }
+
+  .dash-period-card__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dash-period-card__fields > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .dash-view-context {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dash-view-context__meta {
+    justify-content: flex-start;
+  }
+}
+
+@container dash-detail (max-width: 479px) {
+  .dash-browser__rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dash-period-card__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container dash-cards (max-width: 899px) {
+  .dash-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container dash-cards (max-width: 539px) {
+  .dash-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dash-builder-metric {
+    min-height: 0;
+  }
+}
+
 .lex-noscript-message {
   display: flex;
   align-items: center;
@@ -1598,7 +1843,6 @@
 
 @media (max-width: 1024px) {
   .insights-stat-grid,
-  .insights-dashboard-grid,
   .dash-summary-grid,
   .dash-card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1623,7 +1867,6 @@
 
 @media (max-width: 640px) {
   .insights-stat-grid,
-  .insights-dashboard-grid,
   .dash-summary-grid,
   .dash-card-grid {
     grid-template-columns: 1fr;
