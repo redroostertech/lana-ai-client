@@ -102,7 +102,7 @@
         el = document.createElement('lex-select');
         // Convert string[] to { value, label }[] for lex-select
         el.options = field.options.map(function (opt) {
-          return { value: opt, label: opt };
+          return opt && typeof opt === 'object' ? { value: opt.value, label: opt.label } : { value: opt, label: opt };
         });
         el.placeholder = 'Select...';
       } else if (type === 'textarea') {
@@ -118,6 +118,7 @@
       el.name = name;
       el.label = label;
       el.required = required;
+      if (field.value !== undefined && field.value !== null) el.value = field.value;
 
       fieldsDiv.appendChild(el);
       fieldRefs.push({ name: name, required: required, el: el });
@@ -154,6 +155,7 @@
     // Listen for value changes on all field components
     fieldsDiv.addEventListener('lex-input', checkValidity);
     fieldsDiv.addEventListener('lex-change', checkValidity);
+    checkValidity();
 
     // ── Submit handler ────────────────────────────────────────────
 

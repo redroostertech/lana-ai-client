@@ -1225,6 +1225,13 @@
               }
             }
 
+            // Only the latest saved runtime turn may offer a pending action.
+            // Older approval messages are historical, even if their saved
+            // interaction still says pending.
+            const latestRuntimeMessage = result.messages.slice().reverse().find(m => m.metadata?.intelligence_runtime);
+            const pending = latestRuntimeMessage?.metadata?.intelligence_runtime?.interaction;
+            if (pending?.status === 'pending') this._insertRuntimeInteraction(pending);
+
             // Batch-refresh card states after all messages are rendered so
             // cards reflect their real current state (e.g. approved) rather
             // than the state that was saved when the message was persisted.
@@ -1684,6 +1691,12 @@
           this._insertUncertaintyBlock(event);
           break;
 
+        case 'interaction_required':
+          this._planReadyReceived = true;
+          if (this._activityEl) this._activityEl.hide();
+          this._insertRuntimeInteraction(event.interaction);
+          break;
+
         case 'plan_ready':
           // Backend generated a plan that requires user approval before execution.
           // Hide the activity indicator and insert a plan card into the thread.
@@ -2031,6 +2044,70 @@
      * an opaque id would put a string the user never saw into their own
      * transcript.
      */
+    _insertRuntimeInteraction(interaction) {
+      const container = this._threadEl?._container;
+      if (!container || !global.Lex?.BlockRenderer || !interaction?.id || !interaction.task_id) return;
+      if (!['approval', 'question', 'wizard'].includes(interaction.kind) || interaction.status !== 'pending') return;
+      if (Array.from(container.querySelectorAll('[data-runtime-interaction]')).some(el => el.dataset.runtimeInteraction === interaction.id)) return;
+      const host = document.createElement('div');
+      host.className = 'lex-chat-uncertainty';
+      host.dataset.runtimeInteraction = interaction.id;
+      const conversationId = this.conversationId;
+      const status = document.createElement('p');
+      status.setAttribute('role', 'status');
+      const controls = document.createElement('div');
+      host.appendChild(controls);
+      host.appendChild(status);
+      container.appendChild(host);
+      let submitted = false;
+      const submit = async (label, value) => {
+        if (submitted || this._activeTurnId || this._activeRetryReceipt || this.conversationId !== conversationId) return;
+        submitted = true;
+        controls.hidden = true;
+        status.textContent = 'Sending your response...';
+        let ok = false;
+        try {
+          ok = await this.send(label, { runtimeTaskId: interaction.task_id,
+            runtimeReply: { interaction_id: interaction.id, value } });
+        } catch (_error) {
+          ok = false;
+        } finally {
+          status.textContent = ok ? 'Response submitted.' : 'Response not confirmed. Check the conversation before trying again.';
+          if (!ok) { submitted = false; controls.hidden = false; }
+        }
+      };
+      if (interaction.kind === 'wizard') {
+        Lex.BlockRenderer.render(controls, [{ type: 'form_collect', title: interaction.title || interaction.prompt,
+          fields: interaction.fields || [], submit_label: 'Continue' }]);
+        controls.addEventListener('lex-form-submit', event => {
+          event.stopPropagation();
+          const values = {};
+          for (const field of interaction.fields || []) {
+            const value = event.detail.values?.[field.name];
+            if (!field.required && (value === '' || value === null || value === undefined)) continue;
+            values[field.name] = value;
+          }
+          submit('Use these details', { action: 'submit', values });
+        });
+        const cancel = document.createElement('lex-btn');
+        cancel.textContent = 'Cancel';
+        cancel.addEventListener('click', () => submit('Cancel', { action: 'cancel' }));
+        controls.appendChild(cancel);
+      } else {
+        const approval = interaction.kind === 'approval';
+        const options = approval ? [{ label: 'Approve', value: 'approve' }, { label: 'Decline', value: 'reject' }]
+          : (interaction.choices || []).map(choice => ({ label: choice.label, value: choice.id, description: choice.description }));
+        Lex.BlockRenderer.render(controls, [{ type: 'decision', prompt: interaction.prompt, options, allow_custom: false }]);
+        controls.addEventListener('lex-decision', event => {
+          event.stopPropagation();
+          const chosen = options.find(option => option.value === event.detail.value);
+          if (!chosen) return;
+          submit(chosen.label, approval ? { decision: chosen.value } : { choice_id: chosen.value });
+        });
+      }
+      if (this._threadEl.scrollToBottom) this._threadEl.scrollToBottom();
+    }
+
     _insertUncertaintyBlock(event) {
       if (!this._threadEl || !this._threadEl._container) return;
       if (!global.Lex || !global.Lex.BlockRenderer) return;

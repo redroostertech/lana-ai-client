@@ -271,6 +271,9 @@
           if (options.matterId) body.matter_id = options.matterId;
           if (options.attachments) body.attachments = options.attachments;
           if (options.contextType) body.context_type = options.contextType;
+          if (options.runtimeReply && options.runtimeTaskId) {
+            body.context = { task_id: options.runtimeTaskId, reply: options.runtimeReply };
+          }
           response = await this._conversationsApi.streamMessage(
             conversationId,
             body,
@@ -620,6 +623,7 @@
         // stored name, and that only pays off if the answer space reaches here
         // intact.
         case 'uncertainty':
+          if (data.interaction) return { type: 'interaction_required', interaction: data.interaction };
           return {
             type: 'uncertainty',
             uncertaintyKind: data.uncertainty_kind || null,
@@ -628,6 +632,9 @@
             lookedFor: data.looked_for || null,
             resolvesBy: data.resolves_by || 'choice'
           };
+
+        case 'interaction_required':
+          return data.interaction ? { type: 'interaction_required', interaction: data.interaction } : null;
 
         case 'references':
           return { type: 'references', references: data.references || [] };

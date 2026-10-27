@@ -95,6 +95,24 @@ function responseFromChunks(chunks, status = 200) {
 }
 
 describe('SSEChatSource contract', () => {
+  test('runtime interactions preserve their binding and replies send structured context', async () => {
+    const interaction = { id: 'int-1', task_id: 'task-1', kind: 'approval', status: 'pending',
+      prompt: 'Delete the selected task?', approval: { action: { capability: 'delete_task', arguments: { task_id: 'record-1' } } } };
+    const fetchMock = jest.fn().mockResolvedValue(responseFromChunks([
+      `event: interaction_required\ndata: ${JSON.stringify({ interaction })}\n\n`,
+      'event: done\ndata: {"message_id":"saved-1"}\n\n'
+    ]));
+    const { Source } = loadSource(fetchMock, { api: canonicalApi() });
+    const source = new Source();
+    await source.connect('thread-1');
+    const reply = { interaction_id: 'int-1', value: { decision: 'reject' } };
+    const events = [];
+    for await (const event of source.send('Decline', { runtimeReply: reply, runtimeTaskId: 'task-1' })) events.push(event);
+    expect(events).toContainEqual({ type: 'interaction_required', interaction });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.context).toEqual({ task_id: 'task-1', reply });
+  });
+
   test('live and history adapters preserve exact display labels separately from document routing', async () => {
     const citations = [{ document_id: 'doc-original', filename: 'E2E-_.pdf',
       display_filename: 'E2E (देवनागरी) [2026].pdf', source_type: 'document' }];
